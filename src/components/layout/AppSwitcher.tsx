@@ -68,6 +68,9 @@ export function AppSwitcher() {
                 const isCurrent = a.code === appCode;
                 const available = !!a.deploy_url && !isCurrent;
                 const comingSoon = !a.deploy_url && !isCurrent;
+                const isNew =
+                  available &&
+                  Date.now() - new Date(a.updated_at).getTime() < 7 * 24 * 60 * 60 * 1000;
 
                 return (
                   <DropdownMenuItem
