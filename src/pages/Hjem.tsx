@@ -7,7 +7,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PositionCard } from "@/components/PositionCard";
 import { AppCard } from "@/components/AppCard";
-import { Sparkles } from "lucide-react";
+import { AppHeaderBanner } from "@/components/layout/AppHeaderBanner";
+import { Home, Sparkles } from "lucide-react";
 
 export default function Hjem() {
   const { data: profile } = useCurrentUser();
@@ -23,23 +24,23 @@ export default function Hjem() {
   const accessibleApps = (apps ?? []).filter((a) => a.access_level !== "none");
 
   return (
-    <div className="space-y-8">
-      <header>
-        <h1 className="text-3xl font-bold tracking-tight text-foreground">
-          {greeting}{firstName ? `, ${firstName}` : ""}
-        </h1>
-      </header>
+    <div className="space-y-6">
+      <AppHeaderBanner
+        icon={Home}
+        title={`${greeting}${firstName ? `, ${firstName}` : ""}`}
+        subtitle="Pulsen til NB-konsernet — hjemmebasen for alle ansatte."
+      />
 
-      <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-transparent shadow-card">
+      <Card className="border-app-pastel-border bg-app-pastel/40 shadow-card">
         <CardContent className="flex items-start gap-4 p-6">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-app/10 text-app">
             <Sparkles className="h-5 w-5" />
           </div>
           <div>
             <h2 className="font-semibold text-foreground">Velkommen til ditt dashbord</h2>
             <p className="mt-1 text-sm text-muted-foreground">
               Widgets dukker opp her etter hvert som appene bygges. I mellomtiden kan du
-              navigere til apper via app-velgeren øverst eller via menyen til venstre.
+              navigere til andre apper via app-velgeren øverst.
             </p>
           </div>
         </CardContent>

@@ -3,6 +3,8 @@ import { useApps } from "@/hooks/useApps";
 import { CATEGORY_ORDER } from "@/lib/appIcons";
 import { AppCard } from "@/components/AppCard";
 import { Skeleton } from "@/components/ui/skeleton";
+import { AppHeaderBanner } from "@/components/layout/AppHeaderBanner";
+import { LayoutGrid } from "lucide-react";
 
 export default function MineApper() {
   const { data: apps, isLoading } = useApps();
@@ -17,13 +19,12 @@ export default function MineApper() {
   }, {});
 
   return (
-    <div className="space-y-8">
-      <header>
-        <h1 className="text-3xl font-bold tracking-tight">Mine apper</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Full katalog over apper i NB-konsernet. Apper du ikke har tilgang til er nedtonet.
-        </p>
-      </header>
+    <div className="space-y-6">
+      <AppHeaderBanner
+        icon={LayoutGrid}
+        title="Mine apper"
+        subtitle="Full katalog over apper i NB-konsernet. Apper du ikke har tilgang til er nedtonet."
+      />
 
       {isLoading && (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
