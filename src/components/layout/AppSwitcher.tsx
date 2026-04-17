@@ -1,4 +1,4 @@
-import { ChevronDown, LayoutDashboard } from "lucide-react";
+import { ChevronDown, ExternalLink, LayoutDashboard } from "lucide-react";
 import { toast } from "sonner";
 import {
   DropdownMenu,
@@ -8,10 +8,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
 import { useApps, type AppWithAccess } from "@/hooks/useApps";
 import { useAppTheme } from "@/providers/AppThemeProvider";
 import { CATEGORY_ORDER, getAppIcon } from "@/lib/appIcons";
 import { cn } from "@/lib/utils";
+
+const FROM_PARAM = "nbhub";
 
 export function AppSwitcher() {
   const { appName, appCode } = useAppTheme();
@@ -25,11 +28,13 @@ export function AppSwitcher() {
 
   const handleClick = (a: AppWithAccess) => {
     if (a.code === appCode) return;
-    if (a.status === "planned" || !a.deploy_url) {
-      toast.info(`${a.display_name} er ikke tilgjengelig ennå.`);
+    if (!a.deploy_url) {
+      toast.info("Denne appen er ikke tilgjengelig ennå");
       return;
     }
-    window.open(a.deploy_url, "_blank", "noopener,noreferrer");
+    const url = new URL(a.deploy_url);
+    url.searchParams.set("from", FROM_PARAM);
+    window.open(url.toString(), "_blank", "noopener,noreferrer");
   };
 
   return (
@@ -44,7 +49,7 @@ export function AppSwitcher() {
         <span>{appName}</span>
         <ChevronDown className="h-4 w-4 opacity-80" />
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="center" className="w-72 max-h-[70vh] overflow-y-auto">
+      <DropdownMenuContent align="center" className="w-80 max-h-[70vh] overflow-y-auto">
         <DropdownMenuLabel>Bytt app</DropdownMenuLabel>
         <DropdownMenuSeparator />
         {accessible.length === 0 && (
@@ -61,12 +66,24 @@ export function AppSwitcher() {
               {list.map((a) => {
                 const Icon = getAppIcon(a.icon, a.category);
                 const isCurrent = a.code === appCode;
-                const planned = a.status === "planned" || !a.deploy_url;
+                const available = !!a.deploy_url && !isCurrent;
+                const comingSoon = !a.deploy_url && !isCurrent;
+
                 return (
                   <DropdownMenuItem
                     key={a.id}
-                    onClick={() => handleClick(a)}
-                    className="flex items-center justify-between gap-2"
+                    onSelect={(e) => {
+                      if (isCurrent || comingSoon) {
+                        e.preventDefault();
+                      }
+                      handleClick(a);
+                    }}
+                    disabled={isCurrent}
+                    className={cn(
+                      "flex items-center justify-between gap-2",
+                      isCurrent && "bg-accent data-[disabled]:opacity-100",
+                      comingSoon && "opacity-60 cursor-not-allowed",
+                    )}
                   >
                     <span className="flex items-center gap-2 min-w-0">
                       <span
@@ -76,11 +93,21 @@ export function AppSwitcher() {
                       >
                         <Icon className="h-3.5 w-3.5" />
                       </span>
-                      <span className="truncate text-sm">{a.display_name}</span>
+                      <span className={cn("truncate text-sm", comingSoon && "text-muted-foreground")}>
+                        {a.display_name}
+                      </span>
+                      {available && <ExternalLink className="h-3 w-3 shrink-0 text-muted-foreground" />}
                     </span>
-                    <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                      {isCurrent ? "Aktiv" : planned ? "Kommer" : a.access_level}
-                    </span>
+                    {isCurrent && (
+                      <Badge variant="default" className="text-[10px] h-5 shrink-0">
+                        Du er her
+                      </Badge>
+                    )}
+                    {comingSoon && (
+                      <Badge variant="secondary" className="text-[10px] h-5 shrink-0">
+                        Kommer snart
+                      </Badge>
+                    )}
                   </DropdownMenuItem>
                 );
               })}
