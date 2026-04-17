@@ -106,6 +106,11 @@ export function AppSwitcher() {
                         Du er her
                       </Badge>
                     )}
+                    {isNew && (
+                      <Badge className="text-[10px] h-5 shrink-0 bg-emerald-500 text-white hover:bg-emerald-500">
+                        Ny
+                      </Badge>
+                    )}
                     {comingSoon && (
                       <Badge variant="secondary" className="text-[10px] h-5 shrink-0">
                         Kommer snart
