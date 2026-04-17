@@ -19,6 +19,10 @@ export default {
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
+        surface: {
+          DEFAULT: "hsl(var(--surface))",
+          elevated: "hsl(var(--surface-elevated))",
+        },
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
@@ -48,6 +52,14 @@ export default {
         accent: {
           DEFAULT: "hsl(var(--accent))",
           foreground: "hsl(var(--accent-foreground))",
+        },
+        app: {
+          DEFAULT: "hsl(var(--app-primary))",
+          foreground: "hsl(var(--app-primary-foreground))",
+          dark: "hsl(var(--app-primary-dark))",
+          light: "hsl(var(--app-primary-light))",
+          pastel: "hsl(var(--app-primary-pastel))",
+          "pastel-border": "hsl(var(--app-primary-pastel-border))",
         },
         popover: {
           DEFAULT: "hsl(var(--popover))",

@@ -1,5 +1,7 @@
 import { useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { AppHeaderBanner } from "@/components/layout/AppHeaderBanner";
+import { HelpCircle } from "lucide-react";
 
 export default function Hjelp() {
   useEffect(() => {
@@ -8,12 +10,11 @@ export default function Hjelp() {
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-3xl font-bold tracking-tight">Hjelp</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Kort innføring i NBHub og NB-plattformen.
-        </p>
-      </header>
+      <AppHeaderBanner
+        icon={HelpCircle}
+        title="Hjelp og støtte"
+        subtitle="Kort innføring i NBHub og NB-plattformen."
+      />
 
       <Card>
         <CardHeader>
@@ -37,8 +38,8 @@ export default function Hjelp() {
           <CardTitle>Hvordan finner jeg appene mine?</CardTitle>
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground">
-          Bruk app-velgeren ("Apper") øverst i topbaren, eller åpne{" "}
-          <a href="/mine-apper" className="font-medium text-primary hover:underline">
+          Bruk app-velgeren ("NBHub") sentralt i topbaren, eller åpne{" "}
+          <a href="/mine-apper" className="font-medium text-app hover:underline">
             Mine apper
           </a>{" "}
           for full katalog gruppert etter kategori.
