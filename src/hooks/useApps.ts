@@ -14,6 +14,7 @@ export interface AppWithAccess {
   status: string;
   deploy_url: string | null;
   theme_primary_color: string | null;
+  updated_at: string;
   access_level: AccessLevel;
 }
 
@@ -26,7 +27,7 @@ export function useApps() {
     queryFn: async (): Promise<AppWithAccess[]> => {
       const { data: apps, error } = await supabase
         .from("apps")
-        .select("id, code, display_name, description, category, icon, status, deploy_url, theme_primary_color, sort_order")
+        .select("id, code, display_name, description, category, icon, status, deploy_url, theme_primary_color, sort_order, updated_at")
         .order("sort_order", { ascending: true });
       if (error) throw error;
 
