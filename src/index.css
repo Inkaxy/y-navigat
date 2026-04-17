@@ -2,15 +2,28 @@
 @tailwind components;
 @tailwind utilities;
 
-/* NBHub design system — light theme.
-   All colors MUST be HSL.
+/* NBHub designsystem.
+   Lys hovedflate med app-farget topbar/sub-meny.
+   Alle farger som HSL.
 */
 
 @layer base {
   :root {
-    /* Surfaces */
-    --background: 210 40% 98%;        /* slate-50 #F8FAFC */
-    --foreground: 222 47% 11%;        /* slate-900 #0F172A */
+    /* App-farge (settes dynamisk av AppThemeProvider basert på apps.theme_primary_color).
+       Default = NBHub sky-500 #0EA5E9. Alle varianter beregnes fra hovedfargen. */
+    --app-primary: 199 89% 48%;
+    --app-primary-foreground: 0 0% 100%;
+    --app-primary-dark: 199 89% 33%;
+    --app-primary-light: 199 89% 54%;
+    --app-primary-pastel: 199 89% 95%;
+    --app-primary-pastel-border: 199 60% 85%;
+
+    /* Lys hovedflate */
+    --background: 210 40% 98%;          /* slate-50 */
+    --foreground: 222 47% 11%;          /* slate-900 */
+
+    --surface: 0 0% 100%;
+    --surface-elevated: 210 40% 96%;
 
     --card: 0 0% 100%;
     --card-foreground: 222 47% 11%;
@@ -18,21 +31,21 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
 
-    /* Brand */
-    --primary: 199 89% 48%;           /* sky-500 #0EA5E9 */
+    /* Primary speiler app-fargen for shadcn-komponenter */
+    --primary: 199 89% 48%;
     --primary-foreground: 0 0% 100%;
     --primary-glow: 199 95% 74%;
 
-    --accent-brand: 200 98% 39%;      /* sky-600 #0284C7 */
+    --accent-brand: 200 98% 39%;
 
     --secondary: 210 40% 96%;
     --secondary-foreground: 222 47% 11%;
 
     --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%; /* slate-500 #64748B */
+    --muted-foreground: 215 16% 47%;
 
-    --accent: 204 94% 94%;            /* sky-100 */
-    --accent-foreground: 200 98% 30%;
+    --accent: 210 40% 94%;
+    --accent-foreground: 222 47% 11%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
@@ -47,15 +60,14 @@
     --input: 214 32% 91%;
     --ring: 199 89% 48%;
 
-    --radius: 0.625rem;
+    --radius: 0.5rem;
 
-    /* Sidebar (light sky-50) */
-    --sidebar-background: 204 100% 97%;   /* sky-50 */
+    --sidebar-background: 0 0% 100%;
     --sidebar-foreground: 222 47% 11%;
     --sidebar-primary: 199 89% 48%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 204 94% 94%;
-    --sidebar-accent-foreground: 200 98% 30%;
+    --sidebar-accent: 210 40% 96%;
+    --sidebar-accent-foreground: 222 47% 11%;
     --sidebar-border: 214 32% 91%;
     --sidebar-ring: 199 89% 48%;
 
@@ -66,7 +78,6 @@
   }
 
   .dark {
-    /* NBHub er bevisst lyst — dark mode er bare en fallback */
     --background: 222 47% 6%;
     --foreground: 210 40% 98%;
     --card: 222 47% 10%;
@@ -86,14 +97,6 @@
     --border: 217 33% 18%;
     --input: 217 33% 18%;
     --ring: 199 89% 48%;
-    --sidebar-background: 222 47% 8%;
-    --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 199 89% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 217 33% 15%;
-    --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 217 33% 18%;
-    --sidebar-ring: 199 89% 48%;
   }
 }
 
@@ -102,8 +105,20 @@
     @apply border-border;
   }
 
-  body {
-    @apply bg-background text-foreground;
+  html,
+  body,
+  #root {
+    @apply min-h-screen bg-background text-foreground;
     font-feature-settings: "cv11", "ss01";
+  }
+}
+
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
   }
 }

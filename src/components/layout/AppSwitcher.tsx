@@ -1,92 +1,87 @@
+import { ChevronDown, LayoutDashboard } from "lucide-react";
+import { toast } from "sonner";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { LayoutGrid, ChevronDown } from "lucide-react";
 import { useApps, type AppWithAccess } from "@/hooks/useApps";
+import { useAppTheme } from "@/providers/AppThemeProvider";
 import { CATEGORY_ORDER, getAppIcon } from "@/lib/appIcons";
 import { cn } from "@/lib/utils";
 
-const accessVariant: Record<string, string> = {
-  admin: "bg-primary/10 text-primary",
-  approve: "bg-warning/10 text-warning",
-  write: "bg-success/10 text-success",
-  read: "bg-muted text-muted-foreground",
-};
-
-export function AppSwitcher({ compact = false }: { compact?: boolean }) {
-  const { data: apps, isLoading } = useApps();
+export function AppSwitcher() {
+  const { appName, appCode } = useAppTheme();
+  const { data: apps } = useApps();
 
   const accessible = (apps ?? []).filter((a) => a.access_level !== "none");
-  const grouped = groupByCategory(accessible);
+  const grouped = accessible.reduce<Record<string, AppWithAccess[]>>((acc, a) => {
+    (acc[a.category] ||= []).push(a);
+    return acc;
+  }, {});
 
-  const handleClick = (app: AppWithAccess) => {
-    if (app.status === "planned") return;
-    alert(`Appen ${app.display_name} er ikke bygget ennå`);
+  const handleClick = (a: AppWithAccess) => {
+    if (a.code === appCode) return;
+    if (a.status === "planned" || !a.deploy_url) {
+      toast.info(`${a.display_name} er ikke tilgjengelig ennå.`);
+      return;
+    }
+    window.open(a.deploy_url, "_blank", "noopener,noreferrer");
   };
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-2">
-          <LayoutGrid className="h-4 w-4" />
-          {!compact && <span>Apper</span>}
-          <ChevronDown className="h-3.5 w-3.5 opacity-60" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-72 max-h-[70vh] overflow-y-auto">
-        {isLoading && (
-          <div className="p-3 text-sm text-muted-foreground">Laster apper…</div>
+      <DropdownMenuTrigger
+        className={cn(
+          "flex items-center gap-2 rounded-md border border-white/30 bg-white/5 px-3 py-1.5 text-sm font-semibold",
+          "text-app-foreground transition-colors hover:bg-white/15 focus:outline-none",
         )}
-        {!isLoading && accessible.length === 0 && (
-          <div className="p-3 text-sm text-muted-foreground">Ingen tilgjengelige apper.</div>
+      >
+        <LayoutDashboard className="h-4 w-4" />
+        <span>{appName}</span>
+        <ChevronDown className="h-4 w-4 opacity-80" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="center" className="w-72 max-h-[70vh] overflow-y-auto">
+        <DropdownMenuLabel>Bytt app</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        {accessible.length === 0 && (
+          <DropdownMenuItem disabled>Ingen apper tilgjengelig</DropdownMenuItem>
         )}
         {CATEGORY_ORDER.map((cat) => {
           const list = grouped[cat];
           if (!list?.length) return null;
           return (
             <div key={cat}>
-              <DropdownMenuLabel className="text-xs uppercase tracking-wider text-muted-foreground">
+              <DropdownMenuLabel className="text-xs uppercase tracking-wide text-muted-foreground">
                 {cat}
               </DropdownMenuLabel>
-              {list.map((app) => {
-                const Icon = getAppIcon(app.icon, app.category);
-                const planned = app.status === "planned";
+              {list.map((a) => {
+                const Icon = getAppIcon(a.icon, a.category);
+                const isCurrent = a.code === appCode;
+                const planned = a.status === "planned" || !a.deploy_url;
                 return (
-                  <button
-                    key={app.id}
-                    onClick={() => handleClick(app)}
-                    disabled={planned}
-                    className={cn(
-                      "flex w-full items-center gap-3 rounded-sm px-2 py-2 text-left text-sm transition-colors",
-                      planned
-                        ? "cursor-not-allowed opacity-60"
-                        : "hover:bg-accent hover:text-accent-foreground",
-                    )}
+                  <DropdownMenuItem
+                    key={a.id}
+                    onClick={() => handleClick(a)}
+                    className="flex items-center justify-between gap-2"
                   >
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
-                      <Icon className="h-4 w-4" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate font-medium">{app.display_name}</div>
-                      {planned && (
-                        <div className="text-xs text-muted-foreground">Kommer snart</div>
-                      )}
-                    </div>
-                    {!planned && (
-                      <Badge
-                        variant="secondary"
-                        className={cn("text-[10px] uppercase", accessVariant[app.access_level])}
+                    <span className="flex items-center gap-2 min-w-0">
+                      <span
+                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm"
+                        style={{ background: a.theme_primary_color ?? "#94a3b8", color: "#fff" }}
+                        aria-hidden
                       >
-                        {app.access_level}
-                      </Badge>
-                    )}
-                  </button>
+                        <Icon className="h-3.5 w-3.5" />
+                      </span>
+                      <span className="truncate text-sm">{a.display_name}</span>
+                    </span>
+                    <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                      {isCurrent ? "Aktiv" : planned ? "Kommer" : a.access_level}
+                    </span>
+                  </DropdownMenuItem>
                 );
               })}
               <DropdownMenuSeparator />
@@ -96,11 +91,4 @@ export function AppSwitcher({ compact = false }: { compact?: boolean }) {
       </DropdownMenuContent>
     </DropdownMenu>
   );
-}
-
-function groupByCategory(apps: AppWithAccess[]) {
-  return apps.reduce<Record<string, AppWithAccess[]>>((acc, a) => {
-    (acc[a.category] ||= []).push(a);
-    return acc;
-  }, {});
 }
