@@ -107,7 +107,7 @@ export function AppSwitcher() {
                       </Badge>
                     )}
                     {isNew && (
-                      <Badge className="text-[10px] h-5 shrink-0 bg-emerald-500 text-white hover:bg-emerald-500">
+                      <Badge variant="default" className="text-[10px] h-5 shrink-0 bg-accent text-accent-foreground">
                         Ny
                       </Badge>
                     )}
