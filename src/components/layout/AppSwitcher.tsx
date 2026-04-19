@@ -29,15 +29,17 @@ const CATEGORY_LABELS: Record<string, string> = {
 export function AppSwitcher() {
   const { appName, appCode } = useAppTheme();
   const { data: apps } = useApps();
-  const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({
-    platform: true,
-  });
 
   const grouped: Record<string, AppWithAccess[]> = {};
   (apps ?? []).forEach((a) => {
     const cat = a.category ?? "general";
     (grouped[cat] ||= []).push(a);
   });
+
+  // Default: all categories expanded
+  const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({});
+  const isCategoryOpen = (cat: string) =>
+    openCategories[cat] === undefined ? true : openCategories[cat];
 
   const buildHref = (deployUrl: string) => {
     try {
@@ -73,7 +75,7 @@ export function AppSwitcher() {
             <DropdownMenuItem disabled>Ingen apper tilgjengelig</DropdownMenuItem>
           )}
           {Object.entries(grouped).map(([cat, list]) => {
-            const isOpen = openCategories[cat] ?? false;
+            const isOpen = isCategoryOpen(cat);
             const label = CATEGORY_LABELS[cat] ?? cat;
             return (
               <Collapsible
@@ -162,10 +164,15 @@ export function AppSwitcher() {
                         key={a.id}
                         onSelect={(e) => e.preventDefault()}
                         disabled={disabled}
+                        title={
+                          isActive
+                            ? "Du er her"
+                            : "Under utvikling — ikke tilgjengelig ennå"
+                        }
                         className={cn(
                           "ml-4 flex items-center justify-between gap-2",
                           isActive && "bg-accent/60 font-semibold focus:bg-accent/60",
-                          disabled && "opacity-60",
+                          disabled && "opacity-60 cursor-not-allowed",
                         )}
                       >
                         {inner}
