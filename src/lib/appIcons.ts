@@ -43,28 +43,42 @@ const iconMap: Record<string, LucideIcon> = {
 };
 
 const categoryFallback: Record<string, LucideIcon> = {
-  Platform: ShieldCheck,
-  Masterdata: Boxes,
-  Operations: Factory,
-  Retail: Store,
-  Finance: Wallet,
-  Analytics: BarChart3,
-  HR: Users,
-  Public: Globe,
+  platform: ShieldCheck,
+  masterdata: Boxes,
+  operations: Factory,
+  retail: Store,
+  finance: Wallet,
+  analytics: BarChart3,
+  hr: Users,
+  public: Globe,
+  general: LayoutGrid,
 };
 
 export function getAppIcon(icon: string | null, category: string): LucideIcon {
   if (icon && iconMap[icon]) return iconMap[icon];
-  return categoryFallback[category] ?? LayoutGrid;
+  return categoryFallback[category?.toLowerCase()] ?? LayoutGrid;
 }
 
 export const CATEGORY_ORDER = [
-  "Platform",
-  "Masterdata",
-  "Operations",
-  "Retail",
-  "Finance",
-  "Analytics",
-  "HR",
-  "Public",
+  "platform",
+  "masterdata",
+  "operations",
+  "retail",
+  "finance",
+  "analytics",
+  "hr",
+  "public",
+  "general",
 ];
+
+export const CATEGORY_LABELS: Record<string, string> = {
+  platform: "Plattform",
+  masterdata: "Stamdata",
+  operations: "Drift",
+  retail: "Butikk",
+  finance: "Økonomi",
+  analytics: "Analyse",
+  hr: "HR",
+  public: "Publikum",
+  general: "Generelt",
+};
