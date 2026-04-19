@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useApps } from "@/hooks/useApps";
-import { CATEGORY_ORDER } from "@/lib/appIcons";
+import { CATEGORY_ORDER, CATEGORY_LABELS } from "@/lib/appIcons";
 import { AppCard } from "@/components/AppCard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AppHeaderBanner } from "@/components/layout/AppHeaderBanner";
@@ -39,17 +39,17 @@ export default function MineApper() {
       )}
 
       {!isLoading &&
-        CATEGORY_ORDER.map((cat) => {
+        categoryOrder.map((cat) => {
           const list = grouped[cat];
           if (!list?.length) return null;
           return (
             <section key={cat} className="space-y-3">
               <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                {cat}
+                {CATEGORY_LABELS[cat] ?? cat}
               </h2>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {list.map((a) => (
-                  <AppCard key={a.id} app={a} />
+                  <AppCard key={a.id} app={a} showDescription />
                 ))}
               </div>
             </section>
