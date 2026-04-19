@@ -18,6 +18,10 @@ export default function MineApper() {
     return acc;
   }, {});
 
+  const categoryOrder = Array.from(
+    new Set([...CATEGORY_ORDER, ...Object.keys(grouped)]),
+  );
+
   return (
     <div className="space-y-6">
       <AppHeaderBanner
