@@ -21,6 +21,9 @@ tilgjengelige apper.
 Henter data fra `get_my_accessible_apps()` RPC via
 `useAccessibleApps()`-hook. Cache 5 min, refresh ved window focus.
 
+RPC returnerer per app: `id, slug, display_name, category, deploy_url,
+start_path, icon_name, sort_order, status, color_hex, access_level`.
+
 ## Aktiv app
 
 Matches via `slug === CURRENT_APP_SLUG` (primært) og fallback hostname-
@@ -37,6 +40,9 @@ const CURRENT_APP_SLUG = "nbhub";    // → bytt til 'nbos' / 'ordre' / 'kunder'
 const SHOW_ALL_APPS_LINK = true;     // → false i alle satellittapper
 ```
 
+Samme `CURRENT_APP_SLUG` må også oppdateres i `Topbar.tsx` (brukes til å
+hente app-fargen for underlinjen) og i `GlobalSearch.tsx`.
+
 Ikke endre noe annet lokalt. Endringer speiles tilbake via NBHub.
 
 ## Navigasjon
@@ -45,18 +51,35 @@ Ikke endre noe annet lokalt. Endringer speiles tilbake via NBHub.
 - IKKE `target="_blank"`. IKKE `window.open()`.
 - Samme fane → tilbake-knapp i nettleseren tar bruker tilbake.
 
+## App-farger
+
+Hver app har en signaturfarge (`color_hex` i `apps`-tabellen) som vises:
+
+- **AppSwitcher-trigger**: 3px venstre border + 8% alpha bakgrunn + ChevronDown-ikon i app-fargen
+- **Topbar**: 2px underlinje i app-fargen (i `Topbar.tsx`)
+- **AppSwitcher-dropdown**: liten farget prikk per app-rad (visuell repetisjon for læring)
+- **/mine-apper-kort**: 3px topp-border + ikon-bakgrunn (12% alpha) + "Åpne →"-tekst i app-fargen
+
+Fargen hentes fra `get_my_accessible_apps()` RPC, så endringer i
+`apps.color_hex` reflekteres øyeblikkelig etter cache-utløp (5 min) eller
+window-focus-refresh.
+
+Når en ny app opprettes, sett `color_hex` i NBOS `/apper`-admin (input
+type="color"). Unngå farger for nær eksisterende apper for å bevare
+visuell distinksjon.
+
+Default fallback hvis `color_hex` mangler: `#64748b` (slate-500).
+
 ## CSS-avhengigheter
 
 Bruker kun shadcn-komponenter (Popover, Input, Badge) + Lucide-ikoner +
-standard Tailwind-klasser. Ingen custom CSS.
+standard Tailwind-klasser. App-farger settes via inline `style` siden de
+er dynamiske per app — ikke via CSS-tokens.
 
-Brukte tokens (alle shadcn-standard):
+Brukte shadcn-tokens:
 `--background`, `--foreground`, `--muted`, `--muted-foreground`,
 `--accent`, `--accent-foreground`, `--border`, `--primary`,
-`--primary-foreground`, `--popover`, `--popover-foreground`.
-
-I tillegg brukes `bg-app` / `text-app-foreground` på trigger-knappen for
-å matche topbar-fargen i hver app (definert via `AppThemeProvider`).
+`--primary-foreground`, `--popover`, `--popover-foreground`, `--ring`.
 
 ## Avhengigheter
 

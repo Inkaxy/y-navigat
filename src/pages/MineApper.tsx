@@ -39,18 +39,23 @@ function AccessibleAppCard({ app }: { app: AccessibleApp }) {
   const IconComponent = iconMap[app.icon_name] ?? Box;
   const active = isActiveApp(app);
   const accessText = accessLabel[app.access_level];
+  const appColor = app.color_hex ?? "#64748b";
 
   return (
     <Card
       className={cn(
-        "group relative flex flex-col shadow-card transition-all",
+        "group relative flex flex-col overflow-hidden border-t-[3px] shadow-card transition-all",
         "hover:-translate-y-0.5 hover:shadow-elevated",
         active && "ring-2 ring-primary/40",
       )}
+      style={{ borderTopColor: appColor }}
     >
       <CardContent className="flex flex-1 flex-col gap-3 p-5">
         <div className="flex items-start justify-between gap-2">
-          <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-app/10 text-app">
+          <div
+            className="flex h-12 w-12 items-center justify-center rounded-lg"
+            style={{ backgroundColor: `${appColor}1f`, color: appColor }}
+          >
             <IconComponent className="h-6 w-6" />
           </div>
           {active && (
@@ -78,9 +83,10 @@ function AccessibleAppCard({ app }: { app: AccessibleApp }) {
           type="button"
           onClick={() => navigateToApp(app)}
           className={cn(
-            "mt-auto self-start text-sm font-medium text-app hover:underline",
+            "mt-auto self-start text-sm font-medium hover:underline",
             "focus:outline-none focus-visible:underline",
           )}
+          style={{ color: appColor }}
         >
           {active ? "Gå til hjem →" : "Åpne →"}
         </button>

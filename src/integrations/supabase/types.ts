@@ -19,6 +19,7 @@ export type Database = {
           access_pattern: string
           category: string
           code: string
+          color_hex: string
           created_at: string
           deploy_url: string | null
           description: string | null
@@ -37,6 +38,7 @@ export type Database = {
           access_pattern: string
           category?: string
           code: string
+          color_hex?: string
           created_at?: string
           deploy_url?: string | null
           description?: string | null
@@ -55,6 +57,7 @@ export type Database = {
           access_pattern?: string
           category?: string
           code?: string
+          color_hex?: string
           created_at?: string
           deploy_url?: string | null
           description?: string | null
@@ -2781,8 +2784,9 @@ export type Database = {
       get_my_accessible_apps: {
         Args: never
         Returns: {
-          access_level: string
+          access_level: Database["public"]["Enums"]["access_level"]
           category: string
+          color_hex: string
           deploy_url: string
           display_name: string
           icon_name: string

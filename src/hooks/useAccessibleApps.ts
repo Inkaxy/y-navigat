@@ -13,6 +13,7 @@ export type AccessibleApp = {
   icon_name: string;
   sort_order: number;
   status: string;
+  color_hex: string;
   access_level: AccessLevel;
 };
 

@@ -18,6 +18,7 @@ import {
 // ----------------------------------------------------------------------------
 const CURRENT_APP_SLUG = "nbhub";
 const SHOW_ALL_APPS_LINK = true; // keep true only in NBHub
+const FALLBACK_COLOR = "#64748b";
 // ----------------------------------------------------------------------------
 
 const iconMap = Icons as unknown as Record<string, React.ComponentType<{ className?: string }>>;
@@ -52,6 +53,8 @@ export function AppSwitcher({ label }: AppSwitcherProps) {
   const { data: apps, isLoading } = useAccessibleApps();
 
   const triggerLabel = label ?? getAppDisplayName(apps);
+  const currentApp = apps?.find((a) => a.slug === getCurrentAppSlug());
+  const appColor = currentApp?.color_hex ?? FALLBACK_COLOR;
 
   const filtered = useMemo(() => {
     if (!apps) return [];
@@ -83,15 +86,20 @@ export function AppSwitcher({ label }: AppSwitcherProps) {
       <PopoverTrigger
         className={cn(
           "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-sm font-semibold",
-          "text-app-foreground transition-colors hover:bg-white/15 focus:outline-none",
-          "focus-visible:ring-2 focus-visible:ring-white/40",
-          open && "bg-white/15",
+          "border-l-[3px] transition-colors hover:bg-accent focus:outline-none",
+          "focus-visible:ring-2 focus-visible:ring-ring",
         )}
+        style={{
+          borderLeftColor: appColor,
+          backgroundColor: open ? `${appColor}24` : `${appColor}14`,
+          color: "hsl(var(--foreground))",
+        }}
         aria-label="Bytt app"
       >
         <span>{triggerLabel}</span>
         <ChevronDown
-          className={cn("h-4 w-4 opacity-80 transition-transform", open && "rotate-180")}
+          className={cn("h-4 w-4 transition-transform", open && "rotate-180")}
+          style={{ color: appColor }}
         />
       </PopoverTrigger>
       <PopoverContent
@@ -140,6 +148,7 @@ export function AppSwitcher({ label }: AppSwitcherProps) {
                 {list.map((app) => {
                   const active = isActiveApp(app);
                   const IconComponent = iconMap[app.icon_name] ?? Box;
+                  const dotColor = app.color_hex ?? FALLBACK_COLOR;
                   return (
                     <button
                       key={app.id}
@@ -155,6 +164,11 @@ export function AppSwitcher({ label }: AppSwitcherProps) {
                         "disabled:cursor-default disabled:bg-accent/50 disabled:opacity-80",
                       )}
                     >
+                      <span
+                        className="h-2 w-2 shrink-0 rounded-full"
+                        style={{ backgroundColor: dotColor }}
+                        aria-hidden="true"
+                      />
                       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted text-foreground">
                         <IconComponent className="h-4 w-4" />
                       </div>
