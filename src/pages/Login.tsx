@@ -29,18 +29,6 @@ const DEMO_USERS: Array<{
     role: "Baker",
     entity: "Nøtterø Bakeri (NB)",
   },
-  {
-    email: "anne.hansen@demo.no",
-    name: "Anne Hansen",
-    role: "Butikkleder",
-    entity: "Inka Bakeri (IB)",
-  },
-  {
-    email: "per.olsen@demo.no",
-    name: "Per Olsen",
-    role: "Baker",
-    entity: "Nøtterø Bakeri (NB)",
-  },
 ];
 
 export default function Login() {
