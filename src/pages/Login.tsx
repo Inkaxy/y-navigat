@@ -18,10 +18,16 @@ const DEMO_USERS: Array<{
   entity: string;
 }> = [
   {
-    email: "henrik@nottero-bakeri.no",
-    name: "Henrik",
-    role: "Plattform-ansvarlig",
-    entity: "Konsern (NK · MK · NB · IB)",
+    email: "anne.hansen@demo.no",
+    name: "Anne Hansen",
+    role: "Butikkleder",
+    entity: "Inka Bakeri (IB)",
+  },
+  {
+    email: "per.olsen@demo.no",
+    name: "Per Olsen",
+    role: "Baker",
+    entity: "Nøtterø Bakeri (NB)",
   },
   {
     email: "anne.hansen@demo.no",
