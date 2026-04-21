@@ -42,10 +42,6 @@ export function AppCard({ app, showAccessBadge = true, showDescription = false }
       e.preventDefault();
       return;
     }
-    if (e.shiftKey) {
-      e.preventDefault();
-      window.open(buildHref(), "_blank", "noopener,noreferrer");
-    }
   };
 
   const content = (
@@ -98,7 +94,7 @@ export function AppCard({ app, showAccessBadge = true, showDescription = false }
           ? "Du har ikke tilgang til denne appen"
           : planned
           ? "Under utvikling — ikke tilgjengelig ennå"
-          : `Åpne ${app.display_name} (Shift-klikk for ny fane)`
+          : `Åpne ${app.display_name}`
       }
       className={cn(
         "block rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",

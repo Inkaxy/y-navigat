@@ -6,7 +6,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { CompanySelector } from "./CompanySelector";
 import { OutletSelector } from "./OutletSelector";
-import { AppSwitcher } from "./AppSwitcher";
+import { AppSwitcher } from "@/components/AppSwitcher";
 
 export function Topbar() {
   const { signOut } = useAuth();

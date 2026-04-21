@@ -26,6 +26,7 @@ export type Database = {
           icon: string | null
           id: string
           sort_order: number
+          start_path: string
           status: string
           subdomain: string | null
           theme_accent_color: string | null
@@ -43,6 +44,7 @@ export type Database = {
           icon?: string | null
           id?: string
           sort_order?: number
+          start_path?: string
           status?: string
           subdomain?: string | null
           theme_accent_color?: string | null
@@ -60,6 +62,7 @@ export type Database = {
           icon?: string | null
           id?: string
           sort_order?: number
+          start_path?: string
           status?: string
           subdomain?: string | null
           theme_accent_color?: string | null
@@ -352,6 +355,7 @@ export type Database = {
           order_confirmation_emails: string | null
           order_confirmation_mode: string | null
           payment_terms_days: number | null
+          pickup_location_id: string | null
           price_on_packing_slip: boolean | null
           print_declaration_labels: boolean | null
           retail_price_on_packing_slip: boolean | null
@@ -404,6 +408,7 @@ export type Database = {
           order_confirmation_emails?: string | null
           order_confirmation_mode?: string | null
           payment_terms_days?: number | null
+          pickup_location_id?: string | null
           price_on_packing_slip?: boolean | null
           print_declaration_labels?: boolean | null
           retail_price_on_packing_slip?: boolean | null
@@ -456,6 +461,7 @@ export type Database = {
           order_confirmation_emails?: string | null
           order_confirmation_mode?: string | null
           payment_terms_days?: number | null
+          pickup_location_id?: string | null
           price_on_packing_slip?: boolean | null
           print_declaration_labels?: boolean | null
           retail_price_on_packing_slip?: boolean | null
@@ -490,10 +496,18 @@ export type Database = {
             referencedRelation: "legal_entities"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "customer_profiles_pickup_location_id_fkey"
+            columns: ["pickup_location_id"]
+            isOneToOne: false
+            referencedRelation: "pickup_locations"
+            referencedColumns: ["id"]
+          },
         ]
       }
       customers: {
         Row: {
+          allows_returns: boolean
           billing_address_line1: string | null
           billing_address_line2: string | null
           billing_city: string | null
@@ -536,6 +550,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          allows_returns?: boolean
           billing_address_line1?: string | null
           billing_address_line2?: string | null
           billing_city?: string | null
@@ -578,6 +593,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          allows_returns?: boolean
           billing_address_line1?: string | null
           billing_address_line2?: string | null
           billing_city?: string | null
@@ -657,6 +673,91 @@ export type Database = {
           },
           {
             foreignKeyName: "customers_legal_entity_id_fkey"
+            columns: ["legal_entity_id"]
+            isOneToOne: false
+            referencedRelation: "legal_entities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      delivery_tours: {
+        Row: {
+          active_friday: boolean
+          active_monday: boolean
+          active_saturday: boolean
+          active_sunday: boolean
+          active_thursday: boolean
+          active_tuesday: boolean
+          active_wednesday: boolean
+          created_at: string
+          created_by: string | null
+          description: string | null
+          display_name: string
+          id: string
+          legal_entity_id: string
+          status: string
+          time_from: string
+          time_to: string
+          tour_number: number
+          updated_at: string
+        }
+        Insert: {
+          active_friday?: boolean
+          active_monday?: boolean
+          active_saturday?: boolean
+          active_sunday?: boolean
+          active_thursday?: boolean
+          active_tuesday?: boolean
+          active_wednesday?: boolean
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          display_name: string
+          id?: string
+          legal_entity_id: string
+          status?: string
+          time_from: string
+          time_to: string
+          tour_number: number
+          updated_at?: string
+        }
+        Update: {
+          active_friday?: boolean
+          active_monday?: boolean
+          active_saturday?: boolean
+          active_sunday?: boolean
+          active_thursday?: boolean
+          active_tuesday?: boolean
+          active_wednesday?: boolean
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          display_name?: string
+          id?: string
+          legal_entity_id?: string
+          status?: string
+          time_from?: string
+          time_to?: string
+          tour_number?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_tours_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_tours_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_tours_legal_entity_id_fkey"
             columns: ["legal_entity_id"]
             isOneToOne: false
             referencedRelation: "legal_entities"
@@ -876,6 +977,7 @@ export type Database = {
           line_subtotal_excl_vat: number
           line_total_incl_vat: number
           line_vat: number
+          merknad: Json | null
           notes: string | null
           order_id: string
           product_id: string
@@ -895,6 +997,7 @@ export type Database = {
           line_subtotal_excl_vat: number
           line_total_incl_vat: number
           line_vat: number
+          merknad?: Json | null
           notes?: string | null
           order_id: string
           product_id: string
@@ -914,6 +1017,7 @@ export type Database = {
           line_subtotal_excl_vat?: number
           line_total_incl_vat?: number
           line_vat?: number
+          merknad?: Json | null
           notes?: string | null
           order_id?: string
           product_id?: string
@@ -1017,10 +1121,12 @@ export type Database = {
           delivery_instructions: string | null
           delivery_postal_code: string | null
           delivery_time: string | null
+          delivery_tour_id: string | null
           id: string
           internal_notes: string | null
           invoice_recipient_customer_id: string | null
           invoice_recipient_snapshot: Json | null
+          is_return: boolean
           legal_entity_id: string
           order_number: string
           order_sequence: number
@@ -1058,10 +1164,12 @@ export type Database = {
           delivery_instructions?: string | null
           delivery_postal_code?: string | null
           delivery_time?: string | null
+          delivery_tour_id?: string | null
           id?: string
           internal_notes?: string | null
           invoice_recipient_customer_id?: string | null
           invoice_recipient_snapshot?: Json | null
+          is_return?: boolean
           legal_entity_id: string
           order_number: string
           order_sequence: number
@@ -1099,10 +1207,12 @@ export type Database = {
           delivery_instructions?: string | null
           delivery_postal_code?: string | null
           delivery_time?: string | null
+          delivery_tour_id?: string | null
           id?: string
           internal_notes?: string | null
           invoice_recipient_customer_id?: string | null
           invoice_recipient_snapshot?: Json | null
+          is_return?: boolean
           legal_entity_id?: string
           order_number?: string
           order_sequence?: number
@@ -1169,6 +1279,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_delivery_tour_id_fkey"
+            columns: ["delivery_tour_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_tours"
             referencedColumns: ["id"]
           },
           {
@@ -1274,6 +1391,65 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "outlets_legal_entity_id_fkey"
+            columns: ["legal_entity_id"]
+            isOneToOne: false
+            referencedRelation: "legal_entities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pickup_locations: {
+        Row: {
+          address_line_1: string | null
+          address_line_2: string | null
+          city: string | null
+          country_code: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          display_name: string
+          id: string
+          legal_entity_id: string
+          pickup_number: number
+          postal_code: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          address_line_1?: string | null
+          address_line_2?: string | null
+          city?: string | null
+          country_code?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          display_name: string
+          id?: string
+          legal_entity_id: string
+          pickup_number: number
+          postal_code?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          address_line_1?: string | null
+          address_line_2?: string | null
+          city?: string | null
+          country_code?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          display_name?: string
+          id?: string
+          legal_entity_id?: string
+          pickup_number?: number
+          postal_code?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pickup_locations_legal_entity_id_fkey"
             columns: ["legal_entity_id"]
             isOneToOne: false
             referencedRelation: "legal_entities"
@@ -1512,7 +1688,8 @@ export type Database = {
           id: string
           is_default: boolean
           legal_entity_id: string
-          mva_rate: number
+          list_number: number | null
+          price_list_type: string
           prices_include_mva: boolean
           status: string
           updated_at: string
@@ -1525,7 +1702,8 @@ export type Database = {
           id?: string
           is_default?: boolean
           legal_entity_id: string
-          mva_rate?: number
+          list_number?: number | null
+          price_list_type?: string
           prices_include_mva?: boolean
           status?: string
           updated_at?: string
@@ -1538,7 +1716,8 @@ export type Database = {
           id?: string
           is_default?: boolean
           legal_entity_id?: string
-          mva_rate?: number
+          list_number?: number | null
+          price_list_type?: string
           prices_include_mva?: boolean
           status?: string
           updated_at?: string
@@ -2529,9 +2708,17 @@ export type Database = {
       }
     }
     Functions: {
+      _import_upsert_price: {
+        Args: { p_price: number; p_price_list_id: string; p_product_id: string }
+        Returns: number
+      }
       app_access_level: {
         Args: { p_app_code: string }
         Returns: Database["public"]["Enums"]["access_level"]
+      }
+      change_order_tour: {
+        Args: { p_new_tour_id: string; p_order_id: string; p_reason?: string }
+        Returns: undefined
       }
       current_user_entity_ids: { Args: never; Returns: string[] }
       current_user_id: { Args: never; Returns: string }
@@ -2544,13 +2731,37 @@ export type Database = {
           position_code: string
         }[]
       }
+      delete_demo_data: {
+        Args: never
+        Returns: {
+          deleted_count: number
+          entity: string
+        }[]
+      }
       generate_next_gtin: {
         Args: { p_legal_entity_id: string }
         Returns: string
       }
+      get_addable_products: {
+        Args: { p_customer_id: string }
+        Returns: {
+          display_name: string
+          display_number: number
+          id: string
+          sales_unit: string
+          unit_price: number
+        }[]
+      }
       get_customer_effective_settings: {
         Args: { p_customer_id: string }
         Returns: Json
+      }
+      get_customer_matrix_data: {
+        Args: { p_customer_id: string; p_date_from: string; p_date_to: string }
+        Returns: {
+          payload: Json
+          section: string
+        }[]
       }
       get_effective_price: {
         Args: {
@@ -2565,6 +2776,21 @@ export type Database = {
           price_list_id: string
           source: string
           special_price_id: string
+        }[]
+      }
+      get_my_accessible_apps: {
+        Args: never
+        Returns: {
+          access_level: string
+          category: string
+          deploy_url: string
+          display_name: string
+          icon_name: string
+          id: string
+          slug: string
+          sort_order: number
+          start_path: string
+          status: string
         }[]
       }
       gtin_check_digit: { Args: { p_base12: string }; Returns: number }
@@ -2583,6 +2809,16 @@ export type Database = {
         Args: { p_legal_entity_id: string; p_position_code: string }
         Returns: boolean
       }
+      import_tedebe_products_prices: {
+        Args: {
+          p_legal_entity_id: string
+          p_options: Json
+          p_rows: Json
+          p_source_filename: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
       is_platform_admin: { Args: never; Returns: boolean }
       next_customer_number: {
         Args: { p_legal_entity_id: string; p_profile_id: string }
@@ -2598,6 +2834,16 @@ export type Database = {
           order_number: string
           order_sequence: number
           order_year: number
+        }[]
+      }
+      save_matrix_changes: {
+        Args: { p_changes: Json; p_customer_id: string }
+        Returns: {
+          lines_created: number
+          lines_deleted: number
+          lines_updated: number
+          orders_created: number
+          orders_deleted: number
         }[]
       }
       unaccent: { Args: { "": string }; Returns: string }
