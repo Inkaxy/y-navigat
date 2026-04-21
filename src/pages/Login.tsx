@@ -23,16 +23,29 @@ export default function Login() {
     document.title = "Logg inn — NBHub";
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const signIn = async (loginEmail: string, loginPassword: string) => {
     setSubmitting(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.signInWithPassword({
+      email: loginEmail,
+      password: loginPassword,
+    });
     setSubmitting(false);
     if (error) {
       toast.error("Innlogging mislyktes", { description: error.message });
       return;
     }
     navigate("/hjem", { replace: true });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await signIn(email, password);
+  };
+
+  const handleDemoLogin = async (demoEmail: string) => {
+    setEmail(demoEmail);
+    setPassword(DEMO_PASSWORD);
+    await signIn(demoEmail, DEMO_PASSWORD);
   };
 
   return (
