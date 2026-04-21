@@ -55,11 +55,14 @@ export interface AppPalette {
 
 export function buildAppPalette(hex: string | null | undefined): AppPalette {
   const { h, s, l } = hexToHslParts(hex || "#0EA5E9");
+  // Hierarki: topbar (dark) tydelig mørkere enn submeny (light).
+  const darkL = clamp(l - 22, 8, 40);
+  const lightL = clamp(l - 4, 25, 60);
   return {
     primary: hslString(h, s, l),
     primaryForeground: readableForeground(l),
-    primaryDark: hslString(h, s, clamp(l - 15, 5, 95)),
-    primaryLight: hslString(h, s, clamp(l + 6, 5, 95)),
+    primaryDark: hslString(h, clamp(s - 5, 20, 95), darkL),
+    primaryLight: hslString(h, s, lightL),
     primaryPastel: hslString(h, clamp(s, 20, 95), 95),
     primaryPastelBorder: hslString(h, clamp(s - 30, 10, 90), 85),
   };
