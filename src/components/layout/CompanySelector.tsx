@@ -64,7 +64,7 @@ export function CompanySelector() {
         <span
           className={cn(
             "flex h-8 w-8 items-center justify-center rounded-md text-[11px] font-bold tracking-tight",
-            "bg-app-dark text-app-foreground",
+            "bg-white/20 text-app-foreground",
           )}
           aria-hidden
         >
