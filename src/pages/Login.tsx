@@ -17,18 +17,14 @@ const DEMO_USERS: Array<{
   role: string;
   entity: string;
 }> = [
-  {
-    email: "anne.hansen@demo.no",
-    name: "Anne Hansen",
-    role: "Butikkleder",
-    entity: "Inka Bakeri (IB)",
-  },
-  {
-    email: "per.olsen@demo.no",
-    name: "Per Olsen",
-    role: "Baker",
-    entity: "Nøtterø Bakeri (NB)",
-  },
+  { email: "kari.berg@demo.no",     name: "Kari Berg",     role: "Daglig leder",   entity: "Nøtterø Bakeri (NB)" },
+  { email: "lars.solheim@demo.no",  name: "Lars Solheim",  role: "Ordrekontor",    entity: "Nøtterø Bakeri (NB)" },
+  { email: "maja.lund@demo.no",     name: "Maja Lund",     role: "HR-ansvarlig",   entity: "Nøtterø Bakeri (NB)" },
+  { email: "anne.hansen@demo.no",   name: "Anne Hansen",   role: "Butikkleder",    entity: "Is & Bakevarer (IB)" },
+  { email: "ole.nilsen@demo.no",    name: "Ole Nilsen",    role: "Butikkleder",    entity: "Nøtterø Kafeer (NK)" },
+  { email: "per.olsen@demo.no",     name: "Per Olsen",     role: "Baker",          entity: "Nøtterø Bakeri (NB)" },
+  { email: "ida.strand@demo.no",    name: "Ida Strand",    role: "Konditor",       entity: "Mellom Kafé (MK)" },
+  { email: "tom.eriksen@demo.no",   name: "Tom Eriksen",   role: "Sjåfør",         entity: "Nøtterø Bakeri (NB)" },
 ];
 
 export default function Login() {
