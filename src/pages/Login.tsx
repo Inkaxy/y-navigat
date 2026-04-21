@@ -7,6 +7,35 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
+import { UserCircle2 } from "lucide-react";
+
+const DEMO_PASSWORD = "Demo2026!";
+
+const DEMO_USERS: Array<{
+  email: string;
+  name: string;
+  role: string;
+  entity: string;
+}> = [
+  {
+    email: "henrik@nottero-bakeri.no",
+    name: "Henrik",
+    role: "Plattform-ansvarlig",
+    entity: "Konsern (NK · MK · NB · IB)",
+  },
+  {
+    email: "anne.hansen@demo.no",
+    name: "Anne Hansen",
+    role: "Butikkleder",
+    entity: "Inka Bakeri (IB)",
+  },
+  {
+    email: "per.olsen@demo.no",
+    name: "Per Olsen",
+    role: "Baker",
+    entity: "Nøtterø Bakeri (NB)",
+  },
+];
 
 export default function Login() {
   const navigate = useNavigate();
