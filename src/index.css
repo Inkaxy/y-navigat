@@ -2,123 +2,145 @@
 @tailwind components;
 @tailwind utilities;
 
-/* NBHub designsystem.
-   Lys hovedflate med app-farget topbar/sub-meny.
-   Alle farger som HSL.
-*/
+/* ============================================================================
+   NBHub — Design system (papir-cream + app-farget topbar, speilet fra NBOS)
+   Alle farger som HSL. App-farge settes dynamisk av AppColorProvider.
+   ========================================================================== */
 
 @layer base {
   :root {
-    /* App-farge (settes dynamisk av AppThemeProvider basert på apps.theme_primary_color).
-       Default = NBHub sky-500 #0EA5E9. Alle varianter beregnes fra hovedfargen. */
-    --app-primary: 199 89% 48%;
-    --app-primary-foreground: 0 0% 100%;
-    --app-primary-dark: 199 89% 33%;
-    --app-primary-light: 199 89% 54%;
-    --app-primary-pastel: 199 89% 95%;
-    --app-primary-pastel-border: 199 60% 85%;
+    /* ---- Surfaces (lys / papir-cream) ---- */
+    --surface-canvas:        45 60% 95%;     /* #FAF6EC */
+    --surface-raised:        0 0% 100%;      /* #FFFFFF */
+    --surface-sunken:        45 47% 90%;     /* #F2EBD9 */
+    --surface-overlay:       0 0% 100%;
 
-    /* Lys hovedflate */
-    --background: 210 40% 98%;          /* slate-50 */
-    --foreground: 222 47% 11%;          /* slate-900 */
+    /* ---- Borders ---- */
+    --border-subtle:         44 39% 83%;
+    --border-default:        43 35% 79%;
+    --border-strong:         42 28% 67%;
 
-    --surface: 0 0% 100%;
-    --surface-elevated: 210 40% 96%;
+    /* ---- Text ---- */
+    --text-primary:          32 28% 13%;
+    --text-secondary:        38 22% 35%;
+    --text-tertiary:         39 20% 46%;
+    --text-on-accent:        45 60% 95%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    /* ---- App-farge (dynamisk via AppColorProvider, fallback = NBHub sky) ---- */
+    --app-color:             199 89% 48%;    /* #0EA5E9 */
+    --app-color-deep:        201 96% 32%;    /* mørk sky */
+    --app-color-soft:        199 89% 48%;    /* brukes med /10 alpha */
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
+    /* ---- States ---- */
+    --state-danger:          15 70% 36%;
+    --state-warning:         33 79% 41%;
+    --state-success:         85 64% 37%;
+    --state-neutral:         39 20% 46%;
+    --state-info:            209 75% 37%;
 
-    /* Primary speiler app-fargen for shadcn-komponenter */
-    --primary: 199 89% 48%;
-    --primary-foreground: 0 0% 100%;
-    --primary-glow: 199 95% 74%;
+    /* ---- Radii ---- */
+    --radius-sm: 6px;
+    --radius-md: 8px;
+    --radius-lg: 10px;
+    --radius:    8px;
 
-    --accent-brand: 200 98% 39%;
+    /* ---- Shadcn aliases ---- */
+    --background:            var(--surface-canvas);
+    --foreground:            var(--text-primary);
+    --card:                  var(--surface-raised);
+    --card-foreground:       var(--text-primary);
+    --popover:               var(--surface-raised);
+    --popover-foreground:    var(--text-primary);
+    --primary:               var(--app-color);
+    --primary-foreground:    var(--text-on-accent);
+    --secondary:             var(--surface-sunken);
+    --secondary-foreground:  var(--text-primary);
+    --muted:                 var(--surface-sunken);
+    --muted-foreground:      var(--text-secondary);
+    --accent:                var(--surface-sunken);
+    --accent-foreground:     var(--text-primary);
+    --destructive:           var(--state-danger);
+    --destructive-foreground: var(--text-on-accent);
+    --danger:                var(--state-danger);
+    --danger-foreground:     var(--text-on-accent);
+    --success:               var(--state-success);
+    --success-foreground:    var(--text-on-accent);
+    --warning:               var(--state-warning);
+    --warning-foreground:    var(--text-on-accent);
+    --border:                var(--border-default);
+    --input:                 var(--border-default);
+    --ring:                  var(--app-color);
+    --surface:               var(--surface-raised);
+    --surface-elevated:      var(--surface-sunken);
 
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222 47% 11%;
+    /* ---- Legacy aliases (bevart slik at AppHeaderBanner og eldre komponenter
+            ikke brekker — peker nå mot --app-color-systemet). ---- */
+    --app-primary:               var(--app-color);
+    --app-primary-foreground:    var(--text-on-accent);
+    --app-primary-dark:          var(--app-color-deep);
+    --app-primary-light:         var(--app-color);
+    --app-primary-pastel:        var(--surface-sunken);
+    --app-primary-pastel-border: var(--border-default);
 
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;
-
-    --accent: 210 40% 94%;
-    --accent-foreground: 222 47% 11%;
-
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 100%;
-
-    --success: 142 71% 45%;
-    --success-foreground: 0 0% 100%;
-
-    --warning: 38 92% 50%;
-    --warning-foreground: 0 0% 100%;
-
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 199 89% 48%;
-
-    --radius: 0.5rem;
-
-    --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 222 47% 11%;
-    --sidebar-primary: 199 89% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 210 40% 96%;
-    --sidebar-accent-foreground: 222 47% 11%;
-    --sidebar-border: 214 32% 91%;
-    --sidebar-ring: 199 89% 48%;
-
-    /* Effects */
-    --shadow-card: 0 1px 2px 0 hsl(222 47% 11% / 0.04), 0 1px 3px 0 hsl(222 47% 11% / 0.06);
-    --shadow-elevated: 0 4px 12px -2px hsl(222 47% 11% / 0.08), 0 2px 6px -2px hsl(222 47% 11% / 0.06);
-    --gradient-brand: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--accent-brand)));
+    /* sidebar */
+    --sidebar-background:    var(--surface-raised);
+    --sidebar-foreground:    var(--text-primary);
+    --sidebar-primary:       var(--app-color);
+    --sidebar-primary-foreground: var(--text-on-accent);
+    --sidebar-accent:        var(--surface-sunken);
+    --sidebar-accent-foreground: var(--text-primary);
+    --sidebar-border:        var(--border-default);
+    --sidebar-ring:          var(--app-color);
   }
 
   .dark {
-    --background: 222 47% 6%;
-    --foreground: 210 40% 98%;
-    --card: 222 47% 10%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222 47% 10%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 199 89% 48%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 217 33% 18%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217 33% 18%;
-    --muted-foreground: 215 20% 65%;
-    --accent: 217 33% 18%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 63% 41%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217 33% 18%;
-    --input: 217 33% 18%;
-    --ring: 199 89% 48%;
+    --surface-canvas:        32 22% 8%;
+    --surface-raised:        35 19% 12%;
+    --surface-sunken:        37 17% 16%;
+    --border-subtle:         38 18% 19%;
+    --border-default:        38 17% 25%;
+    --border-strong:         40 17% 31%;
+    --text-primary:          45 47% 90%;
+    --text-secondary:        42 28% 67%;
+    --text-tertiary:         39 20% 46%;
   }
 }
 
 @layer base {
-  * {
-    @apply border-border;
+  * { @apply border-border; }
+
+  html, body, #root {
+    @apply min-h-screen bg-background text-foreground;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
-  html,
-  body,
-  #root {
-    @apply min-h-screen bg-background text-foreground;
-    font-feature-settings: "cv11", "ss01";
+  h1, h2, h3, .font-serif {
+    font-family: 'Fraunces', Georgia, serif;
+    font-weight: 500;
+    letter-spacing: -0.015em;
   }
+  h1 { font-size: 30px; line-height: 1.15; }
+  h2 { font-size: 18px; font-family: 'Inter', sans-serif; font-weight: 500; letter-spacing: 0; }
+  h3 { font-size: 16px; font-family: 'Inter', sans-serif; font-weight: 500; letter-spacing: 0; }
 }
 
 @layer utilities {
-  .no-scrollbar::-webkit-scrollbar {
-    display: none;
-  }
-  .no-scrollbar {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+  .font-display { font-family: 'Fraunces', Georgia, serif; }
+  .font-body    { font-family: 'Inter', system-ui, sans-serif; }
+
+  .eyebrow {
+    font-family: 'Inter', sans-serif;
+    font-weight: 500;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: hsl(var(--text-tertiary));
   }
 }
