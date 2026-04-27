@@ -45,9 +45,11 @@ function getAppDisplayName(apps: AccessibleApp[] | undefined): string {
 interface AppSwitcherProps {
   /** Optional override of the trigger label (defaults to current app's display_name). */
   label?: string;
+  /** Optional custom trigger renderer. Receives the resolved label and open state. */
+  renderTrigger?: (args: { label: string; open: boolean; appColor: string }) => React.ReactNode;
 }
 
-export function AppSwitcher({ label }: AppSwitcherProps) {
+export function AppSwitcher({ label, renderTrigger }: AppSwitcherProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const { data: apps, isLoading } = useAccessibleApps();
@@ -83,25 +85,31 @@ export function AppSwitcher({ label }: AppSwitcherProps) {
         if (!o) setQuery("");
       }}
     >
-      <PopoverTrigger
-        className={cn(
-          "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-sm font-semibold",
-          "border-l-[3px] transition-colors hover:bg-accent focus:outline-none",
-          "focus-visible:ring-2 focus-visible:ring-ring",
-        )}
-        style={{
-          borderLeftColor: appColor,
-          backgroundColor: open ? `${appColor}24` : `${appColor}14`,
-          color: "hsl(var(--foreground))",
-        }}
-        aria-label="Bytt app"
-      >
-        <span>{triggerLabel}</span>
-        <ChevronDown
-          className={cn("h-4 w-4 transition-transform", open && "rotate-180")}
-          style={{ color: appColor }}
-        />
-      </PopoverTrigger>
+      {renderTrigger ? (
+        <PopoverTrigger asChild aria-label="Bytt app">
+          {renderTrigger({ label: triggerLabel, open, appColor })}
+        </PopoverTrigger>
+      ) : (
+        <PopoverTrigger
+          className={cn(
+            "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-sm font-semibold",
+            "border-l-[3px] transition-colors hover:bg-accent focus:outline-none",
+            "focus-visible:ring-2 focus-visible:ring-ring",
+          )}
+          style={{
+            borderLeftColor: appColor,
+            backgroundColor: open ? `${appColor}24` : `${appColor}14`,
+            color: "hsl(var(--foreground))",
+          }}
+          aria-label="Bytt app"
+        >
+          <span>{triggerLabel}</span>
+          <ChevronDown
+            className={cn("h-4 w-4 transition-transform", open && "rotate-180")}
+            style={{ color: appColor }}
+          />
+        </PopoverTrigger>
+      )}
       <PopoverContent
         align="center"
         sideOffset={6}

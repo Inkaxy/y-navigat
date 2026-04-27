@@ -4,6 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/hooks/useAuth";
+import { ThemeProvider } from "@/providers/ThemeProvider";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { AppShell } from "@/components/layout/AppShell";
 import Index from "./pages/Index";
@@ -25,25 +26,27 @@ const Shell = ({ children }: { children: React.ReactNode }) => (
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <AuthProvider>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/" element={<Index />} />
-            <Route path="/hjem" element={<Shell><Hjem /></Shell>} />
-            <Route path="/mine-apper" element={<Shell><MineApper /></Shell>} />
-            <Route path="/min-profil" element={<Shell><MinProfil /></Shell>} />
-            <Route path="/varsler" element={<Shell><Varsler /></Shell>} />
-            <Route path="/hjelp" element={<Shell><Hjelp /></Shell>} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </AuthProvider>
-      </BrowserRouter>
-    </TooltipProvider>
+    <ThemeProvider>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <AuthProvider>
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route path="/" element={<Index />} />
+              <Route path="/hjem" element={<Shell><Hjem /></Shell>} />
+              <Route path="/mine-apper" element={<Shell><MineApper /></Shell>} />
+              <Route path="/min-profil" element={<Shell><MinProfil /></Shell>} />
+              <Route path="/varsler" element={<Shell><Varsler /></Shell>} />
+              <Route path="/hjelp" element={<Shell><Hjelp /></Shell>} />
+              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </AuthProvider>
+        </BrowserRouter>
+      </TooltipProvider>
+    </ThemeProvider>
   </QueryClientProvider>
 );
 
