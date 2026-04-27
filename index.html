@@ -1,29 +1,40 @@
 <!doctype html>
-<html lang="en">
+<html lang="nb">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- TODO: Set the document title to the name of your application -->
-    <title>Lovable App</title>
-    <meta name="description" content="Nøtterø Hub is a central application shell for all employees, providing a personalized dashboard and app navigation.">
-    <meta name="author" content="Lovable" />
+    <title>NBHub — Nøtterø Bakeri</title>
+    <meta name="description" content="NBHub er det sentrale appsenteret for alle ansatte i Nøtterø Bakeri-konsernet — personlig dashbord og navigasjon mellom alle apper." />
+    <meta name="author" content="Nøtterø Bakeri" />
 
-    <!-- TODO: Update og:title to match your application name -->
-    
-    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+
     <meta property="og:type" content="website" />
-    <meta property="og:image" content="https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/c6349590-d6b8-4c77-9b2a-9028796244c2/id-preview-bee4a6f8--55f2f22b-89c6-4b5e-a4ed-f237dd0006c9.lovable.app-1776617208915.png">
+    <meta property="og:title" content="NBHub — Nøtterø Bakeri" />
+    <meta property="og:description" content="NBHub er det sentrale appsenteret for alle ansatte i Nøtterø Bakeri-konsernet." />
+    <meta property="og:image" content="https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/c6349590-d6b8-4c77-9b2a-9028796244c2/id-preview-bee4a6f8--55f2f22b-89c6-4b5e-a4ed-f237dd0006c9.lovable.app-1776617208915.png" />
 
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@Lovable" />
-    <meta name="twitter:image" content="https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/c6349590-d6b8-4c77-9b2a-9028796244c2/id-preview-bee4a6f8--55f2f22b-89c6-4b5e-a4ed-f237dd0006c9.lovable.app-1776617208915.png">
-    <meta property="og:title" content="Lovable App">
-  <meta name="twitter:title" content="Lovable App">
-  <meta property="og:description" content="Nøtterø Hub is a central application shell for all employees, providing a personalized dashboard and app navigation.">
-  <meta name="twitter:description" content="Nøtterø Hub is a central application shell for all employees, providing a personalized dashboard and app navigation.">
-  <link rel="icon" type="image/x-icon" href="/favicon.ico">
-</head>
+    <meta name="twitter:title" content="NBHub — Nøtterø Bakeri" />
+    <meta name="twitter:description" content="NBHub er det sentrale appsenteret for alle ansatte i Nøtterø Bakeri-konsernet." />
+    <meta name="twitter:image" content="https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/c6349590-d6b8-4c77-9b2a-9028796244c2/id-preview-bee4a6f8--55f2f22b-89c6-4b5e-a4ed-f237dd0006c9.lovable.app-1776617208915.png" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
 
+    <script>
+      // Anti-flash theme bootstrap. Reads nbhub_theme: "light" | "dark" | "system".
+      (function () {
+        try {
+          var stored = localStorage.getItem('nbhub_theme') || 'system';
+          var systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          var dark = stored === 'dark' || (stored === 'system' && systemDark);
+          if (dark) document.documentElement.classList.add('dark');
+        } catch (_) { /* noop */ }
+      })();
+    </script>
+  </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
