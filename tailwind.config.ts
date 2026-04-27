@@ -8,27 +8,59 @@ export default {
     container: {
       center: true,
       padding: "2rem",
-      screens: {
-        "2xl": "1400px",
-      },
+      screens: { "2xl": "1400px" },
     },
     extend: {
+      fontFamily: {
+        display: ["Fraunces", "Georgia", "serif"],
+        body: ["Inter", "system-ui", "sans-serif"],
+        sans: ["Inter", "system-ui", "sans-serif"],
+        serif: ["Fraunces", "Georgia", "serif"],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
+
+        // Semantic surfaces (NBHub design system, speilet fra NBOS)
         surface: {
           DEFAULT: "hsl(var(--surface))",
+          canvas: "hsl(var(--surface-canvas))",
+          raised: "hsl(var(--surface-raised))",
+          sunken: "hsl(var(--surface-sunken))",
           elevated: "hsl(var(--surface-elevated))",
         },
+        ink: {
+          primary: "hsl(var(--text-primary))",
+          secondary: "hsl(var(--text-secondary))",
+          tertiary: "hsl(var(--text-tertiary))",
+          "on-accent": "hsl(var(--text-on-accent))",
+        },
+        line: {
+          subtle: "hsl(var(--border-subtle))",
+          DEFAULT: "hsl(var(--border-default))",
+          strong: "hsl(var(--border-strong))",
+        },
+
+        // Dynamic app color (set by AppColorProvider). Beholder legacy aliases
+        // (foreground/dark/light/pastel/pastel-border) for eldre komponenter.
+        app: {
+          DEFAULT: "hsl(var(--app-color))",
+          deep: "hsl(var(--app-color-deep))",
+          soft: "hsl(var(--app-color-soft))",
+          foreground: "hsl(var(--text-on-accent))",
+          dark: "hsl(var(--app-color-deep))",
+          light: "hsl(var(--app-color))",
+          pastel: "hsl(var(--app-primary-pastel))",
+          "pastel-border": "hsl(var(--app-primary-pastel-border))",
+        },
+
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
-          glow: "hsl(var(--primary-glow))",
         },
-        "accent-brand": "hsl(var(--accent-brand))",
         secondary: {
           DEFAULT: "hsl(var(--secondary))",
           foreground: "hsl(var(--secondary-foreground))",
@@ -36,6 +68,10 @@ export default {
         destructive: {
           DEFAULT: "hsl(var(--destructive))",
           foreground: "hsl(var(--destructive-foreground))",
+        },
+        danger: {
+          DEFAULT: "hsl(var(--danger))",
+          foreground: "hsl(var(--danger-foreground))",
         },
         success: {
           DEFAULT: "hsl(var(--success))",
@@ -52,14 +88,6 @@ export default {
         accent: {
           DEFAULT: "hsl(var(--accent))",
           foreground: "hsl(var(--accent-foreground))",
-        },
-        app: {
-          DEFAULT: "hsl(var(--app-primary))",
-          foreground: "hsl(var(--app-primary-foreground))",
-          dark: "hsl(var(--app-primary-dark))",
-          light: "hsl(var(--app-primary-light))",
-          pastel: "hsl(var(--app-primary-pastel))",
-          "pastel-border": "hsl(var(--app-primary-pastel-border))",
         },
         popover: {
           DEFAULT: "hsl(var(--popover))",
@@ -80,27 +108,14 @@ export default {
           ring: "hsl(var(--sidebar-ring))",
         },
       },
-      backgroundImage: {
-        "gradient-brand": "var(--gradient-brand)",
-      },
-      boxShadow: {
-        card: "var(--shadow-card)",
-        elevated: "var(--shadow-elevated)",
-      },
       borderRadius: {
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
+        lg: "var(--radius-lg)",
+        md: "var(--radius-md)",
+        sm: "var(--radius-sm)",
       },
       keyframes: {
-        "accordion-down": {
-          from: { height: "0" },
-          to: { height: "var(--radix-accordion-content-height)" },
-        },
-        "accordion-up": {
-          from: { height: "var(--radix-accordion-content-height)" },
-          to: { height: "0" },
-        },
+        "accordion-down": { from: { height: "0" }, to: { height: "var(--radix-accordion-content-height)" } },
+        "accordion-up":   { from: { height: "var(--radix-accordion-content-height)" }, to: { height: "0" } },
         "fade-in": {
           from: { opacity: "0", transform: "translateY(4px)" },
           to: { opacity: "1", transform: "translateY(0)" },
