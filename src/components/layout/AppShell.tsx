@@ -1,25 +1,28 @@
 import type { ReactNode } from "react";
+import { AppColorProvider } from "@/providers/AppColorProvider";
+import { SelectionProvider } from "@/providers/SelectionProvider";
 import { Topbar } from "./Topbar";
 import { SubNav } from "./SubNav";
-import { GlobalSearch } from "./GlobalSearch";
 import { BugReportButton } from "./BugReportButton";
-import { AppThemeProvider } from "@/providers/AppThemeProvider";
-import { SelectionProvider } from "@/providers/SelectionProvider";
 
 export function AppShell({ children }: { children: ReactNode }) {
   return (
-    <AppThemeProvider>
+    <AppColorProvider appCode="nbhub">
       <SelectionProvider>
-        <div className="flex min-h-screen w-full flex-col bg-background text-foreground">
+        <div className="app-shell flex min-h-screen flex-col bg-surface-canvas text-ink-primary">
           <Topbar />
           <SubNav />
-          <GlobalSearch />
-          <main className="flex-1 overflow-y-auto px-4 py-4 md:px-6 animate-fade-in">
-            {children}
+          <main className="flex-1">
+            <div
+              className="page-canvas mx-auto w-full animate-fade-in"
+              style={{ maxWidth: "1280px", padding: "32px 32px 48px" }}
+            >
+              {children}
+            </div>
           </main>
           <BugReportButton />
         </div>
       </SelectionProvider>
-    </AppThemeProvider>
+    </AppColorProvider>
   );
 }
