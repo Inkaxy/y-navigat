@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,13 @@ import { useAuth } from "@/hooks/useAuth";
 import { UserCircle2 } from "lucide-react";
 
 const DEMO_PASSWORD = "Demo2026!";
+
+const ALLOWED_RETURN_HOSTS = /^https:\/\/[a-z0-9-]+\.nbhub\.no(\/|$)/;
+
+const resolveReturnTarget = (raw: string | null): string | null => {
+  if (!raw) return null;
+  return ALLOWED_RETURN_HOSTS.test(raw) ? raw : null;
+};
 
 const DEMO_USERS: Array<{
   email: string;
@@ -29,14 +36,21 @@ const DEMO_USERS: Array<{
 
 export default function Login() {
   const navigate = useNavigate();
+  const [params] = useSearchParams();
   const { user } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (user) navigate("/hjem", { replace: true });
-  }, [user, navigate]);
+    if (!user) return;
+    const target = resolveReturnTarget(params.get("return"));
+    if (target) {
+      window.location.href = target;
+    } else {
+      navigate("/hjem", { replace: true });
+    }
+  }, [user, navigate, params]);
 
   useEffect(() => {
     document.title = "Logg inn — NBHub";
@@ -53,7 +67,12 @@ export default function Login() {
       toast.error("Innlogging mislyktes", { description: error.message });
       return;
     }
-    navigate("/hjem", { replace: true });
+    const target = resolveReturnTarget(params.get("return"));
+    if (target) {
+      window.location.href = target;
+    } else {
+      navigate("/hjem", { replace: true });
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
