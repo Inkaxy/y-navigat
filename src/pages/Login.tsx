@@ -11,7 +11,7 @@ import { UserCircle2 } from "lucide-react";
 
 const DEMO_PASSWORD = "Demo2026!";
 
-const ALLOWED_RETURN_HOSTS = /^https:\/\/[a-z0-9-]+\.nbhub\.no(\/|$)/;
+const ALLOWED_RETURN_HOSTS = /^https:\/\/([a-z0-9-]+\.)?nbhub\.no(\/|$)/;
 
 const resolveReturnTarget = (raw: string | null): string | null => {
   if (!raw) return null;
