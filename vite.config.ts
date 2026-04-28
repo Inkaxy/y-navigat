@@ -13,7 +13,19 @@ export default defineConfig(({ mode }) => ({
     },
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
-  resolve: {
+  build: {
+    minify: "terser",
+    terserOptions: {
+      compress: {
+        drop_console: false,
+        passes: 2,
+      },
+      format: {
+        comments: false,
+      },
+    },
+  },
+  resolve:
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
