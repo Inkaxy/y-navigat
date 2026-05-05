@@ -46,6 +46,25 @@ import VarerSettingsProductPages from "@/varer/pages/settings/SettingsProductPag
 import VarerSettingsSalesGroups from "@/varer/pages/settings/SettingsSalesGroups";
 import VarerSettingsProductionGroups from "@/varer/pages/settings/SettingsProductionGroups";
 import VarerCakeBuilderEmbed from "@/varer/pages/embed/CakeBuilderEmbed";
+import { SelectedEntityProvider as KunderEntityProviderRaw } from "@/kunder/state/SelectedEntityContext";
+import KunderCustomerList from "@/kunder/pages/CustomerList";
+import KunderCustomerDetail from "@/kunder/pages/CustomerDetail";
+import KunderProfileList from "@/kunder/pages/ProfileList";
+import KunderProfileDetail from "@/kunder/pages/ProfileDetail";
+import KunderPickupLocations from "@/kunder/pages/PickupLocations";
+import KunderPlaceholder from "@/kunder/pages/Placeholder";
+import { useUserAccess as useKunderUserAccess } from "@/kunder/hooks/useUserAccess";
+import { useAuth as useNbhubAuth } from "@/hooks/useAuth";
+
+const KunderEntityProvider = ({ children }: { children: React.ReactNode }) => {
+  const { user } = useNbhubAuth();
+  const { data: access } = useKunderUserAccess(user);
+  return (
+    <KunderEntityProviderRaw defaultEntityId={access?.primaryEntityId ?? null}>
+      {children}
+    </KunderEntityProviderRaw>
+  );
+};
 
 const queryClient = new QueryClient();
 
@@ -124,7 +143,16 @@ const App = () => (
                 <Route path="salgsgrupper" element={<VarerSettingsSalesGroups />} />
                 <Route path="produksjonsgrupper" element={<VarerSettingsProductionGroups />} />
               </Route>
-              <Route path="/kunder" element={<AppRoute code="kunder" name="Kunder" icon="Users" />} />
+              {/* Kunder sub-routes */}
+              <Route path="/kunder" element={<Shell><AppAccessGuard appCode="kunder" appName="Kunder"><KunderEntityProvider><Navigate to="/kunder/kundeliste" replace /></KunderEntityProvider></AppAccessGuard></Shell>} />
+              <Route path="/kunder/kundeliste" element={<Shell><AppAccessGuard appCode="kunder" appName="Kunder"><KunderEntityProvider><KunderCustomerList /></KunderEntityProvider></AppAccessGuard></Shell>} />
+              <Route path="/kunder/kundeliste/:id" element={<Shell><AppAccessGuard appCode="kunder" appName="Kunder"><KunderEntityProvider><KunderCustomerDetail /></KunderEntityProvider></AppAccessGuard></Shell>} />
+              <Route path="/kunder/profiler" element={<Shell><AppAccessGuard appCode="kunder" appName="Kunder"><KunderEntityProvider><KunderProfileList /></KunderEntityProvider></AppAccessGuard></Shell>} />
+              <Route path="/kunder/profiler/:id" element={<Shell><AppAccessGuard appCode="kunder" appName="Kunder"><KunderEntityProvider><KunderProfileDetail /></KunderEntityProvider></AppAccessGuard></Shell>} />
+              <Route path="/kunder/kundegrupper" element={<Shell><AppAccessGuard appCode="kunder" appName="Kunder"><KunderEntityProvider><KunderPlaceholder title="Kundegrupper" description="Segmenter for prising og rapportering" /></KunderEntityProvider></AppAccessGuard></Shell>} />
+              <Route path="/kunder/historikk" element={<Shell><AppAccessGuard appCode="kunder" appName="Kunder"><KunderEntityProvider><KunderPlaceholder title="Historikk" description="Endringslogg, ordrer og fakturaer" /></KunderEntityProvider></AppAccessGuard></Shell>} />
+              <Route path="/kunder/innstillinger" element={<Shell><AppAccessGuard appCode="kunder" appName="Kunder"><KunderEntityProvider><KunderPlaceholder title="Innstillinger" description="App-spesifikke innstillinger" /></KunderEntityProvider></AppAccessGuard></Shell>} />
+              <Route path="/kunder/innstillinger/hentesteder" element={<Shell><AppAccessGuard appCode="kunder" appName="Kunder"><KunderEntityProvider><KunderPickupLocations /></KunderEntityProvider></AppAccessGuard></Shell>} />
               <Route path="/ordre" element={<AppRoute code="ordre" name="Ordre" icon="ShoppingCart" />} />
               <Route path="/produksjon" element={<AppRoute code="produksjon" name="Produksjon" icon="Factory" />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
