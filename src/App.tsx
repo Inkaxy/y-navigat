@@ -55,6 +55,11 @@ import KunderPickupLocations from "@/kunder/pages/PickupLocations";
 import KunderPlaceholder from "@/kunder/pages/Placeholder";
 import { useUserAccess as useKunderUserAccess } from "@/kunder/hooks/useUserAccess";
 import { useAuth as useNbhubAuth } from "@/hooks/useAuth";
+import ProduksjonOversikt from "@/produksjon/pages/OversiktPage";
+import ProduksjonEtiketter from "@/produksjon/pages/EtiketterPage";
+import ProduksjonsavdelingerPage from "@/produksjon/pages/innstillinger/ProduksjonsavdelingerPage";
+import PakkeomraderPage from "@/produksjon/pages/innstillinger/PakkeomraderPage";
+import UtskriftsprofilerPage from "@/produksjon/pages/innstillinger/UtskriftsprofilerPage";
 
 const KunderEntityProvider = ({ children }: { children: React.ReactNode }) => {
   const { user } = useNbhubAuth();
@@ -154,7 +159,12 @@ const App = () => (
               <Route path="/kunder/innstillinger" element={<Shell><AppAccessGuard appCode="kunder" appName="Kunder"><KunderEntityProvider><KunderPlaceholder title="Innstillinger" description="App-spesifikke innstillinger" /></KunderEntityProvider></AppAccessGuard></Shell>} />
               <Route path="/kunder/innstillinger/hentesteder" element={<Shell><AppAccessGuard appCode="kunder" appName="Kunder"><KunderEntityProvider><KunderPickupLocations /></KunderEntityProvider></AppAccessGuard></Shell>} />
               <Route path="/ordre" element={<AppRoute code="ordre" name="Ordre" icon="ShoppingCart" />} />
-              <Route path="/produksjon" element={<AppRoute code="produksjon" name="Produksjon" icon="Factory" />} />
+              <Route path="/produksjon" element={<Shell><AppAccessGuard appCode="produksjon" appName="Produksjon"><Navigate to="/produksjon/oversikt" replace /></AppAccessGuard></Shell>} />
+              <Route path="/produksjon/oversikt" element={<Shell><AppAccessGuard appCode="produksjon" appName="Produksjon"><ProduksjonOversikt /></AppAccessGuard></Shell>} />
+              <Route path="/produksjon/etiketter" element={<Shell><AppAccessGuard appCode="produksjon" appName="Produksjon"><ProduksjonEtiketter /></AppAccessGuard></Shell>} />
+              <Route path="/produksjon/innstillinger/produksjonsavdelinger" element={<Shell><AppAccessGuard appCode="produksjon" appName="Produksjon"><ProduksjonsavdelingerPage /></AppAccessGuard></Shell>} />
+              <Route path="/produksjon/innstillinger/pakkeomrader" element={<Shell><AppAccessGuard appCode="produksjon" appName="Produksjon"><PakkeomraderPage /></AppAccessGuard></Shell>} />
+              <Route path="/produksjon/innstillinger/utskriftsprofiler" element={<Shell><AppAccessGuard appCode="produksjon" appName="Produksjon"><UtskriftsprofilerPage /></AppAccessGuard></Shell>} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
