@@ -29,11 +29,11 @@ export function UserMenu() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        className="flex items-center gap-1 rounded-md px-2 py-1 text-app-foreground/90 transition-colors hover:bg-black/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
-        style={{ fontFamily: "Inter, sans-serif", fontSize: "13px" }}
+        className="flex items-center gap-1.5 rounded-full border border-line-subtle bg-surface-raised px-3 py-1.5 text-ink-primary transition-all hover:bg-bakery-cream hover:border-bakery-wheat/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-app/40"
+        style={{ fontFamily: "Inter, sans-serif", fontSize: "13px", fontWeight: 500 }}
       >
         <span className="max-w-[160px] truncate">{displayName}</span>
-        <ChevronDown className="h-3.5 w-3.5 opacity-80" />
+        <ChevronDown className="h-3.5 w-3.5 opacity-60" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuItem onClick={() => navigate("/min-profil")} className="flex items-center gap-2">
