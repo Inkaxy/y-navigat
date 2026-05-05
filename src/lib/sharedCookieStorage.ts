@@ -6,15 +6,34 @@ const COOKIE_OPTIONS = {
   sameSite: "Lax" as const,
   secure: true,
   path: "/",
-  expires: 7, // 7 dager — Supabase håndterer refresh
+  expires: 7,
 };
 
-// Supabase splitter store tokens i .0/.1/... cookies. Storage-adapteren
-// må håndtere det transparent. Vi bruker enkelt-cookie hvis verdien er
-// liten nok, ellers chunker vi manuelt.
 const MAX_CHUNK = 3500;
 
-export const sharedCookieStorage = {
+/**
+ * Cookies på .nbhub.no fungerer kun når vi faktisk er på det domenet.
+ * I preview (lovableproject.com / lovable.app) faller vi tilbake til
+ * localStorage slik at session-en fortsatt persisteres lokalt.
+ */
+function shouldUseCookies(): boolean {
+  if (typeof window === "undefined") return false;
+  const host = window.location.hostname;
+  return host === "nbhub.no" || host.endsWith(".nbhub.no");
+}
+
+const localStorageAdapter = {
+  getItem: (key: string): string | null =>
+    typeof window !== "undefined" ? window.localStorage.getItem(key) : null,
+  setItem: (key: string, value: string): void => {
+    if (typeof window !== "undefined") window.localStorage.setItem(key, value);
+  },
+  removeItem: (key: string): void => {
+    if (typeof window !== "undefined") window.localStorage.removeItem(key);
+  },
+};
+
+const cookieAdapter = {
   getItem: (key: string): string | null => {
     const single = Cookies.get(key);
     if (single !== undefined) return single;
@@ -51,5 +70,20 @@ export const sharedCookieStorage = {
       Cookies.remove(`${key}.${i}`, { domain: COOKIE_DOMAIN, path: "/" });
       i++;
     }
+  },
+};
+
+export const sharedCookieStorage = {
+  getItem: (key: string): string | null =>
+    shouldUseCookies()
+      ? cookieAdapter.getItem(key) ?? localStorageAdapter.getItem(key)
+      : localStorageAdapter.getItem(key),
+  setItem: (key: string, value: string): void => {
+    if (shouldUseCookies()) cookieAdapter.setItem(key, value);
+    else localStorageAdapter.setItem(key, value);
+  },
+  removeItem: (key: string): void => {
+    if (shouldUseCookies()) cookieAdapter.removeItem(key);
+    localStorageAdapter.removeItem(key);
   },
 };
