@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Home, Box, ChevronDown, Check } from "lucide-react";
+import { LayoutDashboard, Box, ChevronDown, Check } from "lucide-react";
 import * as Icons from "lucide-react";
 import {
   DropdownMenu,
@@ -39,7 +39,14 @@ export function AppTabs() {
   const navigate = useNavigate();
 
   const entries: Entry[] = useMemo(() => {
-    const home: Entry = { key: "home", label: "Hjem", to: "/", color: "#64748b", icon: Home };
+    const nbhubApp = (apps ?? []).find((a) => a.slug === "nbhub");
+    const nbhub: Entry = {
+      key: "nbhub",
+      label: nbhubApp?.display_name ?? "NBHub",
+      to: "/",
+      color: nbhubApp?.color_hex ?? "#0ea5e9",
+      icon: nbhubApp ? (iconMap[nbhubApp.icon_name] ?? LayoutDashboard) : LayoutDashboard,
+    };
     const appEntries: Entry[] = (apps ?? [])
       .filter((a) => a.status === "active" || a.status === "in_development")
       .filter((a) => a.access_level && (a.access_level as string) !== "none")
@@ -52,11 +59,11 @@ export function AppTabs() {
         color: a.color_hex ?? "#64748b",
         icon: iconMap[a.icon_name] ?? Box,
       }));
-    return [home, ...appEntries];
+    return [nbhub, ...appEntries];
   }, [apps]);
 
   const isActive = (e: Entry) => {
-    if (e.key === "home") return pathname === "/" || pathname === "/hjem";
+    if (e.key === "nbhub") return pathname === "/" || pathname === "/hjem";
     if (!e.to) return false;
     return pathname === e.to || pathname.startsWith(e.to + "/");
   };
