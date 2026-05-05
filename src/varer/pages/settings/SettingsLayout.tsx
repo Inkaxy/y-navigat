@@ -38,10 +38,10 @@ export default function SettingsLayout() {
                     to={t.to}
                     className={({ isActive }) =>
                       cn(
-                        "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                        "flex items-center gap-2.5 rounded-full px-3.5 py-2 text-sm transition-all border",
                         isActive
-                          ? "bg-app/10 text-app-dark"
-                          : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                          ? "border-bakery-wheat/40 bg-bakery-cream font-semibold text-ink-primary shadow-xs"
+                          : "border-transparent font-medium text-ink-secondary hover:bg-bakery-cream hover:text-ink-primary",
                       )
                     }
                   >
