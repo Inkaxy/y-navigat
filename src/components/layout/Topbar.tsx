@@ -1,6 +1,4 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
-import { LayoutDashboard } from "lucide-react";
 import { CompanyBlock } from "./CompanyBlock";
 import { CommandTrigger } from "./CommandTrigger";
 import { CommandPalette } from "./CommandPalette";
@@ -18,20 +16,6 @@ export function Topbar() {
         style={{ height: "60px", padding: "0 24px" }}
       >
         <CompanyBlock />
-
-        <Link
-          to="/"
-          className="flex items-center gap-2 rounded-md px-2 py-1 text-app-foreground hover:bg-black/10"
-          aria-label="NBHub hjem"
-        >
-          <LayoutDashboard size={24} strokeWidth={1.6} />
-          <span
-            className="font-display"
-            style={{ fontWeight: 500, fontSize: "20px", letterSpacing: "-0.01em", lineHeight: 1 }}
-          >
-            NBHub
-          </span>
-        </Link>
 
         <AppTabs />
 
