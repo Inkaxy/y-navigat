@@ -299,7 +299,7 @@ export default function CakeBuilderDetail() {
     onSuccess: () => {
       toast({ title: "Kategori slettet" });
       qc.invalidateQueries({ queryKey: ["cake-categories"] });
-      navigate("/kakebygger");
+      navigate("/varer/kakebygger");
     },
     onError: (e: any) =>
       toast({ title: "Kunne ikke slette", description: e.message, variant: "destructive" }),
@@ -504,7 +504,7 @@ export default function CakeBuilderDetail() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => navigate("/kakebygger")}
+            onClick={() => navigate("/varer/kakebygger")}
             className="mb-3 -ml-2"
           >
             <ArrowLeft className="mr-1 h-4 w-4" /> Tilbake til Kakebygger

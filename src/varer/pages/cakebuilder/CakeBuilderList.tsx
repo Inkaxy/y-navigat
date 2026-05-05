@@ -85,7 +85,7 @@ export default function CakeBuilderList() {
             {list.map((c) => (
               <Card
                 key={c.id}
-                onClick={() => navigate(`/kakebygger/${c.id}`)}
+                onClick={() => navigate(`/varer/kakebygger/${c.id}`)}
                 className="group cursor-pointer overflow-hidden transition-shadow hover:shadow-md"
               >
                 <div className="relative aspect-[4/3] bg-muted">

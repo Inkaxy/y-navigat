@@ -63,7 +63,7 @@ export default function Recipes() {
               </thead>
               <tbody>
                 {filtered.map((r: any) => (
-                  <tr key={r.id} onClick={() => navigate(`/vareliste/${r.products.id}?tab=recipe`)} className="cursor-pointer border-t border-border hover:bg-muted/30">
+                  <tr key={r.id} onClick={() => navigate(`/varer/vareliste/${r.products.id}?tab=recipe`)} className="cursor-pointer border-t border-border hover:bg-muted/30">
                     <td className="px-4 py-2.5">
                       <div className="font-medium">{r.products?.display_name}</div>
                       <div className="text-xs font-mono text-muted-foreground">{r.products?.code}</div>

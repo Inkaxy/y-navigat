@@ -255,7 +255,7 @@ export function MatrixView({
                       </td>
                       <td className="px-2 py-1 text-right tabular-nums text-xs text-muted-foreground">
                         <Link
-                          to={`/vareliste/${p.id}`}
+                          to={`/varer/vareliste/${p.id}`}
                           className="hover:text-app hover:underline"
                           title="Åpne varekort"
                         >
@@ -267,7 +267,7 @@ export function MatrixView({
                         style={{ left: "2.5rem" }}
                       >
                         <Link
-                          to={`/vareliste/${p.id}`}
+                          to={`/varer/vareliste/${p.id}`}
                           className="group inline-flex items-center gap-1.5 hover:text-app"
                           title="Åpne varekort"
                         >

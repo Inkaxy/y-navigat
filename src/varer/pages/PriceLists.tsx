@@ -676,7 +676,7 @@ export default function PriceLists() {
           <SimpleView
             lists={listsQuery.data ?? []}
             agg={itemsAggQuery.data}
-            onOpen={(id) => navigate(`/priser/${id}`)}
+            onOpen={(id) => navigate(`/varer/priser/${id}`)}
           />
         ) : view === "retur" ? (
           <ReturView priceDate={priceDate} search={search} />

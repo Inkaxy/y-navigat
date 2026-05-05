@@ -11,12 +11,12 @@ import { AppHeaderBanner } from "@/varer/components/layout/AppHeaderBanner";
 import { cn } from "@/lib/utils";
 
 const tabs = [
-  { to: "/innstillinger/generelt", label: "Generelt", icon: SettingsIcon },
-  { to: "/innstillinger/hovedvaregrupper", label: "Hovedvaregrupper", icon: FolderOpen },
-  { to: "/innstillinger/undervaregrupper", label: "Undervaregrupper", icon: Folder },
-  { to: "/innstillinger/varesider", label: "Varesider", icon: LayoutGrid },
-  { to: "/innstillinger/salgsgrupper", label: "Salgsgrupper", icon: Tag },
-  { to: "/innstillinger/produksjonsgrupper", label: "Produksjonsgrupper", icon: Factory },
+  { to: "/varer/innstillinger/generelt", label: "Generelt", icon: SettingsIcon },
+  { to: "/varer/innstillinger/hovedvaregrupper", label: "Hovedvaregrupper", icon: FolderOpen },
+  { to: "/varer/innstillinger/undervaregrupper", label: "Undervaregrupper", icon: Folder },
+  { to: "/varer/innstillinger/varesider", label: "Varesider", icon: LayoutGrid },
+  { to: "/varer/innstillinger/salgsgrupper", label: "Salgsgrupper", icon: Tag },
+  { to: "/varer/innstillinger/produksjonsgrupper", label: "Produksjonsgrupper", icon: Factory },
 ];
 
 export default function SettingsLayout() {

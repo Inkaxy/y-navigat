@@ -104,7 +104,7 @@ export default function PriceListDetail() {
 
   return (
     <div className="px-6 py-6">
-      <Button variant="ghost" size="sm" onClick={() => navigate("/priser")} className="-ml-2 mb-3">
+      <Button variant="ghost" size="sm" onClick={() => navigate("/varer/priser")} className="-ml-2 mb-3">
         <ArrowLeft className="mr-1 h-4 w-4" /> Tilbake til prislister
       </Button>
 

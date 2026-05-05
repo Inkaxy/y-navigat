@@ -52,7 +52,7 @@ export function DetailLayout({
       <Button
         variant="ghost"
         size="sm"
-        onClick={() => navigate("/vareliste")}
+        onClick={() => navigate("/varer/vareliste")}
         className="mb-3 -ml-2"
       >
         <ArrowLeft className="mr-1 h-4 w-4" /> Tilbake til vareliste

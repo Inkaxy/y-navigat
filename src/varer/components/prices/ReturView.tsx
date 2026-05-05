@@ -160,7 +160,7 @@ export function ReturView({ priceDate, search }: Props) {
             {filtered.map((p) => (
               <tr
                 key={p.id}
-                onClick={() => navigate(`/vareliste/${p.id}?tab=retur`)}
+                onClick={() => navigate(`/varer/vareliste/${p.id}?tab=retur`)}
                 className="cursor-pointer border-t border-border hover:bg-muted/30"
               >
                 <td className="px-3 py-2.5 text-muted-foreground tabular-nums">
