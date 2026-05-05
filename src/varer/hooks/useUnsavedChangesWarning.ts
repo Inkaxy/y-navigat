@@ -23,7 +23,7 @@ export function useUnsavedChangesWarning(when: boolean) {
   }, []);
 
   return {
-    state: "unblocked" as const,
+    state: "unblocked" as "unblocked" | "blocked" | "proceeding",
     proceed: undefined as undefined | (() => void),
     reset: undefined as undefined | (() => void),
     location: undefined,
