@@ -29,28 +29,28 @@ import {
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 
-import { useLegalEntities } from "@/features/produksjonsavdelinger/hooks/useLegalEntities";
+import { useLegalEntities } from "@/produksjon/features/produksjonsavdelinger/hooks/useLegalEntities";
 
-import { DateNavigator } from "@/features/etiketter/components/DateNavigator";
-import { KpiCard } from "@/features/etiketter/components/KpiCard";
-import { LabelFlaggedProductsBar } from "@/features/etiketter/components/LabelFlaggedProductsBar";
-import { LabelProductsTable } from "@/features/etiketter/components/LabelProductsTable";
-import { PrintLabelDialog } from "@/features/etiketter/components/PrintLabelDialog";
-import { RecentLabelJobs } from "@/features/etiketter/components/RecentLabelJobs";
-import { VelgProfilForVareDialog } from "@/features/etiketter/components/VelgProfilForVareDialog";
+import { DateNavigator } from "@/produksjon/features/etiketter/components/DateNavigator";
+import { KpiCard } from "@/produksjon/features/etiketter/components/KpiCard";
+import { LabelFlaggedProductsBar } from "@/produksjon/features/etiketter/components/LabelFlaggedProductsBar";
+import { LabelProductsTable } from "@/produksjon/features/etiketter/components/LabelProductsTable";
+import { PrintLabelDialog } from "@/produksjon/features/etiketter/components/PrintLabelDialog";
+import { RecentLabelJobs } from "@/produksjon/features/etiketter/components/RecentLabelJobs";
+import { VelgProfilForVareDialog } from "@/produksjon/features/etiketter/components/VelgProfilForVareDialog";
 
-import { useDeliveryTours } from "@/features/etiketter/hooks/useDeliveryTours";
-import { useLabelDepartments } from "@/features/etiketter/hooks/useLabelDepartments";
-import { useLabelProducts } from "@/features/etiketter/hooks/useLabelProducts";
-import { useLabelChangeTracking } from "@/features/etiketter/hooks/useLabelChangeTracking";
-import { useLabelRealtime } from "@/features/etiketter/hooks/useLabelRealtime";
-import { useProductLabelProfiles } from "@/features/etiketter/hooks/useProductLabelProfiles";
+import { useDeliveryTours } from "@/produksjon/features/etiketter/hooks/useDeliveryTours";
+import { useLabelDepartments } from "@/produksjon/features/etiketter/hooks/useLabelDepartments";
+import { useLabelProducts } from "@/produksjon/features/etiketter/hooks/useLabelProducts";
+import { useLabelChangeTracking } from "@/produksjon/features/etiketter/hooks/useLabelChangeTracking";
+import { useLabelRealtime } from "@/produksjon/features/etiketter/hooks/useLabelRealtime";
+import { useProductLabelProfiles } from "@/produksjon/features/etiketter/hooks/useProductLabelProfiles";
 import {
   useInsertLabelPrintJob,
   useNextLabelNumber,
-} from "@/features/etiketter/hooks/useLabelPrintJobs";
-import { useLabelPrintProfiles } from "@/features/utskriftsprofiler/hooks/useLabelPrintProfiles";
-import type { LabelProductRow, LabelScreenFilter } from "@/features/etiketter/types";
+} from "@/produksjon/features/etiketter/hooks/useLabelPrintJobs";
+import { useLabelPrintProfiles } from "@/produksjon/features/utskriftsprofiler/hooks/useLabelPrintProfiles";
+import type { LabelProductRow, LabelScreenFilter } from "@/produksjon/features/etiketter/types";
 
 const ALL = "all" as const;
 

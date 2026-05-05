@@ -20,7 +20,7 @@ import {
   useRecentLabelJobs,
   type LabelPrintJob,
 } from "../hooks/useLabelPrintJobs";
-import type { ProductionDepartment } from "@/features/produksjonsavdelinger/types";
+import type { ProductionDepartment } from "@/produksjon/features/produksjonsavdelinger/types";
 
 interface Props {
   deptId: string | undefined;

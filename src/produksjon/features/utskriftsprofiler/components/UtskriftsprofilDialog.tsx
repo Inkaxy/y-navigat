@@ -22,7 +22,7 @@ import {
   useCreateLabelPrintProfile,
   useUpdateLabelPrintProfile,
 } from "../hooks/useLabelPrintProfileMutations";
-import type { LegalEntityOption } from "@/features/produksjonsavdelinger/hooks/useLegalEntities";
+import type { LegalEntityOption } from "@/produksjon/features/produksjonsavdelinger/hooks/useLegalEntities";
 import { FieldPalette } from "./canvas/FieldPalette";
 import { LabelCanvas } from "./canvas/LabelCanvas";
 import { InlineToolbar } from "./canvas/InlineToolbar";

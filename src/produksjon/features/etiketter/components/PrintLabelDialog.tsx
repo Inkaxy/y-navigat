@@ -24,7 +24,7 @@ import {
   useNextLabelNumber,
 } from "../hooks/useLabelPrintJobs";
 import type { LabelProductRow } from "../types";
-import type { ProductionDepartment } from "@/features/produksjonsavdelinger/types";
+import type { ProductionDepartment } from "@/produksjon/features/produksjonsavdelinger/types";
 
 interface Props {
   open: boolean;

@@ -10,10 +10,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useLegalEntities } from "@/features/produksjonsavdelinger/hooks/useLegalEntities";
-import { useProductionDepartments } from "@/features/produksjonsavdelinger/hooks/useProductionDepartments";
-import { DepartmentCard } from "@/features/oversikt/components/DepartmentCard";
-import { useOversiktRealtime } from "@/features/oversikt/hooks/useDepartmentLabelStats";
+import { useLegalEntities } from "@/produksjon/features/produksjonsavdelinger/hooks/useLegalEntities";
+import { useProductionDepartments } from "@/produksjon/features/produksjonsavdelinger/hooks/useProductionDepartments";
+import { DepartmentCard } from "@/produksjon/features/oversikt/components/DepartmentCard";
+import { useOversiktRealtime } from "@/produksjon/features/oversikt/hooks/useDepartmentLabelStats";
 
 export default function OversiktPage() {
   const { data: entities, isLoading: entitiesLoading } = useLegalEntities();

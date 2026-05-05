@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDepartmentLabelStats } from "../hooks/useDepartmentLabelStats";
-import type { ProductionDepartment } from "@/features/produksjonsavdelinger/types";
+import type { ProductionDepartment } from "@/produksjon/features/produksjonsavdelinger/types";
 
 interface DepartmentCardProps {
   department: ProductionDepartment;

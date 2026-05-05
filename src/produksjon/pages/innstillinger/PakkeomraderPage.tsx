@@ -30,15 +30,15 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { useLegalEntities } from "@/features/produksjonsavdelinger/hooks/useLegalEntities";
-import { usePackingAreas } from "@/features/pakkeomrader/hooks/usePackingAreas";
+import { useLegalEntities } from "@/produksjon/features/produksjonsavdelinger/hooks/useLegalEntities";
+import { usePackingAreas } from "@/produksjon/features/pakkeomrader/hooks/usePackingAreas";
 import {
   useArchivePackingArea,
   useRestorePackingArea,
-} from "@/features/pakkeomrader/hooks/usePackingAreaMutations";
-import { PakkeomradeDialog } from "@/features/pakkeomrader/components/PakkeomradeDialog";
-import { ArchiveConfirmDialog } from "@/features/pakkeomrader/components/ArchiveConfirmDialog";
-import type { PackingArea } from "@/features/pakkeomrader/types";
+} from "@/produksjon/features/pakkeomrader/hooks/usePackingAreaMutations";
+import { PakkeomradeDialog } from "@/produksjon/features/pakkeomrader/components/PakkeomradeDialog";
+import { ArchiveConfirmDialog } from "@/produksjon/features/pakkeomrader/components/ArchiveConfirmDialog";
+import type { PackingArea } from "@/produksjon/features/pakkeomrader/types";
 
 export default function PakkeomraderPage() {
   const { data: entities, isLoading: entitiesLoading } = useLegalEntities();

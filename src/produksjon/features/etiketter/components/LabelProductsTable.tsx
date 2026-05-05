@@ -19,8 +19,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import type { LabelMode, LabelPrintModel, LabelProductRow } from "../types";
-import type { ProductionDepartment } from "@/features/produksjonsavdelinger/types";
-import type { LabelPrintProfile } from "@/features/utskriftsprofiler/types";
+import type { ProductionDepartment } from "@/produksjon/features/produksjonsavdelinger/types";
+import type { LabelPrintProfile } from "@/produksjon/features/utskriftsprofiler/types";
 
 interface Props {
   rows: LabelProductRow[] | undefined;

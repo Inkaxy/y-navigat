@@ -24,16 +24,16 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { useLegalEntities } from "@/features/produksjonsavdelinger/hooks/useLegalEntities";
-import { useLabelPrintProfiles } from "@/features/utskriftsprofiler/hooks/useLabelPrintProfiles";
+import { useLegalEntities } from "@/produksjon/features/produksjonsavdelinger/hooks/useLegalEntities";
+import { useLabelPrintProfiles } from "@/produksjon/features/utskriftsprofiler/hooks/useLabelPrintProfiles";
 import {
   useArchiveLabelPrintProfile,
   useRestoreLabelPrintProfile,
-} from "@/features/utskriftsprofiler/hooks/useLabelPrintProfileMutations";
-import { UtskriftsprofilDialog } from "@/features/utskriftsprofiler/components/UtskriftsprofilDialog";
-import { ArchiveProfileDialog } from "@/features/utskriftsprofiler/components/ArchiveProfileDialog";
-import { ProfileCard } from "@/features/utskriftsprofiler/components/ProfileCard";
-import type { LabelPrintProfile } from "@/features/utskriftsprofiler/types";
+} from "@/produksjon/features/utskriftsprofiler/hooks/useLabelPrintProfileMutations";
+import { UtskriftsprofilDialog } from "@/produksjon/features/utskriftsprofiler/components/UtskriftsprofilDialog";
+import { ArchiveProfileDialog } from "@/produksjon/features/utskriftsprofiler/components/ArchiveProfileDialog";
+import { ProfileCard } from "@/produksjon/features/utskriftsprofiler/components/ProfileCard";
+import type { LabelPrintProfile } from "@/produksjon/features/utskriftsprofiler/types";
 
 function formatDate(iso: string): string {
   try {

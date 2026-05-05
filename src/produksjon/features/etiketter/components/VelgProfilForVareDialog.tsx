@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 
-import { useLabelPrintProfiles } from "@/features/utskriftsprofiler/hooks/useLabelPrintProfiles";
+import { useLabelPrintProfiles } from "@/produksjon/features/utskriftsprofiler/hooks/useLabelPrintProfiles";
 import { useUpdateProductLabelProfile } from "../hooks/useProductLabelProfiles";
 
 interface Props {

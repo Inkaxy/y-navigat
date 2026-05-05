@@ -26,11 +26,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useLegalEntities } from "@/features/produksjonsavdelinger/hooks/useLegalEntities";
-import { useProductionDepartments } from "@/features/produksjonsavdelinger/hooks/useProductionDepartments";
-import { useToggleProductionDepartmentStatus } from "@/features/produksjonsavdelinger/hooks/useProductionDepartmentMutations";
-import { ProduksjonsavdelingDialog } from "@/features/produksjonsavdelinger/components/ProduksjonsavdelingDialog";
-import type { ProductionDepartment } from "@/features/produksjonsavdelinger/types";
+import { useLegalEntities } from "@/produksjon/features/produksjonsavdelinger/hooks/useLegalEntities";
+import { useProductionDepartments } from "@/produksjon/features/produksjonsavdelinger/hooks/useProductionDepartments";
+import { useToggleProductionDepartmentStatus } from "@/produksjon/features/produksjonsavdelinger/hooks/useProductionDepartmentMutations";
+import { ProduksjonsavdelingDialog } from "@/produksjon/features/produksjonsavdelinger/components/ProduksjonsavdelingDialog";
+import type { ProductionDepartment } from "@/produksjon/features/produksjonsavdelinger/types";
 
 export default function ProduksjonsavdelingerPage() {
   const { data: entities, isLoading: entitiesLoading } = useLegalEntities();

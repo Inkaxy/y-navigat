@@ -25,7 +25,7 @@ import {
 } from "../hooks/usePackingAreaMutations";
 import { usePackingAreaUsage } from "../hooks/usePackingAreas";
 import type { PackingArea } from "../types";
-import type { LegalEntityOption } from "@/features/produksjonsavdelinger/hooks/useLegalEntities";
+import type { LegalEntityOption } from "@/produksjon/features/produksjonsavdelinger/hooks/useLegalEntities";
 
 interface Props {
   open: boolean;

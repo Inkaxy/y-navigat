@@ -1,4 +1,4 @@
-import { useProductionDepartments } from "@/features/produksjonsavdelinger/hooks/useProductionDepartments";
+import { useProductionDepartments } from "@/produksjon/features/produksjonsavdelinger/hooks/useProductionDepartments";
 
 /**
  * Convenience wrapper: aktive produksjonsavdelinger for ett selskap.
