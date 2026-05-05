@@ -12,8 +12,17 @@ export function Topbar() {
   return (
     <>
       <header
-        className="relative grid items-center bg-app text-app-foreground"
-        style={{ height: "60px", padding: "0 24px", gridTemplateColumns: "1fr auto 1fr" }}
+        className="sticky top-0 z-40 grid items-center backdrop-blur-md"
+        style={{
+          height: "60px",
+          padding: "0 20px",
+          gridTemplateColumns: "1fr auto 1fr",
+          background:
+            "linear-gradient(180deg, hsl(var(--bakery-cream)) 0%, hsl(var(--surface-raised) / 0.92) 100%)",
+          borderBottom: "1px solid hsl(var(--border-subtle))",
+          boxShadow: "0 1px 0 0 hsl(var(--bakery-wheat) / 0.18), var(--shadow-xs)",
+          color: "hsl(var(--text-primary))",
+        }}
       >
         <div className="flex items-center justify-start">
           <CompanyBlock />
@@ -23,7 +32,7 @@ export function Topbar() {
           <AppTabs />
         </div>
 
-        <div className="flex items-center justify-end gap-3">
+        <div className="flex items-center justify-end gap-2">
           <CommandTrigger onClick={() => setPaletteOpen(true)} />
           <OutletSelector />
           <UserMenu />
