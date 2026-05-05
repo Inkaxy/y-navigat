@@ -1,6 +1,6 @@
 import { Package, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useAppContext } from "@/context/AppContext";
+import { useAppContext } from "@/varer/context/AppContext";
 import { ReactNode } from "react";
 
 interface AppHeaderBannerProps {
