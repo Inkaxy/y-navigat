@@ -17,6 +17,12 @@ import Hjelp from "./pages/Hjelp";
 import NotFound from "./pages/NotFound";
 import AppPlaceholder from "./pages/apps/AppPlaceholder";
 import { AppAccessGuard } from "./components/auth/AppAccessGuard";
+import AdminIndex from "./pages/admin/AdminIndex";
+import AdminPlaceholder from "./pages/admin/AdminPlaceholder";
+import Selskaper from "./pages/admin/Selskaper";
+import Brukere from "./pages/admin/Brukere";
+import BrukerDetalj from "./pages/admin/BrukerDetalj";
+import Tilganger from "./pages/admin/Tilganger";
 
 const queryClient = new QueryClient();
 
@@ -58,7 +64,17 @@ const App = () => (
               <Route path="/min-profil" element={<Shell><MinProfil /></Shell>} />
               <Route path="/varsler" element={<Shell><Varsler /></Shell>} />
               <Route path="/hjelp" element={<Shell><Hjelp /></Shell>} />
-              <Route path="/admin" element={<AppRoute code="nbos" name="NBOS Admin" icon="ShieldCheck" />} />
+              <Route path="/admin" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><AdminIndex /></AppAccessGuard></Shell>} />
+              <Route path="/admin/selskaper" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><Selskaper /></AppAccessGuard></Shell>} />
+              <Route path="/admin/brukere" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><Brukere /></AppAccessGuard></Shell>} />
+              <Route path="/admin/brukere/:id" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><BrukerDetalj /></AppAccessGuard></Shell>} />
+              <Route path="/admin/tilganger" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><Tilganger /></AppAccessGuard></Shell>} />
+              <Route path="/admin/outlets" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><AdminPlaceholder title="Outlets" phase="1B" /></AppAccessGuard></Shell>} />
+              <Route path="/admin/stillinger" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><AdminPlaceholder title="Stillinger" phase="1B" /></AppAccessGuard></Shell>} />
+              <Route path="/admin/apper" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><AdminPlaceholder title="Apper" phase="1B" /></AppAccessGuard></Shell>} />
+              <Route path="/admin/integrasjoner" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><AdminPlaceholder title="Integrasjoner" phase="1C" /></AppAccessGuard></Shell>} />
+              <Route path="/admin/helsesenter" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><AdminPlaceholder title="Helsesenter" phase="1C" /></AppAccessGuard></Shell>} />
+              <Route path="/admin/audit" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><AdminPlaceholder title="Audit" phase="1C" /></AppAccessGuard></Shell>} />
               <Route path="/varer" element={<AppRoute code="varer" name="Varer" icon="Package" />} />
               <Route path="/kunder" element={<AppRoute code="kunder" name="Kunder" icon="Users" />} />
               <Route path="/ordre" element={<AppRoute code="ordre" name="Ordre" icon="ShoppingCart" />} />
