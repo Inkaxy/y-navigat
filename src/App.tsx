@@ -15,6 +15,8 @@ import MinProfil from "./pages/MinProfil";
 import Varsler from "./pages/Varsler";
 import Hjelp from "./pages/Hjelp";
 import NotFound from "./pages/NotFound";
+import AppPlaceholder from "./pages/apps/AppPlaceholder";
+import { AppAccessGuard } from "./components/auth/AppAccessGuard";
 
 const queryClient = new QueryClient();
 
@@ -22,6 +24,22 @@ const Shell = ({ children }: { children: React.ReactNode }) => (
   <ProtectedRoute>
     <AppShell>{children}</AppShell>
   </ProtectedRoute>
+);
+
+const AppRoute = ({
+  code,
+  name,
+  icon,
+}: {
+  code: string;
+  name: string;
+  icon: string;
+}) => (
+  <Shell>
+    <AppAccessGuard appCode={code} appName={name}>
+      <AppPlaceholder appCode={code} title={name} iconName={icon} />
+    </AppAccessGuard>
+  </Shell>
 );
 
 const App = () => (
@@ -40,6 +58,11 @@ const App = () => (
               <Route path="/min-profil" element={<Shell><MinProfil /></Shell>} />
               <Route path="/varsler" element={<Shell><Varsler /></Shell>} />
               <Route path="/hjelp" element={<Shell><Hjelp /></Shell>} />
+              <Route path="/admin" element={<AppRoute code="nbos" name="NBOS Admin" icon="ShieldCheck" />} />
+              <Route path="/varer" element={<AppRoute code="varer" name="Varer" icon="Package" />} />
+              <Route path="/kunder" element={<AppRoute code="kunder" name="Kunder" icon="Users" />} />
+              <Route path="/ordre" element={<AppRoute code="ordre" name="Ordre" icon="ShoppingCart" />} />
+              <Route path="/produksjon" element={<AppRoute code="produksjon" name="Produksjon" icon="Factory" />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
