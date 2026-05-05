@@ -27,6 +27,25 @@ import Outlets from "./pages/admin/Outlets";
 import Stillinger from "./pages/admin/Stillinger";
 import StillingDetalj from "./pages/admin/StillingDetalj";
 import Apper from "./pages/admin/Apper";
+import { Navigate } from "react-router-dom";
+import { AppProvider as VarerAppProvider } from "@/varer/context/AppContext";
+import VarerProductList from "@/varer/pages/ProductList";
+import VarerProductDetail from "@/varer/pages/ProductDetail";
+import VarerPriceLists from "@/varer/pages/PriceLists";
+import VarerPriceListDetail from "@/varer/pages/PriceListDetail";
+import VarerSpecialPrices from "@/varer/pages/SpecialPrices";
+import VarerRecipes from "@/varer/pages/Recipes";
+import VarerPlaceholder from "@/varer/pages/PlaceholderPage";
+import VarerCakeBuilderList from "@/varer/pages/cakebuilder/CakeBuilderList";
+import VarerCakeBuilderDetail from "@/varer/pages/cakebuilder/CakeBuilderDetail";
+import VarerSettingsLayout from "@/varer/pages/settings/SettingsLayout";
+import VarerSettingsGeneral from "@/varer/pages/settings/SettingsGeneral";
+import VarerSettingsMainCategories from "@/varer/pages/settings/SettingsMainCategories";
+import VarerSettingsSubCategories from "@/varer/pages/settings/SettingsSubCategories";
+import VarerSettingsProductPages from "@/varer/pages/settings/SettingsProductPages";
+import VarerSettingsSalesGroups from "@/varer/pages/settings/SettingsSalesGroups";
+import VarerSettingsProductionGroups from "@/varer/pages/settings/SettingsProductionGroups";
+import VarerCakeBuilderEmbed from "@/varer/pages/embed/CakeBuilderEmbed";
 
 const queryClient = new QueryClient();
 
