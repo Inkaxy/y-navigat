@@ -23,6 +23,10 @@ import Selskaper from "./pages/admin/Selskaper";
 import Brukere from "./pages/admin/Brukere";
 import BrukerDetalj from "./pages/admin/BrukerDetalj";
 import Tilganger from "./pages/admin/Tilganger";
+import Outlets from "./pages/admin/Outlets";
+import Stillinger from "./pages/admin/Stillinger";
+import StillingDetalj from "./pages/admin/StillingDetalj";
+import Apper from "./pages/admin/Apper";
 
 const queryClient = new QueryClient();
 
