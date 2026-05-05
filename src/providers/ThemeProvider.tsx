@@ -13,10 +13,10 @@ interface ThemeContextValue {
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
 function readStoredMode(): ThemeMode {
-  if (typeof window === "undefined") return "system";
+  if (typeof window === "undefined") return "light";
   const stored = window.localStorage.getItem(STORAGE_KEY);
   if (stored === "light" || stored === "dark" || stored === "system") return stored;
-  return "system";
+  return "light";
 }
 
 function applyTheme(mode: ThemeMode) {

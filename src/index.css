@@ -9,40 +9,47 @@
 
 @layer base {
   :root {
-    /* ---- Surfaces (lys / papir-cream) ---- */
-    --surface-canvas:        45 60% 95%;     /* #FAF6EC */
-    --surface-raised:        0 0% 100%;      /* #FFFFFF */
-    --surface-sunken:        45 47% 90%;     /* #F2EBD9 */
+    /* ---- Surfaces (lys, modernisert: ren off-white, mindre gult) ---- */
+    --surface-canvas:        220 20% 98%;     /* #F7F8FA — sideflate */
+    --surface-raised:        0 0% 100%;       /* #FFFFFF — kort */
+    --surface-sunken:        220 16% 95%;     /* #EEF0F4 — innfelt */
     --surface-overlay:       0 0% 100%;
+    --surface-muted:         220 14% 96%;
 
-    /* ---- Borders ---- */
-    --border-subtle:         44 39% 83%;
-    --border-default:        43 35% 79%;
-    --border-strong:         42 28% 67%;
+    /* ---- Borders (myke, kjølige nøytraler) ---- */
+    --border-subtle:         220 14% 92%;
+    --border-default:        220 13% 88%;
+    --border-strong:         220 12% 78%;
 
-    /* ---- Text ---- */
-    --text-primary:          32 28% 13%;
-    --text-secondary:        38 22% 35%;
-    --text-tertiary:         39 20% 46%;
-    --text-on-accent:        45 60% 95%;
+    /* ---- Text (kjølig grå-skala for moderne look) ---- */
+    --text-primary:          222 25% 12%;
+    --text-secondary:        220 12% 38%;
+    --text-tertiary:         220 9%  52%;
+    --text-on-accent:        0   0%  100%;
 
-    /* ---- App-farge (dynamisk via AppColorProvider, fallback = NBHub sky) ---- */
-    --app-color:             199 89% 48%;    /* #0EA5E9 */
-    --app-color-deep:        201 96% 32%;    /* mørk sky */
-    --app-color-soft:        199 89% 48%;    /* brukes med /10 alpha */
+    /* ---- App-farge (dynamisk via AppColorProvider) ---- */
+    --app-color:             221 83% 53%;     /* moderne blå default */
+    --app-color-deep:        222 76% 40%;
+    --app-color-soft:        221 83% 53%;
 
-    /* ---- States ---- */
-    --state-danger:          15 70% 36%;
-    --state-warning:         33 79% 41%;
-    --state-success:         85 64% 37%;
-    --state-neutral:         39 20% 46%;
-    --state-info:            209 75% 37%;
+    /* ---- States (litt mer mettet, moderne) ---- */
+    --state-danger:          0   72% 51%;
+    --state-warning:         32  95% 50%;
+    --state-success:         142 71% 38%;
+    --state-neutral:         220 9%  52%;
+    --state-info:            217 91% 55%;
 
-    /* ---- Radii ---- */
-    --radius-sm: 6px;
-    --radius-md: 8px;
-    --radius-lg: 10px;
-    --radius:    8px;
+    /* ---- Radii (større/mykere — Apple-aktig) ---- */
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --radius:    12px;
+
+    /* ---- Elevation (subtile, lagdelte skygger) ---- */
+    --shadow-xs: 0 1px 2px 0 hsl(220 30% 10% / 0.04);
+    --shadow-sm: 0 1px 2px 0 hsl(220 30% 10% / 0.05), 0 1px 3px 0 hsl(220 30% 10% / 0.04);
+    --shadow-md: 0 4px 12px -2px hsl(220 30% 10% / 0.06), 0 2px 4px -2px hsl(220 30% 10% / 0.04);
+    --shadow-lg: 0 12px 32px -8px hsl(220 30% 10% / 0.10), 0 4px 12px -4px hsl(220 30% 10% / 0.06);
 
     /* ---- Shadcn aliases ---- */
     --background:            var(--surface-canvas);
@@ -73,8 +80,7 @@
     --surface:               var(--surface-raised);
     --surface-elevated:      var(--surface-sunken);
 
-    /* ---- Legacy aliases (bevart slik at AppHeaderBanner og eldre komponenter
-            ikke brekker — peker nå mot --app-color-systemet). ---- */
+    /* ---- Legacy aliases (peker på app-color-systemet) ---- */
     --app-primary:               var(--app-color);
     --app-primary-foreground:    var(--text-on-accent);
     --app-primary-dark:          var(--app-color-deep);
@@ -94,15 +100,22 @@
   }
 
   .dark {
-    --surface-canvas:        32 22% 8%;
-    --surface-raised:        35 19% 12%;
-    --surface-sunken:        37 17% 16%;
-    --border-subtle:         38 18% 19%;
-    --border-default:        38 17% 25%;
-    --border-strong:         40 17% 31%;
-    --text-primary:          45 47% 90%;
-    --text-secondary:        42 28% 67%;
-    --text-tertiary:         39 20% 46%;
+    --surface-canvas:        222 24% 7%;
+    --surface-raised:        222 22% 10%;
+    --surface-sunken:        222 20% 13%;
+    --surface-muted:         222 20% 12%;
+    --border-subtle:         222 16% 18%;
+    --border-default:        222 15% 22%;
+    --border-strong:         222 14% 30%;
+    --text-primary:          220 20% 96%;
+    --text-secondary:        220 12% 70%;
+    --text-tertiary:         220 9%  55%;
+    --text-on-accent:        0   0%  100%;
+
+    --shadow-xs: 0 1px 2px 0 hsl(0 0% 0% / 0.30);
+    --shadow-sm: 0 1px 2px 0 hsl(0 0% 0% / 0.35), 0 1px 3px 0 hsl(0 0% 0% / 0.25);
+    --shadow-md: 0 4px 12px -2px hsl(0 0% 0% / 0.40), 0 2px 4px -2px hsl(0 0% 0% / 0.25);
+    --shadow-lg: 0 12px 32px -8px hsl(0 0% 0% / 0.55), 0 4px 12px -4px hsl(0 0% 0% / 0.35);
   }
 }
 
@@ -111,29 +124,35 @@
 
   html, body, #root {
     @apply min-h-screen bg-background text-foreground;
-    font-family: 'Inter', system-ui, sans-serif;
+    font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, "SF Pro Text", sans-serif;
     font-size: 14px;
-    line-height: 1.6;
+    line-height: 1.55;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    font-feature-settings: "cv11", "ss01", "ss03";
   }
 
-  h1, h2, h3, .font-serif {
-    font-family: 'Fraunces', Georgia, serif;
-    font-weight: 500;
-    letter-spacing: -0.015em;
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, "SF Pro Display", sans-serif;
+    font-weight: 600;
+    letter-spacing: -0.018em;
+    color: hsl(var(--text-primary));
   }
-  h1 { font-size: 30px; line-height: 1.15; }
-  h2 { font-size: 18px; font-family: 'Inter', sans-serif; font-weight: 500; letter-spacing: 0; }
-  h3 { font-size: 16px; font-family: 'Inter', sans-serif; font-weight: 500; letter-spacing: 0; }
+  h1 { font-size: 28px; line-height: 1.2; letter-spacing: -0.022em; font-weight: 600; }
+  h2 { font-size: 20px; line-height: 1.3; font-weight: 600; }
+  h3 { font-size: 16px; line-height: 1.35; font-weight: 600; }
+
+  ::selection { background: hsl(var(--app-color) / 0.18); color: hsl(var(--text-primary)); }
 }
 
 @layer utilities {
   .no-scrollbar::-webkit-scrollbar { display: none; }
   .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-  .font-display { font-family: 'Fraunces', Georgia, serif; }
-  .font-body    { font-family: 'Inter', system-ui, sans-serif; }
+  .font-display { font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; letter-spacing: -0.02em; }
+  .font-body    { font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; }
+  .font-serif   { font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; letter-spacing: -0.02em; }
 
   .eyebrow {
     font-family: 'Inter', sans-serif;
@@ -143,4 +162,9 @@
     letter-spacing: 0.08em;
     color: hsl(var(--text-tertiary));
   }
+
+  .shadow-xs { box-shadow: var(--shadow-xs); }
+  .shadow-card { box-shadow: var(--shadow-sm); }
+  .shadow-elevated { box-shadow: var(--shadow-md); }
+  .shadow-floating { box-shadow: var(--shadow-lg); }
 }
