@@ -816,6 +816,7 @@ export type Database = {
           delivery_postal_code: string | null
           display_name: string
           ehf_participant: string | null
+          enforce_custom_reference: boolean
           geocode_latitude: number | null
           geocode_longitude: number | null
           geocode_source: string | null
@@ -864,6 +865,7 @@ export type Database = {
           delivery_postal_code?: string | null
           display_name: string
           ehf_participant?: string | null
+          enforce_custom_reference?: boolean
           geocode_latitude?: number | null
           geocode_longitude?: number | null
           geocode_source?: string | null
@@ -912,6 +914,7 @@ export type Database = {
           delivery_postal_code?: string | null
           display_name?: string
           ehf_participant?: string | null
+          enforce_custom_reference?: boolean
           geocode_latitude?: number | null
           geocode_longitude?: number | null
           geocode_source?: string | null
