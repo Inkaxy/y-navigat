@@ -69,15 +69,15 @@ export function CompanyBlock({ className }: { className?: string }) {
     <DropdownMenu>
       <DropdownMenuTrigger
         className={cn(
-          "group flex items-center gap-1.5 py-1.5 pl-1 pr-3.5 text-app-foreground transition-colors",
-          "focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30 rounded",
-          "border-r border-white/20",
+          "group flex items-center gap-1.5 py-1.5 pl-1 pr-3.5 text-ink-primary transition-colors",
+          "focus:outline-none focus-visible:ring-2 focus-visible:ring-app/40 rounded-md",
+          "border-r border-line-subtle hover:bg-bakery-cream-deep",
           className,
         )}
       >
         <span
-          className="font-display italic"
-          style={{ fontWeight: 400, fontSize: "13px", letterSpacing: "0.05em" }}
+          className="font-display"
+          style={{ fontWeight: 600, fontSize: "13px", letterSpacing: "0.04em" }}
         >
           {label}
           {year && (
@@ -85,17 +85,18 @@ export function CompanyBlock({ className }: { className?: string }) {
               className="font-display"
               style={{
                 fontSize: "9px",
-                fontWeight: 400,
-                marginLeft: "2px",
+                fontWeight: 500,
+                marginLeft: "3px",
                 verticalAlign: "super",
-                opacity: 0.7,
+                color: "hsl(var(--bakery-crust))",
+                opacity: 0.85,
               }}
             >
               {year}
             </sup>
           )}
         </span>
-        <ChevronDown className="h-3.5 w-3.5 opacity-60" />
+        <ChevronDown className="h-3.5 w-3.5 opacity-50" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-64">
         <DropdownMenuLabel>Selskap</DropdownMenuLabel>
