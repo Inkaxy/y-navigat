@@ -72,19 +72,19 @@ export function AppTabs() {
   const ActiveIcon = active.icon;
 
   return (
-    <div className="flex flex-1 items-center">
+    <div className="flex flex-1 items-center justify-center">
       <DropdownMenu>
         <DropdownMenuTrigger
           className={cn(
-            "flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium",
+            "flex items-center gap-2.5 rounded-md px-5 py-2.5 text-base font-semibold",
             "text-app-foreground transition-colors hover:bg-black/10",
             "focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30",
           )}
           style={{ boxShadow: `inset 0 -2px 0 0 ${active.color}` }}
         >
-          <ActiveIcon className="h-4 w-4" />
+          <ActiveIcon className="h-5 w-5" />
           <span>{active.label}</span>
-          <ChevronDown className="h-4 w-4 opacity-75" />
+          <ChevronDown className="h-5 w-5 opacity-75" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-64">
           <DropdownMenuLabel className="text-xs text-muted-foreground">Apper</DropdownMenuLabel>

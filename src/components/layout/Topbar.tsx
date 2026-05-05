@@ -12,18 +12,22 @@ export function Topbar() {
   return (
     <>
       <header
-        className="flex items-center gap-3 bg-app text-app-foreground"
-        style={{ height: "60px", padding: "0 24px" }}
+        className="relative grid items-center bg-app text-app-foreground"
+        style={{ height: "60px", padding: "0 24px", gridTemplateColumns: "1fr auto 1fr" }}
       >
-        <CompanyBlock />
+        <div className="flex items-center justify-start">
+          <CompanyBlock />
+        </div>
 
-        <AppTabs />
+        <div className="flex items-center justify-center">
+          <AppTabs />
+        </div>
 
-        <CommandTrigger onClick={() => setPaletteOpen(true)} />
-
-        <OutletSelector />
-
-        <UserMenu />
+        <div className="flex items-center justify-end gap-3">
+          <CommandTrigger onClick={() => setPaletteOpen(true)} />
+          <OutletSelector />
+          <UserMenu />
+        </div>
       </header>
 
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
