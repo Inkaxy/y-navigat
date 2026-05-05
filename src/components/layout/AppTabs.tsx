@@ -83,7 +83,7 @@ export function AppTabs() {
           )}
           style={{ boxShadow: `inset 0 -2px 0 0 ${active.color}` }}
         >
-          <ActiveIcon className="h-4 w-4" style={{ color: active.color }} />
+          <span style={{ color: active.color }} className="inline-flex"><ActiveIcon className="h-4 w-4" /></span>
           <span>{active.label}</span>
           <ChevronDown className="h-4 w-4 opacity-60" />
         </DropdownMenuTrigger>
