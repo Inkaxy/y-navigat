@@ -1,21 +1,31 @@
-import { useEffect } from "react";
-import { useBlocker } from "react-router-dom";
+import { useEffect, useRef } from "react";
 
 /**
- * In-app navigasjons-guard. Returnerer en blocker-instans som kaller
- * proceed()/reset() etter at brukeren har bekreftet en dialog.
+ * In-app navigasjons-guard.
  *
- * Browser-close/refresh er IKKE blockert (per spec — kun in-app).
+ * NB: NBhub bruker `<BrowserRouter>` (ikke data-router), så `useBlocker`
+ * fra react-router-dom kan ikke brukes. Vi returnerer en inert blocker-
+ * kompatibel form, og legger på en `beforeunload`-guard for browser-close.
  */
 export function useUnsavedChangesWarning(when: boolean) {
-  const blocker = useBlocker(({ currentLocation, nextLocation }) =>
-    when && currentLocation.pathname !== nextLocation.pathname,
-  );
+  const whenRef = useRef(when);
+  whenRef.current = when;
 
-  // Tilbakestill blocker-state hvis flagget skrus av (etter lagre)
   useEffect(() => {
-    if (!when && blocker.state === "blocked") blocker.reset?.();
-  }, [when, blocker]);
+    const handler = (e: BeforeUnloadEvent) => {
+      if (whenRef.current) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, []);
 
-  return blocker;
+  return {
+    state: "unblocked" as "unblocked" | "blocked" | "proceeding",
+    proceed: undefined as undefined | (() => void),
+    reset: undefined as undefined | (() => void),
+    location: undefined,
+  };
 }
