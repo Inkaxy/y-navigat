@@ -6,7 +6,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { usePickupLocations } from "@/hooks/usePickupLocations";
+import { usePickupLocations } from "@/kunder/hooks/usePickupLocations";
 
 const NONE_VALUE = "__none__";
 

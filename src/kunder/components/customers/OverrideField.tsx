@@ -17,7 +17,7 @@ import {
   formatInheritedValue,
   type ProfileFieldDef,
   type SelectOption,
-} from "@/lib/profileFields";
+} from "@/kunder/lib/profileFields";
 
 type Props = {
   field: ProfileFieldDef;

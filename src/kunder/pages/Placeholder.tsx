@@ -1,4 +1,4 @@
-import { AppBanner } from "@/components/shell/AppBanner";
+import { AppBanner } from "@/kunder/components/shell/AppBanner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Construction } from "lucide-react";
 

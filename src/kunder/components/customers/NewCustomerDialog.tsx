@@ -25,8 +25,8 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { logAudit } from "@/lib/audit";
-import { useCustomerProfiles } from "@/hooks/useCustomerProfiles";
+import { logAudit } from "@/kunder/lib/audit";
+import { useCustomerProfiles } from "@/kunder/hooks/useCustomerProfiles";
 
 const schema = z
   .object({

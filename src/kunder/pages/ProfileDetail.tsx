@@ -48,13 +48,13 @@ import {
   useCustomerProfile,
   useProfileCustomerCounts,
   useProfilePriceLists,
-} from "@/hooks/useCustomerProfiles";
-import { usePriceLists } from "@/hooks/useCustomers";
-import { usePickupLocations } from "@/hooks/usePickupLocations";
-import { PickupLocationSelect } from "@/components/customers/PickupLocationSelect";
-import { useUserAccess } from "@/hooks/useUserAccess";
+} from "@/kunder/hooks/useCustomerProfiles";
+import { usePriceLists } from "@/kunder/hooks/useCustomers";
+import { usePickupLocations } from "@/kunder/hooks/usePickupLocations";
+import { PickupLocationSelect } from "@/kunder/components/customers/PickupLocationSelect";
+import { useUserAccess } from "@/kunder/hooks/useUserAccess";
 import { useAuth } from "@/hooks/useAuth";
-import { logAudit } from "@/lib/audit";
+import { logAudit } from "@/kunder/lib/audit";
 
 const schema = z.object({
   code: z.string().trim().min(1, "Påkrevd").max(40),

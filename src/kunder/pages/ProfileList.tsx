@@ -11,18 +11,18 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { AppBanner } from "@/components/shell/AppBanner";
-import { useSelectedEntity, ALL_ENTITIES } from "@/state/SelectedEntityContext";
+import { AppBanner } from "@/kunder/components/shell/AppBanner";
+import { useSelectedEntity, ALL_ENTITIES } from "@/kunder/state/SelectedEntityContext";
 import {
   useCustomerProfiles,
   useProfileCustomerCounts,
-} from "@/hooks/useCustomerProfiles";
-import { NewProfileDialog } from "@/components/profiles/NewProfileDialog";
+} from "@/kunder/hooks/useCustomerProfiles";
+import { NewProfileDialog } from "@/kunder/components/profiles/NewProfileDialog";
 import {
   CreatePriceListPrompt,
   type NewProfileSeed,
-} from "@/components/profiles/CreatePriceListPrompt";
-import { useUserAccess } from "@/hooks/useUserAccess";
+} from "@/kunder/components/profiles/CreatePriceListPrompt";
+import { useUserAccess } from "@/kunder/hooks/useUserAccess";
 import { useAuth } from "@/hooks/useAuth";
 
 export default function ProfileList() {

@@ -40,14 +40,14 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { useCustomer, usePriceLists } from "@/hooks/useCustomers";
-import { useCustomerProfile } from "@/hooks/useCustomerProfiles";
-import { usePickupLocations } from "@/hooks/usePickupLocations";
-import { useUserAccess } from "@/hooks/useUserAccess";
+import { useCustomer, usePriceLists } from "@/kunder/hooks/useCustomers";
+import { useCustomerProfile } from "@/kunder/hooks/useCustomerProfiles";
+import { usePickupLocations } from "@/kunder/hooks/usePickupLocations";
+import { useUserAccess } from "@/kunder/hooks/useUserAccess";
 import { useAuth } from "@/hooks/useAuth";
-import { logAudit } from "@/lib/audit";
-import { OverrideField } from "@/components/customers/OverrideField";
-import { ChangeProfileDialog } from "@/components/customers/ChangeProfileDialog";
+import { logAudit } from "@/kunder/lib/audit";
+import { OverrideField } from "@/kunder/components/customers/OverrideField";
+import { ChangeProfileDialog } from "@/kunder/components/customers/ChangeProfileDialog";
 import {
   ALL_OVERRIDABLE_FIELDS,
   DELIVERY_FIELDS,
@@ -57,7 +57,7 @@ import {
   PRICING_FIELDS,
   type ProfileFieldDef,
   type SelectOption,
-} from "@/lib/profileFields";
+} from "@/kunder/lib/profileFields";
 
 const baseSchema = z
   .object({

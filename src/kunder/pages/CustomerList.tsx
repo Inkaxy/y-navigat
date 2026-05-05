@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus, Search, AlertCircle, Loader2 } from "lucide-react";
-import { AppBanner } from "@/components/shell/AppBanner";
+import { AppBanner } from "@/kunder/components/shell/AppBanner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -20,13 +20,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { useCustomers } from "@/hooks/useCustomers";
-import { ALL_ENTITIES, useSelectedEntity } from "@/state/SelectedEntityContext";
-import { useUserAccess } from "@/hooks/useUserAccess";
+import { useCustomers } from "@/kunder/hooks/useCustomers";
+import { ALL_ENTITIES, useSelectedEntity } from "@/kunder/state/SelectedEntityContext";
+import { useUserAccess } from "@/kunder/hooks/useUserAccess";
 import { useAuth } from "@/hooks/useAuth";
-import { formatNOK } from "@/lib/format";
-import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-import { NewCustomerDialog } from "@/components/customers/NewCustomerDialog";
+import { formatNOK } from "@/kunder/lib/format";
+import { useDebouncedValue } from "@/kunder/hooks/useDebouncedValue";
+import { NewCustomerDialog } from "@/kunder/components/customers/NewCustomerDialog";
 
 const typeLabel: Record<string, string> = {
   business: "Bedrift",

@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Plus, Pencil, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { AppBanner } from "@/components/shell/AppBanner";
+import { AppBanner } from "@/kunder/components/shell/AppBanner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -54,11 +54,11 @@ import {
   usePickupLocations,
   usePickupLocationUsage,
   useUpsertPickupLocation,
-} from "@/hooks/usePickupLocations";
-import { useUserAccess } from "@/hooks/useUserAccess";
+} from "@/kunder/hooks/usePickupLocations";
+import { useUserAccess } from "@/kunder/hooks/useUserAccess";
 import { useAuth } from "@/hooks/useAuth";
-import { useSelectedEntity, ALL_ENTITIES } from "@/state/SelectedEntityContext";
-import { SettingsSubMenu } from "@/components/shell/SettingsSubMenu";
+import { useSelectedEntity, ALL_ENTITIES } from "@/kunder/state/SelectedEntityContext";
+import { SettingsSubMenu } from "@/kunder/components/shell/SettingsSubMenu";
 
 export default function PickupLocations() {
   const { user } = useAuth();

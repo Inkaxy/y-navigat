@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { ALL_ENTITIES } from "@/state/SelectedEntityContext";
+import { ALL_ENTITIES } from "@/kunder/state/SelectedEntityContext";
 
 export type CustomerProfileRow = {
   id: string;
