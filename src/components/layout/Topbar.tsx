@@ -5,6 +5,7 @@ import { CommandPalette } from "./CommandPalette";
 import { UserMenu } from "./UserMenu";
 import { OutletSelector } from "./OutletSelector";
 import { AppTabs } from "./AppTabs";
+import { MobileMenu } from "./MobileMenu";
 
 export function Topbar() {
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -12,27 +13,29 @@ export function Topbar() {
   return (
     <>
       <header
-        className="sticky top-0 z-40 grid items-center backdrop-blur-md"
+        className="sticky top-0 z-40 flex items-center backdrop-blur-md md:grid"
         style={{
           height: "60px",
-          padding: "0 20px",
-          gridTemplateColumns: "1fr auto 1fr",
+          padding: "0 16px",
           background:
             "linear-gradient(180deg, hsl(var(--bakery-cream)) 0%, hsl(var(--surface-raised) / 0.92) 100%)",
           borderBottom: "1px solid hsl(var(--border-subtle))",
           boxShadow: "0 1px 0 0 hsl(var(--bakery-wheat) / 0.18), var(--shadow-xs)",
           color: "hsl(var(--text-primary))",
+          gridTemplateColumns: "1fr auto 1fr",
         }}
       >
-        <div className="flex items-center justify-start">
+        <MobileMenu onOpenPalette={() => setPaletteOpen(true)} />
+
+        <div className="hidden items-center justify-start md:flex">
           <CompanyBlock />
         </div>
 
-        <div className="flex items-center justify-center">
+        <div className="hidden items-center justify-center md:flex">
           <AppTabs />
         </div>
 
-        <div className="flex items-center justify-end gap-2">
+        <div className="hidden items-center justify-end gap-2 md:flex">
           <CommandTrigger onClick={() => setPaletteOpen(true)} />
           <OutletSelector />
           <UserMenu />
