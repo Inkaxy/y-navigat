@@ -74,7 +74,7 @@ export function DepartmentCard({ department }: DepartmentCardProps) {
         variant="outline"
         size="sm"
         className="w-full justify-between mt-1"
-        onClick={() => navigate("/etiketter")}
+        onClick={() => navigate("/produksjon/etiketter")}
       >
         Se etiketter
         <ArrowRight className="h-4 w-4" />

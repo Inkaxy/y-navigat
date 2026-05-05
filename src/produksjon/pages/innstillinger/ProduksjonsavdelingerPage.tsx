@@ -90,7 +90,7 @@ export default function ProduksjonsavdelingerPage() {
     <div className="container py-8">
       {/* Breadcrumbs */}
       <nav className="mb-6 flex items-center gap-1 text-sm text-muted-foreground">
-        <Link to="/" className="hover:text-foreground">
+        <Link to="/produksjon" className="hover:text-foreground">
           Innstillinger
         </Link>
         <ChevronRight className="h-4 w-4" />

@@ -96,7 +96,7 @@ export default function OversiktPage() {
             Opprett en avdeling for å begynne å spore etikett-utskrifter.
           </p>
           <Button asChild>
-            <Link to="/innstillinger/produksjonsavdelinger">Opprett avdeling</Link>
+            <Link to="/produksjon/innstillinger/produksjonsavdelinger">Opprett avdeling</Link>
           </Button>
         </Card>
       )}
