@@ -1,5 +1,13 @@
-import { Navigate } from "react-router-dom";
+import Hjem from "./Hjem";
+import { AppShell } from "@/components/layout/AppShell";
+import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 
 export default function Index() {
-  return <Navigate to="/hjem" replace />;
+  return (
+    <ProtectedRoute>
+      <AppShell>
+        <Hjem />
+      </AppShell>
+    </ProtectedRoute>
+  );
 }
