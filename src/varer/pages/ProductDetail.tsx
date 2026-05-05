@@ -468,7 +468,7 @@ export default function ProductDetail() {
             <CardContent>
               {(pricesQuery.data?.length ?? 0) === 0 ? (
                 <p className="text-sm text-muted-foreground">
-                  Denne varen ligger ikke i noen prisliste ennå. Gå til <a href="/priser" className="text-app underline">Priser</a> for å legge den til.
+                  Denne varen ligger ikke i noen prisliste ennå. Gå til <a href="/varer/priser" className="text-app underline">Priser</a> for å legge den til.
                 </p>
               ) : (
                 <table className="w-full text-sm">
@@ -514,7 +514,7 @@ function VariantsTab({ product, variants }: { product: any; variants: any[] }) {
       <Card>
         <CardContent className="pt-6 text-sm">
           Dette er en variant. Mor-vare:{" "}
-          <button onClick={() => navigate(`/vareliste/${product.variant_of_product_id}`)} className="text-app underline">
+          <button onClick={() => navigate(`/varer/vareliste/${product.variant_of_product_id}`)} className="text-app underline">
             Vis mor-vare
           </button>
         </CardContent>
@@ -531,7 +531,7 @@ function VariantsTab({ product, variants }: { product: any; variants: any[] }) {
           <ul className="divide-y divide-border">
             {variants.map((v) => (
               <li key={v.id}>
-                <button onClick={() => navigate(`/vareliste/${v.id}`)} className="flex w-full items-center justify-between py-3 text-left hover:text-app">
+                <button onClick={() => navigate(`/varer/vareliste/${v.id}`)} className="flex w-full items-center justify-between py-3 text-left hover:text-app">
                   <span>
                     <span className="font-medium">{v.display_name}</span>
                     {v.variant_label && <span className="ml-2 text-xs text-muted-foreground">({v.variant_label})</span>}

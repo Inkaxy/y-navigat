@@ -203,7 +203,7 @@ export function CakeBuilderSection({
             {categories.length === 0 ? (
               <p className="text-xs text-muted-foreground rounded-md border border-dashed border-border px-3 py-4 text-center">
                 Ingen kake-kategorier opprettet ennå. Opprett først i{" "}
-                <a href="/kakebygger" className="text-app underline">
+                <a href="/varer/kakebygger" className="text-app underline">
                   Kakebygger
                 </a>
                 .

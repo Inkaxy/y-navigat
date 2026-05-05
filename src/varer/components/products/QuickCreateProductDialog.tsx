@@ -132,7 +132,7 @@ export function QuickCreateProductDialog({ open, onOpenChange, productOptions }:
     onOpenChange(false);
     form.reset();
     setCodeTouched(false);
-    navigate(`/vareliste/${data.id}`);
+    navigate(`/varer/vareliste/${data.id}`);
   }
 
   return (
