@@ -1,0 +1,90 @@
+import { NavLink, useLocation } from "react-router-dom";
+import { useAccessibleApps } from "@/hooks/useAccessibleApps";
+import { cn } from "@/lib/utils";
+
+interface SubItem {
+  to: string;
+  label: string;
+}
+
+const SUBMENUS: Record<string, { prefix: string; appSlug: string; items: SubItem[] }> = {
+  varer: {
+    prefix: "/varer",
+    appSlug: "varer",
+    items: [
+      { to: "/varer/vareliste", label: "Vareliste" },
+      { to: "/varer/priser", label: "Priser" },
+      { to: "/varer/spesialpriser", label: "Spesialpriser" },
+      { to: "/varer/kakebygger", label: "Kakebygger" },
+      { to: "/varer/oppskrifter", label: "Oppskrifter" },
+      { to: "/varer/sortiment", label: "Sortiment" },
+      { to: "/varer/avvik", label: "Avvik" },
+      { to: "/varer/innstillinger", label: "Innstillinger" },
+    ],
+  },
+  admin: {
+    prefix: "/admin",
+    appSlug: "nbos",
+    items: [
+      { to: "/admin/selskaper", label: "Selskaper" },
+      { to: "/admin/brukere", label: "Brukere" },
+      { to: "/admin/tilganger", label: "Tilganger" },
+      { to: "/admin/outlets", label: "Outlets" },
+      { to: "/admin/stillinger", label: "Stillinger" },
+      { to: "/admin/apper", label: "Apper" },
+      { to: "/admin/integrasjoner", label: "Integrasjoner" },
+      { to: "/admin/helsesenter", label: "Helsesenter" },
+      { to: "/admin/audit", label: "Audit" },
+    ],
+  },
+};
+
+export function SubAppNav() {
+  const { pathname } = useLocation();
+  const { data: apps } = useAccessibleApps();
+
+  const match = Object.values(SUBMENUS).find(
+    (s) => pathname === s.prefix || pathname.startsWith(s.prefix + "/"),
+  );
+  if (!match) return null;
+
+  const app = apps?.find((a) => a.slug === match.appSlug);
+  const color = app?.color_hex ?? "hsl(var(--primary))";
+
+  const isActive = (to: string) => pathname === to || pathname.startsWith(to + "/");
+
+  return (
+    <nav className="border-b border-line bg-surface-canvas" style={{ padding: "0 16px" }}>
+      <ul className="no-scrollbar flex items-stretch gap-0 overflow-x-auto">
+        {match.items.map((item) => {
+          const active = isActive(item.to);
+          return (
+            <li key={item.to} className="shrink-0">
+              <NavLink
+                to={item.to}
+                className={cn(
+                  "flex items-center whitespace-nowrap text-sm text-ink-secondary",
+                  "border-b-2 border-transparent transition-colors",
+                  "hover:bg-surface-sunken hover:text-ink-primary",
+                )}
+                style={
+                  active
+                    ? {
+                        padding: "10px 14px",
+                        color,
+                        borderBottomColor: color,
+                        backgroundColor: `${color}14`,
+                        fontWeight: 500,
+                      }
+                    : { padding: "10px 14px" }
+                }
+              >
+                {item.label}
+              </NavLink>
+            </li>
+          );
+        })}
+      </ul>
+    </nav>
+  );
+}
