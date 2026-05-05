@@ -1,4 +1,4 @@
-import { AppHeaderBanner } from "@/components/layout/AppHeaderBanner";
+import { AppHeaderBanner } from "@/varer/components/layout/AppHeaderBanner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Construction } from "lucide-react";
 

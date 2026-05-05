@@ -20,7 +20,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { NB_LEGAL_ENTITY_ID } from "@/varer/lib/constants";
 import { logAudit } from "@/varer/lib/audit";
 import { useAppContext } from "@/varer/context/AppContext";
-import { AppHeaderBanner } from "@/components/layout/AppHeaderBanner";
+import { AppHeaderBanner } from "@/varer/components/layout/AppHeaderBanner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";

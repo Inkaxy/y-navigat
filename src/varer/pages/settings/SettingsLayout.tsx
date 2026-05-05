@@ -7,7 +7,7 @@ import {
   Tag,
   Factory,
 } from "lucide-react";
-import { AppHeaderBanner } from "@/components/layout/AppHeaderBanner";
+import { AppHeaderBanner } from "@/varer/components/layout/AppHeaderBanner";
 import { cn } from "@/lib/utils";
 
 const tabs = [

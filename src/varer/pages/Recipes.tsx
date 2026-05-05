@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { AppHeaderBanner } from "@/components/layout/AppHeaderBanner";
+import { AppHeaderBanner } from "@/varer/components/layout/AppHeaderBanner";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Search, Loader2, ChefHat } from "lucide-react";
