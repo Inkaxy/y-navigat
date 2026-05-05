@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { AppColorProvider } from "@/providers/AppColorProvider";
 import { SelectionProvider } from "@/providers/SelectionProvider";
 import { Topbar } from "./Topbar";
+import { SubAppNav } from "./SubAppNav";
 import { BugReportButton } from "./BugReportButton";
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -10,6 +11,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <SelectionProvider>
         <div className="app-shell flex min-h-screen w-full flex-col bg-surface-canvas text-ink-primary">
           <Topbar />
+          <SubAppNav />
           <main className="flex-1">
             <div
               className="page-canvas mx-auto w-full animate-fade-in"
