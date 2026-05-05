@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import AdminLayout from "./AdminLayout";
@@ -24,6 +25,8 @@ const LEVEL_COLOR: Record<Level, string> = {
 
 export default function Tilganger() {
   const qc = useQueryClient();
+  const [params] = useSearchParams();
+  const positionFilter = params.get("position");
   const [posSearch, setPosSearch] = useState("");
   const [appSearch, setAppSearch] = useState("");
 
@@ -81,9 +84,10 @@ export default function Tilganger() {
     onError: (e: any) => toast.error(e.message ?? "Kunne ikke oppdatere"),
   });
 
-  const filteredPositions = positions.filter((p: any) =>
-    !posSearch || p.display_name.toLowerCase().includes(posSearch.toLowerCase()) || p.code.toLowerCase().includes(posSearch.toLowerCase())
-  );
+  const filteredPositions = positions.filter((p: any) => {
+    if (positionFilter && p.id !== positionFilter) return false;
+    return !posSearch || p.display_name.toLowerCase().includes(posSearch.toLowerCase()) || p.code.toLowerCase().includes(posSearch.toLowerCase());
+  });
   const filteredApps = apps.filter((a: any) =>
     !appSearch || a.display_name.toLowerCase().includes(appSearch.toLowerCase()) || a.code.toLowerCase().includes(appSearch.toLowerCase())
   );
