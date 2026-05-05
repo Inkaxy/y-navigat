@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { ChevronDown, Check, LogOut, Sun, Moon, Monitor } from "lucide-react";
+import { ChevronDown, Check, LogOut, Sun, Moon, Monitor, User, Bell, HelpCircle } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,6 +36,16 @@ export function UserMenu() {
         <ChevronDown className="h-3.5 w-3.5 opacity-80" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuItem onClick={() => navigate("/min-profil")} className="flex items-center gap-2">
+          <User className="h-4 w-4 opacity-70" /> Min profil
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => navigate("/varsler")} className="flex items-center gap-2">
+          <Bell className="h-4 w-4 opacity-70" /> Varsler
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => navigate("/hjelp")} className="flex items-center gap-2">
+          <HelpCircle className="h-4 w-4 opacity-70" /> Hjelp
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
         <DropdownMenuLabel className="text-xs text-muted-foreground">Tema</DropdownMenuLabel>
         {themeOptions.map((opt) => {
           const Icon = opt.icon;

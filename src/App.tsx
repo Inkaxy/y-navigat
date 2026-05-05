@@ -82,8 +82,8 @@ const App = () => (
             <Routes>
               <Route path="/login" element={<Login />} />
               <Route path="/" element={<Index />} />
-              <Route path="/hjem" element={<Shell><Hjem /></Shell>} />
-              <Route path="/mine-apper" element={<Shell><MineApper /></Shell>} />
+              <Route path="/hjem" element={<Navigate to="/" replace />} />
+              <Route path="/mine-apper" element={<Navigate to="/" replace />} />
               <Route path="/min-profil" element={<Shell><MinProfil /></Shell>} />
               <Route path="/varsler" element={<Shell><Varsler /></Shell>} />
               <Route path="/hjelp" element={<Shell><Hjelp /></Shell>} />
