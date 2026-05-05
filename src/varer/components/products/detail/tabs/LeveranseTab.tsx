@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { AlertCircle, Calendar, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { ProductFormValues } from "@/lib/productSchema";
+import type { ProductFormValues } from "@/varer/lib/productSchema";
 
 interface Props {
   canWrite: boolean;

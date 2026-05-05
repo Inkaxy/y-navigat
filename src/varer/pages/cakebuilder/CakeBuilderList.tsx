@@ -7,8 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Cake, Plus, Loader2, Eye } from "lucide-react";
-import { NB_LEGAL_ENTITY_ID, CAKE_CATEGORY_STATUS_LABEL } from "@/lib/constants";
-import { useAppContext } from "@/context/AppContext";
+import { NB_LEGAL_ENTITY_ID, CAKE_CATEGORY_STATUS_LABEL } from "@/varer/lib/constants";
+import { useAppContext } from "@/varer/context/AppContext";
 import { NewCategoryDialog } from "./NewCategoryDialog";
 import { CakeBuilderPreview } from "./CakeBuilderPreview";
 

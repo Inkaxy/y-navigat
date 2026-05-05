@@ -17,9 +17,9 @@ import {
   Check,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { NB_LEGAL_ENTITY_ID } from "@/lib/constants";
-import { logAudit } from "@/lib/audit";
-import { useAppContext } from "@/context/AppContext";
+import { NB_LEGAL_ENTITY_ID } from "@/varer/lib/constants";
+import { logAudit } from "@/varer/lib/audit";
+import { useAppContext } from "@/varer/context/AppContext";
 import { AppHeaderBanner } from "@/components/layout/AppHeaderBanner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -52,8 +52,8 @@ import {
 } from "@/components/ui/table";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { toast } from "sonner";
-import { formatKr, downloadCsv, toCsv } from "@/lib/pricing";
-import { SpecialPriceDialog, type SpecialPriceRow } from "@/components/prices/SpecialPriceDialog";
+import { formatKr, downloadCsv, toCsv } from "@/varer/lib/pricing";
+import { SpecialPriceDialog, type SpecialPriceRow } from "@/varer/components/prices/SpecialPriceDialog";
 
 type ProductLite = { id: string; display_number: number; display_name: string; code: string };
 type CustomerLite = { id: string; customer_number: string; display_name: string };

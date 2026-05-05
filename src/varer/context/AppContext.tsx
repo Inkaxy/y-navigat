@@ -2,8 +2,8 @@ import { createContext, useContext, useEffect, useState, ReactNode } from "react
 import { useQuery } from "@tanstack/react-query";
 import type { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
-import { APP_CODE, NB_LEGAL_ENTITY_ID } from "@/lib/constants";
-import { setAppThemeFromHex } from "@/lib/theme";
+import { APP_CODE, NB_LEGAL_ENTITY_ID } from "@/varer/lib/constants";
+import { setAppThemeFromHex } from "@/varer/lib/theme";
 
 export type AccessLevel = "none" | "read" | "write" | "approve" | "admin";
 

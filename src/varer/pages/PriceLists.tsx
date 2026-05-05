@@ -2,9 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { NB_LEGAL_ENTITY_ID } from "@/lib/constants";
-import { logAudit } from "@/lib/audit";
-import { useAppContext } from "@/context/AppContext";
+import { NB_LEGAL_ENTITY_ID } from "@/varer/lib/constants";
+import { logAudit } from "@/varer/lib/audit";
+import { useAppContext } from "@/varer/context/AppContext";
 import { AppHeaderBanner } from "@/components/layout/AppHeaderBanner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -36,12 +36,12 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { toCsv, downloadCsv } from "@/lib/pricing";
-import { MatrixView, type ProductRow, type PriceListLite } from "@/components/prices/MatrixView";
-import { BatchAdjustDialog } from "@/components/prices/BatchAdjustDialog";
-import { OfferPriceListsDialog } from "@/components/prices/OfferPriceListsDialog";
-import { ImportPricesDialog } from "@/components/prices/ImportPricesDialog";
-import { ReturView } from "@/components/prices/ReturView";
+import { toCsv, downloadCsv } from "@/varer/lib/pricing";
+import { MatrixView, type ProductRow, type PriceListLite } from "@/varer/components/prices/MatrixView";
+import { BatchAdjustDialog } from "@/varer/components/prices/BatchAdjustDialog";
+import { OfferPriceListsDialog } from "@/varer/components/prices/OfferPriceListsDialog";
+import { ImportPricesDialog } from "@/varer/components/prices/ImportPricesDialog";
+import { ReturView } from "@/varer/components/prices/ReturView";
 
 type ViewMode = "simple" | "matrix" | "retur";
 

@@ -5,8 +5,8 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { RotateCcw } from "lucide-react";
-import { formatKr } from "@/lib/pricing";
-import type { ProductFormValues } from "@/lib/productSchema";
+import { formatKr } from "@/varer/lib/pricing";
+import type { ProductFormValues } from "@/varer/lib/productSchema";
 import { ReturOverridesTable } from "./ReturOverridesTable";
 
 interface Props {

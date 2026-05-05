@@ -6,8 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Cake, Eye, Loader2 } from "lucide-react";
-import { NB_LEGAL_ENTITY_ID } from "@/lib/constants";
-import { CakeBuilder } from "@/features/cakeBuilder/CakeBuilder";
+import { NB_LEGAL_ENTITY_ID } from "@/varer/lib/constants";
+import { CakeBuilder } from "@/varer/features/cakeBuilder/CakeBuilder";
 import { toast } from "sonner";
 
 /**

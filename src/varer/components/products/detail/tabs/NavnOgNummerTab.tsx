@@ -16,8 +16,8 @@ import {
 import { Loader2, Sparkles, ShieldCheck, AlertCircle, CheckCircle2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { MVA_RATES, NB_LEGAL_ENTITY_ID, UNITS_OF_SALE } from "@/lib/constants";
-import type { ProductFormValues } from "@/lib/productSchema";
+import { MVA_RATES, NB_LEGAL_ENTITY_ID, UNITS_OF_SALE } from "@/varer/lib/constants";
+import type { ProductFormValues } from "@/varer/lib/productSchema";
 
 interface Props {
   product: {

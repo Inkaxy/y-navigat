@@ -17,7 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { formatKr } from "@/lib/pricing";
+import { formatKr } from "@/varer/lib/pricing";
 
 interface Props {
   open: boolean;

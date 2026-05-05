@@ -1,5 +1,5 @@
 import { Folder } from "lucide-react";
-import { StamdataPage, type StamdataRow } from "@/components/stamdata/StamdataPage";
+import { StamdataPage, type StamdataRow } from "@/varer/components/stamdata/StamdataPage";
 
 export default function SettingsSubCategories() {
   return (

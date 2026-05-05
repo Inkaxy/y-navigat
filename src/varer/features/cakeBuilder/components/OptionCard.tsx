@@ -1,7 +1,7 @@
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Cake, Check } from "lucide-react";
-import { formatKr } from "@/lib/pricing";
+import { formatKr } from "@/varer/lib/pricing";
 import { cn } from "@/lib/utils";
 import type { WizardOption } from "../types";
 

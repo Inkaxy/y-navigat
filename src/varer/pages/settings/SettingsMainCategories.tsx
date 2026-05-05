@@ -1,5 +1,5 @@
 import { FolderOpen } from "lucide-react";
-import { StamdataPage } from "@/components/stamdata/StamdataPage";
+import { StamdataPage } from "@/varer/components/stamdata/StamdataPage";
 
 export default function SettingsMainCategories() {
   return (

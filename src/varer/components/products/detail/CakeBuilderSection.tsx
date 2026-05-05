@@ -24,8 +24,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Cake, Plus, Trash2 } from "lucide-react";
-import { CAKE_ROLE_OPTIONS, NB_LEGAL_ENTITY_ID } from "@/lib/constants";
-import type { ProductFormValues } from "@/lib/productSchema";
+import { CAKE_ROLE_OPTIONS, NB_LEGAL_ENTITY_ID } from "@/varer/lib/constants";
+import type { ProductFormValues } from "@/varer/lib/productSchema";
 
 /** Lokal modell for valgte kategori/steg-koblinger.
  *  Persisteres ved Lagre-trykk fra ProductDetail. */

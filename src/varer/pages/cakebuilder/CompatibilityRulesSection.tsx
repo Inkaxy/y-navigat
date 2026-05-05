@@ -56,7 +56,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { logAudit } from "@/lib/audit";
+import { logAudit } from "@/varer/lib/audit";
 
 type Severity = "info" | "warning" | "block";
 type RuleType = "require_all_selected" | "require_any_two_selected";

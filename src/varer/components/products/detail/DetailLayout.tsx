@@ -4,7 +4,7 @@ import { ArrowLeft, Loader2, Save, X, Ban } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { PRODUCT_STATUS_LABEL, ProductStatus } from "@/lib/constants";
+import { PRODUCT_STATUS_LABEL, ProductStatus } from "@/varer/lib/constants";
 import { TabNavItem, type TabConfig } from "./TabNavItem";
 
 interface DetailLayoutProps {

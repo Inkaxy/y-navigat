@@ -12,9 +12,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2, Lock, LockOpen } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { NB_LEGAL_ENTITY_ID } from "@/lib/constants";
-import { logAudit } from "@/lib/audit";
-import { useAppContext } from "@/context/AppContext";
+import { NB_LEGAL_ENTITY_ID } from "@/varer/lib/constants";
+import { logAudit } from "@/varer/lib/audit";
+import { useAppContext } from "@/varer/context/AppContext";
 import {
   Dialog,
   DialogContent,
@@ -36,7 +36,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { ProductSearchSelect, type ProductOption } from "@/components/products/detail/ProductSearchSelect";
+import { ProductSearchSelect, type ProductOption } from "@/varer/components/products/detail/ProductSearchSelect";
 import { CustomerSearchSelect, type CustomerOption } from "./CustomerSearchSelect";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";

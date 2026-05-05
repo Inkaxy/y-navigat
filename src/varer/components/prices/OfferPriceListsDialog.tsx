@@ -7,8 +7,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { NB_LEGAL_ENTITY_ID } from "@/lib/constants";
-import { logAudit } from "@/lib/audit";
+import { NB_LEGAL_ENTITY_ID } from "@/varer/lib/constants";
+import { logAudit } from "@/varer/lib/audit";
 import {
   Dialog,
   DialogContent,

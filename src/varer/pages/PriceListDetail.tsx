@@ -10,10 +10,10 @@ import { ArrowLeft, Loader2, Plus, Trash2 } from "lucide-react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { NB_LEGAL_ENTITY_ID } from "@/lib/constants";
-import { logAudit } from "@/lib/audit";
+import { NB_LEGAL_ENTITY_ID } from "@/varer/lib/constants";
+import { logAudit } from "@/varer/lib/audit";
 import { toast } from "sonner";
-import { useAppContext } from "@/context/AppContext";
+import { useAppContext } from "@/varer/context/AppContext";
 
 export default function PriceListDetail() {
   const { id } = useParams<{ id: string }>();

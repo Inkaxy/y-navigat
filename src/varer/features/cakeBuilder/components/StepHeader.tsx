@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
-import { formatKr } from "@/lib/pricing";
+import { formatKr } from "@/varer/lib/pricing";
 import { Loader2 } from "lucide-react";
 
 interface StepHeaderProps {

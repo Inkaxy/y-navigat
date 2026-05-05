@@ -6,7 +6,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { NB_LEGAL_ENTITY_ID } from "@/lib/constants";
+import { NB_LEGAL_ENTITY_ID } from "@/varer/lib/constants";
 import {
   Dialog,
   DialogContent,
@@ -52,7 +52,7 @@ import {
   type FilterOptions,
   type ParseResult,
   type RowAction,
-} from "@/lib/tedebeImport";
+} from "@/varer/lib/tedebeImport";
 
 interface Props {
   open: boolean;

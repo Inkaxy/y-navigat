@@ -26,7 +26,7 @@ import {
   ROUND_OPTIONS,
   applyAdjustment,
   formatKr,
-} from "@/lib/pricing";
+} from "@/varer/lib/pricing";
 
 export type AdjustTarget = {
   productId: string;

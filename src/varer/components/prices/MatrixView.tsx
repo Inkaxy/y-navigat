@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ExternalLink } from "lucide-react";
-import { useAppContext } from "@/context/AppContext";
+import { useAppContext } from "@/varer/context/AppContext";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { formatKr } from "@/lib/pricing";
+import { formatKr } from "@/varer/lib/pricing";
 
 export type ProductRow = {
   id: string;

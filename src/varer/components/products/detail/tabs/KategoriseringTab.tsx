@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/select";
 import { ProductSearchSelect, ProductOption } from "../ProductSearchSelect";
 import { MultiSelectChips } from "../MultiSelectChips";
-import type { ProductFormValues } from "@/lib/productSchema";
+import type { ProductFormValues } from "@/varer/lib/productSchema";
 
 interface LookupRow {
   id: string;

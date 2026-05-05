@@ -71,10 +71,10 @@ import {
   CakeRole,
   CakeSelectionType,
   NB_LEGAL_ENTITY_ID,
-} from "@/lib/constants";
-import { useAppContext } from "@/context/AppContext";
+} from "@/varer/lib/constants";
+import { useAppContext } from "@/varer/context/AppContext";
 import { useToast } from "@/hooks/use-toast";
-import { logAudit } from "@/lib/audit";
+import { logAudit } from "@/varer/lib/audit";
 import { NewCategoryDialog } from "./NewCategoryDialog";
 import { CakeBuilderPreview } from "./CakeBuilderPreview";
 import {

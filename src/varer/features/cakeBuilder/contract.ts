@@ -73,7 +73,7 @@ import {
  * samme monorepo:
  *
  * ```ts
- * import { createCakeBuilderListener } from "@/features/cakeBuilder/contract";
+ * import { createCakeBuilderListener } from "@/varer/features/cakeBuilder/contract";
  *
  * useEffect(() => {
  *   const off = createCakeBuilderListener((msg) => {

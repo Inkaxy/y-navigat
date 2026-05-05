@@ -27,22 +27,22 @@ import {
   formValuesToUpdatePayload,
   FIELD_TO_TAB,
   type ProductFormValues,
-} from "@/lib/productSchema";
-import { logAudit } from "@/lib/audit";
-import { useAppContext } from "@/context/AppContext";
-import { NB_LEGAL_ENTITY_ID, ProductStatus } from "@/lib/constants";
-import { useUnsavedChangesWarning } from "@/hooks/useUnsavedChangesWarning";
-import { DetailLayout } from "@/components/products/detail/DetailLayout";
-import type { TabConfig } from "@/components/products/detail/TabNavItem";
-import { UnsavedChangesDialog } from "@/components/products/detail/UnsavedChangesDialog";
-import { NavnOgNummerTab } from "@/components/products/detail/tabs/NavnOgNummerTab";
-import { KategoriseringTab } from "@/components/products/detail/tabs/KategoriseringTab";
-import { ProduksjonTab } from "@/components/products/detail/tabs/ProduksjonTab";
-import { VaredetaljerTab } from "@/components/products/detail/tabs/VaredetaljerTab";
-import { LeveranseTab } from "@/components/products/detail/tabs/LeveranseTab";
-import { PakkeTab, type PackageItem } from "@/components/products/detail/tabs/PakkeTab";
-import { ReturTab } from "@/components/products/detail/tabs/ReturTab";
-import { RecipeEditor } from "@/components/products/RecipeEditor";
+} from "@/varer/lib/productSchema";
+import { logAudit } from "@/varer/lib/audit";
+import { useAppContext } from "@/varer/context/AppContext";
+import { NB_LEGAL_ENTITY_ID, ProductStatus } from "@/varer/lib/constants";
+import { useUnsavedChangesWarning } from "@/varer/hooks/useUnsavedChangesWarning";
+import { DetailLayout } from "@/varer/components/products/detail/DetailLayout";
+import type { TabConfig } from "@/varer/components/products/detail/TabNavItem";
+import { UnsavedChangesDialog } from "@/varer/components/products/detail/UnsavedChangesDialog";
+import { NavnOgNummerTab } from "@/varer/components/products/detail/tabs/NavnOgNummerTab";
+import { KategoriseringTab } from "@/varer/components/products/detail/tabs/KategoriseringTab";
+import { ProduksjonTab } from "@/varer/components/products/detail/tabs/ProduksjonTab";
+import { VaredetaljerTab } from "@/varer/components/products/detail/tabs/VaredetaljerTab";
+import { LeveranseTab } from "@/varer/components/products/detail/tabs/LeveranseTab";
+import { PakkeTab, type PackageItem } from "@/varer/components/products/detail/tabs/PakkeTab";
+import { ReturTab } from "@/varer/components/products/detail/tabs/ReturTab";
+import { RecipeEditor } from "@/varer/components/products/RecipeEditor";
 import { useNavigate as useNav } from "react-router-dom";
 
 const TABS: TabConfig[] = [

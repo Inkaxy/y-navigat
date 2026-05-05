@@ -7,11 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { QuickCreateProductDialog } from "@/components/products/QuickCreateProductDialog";
+import { QuickCreateProductDialog } from "@/varer/components/products/QuickCreateProductDialog";
 import { Search, Loader2, Tag, Cake } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { NB_LEGAL_ENTITY_ID, PRODUCT_STATUS_LABEL, ProductStatus, CAKE_ROLE_LABEL, CakeRole } from "@/lib/constants";
-import { useAppContext } from "@/context/AppContext";
+import { NB_LEGAL_ENTITY_ID, PRODUCT_STATUS_LABEL, ProductStatus, CAKE_ROLE_LABEL, CakeRole } from "@/varer/lib/constants";
+import { useAppContext } from "@/varer/context/AppContext";
 
 type ProductRow = {
   id: string;

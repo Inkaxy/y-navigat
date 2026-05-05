@@ -6,7 +6,7 @@ import { AppHeaderBanner } from "@/components/layout/AppHeaderBanner";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Search, Loader2, ChefHat } from "lucide-react";
-import { NB_LEGAL_ENTITY_ID } from "@/lib/constants";
+import { NB_LEGAL_ENTITY_ID } from "@/varer/lib/constants";
 
 export default function Recipes() {
   const navigate = useNavigate();

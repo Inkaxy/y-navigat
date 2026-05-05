@@ -21,15 +21,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { MultiSelectChips } from "@/components/products/detail/MultiSelectChips";
+import { MultiSelectChips } from "@/varer/components/products/detail/MultiSelectChips";
 import {
   LABEL_MODE_OPTIONS,
   LABEL_MODE_HELP,
   LABEL_PRINT_MODEL_OPTIONS,
   LABEL_PRINT_MODEL_HELP,
-} from "@/lib/constants";
-import type { ProductFormValues } from "@/lib/productSchema";
-import { CakeBuilderSection, type CakeStepLink } from "@/components/products/detail/CakeBuilderSection";
+} from "@/varer/lib/constants";
+import type { ProductFormValues } from "@/varer/lib/productSchema";
+import { CakeBuilderSection, type CakeStepLink } from "@/varer/components/products/detail/CakeBuilderSection";
 
 interface LookupRow {
   id: string;

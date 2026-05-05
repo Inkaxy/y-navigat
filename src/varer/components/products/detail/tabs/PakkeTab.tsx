@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Plus, Trash2 } from "lucide-react";
 import { ProductSearchSelect, ProductOption } from "../ProductSearchSelect";
-import type { ProductFormValues } from "@/lib/productSchema";
+import type { ProductFormValues } from "@/varer/lib/productSchema";
 
 export interface PackageItem {
   contained_product_id: string;

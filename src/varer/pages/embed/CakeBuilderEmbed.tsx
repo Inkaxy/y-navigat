@@ -1,8 +1,8 @@
 import { useEffect } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
-import { CakeBuilder } from "@/features/cakeBuilder/CakeBuilder";
-import { listenFromParent, postToParent } from "@/features/cakeBuilder/protocol";
-import type { CakeResult, PriceBreakdown } from "@/features/cakeBuilder/types";
+import { CakeBuilder } from "@/varer/features/cakeBuilder/CakeBuilder";
+import { listenFromParent, postToParent } from "@/varer/features/cakeBuilder/protocol";
+import type { CakeResult, PriceBreakdown } from "@/varer/features/cakeBuilder/types";
 import { AlertTriangle } from "lucide-react";
 
 /**

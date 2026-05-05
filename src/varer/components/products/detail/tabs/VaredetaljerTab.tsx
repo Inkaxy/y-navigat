@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { TagsInput } from "../TagsInput";
 import { ImageOff, FileText } from "lucide-react";
-import type { ProductFormValues } from "@/lib/productSchema";
+import type { ProductFormValues } from "@/varer/lib/productSchema";
 
 interface Props {
   canWrite: boolean;

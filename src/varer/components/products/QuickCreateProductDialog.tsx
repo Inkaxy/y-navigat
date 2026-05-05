@@ -24,8 +24,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ProductSearchSelect, ProductOption } from "./detail/ProductSearchSelect";
-import { NB_LEGAL_ENTITY_ID, UNITS_OF_SALE } from "@/lib/constants";
-import { logAudit } from "@/lib/audit";
+import { NB_LEGAL_ENTITY_ID, UNITS_OF_SALE } from "@/varer/lib/constants";
+import { logAudit } from "@/varer/lib/audit";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
