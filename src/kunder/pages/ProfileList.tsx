@@ -39,8 +39,8 @@ export default function ProfileList() {
   const canWrite = !!access?.hasKunderWrite;
   const showEntity = selected === ALL_ENTITIES;
 
-  const entityById = new Map(
-    (access?.entities ?? []).map((e) => [e.id, e.short_code]),
+  const entityById = new Map<string, string>(
+    (access?.entities ?? []).map((e) => [e.id, e.short_code] as [string, string]),
   );
 
   return (
