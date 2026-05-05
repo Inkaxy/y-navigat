@@ -1,16 +1,13 @@
 import { useEffect } from "react";
 import { Link } from "react-router-dom";
 import * as Icons from "lucide-react";
-import { Box, ArrowLeft } from "lucide-react";
+import { Box, ArrowLeft, type LucideIcon } from "lucide-react";
 import { AppHeaderBanner } from "@/components/layout/AppHeaderBanner";
 import { AppColorProvider } from "@/providers/AppColorProvider";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
-const iconMap = Icons as unknown as Record<
-  string,
-  React.ComponentType<{ className?: string }>
->;
+const iconMap = Icons as unknown as Record<string, LucideIcon>;
 
 interface Props {
   appCode: string;
