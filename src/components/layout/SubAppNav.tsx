@@ -22,6 +22,17 @@ const SUBMENUS: Record<string, { prefix: string; appSlug: string; items: SubItem
       { to: "/varer/innstillinger", label: "Innstillinger" },
     ],
   },
+  kunder: {
+    prefix: "/kunder",
+    appSlug: "kunder",
+    items: [
+      { to: "/kunder/kundeliste", label: "Kundeliste" },
+      { to: "/kunder/profiler", label: "Profiler" },
+      { to: "/kunder/kundegrupper", label: "Kundegrupper" },
+      { to: "/kunder/historikk", label: "Historikk" },
+      { to: "/kunder/innstillinger", label: "Innstillinger" },
+    ],
+  },
   admin: {
     prefix: "/admin",
     appSlug: "nbos",
