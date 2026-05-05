@@ -64,15 +64,15 @@ export function OutletSelector() {
     <DropdownMenu>
       <DropdownMenuTrigger
         className={cn(
-          "flex items-center gap-2 rounded-md border border-white/25 bg-white/5 px-3 py-1.5 text-sm",
-          "text-app-foreground transition-colors hover:bg-white/15 focus:outline-none",
+          "flex items-center gap-2 rounded-full border border-line-subtle bg-surface-raised px-3 py-1.5 text-sm",
+          "text-ink-primary transition-all hover:bg-bakery-cream hover:border-bakery-wheat/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-app/40",
         )}
       >
-        <Store className="h-4 w-4 sm:hidden" />
+        <Store className="h-4 w-4 opacity-70 sm:hidden" />
         <span className="hidden max-w-[160px] truncate sm:inline">
           {active?.short_name ?? "Velg outlet"}
         </span>
-        <ChevronDown className="h-4 w-4 opacity-80" />
+        <ChevronDown className="h-4 w-4 opacity-60" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-64">
         <DropdownMenuLabel>Outlet</DropdownMenuLabel>

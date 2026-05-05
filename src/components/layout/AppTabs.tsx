@@ -76,15 +76,16 @@ export function AppTabs() {
       <DropdownMenu>
         <DropdownMenuTrigger
           className={cn(
-            "flex items-center gap-2.5 rounded-md px-5 py-2.5 text-base font-semibold",
-            "text-app-foreground transition-colors hover:bg-black/10",
-            "focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30",
+            "flex items-center gap-2.5 rounded-full px-4 py-2 text-sm font-semibold",
+            "text-ink-primary bg-surface-raised border border-line-subtle",
+            "transition-all hover:bg-bakery-cream hover:border-bakery-wheat/40 hover:shadow-card",
+            "focus:outline-none focus-visible:ring-2 focus-visible:ring-app/40",
           )}
           style={{ boxShadow: `inset 0 -2px 0 0 ${active.color}` }}
         >
-          <ActiveIcon className="h-5 w-5" />
+          <span style={{ color: active.color }} className="inline-flex"><ActiveIcon className="h-4 w-4" /></span>
           <span>{active.label}</span>
-          <ChevronDown className="h-5 w-5 opacity-75" />
+          <ChevronDown className="h-4 w-4 opacity-60" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-64">
           <DropdownMenuLabel className="text-xs text-muted-foreground">Apper</DropdownMenuLabel>

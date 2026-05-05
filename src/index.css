@@ -32,6 +32,12 @@
     --app-color-deep:        222 76% 40%;
     --app-color-soft:        221 83% 53%;
 
+    /* ---- Bakeri-aksent (varm wheat/gold) — brukt i topbar/submenu ---- */
+    --bakery-wheat:          35  65% 55%;     /* varm gold */
+    --bakery-crust:          28  45% 42%;     /* dypere crust */
+    --bakery-cream:          40  55% 96%;     /* myk papir */
+    --bakery-cream-deep:     38  40% 92%;
+
     /* ---- States (litt mer mettet, moderne) ---- */
     --state-danger:          0   72% 51%;
     --state-warning:         32  95% 50%;
