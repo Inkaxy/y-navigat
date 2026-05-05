@@ -65,8 +65,11 @@ export function SubAppNav() {
   const isActive = (to: string) => pathname === to || pathname.startsWith(to + "/");
 
   return (
-    <nav className="border-b border-line bg-surface-canvas" style={{ padding: "0 16px" }}>
-      <ul className="no-scrollbar flex items-stretch gap-0 overflow-x-auto">
+    <nav
+      className="border-b border-line-subtle bg-surface-raised/70 backdrop-blur-sm"
+      style={{ padding: "8px 16px" }}
+    >
+      <ul className="no-scrollbar mx-auto flex max-w-[1280px] items-stretch gap-1 overflow-x-auto">
         {match.items.map((item) => {
           const active = isActive(item.to);
           return (
@@ -74,20 +77,20 @@ export function SubAppNav() {
               <NavLink
                 to={item.to}
                 className={cn(
-                  "flex items-center whitespace-nowrap text-sm text-ink-secondary",
-                  "border-b-2 border-transparent transition-colors",
-                  "hover:bg-surface-sunken hover:text-ink-primary",
+                  "flex items-center whitespace-nowrap rounded-full text-sm transition-all",
+                  active
+                    ? "font-semibold shadow-xs"
+                    : "text-ink-secondary font-medium hover:bg-bakery-cream hover:text-ink-primary",
                 )}
                 style={
                   active
                     ? {
-                        padding: "10px 14px",
+                        padding: "7px 14px",
                         color,
-                        borderBottomColor: color,
                         backgroundColor: `${color}14`,
-                        fontWeight: 500,
+                        border: `1px solid ${color}33`,
                       }
-                    : { padding: "10px 14px" }
+                    : { padding: "7px 14px", border: "1px solid transparent" }
                 }
               >
                 {item.label}
