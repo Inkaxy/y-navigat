@@ -84,9 +84,10 @@ export default function Tilganger() {
     onError: (e: any) => toast.error(e.message ?? "Kunne ikke oppdatere"),
   });
 
-  const filteredPositions = positions.filter((p: any) =>
-    !posSearch || p.display_name.toLowerCase().includes(posSearch.toLowerCase()) || p.code.toLowerCase().includes(posSearch.toLowerCase())
-  );
+  const filteredPositions = positions.filter((p: any) => {
+    if (positionFilter && p.id !== positionFilter) return false;
+    return !posSearch || p.display_name.toLowerCase().includes(posSearch.toLowerCase()) || p.code.toLowerCase().includes(posSearch.toLowerCase());
+  });
   const filteredApps = apps.filter((a: any) =>
     !appSearch || a.display_name.toLowerCase().includes(appSearch.toLowerCase()) || a.code.toLowerCase().includes(appSearch.toLowerCase())
   );
