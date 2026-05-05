@@ -208,7 +208,7 @@ export default function CustomerList() {
                 <TableRow
                   key={c.id}
                   className="cursor-pointer hover:bg-muted/40"
-                  onClick={() => navigate(`/kundeliste/${c.id}`)}
+                  onClick={() => navigate(`/kunder/kundeliste/${c.id}`)}
                 >
                   <TableCell className="font-mono text-sm">{c.customer_number}</TableCell>
                   <TableCell>

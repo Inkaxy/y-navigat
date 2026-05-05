@@ -102,7 +102,7 @@ export default function ProfileList() {
                 <TableRow
                   key={p.id}
                   className="cursor-pointer"
-                  onClick={() => navigate(`/profiler/${p.id}`)}
+                  onClick={() => navigate(`/kunder/profiler/${p.id}`)}
                 >
                   <TableCell className="font-mono text-xs">{p.code}</TableCell>
                   <TableCell className="font-medium">{p.display_name}</TableCell>
@@ -165,7 +165,7 @@ export default function ProfileList() {
         onDone={() => {
           const id = createdProfile?.id;
           setCreatedProfile(null);
-          if (id) navigate(`/profiler/${id}`);
+          if (id) navigate(`/kunder/profiler/${id}`);
         }}
       />
     </div>

@@ -400,7 +400,7 @@ export default function CustomerDetail() {
       const ok = window.confirm("Du har ulagrede endringer. Forlat siden likevel?");
       if (!ok) return;
     }
-    navigate("/kundeliste");
+    navigate("/kunder/kundeliste");
   }
 
   const entityShortCode = useMemo(() => {

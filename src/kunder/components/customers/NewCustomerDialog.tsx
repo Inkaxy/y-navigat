@@ -161,7 +161,7 @@ export function NewCustomerDialog({
       queryClient.invalidateQueries({ queryKey: ["customer-profiles"] });
       onOpenChange(false);
       toast.success("Kunde opprettet. Fyll inn detaljer i fanene.");
-      navigate(`/kundeliste/${data.id}`);
+      navigate(`/kunder/kundeliste/${data.id}`);
     },
     onError: (e: any) => {
       const msg = e?.message ?? "Ukjent feil";
@@ -197,7 +197,7 @@ export function NewCustomerDialog({
                   className="text-primary underline-offset-2 hover:underline"
                   onClick={() => {
                     onOpenChange(false);
-                    navigate("/profiler");
+                    navigate("/kunder/profiler");
                   }}
                 >
                   Profiler

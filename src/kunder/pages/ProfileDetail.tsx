@@ -376,7 +376,7 @@ export default function ProfileDetail() {
       const ok = window.confirm("Du har ulagrede endringer. Forlat siden likevel?");
       if (!ok) return;
     }
-    navigate("/profiler");
+    navigate("/kunder/profiler");
   }
 
   function togglePriceList(pid: string) {
