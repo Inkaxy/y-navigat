@@ -15,6 +15,8 @@ import MinProfil from "./pages/MinProfil";
 import Varsler from "./pages/Varsler";
 import Hjelp from "./pages/Hjelp";
 import NotFound from "./pages/NotFound";
+import AppPlaceholder from "./pages/apps/AppPlaceholder";
+import { AppAccessGuard } from "./components/auth/AppAccessGuard";
 
 const queryClient = new QueryClient();
 
@@ -22,6 +24,22 @@ const Shell = ({ children }: { children: React.ReactNode }) => (
   <ProtectedRoute>
     <AppShell>{children}</AppShell>
   </ProtectedRoute>
+);
+
+const AppRoute = ({
+  code,
+  name,
+  icon,
+}: {
+  code: string;
+  name: string;
+  icon: string;
+}) => (
+  <Shell>
+    <AppAccessGuard appCode={code} appName={name}>
+      <AppPlaceholder appCode={code} title={name} iconName={icon} />
+    </AppAccessGuard>
+  </Shell>
 );
 
 const App = () => (
