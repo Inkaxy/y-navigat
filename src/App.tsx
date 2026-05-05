@@ -55,6 +55,11 @@ import KunderPickupLocations from "@/kunder/pages/PickupLocations";
 import KunderPlaceholder from "@/kunder/pages/Placeholder";
 import { useUserAccess as useKunderUserAccess } from "@/kunder/hooks/useUserAccess";
 import { useAuth as useNbhubAuth } from "@/hooks/useAuth";
+import ProduksjonOversikt from "@/produksjon/pages/OversiktPage";
+import ProduksjonEtiketter from "@/produksjon/pages/EtiketterPage";
+import ProduksjonsavdelingerPage from "@/produksjon/pages/innstillinger/ProduksjonsavdelingerPage";
+import PakkeomraderPage from "@/produksjon/pages/innstillinger/PakkeomraderPage";
+import UtskriftsprofilerPage from "@/produksjon/pages/innstillinger/UtskriftsprofilerPage";
 
 const KunderEntityProvider = ({ children }: { children: React.ReactNode }) => {
   const { user } = useNbhubAuth();
