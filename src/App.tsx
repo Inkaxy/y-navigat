@@ -99,7 +99,31 @@ const App = () => (
               <Route path="/admin/integrasjoner" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><AdminPlaceholder title="Integrasjoner" phase="1C" /></AppAccessGuard></Shell>} />
               <Route path="/admin/helsesenter" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><AdminPlaceholder title="Helsesenter" phase="1C" /></AppAccessGuard></Shell>} />
               <Route path="/admin/audit" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><AdminPlaceholder title="Audit" phase="1C" /></AppAccessGuard></Shell>} />
-              <Route path="/varer" element={<AppRoute code="varer" name="Varer" icon="Package" />} />
+              {/* Varer embed routes — frosset kontrakt, INGEN AppShell */}
+              <Route path="/embed/v1/kakebygger/:categoryId" element={<VarerAppProvider><VarerCakeBuilderEmbed /></VarerAppProvider>} />
+              <Route path="/embed/kakebygger/:categoryId" element={<VarerAppProvider><VarerCakeBuilderEmbed /></VarerAppProvider>} />
+
+              {/* Varer sub-routes */}
+              <Route path="/varer" element={<Shell><AppAccessGuard appCode="varer" appName="Varer"><VarerAppProvider><Navigate to="/varer/vareliste" replace /></VarerAppProvider></AppAccessGuard></Shell>} />
+              <Route path="/varer/vareliste" element={<Shell><AppAccessGuard appCode="varer" appName="Varer"><VarerAppProvider><VarerProductList /></VarerAppProvider></AppAccessGuard></Shell>} />
+              <Route path="/varer/vareliste/:id" element={<Shell><AppAccessGuard appCode="varer" appName="Varer"><VarerAppProvider><VarerProductDetail /></VarerAppProvider></AppAccessGuard></Shell>} />
+              <Route path="/varer/priser" element={<Shell><AppAccessGuard appCode="varer" appName="Varer"><VarerAppProvider><VarerPriceLists /></VarerAppProvider></AppAccessGuard></Shell>} />
+              <Route path="/varer/priser/:id" element={<Shell><AppAccessGuard appCode="varer" appName="Varer"><VarerAppProvider><VarerPriceListDetail /></VarerAppProvider></AppAccessGuard></Shell>} />
+              <Route path="/varer/spesialpriser" element={<Shell><AppAccessGuard appCode="varer" appName="Varer"><VarerAppProvider><VarerSpecialPrices /></VarerAppProvider></AppAccessGuard></Shell>} />
+              <Route path="/varer/oppskrifter" element={<Shell><AppAccessGuard appCode="varer" appName="Varer"><VarerAppProvider><VarerRecipes /></VarerAppProvider></AppAccessGuard></Shell>} />
+              <Route path="/varer/kakebygger" element={<Shell><AppAccessGuard appCode="varer" appName="Varer"><VarerAppProvider><VarerCakeBuilderList /></VarerAppProvider></AppAccessGuard></Shell>} />
+              <Route path="/varer/kakebygger/:id" element={<Shell><AppAccessGuard appCode="varer" appName="Varer"><VarerAppProvider><VarerCakeBuilderDetail /></VarerAppProvider></AppAccessGuard></Shell>} />
+              <Route path="/varer/sortiment" element={<Shell><AppAccessGuard appCode="varer" appName="Varer"><VarerAppProvider><VarerPlaceholder title="Sortiment" subtitle="Kanaler og kunder" body="Sortimentsstyring kommer når Kunder-appen er bygget." /></VarerAppProvider></AppAccessGuard></Shell>} />
+              <Route path="/varer/avvik" element={<Shell><AppAccessGuard appCode="varer" appName="Varer"><VarerAppProvider><VarerPlaceholder title="Avvik" subtitle="Avviksregistrering" body="Avviksregistrering for varer kommer i fremtidig iterasjon." /></VarerAppProvider></AppAccessGuard></Shell>} />
+              <Route path="/varer/innstillinger" element={<Shell><AppAccessGuard appCode="varer" appName="Varer"><VarerAppProvider><VarerSettingsLayout /></VarerAppProvider></AppAccessGuard></Shell>}>
+                <Route index element={<Navigate to="/varer/innstillinger/hovedvaregrupper" replace />} />
+                <Route path="generelt" element={<VarerSettingsGeneral />} />
+                <Route path="hovedvaregrupper" element={<VarerSettingsMainCategories />} />
+                <Route path="undervaregrupper" element={<VarerSettingsSubCategories />} />
+                <Route path="varesider" element={<VarerSettingsProductPages />} />
+                <Route path="salgsgrupper" element={<VarerSettingsSalesGroups />} />
+                <Route path="produksjonsgrupper" element={<VarerSettingsProductionGroups />} />
+              </Route>
               <Route path="/kunder" element={<AppRoute code="kunder" name="Kunder" icon="Users" />} />
               <Route path="/ordre" element={<AppRoute code="ordre" name="Ordre" icon="ShoppingCart" />} />
               <Route path="/produksjon" element={<AppRoute code="produksjon" name="Produksjon" icon="Factory" />} />
