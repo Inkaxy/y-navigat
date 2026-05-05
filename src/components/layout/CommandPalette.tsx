@@ -8,7 +8,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSelection } from "@/providers/SelectionProvider";
 import { useTheme, type ThemeMode } from "@/providers/ThemeProvider";
 import { useAccessibleApps } from "@/hooks/useAccessibleApps";
-import { NAV_ITEMS } from "./navItems";
+import { Home, User, Bell, HelpCircle, type LucideIcon } from "lucide-react";
+
+const NAV_ITEMS: { to: string; label: string; icon: LucideIcon }[] = [
+  { to: "/", label: "Hjem", icon: Home },
+  { to: "/min-profil", label: "Min profil", icon: User },
+  { to: "/varsler", label: "Varsler", icon: Bell },
+  { to: "/hjelp", label: "Hjelp", icon: HelpCircle },
+];
 import { cn } from "@/lib/utils";
 
 interface Props {

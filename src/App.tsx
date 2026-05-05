@@ -10,7 +10,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Hjem from "./pages/Hjem";
-import MineApper from "./pages/MineApper";
+
 import MinProfil from "./pages/MinProfil";
 import Varsler from "./pages/Varsler";
 import Hjelp from "./pages/Hjelp";
