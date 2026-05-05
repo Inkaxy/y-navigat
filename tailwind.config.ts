@@ -44,6 +44,14 @@ export default {
           strong: "hsl(var(--border-strong))",
         },
 
+        // Bakeri-aksenter (varm wheat/gold) — for topbar/submenu
+        bakery: {
+          wheat: "hsl(var(--bakery-wheat))",
+          crust: "hsl(var(--bakery-crust))",
+          cream: "hsl(var(--bakery-cream))",
+          "cream-deep": "hsl(var(--bakery-cream-deep))",
+        },
+
         // Dynamic app color (set by AppColorProvider). Beholder legacy aliases
         // (foreground/dark/light/pastel/pastel-border) for eldre komponenter.
         app: {
