@@ -1,103 +1,112 @@
-# Plan: Varer-app — Oppskrifter, Deklarasjon, Kalkulasjon
+# Omfattende oppskrift- og kalkulasjonsmodul
 
-Stor leveranse i tre steg. Jeg ber om godkjenning før jeg starter, og stopper mellom hvert steg slik at du kan teste.
+Behold dagens menyer og ruter (`/varer/oppskrifter`, `/varer/vareliste`, `ProductDetail`-faner). Vi bytter ut **innholdet** i Oppskrift-, Deklarasjon- og (ny) Kalkyle-fanen, og introduserer master-oppskrift som kan brukes av flere produkter.
 
-## Forutsetninger jeg verifiserer først (diagnostikk, ingen kodeendringer)
+## 1. Datamodell (migrasjon)
 
-Før migrering kjører jeg lese-spørringer mot DB for å bekrefte/justere planen:
-- Faktisk skjema for `recipes`, `recipe_lines` (kolonnenavn for fritekst, mengde, enhet, utbytte, svinn).
-- Om `raw_materials` har `unit_weight_grams`, `base_unit`, `current_cost_price`, `price_updated_at`.
-- Om `raw_material_nutrition` / `raw_material_allergens` finnes med forventede felt.
-- Om `legal_entities`-tabellen heter det.
-- Eksisterende versjoneringslogikk på `recipes` (trigger eller app-logikk).
-- Om `pg_trgm` extension er aktivert (for fuzzy-match ved migrering).
+Ny separat oppskriftstabell — uavhengig av produkt — slik at flere produkter kan dele én oppskrift.
 
-Hvis noe avviker fra spec'en (f.eks. andre kolonnenavn), justerer jeg SQL og UI-koblinger før Steg 1.
+```text
+recipes (master)
+ ├─ recipe_lines           (base-ingredienser, sortert)
+ ├─ recipe_labor_lines     (Produksjon/Dekorasjon/Håndtering/Transport — timer + timepris)
+ └─ recipe_packaging_lines (pose/eske/etikett — antall + pris)
+
+product_recipe_links
+ ├─ product_id
+ ├─ recipe_id
+ ├─ yield_weight_g          (vekt på ferdig produkt — overstyrer master)
+ ├─ units_per_batch         (antall enheter — overstyrer master)
+ ├─ extra_lines (jsonb)     (per-produkt ekstra ingredienser, f.eks. dekor)
+ ├─ extra_packaging (jsonb)
+ └─ price_overrides (jsonb) (netto/engros pr produkt)
+```
+
+Eksisterende `product_recipes`-tabell migreres: hver rad blir en `recipes`-master + en `product_recipe_links`-rad. Ingen data går tapt.
+
+Globale defaults: `legal_entity_settings.default_hourly_rate` (400 kr), `default_vat_rate` (15%), `target_db_pct` (40 %).
+
+## 2. UI — Oppskrift-fanen (RecipeEditor v2)
+
+Inspirert av Excel-arket, men moderne kort-basert layout:
+
+```text
+┌─────────────────────────────────────────────────────────────┐
+│ [Tebriks]   Brukes av: 3 produkter ▾    [Lagre ny versjon]  │
+├──────────────────────────┬──────────────────────────────────┤
+│ INGREDIENSER             │ ARBEID                           │
+│ # Råvare    Mengde Pris  │ Produksjon  4 t × 400 = 1600     │
+│ 1 Hvetemel  30000g 5,70  │ Dekorasjon  0 t × 400 =    0     │
+│ 2 Sukker    1500g 11,15  │ Håndtering  0,5 × 400 =  200     │
+│ + Legg til               │ Transport   0,5 × 400 =  200     │
+│                          │ Total arbeid:          2 000     │
+│ Total råvare:  820,28    │                                  │
+├──────────────────────────┼──────────────────────────────────┤
+│ EMBALLASJE               │ NØKKELTALL (live)                │
+│ Pølsepose × 1   1,00     │ Vekt:    110 g                   │
+│ + Legg til               │ Enheter: 656                     │
+│                          │ Kost/stk: 4,30 kr                │
+│                          │ DB: 2,20  DG: 34 % ⚠            │
+└──────────────────────────┴──────────────────────────────────┘
+```
+
+- Inline-redigering på alle linjer, autosave med debounce
+- Drag-handle for sortering, hurtigtast `+` for ny linje
+- Råvarepris hentes fra `raw_materials.current_cost_price` (live)
+- Cmd/Ctrl+K åpner råvare-søk
+
+## 3. UI — Produkt-tilknytning ("Brukes av")
+
+På master-oppskriften: liste over koblede produkter med mulighet til å:
+- Legge til/fjerne produkt
+- Per produkt: overstyre `vekt`, `enheter pr batch`
+- Per produkt: legge til **ekstra ingredienslinjer** (dekor, valmuefrø, etc.) og **ekstra emballasje**
+- Se hvert produkts egne nøkkeltall side-om-side
+
+I `ProductDetail` → Oppskrift-fanen vises master read-only + en "Tillegg for dette produktet"-seksjon for ekstra-linjene.
+
+## 4. UI — Kalkyle-fanen (ny)
+
+Erstatter dagens enklere visning. Layout speiler høyresiden av Excel-arket:
+
+- **Salgspriser** (4 redigerbare kort): Salgspris NETTO, Pris Engros, Salgspris m/embalasje ENGROS, Salgspris m/embalasje EGNE UTSALG
+- **Resultat-kolonne** per pris: Brutto fortjeneste %, DB kr, DG %, mva inn/ut
+- Fargekoding: grønn ≥ target_db_pct, gul innen 5pp under, rød ellers
+- **What-if slider**: råvarepris ±X %, arbeidstid ±Y % → ser umiddelbart effekt på DG
+- **Sammenligning**: hvis oppskriften brukes av flere produkter, vis tabell med DG per produkt
+
+## 5. Beregningsmotor
+
+Ren TS-funksjon `calculateRecipeMetrics(master, link, settings)` returnerer alle tall — brukt av UI for live preview, og av en `compute-recipe-cost` edge function for batch-rekalkulering når råvarepriser endres.
+
+Formler (matcher Excel):
+- `total_raw = Σ(mengde_g/1000 × pris_kg) + Σ ekstra_linjer`
+- `total_labor = Σ(timer × timepris)`
+- `cost_per_unit = (total_raw + total_labor) / units_per_batch`
+- `db = pris_netto − cost_per_unit − emballasje_per_stk`
+- `dg = db / pris_netto`
+
+## 6. Migrering av eksisterende data
+
+Engangsskript i SQL-migrasjonen: hver rad i gamle `product_recipes` blir én `recipes` + én `product_recipe_links`. Navnet på master-oppskriften = produktnavnet (kan endres etterpå). Brukeren kan så slå sammen master-oppskrifter som er like via "Slå sammen oppskrift"-knapp.
+
+## 7. Leveranse i steg
+
+1. **Migrasjon** — nye tabeller + datamigrering + RLS
+2. **Beregningsmotor + hooks** — `useRecipe`, `useProductRecipeLink`, `calculateMetrics`
+3. **RecipeEditor v2** — inkl. arbeid + emballasje
+4. **"Brukes av"-panel + per-produkt tillegg**
+5. **Kalkyle-fane v2** — fire priser + what-if
+6. **Deklarasjon** — oppdater `compute-recipe-declaration` til å lese fra ny modell (inkl. ekstra-linjer)
+
+Hvert steg er testbart for seg. Du godkjenner steg-for-steg som før.
+
+## Det vi IKKE bygger nå
+
+- Versjonering med rollback (kun forward — beholdes som i dagens spec)
+- Halvfabrikat-råvarer (oppskrift som blir råvare i annen oppskrift)
+- Faktisk PDF-utskrift av kalkyle (kun skjerm + CSV-eksport)
 
 ---
 
-## Steg 1 — Datamodell + migrering
-
-### Migrasjoner (én samlet fil)
-1. `recipe_parts`-tabell (recipe_id, name, sort_order, instructions, prep_time_minutes, rest_time_minutes).
-2. `recipe_lines`: nye kolonner `recipe_part_id`, `include_in_declaration` (default true), `is_quid_relevant` (default false), `custom_declaration_text`.
-3. `recipes`: nye kolonner `requires_cleanup`, `bulk_proof_minutes`, `shape_proof_minutes`, `bake_temp_celsius`, `bake_time_minutes`, `steam_seconds`, `cooling_minutes`, `production_notes`, `declaration_mode` (enum), `manual_ingredient_declaration`, `manual_nutrition` jsonb, `manual_allergen_summary` jsonb, `declaration_updated_at`, `declaration_updated_by`.
-4. `recipe_declaration_overrides`-tabell.
-5. `products`: `packaging_cost_per_unit`, `labor_cost_per_unit`, `energy_cost_per_unit`.
-6. `legal_entity_margin_thresholds`-tabell, seedet pr legal_entity med default-terskler (30/50/60/5/90).
-7. View `recipe_nutrition_calculated` (enhetskonvertering + næring/100g med svinn).
-8. RLS på alle nye tabeller speiler eksisterende mønster i Varer-appen.
-
-### Datamigrering (i samme migrasjon, etter DDL, før constraints)
-1. Aktiver `pg_trgm` om nødvendig.
-2. For hver eksisterende `recipes`-rad: opprett `recipe_parts`-rad "Hoveddel" (sort_order 0) og sett alle tilhørende `recipe_lines.recipe_part_id` til denne.
-3. Fuzzy-match fritekst-ingredienser mot `raw_materials.name` (samme legal_entity, similarity ≥ 0.7 og dominant treff). Koble og logg.
-4. Marker oppskrifter med gjenværende ukoblede linjer som `requires_cleanup = true`.
-5. Sett `recipe_lines.recipe_part_id NOT NULL`. **`raw_material_id NOT NULL` settes IKKE i denne migrasjonen** — det skjer i en oppfølger etter at oppryddings-rapporten er kjørt manuelt (ellers blokkerer constraint hele driften). Dette presiserer jeg i koden med kommentar + TODO-migrasjon.
-6. Trigger som setter `requires_cleanup = false` automatisk når alle linjer i en oppskrift har `raw_material_id`.
-
-### Bekrefter eksplisitt
-Versjonering: ingen ny `recipes`-versjon ved råvareprisendring. Kalkulasjon er live. Hvis dagens versjoneringstrigger gjør noe annet, dokumenterer jeg det i diagnostikk-svaret før Steg 2.
-
-**STOPP — venter på din OK for å starte Steg 2.**
-
----
-
-## Steg 2 — UI: Oppskrift-tab
-
-- Erstatt fritekst-input i `RecipeEditor` med autocomplete mot `raw_materials` (filtrert på legal_entity, søker name + sku, viser kategori, kostpris, primær leverandør). "+ Opprett ny råvare" åpner Råvarer-appens `NewRawMaterialDialog` med pre-fylt navn.
-- Strukturerte deler: collapsible seksjoner pr `recipe_part`, drag-and-drop (dnd-kit) på deler og linjer, inline-redigerbar tittel, ⋮-meny (rediger, slett med advarsel, opp/ned, dupliser).
-- Fremgangsmåte + prep/rest-tider pr del.
-- Produksjonsparametre-seksjon under alle delene.
-- Total tid-beregning vist øverst (Aktiv / Hvile/heving).
-- Default: skjul del-header når kun én del finnes.
-- Ny rute `/varer/oppskrifter/krever-opprydding` med KPI-kort + tabell + "Rydd opp"-knapp som dyplinker til oppskrift-detalj.
-- Sidebar i Varer: lenke til oppryddings-rapport under Oppskrifter (med count-badge).
-
-**STOPP — venter på din OK for å starte Steg 3.**
-
----
-
-## Steg 3 — Tabs Deklarasjon + Kalkulasjon
-
-### Backend
-- Edge function `compute-recipe-declaration`: leser `recipe_nutrition_calculated`, bygger ingrediensdeklarasjon på tvers av deler (QUID-sortert i gram desc, allergener i `<strong>`, prosent for QUID-relevante), aggregerer allergen-sammendrag (contains / may_contain), returnerer datakvalitet og warnings. Respekterer `declaration_mode` og overrides.
-- Auto-foreslå `is_quid_relevant` når råvarens navn er ord i produktnavnet (case-insensitive, ord-grense).
-
-### Deklarasjon-tab (ny i venstre meny på vare-detaljside, mellom Oppskrift og Priser)
-- Modus-velger (3 kort) med bekreftelse ved tap av manuelle data.
-- Datakvalitets-banner med dyplenker til råvare for å fylle inn manglende næring/allergen.
-- Under-tabs:
-  - **A. Næring/100g**: norsk standardrekkefølge, lås-ikon pr rad i `auto_with_overrides`.
-  - **B. Ingrediensdeklarasjon**: preview-boks (HTML med `<strong>`) + redigerbar tabell (Mengde / Råvare / Inkluder / QUID / Tilpasset tekst).
-  - **C. Allergener**: auto-aggregert "Inneholder" + "Kan inneholde spor av", manuelt redigerbar i manual-modus.
-- "Forhåndsvis etikett"-modal med Skriv ut / Kopier tekst / Last ned PDF (jsPDF) / Lukk.
-
-### Kalkulasjon-tab (ny, mellom Deklarasjon og Priser)
-- 5 KPI-kort (Råvarekostnad/enhet, /100g, Salgspris, DB, DG fargekodet via terskler fra `legal_entity_margin_thresholds`).
-- Margin-varsler (negativt DB, DG under terskel, fall > N pp på 90 dager via prishistorikk, utdaterte priser).
-- Kostnadsbreakdown-tabell sortbar på % av total, med fargekodet pris-alder.
-- Hva-om-kalkulator (sliders for råvarepris og salgspris).
-- Marginhistorikk: Recharts line chart 12 mnd, terskel-linjer, markører på prisendringer > 1 pp impact.
-- Tilleggskostnader-seksjon (emballasje/arbeid/energi) som oppdaterer "Total kostnad" og "DG inkl. tilleggskostnader".
-- Margin-terskler redigerbar i Varer-innstillinger pr legal_entity.
-
----
-
-## Tekniske detaljer
-- Alle nye tabeller får RLS som speiler eksisterende `recipes`/`products`-policyer (skrivetilgang via Varer-appens access-rolle på riktig legal_entity).
-- Edge function bruker service role internt, validerer JWT + tilgang i kode. CORS via standard `corsHeaders`.
-- Frontend: kun semantic tokens, ingen hardkodede farger. Inter-typografi, eksisterende kortstil.
-- `react-query` invalidates ved alle mutasjoner. `dnd-kit` for drag-and-drop (allerede i prosjektet ellers vi legger den til).
-- Ingen endringer i Råvarer-appens UI utover at `NewRawMaterialDialog` må kunne åpnes fra Varer med pre-fylt navn + callback.
-
-## Hva som IKKE bygges (per spec)
-PDF/ZPL-etikett som ekte print, rollback-versjonering, halvfabrikat-råvarer, tetthet pr råvare, produksjonsplanlegging.
-
-## Rekkefølge
-1. Diagnostikk (read-queries) → juster SQL.
-2. Migrasjon (Steg 1) → STOPP.
-3. UI Oppskrift (Steg 2) → STOPP.
-4. Deklarasjon + Kalkulasjon (Steg 3) → ferdig.
-
-Si fra om du godkjenner, eller om du vil at noe (f.eks. `raw_material_id NOT NULL` umiddelbart, eller annen rekkefølge) endres.
+Si fra om du vil justere noe (f.eks. felt-navn, om "ekstra-linjer" skal være egen tabell i stedet for jsonb, eller om vi skal starte med et annet steg) — ellers begynner jeg på **Steg 1: migrasjon**.
