@@ -46,13 +46,13 @@ export function FakturaerProvider({ children }: { children: ReactNode }) {
   const accessLevel: AccessLevel = accessQuery.data ?? "none";
   const canRead = accessLevel !== "none";
   const canWrite = ["write", "approve", "admin"].includes(accessLevel);
-  const canApprove = ["approve", "admin"].includes(accessLevel);
+  const canReconcile = ["approve", "admin"].includes(accessLevel);
   const canAdmin = accessLevel === "admin";
 
   const loading = authLoading || (!!session && accessQuery.isLoading);
 
   return (
-    <Ctx.Provider value={{ loading, session, accessLevel, canRead, canWrite, canApprove, canAdmin }}>
+    <Ctx.Provider value={{ loading, session, accessLevel, canRead, canWrite, canReconcile, canAdmin }}>
       {children}
     </Ctx.Provider>
   );
