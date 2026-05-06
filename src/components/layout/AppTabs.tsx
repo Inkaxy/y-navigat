@@ -11,6 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAccessibleApps, type AccessibleApp } from "@/hooks/useAccessibleApps";
+import { getPageLabel } from "@/lib/pageLabels";
 import { cn } from "@/lib/utils";
 
 const iconMap = Icons as unknown as Record<string, React.ComponentType<{ className?: string }>>;
