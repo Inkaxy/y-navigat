@@ -31,7 +31,7 @@ export default function RawMaterialDetail() {
         <p className="text-sm text-ink-secondary">SKU {rm.sku} · {rm.category ?? "Uten kategori"}</p>
       </div>
 
-      <Tabs defaultValue="overview">
+      <Tabs value={tabFromUrl} onValueChange={(v) => setSearchParams(v === "overview" ? {} : { tab: v }, { replace: true })}>
         <TabsList>
           <TabsTrigger value="overview">Oversikt</TabsTrigger>
           {!rm.is_packaging && <TabsTrigger value="nutrition">Næring & deklarasjon</TabsTrigger>}
