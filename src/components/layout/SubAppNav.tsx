@@ -79,9 +79,7 @@ export function SubAppNav() {
           { to: "/ravarer/vareliste", label: "Vareliste" },
           { to: "/ravarer/fakturaer", label: "Alle fakturaer" },
           { to: "/ravarer/fakturaer/til-behandling", label: "Til behandling" },
-          { to: "/ravarer/fakturaer/ny", label: "Ny faktura" },
-          { to: "/ravarer/fakturaer/import-ehf", label: "Importer EHF" },
-          { to: "/ravarer/fakturaer/import-pdf", label: "Last opp PDF" },
+          { to: "/ravarer/fakturaer/import", label: "Importer manuelt" },
           { to: "/ravarer/innstillinger/tripletex", label: "Tripletex" },
           { to: "/ravarer/innstillinger/ai-tjenester", label: "AI-tjenester" },
         ]
