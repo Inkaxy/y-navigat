@@ -4,13 +4,16 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Loader2, Package } from "lucide-react";
+import { Search, Loader2, Package, ArrowUpDown } from "lucide-react";
 import { RavarerHeaderBanner, NewRawMaterialButton } from "@/ravarer/components/RavarerHeaderBanner";
 import { NewRawMaterialDialog } from "@/ravarer/components/NewRawMaterialDialog";
 import { useRawMaterials } from "@/ravarer/hooks/useRawMaterials";
 import { useSuppliers } from "@/ravarer/hooks/useSuppliers";
-import { formatNok, formatDate } from "@/ravarer/lib/constants";
+import { useAllRawMaterialPurchaseStats } from "@/ravarer/hooks/usePurchaseStats";
+import { formatNok, formatNumber, formatDate } from "@/ravarer/lib/constants";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
+
+type SortKey = "name" | "volume_12m";
 
 export default function VarelistePage() {
   const navigate = useNavigate();
