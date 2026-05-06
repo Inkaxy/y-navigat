@@ -73,6 +73,15 @@ export function AppSwitcher({ label, renderTrigger }: AppSwitcherProps) {
 
   const handleNavigate = (app: AccessibleApp) => {
     if (isActiveApp(app)) return;
+    try {
+      const target = new URL(app.deploy_url);
+      if (target.hostname === window.location.hostname) {
+        window.location.href = `${app.start_path}?from=${getCurrentAppSlug()}`;
+        return;
+      }
+    } catch {
+      // fall through
+    }
     const url = `${app.deploy_url}${app.start_path}?from=${getCurrentAppSlug()}`;
     window.location.href = url;
   };
