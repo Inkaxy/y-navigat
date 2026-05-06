@@ -40,9 +40,26 @@ Deno.serve(async (req) => {
 
     const service = createClient(supaUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
-    // Last filen som signed url for AI
-    const { data: signed } = await service.storage.from("raw-material-datasheets").createSignedUrl(file_path, 600);
-    if (!signed?.signedUrl) return json({ error: "File not found" }, 404);
+    // Last ned filen og base64-encode (Gemini godtar ikke signed URLs for PDF/bilde via image_url)
+    const { data: blob, error: dlErr } = await service.storage.from("raw-material-datasheets").download(file_path);
+    if (dlErr || !blob) return json({ error: `Kunne ikke laste fil: ${dlErr?.message ?? "ukjent"}` }, 404);
+    const buf = new Uint8Array(await blob.arrayBuffer());
+    // Base64 i chunks for å unngå stack overflow på store filer
+    let binary = "";
+    const chunkSize = 0x8000;
+    for (let i = 0; i < buf.length; i += chunkSize) {
+      binary += String.fromCharCode(...buf.subarray(i, i + chunkSize));
+    }
+    const base64 = btoa(binary);
+    const filename = file_path.split("/").pop() ?? "file";
+    const ext = filename.split(".").pop()?.toLowerCase() ?? "";
+    const isPdf = ext === "pdf" || blob.type === "application/pdf";
+    const mime = isPdf ? "application/pdf"
+      : ext === "png" ? "image/png"
+      : ext === "webp" ? "image/webp"
+      : ext === "gif" ? "image/gif"
+      : "image/jpeg";
+    const dataUrl = `data:${mime};base64,${base64}`;
 
     // Hent legal_entity_id (fra raw_material eller user-context)
     let legalEntityId: string | null = null;
@@ -59,17 +76,23 @@ Deno.serve(async (req) => {
     const apiKey = Deno.env.get("LOVABLE_API_KEY");
     if (!apiKey) return json({ error: "LOVABLE_API_KEY missing" }, 500);
 
+    // PDF: bruk OpenAI-spec "file"-type (gateway router til Gemini inline PDF). Bilder: image_url med data-URL.
+    const userContent: any[] = [
+      { type: "text", text: "Ekstraher strukturert informasjon fra dette databladet." },
+      isPdf
+        ? { type: "file", file: { filename, file_data: dataUrl } }
+        : { type: "image_url", image_url: { url: dataUrl } },
+    ];
+
     const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: [
-            { type: "text", text: "Ekstraher strukturert informasjon fra dette databladet." },
-            { type: "image_url", image_url: { url: signed.signedUrl } },
-          ] },
+          { role: "user", content: userContent },
+        ],
         ],
         tools: [{
           type: "function",
