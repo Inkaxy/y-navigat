@@ -6529,6 +6529,34 @@ export type Database = {
           },
         ]
       }
+      raw_material_monthly_purchases: {
+        Row: {
+          avg_price_per_base_unit: number | null
+          invoice_count: number | null
+          legal_entity_id: string | null
+          month_start: string | null
+          raw_material_id: string | null
+          supplier_id: string | null
+          total_cost: number | null
+          total_quantity: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_lines_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "raw_materials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_legal_entity_id_fkey"
+            columns: ["legal_entity_id"]
+            isOneToOne: false
+            referencedRelation: "legal_entities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       raw_material_purchase_stats: {
         Row: {
           avg_monthly_volume: number | null
@@ -6932,6 +6960,24 @@ export type Database = {
           image_url: string
           name: string
           sort_order: number
+        }[]
+      }
+      list_monthly_purchases: {
+        Args: {
+          p_legal_entity_id: string
+          p_month_from?: string
+          p_month_to?: string
+          p_raw_material_id?: string
+          p_supplier_id?: string
+        }
+        Returns: {
+          avg_price_per_base_unit: number
+          invoice_count: number
+          month_start: string
+          raw_material_id: string
+          supplier_id: string
+          total_cost: number
+          total_quantity: number
         }[]
       }
       list_raw_material_purchase_stats: {

@@ -81,3 +81,75 @@ export function useSupplierPurchaseStats(supplierId: string | undefined) {
     staleTime: 60_000,
   });
 }
+
+// =====================================================================
+// Periode-basert innkjøpsstatistikk via edge function
+// =====================================================================
+
+export interface PeriodAggregate {
+  start: string;
+  end: string;
+  total_quantity: number;
+  total_cost: number;
+  invoice_count: number;
+  avg_price_per_base_unit: number | null;
+  monthly_breakdown: Array<{
+    month: string;
+    quantity: number;
+    cost: number;
+    invoice_count: number;
+    avg_price: number | null;
+  }>;
+}
+
+export interface PeriodStatsResponse {
+  primary_period: PeriodAggregate;
+  comparison_period: PeriodAggregate | null;
+  delta: {
+    quantity_change: number;
+    quantity_change_pct: number | null;
+    cost_change: number;
+    cost_change_pct: number | null;
+    price_change: number | null;
+    price_change_pct: number | null;
+    pure_price_impact_kr: number | null;
+    pure_volume_impact_kr: number | null;
+  } | null;
+}
+
+export interface PurchaseRangeArgs {
+  legalEntityId: string;
+  rawMaterialId?: string;
+  supplierId?: string;
+  periodStart: string;
+  periodEnd: string;
+  compareTo: "none" | "same_period_last_year" | "previous_period" | "custom";
+  comparePeriodStart?: string;
+  comparePeriodEnd?: string;
+  granularity?: "total" | "monthly";
+}
+
+export function usePurchaseStatsForRange(args: PurchaseRangeArgs | null) {
+  return useQuery({
+    queryKey: ["purchase-stats-range", args],
+    enabled: !!args,
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke("get-purchase-stats-for-range", {
+        body: {
+          legal_entity_id: args!.legalEntityId,
+          raw_material_id: args!.rawMaterialId ?? null,
+          supplier_id: args!.supplierId ?? null,
+          period_start: args!.periodStart,
+          period_end: args!.periodEnd,
+          compare_to: args!.compareTo,
+          compare_period_start: args!.comparePeriodStart ?? null,
+          compare_period_end: args!.comparePeriodEnd ?? null,
+          granularity: args!.granularity ?? "total",
+        },
+      });
+      if (error) throw error;
+      return data as PeriodStatsResponse;
+    },
+    staleTime: 60_000,
+  });
+}
