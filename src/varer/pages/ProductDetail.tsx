@@ -19,6 +19,7 @@ import {
   AlertTriangle,
   Loader2,
   RotateCcw,
+  ScrollText,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
