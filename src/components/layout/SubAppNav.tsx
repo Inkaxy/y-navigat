@@ -29,6 +29,17 @@ const SUBMENUS: Record<string, { prefix: string; appSlug: string; items: SubItem
       { to: "/ravarer/vareliste", label: "Vareliste" },
     ],
   },
+  fakturaer: {
+    prefix: "/fakturaer",
+    appSlug: "fakturaer",
+    items: [
+      { to: "/fakturaer", label: "Alle fakturaer" },
+      { to: "/fakturaer/ny", label: "Ny faktura" },
+      { to: "/fakturaer/import-ehf", label: "Importer EHF" },
+      { to: "/fakturaer/import-pdf", label: "Last opp PDF" },
+      { to: "/fakturaer/til-behandling", label: "Til behandling" },
+    ],
+  },
   kunder: {
     prefix: "/kunder",
     appSlug: "kunder",
