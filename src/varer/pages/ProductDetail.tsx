@@ -44,6 +44,7 @@ import { LeveranseTab } from "@/varer/components/products/detail/tabs/LeveranseT
 import { PakkeTab, type PackageItem } from "@/varer/components/products/detail/tabs/PakkeTab";
 import { ReturTab } from "@/varer/components/products/detail/tabs/ReturTab";
 import { RecipeEditor } from "@/varer/components/products/RecipeEditor";
+import { DeclarationTab } from "@/varer/components/products/DeclarationTab";
 import { useNavigate as useNav } from "react-router-dom";
 
 const TABS: TabConfig[] = [
