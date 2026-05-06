@@ -143,27 +143,37 @@ export default function DatabladBulk() {
           </div>
           <Card className="divide-y divide-line-subtle">
             {rows.map((r, i) => (
-              <div key={i} className="p-4 flex items-center gap-3">
-                <FileText className="h-4 w-4 text-ink-secondary" />
+              <div key={i} className="p-4 flex items-start gap-3">
+                {r.status === "error"
+                  ? <AlertCircle className="h-4 w-4 text-destructive mt-0.5" />
+                  : <FileText className="h-4 w-4 text-ink-secondary mt-0.5" />}
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium truncate">{r.file.name}</div>
                   <div className="text-xs text-ink-secondary mt-0.5">
                     {r.status === "uploading" && "Laster opp…"}
                     {r.status === "extracting" && "AI analyserer…"}
                     {r.status === "matching" && "Matcher…"}
-                    {r.status === "error" && <span className="text-destructive">{r.error}</span>}
                     {r.status === "ready" && r.candidates && r.candidates.length > 0 && (
                       <>Foreslått: {r.candidates[0].name} <Badge variant="outline" className="ml-1 text-xs">{Math.round(r.candidates[0].score * 100)}%</Badge></>
                     )}
                     {r.status === "ready" && (!r.candidates || r.candidates.length === 0) && "Ingen match funnet"}
                     {r.applied && <span className="text-success ml-2">✓ Anvendt</span>}
                   </div>
+                  {r.status === "error" && (
+                    <div className="mt-1.5 rounded-lg bg-destructive/10 border border-destructive/20 px-2.5 py-1.5">
+                      <div className="text-xs text-destructive font-medium break-words">{r.error}</div>
+                    </div>
+                  )}
                 </div>
-                {(r.status === "uploading" || r.status === "extracting" || r.status === "matching") && <Loader2 className="h-4 w-4 animate-spin" />}
+                {(r.status === "uploading" || r.status === "extracting" || r.status === "matching") && <Loader2 className="h-4 w-4 animate-spin mt-0.5" />}
                 {r.status === "ready" && !r.applied && r.selectedRm && (
                   <Button size="sm" onClick={() => applyRow(i)}><Check className="mr-1 h-3.5 w-3.5" /> Anvend</Button>
                 )}
-                {r.status === "error" && <X className="h-4 w-4 text-destructive" />}
+                {r.status === "error" && (
+                  <Button size="sm" variant="outline" onClick={() => retryRow(i)}>
+                    <RefreshCw className="mr-1 h-3.5 w-3.5" /> Prøv igjen
+                  </Button>
+                )}
               </div>
             ))}
           </Card>
