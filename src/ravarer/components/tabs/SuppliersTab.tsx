@@ -15,6 +15,7 @@ import { useRavarer } from "@/ravarer/context/RavarerContext";
 import type { RawMaterialRow } from "@/ravarer/hooks/useRawMaterials";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Legend } from "recharts";
 import { Link } from "react-router-dom";
+import { PurchaseStatsCard } from "@/ravarer/components/PurchaseStatsCard";
 
 interface Props { rm: RawMaterialRow; }
 
