@@ -20,10 +20,13 @@ export default function VarelistePage() {
   const { canWrite } = useRavarer();
   const { data: rows = [], isLoading } = useRawMaterials();
   const { data: suppliers = [] } = useSuppliers();
+  const { data: statsMap } = useAllRawMaterialPurchaseStats();
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const [cat, setCat] = useState("all");
   const [active, setActive] = useState("active");
+  const [sortKey, setSortKey] = useState<SortKey>("name");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
   const supplierMap = useMemo(() => new Map(suppliers.map(s => [s.id, s.name])), [suppliers]);
 
