@@ -2290,6 +2290,47 @@ export type Database = {
         }
         Relationships: []
       }
+      legal_entity_margin_thresholds: {
+        Row: {
+          critical_below_pct: number
+          legal_entity_id: string
+          target_above_pct: number
+          updated_at: string
+          updated_by: string | null
+          warn_on_drop_pp: number
+          warn_on_price_age_days: number
+          warning_below_pct: number
+        }
+        Insert: {
+          critical_below_pct?: number
+          legal_entity_id: string
+          target_above_pct?: number
+          updated_at?: string
+          updated_by?: string | null
+          warn_on_drop_pp?: number
+          warn_on_price_age_days?: number
+          warning_below_pct?: number
+        }
+        Update: {
+          critical_below_pct?: number
+          legal_entity_id?: string
+          target_above_pct?: number
+          updated_at?: string
+          updated_by?: string | null
+          warn_on_drop_pp?: number
+          warn_on_price_age_days?: number
+          warning_below_pct?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "legal_entity_margin_thresholds_legal_entity_id_fkey"
+            columns: ["legal_entity_id"]
+            isOneToOne: true
+            referencedRelation: "legal_entities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       number_sequences: {
         Row: {
           domain: string
@@ -4350,6 +4391,7 @@ export type Database = {
           display_number: number
           dough_type: string | null
           ean_code: string | null
+          energy_cost_per_unit: number
           epd_number: string | null
           gtin: string | null
           id: string
@@ -4367,11 +4409,13 @@ export type Database = {
           label_mode: string
           label_print_model: string
           label_profile_id: string | null
+          labor_cost_per_unit: number
           lead_time_days: number | null
           legal_entity_id: string
           main_category_id: string | null
           mva_always_included: boolean
           mva_rate: number
+          packaging_cost_per_unit: number
           pause_delivery_from: string | null
           pause_delivery_to: string | null
           pause_reason: string | null
@@ -4412,6 +4456,7 @@ export type Database = {
           display_number: number
           dough_type?: string | null
           ean_code?: string | null
+          energy_cost_per_unit?: number
           epd_number?: string | null
           gtin?: string | null
           id?: string
@@ -4429,11 +4474,13 @@ export type Database = {
           label_mode?: string
           label_print_model?: string
           label_profile_id?: string | null
+          labor_cost_per_unit?: number
           lead_time_days?: number | null
           legal_entity_id: string
           main_category_id?: string | null
           mva_always_included?: boolean
           mva_rate?: number
+          packaging_cost_per_unit?: number
           pause_delivery_from?: string | null
           pause_delivery_to?: string | null
           pause_reason?: string | null
@@ -4474,6 +4521,7 @@ export type Database = {
           display_number?: number
           dough_type?: string | null
           ean_code?: string | null
+          energy_cost_per_unit?: number
           epd_number?: string | null
           gtin?: string | null
           id?: string
@@ -4491,11 +4539,13 @@ export type Database = {
           label_mode?: string
           label_print_model?: string
           label_profile_id?: string | null
+          labor_cost_per_unit?: number
           lead_time_days?: number | null
           legal_entity_id?: string
           main_category_id?: string | null
           mva_always_included?: boolean
           mva_rate?: number
+          packaging_cost_per_unit?: number
           pause_delivery_from?: string | null
           pause_delivery_to?: string | null
           pause_reason?: string | null
@@ -4893,6 +4943,7 @@ export type Database = {
           price_updated_at: string | null
           primary_supplier_id: string | null
           sku: string
+          unit_weight_grams: number | null
           updated_at: string
         }
         Insert: {
@@ -4916,6 +4967,7 @@ export type Database = {
           price_updated_at?: string | null
           primary_supplier_id?: string | null
           sku: string
+          unit_weight_grams?: number | null
           updated_at?: string
         }
         Update: {
@@ -4939,6 +4991,7 @@ export type Database = {
           price_updated_at?: string | null
           primary_supplier_id?: string | null
           sku?: string
+          unit_weight_grams?: number | null
           updated_at?: string
         }
         Relationships: [
@@ -4958,17 +5011,66 @@ export type Database = {
           },
         ]
       }
+      recipe_declaration_overrides: {
+        Row: {
+          field_name: string
+          id: string
+          override_value: Json
+          reason: string | null
+          recipe_id: string
+          set_at: string
+          set_by: string | null
+        }
+        Insert: {
+          field_name: string
+          id?: string
+          override_value: Json
+          reason?: string | null
+          recipe_id: string
+          set_at?: string
+          set_by?: string | null
+        }
+        Update: {
+          field_name?: string
+          id?: string
+          override_value?: Json
+          reason?: string | null
+          recipe_id?: string
+          set_at?: string
+          set_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recipe_declaration_overrides_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipe_nutrition_calculated"
+            referencedColumns: ["recipe_id"]
+          },
+          {
+            foreignKeyName: "recipe_declaration_overrides_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       recipe_lines: {
         Row: {
           created_at: string
+          custom_declaration_text: string | null
           id: string
+          include_in_declaration: boolean
           ingredient_id: string | null
-          ingredient_name: string
+          ingredient_name: string | null
+          is_quid_relevant: boolean
           notes: string | null
           quantity: number
           quantity_grams: number | null
           raw_material_id: string | null
           recipe_id: string
+          recipe_part_id: string
           sort_order: number
           unit: string
           updated_at: string
@@ -4976,14 +5078,18 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          custom_declaration_text?: string | null
           id?: string
+          include_in_declaration?: boolean
           ingredient_id?: string | null
-          ingredient_name: string
+          ingredient_name?: string | null
+          is_quid_relevant?: boolean
           notes?: string | null
           quantity: number
           quantity_grams?: number | null
           raw_material_id?: string | null
           recipe_id: string
+          recipe_part_id: string
           sort_order?: number
           unit: string
           updated_at?: string
@@ -4991,14 +5097,18 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          custom_declaration_text?: string | null
           id?: string
+          include_in_declaration?: boolean
           ingredient_id?: string | null
-          ingredient_name?: string
+          ingredient_name?: string | null
+          is_quid_relevant?: boolean
           notes?: string | null
           quantity?: number
           quantity_grams?: number | null
           raw_material_id?: string | null
           recipe_id?: string
+          recipe_part_id?: string
           sort_order?: number
           unit?: string
           updated_at?: string
@@ -5016,6 +5126,71 @@ export type Database = {
             foreignKeyName: "recipe_lines_recipe_id_fkey"
             columns: ["recipe_id"]
             isOneToOne: false
+            referencedRelation: "recipe_nutrition_calculated"
+            referencedColumns: ["recipe_id"]
+          },
+          {
+            foreignKeyName: "recipe_lines_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipe_lines_recipe_part_id_fkey"
+            columns: ["recipe_part_id"]
+            isOneToOne: false
+            referencedRelation: "recipe_parts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recipe_parts: {
+        Row: {
+          created_at: string
+          id: string
+          instructions: string | null
+          name: string
+          prep_time_minutes: number | null
+          recipe_id: string
+          rest_time_minutes: number | null
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          instructions?: string | null
+          name: string
+          prep_time_minutes?: number | null
+          recipe_id: string
+          rest_time_minutes?: number | null
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          instructions?: string | null
+          name?: string
+          prep_time_minutes?: number | null
+          recipe_id?: string
+          rest_time_minutes?: number | null
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recipe_parts_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipe_nutrition_calculated"
+            referencedColumns: ["recipe_id"]
+          },
+          {
+            foreignKeyName: "recipe_parts_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
             referencedRelation: "recipes"
             referencedColumns: ["id"]
           },
@@ -5023,41 +5198,89 @@ export type Database = {
       }
       recipes: {
         Row: {
+          bake_temp_celsius: number | null
+          bake_time_minutes: number | null
+          bulk_proof_minutes: number | null
+          cooling_minutes: number | null
           created_at: string
           created_by: string | null
+          declaration_mode: Database["public"]["Enums"]["declaration_mode"]
+          declaration_updated_at: string | null
+          declaration_updated_by: string | null
           id: string
+          manual_allergen_summary: Json | null
+          manual_ingredient_declaration: string | null
+          manual_nutrition: Json | null
           notes: string | null
           product_id: string
+          production_notes: string | null
+          requires_cleanup: boolean
+          shape_proof_minutes: number | null
+          steam_seconds: number | null
           updated_at: string
           valid_from: string
           valid_to: string | null
           version: number
+          yield_grams: number | null
+          yield_loss_pct: number
           yield_quantity: number
           yield_unit: string
         }
         Insert: {
+          bake_temp_celsius?: number | null
+          bake_time_minutes?: number | null
+          bulk_proof_minutes?: number | null
+          cooling_minutes?: number | null
           created_at?: string
           created_by?: string | null
+          declaration_mode?: Database["public"]["Enums"]["declaration_mode"]
+          declaration_updated_at?: string | null
+          declaration_updated_by?: string | null
           id?: string
+          manual_allergen_summary?: Json | null
+          manual_ingredient_declaration?: string | null
+          manual_nutrition?: Json | null
           notes?: string | null
           product_id: string
+          production_notes?: string | null
+          requires_cleanup?: boolean
+          shape_proof_minutes?: number | null
+          steam_seconds?: number | null
           updated_at?: string
           valid_from?: string
           valid_to?: string | null
           version?: number
+          yield_grams?: number | null
+          yield_loss_pct?: number
           yield_quantity?: number
           yield_unit?: string
         }
         Update: {
+          bake_temp_celsius?: number | null
+          bake_time_minutes?: number | null
+          bulk_proof_minutes?: number | null
+          cooling_minutes?: number | null
           created_at?: string
           created_by?: string | null
+          declaration_mode?: Database["public"]["Enums"]["declaration_mode"]
+          declaration_updated_at?: string | null
+          declaration_updated_by?: string | null
           id?: string
+          manual_allergen_summary?: Json | null
+          manual_ingredient_declaration?: string | null
+          manual_nutrition?: Json | null
           notes?: string | null
           product_id?: string
+          production_notes?: string | null
+          requires_cleanup?: boolean
+          shape_proof_minutes?: number | null
+          steam_seconds?: number | null
           updated_at?: string
           valid_from?: string
           valid_to?: string | null
           version?: number
+          yield_grams?: number | null
+          yield_loss_pct?: number
           yield_quantity?: number
           yield_unit?: string
         }
@@ -5723,6 +5946,25 @@ export type Database = {
       }
     }
     Views: {
+      recipe_nutrition_calculated: {
+        Row: {
+          carbs_g_per_100g: number | null
+          energy_kcal_per_100g: number | null
+          energy_kj_per_100g: number | null
+          fat_g_per_100g: number | null
+          fiber_g_per_100g: number | null
+          final_weight_grams: number | null
+          ingredient_count: number | null
+          ingredients_with_nutrition: number | null
+          protein_g_per_100g: number | null
+          recipe_id: string | null
+          salt_g_per_100g: number | null
+          saturated_fat_g_per_100g: number | null
+          sugars_g_per_100g: number | null
+          total_input_grams: number | null
+        }
+        Relationships: []
+      }
       users_public: {
         Row: {
           avatar_url: string | null
@@ -6261,6 +6503,7 @@ export type Database = {
         | "sulphites"
         | "lupin"
         | "molluscs"
+      declaration_mode: "auto" | "manual" | "auto_with_overrides"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -6419,6 +6662,7 @@ export const Constants = {
         "lupin",
         "molluscs",
       ],
+      declaration_mode: ["auto", "manual", "auto_with_overrides"],
     },
   },
 } as const
