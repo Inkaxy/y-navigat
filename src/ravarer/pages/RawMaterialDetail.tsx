@@ -11,6 +11,8 @@ import { SuppliersTab } from "@/ravarer/components/tabs/SuppliersTab";
 export default function RawMaterialDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabFromUrl = searchParams.get("tab") ?? "overview";
   const { data: rm, isLoading } = useRawMaterial(id);
 
   if (isLoading) return <div className="flex justify-center p-12"><Loader2 className="h-5 w-5 animate-spin" /></div>;
