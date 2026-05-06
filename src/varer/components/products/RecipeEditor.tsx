@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   Plus, Trash2, Loader2, Save, GripVertical, ChevronDown, MoreVertical,
-  AlertTriangle, Copy, ArrowUp, ArrowDown, Pencil, Check, X,
+  AlertTriangle, Copy, ArrowUp, ArrowDown, Pencil, Check, X, FileText,
 } from "lucide-react";
 import {
   DndContext, closestCenter, PointerSensor, useSensor, useSensors,
