@@ -72,6 +72,7 @@ import FakturaerImportEhf from "@/fakturaer/pages/ImportEhf";
 import FakturaerImportPdf from "@/fakturaer/pages/ImportPdf";
 import FakturaerDetail from "@/fakturaer/pages/InvoiceDetail";
 import FakturaerReviewQueue from "@/fakturaer/pages/ReviewQueue";
+import { InvoiceAccessGuard } from "@/ravarer/components/InvoiceAccessGuard";
 
 const KunderEntityProvider = ({ children }: { children: React.ReactNode }) => {
   const { user } = useNbhubAuth();
