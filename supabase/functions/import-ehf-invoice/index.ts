@@ -218,6 +218,7 @@ Deno.serve(async (req) => {
         total_amount: totalAmount,
         total_vat: totalVat,
         source: "ehf",
+        lines_source: "ehf",
         source_document_url: storagePath ?? null,
         status: "imported",
       })
