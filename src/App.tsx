@@ -65,6 +65,13 @@ import { RavarerProvider } from "@/ravarer/context/RavarerContext";
 import RavarerVareliste from "@/ravarer/pages/Vareliste";
 import RavarerDetail from "@/ravarer/pages/RawMaterialDetail";
 
+import { FakturaerProvider } from "@/fakturaer/context/FakturaerContext";
+import FakturaerList from "@/fakturaer/pages/FakturaerList";
+import FakturaerNew from "@/fakturaer/pages/NewInvoice";
+import FakturaerImportEhf from "@/fakturaer/pages/ImportEhf";
+import FakturaerImportPdf from "@/fakturaer/pages/ImportPdf";
+import FakturaerDetail from "@/fakturaer/pages/InvoiceDetail";
+
 const KunderEntityProvider = ({ children }: { children: React.ReactNode }) => {
   const { user } = useNbhubAuth();
   const { data: access } = useKunderUserAccess(user);
