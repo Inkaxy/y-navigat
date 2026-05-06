@@ -63,16 +63,33 @@ export function SubAppNav() {
   const { pathname } = useLocation();
   const { data: apps } = useAccessibleApps();
   const { data: reviewCount = 0 } = useReviewCount();
+  const { data: hasInvoiceAccess = false } = useInvoiceAccess();
 
   const match = Object.values(SUBMENUS).find(
     (s) => pathname === s.prefix || pathname.startsWith(s.prefix + "/"),
   );
   if (!match) return null;
 
+  // Råvarer-appen får dynamiske fakturaer-items når brukeren har invoice_access
+  const items =
+    match.appSlug === "ravarer" && hasInvoiceAccess
+      ? [
+          ...match.items,
+          { to: "/ravarer/fakturaer", label: "Alle fakturaer" },
+          { to: "/ravarer/fakturaer/til-behandling", label: "Til behandling" },
+          { to: "/ravarer/fakturaer/ny", label: "Ny faktura" },
+          { to: "/ravarer/fakturaer/import-ehf", label: "Importer EHF" },
+          { to: "/ravarer/fakturaer/import-pdf", label: "Last opp PDF" },
+        ]
+      : match.items;
+
   const app = apps?.find((a) => a.slug === match.appSlug);
   const color = app?.color_hex ?? "hsl(var(--primary))";
 
-  const isActive = (to: string) => pathname === to || pathname.startsWith(to + "/");
+  const isActive = (to: string) => {
+    if (to === "/ravarer/fakturaer") return pathname === to;
+    return pathname === to || pathname.startsWith(to + "/");
+  };
 
   return (
     <nav
@@ -80,7 +97,7 @@ export function SubAppNav() {
       style={{ padding: "8px 16px" }}
     >
       <ul className="no-scrollbar mx-auto flex max-w-[1280px] items-stretch gap-1 overflow-x-auto">
-        {match.items.map((item) => {
+        {items.map((item) => {
           const active = isActive(item.to);
           return (
             <li key={item.to} className="shrink-0">
@@ -104,7 +121,7 @@ export function SubAppNav() {
                 }
               >
                 {item.label}
-                {item.to === "/fakturaer/til-behandling" && reviewCount > 0 && (
+                {item.to === "/ravarer/fakturaer/til-behandling" && reviewCount > 0 && (
                   <span className={cn("ml-2 rounded-full px-1.5 py-0.5 text-[10px] font-semibold", reviewCount > 10 ? "bg-destructive text-destructive-foreground" : "bg-warning/20 text-warning")}>
                     {reviewCount}
                   </span>
