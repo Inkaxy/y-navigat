@@ -465,6 +465,9 @@ export default function ProductDetail() {
         {tab === "oppskrift" && !product.variant_of_product_id && (
           <RecipeEditor productId={product.id} productName={product.display_name} canWrite={canWrite} />
         )}
+        {tab === "deklarasjon" && !product.variant_of_product_id && (
+          <DeclarationTab productId={product.id} productName={product.display_name} canWrite={canWrite} />
+        )}
         {tab === "priser" && (
           <Card>
             <CardHeader><CardTitle className="text-base">Priser</CardTitle></CardHeader>
