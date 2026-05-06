@@ -1,4 +1,4 @@
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useRawMaterial } from "@/ravarer/hooks/useRawMaterials";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
@@ -11,6 +11,8 @@ import { SuppliersTab } from "@/ravarer/components/tabs/SuppliersTab";
 export default function RawMaterialDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabFromUrl = searchParams.get("tab") ?? "overview";
   const { data: rm, isLoading } = useRawMaterial(id);
 
   if (isLoading) return <div className="flex justify-center p-12"><Loader2 className="h-5 w-5 animate-spin" /></div>;
@@ -29,7 +31,7 @@ export default function RawMaterialDetail() {
         <p className="text-sm text-ink-secondary">SKU {rm.sku} · {rm.category ?? "Uten kategori"}</p>
       </div>
 
-      <Tabs defaultValue="overview">
+      <Tabs value={tabFromUrl} onValueChange={(v) => setSearchParams(v === "overview" ? {} : { tab: v }, { replace: true })}>
         <TabsList>
           <TabsTrigger value="overview">Oversikt</TabsTrigger>
           {!rm.is_packaging && <TabsTrigger value="nutrition">Næring & deklarasjon</TabsTrigger>}

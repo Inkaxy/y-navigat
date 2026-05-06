@@ -29,8 +29,10 @@ export interface PriceHistoryRow {
   effective_date: string;
   source: string;
   source_reference: string | null;
+  invoice_id: string | null;
   notes: string | null;
   created_at: string;
+  invoices?: { invoice_number: string | null } | null;
 }
 
 export function useRawMaterialSuppliers(rawMaterialId: string | undefined) {
@@ -91,14 +93,17 @@ export function usePriceHistory(rawMaterialId: string | undefined) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("raw_material_price_history")
-        .select("*")
+        .select("*, invoices(invoice_number)")
         .eq("raw_material_id", rawMaterialId!)
         .order("effective_date", { ascending: false });
       if (error) throw error;
-      return (data ?? []) as PriceHistoryRow[];
+      return (data ?? []) as unknown as PriceHistoryRow[];
     },
   });
 }
+
+/** @deprecated bruk usePriceHistory */
+export const n = usePriceHistory;
 
 export function useAddPriceHistory() {
   const qc = useQueryClient();

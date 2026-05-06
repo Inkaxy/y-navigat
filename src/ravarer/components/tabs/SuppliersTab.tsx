@@ -14,6 +14,7 @@ import { PACKAGE_UNITS, PRICE_SOURCES, formatNok, formatDate } from "@/ravarer/l
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import type { RawMaterialRow } from "@/ravarer/hooks/useRawMaterials";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Legend } from "recharts";
+import { Link } from "react-router-dom";
 
 interface Props { rm: RawMaterialRow; }
 
@@ -151,6 +152,7 @@ export function SuppliersTab({ rm }: Props) {
                   <th className="pb-2">Leverandør</th>
                   <th className="pb-2 text-right">Pris</th>
                   <th className="pb-2">Kilde</th>
+                  <th className="pb-2">Faktura</th>
                   <th className="pb-2">Notat</th>
                 </tr>
               </thead>
@@ -161,6 +163,18 @@ export function SuppliersTab({ rm }: Props) {
                     <td className="py-2 text-ink-secondary">{h.supplier_id ? supplierMap.get(h.supplier_id)?.name ?? "—" : "—"}</td>
                     <td className="py-2 text-right tabular-nums">{formatNok(h.price)}</td>
                     <td className="py-2"><Badge variant="outline">{h.source}</Badge></td>
+                    <td className="py-2">
+                      {h.invoice_id ? (
+                        <Link
+                          to={`/fakturaer/${h.invoice_id}`}
+                          className="font-mono text-xs text-app underline-offset-2 hover:underline"
+                        >
+                          {h.invoices?.invoice_number ?? "Åpne"}
+                        </Link>
+                      ) : (
+                        <span className="text-ink-secondary">—</span>
+                      )}
+                    </td>
                     <td className="py-2 text-ink-secondary">{h.notes ?? "—"}</td>
                   </tr>
                 ))}
