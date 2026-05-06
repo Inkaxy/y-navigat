@@ -3,9 +3,12 @@ import { Link } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Search, Loader2, Truck } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Search, Loader2, Truck, Plus } from "lucide-react";
 import { RavarerHeaderBanner } from "@/ravarer/components/RavarerHeaderBanner";
 import { useSuppliers } from "@/ravarer/hooks/useSuppliers";
+import { useRavarer } from "@/ravarer/context/RavarerContext";
+import { NewSupplierDialog } from "@/ravarer/components/NewSupplierDialog";
 
 export default function LeverandorerPage() {
   const { data: rows = [], isLoading } = useSuppliers();
