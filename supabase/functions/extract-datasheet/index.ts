@@ -93,7 +93,6 @@ Deno.serve(async (req) => {
           { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: userContent },
         ],
-        ],
         tools: [{
           type: "function",
           function: {
