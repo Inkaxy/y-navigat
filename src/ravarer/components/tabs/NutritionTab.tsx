@@ -60,6 +60,7 @@ export function NutritionTab({ rawMaterialId }: Props) {
 
   return (
     <div className="space-y-5">
+      <DatasheetSection rawMaterialId={rawMaterialId} />
       <Card className="p-5 space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-base font-semibold">Næringsinnhold pr 100 g</h3>
