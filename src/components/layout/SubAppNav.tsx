@@ -18,11 +18,12 @@ interface SimpleItem {
   label: string;
   badge?: number;
 }
+interface DropdownLink { to: string; label: string; badge?: number }
 interface DropdownItem {
   kind: "dropdown";
   label: string;
   basePath: string;
-  links: { to: string; label: string; badge?: number }[];
+  links: DropdownLink[];
 }
 type NavItem = SimpleItem | DropdownItem;
 
@@ -71,121 +72,23 @@ const STATIC_SUBMENUS: Record<string, { prefix: string; appSlug: string; items: 
 
 export function SubAppNav() {
   const { pathname } = useLocation();
-  const navigate = useNavigate();
-  const { data: apps } = useAccessibleApps();
-  const { data: reviewCount = 0 } = useReviewCount();
-  const { data: hasInvoiceAccess = false } = useInvoiceAccess();
-
   const isRavarer = pathname === "/ravarer" || pathname.startsWith("/ravarer/");
+
+  if (isRavarer) return <RavarerNav />;
+
   const staticMatch = Object.values(STATIC_SUBMENUS).find(
     (s) => pathname === s.prefix || pathname.startsWith(s.prefix + "/"),
   );
+  if (!staticMatch) return null;
 
-  if (!isRavarer && !staticMatch) return null;
-
-  let appSlug: string;
-  let items: NavItem[];
-
-  if (isRavarer) {
-    appSlug = "ravarer";
-    items = buildRavarerItems(hasInvoiceAccess, reviewCount);
-  } else {
-    appSlug = staticMatch!.appSlug;
-    items = staticMatch!.items;
-  }
-
-  const app = apps?.find((a) => a.slug === appSlug);
-  const color = app?.color_hex ?? "hsl(var(--primary))";
-
-  const isActive = (to: string, exact = false) => {
-    if (exact) return pathname === to;
-    if (to === "/ravarer/fakturaer") return pathname === to || pathname.startsWith("/ravarer/fakturaer/");
-    return pathname === to || pathname.startsWith(to + "/");
-  };
-  const isDropdownActive = (basePath: string) => pathname === basePath || pathname.startsWith(basePath + "/");
-
-  const baseClass = (active: boolean) =>
-    cn(
-      "flex items-center whitespace-nowrap rounded-full text-sm transition-all",
-      active
-        ? "font-semibold shadow-xs"
-        : "text-ink-secondary font-medium hover:bg-bakery-cream hover:text-ink-primary",
-    );
-  const baseStyle = (active: boolean) =>
-    active
-      ? { padding: "7px 14px", color, backgroundColor: `${color}14`, border: `1px solid ${color}33` }
-      : { padding: "7px 14px", border: "1px solid transparent" };
-
-  return (
-    <nav
-      className="border-b border-line-subtle bg-surface-raised/70 backdrop-blur-sm"
-      style={{ padding: "8px 16px" }}
-    >
-      <ul className="no-scrollbar mx-auto flex max-w-[1280px] items-stretch gap-1 overflow-x-auto">
-        {items.map((item) => {
-          if (item.kind === "link") {
-            const active = isActive(item.to);
-            return (
-              <li key={item.to} className="shrink-0">
-                <NavLink to={item.to} className={baseClass(active)} style={baseStyle(active)}>
-                  {item.label}
-                  {item.badge != null && item.badge > 0 && (
-                    <Badge value={item.badge} />
-                  )}
-                </NavLink>
-              </li>
-            );
-          }
-          const active = isDropdownActive(item.basePath);
-          return (
-            <li key={item.label} className="shrink-0">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button className={baseClass(active)} style={baseStyle(active)}>
-                    {item.label}
-                    <ChevronDown className="ml-1 h-3.5 w-3.5" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="min-w-[220px]">
-                  {item.links.map((l) => (
-                    <DropdownMenuItem key={l.to} onClick={() => navigate(l.to)} className="cursor-pointer">
-                      <span className="flex-1">{l.label}</span>
-                      {l.badge != null && l.badge > 0 && <Badge value={l.badge} />}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </li>
-          );
-        })}
-      </ul>
-    </nav>
-  );
+  return <NavBar appSlug={staticMatch.appSlug} items={staticMatch.items} />;
 }
 
-function Badge({ value }: { value: number }) {
-  return (
-    <span
-      className={cn(
-        "ml-2 rounded-full px-1.5 py-0.5 text-[10px] font-semibold",
-        value > 10 ? "bg-destructive text-destructive-foreground" : "bg-warning/20 text-warning",
-      )}
-    >
-      {value}
-    </span>
-  );
-}
-
-function buildRavarerItems(hasInvoiceAccess: boolean, reviewCount: number): NavItem[] {
-  // hook may not be available outside RavarerProvider; safe-guard via try/catch
-  let canManage = false;
-  try {
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    const { accessLevel } = useRavarer();
-    canManage = accessLevel === "admin" || accessLevel === "approve";
-  } catch {
-    canManage = false;
-  }
+function RavarerNav() {
+  const { data: reviewCount = 0 } = useReviewCount();
+  const { data: hasInvoiceAccess = false } = useInvoiceAccess();
+  const { accessLevel } = useRavarer();
+  const canManage = accessLevel === "admin" || accessLevel === "approve";
 
   const items: NavItem[] = [
     { kind: "link", to: "/ravarer/vareliste", label: "Vareliste" },
@@ -221,5 +124,100 @@ function buildRavarerItems(hasInvoiceAccess: boolean, reviewCount: number): NavI
     });
   }
 
-  return items;
+  return <NavBar appSlug="ravarer" items={items} />;
+}
+
+function NavBar({ appSlug, items }: { appSlug: string; items: NavItem[] }) {
+  const { pathname, search } = useLocation();
+  const navigate = useNavigate();
+  const { data: apps } = useAccessibleApps();
+  const app = apps?.find((a) => a.slug === appSlug);
+  const color = app?.color_hex ?? "hsl(var(--primary))";
+
+  const isLinkActive = (to: string) => {
+    const [path, query] = to.split("?");
+    if (path === "/ravarer/fakturaer" && !query) {
+      // "Alle fakturaer" — active only when on /ravarer/fakturaer without status
+      return pathname === path && !new URLSearchParams(search).get("status");
+    }
+    if (query) {
+      const want = new URLSearchParams(query);
+      const cur = new URLSearchParams(search);
+      if (pathname !== path) return false;
+      for (const [k, v] of want) if (cur.get(k) !== v) return false;
+      return true;
+    }
+    return pathname === path || pathname.startsWith(path + "/");
+  };
+  const isDropdownActive = (basePath: string) =>
+    pathname === basePath || pathname.startsWith(basePath + "/");
+
+  const baseClass = (active: boolean) =>
+    cn(
+      "flex items-center whitespace-nowrap rounded-full text-sm transition-all",
+      active
+        ? "font-semibold shadow-xs"
+        : "text-ink-secondary font-medium hover:bg-bakery-cream hover:text-ink-primary",
+    );
+  const baseStyle = (active: boolean) =>
+    active
+      ? { padding: "7px 14px", color, backgroundColor: `${color}14`, border: `1px solid ${color}33` }
+      : { padding: "7px 14px", border: "1px solid transparent" };
+
+  return (
+    <nav
+      className="border-b border-line-subtle bg-surface-raised/70 backdrop-blur-sm"
+      style={{ padding: "8px 16px" }}
+    >
+      <ul className="no-scrollbar mx-auto flex max-w-[1280px] items-stretch gap-1 overflow-x-auto">
+        {items.map((item) => {
+          if (item.kind === "link") {
+            const active = isLinkActive(item.to);
+            return (
+              <li key={item.to} className="shrink-0">
+                <NavLink to={item.to} className={baseClass(active)} style={baseStyle(active)}>
+                  {item.label}
+                  {item.badge != null && item.badge > 0 && <CountBadge value={item.badge} />}
+                </NavLink>
+              </li>
+            );
+          }
+          const active = isDropdownActive(item.basePath);
+          return (
+            <li key={item.label} className="shrink-0">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className={baseClass(active)} style={baseStyle(active)}>
+                    {item.label}
+                    <ChevronDown className="ml-1 h-3.5 w-3.5" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="min-w-[220px]">
+                  {item.links.map((l) => (
+                    <DropdownMenuItem key={l.to} onClick={() => navigate(l.to)} className="cursor-pointer">
+                      <span className="flex-1">{l.label}</span>
+                      {l.badge != null && l.badge > 0 && <CountBadge value={l.badge} />}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </li>
+          );
+        })}
+      </ul>
+    </nav>
+  );
+}
+
+function CountBadge({ value }: { value: number }) {
+  return (
+    <span
+      className={cn(
+        "ml-2 rounded-full px-1.5 py-0.5 text-[10px] font-semibold",
+        value > 10 ? "bg-destructive text-destructive-foreground" : "bg-warning/20 text-warning",
+      )}
+    >
+      {value}
+    </span>
+  );
 }
