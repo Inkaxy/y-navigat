@@ -50,14 +50,17 @@ export default function DatabladBulk() {
       const { error: upErr } = await supabase.storage.from("raw-material-datasheets").upload(path, row.file);
       if (upErr) throw upErr;
       updateRow(i, { status: "extracting" });
-      const { data: ext } = await supabase.functions.invoke("extract-datasheet", {
+      const { data: ext, error: extErr } = await supabase.functions.invoke("extract-datasheet", {
         body: { file_path: path, batch_id },
       });
+      if (extErr) throw new Error(extErr.message);
+      if (!ext) throw new Error("Ingen respons fra extract-datasheet");
       if (ext.error) throw new Error(ext.error);
       updateRow(i, { status: "matching", datasheet_id: ext.datasheet_id });
-      const { data: match } = await supabase.functions.invoke("match-datasheet-to-raw-material", {
+      const { data: match, error: matchErr } = await supabase.functions.invoke("match-datasheet-to-raw-material", {
         body: { datasheet_id: ext.datasheet_id },
       });
+      if (matchErr) throw new Error(matchErr.message);
       updateRow(i, {
         status: "ready",
         candidates: match?.candidates ?? [],
@@ -72,13 +75,15 @@ export default function DatabladBulk() {
     const r = rows[i];
     if (!r.datasheet_id || !r.selectedRm) return;
     try {
-      const { data } = await supabase.functions.invoke("apply-datasheet-update", {
+      const { data, error } = await supabase.functions.invoke("apply-datasheet-update", {
         body: {
           datasheet_id: r.datasheet_id,
           raw_material_id: r.selectedRm,
           accepted_fields: ["nutrition", "allergens", "ingredient_declaration", "composite", "grain", "package"],
         },
       });
+      if (error) throw new Error(error.message);
+      if (!data) throw new Error("Ingen respons fra apply-datasheet-update");
       if (data.error) throw new Error(data.error);
       updateRow(i, { applied: true });
       toast.success(`${r.file.name}: ${data.changes_logged} endringer logget`);
