@@ -72,6 +72,8 @@ import FakturaerImportEhf from "@/fakturaer/pages/ImportEhf";
 import FakturaerImportPdf from "@/fakturaer/pages/ImportPdf";
 import FakturaerDetail from "@/fakturaer/pages/InvoiceDetail";
 import FakturaerReviewQueue from "@/fakturaer/pages/ReviewQueue";
+import FakturaerImport from "@/fakturaer/pages/ImportInvoice";
+import FakturaerRegistrerLinjer from "@/fakturaer/pages/RegistrerLinjer";
 import { InvoiceAccessGuard } from "@/ravarer/components/InvoiceAccessGuard";
 import TripletexSettings from "@/ravarer/pages/innstillinger/TripletexSettings";
 import AiServicesSettings from "@/ravarer/pages/innstillinger/AiServicesSettings";
@@ -184,10 +186,14 @@ const App = () => (
 
               {/* Fakturaer flyttet inn under Råvarer-appen (granulær invoice_access) */}
               <Route path="/ravarer/fakturaer" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><InvoiceAccessGuard><FakturaerProvider><FakturaerList /></FakturaerProvider></InvoiceAccessGuard></RavarerProvider></AppAccessGuard></Shell>} />
-              <Route path="/ravarer/fakturaer/ny" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><InvoiceAccessGuard><FakturaerProvider><FakturaerNew /></FakturaerProvider></InvoiceAccessGuard></RavarerProvider></AppAccessGuard></Shell>} />
-              <Route path="/ravarer/fakturaer/import-ehf" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><InvoiceAccessGuard><FakturaerProvider><FakturaerImportEhf /></FakturaerProvider></InvoiceAccessGuard></RavarerProvider></AppAccessGuard></Shell>} />
-              <Route path="/ravarer/fakturaer/import-pdf" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><InvoiceAccessGuard><FakturaerProvider><FakturaerImportPdf /></FakturaerProvider></InvoiceAccessGuard></RavarerProvider></AppAccessGuard></Shell>} />
+              {/* Samlet manuell import (EHF/PDF/manuelt) under én rute med tabs */}
+              <Route path="/ravarer/fakturaer/import" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><InvoiceAccessGuard><FakturaerProvider><FakturaerImport /></FakturaerProvider></InvoiceAccessGuard></RavarerProvider></AppAccessGuard></Shell>} />
+              {/* Bakoverkompat — peker mot tab-versjonen */}
+              <Route path="/ravarer/fakturaer/ny" element={<Navigate to="/ravarer/fakturaer/import?tab=manuelt" replace />} />
+              <Route path="/ravarer/fakturaer/import-ehf" element={<Navigate to="/ravarer/fakturaer/import?tab=ehf" replace />} />
+              <Route path="/ravarer/fakturaer/import-pdf" element={<Navigate to="/ravarer/fakturaer/import?tab=pdf" replace />} />
               <Route path="/ravarer/fakturaer/til-behandling" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><InvoiceAccessGuard><FakturaerProvider><FakturaerReviewQueue /></FakturaerProvider></InvoiceAccessGuard></RavarerProvider></AppAccessGuard></Shell>} />
+              <Route path="/ravarer/fakturaer/:id/registrer-linjer" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><InvoiceAccessGuard><FakturaerProvider><FakturaerRegistrerLinjer /></FakturaerProvider></InvoiceAccessGuard></RavarerProvider></AppAccessGuard></Shell>} />
               <Route path="/ravarer/fakturaer/:id" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><InvoiceAccessGuard><FakturaerProvider><FakturaerDetail /></FakturaerProvider></InvoiceAccessGuard></RavarerProvider></AppAccessGuard></Shell>} />
               <Route path="/ravarer/innstillinger" element={<Navigate to="/ravarer/innstillinger/tripletex" replace />} />
               <Route path="/ravarer/innstillinger/tripletex" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><TripletexSettings /></RavarerProvider></AppAccessGuard></Shell>} />
@@ -195,9 +201,9 @@ const App = () => (
 
               {/* Backward-compat redirects fra gamle /fakturaer/* */}
               <Route path="/fakturaer" element={<Navigate to="/ravarer/fakturaer" replace />} />
-              <Route path="/fakturaer/ny" element={<Navigate to="/ravarer/fakturaer/ny" replace />} />
-              <Route path="/fakturaer/import-ehf" element={<Navigate to="/ravarer/fakturaer/import-ehf" replace />} />
-              <Route path="/fakturaer/import-pdf" element={<Navigate to="/ravarer/fakturaer/import-pdf" replace />} />
+              <Route path="/fakturaer/ny" element={<Navigate to="/ravarer/fakturaer/import?tab=manuelt" replace />} />
+              <Route path="/fakturaer/import-ehf" element={<Navigate to="/ravarer/fakturaer/import?tab=ehf" replace />} />
+              <Route path="/fakturaer/import-pdf" element={<Navigate to="/ravarer/fakturaer/import?tab=pdf" replace />} />
               <Route path="/fakturaer/til-behandling" element={<Navigate to="/ravarer/fakturaer/til-behandling" replace />} />
               <Route path="/fakturaer/:id" element={<RedirectFakturaer />} />
 

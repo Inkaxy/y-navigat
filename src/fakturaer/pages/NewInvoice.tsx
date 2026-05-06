@@ -39,7 +39,7 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>;
 
-export default function NewInvoicePage() {
+export default function NewInvoicePage({ embedded = false }: { embedded?: boolean } = {}) {
   const navigate = useNavigate();
   const { canWrite } = useFakturaer();
   const { data: entities = [] } = useFakturaerLegalEntities();
@@ -87,10 +87,7 @@ export default function NewInvoicePage() {
 
   if (!canWrite) {
     return (
-      <div className="space-y-5">
-        <FakturaerHeaderBanner title="Ny faktura" />
-        <Card className="p-8 text-center text-ink-secondary">Du har ikke skrivetilgang til fakturaer.</Card>
-      </div>
+      <Card className="p-8 text-center text-ink-secondary">Du har ikke skrivetilgang til fakturaer.</Card>
     );
   }
 
@@ -154,15 +151,17 @@ export default function NewInvoicePage() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <button
-          onClick={() => navigate("/ravarer/fakturaer")}
-          className="mb-3 flex items-center gap-1 text-sm text-ink-secondary transition-colors hover:text-ink-primary"
-        >
-          <ArrowLeft className="h-4 w-4" /> Tilbake
-        </button>
-        <FakturaerHeaderBanner title="Ny faktura" subtitle="Registrer faktura manuelt med linjer" />
-      </div>
+      {!embedded && (
+        <div>
+          <button
+            onClick={() => navigate("/ravarer/fakturaer")}
+            className="mb-3 flex items-center gap-1 text-sm text-ink-secondary transition-colors hover:text-ink-primary"
+          >
+            <ArrowLeft className="h-4 w-4" /> Tilbake
+          </button>
+          <FakturaerHeaderBanner title="Ny faktura" subtitle="Registrer faktura manuelt med linjer" />
+        </div>
+      )}
 
       <form onSubmit={onSubmit} className="space-y-5">
         <Card className="p-6">

@@ -35,17 +35,9 @@ export default function FakturaerListPage() {
       <FakturaerHeaderBanner
         actions={
           canWrite && (
-            <>
-              <Button variant="outline" onClick={() => navigate("/ravarer/fakturaer/import-pdf")} className="gap-2">
-                <Upload className="h-4 w-4" /> Last opp PDF
-              </Button>
-              <Button variant="outline" onClick={() => navigate("/ravarer/fakturaer/import-ehf")} className="gap-2">
-                <FileUp className="h-4 w-4" /> Importer EHF
-              </Button>
-              <Button onClick={() => navigate("/ravarer/fakturaer/ny")} className="gap-2">
-                <Plus className="h-4 w-4" /> Ny faktura
-              </Button>
-            </>
+            <Button onClick={() => navigate("/ravarer/fakturaer/import")} className="gap-2">
+              <Plus className="h-4 w-4" /> Importer manuelt
+            </Button>
           )
         }
       />
@@ -110,7 +102,7 @@ export default function FakturaerListPage() {
             <FileText className="mb-3 h-10 w-10 text-ink-secondary" />
             <p className="text-ink-secondary">Ingen fakturaer enda.</p>
             {canWrite && (
-              <button onClick={() => navigate("/ravarer/fakturaer/ny")} className="mt-3 text-sm font-medium text-primary hover:underline">
+              <button onClick={() => navigate("/ravarer/fakturaer/import")} className="mt-3 text-sm font-medium text-primary hover:underline">
                 Registrer første faktura
               </button>
             )}

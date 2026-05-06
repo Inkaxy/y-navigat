@@ -106,7 +106,7 @@ export default function InvoiceDetailPage() {
             <div className="p-8 text-center text-sm text-ink-secondary">
               Ingen linjer registrert ennå.
               <div className="mt-3">
-                <Button size="sm" variant="outline" onClick={() => navigate("/ravarer/fakturaer/ny")}>Fyll inn manuelt</Button>
+                <Button size="sm" variant="outline" onClick={() => navigate(`/ravarer/fakturaer/${id}/registrer-linjer`)}>Registrer linjer</Button>
               </div>
             </div>
           ) : (

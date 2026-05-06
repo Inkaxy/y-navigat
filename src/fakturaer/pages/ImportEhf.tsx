@@ -8,7 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { FakturaerHeaderBanner } from "@/fakturaer/components/FakturaerHeaderBanner";
 import { useFakturaer } from "@/fakturaer/context/FakturaerContext";
 
-export default function ImportEhfPage() {
+export default function ImportEhfPage({ embedded = false }: { embedded?: boolean } = {}) {
   const navigate = useNavigate();
   const { canWrite } = useFakturaer();
   const [busy, setBusy] = useState(false);
@@ -45,22 +45,23 @@ export default function ImportEhfPage() {
 
   if (!canWrite) {
     return (
-      <div className="space-y-5">
-        <FakturaerHeaderBanner title="Importer EHF" />
-        <Card className="p-8 text-center text-ink-secondary">Du har ikke skrivetilgang til fakturaer.</Card>
-      </div>
+      <Card className="p-8 text-center text-ink-secondary">Du har ikke skrivetilgang til fakturaer.</Card>
     );
   }
 
   return (
     <div className="space-y-5">
-      <button
-        onClick={() => navigate("/ravarer/fakturaer")}
-        className="flex items-center gap-1 text-sm text-ink-secondary transition-colors hover:text-ink-primary"
-      >
-        <ArrowLeft className="h-4 w-4" /> Tilbake
-      </button>
-      <FakturaerHeaderBanner title="Importer EHF" subtitle="Last opp UBL/PEPPOL XML-faktura" />
+      {!embedded && (
+        <>
+          <button
+            onClick={() => navigate("/ravarer/fakturaer")}
+            className="flex items-center gap-1 text-sm text-ink-secondary transition-colors hover:text-ink-primary"
+          >
+            <ArrowLeft className="h-4 w-4" /> Tilbake
+          </button>
+          <FakturaerHeaderBanner title="Importer EHF" subtitle="Last opp UBL/PEPPOL XML-faktura" />
+        </>
+      )}
 
       <Card
         onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}

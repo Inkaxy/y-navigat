@@ -64,7 +64,7 @@ async function fileToBase64(file: File): Promise<string> {
   return btoa(binary);
 }
 
-export default function ImportPdfPage() {
+export default function ImportPdfPage({ embedded = false }: { embedded?: boolean } = {}) {
   const navigate = useNavigate();
   const { canWrite } = useFakturaer();
   const { data: entities = [] } = useFakturaerLegalEntities();
@@ -215,7 +215,7 @@ export default function ImportPdfPage() {
           total_vat: totalVat ? Number(totalVat) : null,
           currency: currency || "NOK",
           source: "pdf_upload",
-          lines_source: lines.length > 0 ? "pdf_extracted" : null,
+          lines_source: lines.length > 0 ? "pdf_extracted" : "pending_manual",
           source_document_url: path,
           status: "imported",
           notes: kid || accountNumber
@@ -242,8 +242,13 @@ export default function ImportPdfPage() {
         if (linesErr) throw linesErr;
       }
 
-      toast.success("Faktura opprettet");
-      navigate(`/ravarer/fakturaer/${invoice.id}`);
+      if (lines.length === 0) {
+        toast.success("Faktura opprettet — registrer linjer");
+        navigate(`/ravarer/fakturaer/${invoice.id}/registrer-linjer`);
+      } else {
+        toast.success("Faktura opprettet");
+        navigate(`/ravarer/fakturaer/${invoice.id}`);
+      }
     } catch (e: any) {
       toast.error(`Opplasting feilet: ${e?.message ?? e}`);
     } finally {
@@ -253,10 +258,7 @@ export default function ImportPdfPage() {
 
   if (!canWrite) {
     return (
-      <div className="space-y-5">
-        <FakturaerHeaderBanner title="Last opp PDF" />
-        <Card className="p-8 text-center text-ink-secondary">Du har ikke skrivetilgang til fakturaer.</Card>
-      </div>
+      <Card className="p-8 text-center text-ink-secondary">Du har ikke skrivetilgang til fakturaer.</Card>
     );
   }
 
@@ -264,10 +266,14 @@ export default function ImportPdfPage() {
   if (!parseResult) {
     return (
       <div className="space-y-5">
-        <button onClick={() => navigate("/ravarer/fakturaer")} className="flex items-center gap-1 text-sm text-ink-secondary hover:text-ink-primary">
-          <ArrowLeft className="h-4 w-4" /> Tilbake
-        </button>
-        <FakturaerHeaderBanner title="Last opp PDF" subtitle="AI leser fakturaen og gir deg et forslag du kan bekrefte" />
+        {!embedded && (
+          <>
+            <button onClick={() => navigate("/ravarer/fakturaer")} className="flex items-center gap-1 text-sm text-ink-secondary hover:text-ink-primary">
+              <ArrowLeft className="h-4 w-4" /> Tilbake
+            </button>
+            <FakturaerHeaderBanner title="Last opp PDF" subtitle="AI leser fakturaen og gir deg et forslag du kan bekrefte" />
+          </>
+        )}
 
         <Card className="p-6">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -310,7 +316,9 @@ export default function ImportPdfPage() {
         className="flex items-center gap-1 text-sm text-ink-secondary hover:text-ink-primary">
         <ArrowLeft className="h-4 w-4" /> Last opp en annen fil
       </button>
-      <FakturaerHeaderBanner title="Bekreft fakturadata" subtitle="Sjekk at AI har lest riktig før du lagrer" />
+      {!embedded && (
+        <FakturaerHeaderBanner title="Bekreft fakturadata" subtitle="Sjekk at AI har lest riktig før du lagrer" />
+      )}
 
       <div className="flex flex-wrap items-center gap-2">
         <Badge variant="outline" className="gap-1">
