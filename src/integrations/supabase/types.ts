@@ -1535,6 +1535,346 @@ export type Database = {
           },
         ]
       }
+      invoice_line_exclusion_patterns: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          id: string
+          legal_entity_id: string
+          pattern_type: string
+          pattern_value: string
+          pattern_value_normalized: string | null
+          reason: string | null
+          supplier_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          legal_entity_id: string
+          pattern_type: string
+          pattern_value: string
+          pattern_value_normalized?: string | null
+          reason?: string | null
+          supplier_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          legal_entity_id?: string
+          pattern_type?: string
+          pattern_value?: string
+          pattern_value_normalized?: string | null
+          reason?: string | null
+          supplier_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_line_exclusion_patterns_legal_entity_id_fkey"
+            columns: ["legal_entity_id"]
+            isOneToOne: false
+            referencedRelation: "legal_entities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_line_exclusion_patterns_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoice_line_match_suggestions: {
+        Row: {
+          confidence: number
+          created_at: string | null
+          id: string
+          invoice_line_id: string
+          match_reason: string | null
+          rank: number
+          raw_material_id: string
+        }
+        Insert: {
+          confidence: number
+          created_at?: string | null
+          id?: string
+          invoice_line_id: string
+          match_reason?: string | null
+          rank: number
+          raw_material_id: string
+        }
+        Update: {
+          confidence?: number
+          created_at?: string | null
+          id?: string
+          invoice_line_id?: string
+          match_reason?: string | null
+          rank?: number
+          raw_material_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_line_match_suggestions_invoice_line_id_fkey"
+            columns: ["invoice_line_id"]
+            isOneToOne: false
+            referencedRelation: "invoice_lines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_line_match_suggestions_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "raw_materials"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoice_lines: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          expected_price_per_base_unit: number | null
+          id: string
+          invoice_id: string
+          line_number: number | null
+          match_confidence: string | null
+          price_per_base_unit: number | null
+          price_variance_pct: number | null
+          quantity: number | null
+          raw_material_id: string | null
+          requires_review: boolean | null
+          resolution_note: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          review_reason: string | null
+          supplier_sku: string | null
+          total_amount: number | null
+          unit: string | null
+          unit_price: number | null
+          updated_at: string | null
+          variance_status: string | null
+          vat_rate: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          expected_price_per_base_unit?: number | null
+          id?: string
+          invoice_id: string
+          line_number?: number | null
+          match_confidence?: string | null
+          price_per_base_unit?: number | null
+          price_variance_pct?: number | null
+          quantity?: number | null
+          raw_material_id?: string | null
+          requires_review?: boolean | null
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          review_reason?: string | null
+          supplier_sku?: string | null
+          total_amount?: number | null
+          unit?: string | null
+          unit_price?: number | null
+          updated_at?: string | null
+          variance_status?: string | null
+          vat_rate?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          expected_price_per_base_unit?: number | null
+          id?: string
+          invoice_id?: string
+          line_number?: number | null
+          match_confidence?: string | null
+          price_per_base_unit?: number | null
+          price_variance_pct?: number | null
+          quantity?: number | null
+          raw_material_id?: string | null
+          requires_review?: boolean | null
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          review_reason?: string | null
+          supplier_sku?: string | null
+          total_amount?: number | null
+          unit?: string | null
+          unit_price?: number | null
+          updated_at?: string | null
+          variance_status?: string | null
+          vat_rate?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_lines_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_lines_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "raw_materials"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoice_match_category_tolerances: {
+        Row: {
+          category: string
+          id: string
+          legal_entity_id: string
+          price_tolerance_pct: number
+        }
+        Insert: {
+          category: string
+          id?: string
+          legal_entity_id: string
+          price_tolerance_pct: number
+        }
+        Update: {
+          category?: string
+          id?: string
+          legal_entity_id?: string
+          price_tolerance_pct?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_match_category_tolerances_legal_entity_id_fkey"
+            columns: ["legal_entity_id"]
+            isOneToOne: false
+            referencedRelation: "legal_entities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoice_match_settings: {
+        Row: {
+          auto_approve_within_tolerance: boolean | null
+          default_price_tolerance_pct: number | null
+          fuzzy_auto_match_dominance_threshold: number | null
+          fuzzy_auto_match_threshold: number | null
+          fuzzy_match_threshold: number | null
+          legal_entity_id: string
+          updated_at: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          auto_approve_within_tolerance?: boolean | null
+          default_price_tolerance_pct?: number | null
+          fuzzy_auto_match_dominance_threshold?: number | null
+          fuzzy_auto_match_threshold?: number | null
+          fuzzy_match_threshold?: number | null
+          legal_entity_id: string
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          auto_approve_within_tolerance?: boolean | null
+          default_price_tolerance_pct?: number | null
+          fuzzy_auto_match_dominance_threshold?: number | null
+          fuzzy_auto_match_threshold?: number | null
+          fuzzy_match_threshold?: number | null
+          legal_entity_id?: string
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_match_settings_legal_entity_id_fkey"
+            columns: ["legal_entity_id"]
+            isOneToOne: true
+            referencedRelation: "legal_entities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoices: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string | null
+          currency: string | null
+          due_date: string | null
+          ehf_payload: Json | null
+          id: string
+          imported_at: string | null
+          invoice_date: string
+          invoice_number: string
+          legal_entity_id: string
+          notes: string | null
+          source: string | null
+          source_document_url: string | null
+          status: string
+          supplier_id: string
+          total_amount: number | null
+          total_vat: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string | null
+          currency?: string | null
+          due_date?: string | null
+          ehf_payload?: Json | null
+          id?: string
+          imported_at?: string | null
+          invoice_date: string
+          invoice_number: string
+          legal_entity_id: string
+          notes?: string | null
+          source?: string | null
+          source_document_url?: string | null
+          status?: string
+          supplier_id: string
+          total_amount?: number | null
+          total_vat?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string | null
+          currency?: string | null
+          due_date?: string | null
+          ehf_payload?: Json | null
+          id?: string
+          imported_at?: string | null
+          invoice_date?: string
+          invoice_number?: string
+          legal_entity_id?: string
+          notes?: string | null
+          source?: string | null
+          source_document_url?: string | null
+          status?: string
+          supplier_id?: string
+          total_amount?: number | null
+          total_vat?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoices_legal_entity_id_fkey"
+            columns: ["legal_entity_id"]
+            isOneToOne: false
+            referencedRelation: "legal_entities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       label_number_sequences: {
         Row: {
           last_number: number
@@ -4254,6 +4594,7 @@ export type Database = {
         Row: {
           alias_type: Database["public"]["Enums"]["alias_type"]
           alias_value: string
+          alias_value_normalized: string | null
           confirmed_at: string | null
           confirmed_by: string | null
           created_at: string
@@ -4269,6 +4610,7 @@ export type Database = {
         Insert: {
           alias_type: Database["public"]["Enums"]["alias_type"]
           alias_value: string
+          alias_value_normalized?: string | null
           confirmed_at?: string | null
           confirmed_by?: string | null
           created_at?: string
@@ -4284,6 +4626,7 @@ export type Database = {
         Update: {
           alias_type?: Database["public"]["Enums"]["alias_type"]
           alias_value?: string
+          alias_value_normalized?: string | null
           confirmed_at?: string | null
           confirmed_by?: string | null
           created_at?: string
@@ -5349,6 +5692,14 @@ export type Database = {
       }
       has_app_admin_access: { Args: { p_app_code: string }; Returns: boolean }
       has_app_write_access: { Args: { p_app_code: string }; Returns: boolean }
+      has_fakturaer_access: {
+        Args: { _legal_entity_id: string; _required_level?: string }
+        Returns: boolean
+      }
+      has_fakturaer_read_or_owner: {
+        Args: { _legal_entity_id: string }
+        Returns: boolean
+      }
       has_position_in_entity: {
         Args: { p_legal_entity_id: string }
         Returns: boolean
