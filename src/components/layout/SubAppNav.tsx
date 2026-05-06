@@ -114,6 +114,11 @@ export function SubAppNav() {
                 }
               >
                 {item.label}
+                {item.to === "/fakturaer/til-behandling" && reviewCount > 0 && (
+                  <span className={cn("ml-2 rounded-full px-1.5 py-0.5 text-[10px] font-semibold", reviewCount > 10 ? "bg-destructive text-destructive-foreground" : "bg-warning/20 text-warning")}>
+                    {reviewCount}
+                  </span>
+                )}
               </NavLink>
             </li>
           );
