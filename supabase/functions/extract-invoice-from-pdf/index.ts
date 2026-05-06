@@ -28,12 +28,21 @@ Felter som skal hentes:
 - lines (array av objekter):
   - description (string)
   - sku (string) eller null
-  - quantity (number) eller null
-  - unit (string) eller null
-  - unit_price (number) eller null
+  - quantity (number) eller null — antall enheter slik fakturaen viser dem (f.eks. 2 hvis "2 STK")
+  - unit (string) eller null — NORMALISER til kanonisk form: "kg", "g", "l", "ml", "dl", "cl", "stk", "eske", "pakke", "sekk", "flaske", "rull", "spann", "boks", "brett". Aldri rå koder som "STK", "ESK", "POS", "FL", "KRT", "BX", "PK" — oversett dem.
+  - unit_price (number) eller null — pris per enhet (samme enhet som unit)
   - total_amount (number) eller null
   - vat_rate (number) eller null
+  - package_size (number) eller null — pakke-størrelse hentet fra beskrivelsen (f.eks. 10 for "10l bib", 90 for "36X90G ALI", 0.5 for "500ml flaske"). Hvis "36X90G", sett package_size=90 og count_per_package=36.
+  - package_unit (string) eller null — base-enhet for package_size ("g", "kg", "l", "ml", "dl", "cl", "stk")
+  - count_per_package (number) eller null — antall sub-enheter per pakke (f.eks. 36 for "36X90G")
 - field_confidence (object): for hvert toppnivå-felt over (utenom lines), gi en tallverdi 0-1 som sier hvor sikker du er.
+
+Eksempler på linjer:
+  "TINE Helmelk 10l bib" qty=2 STK   -> unit="stk", package_size=10, package_unit="l"
+  "ALI ORIGINAL FINMALT 36X90G" qty=1 ESK -> unit="eske", package_size=90, package_unit="g", count_per_package=36
+  "VANILJEKREM 2 KG" qty=96 KG       -> unit="kg", package_size=2, package_unit="kg"  (her er fakturaen tvetydig — sett field_confidence lavt)
+  "EPLEJUICE 2L" qty=8 STK           -> unit="stk", package_size=2, package_unit="l"
 
 Hvis du er usikker på et felt, returner null. Aldri gjett.
 Returner alltid valid JSON, aldri prose.`;

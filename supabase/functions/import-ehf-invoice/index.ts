@@ -5,6 +5,7 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { parse as parseXml } from "https://deno.land/x/xml@2.1.3/mod.ts";
+import { normalizeUnit } from "../_shared/units.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -250,7 +251,7 @@ Deno.serve(async (req) => {
         description: desc,
         supplier_sku: supplierItemNumber,
         quantity: qty,
-        unit: unitCode,
+        unit: normalizeUnit(unitCode) ?? unitCode,
         unit_price: unitPrice,
         total_amount: lineNet,
       };

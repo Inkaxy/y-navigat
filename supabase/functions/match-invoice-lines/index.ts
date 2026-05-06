@@ -2,6 +2,7 @@
 // Input: { invoice_id: string, line_ids?: string[] }
 import { createClient } from "npm:@supabase/supabase-js@2.95.0";
 import { corsHeaders } from "npm:@supabase/supabase-js@2.95.0/cors";
+import { normalizeUnit, isPackageUnit, quantityToBase } from "../_shared/units.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const ANON = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -10,21 +11,6 @@ const SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 type AnyRec = Record<string, any>;
 
 const norm = (s: string | null | undefined) => (s ?? "").trim().toLowerCase();
-
-// Convert quantity in `from` unit to `to` (base) unit. Returns null if unknown conversion.
-function toBaseFactor(from: string | null | undefined, to: string | null | undefined): number | null {
-  const f = norm(from);
-  const t = norm(to);
-  if (!f || !t) return null;
-  if (f === t) return 1;
-  const map: Record<string, [string, number]> = {
-    g: ["kg", 0.001], kg: ["g", 1000],
-    ml: ["l", 0.001], l: ["ml", 1000],
-  };
-  const e = map[f];
-  if (e && e[0] === t) return e[1];
-  return null;
-}
 
 // Lightweight trigram-style similarity (fallback if pg_trgm RPC not used). Range 0..1.
 function similarity(a: string, b: string): number {
@@ -314,6 +300,12 @@ Deno.serve(async (req) => {
         update.review_reason = null;
       }
 
+      // Normaliser enheten alltid (også for unmatched linjer)
+      const normalizedUnit = normalizeUnit(line.unit);
+      if (normalizedUnit && normalizedUnit !== line.unit) {
+        update.unit = normalizedUnit;
+      }
+
       if (matchedRmId) update.raw_material_id = matchedRmId;
 
       // STEG 6 — price variance (when raw_material_id is set)
@@ -323,12 +315,30 @@ Deno.serve(async (req) => {
         const expected = rmsRow?.agreed_price_per_base_unit != null ? Number(rmsRow.agreed_price_per_base_unit) : null;
 
         let actual: number | null = null;
+        let conv: ReturnType<typeof quantityToBase> = null;
         if (line.unit_price != null && rm?.base_unit) {
-          const factor = toBaseFactor(line.unit, rm.base_unit);
-          if (factor != null && factor !== 0) actual = Number(line.unit_price) / factor;
+          conv = quantityToBase({
+            quantity: 1,
+            unit: line.unit,
+            description: line.description,
+            baseUnit: rm.base_unit,
+            rmsPackageSize: rmsRow?.package_size ?? null,
+            rmsPackageUnit: rmsRow?.package_unit ?? null,
+            linePackageSize: (line as any).package_size ?? null,
+            linePackageUnit: (line as any).package_unit ?? null,
+          });
+          if (conv && conv.factor !== 0) actual = Number(line.unit_price) / conv.factor;
         }
         update.price_per_base_unit = actual;
         update.expected_price_per_base_unit = expected;
+
+        // Flagg ukjent pakke-størrelse for pakke-enheter
+        if (actual == null && isPackageUnit(normalizedUnit) && rm?.base_unit) {
+          update.requires_review = true;
+          update.review_reason = update.review_reason
+            ? Array.from(new Set(`${update.review_reason},unknown_package_size`.split(","))).join(",")
+            : "unknown_package_size";
+        }
 
         if (expected != null && actual != null && expected !== 0) {
           const variance = ((actual - expected) / expected) * 100;
