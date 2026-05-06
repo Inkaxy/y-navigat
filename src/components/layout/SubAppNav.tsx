@@ -40,16 +40,6 @@ const STATIC_SUBMENUS: Record<string, { prefix: string; appSlug: string; items: 
       { kind: "link", to: "/kunder/innstillinger", label: "Innstillinger" },
     ],
   },
-    prefix: "/kunder",
-    appSlug: "kunder",
-    items: [
-      { kind: "link", to: "/kunder/kundeliste", label: "Kundeliste" },
-      { kind: "link", to: "/kunder/profiler", label: "Profiler" },
-      { kind: "link", to: "/kunder/kundegrupper", label: "Kundegrupper" },
-      { kind: "link", to: "/kunder/historikk", label: "Historikk" },
-      { kind: "link", to: "/kunder/innstillinger", label: "Innstillinger" },
-    ],
-  },
   admin: {
     prefix: "/admin",
     appSlug: "nbos",
