@@ -61,6 +61,10 @@ import ProduksjonsavdelingerPage from "@/produksjon/pages/innstillinger/Produksj
 import PakkeomraderPage from "@/produksjon/pages/innstillinger/PakkeomraderPage";
 import UtskriftsprofilerPage from "@/produksjon/pages/innstillinger/UtskriftsprofilerPage";
 
+import { RavarerProvider } from "@/ravarer/context/RavarerContext";
+import RavarerVareliste from "@/ravarer/pages/Vareliste";
+import RavarerDetail from "@/ravarer/pages/RawMaterialDetail";
+
 const KunderEntityProvider = ({ children }: { children: React.ReactNode }) => {
   const { user } = useNbhubAuth();
   const { data: access } = useKunderUserAccess(user);
