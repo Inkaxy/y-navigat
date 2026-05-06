@@ -42,6 +42,9 @@ export function estimateCostUsd(model: string, inTok: number | null, outTok: num
 }
 
 export async function callAi(p: AiCallParams): Promise<AiCallResult> {
+  // Trim whitespace/newlines som ofte sniker seg inn ved copy-paste
+  p = { ...p, apiKey: (p.apiKey ?? "").trim() };
+  if (!p.apiKey) throw new Error("API-key er tom");
   if (p.provider === "anthropic") return callAnthropic(p);
   if (p.provider === "openai") return callOpenAi(p);
   if (p.provider === "azure_openai") return callAzureOpenAi(p);
