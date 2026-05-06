@@ -232,6 +232,9 @@ function RecipeForm({ recipe, productName, canWrite }: { recipe: any; productNam
       unit: "g",
       waste_percent: 0,
       sort_order: partLines.length,
+      include_in_declaration: true,
+      is_quid_relevant: false,
+      custom_declaration_text: null,
     };
     setLines([...lines, newLine]);
   }
