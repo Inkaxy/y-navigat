@@ -166,7 +166,7 @@ export function SuppliersTab({ rm }: Props) {
                     <td className="py-2">
                       {h.invoice_id ? (
                         <Link
-                          to={`/fakturaer/${h.invoice_id}`}
+                          to={`/ravarer/fakturaer/${h.invoice_id}`}
                           className="font-mono text-xs text-app underline-offset-2 hover:underline"
                         >
                           {h.invoices?.invoice_number ?? "Åpne"}

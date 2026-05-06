@@ -144,7 +144,7 @@ export default function NewInvoicePage() {
         /* matching kommer i Steg 3 */
       }
 
-      navigate(`/fakturaer/${invoice.id}`);
+      navigate(`/ravarer/fakturaer/${invoice.id}`);
     } catch (e: any) {
       toast.error(`Kunne ikke lagre: ${e.message ?? e}`);
     } finally {
@@ -156,7 +156,7 @@ export default function NewInvoicePage() {
     <div className="space-y-5">
       <div>
         <button
-          onClick={() => navigate("/fakturaer")}
+          onClick={() => navigate("/ravarer/fakturaer")}
           className="mb-3 flex items-center gap-1 text-sm text-ink-secondary transition-colors hover:text-ink-primary"
         >
           <ArrowLeft className="h-4 w-4" /> Tilbake
@@ -331,7 +331,7 @@ export default function NewInvoicePage() {
         </Card>
 
         <div className="flex justify-end gap-2">
-          <Button type="button" variant="outline" onClick={() => navigate("/fakturaer")} disabled={submitting}>
+          <Button type="button" variant="outline" onClick={() => navigate("/ravarer/fakturaer")} disabled={submitting}>
             Avbryt
           </Button>
           <Button type="submit" disabled={submitting} className="gap-2">

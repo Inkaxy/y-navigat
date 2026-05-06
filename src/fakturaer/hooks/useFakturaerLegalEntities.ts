@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { APP_CODE } from "@/fakturaer/lib/constants";
+
 
 export interface LegalEntityRow {
   id: string;
@@ -42,10 +42,10 @@ export function useFakturaerLegalEntities() {
       if (positionIds.length === 0) return [];
       const { data: paa } = await supabase
         .from("position_app_access")
-        .select("position_id, apps!inner(code)")
+        .select("position_id, invoice_access, apps!inner(code)")
         .in("position_id", positionIds);
       const allowedPositions = new Set(
-        (paa ?? []).filter((row: any) => row.apps?.code === APP_CODE).map((row: any) => row.position_id),
+        (paa ?? []).filter((row: any) => row.apps?.code === "ravarer" && row.invoice_access === true).map((row: any) => row.position_id),
       );
       const entityIds = Array.from(
         new Set(

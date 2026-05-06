@@ -34,8 +34,8 @@ export default function ImportEhfPage() {
       if (error) throw error;
       const invoiceId = (data as any)?.invoice_id;
       toast.success("EHF-faktura importert");
-      if (invoiceId) navigate(`/fakturaer/${invoiceId}`);
-      else navigate("/fakturaer");
+      if (invoiceId) navigate(`/ravarer/fakturaer/${invoiceId}`);
+      else navigate("/ravarer/fakturaer");
     } catch (e: any) {
       toast.error(`Import feilet: ${e.message ?? e}`);
     } finally {
@@ -55,7 +55,7 @@ export default function ImportEhfPage() {
   return (
     <div className="space-y-5">
       <button
-        onClick={() => navigate("/fakturaer")}
+        onClick={() => navigate("/ravarer/fakturaer")}
         className="flex items-center gap-1 text-sm text-ink-secondary transition-colors hover:text-ink-primary"
       >
         <ArrowLeft className="h-4 w-4" /> Tilbake

@@ -63,7 +63,7 @@ export default function ImportPdfPage() {
       if (error) throw error;
 
       toast.success("PDF lastet opp. Fyll inn linjer manuelt.");
-      navigate(`/fakturaer/${invoice.id}`);
+      navigate(`/ravarer/fakturaer/${invoice.id}`);
     } catch (e: any) {
       toast.error(`Opplasting feilet: ${e.message ?? e}`);
     } finally {
@@ -82,7 +82,7 @@ export default function ImportPdfPage() {
 
   return (
     <div className="space-y-5">
-      <button onClick={() => navigate("/fakturaer")} className="flex items-center gap-1 text-sm text-ink-secondary transition-colors hover:text-ink-primary">
+      <button onClick={() => navigate("/ravarer/fakturaer")} className="flex items-center gap-1 text-sm text-ink-secondary transition-colors hover:text-ink-primary">
         <ArrowLeft className="h-4 w-4" /> Tilbake
       </button>
       <FakturaerHeaderBanner title="Last opp PDF" subtitle="OCR-parsing kommer senere — registrer linjene manuelt" />
@@ -123,7 +123,7 @@ export default function ImportPdfPage() {
         </div>
 
         <div className="mt-5 flex justify-end gap-2">
-          <Button variant="outline" onClick={() => navigate("/fakturaer")} disabled={busy}>Avbryt</Button>
+          <Button variant="outline" onClick={() => navigate("/ravarer/fakturaer")} disabled={busy}>Avbryt</Button>
           <Button onClick={upload} disabled={busy} className="gap-2">
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
             Last opp og fortsett

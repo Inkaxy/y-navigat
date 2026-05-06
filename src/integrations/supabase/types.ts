@@ -3551,16 +3551,19 @@ export type Database = {
       position_app_access: {
         Row: {
           app_id: string
+          invoice_access: boolean
           level: Database["public"]["Enums"]["access_level"]
           position_id: string
         }
         Insert: {
           app_id: string
+          invoice_access?: boolean
           level?: Database["public"]["Enums"]["access_level"]
           position_id: string
         }
         Update: {
           app_id?: string
+          invoice_access?: boolean
           level?: Database["public"]["Enums"]["access_level"]
           position_id?: string
         }
@@ -5860,6 +5863,14 @@ export type Database = {
         }
         Returns: boolean
       }
+      has_ravarer_invoice_access: {
+        Args: { _legal_entity_id: string; _required_level?: string }
+        Returns: boolean
+      }
+      has_ravarer_invoice_read_or_owner: {
+        Args: { _legal_entity_id: string }
+        Returns: boolean
+      }
       has_specific_position_in_entity: {
         Args: { p_legal_entity_id: string; p_position_code: string }
         Returns: boolean
@@ -6108,6 +6119,7 @@ export type Database = {
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
       unaccent: { Args: { "": string }; Returns: string }
+      user_has_invoice_access: { Args: never; Returns: boolean }
       verify_gtin: { Args: { p_gtin: string }; Returns: boolean }
     }
     Enums: {

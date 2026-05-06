@@ -114,7 +114,7 @@ export default function FakturaerReviewQueuePage() {
                   lines={filteredLines}
                   reason={t.value}
                   onAction={open}
-                  onOpenInvoice={(id) => navigate(`/fakturaer/${id}`)}
+                  onOpenInvoice={(id) => navigate(`/ravarer/fakturaer/${id}`)}
                 />
               )}
             </Card>
