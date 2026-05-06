@@ -1,0 +1,263 @@
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useRavarer } from "@/ravarer/context/RavarerContext";
+import { toast } from "sonner";
+
+export type NegotiationStatus = "draft" | "invited" | "in_progress" | "concluded" | "cancelled";
+
+export interface NegotiationRow {
+  id: string;
+  legal_entity_id: string;
+  title: string;
+  purpose: string | null;
+  contract_start: string | null;
+  contract_end: string | null;
+  baseline_period_start: string | null;
+  baseline_period_end: string | null;
+  response_deadline: string | null;
+  status: NegotiationStatus;
+  notes: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  concluded_at: string | null;
+  archived_at: string | null;
+}
+
+export interface NegotiationItemRow {
+  id: string;
+  negotiation_id: string;
+  raw_material_id: string;
+  expected_annual_volume: number | null;
+  expected_annual_volume_unit: string | null;
+  actual_volume_baseline: number | null;
+  actual_cost_baseline: number | null;
+  actual_avg_price_baseline: number | null;
+  target_price: number | null;
+  suggested_package_size: number | null;
+  suggested_package_unit: string | null;
+  notes: string | null;
+  sort_order: number;
+}
+
+export interface NegotiationRecipientRow {
+  id: string;
+  negotiation_id: string;
+  supplier_id: string;
+  contact_email: string | null;
+  contact_name: string | null;
+  access_token: string;
+  password_set_at: string | null;
+  password_expires_at: string | null;
+  failed_attempts: number;
+  locked_until: string | null;
+  status: "invited" | "viewed" | "responded" | "declined" | "expired" | "locked";
+  invited_at: string | null;
+  first_viewed_at: string | null;
+  last_viewed_at: string | null;
+  responded_at: string | null;
+  expires_at: string;
+}
+
+export function useNegotiations(opts?: { archived?: boolean }) {
+  const { legalEntityId } = useRavarer();
+  return useQuery({
+    queryKey: ["negotiations", legalEntityId, opts?.archived ?? false],
+    queryFn: async () => {
+      let q = supabase
+        .from("negotiations" as any)
+        .select("*")
+        .eq("legal_entity_id", legalEntityId)
+        .order("created_at", { ascending: false });
+      if (opts?.archived) q = q.not("archived_at", "is", null);
+      else q = q.is("archived_at", null);
+      const { data, error } = await q;
+      if (error) throw error;
+      return (data ?? []) as unknown as NegotiationRow[];
+    },
+  });
+}
+
+export function useNegotiation(id: string | undefined) {
+  return useQuery({
+    queryKey: ["negotiation", id],
+    enabled: !!id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("negotiations" as any)
+        .select("*")
+        .eq("id", id!)
+        .maybeSingle();
+      if (error) throw error;
+      return data as unknown as NegotiationRow | null;
+    },
+  });
+}
+
+export function useNegotiationItems(negotiationId: string | undefined) {
+  return useQuery({
+    queryKey: ["negotiation-items", negotiationId],
+    enabled: !!negotiationId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("negotiation_items" as any)
+        .select("*")
+        .eq("negotiation_id", negotiationId!)
+        .order("sort_order");
+      if (error) throw error;
+      return (data ?? []) as unknown as NegotiationItemRow[];
+    },
+  });
+}
+
+export function useNegotiationRecipients(negotiationId: string | undefined) {
+  return useQuery({
+    queryKey: ["negotiation-recipients", negotiationId],
+    enabled: !!negotiationId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("negotiation_recipients" as any)
+        .select("*")
+        .eq("negotiation_id", negotiationId!)
+        .order("created_at");
+      if (error) throw error;
+      return (data ?? []) as unknown as NegotiationRecipientRow[];
+    },
+  });
+}
+
+export function useCreateNegotiation() {
+  const qc = useQueryClient();
+  const { legalEntityId, user } = useRavarer();
+  return useMutation({
+    mutationFn: async (input: Partial<NegotiationRow> & { title: string }) => {
+      const { data, error } = await supabase
+        .from("negotiations" as any)
+        .insert({
+          legal_entity_id: legalEntityId,
+          created_by: user!.id,
+          status: "draft",
+          ...input,
+        } as any)
+        .select()
+        .single();
+      if (error) throw error;
+      return data as unknown as NegotiationRow;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["negotiations"] });
+    },
+    onError: (e: any) => toast.error(`Kunne ikke opprette: ${e.message ?? e}`),
+  });
+}
+
+export function useUpdateNegotiation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { id: string; patch: Partial<NegotiationRow> }) => {
+      const { data, error } = await supabase
+        .from("negotiations" as any)
+        .update(input.patch as any)
+        .eq("id", input.id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data as unknown as NegotiationRow;
+    },
+    onSuccess: (_d, v) => {
+      qc.invalidateQueries({ queryKey: ["negotiations"] });
+      qc.invalidateQueries({ queryKey: ["negotiation", v.id] });
+    },
+    onError: (e: any) => toast.error(`Lagring feilet: ${e.message ?? e}`),
+  });
+}
+
+export function useUpsertNegotiationItems() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      negotiationId: string;
+      items: Array<Partial<NegotiationItemRow> & { raw_material_id: string }>;
+    }) => {
+      // Replace all items for this negotiation (simple, transactional enough for wizard)
+      const { error: delErr } = await supabase
+        .from("negotiation_items" as any)
+        .delete()
+        .eq("negotiation_id", input.negotiationId);
+      if (delErr) throw delErr;
+      if (input.items.length === 0) return [];
+      const rows = input.items.map((it, idx) => ({
+        ...it,
+        negotiation_id: input.negotiationId,
+        sort_order: it.sort_order ?? idx,
+      }));
+      const { data, error } = await supabase.from("negotiation_items" as any).insert(rows as any).select();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (_d, v) =>
+      qc.invalidateQueries({ queryKey: ["negotiation-items", v.negotiationId] }),
+    onError: (e: any) => toast.error(`Kunne ikke lagre råvarer: ${e.message ?? e}`),
+  });
+}
+
+export function useUpsertNegotiationRecipients() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      negotiationId: string;
+      recipients: Array<{ supplier_id: string; contact_email?: string | null; contact_name?: string | null }>;
+    }) => {
+      const { error: delErr } = await supabase
+        .from("negotiation_recipients" as any)
+        .delete()
+        .eq("negotiation_id", input.negotiationId);
+      if (delErr) throw delErr;
+      if (input.recipients.length === 0) return [];
+      const rows = input.recipients.map((r) => ({
+        ...r,
+        negotiation_id: input.negotiationId,
+      }));
+      const { data, error } = await supabase
+        .from("negotiation_recipients" as any)
+        .insert(rows as any)
+        .select();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (_d, v) =>
+      qc.invalidateQueries({ queryKey: ["negotiation-recipients", v.negotiationId] }),
+    onError: (e: any) => toast.error(`Kunne ikke lagre leverandører: ${e.message ?? e}`),
+  });
+}
+
+export function useGenerateRfqCredentials() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { negotiationId: string }) => {
+      const { data, error } = await supabase.functions.invoke("generate-rfq-credentials", {
+        body: { negotiation_id: input.negotiationId },
+      });
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error ?? "Ukjent feil");
+      return data as {
+        success: true;
+        credentials: Array<{
+          recipient_id: string;
+          supplier_id: string;
+          supplier_name: string;
+          contact_email: string | null;
+          access_token: string;
+          password: string;
+          portal_url: string;
+        }>;
+      };
+    },
+    onSuccess: (_d, v) => {
+      qc.invalidateQueries({ queryKey: ["negotiations"] });
+      qc.invalidateQueries({ queryKey: ["negotiation", v.negotiationId] });
+      qc.invalidateQueries({ queryKey: ["negotiation-recipients", v.negotiationId] });
+    },
+    onError: (e: any) => toast.error(`Kunne ikke generere passord: ${e.message ?? e}`),
+  });
+}
