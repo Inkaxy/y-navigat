@@ -1,16 +1,23 @@
+import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Loader2, LineChart as LineChartIcon } from "lucide-react";
+import { ArrowLeft, Loader2, LineChart as LineChartIcon, CheckCircle2, Flag } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { FakturaerHeaderBanner } from "@/fakturaer/components/FakturaerHeaderBanner";
 import { InvoiceStatusBadge } from "@/fakturaer/components/InvoiceStatusBadge";
+import { ConfirmReconcileDialog } from "@/fakturaer/components/ConfirmReconcileDialog";
+import { FlagInvoiceDialog } from "@/fakturaer/components/FlagInvoiceDialog";
+import { useFakturaer } from "@/fakturaer/context/FakturaerContext";
 import { formatNok, formatDate, INVOICE_SOURCES } from "@/fakturaer/lib/constants";
 
 export default function InvoiceDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { canReconcile, canWrite } = useFakturaer();
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [flagOpen, setFlagOpen] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["invoice", id],
@@ -39,6 +46,8 @@ export default function InvoiceDetailPage() {
 
   const sourceMeta = INVOICE_SOURCES.find((s) => s.value === data.source);
   const lines = (data.invoice_lines ?? []) as any[];
+  const reviewLineCount = lines.filter((l) => l.requires_review).length;
+  const isFinal = ["reconciled", "flagged"].includes(data.status);
 
   return (
     <div className="space-y-5">
@@ -49,8 +58,31 @@ export default function InvoiceDetailPage() {
       <FakturaerHeaderBanner
         title={`Faktura ${data.invoice_number}`}
         subtitle={`${data.suppliers?.name ?? ""} • ${data.legal_entities?.legal_name ?? ""}`}
-        actions={<InvoiceStatusBadge status={data.status} />}
+        actions={
+          <div className="flex items-center gap-2">
+            <InvoiceStatusBadge status={data.status} />
+            {!isFinal && canWrite && (
+              <Button variant="outline" size="sm" onClick={() => setFlagOpen(true)} className="gap-1.5">
+                <Flag className="h-4 w-4" /> Flagg for oppfølging
+              </Button>
+            )}
+            {!isFinal && canReconcile && (
+              <Button size="sm" onClick={() => setConfirmOpen(true)} disabled={reviewLineCount > 0} className="gap-1.5">
+                <CheckCircle2 className="h-4 w-4" /> Bekreft prismatch
+              </Button>
+            )}
+          </div>
+        }
       />
+
+      <ConfirmReconcileDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        invoiceId={data.id}
+        invoiceNumber={data.invoice_number}
+        reviewLineCount={reviewLineCount}
+      />
+      <FlagInvoiceDialog open={flagOpen} onOpenChange={setFlagOpen} invoiceId={data.id} />
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         <Card className="p-6 lg:col-span-1">

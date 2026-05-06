@@ -1803,6 +1803,10 @@ export type Database = {
           currency: string | null
           due_date: string | null
           ehf_payload: Json | null
+          flag_action_type: string | null
+          flag_reason: string | null
+          flagged_at: string | null
+          flagged_by: string | null
           id: string
           imported_at: string | null
           imported_from_tripletex_at: string | null
@@ -1830,6 +1834,10 @@ export type Database = {
           currency?: string | null
           due_date?: string | null
           ehf_payload?: Json | null
+          flag_action_type?: string | null
+          flag_reason?: string | null
+          flagged_at?: string | null
+          flagged_by?: string | null
           id?: string
           imported_at?: string | null
           imported_from_tripletex_at?: string | null
@@ -1857,6 +1865,10 @@ export type Database = {
           currency?: string | null
           due_date?: string | null
           ehf_payload?: Json | null
+          flag_action_type?: string | null
+          flag_reason?: string | null
+          flagged_at?: string | null
+          flagged_by?: string | null
           id?: string
           imported_at?: string | null
           imported_from_tripletex_at?: string | null
