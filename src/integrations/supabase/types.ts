@@ -3948,6 +3948,51 @@ export type Database = {
           },
         ]
       }
+      product_declaration_overrides: {
+        Row: {
+          field_name: string
+          id: string
+          override_value: Json
+          product_recipe_link_id: string
+          reason: string | null
+          set_at: string
+          set_by: string | null
+        }
+        Insert: {
+          field_name: string
+          id?: string
+          override_value: Json
+          product_recipe_link_id: string
+          reason?: string | null
+          set_at?: string
+          set_by?: string | null
+        }
+        Update: {
+          field_name?: string
+          id?: string
+          override_value?: Json
+          product_recipe_link_id?: string
+          reason?: string | null
+          set_at?: string
+          set_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_declaration_overrides_product_recipe_link_id_fkey"
+            columns: ["product_recipe_link_id"]
+            isOneToOne: false
+            referencedRelation: "product_nutrition_calculated"
+            referencedColumns: ["product_recipe_link_id"]
+          },
+          {
+            foreignKeyName: "product_declaration_overrides_product_recipe_link_id_fkey"
+            columns: ["product_recipe_link_id"]
+            isOneToOne: false
+            referencedRelation: "product_recipe_links"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_label_departments: {
         Row: {
           created_at: string
@@ -4159,10 +4204,18 @@ export type Database = {
       product_recipe_links: {
         Row: {
           created_at: string
+          declaration_mode:
+            | Database["public"]["Enums"]["declaration_mode"]
+            | null
+          declaration_updated_at: string | null
+          declaration_updated_by: string | null
           extra_lines: Json
           extra_packaging: Json
           id: string
           is_primary: boolean
+          manual_allergen_summary: Json | null
+          manual_ingredient_declaration: string | null
+          manual_nutrition: Json | null
           notes: string | null
           price_overrides: Json
           product_id: string
@@ -4173,10 +4226,18 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          declaration_mode?:
+            | Database["public"]["Enums"]["declaration_mode"]
+            | null
+          declaration_updated_at?: string | null
+          declaration_updated_by?: string | null
           extra_lines?: Json
           extra_packaging?: Json
           id?: string
           is_primary?: boolean
+          manual_allergen_summary?: Json | null
+          manual_ingredient_declaration?: string | null
+          manual_nutrition?: Json | null
           notes?: string | null
           price_overrides?: Json
           product_id: string
@@ -4187,10 +4248,18 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          declaration_mode?:
+            | Database["public"]["Enums"]["declaration_mode"]
+            | null
+          declaration_updated_at?: string | null
+          declaration_updated_by?: string | null
           extra_lines?: Json
           extra_packaging?: Json
           id?: string
           is_primary?: boolean
+          manual_allergen_summary?: Json | null
+          manual_ingredient_declaration?: string | null
+          manual_nutrition?: Json | null
           notes?: string | null
           price_overrides?: Json
           product_id?: string
@@ -5074,51 +5143,6 @@ export type Database = {
             columns: ["primary_supplier_id"]
             isOneToOne: false
             referencedRelation: "suppliers"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      recipe_declaration_overrides: {
-        Row: {
-          field_name: string
-          id: string
-          override_value: Json
-          reason: string | null
-          recipe_id: string
-          set_at: string
-          set_by: string | null
-        }
-        Insert: {
-          field_name: string
-          id?: string
-          override_value: Json
-          reason?: string | null
-          recipe_id: string
-          set_at?: string
-          set_by?: string | null
-        }
-        Update: {
-          field_name?: string
-          id?: string
-          override_value?: Json
-          reason?: string | null
-          recipe_id?: string
-          set_at?: string
-          set_by?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "recipe_declaration_overrides_recipe_id_fkey"
-            columns: ["recipe_id"]
-            isOneToOne: false
-            referencedRelation: "recipe_nutrition_calculated"
-            referencedColumns: ["recipe_id"]
-          },
-          {
-            foreignKeyName: "recipe_declaration_overrides_recipe_id_fkey"
-            columns: ["recipe_id"]
-            isOneToOne: false
-            referencedRelation: "recipes"
             referencedColumns: ["id"]
           },
         ]
@@ -6146,6 +6170,34 @@ export type Database = {
       }
     }
     Views: {
+      product_nutrition_calculated: {
+        Row: {
+          carbs_g_per_100g: number | null
+          energy_kcal_per_100g: number | null
+          energy_kj_per_100g: number | null
+          fat_g_per_100g: number | null
+          fiber_g_per_100g: number | null
+          final_weight_grams: number | null
+          ingredient_count: number | null
+          ingredients_with_nutrition: number | null
+          product_id: string | null
+          product_recipe_link_id: string | null
+          protein_g_per_100g: number | null
+          salt_g_per_100g: number | null
+          saturated_fat_g_per_100g: number | null
+          sugars_g_per_100g: number | null
+          total_input_grams: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_recipe_links_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       recipe_nutrition_calculated: {
         Row: {
           carbs_g_per_100g: number | null
