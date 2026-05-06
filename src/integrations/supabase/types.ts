@@ -2215,6 +2215,7 @@ export type Database = {
       legal_entities: {
         Row: {
           bank_account: string | null
+          breadscale_default_enabled: boolean
           created_at: string
           founded_year: number | null
           gs1_prefix: string | null
@@ -2240,6 +2241,7 @@ export type Database = {
         }
         Insert: {
           bank_account?: string | null
+          breadscale_default_enabled?: boolean
           created_at?: string
           founded_year?: number | null
           gs1_prefix?: string | null
@@ -2265,6 +2267,7 @@ export type Database = {
         }
         Update: {
           bank_account?: string | null
+          breadscale_default_enabled?: boolean
           created_at?: string
           founded_year?: number | null
           gs1_prefix?: string | null
@@ -4569,6 +4572,7 @@ export type Database = {
           return_value: number | null
           shelf_life_chilled_days: number | null
           shelf_life_frozen_days: number | null
+          show_breadscale: boolean | null
           statistics_group: string | null
           status: string
           sub_category_id: string | null
@@ -4634,6 +4638,7 @@ export type Database = {
           return_value?: number | null
           shelf_life_chilled_days?: number | null
           shelf_life_frozen_days?: number | null
+          show_breadscale?: boolean | null
           statistics_group?: string | null
           status?: string
           sub_category_id?: string | null
@@ -4699,6 +4704,7 @@ export type Database = {
           return_value?: number | null
           shelf_life_chilled_days?: number | null
           shelf_life_frozen_days?: number | null
+          show_breadscale?: boolean | null
           statistics_group?: string | null
           status?: string
           sub_category_id?: string | null
@@ -4783,6 +4789,60 @@ export type Database = {
           {
             foreignKeyName: "raw_material_allergens_raw_material_id_fkey"
             columns: ["raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "raw_materials"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      raw_material_components: {
+        Row: {
+          allergens: Database["public"]["Enums"]["allergen_type"][] | null
+          component_raw_material_id: string | null
+          created_at: string
+          id: string
+          is_explicit_percentage: boolean
+          is_quid_relevant: boolean
+          parent_raw_material_id: string
+          percentage: number
+          primary_ingredient_name: string | null
+          sort_order: number
+        }
+        Insert: {
+          allergens?: Database["public"]["Enums"]["allergen_type"][] | null
+          component_raw_material_id?: string | null
+          created_at?: string
+          id?: string
+          is_explicit_percentage?: boolean
+          is_quid_relevant?: boolean
+          parent_raw_material_id: string
+          percentage: number
+          primary_ingredient_name?: string | null
+          sort_order?: number
+        }
+        Update: {
+          allergens?: Database["public"]["Enums"]["allergen_type"][] | null
+          component_raw_material_id?: string | null
+          created_at?: string
+          id?: string
+          is_explicit_percentage?: boolean
+          is_quid_relevant?: boolean
+          parent_raw_material_id?: string
+          percentage?: number
+          primary_ingredient_name?: string | null
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "raw_material_components_component_raw_material_id_fkey"
+            columns: ["component_raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "raw_materials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "raw_material_components_parent_raw_material_id_fkey"
+            columns: ["parent_raw_material_id"]
             isOneToOne: false
             referencedRelation: "raw_materials"
             referencedColumns: ["id"]
@@ -5062,13 +5122,16 @@ export type Database = {
           agreed_price: number | null
           base_unit: string
           category: string | null
+          components_reviewed_at: string | null
           created_at: string
           created_by: string | null
           current_cost_price: number | null
           current_stock: number
           description: string | null
+          grain_classification: string | null
           id: string
           is_active: boolean
+          is_composite: boolean
           is_packaging: boolean
           legal_entity_id: string
           min_stock: number | null
@@ -5086,13 +5149,16 @@ export type Database = {
           agreed_price?: number | null
           base_unit: string
           category?: string | null
+          components_reviewed_at?: string | null
           created_at?: string
           created_by?: string | null
           current_cost_price?: number | null
           current_stock?: number
           description?: string | null
+          grain_classification?: string | null
           id?: string
           is_active?: boolean
+          is_composite?: boolean
           is_packaging?: boolean
           legal_entity_id: string
           min_stock?: number | null
@@ -5110,13 +5176,16 @@ export type Database = {
           agreed_price?: number | null
           base_unit?: string
           category?: string | null
+          components_reviewed_at?: string | null
           created_at?: string
           created_by?: string | null
           current_cost_price?: number | null
           current_stock?: number
           description?: string | null
+          grain_classification?: string | null
           id?: string
           is_active?: boolean
+          is_composite?: boolean
           is_packaging?: boolean
           legal_entity_id?: string
           min_stock?: number | null
@@ -5143,6 +5212,57 @@ export type Database = {
             columns: ["primary_supplier_id"]
             isOneToOne: false
             referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recipe_grain_score: {
+        Row: {
+          category: string | null
+          classification_complete: boolean | null
+          coarse_grams_weighted: number | null
+          computed_at: string
+          grain_score_pct: number | null
+          product_recipe_link_id: string
+          total_flour_grams: number | null
+          unclassified_count: number
+          unclassified_names: string[] | null
+        }
+        Insert: {
+          category?: string | null
+          classification_complete?: boolean | null
+          coarse_grams_weighted?: number | null
+          computed_at?: string
+          grain_score_pct?: number | null
+          product_recipe_link_id: string
+          total_flour_grams?: number | null
+          unclassified_count?: number
+          unclassified_names?: string[] | null
+        }
+        Update: {
+          category?: string | null
+          classification_complete?: boolean | null
+          coarse_grams_weighted?: number | null
+          computed_at?: string
+          grain_score_pct?: number | null
+          product_recipe_link_id?: string
+          total_flour_grams?: number | null
+          unclassified_count?: number
+          unclassified_names?: string[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recipe_grain_score_product_recipe_link_id_fkey"
+            columns: ["product_recipe_link_id"]
+            isOneToOne: true
+            referencedRelation: "product_nutrition_calculated"
+            referencedColumns: ["product_recipe_link_id"]
+          },
+          {
+            foreignKeyName: "recipe_grain_score_product_recipe_link_id_fkey"
+            columns: ["product_recipe_link_id"]
+            isOneToOne: true
+            referencedRelation: "product_recipe_links"
             referencedColumns: ["id"]
           },
         ]
