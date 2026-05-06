@@ -253,10 +253,7 @@ export default function ImportPdfPage({ embedded = false }: { embedded?: boolean
 
   if (!canWrite) {
     return (
-      <div className="space-y-5">
-        <FakturaerHeaderBanner title="Last opp PDF" />
-        <Card className="p-8 text-center text-ink-secondary">Du har ikke skrivetilgang til fakturaer.</Card>
-      </div>
+      <Card className="p-8 text-center text-ink-secondary">Du har ikke skrivetilgang til fakturaer.</Card>
     );
   }
 
@@ -264,10 +261,14 @@ export default function ImportPdfPage({ embedded = false }: { embedded?: boolean
   if (!parseResult) {
     return (
       <div className="space-y-5">
-        <button onClick={() => navigate("/ravarer/fakturaer")} className="flex items-center gap-1 text-sm text-ink-secondary hover:text-ink-primary">
-          <ArrowLeft className="h-4 w-4" /> Tilbake
-        </button>
-        <FakturaerHeaderBanner title="Last opp PDF" subtitle="AI leser fakturaen og gir deg et forslag du kan bekrefte" />
+        {!embedded && (
+          <>
+            <button onClick={() => navigate("/ravarer/fakturaer")} className="flex items-center gap-1 text-sm text-ink-secondary hover:text-ink-primary">
+              <ArrowLeft className="h-4 w-4" /> Tilbake
+            </button>
+            <FakturaerHeaderBanner title="Last opp PDF" subtitle="AI leser fakturaen og gir deg et forslag du kan bekrefte" />
+          </>
+        )}
 
         <Card className="p-6">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
