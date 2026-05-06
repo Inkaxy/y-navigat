@@ -300,6 +300,12 @@ Deno.serve(async (req) => {
         update.review_reason = null;
       }
 
+      // Normaliser enheten alltid (også for unmatched linjer)
+      const normalizedUnit = normalizeUnit(line.unit);
+      if (normalizedUnit && normalizedUnit !== line.unit) {
+        update.unit = normalizedUnit;
+      }
+
       if (matchedRmId) update.raw_material_id = matchedRmId;
 
       // STEG 6 — price variance (when raw_material_id is set)
@@ -309,12 +315,30 @@ Deno.serve(async (req) => {
         const expected = rmsRow?.agreed_price_per_base_unit != null ? Number(rmsRow.agreed_price_per_base_unit) : null;
 
         let actual: number | null = null;
+        let conv: ReturnType<typeof quantityToBase> = null;
         if (line.unit_price != null && rm?.base_unit) {
-          const factor = toBaseFactor(line.unit, rm.base_unit);
-          if (factor != null && factor !== 0) actual = Number(line.unit_price) / factor;
+          conv = quantityToBase({
+            quantity: 1,
+            unit: line.unit,
+            description: line.description,
+            baseUnit: rm.base_unit,
+            rmsPackageSize: rmsRow?.package_size ?? null,
+            rmsPackageUnit: rmsRow?.package_unit ?? null,
+            linePackageSize: (line as any).package_size ?? null,
+            linePackageUnit: (line as any).package_unit ?? null,
+          });
+          if (conv && conv.factor !== 0) actual = Number(line.unit_price) / conv.factor;
         }
         update.price_per_base_unit = actual;
         update.expected_price_per_base_unit = expected;
+
+        // Flagg ukjent pakke-størrelse for pakke-enheter
+        if (actual == null && isPackageUnit(normalizedUnit) && rm?.base_unit) {
+          update.requires_review = true;
+          update.review_reason = update.review_reason
+            ? Array.from(new Set(`${update.review_reason},unknown_package_size`.split(","))).join(",")
+            : "unknown_package_size";
+        }
 
         if (expected != null && actual != null && expected !== 0) {
           const variance = ((actual - expected) / expected) * 100;
