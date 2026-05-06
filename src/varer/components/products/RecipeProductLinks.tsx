@@ -41,7 +41,7 @@ export function RecipeProductLinks({ recipeId, currentProductId, canWrite }: Pro
     queryFn: async () => {
       const { data } = await supabase
         .from("product_recipe_links")
-        .select("id, product_id, products(id, display_name, display_number, status)")
+        .select("id, product_id, extra_lines, products(id, display_name, display_number, status)")
         .eq("recipe_id", recipeId);
       return data ?? [];
     },
