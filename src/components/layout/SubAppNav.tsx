@@ -85,12 +85,28 @@ function RavarerNav() {
     },
     staleTime: 60_000,
   });
+  const { data: changelogCount = 0 } = useQuery({
+    queryKey: ["raw-material-changelog-count"],
+    queryFn: async () => {
+      const { count } = await supabase
+        .from("raw_material_changelog")
+        .select("*", { count: "exact", head: true })
+        .eq("acknowledged", false)
+        .in("severity", ["high", "medium"]);
+      return count ?? 0;
+    },
+    refetchInterval: 60_000,
+  });
   const canManage = accessLevel === "admin" || accessLevel === "approve";
 
   const items: NavItem[] = [
     { kind: "link", to: "/ravarer/vareliste", label: "Vareliste" },
     { kind: "link", to: "/ravarer/leverandorer", label: "Leverandører" },
     { kind: "link", to: "/ravarer/avtaler", label: "Avtaler" },
+    { kind: "dropdown", label: "Datablad", basePath: "/ravarer/datablad", links: [
+      { to: "/ravarer/datablad-endringer", label: "Endringer", badge: changelogCount },
+      { to: "/ravarer/datablad-bulk", label: "Bulk-opplasting" },
+    ] },
   ];
 
   if (hasInvoiceAccess) {
