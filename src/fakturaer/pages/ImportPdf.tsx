@@ -64,7 +64,7 @@ async function fileToBase64(file: File): Promise<string> {
   return btoa(binary);
 }
 
-export default function ImportPdfPage() {
+export default function ImportPdfPage({ embedded = false }: { embedded?: boolean } = {}) {
   const navigate = useNavigate();
   const { canWrite } = useFakturaer();
   const { data: entities = [] } = useFakturaerLegalEntities();
