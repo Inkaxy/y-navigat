@@ -83,6 +83,11 @@ export function AppSwitcher({ label, renderTrigger }: AppSwitcherProps) {
 
   const handleNavigate = (app: AccessibleApp) => {
     if (isActiveApp(app)) return;
+    const internalPath = INTERNAL_ROUTES[app.slug];
+    if (internalPath) {
+      window.location.href = `${internalPath}?from=${getCurrentAppSlug()}`;
+      return;
+    }
     try {
       const target = new URL(app.deploy_url);
       if (target.hostname === window.location.hostname) {
