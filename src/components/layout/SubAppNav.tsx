@@ -2,7 +2,8 @@ import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAccessibleApps } from "@/hooks/useAccessibleApps";
 import { useReviewCount } from "@/fakturaer/hooks/useReviewCount";
 import { useInvoiceAccess } from "@/ravarer/hooks/useInvoiceAccess";
-import { useRavarer } from "@/ravarer/context/RavarerContext";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import {
   DropdownMenu,
   DropdownMenuContent,
