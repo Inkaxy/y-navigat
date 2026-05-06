@@ -1,6 +1,7 @@
 import { NavLink, useLocation } from "react-router-dom";
 import { useAccessibleApps } from "@/hooks/useAccessibleApps";
 import { useReviewCount } from "@/fakturaer/hooks/useReviewCount";
+import { useInvoiceAccess } from "@/ravarer/hooks/useInvoiceAccess";
 import { cn } from "@/lib/utils";
 
 interface SubItem {
