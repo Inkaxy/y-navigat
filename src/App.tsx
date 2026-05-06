@@ -175,12 +175,21 @@ const App = () => (
               <Route path="/ravarer/vareliste" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><RavarerVareliste /></RavarerProvider></AppAccessGuard></Shell>} />
               <Route path="/ravarer/vareliste/:id" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><RavarerDetail /></RavarerProvider></AppAccessGuard></Shell>} />
 
-              <Route path="/fakturaer" element={<Shell><AppAccessGuard appCode="fakturaer" appName="Fakturaer"><FakturaerProvider><FakturaerList /></FakturaerProvider></AppAccessGuard></Shell>} />
-              <Route path="/fakturaer/ny" element={<Shell><AppAccessGuard appCode="fakturaer" appName="Fakturaer"><FakturaerProvider><FakturaerNew /></FakturaerProvider></AppAccessGuard></Shell>} />
-              <Route path="/fakturaer/import-ehf" element={<Shell><AppAccessGuard appCode="fakturaer" appName="Fakturaer"><FakturaerProvider><FakturaerImportEhf /></FakturaerProvider></AppAccessGuard></Shell>} />
-              <Route path="/fakturaer/import-pdf" element={<Shell><AppAccessGuard appCode="fakturaer" appName="Fakturaer"><FakturaerProvider><FakturaerImportPdf /></FakturaerProvider></AppAccessGuard></Shell>} />
-              <Route path="/fakturaer/til-behandling" element={<Shell><AppAccessGuard appCode="fakturaer" appName="Fakturaer"><FakturaerProvider><FakturaerReviewQueue /></FakturaerProvider></AppAccessGuard></Shell>} />
-              <Route path="/fakturaer/:id" element={<Shell><AppAccessGuard appCode="fakturaer" appName="Fakturaer"><FakturaerProvider><FakturaerDetail /></FakturaerProvider></AppAccessGuard></Shell>} />
+              {/* Fakturaer flyttet inn under Råvarer-appen (granulær invoice_access) */}
+              <Route path="/ravarer/fakturaer" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><InvoiceAccessGuard><FakturaerProvider><FakturaerList /></FakturaerProvider></InvoiceAccessGuard></RavarerProvider></AppAccessGuard></Shell>} />
+              <Route path="/ravarer/fakturaer/ny" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><InvoiceAccessGuard><FakturaerProvider><FakturaerNew /></FakturaerProvider></InvoiceAccessGuard></RavarerProvider></AppAccessGuard></Shell>} />
+              <Route path="/ravarer/fakturaer/import-ehf" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><InvoiceAccessGuard><FakturaerProvider><FakturaerImportEhf /></FakturaerProvider></InvoiceAccessGuard></RavarerProvider></AppAccessGuard></Shell>} />
+              <Route path="/ravarer/fakturaer/import-pdf" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><InvoiceAccessGuard><FakturaerProvider><FakturaerImportPdf /></FakturaerProvider></InvoiceAccessGuard></RavarerProvider></AppAccessGuard></Shell>} />
+              <Route path="/ravarer/fakturaer/til-behandling" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><InvoiceAccessGuard><FakturaerProvider><FakturaerReviewQueue /></FakturaerProvider></InvoiceAccessGuard></RavarerProvider></AppAccessGuard></Shell>} />
+              <Route path="/ravarer/fakturaer/:id" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><InvoiceAccessGuard><FakturaerProvider><FakturaerDetail /></FakturaerProvider></InvoiceAccessGuard></RavarerProvider></AppAccessGuard></Shell>} />
+
+              {/* Backward-compat redirects fra gamle /fakturaer/* */}
+              <Route path="/fakturaer" element={<Navigate to="/ravarer/fakturaer" replace />} />
+              <Route path="/fakturaer/ny" element={<Navigate to="/ravarer/fakturaer/ny" replace />} />
+              <Route path="/fakturaer/import-ehf" element={<Navigate to="/ravarer/fakturaer/import-ehf" replace />} />
+              <Route path="/fakturaer/import-pdf" element={<Navigate to="/ravarer/fakturaer/import-pdf" replace />} />
+              <Route path="/fakturaer/til-behandling" element={<Navigate to="/ravarer/fakturaer/til-behandling" replace />} />
+              <Route path="/fakturaer/:id" element={<RedirectFakturaer />} />
 
               <Route path="/ordre" element={<AppRoute code="ordre" name="Ordre" icon="ShoppingCart" />} />
               <Route path="/produksjon" element={<Shell><AppAccessGuard appCode="produksjon" appName="Produksjon"><Navigate to="/produksjon/oversikt" replace /></AppAccessGuard></Shell>} />
