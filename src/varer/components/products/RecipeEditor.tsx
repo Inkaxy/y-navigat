@@ -31,6 +31,7 @@ import { logAudit } from "@/varer/lib/audit";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { RawMaterialAutocomplete, RawMaterialOption } from "./RawMaterialAutocomplete";
+import { RecipeProductLinks } from "./RecipeProductLinks";
 
 interface Props {
   productId: string;
@@ -385,6 +386,7 @@ function RecipeForm({ recipe, productName, canWrite }: { recipe: any; productNam
 
   return (
     <div className="space-y-4">
+      <RecipeProductLinks recipeId={recipe.id} currentProductId={recipe.product_id} canWrite={canWrite} />
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-base">

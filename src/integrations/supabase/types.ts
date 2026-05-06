@@ -4156,6 +4156,73 @@ export type Database = {
           },
         ]
       }
+      product_recipe_links: {
+        Row: {
+          created_at: string
+          extra_lines: Json
+          extra_packaging: Json
+          id: string
+          is_primary: boolean
+          notes: string | null
+          price_overrides: Json
+          product_id: string
+          recipe_id: string
+          units_per_batch_override: number | null
+          updated_at: string
+          yield_weight_g_override: number | null
+        }
+        Insert: {
+          created_at?: string
+          extra_lines?: Json
+          extra_packaging?: Json
+          id?: string
+          is_primary?: boolean
+          notes?: string | null
+          price_overrides?: Json
+          product_id: string
+          recipe_id: string
+          units_per_batch_override?: number | null
+          updated_at?: string
+          yield_weight_g_override?: number | null
+        }
+        Update: {
+          created_at?: string
+          extra_lines?: Json
+          extra_packaging?: Json
+          id?: string
+          is_primary?: boolean
+          notes?: string | null
+          price_overrides?: Json
+          product_id?: string
+          recipe_id?: string
+          units_per_batch_override?: number | null
+          updated_at?: string
+          yield_weight_g_override?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_recipe_links_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_recipe_links_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipe_nutrition_calculated"
+            referencedColumns: ["recipe_id"]
+          },
+          {
+            foreignKeyName: "product_recipe_links_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_return_price_overrides: {
         Row: {
           created_at: string
@@ -5056,6 +5123,54 @@ export type Database = {
           },
         ]
       }
+      recipe_labor_lines: {
+        Row: {
+          created_at: string
+          hourly_rate: number | null
+          hours: number
+          id: string
+          labor_type: string
+          recipe_id: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          hourly_rate?: number | null
+          hours?: number
+          id?: string
+          labor_type: string
+          recipe_id: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          hourly_rate?: number | null
+          hours?: number
+          id?: string
+          labor_type?: string
+          recipe_id?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recipe_labor_lines_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipe_nutrition_calculated"
+            referencedColumns: ["recipe_id"]
+          },
+          {
+            foreignKeyName: "recipe_labor_lines_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       recipe_lines: {
         Row: {
           created_at: string
@@ -5145,6 +5260,64 @@ export type Database = {
           },
         ]
       }
+      recipe_packaging_lines: {
+        Row: {
+          created_at: string
+          id: string
+          name: string | null
+          quantity: number
+          raw_material_id: string | null
+          recipe_id: string
+          sort_order: number
+          unit_price_override: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name?: string | null
+          quantity?: number
+          raw_material_id?: string | null
+          recipe_id: string
+          sort_order?: number
+          unit_price_override?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string | null
+          quantity?: number
+          raw_material_id?: string | null
+          recipe_id?: string
+          sort_order?: number
+          unit_price_override?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recipe_packaging_lines_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "raw_materials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipe_packaging_lines_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipe_nutrition_calculated"
+            referencedColumns: ["recipe_id"]
+          },
+          {
+            foreignKeyName: "recipe_packaging_lines_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       recipe_parts: {
         Row: {
           created_at: string
@@ -5207,16 +5380,25 @@ export type Database = {
           declaration_mode: Database["public"]["Enums"]["declaration_mode"]
           declaration_updated_at: string | null
           declaration_updated_by: string | null
+          hourly_rate: number
           id: string
+          legal_entity_id: string | null
           manual_allergen_summary: Json | null
           manual_ingredient_declaration: string | null
           manual_nutrition: Json | null
+          name: string | null
           notes: string | null
-          product_id: string
+          price_egne_utsalg: number | null
+          price_engros: number | null
+          price_engros_with_packaging: number | null
+          price_netto: number | null
+          product_id: string | null
           production_notes: string | null
           requires_cleanup: boolean
           shape_proof_minutes: number | null
           steam_seconds: number | null
+          target_db_pct: number
+          units_per_batch: number | null
           updated_at: string
           valid_from: string
           valid_to: string | null
@@ -5236,16 +5418,25 @@ export type Database = {
           declaration_mode?: Database["public"]["Enums"]["declaration_mode"]
           declaration_updated_at?: string | null
           declaration_updated_by?: string | null
+          hourly_rate?: number
           id?: string
+          legal_entity_id?: string | null
           manual_allergen_summary?: Json | null
           manual_ingredient_declaration?: string | null
           manual_nutrition?: Json | null
+          name?: string | null
           notes?: string | null
-          product_id: string
+          price_egne_utsalg?: number | null
+          price_engros?: number | null
+          price_engros_with_packaging?: number | null
+          price_netto?: number | null
+          product_id?: string | null
           production_notes?: string | null
           requires_cleanup?: boolean
           shape_proof_minutes?: number | null
           steam_seconds?: number | null
+          target_db_pct?: number
+          units_per_batch?: number | null
           updated_at?: string
           valid_from?: string
           valid_to?: string | null
@@ -5265,16 +5456,25 @@ export type Database = {
           declaration_mode?: Database["public"]["Enums"]["declaration_mode"]
           declaration_updated_at?: string | null
           declaration_updated_by?: string | null
+          hourly_rate?: number
           id?: string
+          legal_entity_id?: string | null
           manual_allergen_summary?: Json | null
           manual_ingredient_declaration?: string | null
           manual_nutrition?: Json | null
+          name?: string | null
           notes?: string | null
-          product_id?: string
+          price_egne_utsalg?: number | null
+          price_engros?: number | null
+          price_engros_with_packaging?: number | null
+          price_netto?: number | null
+          product_id?: string | null
           production_notes?: string | null
           requires_cleanup?: boolean
           shape_proof_minutes?: number | null
           steam_seconds?: number | null
+          target_db_pct?: number
+          units_per_batch?: number | null
           updated_at?: string
           valid_from?: string
           valid_to?: string | null
