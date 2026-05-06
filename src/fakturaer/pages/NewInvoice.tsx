@@ -87,10 +87,7 @@ export default function NewInvoicePage({ embedded = false }: { embedded?: boolea
 
   if (!canWrite) {
     return (
-      <div className="space-y-5">
-        <FakturaerHeaderBanner title="Ny faktura" />
-        <Card className="p-8 text-center text-ink-secondary">Du har ikke skrivetilgang til fakturaer.</Card>
-      </div>
+      <Card className="p-8 text-center text-ink-secondary">Du har ikke skrivetilgang til fakturaer.</Card>
     );
   }
 
