@@ -1,9 +1,11 @@
+import { useState } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
-import { useRawMaterial } from "@/ravarer/hooks/useRawMaterials";
+import { useRawMaterial, useRenameRawMaterial } from "@/ravarer/hooks/useRawMaterials";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { ArrowLeft, Loader2, Pencil, Check, X } from "lucide-react";
 import { OverviewTab } from "@/ravarer/components/tabs/OverviewTab";
 import { NutritionTab } from "@/ravarer/components/tabs/NutritionTab";
 import { SuppliersTab } from "@/ravarer/components/tabs/SuppliersTab";
