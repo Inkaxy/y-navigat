@@ -29,6 +29,7 @@ const SUBMENUS: Record<string, { prefix: string; appSlug: string; items: SubItem
     appSlug: "ravarer",
     items: [
       { to: "/ravarer/vareliste", label: "Vareliste" },
+      { to: "/ravarer/innstillinger/tripletex", label: "Innstillinger" },
     ],
   },
   kunder: {
