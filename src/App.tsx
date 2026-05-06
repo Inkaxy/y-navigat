@@ -87,6 +87,7 @@ import RavarerDatabladBulk from "@/ravarer/pages/DatabladBulk";
 import RavarerForhandlingerList from "@/ravarer/pages/forhandlinger/ForhandlingerList";
 import RavarerForhandlingWizard from "@/ravarer/pages/forhandlinger/ForhandlingWizard";
 import RavarerForhandlingDetail from "@/ravarer/pages/forhandlinger/ForhandlingDetail";
+import RavarerSupplierPortal from "@/ravarer/pages/forhandlinger/SupplierPortal";
 
 const KunderEntityProvider = ({ children }: { children: React.ReactNode }) => {
   const { user } = useNbhubAuth();
@@ -158,6 +159,8 @@ const App = () => (
               {/* Varer embed routes — frosset kontrakt, INGEN AppShell */}
               <Route path="/embed/v1/kakebygger/:categoryId" element={<VarerAppProvider><VarerCakeBuilderEmbed /></VarerAppProvider>} />
               <Route path="/embed/kakebygger/:categoryId" element={<VarerAppProvider><VarerCakeBuilderEmbed /></VarerAppProvider>} />
+              {/* Public supplier RFQ portal — no shell, no auth */}
+              <Route path="/tilbud/:token" element={<RavarerSupplierPortal />} />
 
               {/* Varer sub-routes */}
               <Route path="/varer" element={<Shell><AppAccessGuard appCode="varer" appName="Varer"><VarerAppProvider><Navigate to="/varer/vareliste" replace /></VarerAppProvider></AppAccessGuard></Shell>} />

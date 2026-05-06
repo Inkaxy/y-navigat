@@ -1,8 +1,15 @@
+import { useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ArrowLeft, Trophy, Check, X, Loader2, Flag } from "lucide-react";
+import { toast } from "sonner";
 import { RavarerHeaderBanner } from "@/ravarer/components/RavarerHeaderBanner";
 import {
   useNegotiation,
@@ -15,15 +22,71 @@ import { formatDate, formatNok, formatNumber } from "@/ravarer/lib/constants";
 
 export default function ForhandlingDetail() {
   const navigate = useNavigate();
-  const { id } = useParams<{ id: string }>();
+  const qc = useQueryClient();
+  const { id = "" } = useParams<{ id: string }>();
   const { data: neg } = useNegotiation(id);
   const { data: items = [] } = useNegotiationItems(id);
   const { data: recipients = [] } = useNegotiationRecipients(id);
   const { data: rawMaterials = [] } = useRawMaterials();
   const { data: suppliers = [] } = useSuppliers();
 
+  const { data: responses = [] } = useQuery({
+    queryKey: ["negotiation-responses", id],
+    enabled: !!id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("negotiation_responses" as any)
+        .select("*")
+        .eq("negotiation_id", id);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+  });
+
   const rmName = (rid: string) => rawMaterials.find((r) => r.id === rid)?.name ?? "—";
   const supName = (sid: string) => suppliers.find((s) => s.id === sid)?.name ?? "—";
+  const recById = (rcId: string) => recipients.find((r) => r.id === rcId);
+
+  // Build comparison matrix: per item, per recipient
+  const matrix = useMemo(() => {
+    const map = new Map<string, Map<string, any>>();
+    for (const it of items) map.set(it.id, new Map());
+    for (const r of responses) {
+      const m = map.get(r.negotiation_item_id);
+      if (m) m.set(r.recipient_id, r);
+    }
+    return map;
+  }, [items, responses]);
+
+  // Best per item by lowest price
+  const bestByItem = useMemo(() => {
+    const out = new Map<string, string | null>();
+    for (const it of items) {
+      const offers = (responses as any[])
+        .filter((r) => r.negotiation_item_id === it.id && r.offered_price != null && r.status === "submitted");
+      if (offers.length === 0) { out.set(it.id, null); continue; }
+      offers.sort((a, b) => a.offered_price - b.offered_price);
+      out.set(it.id, offers[0].recipient_id);
+    }
+    return out;
+  }, [items, responses]);
+
+  // Total potential savings
+  const totalSavings = useMemo(() => {
+    let saved = 0;
+    for (const it of items) {
+      const winner = bestByItem.get(it.id);
+      if (!winner || !it.actual_volume_baseline || !it.actual_cost_baseline) continue;
+      const r = (responses as any[]).find((x) => x.recipient_id === winner && x.negotiation_item_id === it.id);
+      if (!r?.offered_price) continue;
+      const newCost = Number(it.actual_volume_baseline) * Number(r.offered_price);
+      saved += Number(it.actual_cost_baseline) - newCost;
+    }
+    return saved;
+  }, [items, responses, bestByItem]);
+
+  // Conclusion modal
+  const [concludeOpen, setConcludeOpen] = useState(false);
 
   if (!neg) {
     return (
@@ -47,72 +110,47 @@ export default function ForhandlingDetail() {
         actions={
           <>
             <Badge variant="outline">{neg.status}</Badge>
-            <Button
-              size="sm"
-              variant="outline"
-              className="rounded-full"
-              onClick={() => navigate(`/ravarer/forhandlinger/${id}/rediger`)}
-            >
+            <Button size="sm" variant="outline" className="rounded-full"
+              onClick={() => navigate(`/ravarer/forhandlinger/${id}/rediger`)}>
               Rediger
             </Button>
+            {neg.status !== "concluded" && neg.status !== "cancelled" && (
+              <Button size="sm" className="rounded-full" onClick={() => setConcludeOpen(true)}>
+                <Flag className="mr-1.5 h-4 w-4" /> Avslutt
+              </Button>
+            )}
           </>
         }
       />
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-4">
         <Card className="p-4">
           <p className="text-xs uppercase tracking-wide text-ink-secondary">Svarfrist</p>
           <p className="mt-1 font-medium">{formatDate(neg.response_deadline)}</p>
         </Card>
         <Card className="p-4">
           <p className="text-xs uppercase tracking-wide text-ink-secondary">Kontraktsperiode</p>
-          <p className="mt-1 font-medium">
-            {formatDate(neg.contract_start)} — {formatDate(neg.contract_end)}
-          </p>
+          <p className="mt-1 text-sm">{formatDate(neg.contract_start)} — {formatDate(neg.contract_end)}</p>
         </Card>
         <Card className="p-4">
           <p className="text-xs uppercase tracking-wide text-ink-secondary">Baseline</p>
-          <p className="mt-1 font-medium">
-            {formatDate(neg.baseline_period_start)} — {formatDate(neg.baseline_period_end)}
+          <p className="mt-1 text-sm">{formatDate(neg.baseline_period_start)} — {formatDate(neg.baseline_period_end)}</p>
+        </Card>
+        <Card className="p-4">
+          <p className="text-xs uppercase tracking-wide text-ink-secondary">Estimert besparelse</p>
+          <p className={`mt-1 font-semibold tabular-nums ${totalSavings > 0 ? "text-success" : "text-ink-primary"}`}>
+            {formatNok(totalSavings)}
           </p>
         </Card>
       </div>
 
-      <Card className="overflow-hidden">
-        <div className="border-b border-line-subtle p-4 font-semibold">Råvarer ({items.length})</div>
-        <table className="w-full text-sm">
-          <thead className="bg-surface-muted/50 text-xs uppercase tracking-wide text-ink-secondary">
-            <tr>
-              <th className="px-4 py-2 text-left">Råvare</th>
-              <th className="px-4 py-2 text-right">Forventet volum</th>
-              <th className="px-4 py-2 text-right">Baseline kostnad</th>
-              <th className="px-4 py-2 text-right">Snittpris</th>
-              <th className="px-4 py-2 text-right">Mål-pris</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((it) => (
-              <tr key={it.id} className="border-t border-line-subtle">
-                <td className="px-4 py-2 font-medium">{rmName(it.raw_material_id)}</td>
-                <td className="px-4 py-2 text-right tabular-nums">
-                  {formatNumber(it.expected_annual_volume)} {it.expected_annual_volume_unit ?? ""}
-                </td>
-                <td className="px-4 py-2 text-right tabular-nums">{formatNok(it.actual_cost_baseline)}</td>
-                <td className="px-4 py-2 text-right tabular-nums">{formatNok(it.actual_avg_price_baseline)}</td>
-                <td className="px-4 py-2 text-right tabular-nums">{formatNok(it.target_price)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </Card>
-
+      {/* Recipient status */}
       <Card className="overflow-hidden">
         <div className="border-b border-line-subtle p-4 font-semibold">Mottakere ({recipients.length})</div>
         <table className="w-full text-sm">
           <thead className="bg-surface-muted/50 text-xs uppercase tracking-wide text-ink-secondary">
             <tr>
               <th className="px-4 py-2 text-left">Leverandør</th>
-              <th className="px-4 py-2 text-left">E-post</th>
               <th className="px-4 py-2 text-left">Status</th>
               <th className="px-4 py-2 text-left">Sist sett</th>
               <th className="px-4 py-2 text-left">Utløper</th>
@@ -122,10 +160,7 @@ export default function ForhandlingDetail() {
             {recipients.map((r) => (
               <tr key={r.id} className="border-t border-line-subtle">
                 <td className="px-4 py-2 font-medium">{supName(r.supplier_id)}</td>
-                <td className="px-4 py-2 text-ink-secondary">{r.contact_email ?? "—"}</td>
-                <td className="px-4 py-2">
-                  <Badge variant="outline">{r.status}</Badge>
-                </td>
+                <td className="px-4 py-2"><Badge variant="outline">{r.status}</Badge></td>
                 <td className="px-4 py-2 text-ink-secondary">{formatDate(r.last_viewed_at)}</td>
                 <td className="px-4 py-2 text-ink-secondary">{formatDate(r.expires_at)}</td>
               </tr>
@@ -133,6 +168,169 @@ export default function ForhandlingDetail() {
           </tbody>
         </table>
       </Card>
+
+      {/* Comparison matrix */}
+      <Card className="overflow-x-auto">
+        <div className="border-b border-line-subtle p-4 font-semibold">Tilbudssammenligning</div>
+        <table className="w-full text-sm">
+          <thead className="bg-surface-muted/50 text-xs uppercase tracking-wide text-ink-secondary">
+            <tr>
+              <th className="px-4 py-2 text-left">Råvare</th>
+              <th className="px-4 py-2 text-right">Snittpris baseline</th>
+              {recipients.map((r) => (
+                <th key={r.id} className="px-4 py-2 text-right">{supName(r.supplier_id)}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((it) => {
+              const winner = bestByItem.get(it.id);
+              return (
+                <tr key={it.id} className="border-t border-line-subtle">
+                  <td className="px-4 py-2 font-medium">{rmName(it.raw_material_id)}</td>
+                  <td className="px-4 py-2 text-right tabular-nums text-ink-secondary">
+                    {formatNok(it.actual_avg_price_baseline)}
+                  </td>
+                  {recipients.map((r) => {
+                    const cell = matrix.get(it.id)?.get(r.id);
+                    if (!cell?.offered_price) {
+                      return <td key={r.id} className="px-4 py-2 text-right text-ink-muted">—</td>;
+                    }
+                    const isBest = winner === r.id;
+                    const better = it.actual_avg_price_baseline != null && cell.offered_price < Number(it.actual_avg_price_baseline);
+                    return (
+                      <td key={r.id} className={`px-4 py-2 text-right tabular-nums ${isBest ? "bg-success/10 font-semibold text-success" : better ? "text-success" : "text-destructive"}`}>
+                        <div className="flex items-center justify-end gap-1">
+                          {isBest && <Trophy className="h-3.5 w-3.5" />}
+                          {!isBest && better && <Check className="h-3.5 w-3.5" />}
+                          {!better && !isBest && <X className="h-3.5 w-3.5" />}
+                          {formatNok(cell.offered_price)}
+                        </div>
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </Card>
+
+      <ConcludeDialog
+        open={concludeOpen}
+        onOpenChange={setConcludeOpen}
+        items={items}
+        responses={responses}
+        recipients={recipients}
+        bestByItem={bestByItem}
+        rmName={rmName}
+        supName={supName}
+        negotiationId={id}
+        onSuccess={() => {
+          qc.invalidateQueries({ queryKey: ["negotiation", id] });
+          qc.invalidateQueries({ queryKey: ["negotiations"] });
+          toast.success("Forhandling avsluttet");
+        }}
+      />
     </div>
+  );
+}
+
+function ConcludeDialog({
+  open, onOpenChange, items, responses, recipients, bestByItem, rmName, supName, negotiationId, onSuccess,
+}: any) {
+  const [picks, setPicks] = useState<Record<string, { winner_recipient_id: string | null; set_as_primary: boolean; apply_to_supplier: boolean }>>({});
+
+  // Initialise on open
+  function initIfNeeded() {
+    if (Object.keys(picks).length === 0 && items.length > 0) {
+      const init: any = {};
+      for (const it of items) {
+        init[it.id] = {
+          winner_recipient_id: bestByItem.get(it.id) ?? null,
+          set_as_primary: false,
+          apply_to_supplier: true,
+        };
+      }
+      setPicks(init);
+    }
+  }
+  if (open) initIfNeeded();
+
+  const apply = useMutation({
+    mutationFn: async () => {
+      const outcomes = items.map((it: any) => {
+        const p = picks[it.id];
+        const winnerResp = (responses as any[]).find((r) => r.recipient_id === p?.winner_recipient_id && r.negotiation_item_id === it.id);
+        return {
+          negotiation_item_id: it.id,
+          winner_recipient_id: p?.winner_recipient_id ?? null,
+          winner_response_id: winnerResp?.id ?? null,
+          agreed_price: winnerResp?.offered_price ?? null,
+          agreed_package_size: winnerResp?.offered_package_size ?? null,
+          agreed_package_unit: winnerResp?.offered_package_unit ?? null,
+          set_as_primary: p?.set_as_primary ?? false,
+          apply_to_supplier: p?.apply_to_supplier ?? false,
+        };
+      });
+      const { data, error } = await supabase.functions.invoke("apply-negotiation-outcome", {
+        body: { negotiation_id: negotiationId, outcomes },
+      });
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error ?? "Feil");
+    },
+    onSuccess: () => { onOpenChange(false); onSuccess(); },
+    onError: (e: any) => toast.error(e?.message ?? "Avslutning feilet"),
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-3xl">
+        <DialogHeader><DialogTitle>Avslutt forhandling</DialogTitle></DialogHeader>
+        <div className="max-h-[60vh] overflow-auto space-y-3">
+          {items.map((it: any) => {
+            const p = picks[it.id] ?? { winner_recipient_id: null, set_as_primary: false, apply_to_supplier: true };
+            const offers = (responses as any[]).filter((r) => r.negotiation_item_id === it.id && r.status === "submitted");
+            return (
+              <div key={it.id} className="rounded-md border border-line-subtle p-3">
+                <div className="font-medium">{rmName(it.raw_material_id)}</div>
+                <div className="mt-2 grid gap-2 sm:grid-cols-3 sm:items-center">
+                  <Select value={p.winner_recipient_id ?? "none"}
+                    onValueChange={(v) => setPicks({ ...picks, [it.id]: { ...p, winner_recipient_id: v === "none" ? null : v } })}>
+                    <SelectTrigger><SelectValue placeholder="Vinner" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Ingen vinner</SelectItem>
+                      {offers.map((o: any) => {
+                        const rec = recipients.find((rr: any) => rr.id === o.recipient_id);
+                        return (
+                          <SelectItem key={o.recipient_id} value={o.recipient_id}>
+                            {supName(rec?.supplier_id)} — {formatNok(o.offered_price)}
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                  <label className="flex items-center gap-2 text-sm">
+                    <Checkbox checked={p.apply_to_supplier} onCheckedChange={(v) => setPicks({ ...picks, [it.id]: { ...p, apply_to_supplier: !!v } })} />
+                    Oppdater leverandør-pris
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <Checkbox checked={p.set_as_primary} onCheckedChange={(v) => setPicks({ ...picks, [it.id]: { ...p, set_as_primary: !!v } })} />
+                    Sett som primær
+                  </label>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Avbryt</Button>
+          <Button onClick={() => apply.mutate()} disabled={apply.isPending}>
+            {apply.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Avslutt og lagre
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
