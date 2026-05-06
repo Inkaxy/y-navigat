@@ -88,7 +88,15 @@ export function SubAppNav() {
 function RavarerNav() {
   const { data: reviewCount = 0 } = useReviewCount();
   const { data: hasInvoiceAccess = false } = useInvoiceAccess();
-  const { accessLevel } = useRavarer();
+  const { data: accessLevel = "none" } = useQuery({
+    queryKey: ["ravarer-access-level-nav"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("app_access_level", { p_app_code: "ravarer" });
+      if (error) throw error;
+      return (data as string) ?? "none";
+    },
+    staleTime: 60_000,
+  });
   const canManage = accessLevel === "admin" || accessLevel === "approve";
 
   const items: NavItem[] = [
