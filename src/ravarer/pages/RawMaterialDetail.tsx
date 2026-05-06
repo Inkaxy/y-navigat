@@ -1,9 +1,11 @@
+import { useState } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
-import { useRawMaterial } from "@/ravarer/hooks/useRawMaterials";
+import { useRawMaterial, useRenameRawMaterial } from "@/ravarer/hooks/useRawMaterials";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { ArrowLeft, Loader2, Pencil, Check, X } from "lucide-react";
 import { OverviewTab } from "@/ravarer/components/tabs/OverviewTab";
 import { NutritionTab } from "@/ravarer/components/tabs/NutritionTab";
 import { SuppliersTab } from "@/ravarer/components/tabs/SuppliersTab";
@@ -14,9 +16,20 @@ export default function RawMaterialDetail() {
   const [searchParams, setSearchParams] = useSearchParams();
   const tabFromUrl = searchParams.get("tab") ?? "overview";
   const { data: rm, isLoading } = useRawMaterial(id);
+  const rename = useRenameRawMaterial();
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState("");
 
   if (isLoading) return <div className="flex justify-center p-12"><Loader2 className="h-5 w-5 animate-spin" /></div>;
   if (!rm) return <Card className="p-8 text-center text-ink-secondary">Råvaren ble ikke funnet.</Card>;
+
+  const startEdit = () => { setNameDraft(rm.name); setEditingName(true); };
+  const saveName = async () => {
+    const v = nameDraft.trim();
+    if (!v || v === rm.name) { setEditingName(false); return; }
+    await rename.mutateAsync({ id: rm.id, name: v });
+    setEditingName(false);
+  };
 
   return (
     <div className="space-y-5">
@@ -27,7 +40,31 @@ export default function RawMaterialDetail() {
       </div>
 
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight" style={{ letterSpacing: "-0.02em" }}>{rm.name}</h1>
+        {editingName ? (
+          <div className="flex items-center gap-2">
+            <Input
+              value={nameDraft}
+              onChange={(e) => setNameDraft(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") saveName(); if (e.key === "Escape") setEditingName(false); }}
+              autoFocus
+              className="text-2xl h-11 font-semibold tracking-tight max-w-xl"
+              style={{ letterSpacing: "-0.02em" }}
+            />
+            <Button size="icon" variant="ghost" onClick={saveName} disabled={rename.isPending}>
+              <Check className="h-4 w-4" />
+            </Button>
+            <Button size="icon" variant="ghost" onClick={() => setEditingName(false)}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 group">
+            <h1 className="text-2xl font-semibold tracking-tight" style={{ letterSpacing: "-0.02em" }}>{rm.name}</h1>
+            <Button size="icon" variant="ghost" onClick={startEdit} className="opacity-0 group-hover:opacity-100 transition-opacity" title="Endre navn">
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        )}
         <p className="text-sm text-ink-secondary">SKU {rm.sku} · {rm.category ?? "Uten kategori"}</p>
       </div>
 

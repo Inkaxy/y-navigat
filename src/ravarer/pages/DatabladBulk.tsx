@@ -2,10 +2,11 @@ import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Upload, Loader2, FileText, Check, RefreshCw, AlertCircle } from "lucide-react";
+import { Upload, Loader2, FileText, Check, RefreshCw, AlertCircle, Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
+import { CreateRawMaterialFromDatasheetDialog, type DatasheetExtract } from "@/ravarer/components/CreateRawMaterialFromDatasheetDialog";
 
 interface FileRow {
   file: File;
@@ -13,6 +14,7 @@ interface FileRow {
   stage?: "upload" | "extract" | "match" | "apply";
   storage_path?: string;
   datasheet_id?: string;
+  extracted?: DatasheetExtract;
   candidates?: { id: string; name: string; sku: string; score: number }[];
   selectedRm?: string;
   error?: string;
@@ -23,6 +25,7 @@ export default function DatabladBulk() {
   const { canWrite, legalEntityId } = useRavarer();
   const [rows, setRows] = useState<FileRow[]>([]);
   const [batchId, setBatchId] = useState<string | null>(null);
+  const [createDialogIdx, setCreateDialogIdx] = useState<number | null>(null);
 
   const onPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []).slice(0, 100);
@@ -65,6 +68,15 @@ export default function DatabladBulk() {
       if (ext.error) throw new Error(`AI-ekstrahering: ${ext.error}`);
 
       updateRow(i, { status: "matching", stage: "match", datasheet_id: ext.datasheet_id });
+
+      // Hent ai_extracted slik at vi kan forhåndsutfylle "Opprett ny råvare" hvis ingen match
+      const { data: dsRow } = await supabase
+        .from("raw_material_datasheets")
+        .select("ai_extracted, file_name")
+        .eq("id", ext.datasheet_id)
+        .maybeSingle();
+      const extracted = (dsRow?.ai_extracted ?? {}) as DatasheetExtract;
+
       const { data: match, error: matchErr } = await supabase.functions.invoke("match-datasheet-to-raw-material", {
         body: { datasheet_id: ext.datasheet_id },
       });
@@ -74,6 +86,7 @@ export default function DatabladBulk() {
       updateRow(i, {
         status: "ready",
         stage: undefined,
+        extracted,
         candidates: match?.candidates ?? [],
         selectedRm: match?.candidates?.[0]?.score >= 0.7 ? match.candidates[0].id : undefined,
         error: undefined,
@@ -156,7 +169,9 @@ export default function DatabladBulk() {
                     {r.status === "ready" && r.candidates && r.candidates.length > 0 && (
                       <>Foreslått: {r.candidates[0].name} <Badge variant="outline" className="ml-1 text-xs">{Math.round(r.candidates[0].score * 100)}%</Badge></>
                     )}
-                    {r.status === "ready" && (!r.candidates || r.candidates.length === 0) && "Ingen match funnet"}
+                    {r.status === "ready" && (!r.candidates || r.candidates.length === 0) && (
+                      <span>Ingen match funnet{r.extracted?.name ? <> · AI leste: <span className="font-medium">{r.extracted.name}</span></> : null}</span>
+                    )}
                     {r.applied && <span className="text-success ml-2">✓ Anvendt</span>}
                   </div>
                   {r.status === "error" && (
@@ -169,6 +184,11 @@ export default function DatabladBulk() {
                 {r.status === "ready" && !r.applied && r.selectedRm && (
                   <Button size="sm" onClick={() => applyRow(i)}><Check className="mr-1 h-3.5 w-3.5" /> Anvend</Button>
                 )}
+                {r.status === "ready" && !r.applied && !r.selectedRm && r.datasheet_id && canWrite && (
+                  <Button size="sm" variant="outline" onClick={() => setCreateDialogIdx(i)}>
+                    <Plus className="mr-1 h-3.5 w-3.5" /> Opprett ny råvare
+                  </Button>
+                )}
                 {r.status === "error" && (
                   <Button size="sm" variant="outline" onClick={() => retryRow(i)}>
                     <RefreshCw className="mr-1 h-3.5 w-3.5" /> Prøv igjen
@@ -178,6 +198,22 @@ export default function DatabladBulk() {
             ))}
           </Card>
         </>
+      )}
+
+      {createDialogIdx !== null && rows[createDialogIdx]?.datasheet_id && (
+        <CreateRawMaterialFromDatasheetDialog
+          open={createDialogIdx !== null}
+          onOpenChange={(v) => { if (!v) setCreateDialogIdx(null); }}
+          datasheetId={rows[createDialogIdx].datasheet_id!}
+          fileName={rows[createDialogIdx].file.name}
+          extracted={rows[createDialogIdx].extracted ?? {}}
+          onCreated={(rmId) => {
+            const idx = createDialogIdx;
+            updateRow(idx, { selectedRm: rmId, candidates: [{ id: rmId, name: rows[idx].extracted?.name ?? "Ny råvare", sku: rows[idx].extracted?.sku ?? "", score: 1 }] });
+            // Auto-anvend datablad-felter på den nye råvaren
+            setTimeout(() => applyRow(idx), 100);
+          }}
+        />
       )}
     </div>
   );
