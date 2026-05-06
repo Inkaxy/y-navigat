@@ -29,7 +29,7 @@ export function useFakturaerLegalEntities() {
 
       let entityIds: string[] = [];
       if (isOwner) {
-        const { data: all, error } = await supabase.from("legal_entities").select("id, name").order("name");
+        const { data: all, error } = await supabase.from("legal_entities").select("id, legal_name, short_code").order("name");
         if (error) throw error;
         return (all ?? []) as LegalEntityRow[];
       }
@@ -54,7 +54,7 @@ export function useFakturaerLegalEntities() {
       if (entityIds.length === 0) return [];
       const { data, error } = await supabase
         .from("legal_entities")
-        .select("id, name")
+        .select("id, legal_name, short_code")
         .in("id", entityIds)
         .order("name");
       if (error) throw error;
