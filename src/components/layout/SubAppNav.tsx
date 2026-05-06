@@ -75,14 +75,17 @@ export function SubAppNav() {
   const items =
     match.appSlug === "ravarer" && hasInvoiceAccess
       ? [
-          ...match.items,
+          { to: "/ravarer/vareliste", label: "Vareliste" },
           { to: "/ravarer/fakturaer", label: "Alle fakturaer" },
           { to: "/ravarer/fakturaer/til-behandling", label: "Til behandling" },
           { to: "/ravarer/fakturaer/ny", label: "Ny faktura" },
           { to: "/ravarer/fakturaer/import-ehf", label: "Importer EHF" },
           { to: "/ravarer/fakturaer/import-pdf", label: "Last opp PDF" },
+          { to: "/ravarer/innstillinger/tripletex", label: "Innstillinger" },
         ]
-      : match.items;
+      : match.appSlug === "ravarer"
+        ? [{ to: "/ravarer/vareliste", label: "Vareliste" }]
+        : match.items;
 
   const app = apps?.find((a) => a.slug === match.appSlug);
   const color = app?.color_hex ?? "hsl(var(--primary))";
