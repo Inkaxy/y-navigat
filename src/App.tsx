@@ -74,6 +74,7 @@ import FakturaerDetail from "@/fakturaer/pages/InvoiceDetail";
 import FakturaerReviewQueue from "@/fakturaer/pages/ReviewQueue";
 import { InvoiceAccessGuard } from "@/ravarer/components/InvoiceAccessGuard";
 import TripletexSettings from "@/ravarer/pages/innstillinger/TripletexSettings";
+import AiServicesSettings from "@/ravarer/pages/innstillinger/AiServicesSettings";
 
 const KunderEntityProvider = ({ children }: { children: React.ReactNode }) => {
   const { user } = useNbhubAuth();
