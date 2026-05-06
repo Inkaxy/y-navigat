@@ -4603,6 +4603,7 @@ export type Database = {
           last_seen_at: string
           match_count: number
           raw_material_supplier_id: string
+          rejected_at: string | null
           rejected_by: string | null
           rejected_reason: string | null
           status: Database["public"]["Enums"]["alias_status"]
@@ -4619,6 +4620,7 @@ export type Database = {
           last_seen_at?: string
           match_count?: number
           raw_material_supplier_id: string
+          rejected_at?: string | null
           rejected_by?: string | null
           rejected_reason?: string | null
           status?: Database["public"]["Enums"]["alias_status"]
@@ -4635,6 +4637,7 @@ export type Database = {
           last_seen_at?: string
           match_count?: number
           raw_material_supplier_id?: string
+          rejected_at?: string | null
           rejected_by?: string | null
           rejected_reason?: string | null
           status?: Database["public"]["Enums"]["alias_status"]
