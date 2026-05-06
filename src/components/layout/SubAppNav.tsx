@@ -60,8 +60,10 @@ const STATIC_SUBMENUS: Record<string, { prefix: string; appSlug: string; items: 
 export function SubAppNav() {
   const { pathname } = useLocation();
   const isRavarer = pathname === "/ravarer" || pathname.startsWith("/ravarer/");
+  const isVarer = pathname === "/varer" || pathname.startsWith("/varer/");
 
   if (isRavarer) return <RavarerNav />;
+  if (isVarer) return <VarerNav />;
 
   const staticMatch = Object.values(STATIC_SUBMENUS).find(
     (s) => pathname === s.prefix || pathname.startsWith(s.prefix + "/"),
