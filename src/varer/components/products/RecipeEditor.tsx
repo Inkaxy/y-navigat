@@ -683,6 +683,9 @@ function SortableLine({ line, canWrite, onChange, onRemove }: { line: Line; canW
     opacity: isDragging ? 0.5 : 1,
   };
   const unmatched = !line.raw_material_id;
+  const include = line.include_in_declaration !== false;
+  const isQuid = !!line.is_quid_relevant;
+  const hasCustom = !!line.custom_declaration_text;
 
   return (
     <div
@@ -699,7 +702,7 @@ function SortableLine({ line, canWrite, onChange, onRemove }: { line: Line; canW
         </button>
       ) : <div className="col-span-1" />}
 
-      <div className="col-span-5">
+      <div className="col-span-4">
         <RawMaterialAutocomplete
           value={line.raw_material_id}
           disabled={!canWrite}
@@ -715,13 +718,10 @@ function SortableLine({ line, canWrite, onChange, onRemove }: { line: Line; canW
       </div>
       <div className="col-span-2">
         <Input
-          type="number"
-          step="any"
-          placeholder="Mengde"
+          type="number" step="any" placeholder="Mengde"
           value={line.quantity}
           onChange={(e) => onChange({ quantity: e.target.value })}
-          disabled={!canWrite}
-          className="h-9"
+          disabled={!canWrite} className="h-9"
         />
       </div>
       <div className="col-span-1">
@@ -736,20 +736,87 @@ function SortableLine({ line, canWrite, onChange, onRemove }: { line: Line; canW
       </div>
       <div className="col-span-2">
         <Input
-          type="number"
-          step="0.1"
-          placeholder="Svinn %"
+          type="number" step="0.1" placeholder="Svinn %"
           value={line.waste_percent ?? 0}
           onChange={(e) => onChange({ waste_percent: e.target.value })}
-          disabled={!canWrite}
-          className="h-9"
+          disabled={!canWrite} className="h-9"
         />
       </div>
-      {canWrite && (
+      <div className="col-span-1 flex justify-center">
+        <DeclarationPopover
+          line={line} canWrite={canWrite}
+          include={include} isQuid={isQuid} hasCustom={hasCustom}
+          onChange={onChange}
+        />
+      </div>
+      {canWrite ? (
         <Button type="button" variant="ghost" size="icon" onClick={onRemove} className="col-span-1 h-8 w-8">
           <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
         </Button>
-      )}
+      ) : <div className="col-span-1" />}
     </div>
+  );
+}
+
+function DeclarationPopover({
+  line, canWrite, include, isQuid, hasCustom, onChange,
+}: {
+  line: Line; canWrite: boolean; include: boolean; isQuid: boolean; hasCustom: boolean;
+  onChange: (p: Partial<Line>) => void;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          type="button" variant="ghost" size="icon"
+          className={cn("h-8 w-8 relative", !include && "text-muted-foreground/60")}
+          title="Deklarasjon"
+        >
+          <FileText className="h-4 w-4" />
+          {(isQuid || hasCustom || !include) && (
+            <span className={cn(
+              "absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full",
+              !include ? "bg-muted-foreground" : isQuid ? "bg-app" : "bg-warning",
+            )} />
+          )}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-80 p-3 space-y-3" onCloseAutoFocus={(e) => e.preventDefault()}>
+        <div className="text-xs font-medium text-muted-foreground">Deklarasjons­innstillinger</div>
+        <label className="flex items-start gap-2 text-sm">
+          <input
+            type="checkbox" className="mt-0.5"
+            checked={include} disabled={!canWrite}
+            onChange={(e) => onChange({ include_in_declaration: e.target.checked })}
+          />
+          <span>
+            <span className="font-medium">Inkluder i ingrediensliste</span>
+            <span className="block text-xs text-muted-foreground">Skru av for f.eks. drysse-mel.</span>
+          </span>
+        </label>
+        <label className="flex items-start gap-2 text-sm">
+          <input
+            type="checkbox" className="mt-0.5"
+            checked={isQuid} disabled={!canWrite || !include}
+            onChange={(e) => onChange({ is_quid_relevant: e.target.checked })}
+          />
+          <span>
+            <span className="font-medium">QUID-relevant</span>
+            <span className="block text-xs text-muted-foreground">Vis mengde i prosent etter ingrediensen.</span>
+          </span>
+        </label>
+        <div>
+          <Label className="text-xs">Tilpasset deklarasjonstekst</Label>
+          <Input
+            value={line.custom_declaration_text ?? ""}
+            disabled={!canWrite || !include}
+            onChange={(e) => onChange({ custom_declaration_text: e.target.value || null })}
+            placeholder="Overstyr (valgfri)"
+            className="h-8"
+          />
+          <p className="mt-1 text-[11px] text-muted-foreground">Erstatter automatisk navn + allergen-fete.</p>
+        </div>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
