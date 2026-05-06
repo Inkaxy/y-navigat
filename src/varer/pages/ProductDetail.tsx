@@ -470,6 +470,9 @@ export default function ProductDetail() {
         {tab === "deklarasjon" && !product.variant_of_product_id && (
           <DeclarationTab productId={product.id} productName={product.display_name} canWrite={canWrite} />
         )}
+        {tab === "kalkyle" && !product.variant_of_product_id && (
+          <CalculationTab productId={product.id} productName={product.display_name} canWrite={canWrite} />
+        )}
         {tab === "priser" && (
           <Card>
             <CardHeader><CardTitle className="text-base">Priser</CardTitle></CardHeader>
