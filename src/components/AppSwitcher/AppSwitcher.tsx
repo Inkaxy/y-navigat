@@ -26,6 +26,7 @@ const INTERNAL_ROUTES: Record<string, string> = {
   varer: "/varer",
   kunder: "/kunder",
   ravarer: "/ravarer/vareliste",
+  fakturaer: "/fakturaer",
   ordre: "/ordre",
   produksjon: "/produksjon",
 };
