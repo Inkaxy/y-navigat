@@ -22,6 +22,13 @@ const SUBMENUS: Record<string, { prefix: string; appSlug: string; items: SubItem
       { to: "/varer/innstillinger", label: "Innstillinger" },
     ],
   },
+  ravarer: {
+    prefix: "/ravarer",
+    appSlug: "ravarer",
+    items: [
+      { to: "/ravarer/vareliste", label: "Vareliste" },
+    ],
+  },
   kunder: {
     prefix: "/kunder",
     appSlug: "kunder",
