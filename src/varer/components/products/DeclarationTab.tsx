@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
-import { Loader2, AlertTriangle, FileText, Eye, Save, Copy, Printer, Sparkles, ShieldCheck } from "lucide-react";
+import { Loader2, AlertTriangle, FileText, Eye, Save, Copy, Printer, Sparkles, ShieldCheck, Link2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { logAudit } from "@/varer/lib/audit";
@@ -39,53 +39,62 @@ interface Props {
 export function DeclarationTab({ productId, productName, canWrite }: Props) {
   const qc = useQueryClient();
 
-  const recipeQuery = useQuery({
-    queryKey: ["recipe-for-declaration", productId],
+  const linkQuery = useQuery({
+    queryKey: ["product-recipe-link-decl", productId],
     queryFn: async () => {
       const { data } = await supabase
-        .from("recipes")
-        .select("id, declaration_mode, manual_ingredient_declaration, manual_nutrition, manual_allergen_summary, declaration_updated_at")
+        .from("product_recipe_links")
+        .select("id, recipe_id, declaration_mode, manual_ingredient_declaration, manual_nutrition, manual_allergen_summary, declaration_updated_at, recipes(declaration_mode, manual_ingredient_declaration, manual_nutrition, manual_allergen_summary)")
         .eq("product_id", productId)
-        .is("valid_to", null)
+        .order("is_primary", { ascending: false })
+        .limit(1)
         .maybeSingle();
       return data;
     },
   });
 
-  const recipe = recipeQuery.data;
-
-  if (recipeQuery.isLoading) {
+  if (linkQuery.isLoading) {
     return <div className="flex h-32 items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>;
   }
-  if (!recipe) {
+  if (!linkQuery.data) {
     return (
       <Card><CardContent className="py-12 text-center text-sm text-muted-foreground">
-        Ingen aktiv oppskrift. Opprett en oppskrift først for å se deklarasjon.
+        Ingen aktiv oppskrift koblet til dette produktet. Opprett eller koble til en oppskrift først.
       </CardContent></Card>
     );
   }
 
-  return <DeclarationView recipe={recipe} productName={productName} canWrite={canWrite} qc={qc} />;
+  return <DeclarationView link={linkQuery.data} productName={productName} canWrite={canWrite} qc={qc} />;
 }
 
-function DeclarationView({ recipe, productName, canWrite, qc }: { recipe: any; productName: string; canWrite: boolean; qc: ReturnType<typeof useQueryClient> }) {
-  const [mode, setMode] = useState<Mode>(recipe.declaration_mode);
-  const [manualIngredient, setManualIngredient] = useState<string>(recipe.manual_ingredient_declaration ?? "");
+function DeclarationView({ link, productName, canWrite, qc }: { link: any; productName: string; canWrite: boolean; qc: ReturnType<typeof useQueryClient> }) {
+  // Effektiv modus: kobling vinner, ellers master, ellers auto
+  const inheritedMode: Mode = link.recipes?.declaration_mode ?? "auto";
+  const effectiveMode: Mode = (link.declaration_mode ?? inheritedMode) as Mode;
+  const isOverridden = link.declaration_mode != null;
+
+  const [mode, setMode] = useState<Mode>(effectiveMode);
+  const initialIngredient = link.manual_ingredient_declaration ?? link.recipes?.manual_ingredient_declaration ?? "";
+  const initialNutrition = (link.manual_nutrition ?? link.recipes?.manual_nutrition ?? {}) as Record<string, number>;
+  const initialAllergens = (link.manual_allergen_summary ?? link.recipes?.manual_allergen_summary ?? {}) as any;
+
+  const [manualIngredient, setManualIngredient] = useState<string>(initialIngredient);
   const [manualNutrition, setManualNutrition] = useState<Record<string, string>>(() => {
-    const m = (recipe.manual_nutrition ?? {}) as Record<string, number>;
     const out: Record<string, string> = {};
-    for (const f of NUTRITION_FIELDS) out[f.key] = m[f.key] != null ? String(m[f.key]) : "";
+    for (const f of NUTRITION_FIELDS) out[f.key] = initialNutrition[f.key] != null ? String(initialNutrition[f.key]) : "";
     return out;
   });
-  const [manualContains, setManualContains] = useState<string>(((recipe.manual_allergen_summary as any)?.contains ?? []).join(", "));
-  const [manualMayContain, setManualMayContain] = useState<string>(((recipe.manual_allergen_summary as any)?.may_contain ?? []).join(", "));
+  const [manualContains, setManualContains] = useState<string>((initialAllergens?.contains ?? []).join(", "));
+  const [manualMayContain, setManualMayContain] = useState<string>((initialAllergens?.may_contain ?? []).join(", "));
   const [savingMode, setSavingMode] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
 
   const computeQuery = useQuery({
-    queryKey: ["compute-declaration", recipe.id],
+    queryKey: ["compute-product-declaration", link.id],
     queryFn: async () => {
-      const { data, error } = await supabase.functions.invoke("compute-recipe-declaration", { body: { recipe_id: recipe.id } });
+      const { data, error } = await supabase.functions.invoke("compute-product-declaration", {
+        body: { product_recipe_link_id: link.id },
+      });
       if (error) throw error;
       return data as ComputedDeclaration;
     },
@@ -93,22 +102,23 @@ function DeclarationView({ recipe, productName, canWrite, qc }: { recipe: any; p
 
   const computed = computeQuery.data;
 
-  async function changeMode(newMode: Mode) {
-    if (newMode === mode) return;
-    if (mode === "manual" && newMode !== "manual") {
-      if (!confirm("Bytte fra Manuell til auto vil ikke slette dine manuelle data, men auto vil overstyres ved bytte tilbake. Fortsette?")) return;
-    }
+  async function changeMode(newMode: Mode | "inherit") {
     setSavingMode(true);
-    const { error } = await supabase.from("recipes").update({
-      declaration_mode: newMode,
+    const update: any = {
       declaration_updated_at: new Date().toISOString(),
-    }).eq("id", recipe.id);
+    };
+    if (newMode === "inherit") {
+      update.declaration_mode = null;
+    } else {
+      update.declaration_mode = newMode;
+    }
+    const { error } = await supabase.from("product_recipe_links").update(update).eq("id", link.id);
     setSavingMode(false);
     if (error) { toast.error(error.message); return; }
-    setMode(newMode);
-    await logAudit({ action: "update", entity_type: "recipe", entity_id: recipe.id, entity_display_reference: productName, changes: { declaration_mode: newMode } });
-    qc.invalidateQueries({ queryKey: ["recipe-for-declaration", recipe.id] });
-    qc.invalidateQueries({ queryKey: ["compute-declaration", recipe.id] });
+    if (newMode !== "inherit") setMode(newMode);
+    await logAudit({ action: "update", entity_type: "product_recipe_link", entity_id: link.id, entity_display_reference: productName, changes: { declaration_mode: newMode } });
+    qc.invalidateQueries({ queryKey: ["product-recipe-link-decl", link.id] });
+    qc.invalidateQueries({ queryKey: ["compute-product-declaration", link.id] });
     toast.success("Modus oppdatert");
   }
 
@@ -118,7 +128,7 @@ function DeclarationView({ recipe, productName, canWrite, qc }: { recipe: any; p
       const v = manualNutrition[f.key];
       if (v !== "" && Number.isFinite(Number(v))) nut[f.key] = Number(v);
     }
-    const { error } = await supabase.from("recipes").update({
+    const { error } = await supabase.from("product_recipe_links").update({
       manual_ingredient_declaration: manualIngredient || null,
       manual_nutrition: Object.keys(nut).length ? nut : null,
       manual_allergen_summary: {
@@ -126,16 +136,30 @@ function DeclarationView({ recipe, productName, canWrite, qc }: { recipe: any; p
         may_contain: manualMayContain.split(",").map((s) => s.trim()).filter(Boolean),
       },
       declaration_updated_at: new Date().toISOString(),
-    }).eq("id", recipe.id);
+    }).eq("id", link.id);
     if (error) { toast.error(error.message); return; }
     toast.success("Manuell deklarasjon lagret");
-    qc.invalidateQueries({ queryKey: ["recipe-for-declaration", recipe.id] });
-    qc.invalidateQueries({ queryKey: ["compute-declaration", recipe.id] });
+    qc.invalidateQueries({ queryKey: ["product-recipe-link-decl", link.id] });
+    qc.invalidateQueries({ queryKey: ["compute-product-declaration", link.id] });
   }
 
   return (
     <div className="space-y-4">
-      <ModeSelector mode={mode} canWrite={canWrite} saving={savingMode} onChange={changeMode} />
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <ModeSelector mode={mode} canWrite={canWrite} saving={savingMode} onChange={changeMode} />
+        <div className="text-xs text-muted-foreground flex items-center gap-2">
+          {isOverridden ? (
+            <Badge variant="default" className="gap-1"><Link2 className="h-3 w-3" /> Overstyrt pr produkt</Badge>
+          ) : (
+            <Badge variant="outline" className="gap-1"><Link2 className="h-3 w-3" /> Arvet fra master ({inheritedMode})</Badge>
+          )}
+          {isOverridden && canWrite && (
+            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => changeMode("inherit")}>
+              Bruk master
+            </Button>
+          )}
+        </div>
+      </div>
 
       {computeQuery.isLoading && (
         <Card><CardContent className="py-12 text-center"><Loader2 className="mx-auto h-5 w-5 animate-spin text-muted-foreground" /></CardContent></Card>
@@ -167,8 +191,39 @@ function DeclarationView({ recipe, productName, canWrite, qc }: { recipe: any; p
                     dangerouslySetInnerHTML={{ __html: computed.ingredient_declaration_html || "<em>Ingen ingredienser å vise.</em>" }}
                   />
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Allergener i <strong>fet</strong>. QUID-prosenter beregnes automatisk fra ingredienser merket QUID-relevant.
+                    Allergener i <strong>fet</strong>. QUID-prosenter beregnes på tvers av master + tillegg.
+                    {computed.data_quality.extra_lines > 0 && (
+                      <> · <Badge variant="outline" className="ml-1 h-4 px-1 text-[10px]">+{computed.data_quality.extra_lines} tillegg</Badge></>
+                    )}
                   </p>
+                </div>
+
+                {/* Linje-breakdown med kilde-merking */}
+                <div className="rounded-md border border-border">
+                  <table className="w-full text-xs">
+                    <thead className="bg-muted/30 text-muted-foreground">
+                      <tr>
+                        <th className="px-2 py-1 text-left">Kilde</th>
+                        <th className="px-2 py-1 text-left">Ingrediens</th>
+                        <th className="px-2 py-1 text-right">Gram</th>
+                        <th className="px-2 py-1 text-center">Næring?</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {computed.computed_lines.filter((l) => l.include).map((l, i) => (
+                        <tr key={i} className="border-t border-border">
+                          <td className="px-2 py-1">
+                            {l.source === "extra"
+                              ? <Badge variant="default" className="h-4 px-1 text-[10px]">+ tillegg</Badge>
+                              : <span className="text-muted-foreground">master</span>}
+                          </td>
+                          <td className="px-2 py-1">{l.name}{l.is_quid && <span className="ml-1 text-[10px] text-muted-foreground">QUID</span>}</td>
+                          <td className="px-2 py-1 text-right tabular-nums">{Math.round(l.effective_grams * 10) / 10}</td>
+                          <td className="px-2 py-1 text-center">{l.has_nutrition ? "✓" : <span className="text-warning">—</span>}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
 
                 {mode === "manual" && (
@@ -218,7 +273,7 @@ function DeclarationView({ recipe, productName, canWrite, qc }: { recipe: any; p
                   </tbody>
                 </table>
                 <p className="mt-3 text-xs text-muted-foreground">
-                  Dekning: {computed.data_quality.nutrition_coverage_pct}% av vekten har næringsdata.
+                  Dekning: {computed.data_quality.nutrition_coverage_pct}% av vekten har næringsdata. Ferdigvekt: {Math.round(computed.final_weight_grams)} g.
                 </p>
               </CardContent>
             </Card>
@@ -231,12 +286,7 @@ function DeclarationView({ recipe, productName, canWrite, qc }: { recipe: any; p
                 <div>
                   <Label>Inneholder</Label>
                   {mode === "manual" ? (
-                    <Input
-                      value={manualContains}
-                      disabled={!canWrite}
-                      onChange={(e) => setManualContains(e.target.value)}
-                      placeholder="hvete, melk, egg"
-                    />
+                    <Input value={manualContains} disabled={!canWrite} onChange={(e) => setManualContains(e.target.value)} placeholder="hvete, melk, egg" />
                   ) : (
                     <div className="mt-1 flex flex-wrap gap-1.5">
                       {computed.allergens_contains.length === 0
@@ -248,12 +298,7 @@ function DeclarationView({ recipe, productName, canWrite, qc }: { recipe: any; p
                 <div>
                   <Label>Kan inneholde spor av</Label>
                   {mode === "manual" ? (
-                    <Input
-                      value={manualMayContain}
-                      disabled={!canWrite}
-                      onChange={(e) => setManualMayContain(e.target.value)}
-                      placeholder="nøtter, sesam"
-                    />
+                    <Input value={manualMayContain} disabled={!canWrite} onChange={(e) => setManualMayContain(e.target.value)} placeholder="nøtter, sesam" />
                   ) : (
                     <div className="mt-1 flex flex-wrap gap-1.5">
                       {computed.allergens_may_contain.length === 0
@@ -283,14 +328,14 @@ function DeclarationView({ recipe, productName, canWrite, qc }: { recipe: any; p
   );
 }
 
-function ModeSelector({ mode, canWrite, saving, onChange }: { mode: Mode; canWrite: boolean; saving: boolean; onChange: (m: Mode) => void }) {
+function ModeSelector({ mode, canWrite, saving, onChange }: { mode: Mode; canWrite: boolean; saving: boolean; onChange: (m: Mode | "inherit") => void }) {
   const items: { value: Mode; title: string; desc: string; icon: React.ReactNode }[] = [
-    { value: "auto", title: "Automatisk", desc: "Beregnes fra råvarer + oppskrift.", icon: <Sparkles className="h-4 w-4" /> },
+    { value: "auto", title: "Automatisk", desc: "Beregnes fra råvarer + oppskrift + tillegg.", icon: <Sparkles className="h-4 w-4" /> },
     { value: "auto_with_overrides", title: "Auto + overstyringer", desc: "Auto, med mulighet for å låse enkeltverdier.", icon: <ShieldCheck className="h-4 w-4" /> },
     { value: "manual", title: "Manuell", desc: "Du fyller alt selv. Ingen auto-beregning.", icon: <FileText className="h-4 w-4" /> },
   ];
   return (
-    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 flex-1 min-w-[400px]">
       {items.map((it) => (
         <button
           key={it.value}
@@ -303,9 +348,7 @@ function ModeSelector({ mode, canWrite, saving, onChange }: { mode: Mode; canWri
             (!canWrite || saving) && "opacity-60 cursor-not-allowed",
           )}
         >
-          <div className="flex items-center gap-2 text-sm font-medium">
-            {it.icon} {it.title}
-          </div>
+          <div className="flex items-center gap-2 text-sm font-medium">{it.icon} {it.title}</div>
           <p className="mt-1 text-xs text-muted-foreground">{it.desc}</p>
         </button>
       ))}
@@ -347,10 +390,7 @@ function PreviewDialog({ open, onClose, productName, computed }: { open: boolean
     }
     return lines.join("\n");
   }
-  function copyText() {
-    navigator.clipboard.writeText(plainText());
-    toast.success("Kopiert til utklippstavle");
-  }
+  function copyText() { navigator.clipboard.writeText(plainText()); toast.success("Kopiert til utklippstavle"); }
   function printNow() {
     const w = window.open("", "_blank", "width=600,height=800");
     if (!w) return;
@@ -399,6 +439,10 @@ function PreviewDialog({ open, onClose, productName, computed }: { open: boolean
 
 type ComputedDeclaration = {
   mode: Mode;
+  mode_source: "link" | "recipe" | "default";
+  product_recipe_link_id: string;
+  product_id: string;
+  recipe_id: string;
   product_name: string;
   total_input_grams: number;
   final_weight_grams: number;
@@ -408,11 +452,24 @@ type ComputedDeclaration = {
   allergens_may_contain: string[];
   data_quality: {
     lines_total: number;
-    lines_without_raw_material: number;
-    lines_without_nutrition: number;
-    lines_without_allergens: number;
+    master_lines: number;
+    extra_lines: number;
+    master_lines_without_raw_material: number;
+    extra_lines_without_raw_material: number;
+    master_lines_without_nutrition: number;
+    extra_lines_without_nutrition: number;
     nutrition_coverage_pct: number;
+    yield_grams_set: boolean;
   };
   warnings: string[];
-  computed_lines: any[];
+  computed_lines: Array<{
+    source: "master" | "extra";
+    name: string;
+    grams: number;
+    effective_grams: number;
+    include: boolean;
+    is_quid: boolean;
+    raw_material_id: string | null;
+    has_nutrition: boolean;
+  }>;
 };
