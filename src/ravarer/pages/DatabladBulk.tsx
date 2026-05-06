@@ -68,6 +68,15 @@ export default function DatabladBulk() {
       if (ext.error) throw new Error(`AI-ekstrahering: ${ext.error}`);
 
       updateRow(i, { status: "matching", stage: "match", datasheet_id: ext.datasheet_id });
+
+      // Hent ai_extracted slik at vi kan forhåndsutfylle "Opprett ny råvare" hvis ingen match
+      const { data: dsRow } = await supabase
+        .from("raw_material_datasheets")
+        .select("ai_extracted, file_name")
+        .eq("id", ext.datasheet_id)
+        .maybeSingle();
+      const extracted = (dsRow?.ai_extracted ?? {}) as DatasheetExtract;
+
       const { data: match, error: matchErr } = await supabase.functions.invoke("match-datasheet-to-raw-material", {
         body: { datasheet_id: ext.datasheet_id },
       });
@@ -77,6 +86,7 @@ export default function DatabladBulk() {
       updateRow(i, {
         status: "ready",
         stage: undefined,
+        extracted,
         candidates: match?.candidates ?? [],
         selectedRm: match?.candidates?.[0]?.score >= 0.7 ? match.candidates[0].id : undefined,
         error: undefined,
