@@ -27,14 +27,17 @@ export function useFakturaerLegalEntities() {
 
       const isOwner = (ups ?? []).some((up: any) => up.positions?.is_owner);
 
-      let entityIds: string[] = [];
+      const mapRow = (r: any): LegalEntityRow => ({ id: r.id, name: r.legal_name, short_code: r.short_code });
+
       if (isOwner) {
-        const { data: all, error } = await supabase.from("legal_entities").select("id, legal_name, short_code").order("name");
+        const { data: all, error } = await supabase
+          .from("legal_entities")
+          .select("id, legal_name, short_code")
+          .order("legal_name");
         if (error) throw error;
-        return (all ?? []) as LegalEntityRow[];
+        return (all ?? []).map(mapRow);
       }
 
-      // Filtrer posisjoner som har fakturaer-tilgang
       const positionIds = Array.from(new Set((ups ?? []).map((up: any) => up.position_id)));
       if (positionIds.length === 0) return [];
       const { data: paa } = await supabase
@@ -44,11 +47,11 @@ export function useFakturaerLegalEntities() {
       const allowedPositions = new Set(
         (paa ?? []).filter((row: any) => row.apps?.code === APP_CODE).map((row: any) => row.position_id),
       );
-      entityIds = Array.from(
+      const entityIds = Array.from(
         new Set(
           (ups ?? [])
             .filter((up: any) => allowedPositions.has(up.position_id))
-            .map((up: any) => up.legal_entity_id),
+            .map((up: any) => up.legal_entity_id as string),
         ),
       );
       if (entityIds.length === 0) return [];
@@ -56,9 +59,9 @@ export function useFakturaerLegalEntities() {
         .from("legal_entities")
         .select("id, legal_name, short_code")
         .in("id", entityIds)
-        .order("name");
+        .order("legal_name");
       if (error) throw error;
-      return (data ?? []) as LegalEntityRow[];
+      return (data ?? []).map(mapRow);
     },
   });
 }
