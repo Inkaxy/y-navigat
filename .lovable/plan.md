@@ -1,61 +1,86 @@
-## Mål
+# Plan: Tre forbedringer på Råvarer + Fakturaer
 
-Tre små justeringer før Steg 4: sikre tilgang til Fakturaer-appen og knytte Råvarer- og Fakturaer-detaljsider sammen via klikkbare lenker.
+Stor leveranse delt i 4 deler. Jeg ber om godkjenning før jeg starter.
 
-## 1. Tilgang til Fakturaer-appen
+## Del 1 — Bulk-import av ukjente råvarer fra fakturalinjer (med AI)
 
-**Status sjekket:**
-- `apps`-tabellen inneholder allerede `fakturaer` (status `active`).
-- `position_app_access` har **ingen** rader for fakturaer-app-id'en `8685c890-…`.
-- Min primær-stilling er `daglig_leder` (id `a1c040a2-…`), som allerede har `admin` på Råvarer/Varer.
+### Backend
+- Ny edge function `suggest-raw-material-fields`
+  - Input: `{ legal_entity_id, lines: [{ line_id, description, sku, quantity, unit, unit_price }] }`
+  - Henter AI-konfig fra `ai_provider_config` for `purpose='raw_material_suggestions'`. Fallback til `invoice_extraction`-konfig hvis kun én purpose finnes (admin kan opprette egen senere).
+  - Bruker `_shared/ai-providers.ts` (`callAi`) med systemprompt fra spec.
+  - Strukturert output via tool-calling: `{ suggestions: [{ line_id, sku, category, base_unit, confidence }] }`.
+  - Logger til `ai_usage_log` med `purpose='raw_material_suggestions'`, model + token-stats.
+- Ny edge function `bulk-import-raw-materials-from-invoice`
+  - Input: `{ invoice_id, items: [{ line_id, name, sku, category, base_unit, package_size, package_unit, agreed_price_per_base_unit, set_primary }] }`
+  - Verifiserer skrive-tilgang + invoice_access via eksisterende RPC.
+  - For hver item, i én transaksjon:
+    - Insert `raw_materials` (legal_entity_id fra invoice, current_cost_price, price_source='invoice', price_updated_at=now()).
+    - Insert `raw_material_suppliers` (is_primary, agreed_price, agreed_price_per_base_unit, last_invoice_price, last_invoice_date).
+    - Insert `raw_material_supplier_aliases` (sku + name som confirmed).
+    - Insert `raw_material_price_history` (source='invoice', invoice_id).
+    - Update `invoice_lines` (raw_material_id, match_confidence='manual', requires_review=false).
+  - Returnerer `{ created: [{ raw_material_id, name }] }`.
 
-**Migrasjon:** Gi `admin`-tilgang til Fakturaer for de samme stillingene som har admin på Råvarer (`daglig_leder`, `lageransvarlig`, `controller`/`fb328e43-…`), og `write` til `ordrekontor`. Bruk `INSERT … ON CONFLICT DO NOTHING` mot `position_app_access`.
+### Migrasjon (kun hvis nødvendig)
+- Sørge for at `ai_purpose` enum/check tillater `raw_material_suggestions` (sjekkes først).
+- Seed `raw_material_categories` med "Importert – ikke kategorisert" per legal_entity (se Del 4).
 
-## 2. Klikkbart fakturanummer i prishistorikk-tabellen
+### Frontend
+- I `InvoiceDetail.tsx`: legg til checkbox-kolonne på umatchede linjer + sticky action-bar når valgt.
+- Ny komponent `BulkImportRawMaterialsDrawer`:
+  - Steg 1: kaller `suggest-raw-material-fields`, viser spinner.
+  - Steg 2: tabell med inline-redigering (Navn, SKU, Kategori, Base unit, Pakningsstørrelse, Pakningsenhet, Pris/base_unit, Set primær). 🤖-badge på AI-felt.
+  - Topp-handlere: "Bruk samme kategori for alle", "Bruk samme base unit for alle".
+  - Footer: "Importer alle" / "Importer kun valgte" / "Avbryt".
+- Samme tilgang fra `ReviewQueue.tsx` (behandlingskøen) på umatchede linjer.
 
-Fil: `src/ravarer/components/tabs/SuppliersTab.tsx` (linje 145–170).
+## Del 2 — "+ Ny avtale"-knapp
 
-- Utvid `usePriceHistory`-spørringen (i `useRmSuppliers.ts`, funksjonen feilaktig kalt `n`) til å hente `invoice_id` og evt. `invoices(invoice_number)` via join, så vi kan vise fakturanummeret når `source = 'invoice'`.
-- I tabellen: erstatt "Notat"-kolonnen-visningen for invoice-rader med en `<Link to={"/fakturaer/" + h.invoice_id}>{invoice_number}</Link>` (eller egen kolonne "Faktura"). Bruk `react-router-dom` `Link` med `text-app underline-offset-2 hover:underline`-klasser. Cross-app nav er ren intern routing siden alle apper deler samme shell — samme pattern som `INTERNAL_ROUTES` i `AppTabs.tsx`.
-- Ryd opp: gi `n` et meningsfylt navn (`usePriceHistory`) i samme slengen og oppdater eneste consumer.
+- Ny komponent `NewAgreementDialog` med felt fra spec (autocomplete på råvare og leverandør, auto-beregning av pris/base_unit, opplasting av PDF til `supplier-agreements` bucket hvis denne finnes — ellers oppretter migrasjon den).
+- Lagrer/upserter `raw_material_suppliers`. Hvis primær: nullstiller `is_primary` på øvrige rader for samme råvare.
+- Knapp lagt til:
+  - `Avtaler.tsx` (header).
+  - `Leverandorer.tsx` (per leverandør-detaljside hvis eksisterer; ellers utelates fra denne PR).
+  - `RawMaterialDetail.tsx` under "Leverandører & priser"-tab (`SuppliersTab`).
 
-## 3. Klikkbart råvarenavn på faktura-detaljsiden
+## Del 3 — "+ Ny leverandør"-knapp
 
-Fil: `src/fakturaer/pages/InvoiceDetail.tsx`.
+- Ny komponent `NewSupplierDialog` med validering (org.nr 9 sifre, unik per legal_entity).
+- Lagrer i `suppliers` med aktiv legal_entity.
+- Knapp på `Leverandorer.tsx`. Etter lagring naviger til `/ravarer/leverandorer/:id` hvis detaljside finnes — ellers refresh listen og toast.
 
-- Utvid `invoice_lines`-select til å hente `raw_material_id, raw_materials(id, name, sku)`.
-- Bytt ut "Beskrivelse"-cellen til å rendre, hvis matchet:
-  - `<Link to={"/ravarer/vareliste/" + l.raw_materials.id}>{l.raw_materials.name}</Link>` med subtle muted underline + originalbeskrivelse som liten grå tekst under.
-  - Ellers fall tilbake til ren `description` som i dag.
-- Sjekk faktisk routing-path i `App.tsx` for råvare-detalj — bekreft at det er `/ravarer/vareliste/:id` (basert på `RawMaterialDetail.tsx` som navigerer tilbake dit). Bruk den faktiske path.
+## Del 4 — "Importert – ikke kategorisert" + ufullstendige-rapport
 
-## 4. "Se prishistorikk"-snarvei på matchede linjer
+### Migrasjon
+- Sørge for at kategorien finnes per legal_entity (idempotent insert i `raw_material_categories` eller tilsvarende).
 
-Samme fil. Legg til en ekstra kolonne lengst til høyre (eller en liten ikonknapp i SKU-kolonnen) — kun synlig når `raw_material_id` er satt:
+### Frontend
+- I `Vareliste.tsx`: hvis det finnes råvarer i denne kategorien → banner "⚠️ N råvarer mangler kategori. [Vis dem]" som setter kategori-filter.
+- Ny rute `/ravarer/vareliste/ufullstendige` → `IncompleteRawMaterials.tsx`:
+  - 4 KPI-kort (totalt, mangler kategori, mangler næring, mangler allergen).
+  - Tabell med kolonner og ✅/❌ for hvert manglende felt.
+  - Default-filter: vis kun råvarer som mangler minst én ting.
+  - Lenke fra Vareliste-banner og fra sidebar (sub-meny under Vareliste).
 
-```
-<Button variant="ghost" size="icon" asChild>
-  <Link to={"/ravarer/vareliste/" + rmId + "?tab=suppliers"} title="Se prishistorikk">
-    <LineChart className="h-4 w-4" />
-  </Link>
-</Button>
-```
-
-For at lenken faktisk skal lande på prishistorikk-grafen: utvid `RawMaterialDetail.tsx` til å lese `?tab=` query-param og sette som `defaultValue`/`value` på `<Tabs>`. Liten endring, ingen state-mutasjon.
+### Tilgang
+- Alle handlinger krever `canWrite` på Råvarer.
+- Bulk-import krever i tillegg `hasInvoiceAccess`.
 
 ## Tekniske detaljer
 
-- Ingen design-tokens brytes; bruk `text-app`, `text-ink-secondary`, `hover:underline`.
-- Ingen ny routing — alt fungerer via eksisterende `BrowserRouter` siden Fakturaer og Råvarer deler shell.
-- Migrasjonen er idempotent (`ON CONFLICT (position_id, app_id) DO NOTHING`).
-- Ingen endringer i edge functions eller match-pipeline.
+- Edge functions deployes med `verify_jwt=false` (default i prosjektet) og validerer JWT i kode via `auth.getUser()`.
+- AI-kall bruker `_shared/ai-providers.ts`. Strukturert output via `tool_choice` der støttet, ellers `response_format: json_object`.
+- Idempotens på bulk-import: hvis SKU allerede finnes for legal_entity → skip + returner advarsel pr linje.
+- All UI bruker semantic tokens fra `index.css`/`tailwind.config.ts`. Ingen hardkodede farger.
 
-## Filer som endres
+## Rekkefølge
 
-- `supabase/migrations/<ny>.sql` — gi posisjonstilgang til Fakturaer
-- `src/ravarer/hooks/useRmSuppliers.ts` — rename `n` → `usePriceHistory`, hent `invoice_id` + `invoices.invoice_number`
-- `src/ravarer/components/tabs/SuppliersTab.tsx` — bruk nytt navn + render fakturalenke
-- `src/fakturaer/pages/InvoiceDetail.tsx` — hent `raw_materials`, gjør navn klikkbart, legg til prishistorikk-knapp
-- `src/ravarer/pages/RawMaterialDetail.tsx` — les `?tab=` query-param
+1. Migrasjon (kategori + evt. bucket).
+2. Edge functions `suggest-raw-material-fields` + `bulk-import-raw-materials-from-invoice`.
+3. `NewSupplierDialog` (enklest, ingen avhengighet).
+4. `NewAgreementDialog`.
+5. Bulk-import drawer + integrasjon i InvoiceDetail og ReviewQueue.
+6. Vareliste-banner + ufullstendige-rapport + ny rute.
 
-Etter dette kjører vi Steg 4 (faktura-godkjenning, prisavviks-håndtering).
+Si fra om du vil ha noen del prioritert eller utelatt, eller om jeg kan kjøre alt i ett.

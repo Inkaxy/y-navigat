@@ -3,13 +3,18 @@ import { Link } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Search, Loader2, Truck } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Search, Loader2, Truck, Plus } from "lucide-react";
 import { RavarerHeaderBanner } from "@/ravarer/components/RavarerHeaderBanner";
 import { useSuppliers } from "@/ravarer/hooks/useSuppliers";
+import { useRavarer } from "@/ravarer/context/RavarerContext";
+import { NewSupplierDialog } from "@/ravarer/components/NewSupplierDialog";
 
 export default function LeverandorerPage() {
+  const { canWrite } = useRavarer();
   const { data: rows = [], isLoading } = useSuppliers();
   const [search, setSearch] = useState("");
+  const [newOpen, setNewOpen] = useState(false);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -24,7 +29,16 @@ export default function LeverandorerPage() {
 
   return (
     <div className="space-y-5">
-      <RavarerHeaderBanner title="Leverandører" subtitle="Alle aktive leverandører for valgt selskap" />
+      <RavarerHeaderBanner
+        title="Leverandører"
+        subtitle="Alle aktive leverandører for valgt selskap"
+        actions={canWrite && (
+          <Button size="sm" onClick={() => setNewOpen(true)} className="gap-1.5">
+            <Plus className="h-4 w-4" /> Ny leverandør
+          </Button>
+        )}
+      />
+      <NewSupplierDialog open={newOpen} onOpenChange={setNewOpen} />
 
       <Card className="p-4">
         <div className="flex flex-wrap items-center gap-3">

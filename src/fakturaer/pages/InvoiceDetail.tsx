@@ -1,23 +1,28 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Loader2, LineChart as LineChartIcon, CheckCircle2, Flag } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ArrowLeft, Loader2, LineChart as LineChartIcon, CheckCircle2, Flag, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { FakturaerHeaderBanner } from "@/fakturaer/components/FakturaerHeaderBanner";
 import { InvoiceStatusBadge } from "@/fakturaer/components/InvoiceStatusBadge";
 import { ConfirmReconcileDialog } from "@/fakturaer/components/ConfirmReconcileDialog";
 import { FlagInvoiceDialog } from "@/fakturaer/components/FlagInvoiceDialog";
+import { BulkImportRawMaterialsDrawer } from "@/fakturaer/components/BulkImportRawMaterialsDrawer";
 import { useFakturaer } from "@/fakturaer/context/FakturaerContext";
 import { formatNok, formatDate, INVOICE_SOURCES } from "@/fakturaer/lib/constants";
 
 export default function InvoiceDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { canReconcile, canWrite } = useFakturaer();
+  const qc = useQueryClient();
+  const { canReconcile, canWrite, hasInvoiceAccess } = useFakturaer();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [flagOpen, setFlagOpen] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [selected, setSelected] = useState<Record<string, boolean>>({});
 
   const { data, isLoading } = useQuery({
     queryKey: ["invoice", id],
@@ -48,6 +53,11 @@ export default function InvoiceDetailPage() {
   const lines = (data.invoice_lines ?? []) as any[];
   const reviewLineCount = lines.filter((l) => l.requires_review).length;
   const isFinal = ["reconciled", "flagged"].includes(data.status);
+  const unmatchedLines = lines.filter((l) => !l.raw_material_id);
+  const selectedIds = Object.keys(selected).filter((k) => selected[k]);
+  const selectedLines = unmatchedLines.filter((l) => selected[l.id]);
+  const canBulkImport = canWrite && hasInvoiceAccess && unmatchedLines.length > 0;
+
 
   return (
     <div className="space-y-5">
@@ -83,6 +93,33 @@ export default function InvoiceDetailPage() {
         reviewLineCount={reviewLineCount}
       />
       <FlagInvoiceDialog open={flagOpen} onOpenChange={setFlagOpen} invoiceId={data.id} />
+      {bulkOpen && (
+        <BulkImportRawMaterialsDrawer
+          open={bulkOpen}
+          onOpenChange={setBulkOpen}
+          invoiceId={data.id}
+          legalEntityId={data.legal_entity_id}
+          lines={selectedLines.map((l) => ({
+            id: l.id,
+            description: l.description,
+            supplier_sku: l.supplier_sku,
+            quantity: l.quantity,
+            unit: l.unit,
+            unit_price: l.unit_price,
+            total_amount: l.total_amount,
+          }))}
+          onComplete={() => { setSelected({}); qc.invalidateQueries({ queryKey: ["invoice", id] }); }}
+        />
+      )}
+
+      {canBulkImport && selectedIds.length > 0 && (
+        <div className="sticky top-2 z-10 flex items-center justify-between rounded-lg border border-primary/30 bg-primary/5 px-4 py-2 shadow-xs">
+          <span className="text-sm font-medium">{selectedIds.length} umatchede linjer valgt</span>
+          <Button size="sm" onClick={() => setBulkOpen(true)} className="gap-1.5">
+            <Sparkles className="h-4 w-4" /> Importer som nye råvarer ({selectedIds.length} valgt)
+          </Button>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         <Card className="p-6 lg:col-span-1">
@@ -114,6 +151,7 @@ export default function InvoiceDetailPage() {
               <table className="w-full text-sm">
                 <thead className="bg-muted/30 text-left text-xs uppercase tracking-wider text-ink-secondary">
                   <tr>
+                    {canBulkImport && <th className="w-8 px-2 py-3"></th>}
                     <th className="px-4 py-3">SKU</th>
                     <th className="px-4 py-3">Beskrivelse / råvare</th>
                     <th className="px-4 py-3 text-right">Antall</th>
@@ -128,6 +166,16 @@ export default function InvoiceDetailPage() {
                     const rm = l.raw_materials as { id: string; name: string; sku: string | null } | null;
                     return (
                       <tr key={l.id} className="border-t border-line-subtle align-top">
+                        {canBulkImport && (
+                          <td className="px-2 py-3">
+                            {!rm && (
+                              <Checkbox
+                                checked={!!selected[l.id]}
+                                onCheckedChange={(c) => setSelected((s) => ({ ...s, [l.id]: !!c }))}
+                              />
+                            )}
+                          </td>
+                        )}
                         <td className="px-4 py-3 font-mono text-xs">{l.supplier_sku ?? "—"}</td>
                         <td className="px-4 py-3">
                           {rm ? (
