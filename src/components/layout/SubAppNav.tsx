@@ -112,6 +112,18 @@ function RavarerNav() {
   if (hasInvoiceAccess) {
     items.push({
       kind: "dropdown",
+      label: "Forhandlinger",
+      basePath: "/ravarer/forhandlinger",
+      links: [
+        { to: "/ravarer/forhandlinger", label: "Aktive forhandlinger" },
+        { to: "/ravarer/forhandlinger/ny", label: "Ny forhandling" },
+      ],
+    });
+  }
+
+  if (hasInvoiceAccess) {
+    items.push({
+      kind: "dropdown",
       label: "Fakturaer",
       basePath: "/ravarer/fakturaer",
       links: [

@@ -2370,6 +2370,420 @@ export type Database = {
           },
         ]
       }
+      negotiation_items: {
+        Row: {
+          actual_avg_price_baseline: number | null
+          actual_cost_baseline: number | null
+          actual_volume_baseline: number | null
+          created_at: string
+          expected_annual_volume: number | null
+          expected_annual_volume_unit: string | null
+          id: string
+          negotiation_id: string
+          notes: string | null
+          raw_material_id: string
+          sort_order: number
+          suggested_package_size: number | null
+          suggested_package_unit: string | null
+          target_price: number | null
+        }
+        Insert: {
+          actual_avg_price_baseline?: number | null
+          actual_cost_baseline?: number | null
+          actual_volume_baseline?: number | null
+          created_at?: string
+          expected_annual_volume?: number | null
+          expected_annual_volume_unit?: string | null
+          id?: string
+          negotiation_id: string
+          notes?: string | null
+          raw_material_id: string
+          sort_order?: number
+          suggested_package_size?: number | null
+          suggested_package_unit?: string | null
+          target_price?: number | null
+        }
+        Update: {
+          actual_avg_price_baseline?: number | null
+          actual_cost_baseline?: number | null
+          actual_volume_baseline?: number | null
+          created_at?: string
+          expected_annual_volume?: number | null
+          expected_annual_volume_unit?: string | null
+          id?: string
+          negotiation_id?: string
+          notes?: string | null
+          raw_material_id?: string
+          sort_order?: number
+          suggested_package_size?: number | null
+          suggested_package_unit?: string | null
+          target_price?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "negotiation_items_negotiation_id_fkey"
+            columns: ["negotiation_id"]
+            isOneToOne: false
+            referencedRelation: "negotiations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "negotiation_items_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "raw_materials"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      negotiation_messages: {
+        Row: {
+          actor: string | null
+          created_at: string
+          event_type: string
+          id: string
+          ip_address: string | null
+          negotiation_id: string
+          payload: Json | null
+          recipient_id: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          actor?: string | null
+          created_at?: string
+          event_type: string
+          id?: string
+          ip_address?: string | null
+          negotiation_id: string
+          payload?: Json | null
+          recipient_id?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          actor?: string | null
+          created_at?: string
+          event_type?: string
+          id?: string
+          ip_address?: string | null
+          negotiation_id?: string
+          payload?: Json | null
+          recipient_id?: string | null
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "negotiation_messages_negotiation_id_fkey"
+            columns: ["negotiation_id"]
+            isOneToOne: false
+            referencedRelation: "negotiations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "negotiation_messages_recipient_id_fkey"
+            columns: ["recipient_id"]
+            isOneToOne: false
+            referencedRelation: "negotiation_recipients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      negotiation_outcomes: {
+        Row: {
+          agreed_package_size: number | null
+          agreed_package_unit: string | null
+          agreed_price: number | null
+          applied_to_supplier: boolean
+          created_at: string
+          id: string
+          negotiation_id: string
+          negotiation_item_id: string
+          notes: string | null
+          set_as_primary: boolean
+          winner_recipient_id: string | null
+          winner_response_id: string | null
+        }
+        Insert: {
+          agreed_package_size?: number | null
+          agreed_package_unit?: string | null
+          agreed_price?: number | null
+          applied_to_supplier?: boolean
+          created_at?: string
+          id?: string
+          negotiation_id: string
+          negotiation_item_id: string
+          notes?: string | null
+          set_as_primary?: boolean
+          winner_recipient_id?: string | null
+          winner_response_id?: string | null
+        }
+        Update: {
+          agreed_package_size?: number | null
+          agreed_package_unit?: string | null
+          agreed_price?: number | null
+          applied_to_supplier?: boolean
+          created_at?: string
+          id?: string
+          negotiation_id?: string
+          negotiation_item_id?: string
+          notes?: string | null
+          set_as_primary?: boolean
+          winner_recipient_id?: string | null
+          winner_response_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "negotiation_outcomes_negotiation_id_fkey"
+            columns: ["negotiation_id"]
+            isOneToOne: false
+            referencedRelation: "negotiations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "negotiation_outcomes_negotiation_item_id_fkey"
+            columns: ["negotiation_item_id"]
+            isOneToOne: false
+            referencedRelation: "negotiation_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "negotiation_outcomes_winner_recipient_id_fkey"
+            columns: ["winner_recipient_id"]
+            isOneToOne: false
+            referencedRelation: "negotiation_recipients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "negotiation_outcomes_winner_response_id_fkey"
+            columns: ["winner_response_id"]
+            isOneToOne: false
+            referencedRelation: "negotiation_responses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      negotiation_recipients: {
+        Row: {
+          access_token: string
+          contact_email: string | null
+          contact_name: string | null
+          created_at: string
+          expires_at: string
+          failed_attempts: number
+          first_viewed_at: string | null
+          id: string
+          invited_at: string | null
+          last_viewed_at: string | null
+          locked_until: string | null
+          negotiation_id: string
+          password_expires_at: string | null
+          password_hash: string | null
+          password_set_at: string | null
+          responded_at: string | null
+          status: Database["public"]["Enums"]["negotiation_recipient_status"]
+          supplier_id: string
+          updated_at: string
+        }
+        Insert: {
+          access_token: string
+          contact_email?: string | null
+          contact_name?: string | null
+          created_at?: string
+          expires_at?: string
+          failed_attempts?: number
+          first_viewed_at?: string | null
+          id?: string
+          invited_at?: string | null
+          last_viewed_at?: string | null
+          locked_until?: string | null
+          negotiation_id: string
+          password_expires_at?: string | null
+          password_hash?: string | null
+          password_set_at?: string | null
+          responded_at?: string | null
+          status?: Database["public"]["Enums"]["negotiation_recipient_status"]
+          supplier_id: string
+          updated_at?: string
+        }
+        Update: {
+          access_token?: string
+          contact_email?: string | null
+          contact_name?: string | null
+          created_at?: string
+          expires_at?: string
+          failed_attempts?: number
+          first_viewed_at?: string | null
+          id?: string
+          invited_at?: string | null
+          last_viewed_at?: string | null
+          locked_until?: string | null
+          negotiation_id?: string
+          password_expires_at?: string | null
+          password_hash?: string | null
+          password_set_at?: string | null
+          responded_at?: string | null
+          status?: Database["public"]["Enums"]["negotiation_recipient_status"]
+          supplier_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "negotiation_recipients_negotiation_id_fkey"
+            columns: ["negotiation_id"]
+            isOneToOne: false
+            referencedRelation: "negotiations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "negotiation_recipients_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      negotiation_responses: {
+        Row: {
+          contract_length_months: number | null
+          created_at: string
+          datasheet_url: string | null
+          delivery_terms: string | null
+          id: string
+          min_order_unit: string | null
+          min_order_volume: number | null
+          negotiation_id: string
+          negotiation_item_id: string
+          notes: string | null
+          offered_package_size: number | null
+          offered_package_unit: string | null
+          offered_price: number | null
+          payment_terms: string | null
+          recipient_id: string
+          status: Database["public"]["Enums"]["negotiation_response_status"]
+          submitted_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          contract_length_months?: number | null
+          created_at?: string
+          datasheet_url?: string | null
+          delivery_terms?: string | null
+          id?: string
+          min_order_unit?: string | null
+          min_order_volume?: number | null
+          negotiation_id: string
+          negotiation_item_id: string
+          notes?: string | null
+          offered_package_size?: number | null
+          offered_package_unit?: string | null
+          offered_price?: number | null
+          payment_terms?: string | null
+          recipient_id: string
+          status?: Database["public"]["Enums"]["negotiation_response_status"]
+          submitted_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          contract_length_months?: number | null
+          created_at?: string
+          datasheet_url?: string | null
+          delivery_terms?: string | null
+          id?: string
+          min_order_unit?: string | null
+          min_order_volume?: number | null
+          negotiation_id?: string
+          negotiation_item_id?: string
+          notes?: string | null
+          offered_package_size?: number | null
+          offered_package_unit?: string | null
+          offered_price?: number | null
+          payment_terms?: string | null
+          recipient_id?: string
+          status?: Database["public"]["Enums"]["negotiation_response_status"]
+          submitted_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "negotiation_responses_negotiation_id_fkey"
+            columns: ["negotiation_id"]
+            isOneToOne: false
+            referencedRelation: "negotiations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "negotiation_responses_negotiation_item_id_fkey"
+            columns: ["negotiation_item_id"]
+            isOneToOne: false
+            referencedRelation: "negotiation_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "negotiation_responses_recipient_id_fkey"
+            columns: ["recipient_id"]
+            isOneToOne: false
+            referencedRelation: "negotiation_recipients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      negotiations: {
+        Row: {
+          archived_at: string | null
+          baseline_period_end: string | null
+          baseline_period_start: string | null
+          concluded_at: string | null
+          contract_end: string | null
+          contract_start: string | null
+          created_at: string
+          created_by: string
+          id: string
+          legal_entity_id: string
+          notes: string | null
+          purpose: string | null
+          response_deadline: string | null
+          status: Database["public"]["Enums"]["negotiation_status"]
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          archived_at?: string | null
+          baseline_period_end?: string | null
+          baseline_period_start?: string | null
+          concluded_at?: string | null
+          contract_end?: string | null
+          contract_start?: string | null
+          created_at?: string
+          created_by?: string
+          id?: string
+          legal_entity_id: string
+          notes?: string | null
+          purpose?: string | null
+          response_deadline?: string | null
+          status?: Database["public"]["Enums"]["negotiation_status"]
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          archived_at?: string | null
+          baseline_period_end?: string | null
+          baseline_period_start?: string | null
+          concluded_at?: string | null
+          contract_end?: string | null
+          contract_start?: string | null
+          created_at?: string
+          created_by?: string
+          id?: string
+          legal_entity_id?: string
+          notes?: string | null
+          purpose?: string | null
+          response_deadline?: string | null
+          status?: Database["public"]["Enums"]["negotiation_status"]
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       number_sequences: {
         Row: {
           domain: string
@@ -6757,6 +7171,8 @@ export type Database = {
         Args: { path: string }
         Returns: string
       }
+      gen_rfq_password: { Args: never; Returns: string }
+      gen_rfq_token: { Args: never; Returns: string }
       generate_delivery_notes: {
         Args: {
           p_delivery_date: string
@@ -6915,6 +7331,14 @@ export type Database = {
         Args: { _legal_entity_id: string }
         Returns: boolean
       }
+      has_negotiation_read: {
+        Args: { _legal_entity_id: string }
+        Returns: boolean
+      }
+      has_negotiation_write: {
+        Args: { _legal_entity_id: string }
+        Returns: boolean
+      }
       has_position_in_entity: {
         Args: { p_legal_entity_id: string }
         Returns: boolean
@@ -7028,6 +7452,19 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      negotiation_recipient_by_token: {
+        Args: { p_password: string; p_token: string }
+        Returns: {
+          expires_at: string
+          negotiation_id: string
+          negotiation_title: string
+          recipient_id: string
+          response_deadline: string
+          result: string
+          status: string
+          supplier_id: string
+        }[]
       }
       next_customer_number: {
         Args: { p_legal_entity_id: string; p_profile_id: string }
@@ -7284,6 +7721,7 @@ export type Database = {
           orders_deleted: number
         }[]
       }
+      set_rfq_password: { Args: { p_recipient_id: string }; Returns: string }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
       unaccent: { Args: { "": string }; Returns: string }
@@ -7322,6 +7760,20 @@ export type Database = {
         | "lupin"
         | "molluscs"
       declaration_mode: "auto" | "manual" | "auto_with_overrides"
+      negotiation_recipient_status:
+        | "invited"
+        | "viewed"
+        | "responded"
+        | "declined"
+        | "expired"
+        | "locked"
+      negotiation_response_status: "draft" | "submitted" | "withdrawn"
+      negotiation_status:
+        | "draft"
+        | "invited"
+        | "in_progress"
+        | "concluded"
+        | "cancelled"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -7481,6 +7933,22 @@ export const Constants = {
         "molluscs",
       ],
       declaration_mode: ["auto", "manual", "auto_with_overrides"],
+      negotiation_recipient_status: [
+        "invited",
+        "viewed",
+        "responded",
+        "declined",
+        "expired",
+        "locked",
+      ],
+      negotiation_response_status: ["draft", "submitted", "withdrawn"],
+      negotiation_status: [
+        "draft",
+        "invited",
+        "in_progress",
+        "concluded",
+        "cancelled",
+      ],
     },
   },
 } as const
