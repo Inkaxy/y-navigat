@@ -93,6 +93,33 @@ export default function InvoiceDetailPage() {
         reviewLineCount={reviewLineCount}
       />
       <FlagInvoiceDialog open={flagOpen} onOpenChange={setFlagOpen} invoiceId={data.id} />
+      {bulkOpen && (
+        <BulkImportRawMaterialsDrawer
+          open={bulkOpen}
+          onOpenChange={setBulkOpen}
+          invoiceId={data.id}
+          legalEntityId={data.legal_entity_id}
+          lines={selectedLines.map((l) => ({
+            id: l.id,
+            description: l.description,
+            supplier_sku: l.supplier_sku,
+            quantity: l.quantity,
+            unit: l.unit,
+            unit_price: l.unit_price,
+            total_amount: l.total_amount,
+          }))}
+          onComplete={() => { setSelected({}); qc.invalidateQueries({ queryKey: ["invoice", id] }); }}
+        />
+      )}
+
+      {canBulkImport && selectedIds.length > 0 && (
+        <div className="sticky top-2 z-10 flex items-center justify-between rounded-lg border border-primary/30 bg-primary/5 px-4 py-2 shadow-xs">
+          <span className="text-sm font-medium">{selectedIds.length} umatchede linjer valgt</span>
+          <Button size="sm" onClick={() => setBulkOpen(true)} className="gap-1.5">
+            <Sparkles className="h-4 w-4" /> Importer som nye råvarer ({selectedIds.length} valgt)
+          </Button>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         <Card className="p-6 lg:col-span-1">
