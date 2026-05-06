@@ -12,6 +12,7 @@ import { useInvoices } from "@/fakturaer/hooks/useInvoices";
 import { useFakturaerLegalEntities } from "@/fakturaer/hooks/useFakturaerLegalEntities";
 import { formatNok, formatDate, INVOICE_STATUSES, INVOICE_SOURCES } from "@/fakturaer/lib/constants";
 import { useFakturaer } from "@/fakturaer/context/FakturaerContext";
+import { TripletexStatusCard } from "@/ravarer/components/TripletexStatusCard";
 
 export default function FakturaerListPage() {
   const navigate = useNavigate();
