@@ -73,6 +73,7 @@ export function AppTabs() {
 
   const active = entries.find(isActive) ?? entries[0];
   const ActiveIcon = active.icon;
+  const pageLabel = getPageLabel(pathname, active.label);
 
   return (
     <div className="flex flex-1 items-center justify-center">
