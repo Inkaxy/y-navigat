@@ -1,139 +1,61 @@
-# Råvaremodulen — Pulje 1: Fundament
+## Mål
 
-Bygger råvareregister, næringsinnhold/deklarasjon, og leverandører + manuell prishistorikk. Faktura-import (Pulje 2) og prisinnsikt (Pulje 3) kommer senere.
+Tre små justeringer før Steg 4: sikre tilgang til Fakturaer-appen og knytte Råvarer- og Fakturaer-detaljsider sammen via klikkbare lenker.
 
-## Tilpasninger til eksisterende prosjekt
+## 1. Tilgang til Fakturaer-appen
 
-- **Tenant**: Bruker `legal_entities` i stedet for `organizations`. Alle nye tabeller får `legal_entity_id`.
-- **Tilgang**: Bygger på eksisterende `positions` + `position_app_access` for app-tilgang til `ravarer`. Legger til `is_owner boolean` på `positions` for konsernvisning på tvers av selskap.
-- **Skrive-roller**: RLS-policyer baserer seg på at brukeren har `position_app_access` med `level in ('admin','manager','editor')` for `ravarer`-appen og er knyttet til riktig `legal_entity` via `user_positions`.
-- **Suppliers**: Opprettes nytt, eid pr `legal_entity`.
-- **Recipes**: Legger til nullable `raw_material_id` + `quantity_grams` på `recipe_lines` (forberedelse for Modul F i Pulje 3, ingen migrering av eksisterende rader).
+**Status sjekket:**
+- `apps`-tabellen inneholder allerede `fakturaer` (status `active`).
+- `position_app_access` har **ingen** rader for fakturaer-app-id'en `8685c890-…`.
+- Min primær-stilling er `daglig_leder` (id `a1c040a2-…`), som allerede har `admin` på Råvarer/Varer.
 
-## Migrasjon (én SQL-fil)
+**Migrasjon:** Gi `admin`-tilgang til Fakturaer for de samme stillingene som har admin på Råvarer (`daglig_leder`, `lageransvarlig`, `controller`/`fb328e43-…`), og `write` til `ordrekontor`. Bruk `INSERT … ON CONFLICT DO NOTHING` mot `position_app_access`.
 
-**Nye tabeller** (alle med `legal_entity_id`, RLS aktivert):
-- `suppliers` — leverandørregister
-- `raw_materials` — kjernen (sku, navn, kategori, base_unit, package_size/unit, current_cost_price, agreed_price, lager, primær leverandør)
-- `raw_material_nutrition` — næring pr 100 g + deklarasjon, opprinnelse, e-numre, datablad-URL, verifisering
-- `raw_material_allergens` (+ enums `allergen_type`, `allergen_presence`) — 24 EU-allergener × tilstand
-- `raw_material_suppliers` — kobling med supplier_sku, pakning, avtalt pris, gyldighet, avtale-URL, `is_primary`, siste fakturapris
-- `raw_material_supplier_aliases` (+ enums `alias_type`, `alias_status`) — for senere fakturamatching, klar nå
-- `raw_material_price_history` — append-only prislogg pr leverandør med kilde
+## 2. Klikkbart fakturanummer i prishistorikk-tabellen
 
-**Endringer på eksisterende:**
-- `positions`: `is_owner boolean default false`
-- `recipe_lines`: `raw_material_id uuid references raw_materials(id)` (nullable), `quantity_grams numeric` (nullable)
-- `apps`: oppdater `ravarer` status fra `planned` → `in_development`
+Fil: `src/ravarer/components/tabs/SuppliersTab.tsx` (linje 145–170).
 
-**Storage buckets:**
-- `raw-material-datasheets` (privat)
-- `supplier-agreements` (privat)
+- Utvid `usePriceHistory`-spørringen (i `useRmSuppliers.ts`, funksjonen feilaktig kalt `n`) til å hente `invoice_id` og evt. `invoices(invoice_number)` via join, så vi kan vise fakturanummeret når `source = 'invoice'`.
+- I tabellen: erstatt "Notat"-kolonnen-visningen for invoice-rader med en `<Link to={"/fakturaer/" + h.invoice_id}>{invoice_number}</Link>` (eller egen kolonne "Faktura"). Bruk `react-router-dom` `Link` med `text-app underline-offset-2 hover:underline`-klasser. Cross-app nav er ren intern routing siden alle apper deler samme shell — samme pattern som `INTERNAL_ROUTES` i `AppTabs.tsx`.
+- Ryd opp: gi `n` et meningsfylt navn (`usePriceHistory`) i samme slengen og oppdater eneste consumer.
 
-**Helper-funksjon (SECURITY DEFINER):**
-- `public.has_ravarer_access(_user_id uuid, _legal_entity_id uuid, _min_level text)` — returnerer boolean. Brukes i alle RLS-policyer for å unngå rekursjon.
-- `public.is_ravarer_owner(_user_id uuid)` — sjekker `is_owner`-flagg via `user_positions` → `positions`.
+## 3. Klikkbart råvarenavn på faktura-detaljsiden
 
-**RLS-mønster på alle org-eide tabeller:**
-- SELECT: tilgang til `legal_entity_id` ELLER `is_ravarer_owner = true`
-- INSERT/UPDATE/DELETE: `has_ravarer_access(..., 'editor')` på `legal_entity_id` (eier kan ikke skrive — read-only på tvers)
-- Child-tabeller (`raw_material_nutrition`, `_allergens`, `_suppliers`, `_aliases`, `_price_history`) sjekker via parent's `legal_entity_id`.
+Fil: `src/fakturaer/pages/InvoiceDetail.tsx`.
 
-## App-rute og navigasjon
+- Utvid `invoice_lines`-select til å hente `raw_material_id, raw_materials(id, name, sku)`.
+- Bytt ut "Beskrivelse"-cellen til å rendre, hvis matchet:
+  - `<Link to={"/ravarer/vareliste/" + l.raw_materials.id}>{l.raw_materials.name}</Link>` med subtle muted underline + originalbeskrivelse som liten grå tekst under.
+  - Ellers fall tilbake til ren `description` som i dag.
+- Sjekk faktisk routing-path i `App.tsx` for råvare-detalj — bekreft at det er `/ravarer/vareliste/:id` (basert på `RawMaterialDetail.tsx` som navigerer tilbake dit). Bruk den faktiske path.
 
-- Ny rute: `/ravarer` med `AppAccessGuard appCode="ravarer"`
-- Følger `/varer`-mønsteret: egen `RavarerAppProvider`, egen `AppHeaderBanner`, sub-nav med pille-styling
-- Sidebar/sub-nav: **Vareliste** (default), **Kategorier** (admin), **Import** (CSV)
+## 4. "Se prishistorikk"-snarvei på matchede linjer
 
-## Modul A — Råvareregister
+Samme fil. Legg til en ekstra kolonne lengst til høyre (eller en liten ikonknapp i SKU-kolonnen) — kun synlig når `raw_material_id` er satt:
 
-**`/ravarer/vareliste`** — listeside
-- Tabell (shadcn): SKU, Navn, Kategori, Primær leverandør, Kostpris (kr/enhet), Sist oppdatert, Status-badge
-- Søk på navn/SKU + filtre: kategori, leverandør, aktiv, "mangler næring", "mangler allergen", "mangler avtalt pris"
-- Knapper: **Ny råvare** (modal), **Importer CSV**, **Eksporter CSV**
+```
+<Button variant="ghost" size="icon" asChild>
+  <Link to={"/ravarer/vareliste/" + rmId + "?tab=suppliers"} title="Se prishistorikk">
+    <LineChart className="h-4 w-4" />
+  </Link>
+</Button>
+```
 
-**`/ravarer/vareliste/:id`** — detaljside med 6 tabs:
-1. Oversikt — grunndata + lager
-2. Næring & deklarasjon (Modul B)
-3. Leverandører & priser (Modul C)
-4. Prisinnsikt (Pulje 3 — placeholder nå)
-5. Brukt i oppskrifter (Pulje 3 — placeholder)
-6. Fakturahistorikk (Pulje 2 — placeholder)
-
-**Validering:**
-- SKU unikt pr `legal_entity_id` (DB-constraint + form-feedback)
-- `current_cost_price >= 0`
-- Hvis `is_packaging = true` skjul tabs 2 (næring/allergen)
-
-**CSV-import** (`/ravarer/import`)
-- Last opp CSV → kolonne-mapping-UI → preview med valideringsfeil → atomisk insert
-- Felter: sku, navn, kategori, base_unit, package_size, package_unit, primary_supplier (navn-oppslag), agreed_price
-
-**Kategoristyring** (`/ravarer/innstillinger/kategorier`)
-- Enkel CRUD-side. Kategorier lagres på `raw_materials.category` (text). Forenklet løsning: bare distinct-liste med rename-funksjon (UPDATE av matchende rader). Defaults seedes første gang: mel, sukker, fett, frø, frukt/bær, smaksetting, melkeprodukter, egg, emballasje.
-
-## Modul B — Næring og deklarasjon
-
-Egen tab på detaljsiden.
-
-**Næring pr 100 g** (react-hook-form + zod):
-- Energi (kJ/kcal) — auto-beregn fra makro hvis tomt: `kJ = 37·fett + 17·karbo + 17·protein + 8·fiber`, `kcal = kJ/4.184`. Overstyrbart med "Bruk auto"-knapp.
-- Fett, mettet fett, karbo, sukker, fiber, protein, salt
-- Validering: sum ≤ 100 g (warning, ikke blokkerende)
-
-**Deklarasjon:**
-- Tekstfelt "Ingrediensdeklarasjon"
-- Allergen-grid: 24 allergener × 3 tilstander (inneholder / kan inneholde spor / fri for) som radio
-- E-nummer-tags med autocomplete fra fast liste (E100–E1525, statisk JSON i frontend)
-- Opprinnelsesland: ISO 3166 alpha-2 dropdown + "EU"/"Ikke-EU"
-
-**Datablad:**
-- Filopplasting til `raw-material-datasheets` (path: `{legal_entity_id}/{raw_material_id}/{filename}`)
-- PDF-preview (object-tag)
-- "Verifisert"-knapp setter `verified_at` + `verified_by`
-
-## Modul C — Leverandører og prishistorikk
-
-Egen tab på detaljsiden.
-
-**Leverandørliste:**
-- Tabell: leverandør, supplier_sku, supplier_product_name, pakning, avtalt pris, sist fakturert (kommer i Pulje 2 — vis "—" nå), primær-badge
-- Knapper: **Legg til leverandør** (modal), rad-klikk = edit
-- Avtaledokument-opplasting til `supplier-agreements`, utløpsdato med fargekoding (rød < 30 d, gul < 90 d)
-
-**Prishistorikk-graf** (recharts `LineChart`):
-- En linje pr leverandør, avtalt pris som horisontal stipla referanse
-- Markører pr observasjon med tooltip (dato, pris, kilde, leverandør)
-- Periodevelger: 3M / 6M / 1Å / 3Å / Alt
-
-**Manuell prisregistrering** (modal):
-- Felter: pris, dato, leverandør, kilde (`manual`/`agreement`/`price_list`), notat
-- Sjekkboks "Sett som gjeldende pris" → oppdaterer `raw_materials.current_cost_price` + `price_updated_at` + `price_source`
-- Skriver alltid til `raw_material_price_history`
-
-**Tabell under graf:**
-- All historikk, sorterbar, CSV-eksport
+For at lenken faktisk skal lande på prishistorikk-grafen: utvid `RawMaterialDetail.tsx` til å lese `?tab=` query-param og sette som `defaultValue`/`value` på `<Tabs>`. Liten endring, ingen state-mutasjon.
 
 ## Tekniske detaljer
 
-- **Frontend-mappe**: `src/ravarer/` (følger `varer/`/`kunder/`-mønster) med `pages/`, `components/`, `hooks/`, `lib/`, `context/`
-- **Datahenting**: `@tanstack/react-query` med `useLegalEntity` for tenant-context (henter aktiv legal_entity fra `SelectionProvider`)
-- **Skjemaer**: `react-hook-form` + `zod`
-- **UI**: shadcn-komponenter, semantic tokens, samme bakeri-pille-styling som resten
-- **Norsk språk** overalt (UI, valideringsmeldinger, toasts via sonner)
-- **Norsk tallformat**: bruk `Intl.NumberFormat('nb-NO')` for pris/mengde
-- **Routes registreres** i `src/App.tsx` med `Shell` + `AppAccessGuard` + `RavarerAppProvider`-wrapper
+- Ingen design-tokens brytes; bruk `text-app`, `text-ink-secondary`, `hover:underline`.
+- Ingen ny routing — alt fungerer via eksisterende `BrowserRouter` siden Fakturaer og Råvarer deler shell.
+- Migrasjonen er idempotent (`ON CONFLICT (position_id, app_id) DO NOTHING`).
+- Ingen endringer i edge functions eller match-pipeline.
 
-## Definition of Done — Pulje 1
+## Filer som endres
 
-1. Bruker med `editor`-tilgang til `ravarer` for et `legal_entity` kan opprette, redigere og slette en råvare
-2. Næring (med auto-energi) og 24 allergener kan registreres og vises riktig
-3. Datablad og avtaledokument kan lastes opp og åpnes
-4. Leverandører kan kobles til råvare med avtalt pris og pakning
-5. Manuell prisregistrering oppdaterer `current_cost_price` og lager rad i historikken
-6. Prisgraf viser historikk pr leverandør med avtalt pris som referanse
-7. CSV-import fungerer atomisk med validering
-8. Eier-konto (position med `is_owner = true`) ser råvarer på tvers av alle legal entities (read-only)
-9. Alle tabeller har RLS aktivert; ingen lekkasje på tvers av tenants for ikke-eiere
+- `supabase/migrations/<ny>.sql` — gi posisjonstilgang til Fakturaer
+- `src/ravarer/hooks/useRmSuppliers.ts` — rename `n` → `usePriceHistory`, hent `invoice_id` + `invoices.invoice_number`
+- `src/ravarer/components/tabs/SuppliersTab.tsx` — bruk nytt navn + render fakturalenke
+- `src/fakturaer/pages/InvoiceDetail.tsx` — hent `raw_materials`, gjør navn klikkbart, legg til prishistorikk-knapp
+- `src/ravarer/pages/RawMaterialDetail.tsx` — les `?tab=` query-param
 
-Pulje 2 (faktura/matching) og Pulje 3 (innsikt/SSB/varsler) bygges separat etter at Pulje 1 er testet på reelle data.
+Etter dette kjører vi Steg 4 (faktura-godkjenning, prisavviks-håndtering).
