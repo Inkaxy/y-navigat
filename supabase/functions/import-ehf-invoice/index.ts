@@ -147,7 +147,7 @@ Deno.serve(async (req) => {
     // ---- Verify user has invoice_access on this legal entity ----
     const { data: hasAccess, error: accessErr } = await supabaseAuthed.rpc(
       "has_ravarer_invoice_access",
-      { _user_id: user.id, _legal_entity_id: legalEntity.id, _required: "write" },
+      { _legal_entity_id: legalEntity.id, _required_level: "write" },
     );
     if (accessErr) throw accessErr;
     if (!hasAccess) {
