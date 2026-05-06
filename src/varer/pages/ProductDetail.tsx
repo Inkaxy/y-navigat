@@ -58,6 +58,7 @@ const TABS: TabConfig[] = [
   { type: "separator", id: "sep1" },
   { type: "tab", id: "varianter", label: "Varianter", icon: GitBranch },
   { type: "tab", id: "oppskrift", label: "Oppskrift", icon: ChefHat },
+  { type: "tab", id: "deklarasjon", label: "Deklarasjon", icon: ScrollText },
   { type: "tab", id: "priser", label: "Priser", icon: Receipt },
   { type: "separator", id: "sep2" },
   { type: "tab", id: "sortiment", label: "Sortiment", icon: ListChecks },
