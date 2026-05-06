@@ -172,6 +172,13 @@ const App = () => (
               <Route path="/ravarer" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><Navigate to="/ravarer/vareliste" replace /></RavarerProvider></AppAccessGuard></Shell>} />
               <Route path="/ravarer/vareliste" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><RavarerVareliste /></RavarerProvider></AppAccessGuard></Shell>} />
               <Route path="/ravarer/vareliste/:id" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><RavarerDetail /></RavarerProvider></AppAccessGuard></Shell>} />
+
+              <Route path="/fakturaer" element={<Shell><AppAccessGuard appCode="fakturaer" appName="Fakturaer"><FakturaerProvider><FakturaerList /></FakturaerProvider></AppAccessGuard></Shell>} />
+              <Route path="/fakturaer/ny" element={<Shell><AppAccessGuard appCode="fakturaer" appName="Fakturaer"><FakturaerProvider><FakturaerNew /></FakturaerProvider></AppAccessGuard></Shell>} />
+              <Route path="/fakturaer/import-ehf" element={<Shell><AppAccessGuard appCode="fakturaer" appName="Fakturaer"><FakturaerProvider><FakturaerImportEhf /></FakturaerProvider></AppAccessGuard></Shell>} />
+              <Route path="/fakturaer/import-pdf" element={<Shell><AppAccessGuard appCode="fakturaer" appName="Fakturaer"><FakturaerProvider><FakturaerImportPdf /></FakturaerProvider></AppAccessGuard></Shell>} />
+              <Route path="/fakturaer/:id" element={<Shell><AppAccessGuard appCode="fakturaer" appName="Fakturaer"><FakturaerProvider><FakturaerDetail /></FakturaerProvider></AppAccessGuard></Shell>} />
+
               <Route path="/ordre" element={<AppRoute code="ordre" name="Ordre" icon="ShoppingCart" />} />
               <Route path="/produksjon" element={<Shell><AppAccessGuard appCode="produksjon" appName="Produksjon"><Navigate to="/produksjon/oversikt" replace /></AppAccessGuard></Shell>} />
               <Route path="/produksjon/oversikt" element={<Shell><AppAccessGuard appCode="produksjon" appName="Produksjon"><ProduksjonOversikt /></AppAccessGuard></Shell>} />
