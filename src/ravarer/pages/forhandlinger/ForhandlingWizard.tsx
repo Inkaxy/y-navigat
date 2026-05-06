@@ -97,10 +97,13 @@ export default function ForhandlingWizard() {
   const [selectedRm, setSelectedRm] = useState<Set<string>>(new Set());
 
   // baseline stats lookup via existing list_raw_material_purchase_stats
+  const { legalEntityId } = useRavarer();
   const { data: stats = [] } = useQuery({
-    queryKey: ["rm-purchase-stats-365"],
+    queryKey: ["rm-purchase-stats-365", legalEntityId],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("list_raw_material_purchase_stats" as any);
+      const { data, error } = await supabase.rpc("list_raw_material_purchase_stats" as any, {
+        p_legal_entity_id: legalEntityId,
+      });
       if (error) throw error;
       return (data ?? []) as any[];
     },
