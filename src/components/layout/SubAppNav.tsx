@@ -37,7 +37,7 @@ const SUBMENUS: Record<string, { prefix: string; appSlug: string; items: SubItem
       { to: "/fakturaer/ny", label: "Ny faktura" },
       { to: "/fakturaer/import-ehf", label: "Importer EHF" },
       { to: "/fakturaer/import-pdf", label: "Last opp PDF" },
-      { to: "/fakturaer/til-behandling", label: "Til behandling" },
+      // { to: "/fakturaer/til-behandling", label: "Til behandling" }, // kommer i Steg 3
     ],
   },
   kunder: {
