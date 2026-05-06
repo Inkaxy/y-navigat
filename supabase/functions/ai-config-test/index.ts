@@ -1,7 +1,9 @@
 // Test an AI provider config without saving it. Sends a tiny prompt and verifies a 200 response.
+// If api_key is omitted, falls back to the currently saved config for the given purpose.
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { callAi, type AiProvider } from "../_shared/ai-providers.ts";
+import { decryptWithKey } from "../_shared/crypto.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -33,8 +35,33 @@ Deno.serve(async (req) => {
     if (!isAdmin) return jsonErr("Forbidden", 403);
 
     const body = await req.json().catch(() => ({}));
-    const { provider, api_key, model, azure_endpoint, azure_deployment } = body;
-    if (!provider || !api_key || !model) return jsonErr("provider, api_key, model påkrevd", 400);
+    let { provider, api_key, model, azure_endpoint, azure_deployment } = body;
+    const purpose = body.purpose ?? "invoice_extraction";
+
+    // Fallback: bruk lagret konfig hvis api_key ikke er oppgitt
+    if (!api_key) {
+      const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+      const admin = createClient(supabaseUrl, serviceKey);
+      const { data: cfg, error: cfgErr } = await admin
+        .from("ai_provider_config")
+        .select("provider, model, encrypted_api_key, azure_endpoint, azure_deployment")
+        .eq("purpose", purpose)
+        .eq("is_active", true)
+        .maybeSingle();
+      if (cfgErr) return jsonErr(`Kunne ikke hente lagret konfig: ${cfgErr.message}`, 500);
+      if (!cfg) return jsonErr("Ingen lagret AI-konfig — lim inn API-key for å teste", 400);
+      try {
+        api_key = await decryptWithKey(cfg.encrypted_api_key, "AI_CONFIG_ENCRYPTION_KEY");
+      } catch (e) {
+        return jsonErr(`Dekryptering feilet: ${(e as Error).message}`, 500);
+      }
+      provider = provider ?? cfg.provider;
+      model = model ?? cfg.model;
+      azure_endpoint = azure_endpoint ?? cfg.azure_endpoint;
+      azure_deployment = azure_deployment ?? cfg.azure_deployment;
+    }
+
+    if (!provider || !model) return jsonErr("provider og model påkrevd", 400);
 
     const result = await callAi({
       provider: provider as AiProvider,
