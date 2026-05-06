@@ -166,6 +166,16 @@ export default function InvoiceDetailPage() {
                     const rm = l.raw_materials as { id: string; name: string; sku: string | null } | null;
                     return (
                       <tr key={l.id} className="border-t border-line-subtle align-top">
+                        {canBulkImport && (
+                          <td className="px-2 py-3">
+                            {!rm && (
+                              <Checkbox
+                                checked={!!selected[l.id]}
+                                onCheckedChange={(c) => setSelected((s) => ({ ...s, [l.id]: !!c }))}
+                              />
+                            )}
+                          </td>
+                        )}
                         <td className="px-4 py-3 font-mono text-xs">{l.supplier_sku ?? "—"}</td>
                         <td className="px-4 py-3">
                           {rm ? (
