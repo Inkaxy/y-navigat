@@ -251,7 +251,7 @@ Deno.serve(async (req) => {
         description: desc,
         supplier_sku: supplierItemNumber,
         quantity: qty,
-        unit: unitCode,
+        unit: normalizeUnit(unitCode) ?? unitCode,
         unit_price: unitPrice,
         total_amount: lineNet,
       };
