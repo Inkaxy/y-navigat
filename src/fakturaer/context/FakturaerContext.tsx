@@ -2,16 +2,16 @@ import { createContext, useContext, useEffect, useState, ReactNode } from "react
 import { useQuery } from "@tanstack/react-query";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
-import { APP_CODE } from "@/fakturaer/lib/constants";
+import { useInvoiceAccess } from "@/ravarer/hooks/useInvoiceAccess";
 
-// Access-nivåer matcher app_access_level i DB. "approve" beholdes for kompatibilitet
-// men brukes i NBhub-kontekst som rett til å avstemme/reconciliere fakturaer mot avtaler.
+// Tilgang er nå basert på Råvarer-appens access_level + invoice_access flag.
 export type AccessLevel = "none" | "read" | "write" | "approve" | "admin";
 
 interface FakturaerContextValue {
   loading: boolean;
   session: Session | null;
   accessLevel: AccessLevel;
+  hasInvoiceAccess: boolean;
   canRead: boolean;
   canWrite: boolean;
   canReconcile: boolean;
@@ -34,25 +34,32 @@ export function FakturaerProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const accessQuery = useQuery({
-    queryKey: ["fakturaer-access-level", session?.user.id],
+    queryKey: ["ravarer-access-level", session?.user.id],
     enabled: !!session?.user.id,
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("app_access_level", { p_app_code: APP_CODE });
+      const { data, error } = await supabase.rpc("app_access_level", { p_app_code: "ravarer" });
       if (error) throw error;
       return (data as AccessLevel) ?? "none";
     },
   });
 
-  const accessLevel: AccessLevel = accessQuery.data ?? "none";
+  const invoiceAccess = useInvoiceAccess();
+
+  const ravarerLevel: AccessLevel = accessQuery.data ?? "none";
+  const hasInvoiceAccess = !!invoiceAccess.data;
+  // Effektiv tilgangsnivå for fakturaer = ravarer-nivå hvis invoice_access, ellers none.
+  const accessLevel: AccessLevel = hasInvoiceAccess ? ravarerLevel : "none";
   const canRead = accessLevel !== "none";
   const canWrite = ["write", "approve", "admin"].includes(accessLevel);
-  const canReconcile = ["approve", "admin"].includes(accessLevel);
+  const canReconcile = ["write", "admin"].includes(accessLevel);
   const canAdmin = accessLevel === "admin";
 
-  const loading = authLoading || (!!session && accessQuery.isLoading);
+  const loading =
+    authLoading ||
+    (!!session && (accessQuery.isLoading || invoiceAccess.isLoading));
 
   return (
-    <Ctx.Provider value={{ loading, session, accessLevel, canRead, canWrite, canReconcile, canAdmin }}>
+    <Ctx.Provider value={{ loading, session, accessLevel, hasInvoiceAccess, canRead, canWrite, canReconcile, canAdmin }}>
       {children}
     </Ctx.Provider>
   );
