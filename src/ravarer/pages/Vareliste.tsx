@@ -38,14 +38,28 @@ export default function VarelistePage() {
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    return rows.filter(r => {
+    const arr = rows.filter(r => {
       if (active === "active" && !r.is_active) return false;
       if (active === "inactive" && r.is_active) return false;
       if (cat !== "all" && r.category !== cat) return false;
       if (needle && !`${r.name} ${r.sku}`.toLowerCase().includes(needle)) return false;
       return true;
     });
-  }, [rows, q, cat, active]);
+    arr.sort((a, b) => {
+      if (sortKey === "volume_12m") {
+        const va = statsMap?.get(a.id)?.quantity_12m ?? 0;
+        const vb = statsMap?.get(b.id)?.quantity_12m ?? 0;
+        return sortDir === "asc" ? va - vb : vb - va;
+      }
+      return sortDir === "asc" ? a.name.localeCompare(b.name, "nb") : b.name.localeCompare(a.name, "nb");
+    });
+    return arr;
+  }, [rows, q, cat, active, sortKey, sortDir, statsMap]);
+
+  const toggleSort = (k: SortKey) => {
+    if (sortKey === k) setSortDir(d => (d === "asc" ? "desc" : "asc"));
+    else { setSortKey(k); setSortDir(k === "volume_12m" ? "desc" : "asc"); }
+  };
 
   return (
     <div className="space-y-5">
