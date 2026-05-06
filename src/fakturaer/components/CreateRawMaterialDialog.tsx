@@ -61,8 +61,10 @@ export function CreateRawMaterialDialog({ open, onOpenChange, line }: Props) {
       const nowIso = new Date().toISOString();
 
       // 1) Raw material
+      const skuGen = (line.supplier_sku?.trim() || name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 32)) + "-" + Math.random().toString(36).slice(2, 6);
       const { data: rm, error: rmErr } = await supabase.from("raw_materials").insert({
         legal_entity_id: line.invoice.legal_entity_id,
+        sku: skuGen,
         name: name.trim(), category, base_unit: baseUnit,
         package_size: packageSize ? Number(packageSize) : null,
         package_unit: packageUnit || null,
