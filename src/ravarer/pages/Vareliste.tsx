@@ -109,16 +109,27 @@ export default function VarelistePage() {
               <thead className="bg-muted/30 text-left text-xs uppercase tracking-wider text-ink-secondary">
                 <tr>
                   <th className="px-4 py-3">SKU</th>
-                  <th className="px-4 py-3">Navn</th>
+                  <th className="px-4 py-3">
+                    <button onClick={() => toggleSort("name")} className="inline-flex items-center gap-1 hover:text-ink-primary">
+                      Navn <ArrowUpDown className="h-3 w-3" />
+                    </button>
+                  </th>
                   <th className="px-4 py-3">Kategori</th>
                   <th className="px-4 py-3">Leverandør</th>
                   <th className="px-4 py-3 text-right">Kostpris</th>
+                  <th className="px-4 py-3 text-right">
+                    <button onClick={() => toggleSort("volume_12m")} className="inline-flex items-center gap-1 hover:text-ink-primary">
+                      Volum 12mnd <ArrowUpDown className="h-3 w-3" />
+                    </button>
+                  </th>
                   <th className="px-4 py-3">Sist oppdatert</th>
                   <th className="px-4 py-3">Status</th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(r => (
+                {filtered.map(r => {
+                  const s = statsMap?.get(r.id);
+                  return (
                   <tr
                     key={r.id}
                     onClick={() => navigate(`/ravarer/vareliste/${r.id}`)}
@@ -129,6 +140,11 @@ export default function VarelistePage() {
                     <td className="px-4 py-3 text-ink-secondary">{r.category ?? "—"}</td>
                     <td className="px-4 py-3 text-ink-secondary">{r.primary_supplier_id ? supplierMap.get(r.primary_supplier_id) ?? "—" : "—"}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{formatNok(r.current_cost_price)} <span className="text-xs text-ink-secondary">/ {r.base_unit}</span></td>
+                    <td className="px-4 py-3 text-right tabular-nums">
+                      {s && s.quantity_12m > 0
+                        ? <>{formatNumber(s.quantity_12m, 0)} <span className="text-xs text-ink-secondary">{r.base_unit}</span></>
+                        : <span className="text-ink-secondary">—</span>}
+                    </td>
                     <td className="px-4 py-3 text-ink-secondary">{formatDate(r.price_updated_at)}</td>
                     <td className="px-4 py-3">
                       {r.is_packaging && <Badge variant="outline" className="mr-1">Emballasje</Badge>}
@@ -139,7 +155,8 @@ export default function VarelistePage() {
                       )}
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
