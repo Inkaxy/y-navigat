@@ -6529,6 +6529,80 @@ export type Database = {
           },
         ]
       }
+      raw_material_purchase_stats: {
+        Row: {
+          avg_monthly_volume: number | null
+          avg_price_per_base_unit_12m: number | null
+          cost_12m: number | null
+          cost_24m: number | null
+          cost_30d: number | null
+          cost_90d: number | null
+          has_package_size_warning: boolean | null
+          invoice_count_12m: number | null
+          invoice_count_30d: number | null
+          invoice_count_90d: number | null
+          last_invoice_date: string | null
+          legal_entity_id: string | null
+          quantity_12m: number | null
+          quantity_24m: number | null
+          quantity_30d: number | null
+          quantity_90d: number | null
+          raw_material_id: string | null
+          supplier_count_12m: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_lines_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "raw_materials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_legal_entity_id_fkey"
+            columns: ["legal_entity_id"]
+            isOneToOne: false
+            referencedRelation: "legal_entities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      raw_material_supplier_purchase_stats: {
+        Row: {
+          cost_12m: number | null
+          cost_24m: number | null
+          invoice_count_12m: number | null
+          last_invoice_date: string | null
+          legal_entity_id: string | null
+          quantity_12m: number | null
+          quantity_24m: number | null
+          raw_material_id: string | null
+          supplier_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_lines_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "raw_materials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_legal_entity_id_fkey"
+            columns: ["legal_entity_id"]
+            isOneToOne: false
+            referencedRelation: "legal_entities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       recipe_nutrition_calculated: {
         Row: {
           carbs_g_per_100g: number | null
@@ -6755,6 +6829,35 @@ export type Database = {
           status: string
         }[]
       }
+      get_raw_material_purchase_stats: {
+        Args: { p_raw_material_id: string }
+        Returns: {
+          avg_monthly_volume: number | null
+          avg_price_per_base_unit_12m: number | null
+          cost_12m: number | null
+          cost_24m: number | null
+          cost_30d: number | null
+          cost_90d: number | null
+          has_package_size_warning: boolean | null
+          invoice_count_12m: number | null
+          invoice_count_30d: number | null
+          invoice_count_90d: number | null
+          last_invoice_date: string | null
+          legal_entity_id: string | null
+          quantity_12m: number | null
+          quantity_24m: number | null
+          quantity_30d: number | null
+          quantity_90d: number | null
+          raw_material_id: string | null
+          supplier_count_12m: number | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "raw_material_purchase_stats"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       get_recurring_items_for_delivery: {
         Args: { _delivery_date: string; _legal_entity_id: string }
         Returns: {
@@ -6830,6 +6933,55 @@ export type Database = {
           name: string
           sort_order: number
         }[]
+      }
+      list_raw_material_purchase_stats: {
+        Args: { p_legal_entity_id: string }
+        Returns: {
+          avg_monthly_volume: number | null
+          avg_price_per_base_unit_12m: number | null
+          cost_12m: number | null
+          cost_24m: number | null
+          cost_30d: number | null
+          cost_90d: number | null
+          has_package_size_warning: boolean | null
+          invoice_count_12m: number | null
+          invoice_count_30d: number | null
+          invoice_count_90d: number | null
+          last_invoice_date: string | null
+          legal_entity_id: string | null
+          quantity_12m: number | null
+          quantity_24m: number | null
+          quantity_30d: number | null
+          quantity_90d: number | null
+          raw_material_id: string | null
+          supplier_count_12m: number | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "raw_material_purchase_stats"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      list_supplier_purchase_stats: {
+        Args: { p_supplier_id: string }
+        Returns: {
+          cost_12m: number | null
+          cost_24m: number | null
+          invoice_count_12m: number | null
+          last_invoice_date: string | null
+          legal_entity_id: string | null
+          quantity_12m: number | null
+          quantity_24m: number | null
+          raw_material_id: string | null
+          supplier_id: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "raw_material_supplier_purchase_stats"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       next_customer_number: {
         Args: { p_legal_entity_id: string; p_profile_id: string }
@@ -7037,6 +7189,7 @@ export type Database = {
           total_events: number
         }[]
       }
+      refresh_purchase_stats: { Args: never; Returns: undefined }
       rename_raw_material: {
         Args: { p_id: string; p_name: string }
         Returns: {
