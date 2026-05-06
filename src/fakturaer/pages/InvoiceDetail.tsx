@@ -1,14 +1,16 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Loader2, LineChart as LineChartIcon, CheckCircle2, Flag } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ArrowLeft, Loader2, LineChart as LineChartIcon, CheckCircle2, Flag, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { FakturaerHeaderBanner } from "@/fakturaer/components/FakturaerHeaderBanner";
 import { InvoiceStatusBadge } from "@/fakturaer/components/InvoiceStatusBadge";
 import { ConfirmReconcileDialog } from "@/fakturaer/components/ConfirmReconcileDialog";
 import { FlagInvoiceDialog } from "@/fakturaer/components/FlagInvoiceDialog";
+import { BulkImportRawMaterialsDrawer } from "@/fakturaer/components/BulkImportRawMaterialsDrawer";
 import { useFakturaer } from "@/fakturaer/context/FakturaerContext";
 import { formatNok, formatDate, INVOICE_SOURCES } from "@/fakturaer/lib/constants";
 
