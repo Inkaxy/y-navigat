@@ -81,7 +81,8 @@ export function SubAppNav() {
           { to: "/ravarer/fakturaer/ny", label: "Ny faktura" },
           { to: "/ravarer/fakturaer/import-ehf", label: "Importer EHF" },
           { to: "/ravarer/fakturaer/import-pdf", label: "Last opp PDF" },
-          { to: "/ravarer/innstillinger/tripletex", label: "Innstillinger" },
+          { to: "/ravarer/innstillinger/tripletex", label: "Tripletex" },
+          { to: "/ravarer/innstillinger/ai-tjenester", label: "AI-tjenester" },
         ]
       : match.appSlug === "ravarer"
         ? [{ to: "/ravarer/vareliste", label: "Vareliste" }]
