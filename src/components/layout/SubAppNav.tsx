@@ -29,20 +29,6 @@ interface DropdownItem {
 type NavItem = SimpleItem | DropdownItem;
 
 const STATIC_SUBMENUS: Record<string, { prefix: string; appSlug: string; items: NavItem[] }> = {
-  varer: {
-    prefix: "/varer",
-    appSlug: "varer",
-    items: [
-      { kind: "link", to: "/varer/vareliste", label: "Vareliste" },
-      { kind: "link", to: "/varer/priser", label: "Priser" },
-      { kind: "link", to: "/varer/spesialpriser", label: "Spesialpriser" },
-      { kind: "link", to: "/varer/kakebygger", label: "Kakebygger" },
-      { kind: "link", to: "/varer/oppskrifter", label: "Oppskrifter" },
-      { kind: "link", to: "/varer/sortiment", label: "Sortiment" },
-      { kind: "link", to: "/varer/avvik", label: "Avvik" },
-      { kind: "link", to: "/varer/innstillinger", label: "Innstillinger" },
-    ],
-  },
   kunder: {
     prefix: "/kunder",
     appSlug: "kunder",
@@ -74,8 +60,10 @@ const STATIC_SUBMENUS: Record<string, { prefix: string; appSlug: string; items: 
 export function SubAppNav() {
   const { pathname } = useLocation();
   const isRavarer = pathname === "/ravarer" || pathname.startsWith("/ravarer/");
+  const isVarer = pathname === "/varer" || pathname.startsWith("/varer/");
 
   if (isRavarer) return <RavarerNav />;
+  if (isVarer) return <VarerNav />;
 
   const staticMatch = Object.values(STATIC_SUBMENUS).find(
     (s) => pathname === s.prefix || pathname.startsWith(s.prefix + "/"),
@@ -134,6 +122,44 @@ function RavarerNav() {
   }
 
   return <NavBar appSlug="ravarer" items={items} />;
+}
+
+function VarerNav() {
+  const { data: cleanupCount = 0 } = useQuery({
+    queryKey: ["varer-cleanup-count"],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("recipes")
+        .select("id, products!inner(legal_entity_id)", { count: "exact", head: true })
+        .eq("requires_cleanup", true)
+        .is("valid_to", null)
+        .eq("products.legal_entity_id", "751709bc-04b3-4449-867d-b97faa9ab373");
+      if (error) return 0;
+      return count ?? 0;
+    },
+    staleTime: 60_000,
+  });
+
+  const items: NavItem[] = [
+    { kind: "link", to: "/varer/vareliste", label: "Vareliste" },
+    { kind: "link", to: "/varer/priser", label: "Priser" },
+    { kind: "link", to: "/varer/spesialpriser", label: "Spesialpriser" },
+    { kind: "link", to: "/varer/kakebygger", label: "Kakebygger" },
+    {
+      kind: "dropdown",
+      label: "Oppskrifter",
+      basePath: "/varer/oppskrifter",
+      links: [
+        { to: "/varer/oppskrifter", label: "Alle oppskrifter" },
+        { to: "/varer/oppskrifter/krever-opprydding", label: "Krever opprydding", badge: cleanupCount },
+      ],
+    },
+    { kind: "link", to: "/varer/sortiment", label: "Sortiment" },
+    { kind: "link", to: "/varer/avvik", label: "Avvik" },
+    { kind: "link", to: "/varer/innstillinger", label: "Innstillinger" },
+  ];
+
+  return <NavBar appSlug="varer" items={items} />;
 }
 
 function NavBar({ appSlug, items }: { appSlug: string; items: NavItem[] }) {

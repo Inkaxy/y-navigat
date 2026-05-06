@@ -35,6 +35,7 @@ import VarerPriceLists from "@/varer/pages/PriceLists";
 import VarerPriceListDetail from "@/varer/pages/PriceListDetail";
 import VarerSpecialPrices from "@/varer/pages/SpecialPrices";
 import VarerRecipes from "@/varer/pages/Recipes";
+import VarerRecipesCleanup from "@/varer/pages/RecipesCleanup";
 import VarerPlaceholder from "@/varer/pages/PlaceholderPage";
 import VarerCakeBuilderList from "@/varer/pages/cakebuilder/CakeBuilderList";
 import VarerCakeBuilderDetail from "@/varer/pages/cakebuilder/CakeBuilderDetail";
@@ -161,6 +162,7 @@ const App = () => (
               <Route path="/varer/priser/:id" element={<Shell><AppAccessGuard appCode="varer" appName="Varer"><VarerAppProvider><VarerPriceListDetail /></VarerAppProvider></AppAccessGuard></Shell>} />
               <Route path="/varer/spesialpriser" element={<Shell><AppAccessGuard appCode="varer" appName="Varer"><VarerAppProvider><VarerSpecialPrices /></VarerAppProvider></AppAccessGuard></Shell>} />
               <Route path="/varer/oppskrifter" element={<Shell><AppAccessGuard appCode="varer" appName="Varer"><VarerAppProvider><VarerRecipes /></VarerAppProvider></AppAccessGuard></Shell>} />
+              <Route path="/varer/oppskrifter/krever-opprydding" element={<Shell><AppAccessGuard appCode="varer" appName="Varer"><VarerAppProvider><VarerRecipesCleanup /></VarerAppProvider></AppAccessGuard></Shell>} />
               <Route path="/varer/kakebygger" element={<Shell><AppAccessGuard appCode="varer" appName="Varer"><VarerAppProvider><VarerCakeBuilderList /></VarerAppProvider></AppAccessGuard></Shell>} />
               <Route path="/varer/kakebygger/:id" element={<Shell><AppAccessGuard appCode="varer" appName="Varer"><VarerAppProvider><VarerCakeBuilderDetail /></VarerAppProvider></AppAccessGuard></Shell>} />
               <Route path="/varer/sortiment" element={<Shell><AppAccessGuard appCode="varer" appName="Varer"><VarerAppProvider><VarerPlaceholder title="Sortiment" subtitle="Kanaler og kunder" body="Sortimentsstyring kommer når Kunder-appen er bygget." /></VarerAppProvider></AppAccessGuard></Shell>} />
