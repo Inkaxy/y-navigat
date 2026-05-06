@@ -1,7 +1,9 @@
 // Test an AI provider config without saving it. Sends a tiny prompt and verifies a 200 response.
+// If api_key is omitted, falls back to the currently saved config for the given purpose.
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { callAi, type AiProvider } from "../_shared/ai-providers.ts";
+import { decryptWithKey } from "../_shared/crypto.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
