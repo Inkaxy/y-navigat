@@ -88,7 +88,7 @@ Deno.serve(async (req) => {
     // Verify access
     const { data: hasAccess, error: accessErr } = await supabaseAuthed.rpc(
       "has_ravarer_invoice_access",
-      { _user_id: user.id, _legal_entity_id: legalEntityId, _required: "write" },
+      { _legal_entity_id: legalEntityId, _required_level: "write" },
     );
     if (accessErr) throw accessErr;
     if (!hasAccess) return jsonErr("Mangler skrivetilgang for fakturaer på dette selskapet", 403);
