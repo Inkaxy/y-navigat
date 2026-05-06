@@ -49,7 +49,9 @@ Deno.serve(async (req) => {
         price: l.price_per_base_unit ?? l.unit_price,
         source: "invoice",
         invoice_id: invoice.id,
-        observed_at: invoice.invoice_date,
+        effective_date: invoice.invoice_date,
+        source_reference: invoice.invoice_number,
+        created_by: userId,
       }));
 
     if (historyRows.length > 0) {
