@@ -215,7 +215,7 @@ export default function ImportPdfPage({ embedded = false }: { embedded?: boolean
           total_vat: totalVat ? Number(totalVat) : null,
           currency: currency || "NOK",
           source: "pdf_upload",
-          lines_source: lines.length > 0 ? "pdf_extracted" : null,
+          lines_source: lines.length > 0 ? "pdf_extracted" : "pending_manual",
           source_document_url: path,
           status: "imported",
           notes: kid || accountNumber
