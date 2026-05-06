@@ -53,6 +53,11 @@ export default function InvoiceDetailPage() {
   const lines = (data.invoice_lines ?? []) as any[];
   const reviewLineCount = lines.filter((l) => l.requires_review).length;
   const isFinal = ["reconciled", "flagged"].includes(data.status);
+  const unmatchedLines = lines.filter((l) => !l.raw_material_id);
+  const selectedIds = Object.keys(selected).filter((k) => selected[k]);
+  const selectedLines = unmatchedLines.filter((l) => selected[l.id]);
+  const canBulkImport = canWrite && hasInvoiceAccess && unmatchedLines.length > 0;
+
 
   return (
     <div className="space-y-5">
