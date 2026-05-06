@@ -353,11 +353,14 @@ Deno.serve(async (req) => {
       results.push({ id: line.id, status: update.match_confidence, requires_review: update.requires_review });
     }
 
-    // After pipeline: if all lines processed & none unprocessed, set invoice status to 'matched'
+    // After pipeline: set invoice status based on review-state
     const { data: stillPending } = await svc.from("invoice_lines")
       .select("id").eq("invoice_id", invoiceId).is("match_confidence", null).limit(1);
     if (!stillPending || stillPending.length === 0) {
-      await svc.from("invoices").update({ status: "matched" }).eq("id", invoiceId);
+      const { data: needsReview } = await svc.from("invoice_lines")
+        .select("id").eq("invoice_id", invoiceId).eq("requires_review", true).limit(1);
+      const newStatus = needsReview && needsReview.length > 0 ? "needs_review" : "ready";
+      await svc.from("invoices").update({ status: newStatus }).eq("id", invoiceId);
     }
 
     return json({ ok: true, processed: results.length, results });
