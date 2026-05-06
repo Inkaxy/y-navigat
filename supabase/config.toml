@@ -6,5 +6,5 @@ verify_jwt = false
 [functions.submit-negotiation-response]
 verify_jwt = false
 
-[functions.__test-rfq-flow]
+[functions.test-rfq-flow]
 verify_jwt = false
