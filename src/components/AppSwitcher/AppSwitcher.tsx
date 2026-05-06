@@ -19,6 +19,16 @@ import {
 const CURRENT_APP_SLUG = "nbhub";
 const SHOW_ALL_APPS_LINK = true; // keep true only in NBHub
 const FALLBACK_COLOR = "#64748b";
+// Apps som bor i samme React-app (samme host) → naviger internt uansett deploy_url.
+const INTERNAL_ROUTES: Record<string, string> = {
+  nbhub: "/",
+  nbos: "/admin",
+  varer: "/varer",
+  kunder: "/kunder",
+  ravarer: "/ravarer/vareliste",
+  ordre: "/ordre",
+  produksjon: "/produksjon",
+};
 // ----------------------------------------------------------------------------
 
 const iconMap = Icons as unknown as Record<string, React.ComponentType<{ className?: string }>>;
