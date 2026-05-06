@@ -72,6 +72,7 @@ const SUBMENUS: Record<string, { prefix: string; appSlug: string; items: SubItem
 export function SubAppNav() {
   const { pathname } = useLocation();
   const { data: apps } = useAccessibleApps();
+  const { data: reviewCount = 0 } = useReviewCount();
 
   const match = Object.values(SUBMENUS).find(
     (s) => pathname === s.prefix || pathname.startsWith(s.prefix + "/"),
