@@ -104,6 +104,7 @@ export function RecipeProductLinks({ recipeId, currentProductId, canWrite }: Pro
         <div className="flex flex-wrap gap-1.5 flex-1">
           {links.map((l: any) => {
             const isCurrent = l.product_id === currentProductId;
+            const extraCount = Array.isArray(l.extra_lines) ? l.extra_lines.length : 0;
             return (
               <Badge
                 key={l.id}
@@ -112,17 +113,16 @@ export function RecipeProductLinks({ recipeId, currentProductId, canWrite }: Pro
               >
                 <button
                   className="flex items-center gap-1"
-                  onClick={() => !isCurrent && navigate(`/varer/vareliste/${l.product_id}?tab=oppskrift`)}
+                  onClick={() => !isCurrent && navigate(`/varer/vareliste/${l.product_id}?tab=deklarasjon`)}
+                  title="Åpne deklarasjon for dette produktet"
                 >
                   {l.products?.display_name}
+                  {extraCount > 0 && <span className="text-[10px] opacity-70">+{extraCount}</span>}
                   {!isCurrent && <ExternalLink className="h-2.5 w-2.5 opacity-60" />}
                 </button>
                 {canWrite && !isCurrent && (
                   <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      removeLink(l.id, isCurrent);
-                    }}
+                    onClick={(e) => { e.stopPropagation(); removeLink(l.id, isCurrent); }}
                     className="hover:text-destructive"
                   >
                     <Trash2 className="h-2.5 w-2.5" />
