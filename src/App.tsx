@@ -82,6 +82,8 @@ import MatchToleranserSettings from "@/ravarer/pages/innstillinger/MatchTolerans
 import KategorierSettings from "@/ravarer/pages/innstillinger/KategorierSettings";
 import RavarerLeverandorer from "@/ravarer/pages/Leverandorer";
 import RavarerAvtaler from "@/ravarer/pages/Avtaler";
+import RavarerDatabladEndringer from "@/ravarer/pages/DatabladEndringer";
+import RavarerDatabladBulk from "@/ravarer/pages/DatabladBulk";
 
 const KunderEntityProvider = ({ children }: { children: React.ReactNode }) => {
   const { user } = useNbhubAuth();
