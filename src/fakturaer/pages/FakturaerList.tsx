@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -18,9 +18,23 @@ export default function FakturaerListPage() {
   const navigate = useNavigate();
   const { canWrite } = useFakturaer();
   const { data: entities = [] } = useFakturaerLegalEntities();
+  const [params, setParams] = useSearchParams();
   const [legalEntityId, setLegalEntityId] = useState<string>("all");
-  const [status, setStatus] = useState<string>("all");
+  const [status, setStatus] = useState<string>(params.get("status") ?? "all");
   const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    const next = new URLSearchParams(params);
+    if (status === "all") next.delete("status"); else next.set("status", status);
+    if (next.toString() !== params.toString()) setParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status]);
+
+  useEffect(() => {
+    const urlStatus = params.get("status") ?? "all";
+    if (urlStatus !== status) setStatus(urlStatus);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params]);
 
   const { data: rows = [], isLoading } = useInvoices({
     legalEntityId: legalEntityId === "all" ? null : legalEntityId,
