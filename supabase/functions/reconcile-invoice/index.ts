@@ -65,6 +65,11 @@ Deno.serve(async (req) => {
       .eq("id", invoice_id);
     if (updErr) return json({ error: updErr.message }, 500);
 
+    // Oppdater innkjøpsstatistikk (best-effort, ikke fatal)
+    svc.rpc("refresh_purchase_stats").then(({ error }) => {
+      if (error) console.error("refresh_purchase_stats", error);
+    });
+
     return json({ ok: true, history_rows: historyRows.length });
   } catch (e) {
     console.error("reconcile-invoice error", e);

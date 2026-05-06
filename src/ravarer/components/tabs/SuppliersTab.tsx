@@ -15,6 +15,7 @@ import { useRavarer } from "@/ravarer/context/RavarerContext";
 import type { RawMaterialRow } from "@/ravarer/hooks/useRawMaterials";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Legend } from "recharts";
 import { Link } from "react-router-dom";
+import { PurchaseStatsCard } from "@/ravarer/components/PurchaseStatsCard";
 
 interface Props { rm: RawMaterialRow; }
 
@@ -50,6 +51,7 @@ export function SuppliersTab({ rm }: Props) {
 
   return (
     <div className="space-y-5">
+      <PurchaseStatsCard rawMaterialId={rm.id} baseUnit={rm.base_unit} />
       <Card className="p-5 space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-base font-semibold">Leverandører</h3>
