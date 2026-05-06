@@ -243,7 +243,13 @@ export default function ImportPdfPage({ embedded = false }: { embedded?: boolean
       }
 
       toast.success("Faktura opprettet");
-      navigate(`/ravarer/fakturaer/${invoice.id}`);
+      if (lines.length === 0) {
+        toast.success("Faktura opprettet — registrer linjer");
+        navigate(`/ravarer/fakturaer/${invoice.id}/registrer-linjer`);
+      } else {
+        toast.success("Faktura opprettet");
+        navigate(`/ravarer/fakturaer/${invoice.id}`);
+      }
     } catch (e: any) {
       toast.error(`Opplasting feilet: ${e?.message ?? e}`);
     } finally {
