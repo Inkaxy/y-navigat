@@ -1085,6 +1085,42 @@ export type Database = {
           },
         ]
       }
+      datasheet_upload_batches: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          failed: number
+          id: string
+          legal_entity_id: string
+          processed: number
+          status: string
+          total_files: number
+          uploaded_by: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          failed?: number
+          id?: string
+          legal_entity_id: string
+          processed?: number
+          status?: string
+          total_files?: number
+          uploaded_by?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          failed?: number
+          id?: string
+          legal_entity_id?: string
+          processed?: number
+          status?: string
+          total_files?: number
+          uploaded_by?: string | null
+        }
+        Relationships: []
+      }
       delivery_note_lines: {
         Row: {
           created_at: string
@@ -4524,6 +4560,8 @@ export type Database = {
           created_at: string
           created_by: string | null
           datasheet_url: string | null
+          declaration_needs_review: boolean
+          declaration_review_reason: string | null
           description: string | null
           description_rich: Json | null
           display_name: string
@@ -4590,6 +4628,8 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           datasheet_url?: string | null
+          declaration_needs_review?: boolean
+          declaration_review_reason?: string | null
           description?: string | null
           description_rich?: Json | null
           display_name: string
@@ -4656,6 +4696,8 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           datasheet_url?: string | null
+          declaration_needs_review?: boolean
+          declaration_review_reason?: string | null
           description?: string | null
           description_rich?: Json | null
           display_name?: string
@@ -4795,6 +4837,75 @@ export type Database = {
           },
         ]
       }
+      raw_material_changelog: {
+        Row: {
+          acknowledged: boolean
+          acknowledged_at: string | null
+          acknowledged_by: string | null
+          affected_recipes_count: number
+          change_type: string
+          created_at: string
+          created_by: string | null
+          datasheet_id: string | null
+          field: string | null
+          id: string
+          legal_entity_id: string
+          new_value: Json | null
+          old_value: Json | null
+          raw_material_id: string
+          severity: string
+        }
+        Insert: {
+          acknowledged?: boolean
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          affected_recipes_count?: number
+          change_type: string
+          created_at?: string
+          created_by?: string | null
+          datasheet_id?: string | null
+          field?: string | null
+          id?: string
+          legal_entity_id: string
+          new_value?: Json | null
+          old_value?: Json | null
+          raw_material_id: string
+          severity?: string
+        }
+        Update: {
+          acknowledged?: boolean
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          affected_recipes_count?: number
+          change_type?: string
+          created_at?: string
+          created_by?: string | null
+          datasheet_id?: string | null
+          field?: string | null
+          id?: string
+          legal_entity_id?: string
+          new_value?: Json | null
+          old_value?: Json | null
+          raw_material_id?: string
+          severity?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "raw_material_changelog_datasheet_id_fkey"
+            columns: ["datasheet_id"]
+            isOneToOne: false
+            referencedRelation: "raw_material_datasheets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "raw_material_changelog_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "raw_materials"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       raw_material_components: {
         Row: {
           allergens: Database["public"]["Enums"]["allergen_type"][] | null
@@ -4803,10 +4914,12 @@ export type Database = {
           id: string
           is_explicit_percentage: boolean
           is_quid_relevant: boolean
+          needs_review: boolean
           parent_raw_material_id: string
           percentage: number
           primary_ingredient_name: string | null
           sort_order: number
+          suggested_by_ai: boolean
         }
         Insert: {
           allergens?: Database["public"]["Enums"]["allergen_type"][] | null
@@ -4815,10 +4928,12 @@ export type Database = {
           id?: string
           is_explicit_percentage?: boolean
           is_quid_relevant?: boolean
+          needs_review?: boolean
           parent_raw_material_id: string
           percentage: number
           primary_ingredient_name?: string | null
           sort_order?: number
+          suggested_by_ai?: boolean
         }
         Update: {
           allergens?: Database["public"]["Enums"]["allergen_type"][] | null
@@ -4827,10 +4942,12 @@ export type Database = {
           id?: string
           is_explicit_percentage?: boolean
           is_quid_relevant?: boolean
+          needs_review?: boolean
           parent_raw_material_id?: string
           percentage?: number
           primary_ingredient_name?: string | null
           sort_order?: number
+          suggested_by_ai?: boolean
         }
         Relationships: [
           {
@@ -4845,6 +4962,100 @@ export type Database = {
             columns: ["parent_raw_material_id"]
             isOneToOne: false
             referencedRelation: "raw_materials"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      raw_material_datasheets: {
+        Row: {
+          ai_confidence: number | null
+          ai_extracted: Json | null
+          ai_model: string | null
+          batch_id: string | null
+          file_hash: string | null
+          file_name: string | null
+          file_path: string
+          id: string
+          is_current: boolean
+          legal_entity_id: string
+          package_size_unit: string | null
+          package_size_value: number | null
+          raw_ai_response: Json | null
+          raw_material_id: string | null
+          replaced_by: string | null
+          sku: string | null
+          status: string
+          supplier_name: string | null
+          uploaded_at: string
+          uploaded_by: string | null
+          version: number
+        }
+        Insert: {
+          ai_confidence?: number | null
+          ai_extracted?: Json | null
+          ai_model?: string | null
+          batch_id?: string | null
+          file_hash?: string | null
+          file_name?: string | null
+          file_path: string
+          id?: string
+          is_current?: boolean
+          legal_entity_id: string
+          package_size_unit?: string | null
+          package_size_value?: number | null
+          raw_ai_response?: Json | null
+          raw_material_id?: string | null
+          replaced_by?: string | null
+          sku?: string | null
+          status?: string
+          supplier_name?: string | null
+          uploaded_at?: string
+          uploaded_by?: string | null
+          version?: number
+        }
+        Update: {
+          ai_confidence?: number | null
+          ai_extracted?: Json | null
+          ai_model?: string | null
+          batch_id?: string | null
+          file_hash?: string | null
+          file_name?: string | null
+          file_path?: string
+          id?: string
+          is_current?: boolean
+          legal_entity_id?: string
+          package_size_unit?: string | null
+          package_size_value?: number | null
+          raw_ai_response?: Json | null
+          raw_material_id?: string | null
+          replaced_by?: string | null
+          sku?: string | null
+          status?: string
+          supplier_name?: string | null
+          uploaded_at?: string
+          uploaded_by?: string | null
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "raw_material_datasheets_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "datasheet_upload_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "raw_material_datasheets_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "raw_materials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rmd_replaced_by_fk"
+            columns: ["replaced_by"]
+            isOneToOne: false
+            referencedRelation: "raw_material_datasheets"
             referencedColumns: ["id"]
           },
         ]
