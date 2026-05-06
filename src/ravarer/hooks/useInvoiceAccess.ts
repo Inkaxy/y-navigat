@@ -10,21 +10,12 @@ export function useInvoiceAccess() {
   return useQuery({
     queryKey: ["ravarer-invoice-access"],
     queryFn: async () => {
-      const { data: userData } = await supabase.auth.getUser();
-      const uid = userData?.user?.id;
-      if (!uid) return false;
-      const { data, error } = await supabase
-        .from("position_app_access")
-        .select("invoice_access, apps!inner(code), positions!inner(user_positions!inner(user_id))")
-        .eq("apps.code", "ravarer")
-        .eq("positions.user_positions.user_id", uid)
-        .eq("invoice_access", true)
-        .limit(1);
+      const { data, error } = await supabase.rpc("user_has_invoice_access" as any);
       if (error) {
         console.error("invoice access check", error);
         return false;
       }
-      return (data?.length ?? 0) > 0;
+      return !!data;
     },
     staleTime: 5 * 60 * 1000,
   });
