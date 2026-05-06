@@ -25,6 +25,7 @@ export default function DatabladBulk() {
   const { canWrite, legalEntityId } = useRavarer();
   const [rows, setRows] = useState<FileRow[]>([]);
   const [batchId, setBatchId] = useState<string | null>(null);
+  const [createDialogIdx, setCreateDialogIdx] = useState<number | null>(null);
 
   const onPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []).slice(0, 100);
