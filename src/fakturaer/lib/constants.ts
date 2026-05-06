@@ -1,20 +1,21 @@
 export const APP_CODE = "fakturaer" as const;
 
+// Status-modell etter Tripletex-omlegging: NBhub validerer kun pris.
+// Lifecycle (mottak, godkjenning, attestering, betaling) eies av Tripletex.
 export const INVOICE_STATUSES = [
-  { value: "pending", label: "Venter", tone: "muted" },
-  { value: "parsing", label: "Behandles", tone: "muted" },
-  { value: "matched", label: "Matchet", tone: "info" },
-  { value: "approved", label: "Godkjent", tone: "success" },
-  { value: "disputed", label: "Reklamert", tone: "danger" },
-  { value: "paid", label: "Betalt", tone: "muted" },
-  { value: "pending_parse", label: "Venter parsing", tone: "muted" },
+  { value: "imported", label: "Importert", tone: "muted" },
+  { value: "needs_review", label: "Krever gjennomgang", tone: "warning" },
+  { value: "ready", label: "Klar for avstemming", tone: "info" },
+  { value: "reconciled", label: "Avstemt", tone: "success" },
+  { value: "flagged", label: "Flagget", tone: "danger" },
 ] as const;
 
 export const INVOICE_SOURCES = [
+  { value: "tripletex", label: "Tripletex" },
   { value: "manual", label: "Manuell" },
-  { value: "ehf", label: "EHF" },
-  { value: "pdf_upload", label: "PDF" },
-  { value: "email", label: "E-post" },
+  { value: "ehf", label: "EHF (legacy)" },
+  { value: "pdf_upload", label: "PDF (legacy)" },
+  { value: "email", label: "E-post (legacy)" },
 ] as const;
 
 export const LINE_UNITS = ["kg", "g", "l", "ml", "stk", "pakke", "kartong", "sekk", "pall"] as const;

@@ -136,7 +136,7 @@ export default function InvoiceDetailPage() {
       </div>
 
       <p className="text-center text-xs text-ink-secondary">
-        Auto-matching og godkjenningsflyt kommer i neste pulje.
+        Avstemming og prisavviks-håndtering kommer i neste pulje. Faktura-lifecycle eies av Tripletex.
       </p>
     </div>
   );

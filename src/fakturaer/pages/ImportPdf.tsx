@@ -56,7 +56,7 @@ export default function ImportPdfPage() {
           invoice_date: invoiceDate,
           source: "pdf_upload",
           source_document_url: path,
-          status: "pending_parse",
+          status: "imported",
         })
         .select()
         .single();

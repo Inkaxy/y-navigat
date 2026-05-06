@@ -7,7 +7,7 @@ interface Props {
   actions?: ReactNode;
 }
 
-export function FakturaerHeaderBanner({ title = "Fakturaer", subtitle = "Inngående fakturaer, EHF-import og auto-matching mot råvarer", actions }: Props) {
+export function FakturaerHeaderBanner({ title = "Fakturaer", subtitle = "Prismatch mot Tripletex — validerer pris og oppdaterer prishistorikk", actions }: Props) {
   return (
     <div className="rounded-2xl border border-line-subtle bg-surface-raised p-6 shadow-xs">
       <div className="flex items-start justify-between gap-4">
