@@ -31,6 +31,7 @@ import { logAudit } from "@/varer/lib/audit";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { RawMaterialAutocomplete, RawMaterialOption } from "./RawMaterialAutocomplete";
+import { RecipeProductLinks } from "./RecipeProductLinks";
 
 interface Props {
   productId: string;
