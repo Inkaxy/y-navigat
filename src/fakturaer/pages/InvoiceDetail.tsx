@@ -51,7 +51,7 @@ export default function InvoiceDetailPage() {
 
   return (
     <div className="space-y-5">
-      <button onClick={() => navigate("/fakturaer")} className="flex items-center gap-1 text-sm text-ink-secondary transition-colors hover:text-ink-primary">
+      <button onClick={() => navigate("/ravarer/fakturaer")} className="flex items-center gap-1 text-sm text-ink-secondary transition-colors hover:text-ink-primary">
         <ArrowLeft className="h-4 w-4" /> Tilbake
       </button>
 
@@ -106,7 +106,7 @@ export default function InvoiceDetailPage() {
             <div className="p-8 text-center text-sm text-ink-secondary">
               Ingen linjer registrert ennå.
               <div className="mt-3">
-                <Button size="sm" variant="outline" onClick={() => navigate("/fakturaer/ny")}>Fyll inn manuelt</Button>
+                <Button size="sm" variant="outline" onClick={() => navigate("/ravarer/fakturaer/ny")}>Fyll inn manuelt</Button>
               </div>
             </div>
           ) : (

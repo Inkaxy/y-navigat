@@ -35,13 +35,13 @@ export default function FakturaerListPage() {
         actions={
           canWrite && (
             <>
-              <Button variant="outline" onClick={() => navigate("/fakturaer/import-pdf")} className="gap-2">
+              <Button variant="outline" onClick={() => navigate("/ravarer/fakturaer/import-pdf")} className="gap-2">
                 <Upload className="h-4 w-4" /> Last opp PDF
               </Button>
-              <Button variant="outline" onClick={() => navigate("/fakturaer/import-ehf")} className="gap-2">
+              <Button variant="outline" onClick={() => navigate("/ravarer/fakturaer/import-ehf")} className="gap-2">
                 <FileUp className="h-4 w-4" /> Importer EHF
               </Button>
-              <Button onClick={() => navigate("/fakturaer/ny")} className="gap-2">
+              <Button onClick={() => navigate("/ravarer/fakturaer/ny")} className="gap-2">
                 <Plus className="h-4 w-4" /> Ny faktura
               </Button>
             </>
@@ -52,7 +52,7 @@ export default function FakturaerListPage() {
       {totalReview > 0 && (
         <div
           className="flex cursor-pointer items-center justify-between rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm transition-colors hover:bg-warning/15"
-          onClick={() => navigate("/fakturaer/til-behandling")}
+          onClick={() => navigate("/ravarer/fakturaer/til-behandling")}
         >
           <div className="flex items-center gap-3 text-warning">
             <AlertCircle className="h-5 w-5" />
@@ -107,7 +107,7 @@ export default function FakturaerListPage() {
             <FileText className="mb-3 h-10 w-10 text-ink-secondary" />
             <p className="text-ink-secondary">Ingen fakturaer enda.</p>
             {canWrite && (
-              <button onClick={() => navigate("/fakturaer/ny")} className="mt-3 text-sm font-medium text-primary hover:underline">
+              <button onClick={() => navigate("/ravarer/fakturaer/ny")} className="mt-3 text-sm font-medium text-primary hover:underline">
                 Registrer første faktura
               </button>
             )}
@@ -133,7 +133,7 @@ export default function FakturaerListPage() {
                   return (
                     <tr
                       key={r.id}
-                      onClick={() => navigate(`/fakturaer/${r.id}`)}
+                      onClick={() => navigate(`/ravarer/fakturaer/${r.id}`)}
                       className="cursor-pointer border-t border-line-subtle transition-colors hover:bg-muted/40"
                     >
                       <td className="px-4 py-3 font-mono text-xs">{r.invoice_number}</td>
