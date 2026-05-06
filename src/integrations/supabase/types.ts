@@ -7037,6 +7037,42 @@ export type Database = {
           total_events: number
         }[]
       }
+      rename_raw_material: {
+        Args: { p_id: string; p_name: string }
+        Returns: {
+          agreed_price: number | null
+          base_unit: string
+          category: string | null
+          components_reviewed_at: string | null
+          created_at: string
+          created_by: string | null
+          current_cost_price: number | null
+          current_stock: number
+          description: string | null
+          grain_classification: string | null
+          id: string
+          is_active: boolean
+          is_composite: boolean
+          is_packaging: boolean
+          legal_entity_id: string
+          min_stock: number | null
+          name: string
+          package_size: number | null
+          package_unit: string | null
+          price_source: string | null
+          price_updated_at: string | null
+          primary_supplier_id: string | null
+          sku: string
+          unit_weight_grams: number | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "raw_materials"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       rm_can_read: { Args: { _rm_id: string }; Returns: boolean }
       rm_can_write: { Args: { _rm_id: string }; Returns: boolean }
       save_matrix_changes: {
