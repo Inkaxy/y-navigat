@@ -29,21 +29,17 @@ interface DropdownItem {
 type NavItem = SimpleItem | DropdownItem;
 
 const STATIC_SUBMENUS: Record<string, { prefix: string; appSlug: string; items: NavItem[] }> = {
-  varer: {
-    prefix: "/varer",
-    appSlug: "varer",
+  kunder: {
+    prefix: "/kunder",
+    appSlug: "kunder",
     items: [
-      { kind: "link", to: "/varer/vareliste", label: "Vareliste" },
-      { kind: "link", to: "/varer/priser", label: "Priser" },
-      { kind: "link", to: "/varer/spesialpriser", label: "Spesialpriser" },
-      { kind: "link", to: "/varer/kakebygger", label: "Kakebygger" },
-      { kind: "link", to: "/varer/oppskrifter", label: "Oppskrifter" },
-      { kind: "link", to: "/varer/sortiment", label: "Sortiment" },
-      { kind: "link", to: "/varer/avvik", label: "Avvik" },
-      { kind: "link", to: "/varer/innstillinger", label: "Innstillinger" },
+      { kind: "link", to: "/kunder/kundeliste", label: "Kundeliste" },
+      { kind: "link", to: "/kunder/profiler", label: "Profiler" },
+      { kind: "link", to: "/kunder/kundegrupper", label: "Kundegrupper" },
+      { kind: "link", to: "/kunder/historikk", label: "Historikk" },
+      { kind: "link", to: "/kunder/innstillinger", label: "Innstillinger" },
     ],
   },
-  kunder: {
     prefix: "/kunder",
     appSlug: "kunder",
     items: [
