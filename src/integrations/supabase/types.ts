@@ -5285,6 +5285,7 @@ export type Database = {
           last_synced_at: string | null
           last_synced_voucher_date: string | null
           legal_entity_id: string
+          mode: string
           session_expires_at: string | null
           session_token: string | null
           sync_enabled: boolean
@@ -5300,6 +5301,7 @@ export type Database = {
           last_synced_at?: string | null
           last_synced_voucher_date?: string | null
           legal_entity_id: string
+          mode?: string
           session_expires_at?: string | null
           session_token?: string | null
           sync_enabled?: boolean
@@ -5315,6 +5317,7 @@ export type Database = {
           last_synced_at?: string | null
           last_synced_voucher_date?: string | null
           legal_entity_id?: string
+          mode?: string
           session_expires_at?: string | null
           session_token?: string | null
           sync_enabled?: boolean
