@@ -1,0 +1,1 @@
+UPDATE public.apps SET deploy_url = 'https://nbhub.no', start_path = '/ravarer/vareliste' WHERE code = 'ravarer';
