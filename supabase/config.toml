@@ -5,3 +5,4 @@ verify_jwt = false
 
 [functions.submit-negotiation-response]
 verify_jwt = false
+
