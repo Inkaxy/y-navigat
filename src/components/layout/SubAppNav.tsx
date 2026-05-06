@@ -34,10 +34,10 @@ const SUBMENUS: Record<string, { prefix: string; appSlug: string; items: SubItem
     appSlug: "fakturaer",
     items: [
       { to: "/fakturaer", label: "Alle fakturaer" },
+      { to: "/fakturaer/til-behandling", label: "Til behandling" },
       { to: "/fakturaer/ny", label: "Ny faktura" },
       { to: "/fakturaer/import-ehf", label: "Importer EHF" },
       { to: "/fakturaer/import-pdf", label: "Last opp PDF" },
-      // { to: "/fakturaer/til-behandling", label: "Til behandling" }, // kommer i Steg 3
     ],
   },
   kunder: {

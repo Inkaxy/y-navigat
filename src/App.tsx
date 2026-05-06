@@ -71,6 +71,7 @@ import FakturaerNew from "@/fakturaer/pages/NewInvoice";
 import FakturaerImportEhf from "@/fakturaer/pages/ImportEhf";
 import FakturaerImportPdf from "@/fakturaer/pages/ImportPdf";
 import FakturaerDetail from "@/fakturaer/pages/InvoiceDetail";
+import FakturaerReviewQueue from "@/fakturaer/pages/ReviewQueue";
 
 const KunderEntityProvider = ({ children }: { children: React.ReactNode }) => {
   const { user } = useNbhubAuth();
@@ -177,6 +178,7 @@ const App = () => (
               <Route path="/fakturaer/ny" element={<Shell><AppAccessGuard appCode="fakturaer" appName="Fakturaer"><FakturaerProvider><FakturaerNew /></FakturaerProvider></AppAccessGuard></Shell>} />
               <Route path="/fakturaer/import-ehf" element={<Shell><AppAccessGuard appCode="fakturaer" appName="Fakturaer"><FakturaerProvider><FakturaerImportEhf /></FakturaerProvider></AppAccessGuard></Shell>} />
               <Route path="/fakturaer/import-pdf" element={<Shell><AppAccessGuard appCode="fakturaer" appName="Fakturaer"><FakturaerProvider><FakturaerImportPdf /></FakturaerProvider></AppAccessGuard></Shell>} />
+              <Route path="/fakturaer/til-behandling" element={<Shell><AppAccessGuard appCode="fakturaer" appName="Fakturaer"><FakturaerProvider><FakturaerReviewQueue /></FakturaerProvider></AppAccessGuard></Shell>} />
               <Route path="/fakturaer/:id" element={<Shell><AppAccessGuard appCode="fakturaer" appName="Fakturaer"><FakturaerProvider><FakturaerDetail /></FakturaerProvider></AppAccessGuard></Shell>} />
 
               <Route path="/ordre" element={<AppRoute code="ordre" name="Ordre" icon="ShoppingCart" />} />
