@@ -185,7 +185,7 @@ Deno.serve(async (req) => {
     const totalInputGrams = computed.reduce((s, l) => s + l.effective_grams, 0) || 1;
     const yieldGrams = link.yield_weight_g_override ?? recipe?.yield_grams ?? null;
     const yieldLoss = Number(recipe?.yield_loss_pct) || 0;
-    const finalWeight = yieldGrams ?? (totalInputGrams * (1 - yieldLoss / 100)) || 1;
+    const finalWeight = (yieldGrams ?? (totalInputGrams * (1 - yieldLoss / 100))) || 1;
 
     // Ingrediensliste
     const declLines = computed
