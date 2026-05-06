@@ -51,6 +51,7 @@ export function SuppliersTab({ rm }: Props) {
 
   return (
     <div className="space-y-5">
+      <PurchaseStatsCard rawMaterialId={rm.id} baseUnit={rm.base_unit} />
       <Card className="p-5 space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-base font-semibold">Leverandører</h3>
