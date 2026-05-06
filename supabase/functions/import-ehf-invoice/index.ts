@@ -187,11 +187,11 @@ Deno.serve(async (req) => {
     // ---- Totals ----
     const monetary = get(root, "LegalMonetaryTotal");
     const totalNet = pickNumber(get(monetary, "LineExtensionAmount")) ?? 0;
-    const totalGross =
+    const totalAmount =
       pickNumber(get(monetary, "PayableAmount")) ??
       pickNumber(get(monetary, "TaxInclusiveAmount")) ??
       0;
-    const totalVat = Math.max(0, totalGross - totalNet);
+    const totalVat = Math.max(0, totalAmount - totalNet);
 
     // Duplicate check
     const { data: dupes } = await supabaseAdmin
