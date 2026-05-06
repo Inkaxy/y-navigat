@@ -109,7 +109,7 @@ export default function NewInvoicePage() {
           currency: values.currency,
           notes: values.notes || null,
           source: "manual",
-          status: "pending",
+          status: "imported",
           total_amount: totals.total,
           total_vat: totals.vat,
         })
