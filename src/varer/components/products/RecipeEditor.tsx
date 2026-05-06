@@ -49,6 +49,9 @@ type Line = {
   waste_percent: number | string;
   sort_order: number;
   notes?: string | null;
+  include_in_declaration?: boolean;
+  is_quid_relevant?: boolean;
+  custom_declaration_text?: string | null;
   _rm?: RawMaterialOption | null;
 };
 
