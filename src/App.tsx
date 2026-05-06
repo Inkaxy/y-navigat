@@ -72,6 +72,8 @@ import FakturaerImportEhf from "@/fakturaer/pages/ImportEhf";
 import FakturaerImportPdf from "@/fakturaer/pages/ImportPdf";
 import FakturaerDetail from "@/fakturaer/pages/InvoiceDetail";
 import FakturaerReviewQueue from "@/fakturaer/pages/ReviewQueue";
+import FakturaerImport from "@/fakturaer/pages/ImportInvoice";
+import FakturaerRegistrerLinjer from "@/fakturaer/pages/RegistrerLinjer";
 import { InvoiceAccessGuard } from "@/ravarer/components/InvoiceAccessGuard";
 import TripletexSettings from "@/ravarer/pages/innstillinger/TripletexSettings";
 import AiServicesSettings from "@/ravarer/pages/innstillinger/AiServicesSettings";
