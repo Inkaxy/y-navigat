@@ -40,7 +40,31 @@ export default function RawMaterialDetail() {
       </div>
 
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight" style={{ letterSpacing: "-0.02em" }}>{rm.name}</h1>
+        {editingName ? (
+          <div className="flex items-center gap-2">
+            <Input
+              value={nameDraft}
+              onChange={(e) => setNameDraft(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") saveName(); if (e.key === "Escape") setEditingName(false); }}
+              autoFocus
+              className="text-2xl h-11 font-semibold tracking-tight max-w-xl"
+              style={{ letterSpacing: "-0.02em" }}
+            />
+            <Button size="icon" variant="ghost" onClick={saveName} disabled={rename.isPending}>
+              <Check className="h-4 w-4" />
+            </Button>
+            <Button size="icon" variant="ghost" onClick={() => setEditingName(false)}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 group">
+            <h1 className="text-2xl font-semibold tracking-tight" style={{ letterSpacing: "-0.02em" }}>{rm.name}</h1>
+            <Button size="icon" variant="ghost" onClick={startEdit} className="opacity-0 group-hover:opacity-100 transition-opacity" title="Endre navn">
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        )}
         <p className="text-sm text-ink-secondary">SKU {rm.sku} · {rm.category ?? "Uten kategori"}</p>
       </div>
 
