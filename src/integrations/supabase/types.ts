@@ -1756,6 +1756,7 @@ export type Database = {
       invoice_match_settings: {
         Row: {
           auto_approve_within_tolerance: boolean | null
+          auto_reconcile_clean_imports: boolean
           default_price_tolerance_pct: number | null
           fuzzy_auto_match_dominance_threshold: number | null
           fuzzy_auto_match_threshold: number | null
@@ -1766,6 +1767,7 @@ export type Database = {
         }
         Insert: {
           auto_approve_within_tolerance?: boolean | null
+          auto_reconcile_clean_imports?: boolean
           default_price_tolerance_pct?: number | null
           fuzzy_auto_match_dominance_threshold?: number | null
           fuzzy_auto_match_threshold?: number | null
@@ -1776,6 +1778,7 @@ export type Database = {
         }
         Update: {
           auto_approve_within_tolerance?: boolean | null
+          auto_reconcile_clean_imports?: boolean
           default_price_tolerance_pct?: number | null
           fuzzy_auto_match_dominance_threshold?: number | null
           fuzzy_auto_match_threshold?: number | null
@@ -1796,66 +1799,84 @@ export type Database = {
       }
       invoices: {
         Row: {
-          approved_at: string | null
-          approved_by: string | null
           created_at: string | null
           currency: string | null
           due_date: string | null
           ehf_payload: Json | null
           id: string
           imported_at: string | null
+          imported_from_tripletex_at: string | null
           invoice_date: string
           invoice_number: string
+          is_credit_note: boolean
           legal_entity_id: string
+          lines_source: string | null
           notes: string | null
+          reconciled_at: string | null
+          reconciled_by: string | null
           source: string | null
           source_document_url: string | null
           status: string
           supplier_id: string
           total_amount: number | null
           total_vat: number | null
+          tripletex_supplier_id: string | null
+          tripletex_voucher_id: string | null
+          tripletex_voucher_number: string | null
           updated_at: string | null
         }
         Insert: {
-          approved_at?: string | null
-          approved_by?: string | null
           created_at?: string | null
           currency?: string | null
           due_date?: string | null
           ehf_payload?: Json | null
           id?: string
           imported_at?: string | null
+          imported_from_tripletex_at?: string | null
           invoice_date: string
           invoice_number: string
+          is_credit_note?: boolean
           legal_entity_id: string
+          lines_source?: string | null
           notes?: string | null
+          reconciled_at?: string | null
+          reconciled_by?: string | null
           source?: string | null
           source_document_url?: string | null
           status?: string
           supplier_id: string
           total_amount?: number | null
           total_vat?: number | null
+          tripletex_supplier_id?: string | null
+          tripletex_voucher_id?: string | null
+          tripletex_voucher_number?: string | null
           updated_at?: string | null
         }
         Update: {
-          approved_at?: string | null
-          approved_by?: string | null
           created_at?: string | null
           currency?: string | null
           due_date?: string | null
           ehf_payload?: Json | null
           id?: string
           imported_at?: string | null
+          imported_from_tripletex_at?: string | null
           invoice_date?: string
           invoice_number?: string
+          is_credit_note?: boolean
           legal_entity_id?: string
+          lines_source?: string | null
           notes?: string | null
+          reconciled_at?: string | null
+          reconciled_by?: string | null
           source?: string | null
           source_document_url?: string | null
           status?: string
           supplier_id?: string
           total_amount?: number | null
           total_vat?: number | null
+          tripletex_supplier_id?: string | null
+          tripletex_voucher_id?: string | null
+          tripletex_voucher_number?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -5197,6 +5218,8 @@ export type Database = {
           name: string
           notes: string | null
           org_number: string | null
+          tripletex_supplier_id: string | null
+          tripletex_supplier_number: string | null
           updated_at: string
         }
         Insert: {
@@ -5209,6 +5232,8 @@ export type Database = {
           name: string
           notes?: string | null
           org_number?: string | null
+          tripletex_supplier_id?: string | null
+          tripletex_supplier_number?: string | null
           updated_at?: string
         }
         Update: {
@@ -5221,11 +5246,119 @@ export type Database = {
           name?: string
           notes?: string | null
           org_number?: string | null
+          tripletex_supplier_id?: string | null
+          tripletex_supplier_number?: string | null
           updated_at?: string
         }
         Relationships: [
           {
             foreignKeyName: "suppliers_legal_entity_id_fkey"
+            columns: ["legal_entity_id"]
+            isOneToOne: false
+            referencedRelation: "legal_entities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tripletex_credentials: {
+        Row: {
+          consumer_token_encrypted: string | null
+          created_at: string
+          employee_token_encrypted: string | null
+          last_sync_error: string | null
+          last_sync_status: string | null
+          last_synced_at: string | null
+          last_synced_voucher_date: string | null
+          legal_entity_id: string
+          session_expires_at: string | null
+          session_token: string | null
+          sync_enabled: boolean
+          sync_frequency_minutes: number
+          updated_at: string
+        }
+        Insert: {
+          consumer_token_encrypted?: string | null
+          created_at?: string
+          employee_token_encrypted?: string | null
+          last_sync_error?: string | null
+          last_sync_status?: string | null
+          last_synced_at?: string | null
+          last_synced_voucher_date?: string | null
+          legal_entity_id: string
+          session_expires_at?: string | null
+          session_token?: string | null
+          sync_enabled?: boolean
+          sync_frequency_minutes?: number
+          updated_at?: string
+        }
+        Update: {
+          consumer_token_encrypted?: string | null
+          created_at?: string
+          employee_token_encrypted?: string | null
+          last_sync_error?: string | null
+          last_sync_status?: string | null
+          last_synced_at?: string | null
+          last_synced_voucher_date?: string | null
+          legal_entity_id?: string
+          session_expires_at?: string | null
+          session_token?: string | null
+          sync_enabled?: boolean
+          sync_frequency_minutes?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tripletex_credentials_legal_entity_id_fkey"
+            columns: ["legal_entity_id"]
+            isOneToOne: true
+            referencedRelation: "legal_entities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tripletex_sync_log: {
+        Row: {
+          completed_at: string | null
+          details: Json | null
+          error_message: string | null
+          id: string
+          legal_entity_id: string
+          started_at: string
+          status: string
+          vouchers_failed: number
+          vouchers_fetched: number
+          vouchers_imported: number
+          vouchers_skipped: number
+        }
+        Insert: {
+          completed_at?: string | null
+          details?: Json | null
+          error_message?: string | null
+          id?: string
+          legal_entity_id: string
+          started_at?: string
+          status?: string
+          vouchers_failed?: number
+          vouchers_fetched?: number
+          vouchers_imported?: number
+          vouchers_skipped?: number
+        }
+        Update: {
+          completed_at?: string | null
+          details?: Json | null
+          error_message?: string | null
+          id?: string
+          legal_entity_id?: string
+          started_at?: string
+          status?: string
+          vouchers_failed?: number
+          vouchers_fetched?: number
+          vouchers_imported?: number
+          vouchers_skipped?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tripletex_sync_log_legal_entity_id_fkey"
             columns: ["legal_entity_id"]
             isOneToOne: false
             referencedRelation: "legal_entities"
