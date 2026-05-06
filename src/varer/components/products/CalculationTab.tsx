@@ -417,8 +417,8 @@ export function CalculationTab({ productId, productName, canWrite }: Props) {
                     <tr key={p.id} className="border-b border-border/40 group">
                       <td className="py-1">
                         <RawMaterialAutocomplete
-                          value={p._rm ? { id: p.raw_material_id!, name: p._rm.name, sku: "", current_cost_price: p._rm.current_cost_price ?? 0, base_unit: "stk", category: null } as RawMaterialOption : null}
-                          onSelect={(rm) =>
+                          value={p.raw_material_id ?? null}
+                          onChange={(_id, rm) =>
                             updatePackaging(p.id, {
                               raw_material_id: rm?.id ?? null,
                               name: rm?.name ?? p.name,
@@ -427,7 +427,6 @@ export function CalculationTab({ productId, productName, canWrite }: Props) {
                           }
                           disabled={!canWrite}
                           placeholder={p.name || "Søk emballasje…"}
-                          packagingOnly
                         />
                       </td>
                       <td className="py-1">
