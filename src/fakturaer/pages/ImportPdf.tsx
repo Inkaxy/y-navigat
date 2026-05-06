@@ -311,7 +311,9 @@ export default function ImportPdfPage({ embedded = false }: { embedded?: boolean
         className="flex items-center gap-1 text-sm text-ink-secondary hover:text-ink-primary">
         <ArrowLeft className="h-4 w-4" /> Last opp en annen fil
       </button>
-      <FakturaerHeaderBanner title="Bekreft fakturadata" subtitle="Sjekk at AI har lest riktig før du lagrer" />
+      {!embedded && (
+        <FakturaerHeaderBanner title="Bekreft fakturadata" subtitle="Sjekk at AI har lest riktig før du lagrer" />
+      )}
 
       <div className="flex flex-wrap items-center gap-2">
         <Badge variant="outline" className="gap-1">
