@@ -2,6 +2,7 @@
 // Input: { invoice_id: string, line_ids?: string[] }
 import { createClient } from "npm:@supabase/supabase-js@2.95.0";
 import { corsHeaders } from "npm:@supabase/supabase-js@2.95.0/cors";
+import { normalizeUnit, isPackageUnit, quantityToBase } from "../_shared/units.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const ANON = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -10,21 +11,6 @@ const SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 type AnyRec = Record<string, any>;
 
 const norm = (s: string | null | undefined) => (s ?? "").trim().toLowerCase();
-
-// Convert quantity in `from` unit to `to` (base) unit. Returns null if unknown conversion.
-function toBaseFactor(from: string | null | undefined, to: string | null | undefined): number | null {
-  const f = norm(from);
-  const t = norm(to);
-  if (!f || !t) return null;
-  if (f === t) return 1;
-  const map: Record<string, [string, number]> = {
-    g: ["kg", 0.001], kg: ["g", 1000],
-    ml: ["l", 0.001], l: ["ml", 1000],
-  };
-  const e = map[f];
-  if (e && e[0] === t) return e[1];
-  return null;
-}
 
 // Lightweight trigram-style similarity (fallback if pg_trgm RPC not used). Range 0..1.
 function similarity(a: string, b: string): number {
