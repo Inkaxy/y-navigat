@@ -118,6 +118,23 @@ export function useUpdateRawMaterial() {
   });
 }
 
+export function useRenameRawMaterial() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, name }: { id: string; name: string }) => {
+      const { data, error } = await supabase.rpc("rename_raw_material", { p_id: id, p_name: name });
+      if (error) throw error;
+      return data as RawMaterialRow;
+    },
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ["raw_materials"] });
+      qc.invalidateQueries({ queryKey: ["raw_material", data.id] });
+      toast.success("Navn oppdatert");
+    },
+    onError: (e: any) => toast.error(`Kunne ikke endre navn: ${e.message ?? e}`),
+  });
+}
+
 export function useDeleteRawMaterial() {
   const qc = useQueryClient();
   return useMutation({
