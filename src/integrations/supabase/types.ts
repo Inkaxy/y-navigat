@@ -14,6 +14,111 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_provider_config: {
+        Row: {
+          azure_deployment: string | null
+          azure_endpoint: string | null
+          created_at: string
+          encrypted_api_key: string
+          id: string
+          is_active: boolean
+          max_tokens: number
+          model: string
+          provider: string
+          purpose: string
+          temperature: number
+          updated_at: string
+        }
+        Insert: {
+          azure_deployment?: string | null
+          azure_endpoint?: string | null
+          created_at?: string
+          encrypted_api_key: string
+          id?: string
+          is_active?: boolean
+          max_tokens?: number
+          model: string
+          provider: string
+          purpose: string
+          temperature?: number
+          updated_at?: string
+        }
+        Update: {
+          azure_deployment?: string | null
+          azure_endpoint?: string | null
+          created_at?: string
+          encrypted_api_key?: string
+          id?: string
+          is_active?: boolean
+          max_tokens?: number
+          model?: string
+          provider?: string
+          purpose?: string
+          temperature?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      ai_usage_log: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          estimated_cost_usd: number | null
+          id: string
+          input_tokens: number | null
+          invoice_id: string | null
+          legal_entity_id: string | null
+          model: string
+          output_tokens: number | null
+          provider: string
+          purpose: string
+          success: boolean
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          estimated_cost_usd?: number | null
+          id?: string
+          input_tokens?: number | null
+          invoice_id?: string | null
+          legal_entity_id?: string | null
+          model: string
+          output_tokens?: number | null
+          provider: string
+          purpose: string
+          success?: boolean
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          estimated_cost_usd?: number | null
+          id?: string
+          input_tokens?: number | null
+          invoice_id?: string | null
+          legal_entity_id?: string | null
+          model?: string
+          output_tokens?: number | null
+          provider?: string
+          purpose?: string
+          success?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_usage_log_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_usage_log_legal_entity_id_fkey"
+            columns: ["legal_entity_id"]
+            isOneToOne: false
+            referencedRelation: "legal_entities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       apps: {
         Row: {
           access_pattern: string
