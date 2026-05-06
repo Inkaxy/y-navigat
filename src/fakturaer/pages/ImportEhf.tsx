@@ -8,7 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { FakturaerHeaderBanner } from "@/fakturaer/components/FakturaerHeaderBanner";
 import { useFakturaer } from "@/fakturaer/context/FakturaerContext";
 
-export default function ImportEhfPage() {
+export default function ImportEhfPage({ embedded = false }: { embedded?: boolean } = {}) {
   const navigate = useNavigate();
   const { canWrite } = useFakturaer();
   const [busy, setBusy] = useState(false);
