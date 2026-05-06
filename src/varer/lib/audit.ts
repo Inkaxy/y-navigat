@@ -35,6 +35,7 @@ export type AuditEntityType =
   | "product"
   | "recipe"
   | "recipe_line"
+  | "product_recipe_link"
   | "price_list"
   | "price_list_item"
   | "product_main_category"
