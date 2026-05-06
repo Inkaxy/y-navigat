@@ -124,6 +124,44 @@ function RavarerNav() {
   return <NavBar appSlug="ravarer" items={items} />;
 }
 
+function VarerNav() {
+  const { data: cleanupCount = 0 } = useQuery({
+    queryKey: ["varer-cleanup-count"],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("recipes")
+        .select("id, products!inner(legal_entity_id)", { count: "exact", head: true })
+        .eq("requires_cleanup", true)
+        .is("valid_to", null)
+        .eq("products.legal_entity_id", "751709bc-04b3-4449-867d-b97faa9ab373");
+      if (error) return 0;
+      return count ?? 0;
+    },
+    staleTime: 60_000,
+  });
+
+  const items: NavItem[] = [
+    { kind: "link", to: "/varer/vareliste", label: "Vareliste" },
+    { kind: "link", to: "/varer/priser", label: "Priser" },
+    { kind: "link", to: "/varer/spesialpriser", label: "Spesialpriser" },
+    { kind: "link", to: "/varer/kakebygger", label: "Kakebygger" },
+    {
+      kind: "dropdown",
+      label: "Oppskrifter",
+      basePath: "/varer/oppskrifter",
+      links: [
+        { to: "/varer/oppskrifter", label: "Alle oppskrifter" },
+        { to: "/varer/oppskrifter/krever-opprydding", label: "Krever opprydding", badge: cleanupCount },
+      ],
+    },
+    { kind: "link", to: "/varer/sortiment", label: "Sortiment" },
+    { kind: "link", to: "/varer/avvik", label: "Avvik" },
+    { kind: "link", to: "/varer/innstillinger", label: "Innstillinger" },
+  ];
+
+  return <NavBar appSlug="varer" items={items} />;
+}
+
 function NavBar({ appSlug, items }: { appSlug: string; items: NavItem[] }) {
   const { pathname, search } = useLocation();
   const navigate = useNavigate();
