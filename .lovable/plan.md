@@ -1,112 +1,116 @@
-# Omfattende oppskrift- og kalkulasjonsmodul
+## Steg 6 — Deklarasjon og næring pr produkt
 
-Behold dagens menyer og ruter (`/varer/oppskrifter`, `/varer/vareliste`, `ProductDetail`-faner). Vi bytter ut **innholdet** i Oppskrift-, Deklarasjon- og (ny) Kalkyle-fanen, og introduserer master-oppskrift som kan brukes av flere produkter.
+Mål: deklarasjon, allergener og næring beregnes pr **produkt-kobling** (master + dette produktets `extra_lines`), ikke pr master-oppskrift. Manuelle overstyringer flyttes fra master til kobling med arv som fallback.
 
-## 1. Datamodell (migrasjon)
+### 1. Migrasjon — flytt deklarasjon fra `recipes` til `product_recipe_links`
 
-Ny separat oppskriftstabell — uavhengig av produkt — slik at flere produkter kan dele én oppskrift.
+Behold feltene på `recipes` som default (arv), legg til overstyringer på koblingen.
 
-```text
-recipes (master)
- ├─ recipe_lines           (base-ingredienser, sortert)
- ├─ recipe_labor_lines     (Produksjon/Dekorasjon/Håndtering/Transport — timer + timepris)
- └─ recipe_packaging_lines (pose/eske/etikett — antall + pris)
-
-product_recipe_links
- ├─ product_id
- ├─ recipe_id
- ├─ yield_weight_g          (vekt på ferdig produkt — overstyrer master)
- ├─ units_per_batch         (antall enheter — overstyrer master)
- ├─ extra_lines (jsonb)     (per-produkt ekstra ingredienser, f.eks. dekor)
- ├─ extra_packaging (jsonb)
- └─ price_overrides (jsonb) (netto/engros pr produkt)
+```sql
+alter table product_recipe_links
+  add column declaration_mode declaration_mode,           -- null = arv fra recipes
+  add column manual_ingredient_declaration text,
+  add column manual_nutrition jsonb,
+  add column manual_allergen_summary jsonb,
+  add column declaration_updated_at timestamptz,
+  add column declaration_updated_by uuid references auth.users(id);
 ```
 
-Eksisterende `product_recipes`-tabell migreres: hver rad blir en `recipes`-master + en `product_recipe_links`-rad. Ingen data går tapt.
+Refaktorer overrides-tabell til å peke på koblingen:
 
-Globale defaults: `legal_entity_settings.default_hourly_rate` (400 kr), `default_vat_rate` (15%), `target_db_pct` (40 %).
+```sql
+alter table recipe_declaration_overrides
+  rename to product_declaration_overrides;
+alter table product_declaration_overrides
+  add column product_recipe_link_id uuid references product_recipe_links(id) on delete cascade;
 
-## 2. UI — Oppskrift-fanen (RecipeEditor v2)
+-- Migrer: ta første link pr recipe (kun én link i dag etter Steg 1-migrering)
+update product_declaration_overrides pdo
+set product_recipe_link_id = (select id from product_recipe_links where recipe_id = pdo.recipe_id limit 1);
 
-Inspirert av Excel-arket, men moderne kort-basert layout:
-
-```text
-┌─────────────────────────────────────────────────────────────┐
-│ [Tebriks]   Brukes av: 3 produkter ▾    [Lagre ny versjon]  │
-├──────────────────────────┬──────────────────────────────────┤
-│ INGREDIENSER             │ ARBEID                           │
-│ # Råvare    Mengde Pris  │ Produksjon  4 t × 400 = 1600     │
-│ 1 Hvetemel  30000g 5,70  │ Dekorasjon  0 t × 400 =    0     │
-│ 2 Sukker    1500g 11,15  │ Håndtering  0,5 × 400 =  200     │
-│ + Legg til               │ Transport   0,5 × 400 =  200     │
-│                          │ Total arbeid:          2 000     │
-│ Total råvare:  820,28    │                                  │
-├──────────────────────────┼──────────────────────────────────┤
-│ EMBALLASJE               │ NØKKELTALL (live)                │
-│ Pølsepose × 1   1,00     │ Vekt:    110 g                   │
-│ + Legg til               │ Enheter: 656                     │
-│                          │ Kost/stk: 4,30 kr                │
-│                          │ DB: 2,20  DG: 34 % ⚠            │
-└──────────────────────────┴──────────────────────────────────┘
+alter table product_declaration_overrides
+  alter column product_recipe_link_id set not null,
+  drop column recipe_id;
 ```
 
-- Inline-redigering på alle linjer, autosave med debounce
-- Drag-handle for sortering, hurtigtast `+` for ny linje
-- Råvarepris hentes fra `raw_materials.current_cost_price` (live)
-- Cmd/Ctrl+K åpner råvare-søk
+RLS: speil eksisterende policies på koblings-id (les/skrive hvis bruker har tilgang til produktet).
 
-## 3. UI — Produkt-tilknytning ("Brukes av")
+Dataflytting fra `recipes` til primær link (kun der `recipes.declaration_mode != 'auto'` eller manuelle felter er fylt):
+```sql
+update product_recipe_links prl
+set declaration_mode = r.declaration_mode,
+    manual_ingredient_declaration = r.manual_ingredient_declaration,
+    manual_nutrition = r.manual_nutrition,
+    manual_allergen_summary = r.manual_allergen_summary,
+    declaration_updated_at = r.declaration_updated_at
+from recipes r
+where r.id = prl.recipe_id
+  and prl.is_primary = true
+  and (r.declaration_mode <> 'auto' or r.manual_ingredient_declaration is not null);
+```
+(Felter på `recipes` beholdes som default for nye koblinger.)
 
-På master-oppskriften: liste over koblede produkter med mulighet til å:
-- Legge til/fjerne produkt
-- Per produkt: overstyre `vekt`, `enheter pr batch`
-- Per produkt: legge til **ekstra ingredienslinjer** (dekor, valmuefrø, etc.) og **ekstra emballasje**
-- Se hvert produkts egne nøkkeltall side-om-side
+### 2. Nytt view `product_nutrition_calculated`
 
-I `ProductDetail` → Oppskrift-fanen vises master read-only + en "Tillegg for dette produktet"-seksjon for ekstra-linjene.
+Erstatter `recipe_nutrition_calculated`. Slår sammen `recipe_lines` (master) + `product_recipe_links.extra_lines` (jsonb-array), konverterer mengder til gram, vekter næring pr 100 g, og bruker `prl.yield_weight_g` med fallback til `recipes.yield_weight_g` og deretter beregnet (`total_input_grams * (1 - yield_loss_pct/100)`).
 
-## 4. UI — Kalkyle-fanen (ny)
+Output-kolonner: `product_recipe_link_id`, `product_id`, `ingredient_count`, `ingredients_with_nutrition`, `total_input_grams`, `final_weight_grams`, og `*_per_100g` for alle 9 næringsfelter (samme presisjon som dagens view).
 
-Erstatter dagens enklere visning. Layout speiler høyresiden av Excel-arket:
+### 3. Edge function — omdøp og omskriv
 
-- **Salgspriser** (4 redigerbare kort): Salgspris NETTO, Pris Engros, Salgspris m/embalasje ENGROS, Salgspris m/embalasje EGNE UTSALG
-- **Resultat-kolonne** per pris: Brutto fortjeneste %, DB kr, DG %, mva inn/ut
-- Fargekoding: grønn ≥ target_db_pct, gul innen 5pp under, rød ellers
-- **What-if slider**: råvarepris ±X %, arbeidstid ±Y % → ser umiddelbart effekt på DG
-- **Sammenligning**: hvis oppskriften brukes av flere produkter, vis tabell med DG per produkt
+`compute-recipe-declaration` → `compute-product-declaration`.
 
-## 5. Beregningsmotor
+Input: `{ product_recipe_link_id: uuid }` (frontend slår opp via primær link for produktet — kan også støtte `product_id` som convenience).
 
-Ren TS-funksjon `calculateRecipeMetrics(master, link, settings)` returnerer alle tall — brukt av UI for live preview, og av en `compute-recipe-cost` edge function for batch-rekalkulering når råvarepriser endres.
+Logikk:
+1. Hent link + master-recipe + produkt.
+2. Aktiv modus = `link.declaration_mode ?? recipe.declaration_mode`.
+3. Bygg samlet linje-liste = `recipe_lines` ∪ `link.extra_lines` (hver linje merket `source: "master" | "extra"`).
+4. Beregn gram pr linje (samme `toGrams` som i dag, men også for extra-linjer).
+5. Sortér samlet desc på effektive gram → ingrediensliste (én QUID-rangering på tvers).
+6. Allergen-aggregering på tvers av master + extra (`contains` / `may_contain`).
+7. Næring hentes fra nytt `product_nutrition_calculated` for `final_weight_grams` og `*_per_100g`.
+8. Manuell overstyring: `link.manual_*` vinner; ellers `product_declaration_overrides` pr felt.
+9. `data_quality` skiller `master_lines_without_nutrition` vs `extra_lines_without_nutrition`, og varsler om manglende `yield_weight_g`.
 
-Formler (matcher Excel):
-- `total_raw = Σ(mengde_g/1000 × pris_kg) + Σ ekstra_linjer`
-- `total_labor = Σ(timer × timepris)`
-- `cost_per_unit = (total_raw + total_labor) / units_per_batch`
-- `db = pris_netto − cost_per_unit − emballasje_per_stk`
-- `dg = db / pris_netto`
+Response inkluderer `product_name` (fra produkt, ikke recipe), `source_breakdown` pr linje for UI-visning.
 
-## 6. Migrering av eksisterende data
+Beholder gammel `compute-recipe-declaration` som tynn proxy som slår opp primær link og kaller den nye, så ingenting brekker akutt. Slettes når UI er flyttet.
 
-Engangsskript i SQL-migrasjonen: hver rad i gamle `product_recipes` blir én `recipes` + én `product_recipe_links`. Navnet på master-oppskriften = produktnavnet (kan endres etterpå). Brukeren kan så slå sammen master-oppskrifter som er like via "Slå sammen oppskrift"-knapp.
+### 4. UI — `DeclarationTab.tsx`
 
-## 7. Leveranse i steg
+Endre fra recipe-basert til link-basert oppslag:
+- Hent `product_recipe_links` (primær) for `productId` i stedet for `recipes`.
+- Modus-velger viser "Arvet fra master (auto)" som default-valg + mulighet til å overstyre pr produkt. Visuelt chip: "Overstyrt pr produkt" når `link.declaration_mode` er satt.
+- Manuelle felter (ingrediens-tekst, næringstall, allergen-summary) lagres på `product_recipe_links`.
+- Edge-call bruker `product_recipe_link_id`.
+- Datakvalitets-banner viser separate tellere: master-mangler vs extra-mangler, og advarer hvis hverken kobling eller master har `yield_weight_g`.
+- Etikett-forhåndsvisning bruker `productName` (allerede prop).
+- Visuell merking: extra-linjer i ingrediensliste-preview får liten "+" badge så bruker ser hva som kommer fra tillegg.
 
-1. **Migrasjon** — nye tabeller + datamigrering + RLS
-2. **Beregningsmotor + hooks** — `useRecipe`, `useProductRecipeLink`, `calculateMetrics`
-3. **RecipeEditor v2** — inkl. arbeid + emballasje
-4. **"Brukes av"-panel + per-produkt tillegg**
-5. **Kalkyle-fane v2** — fire priser + what-if
-6. **Deklarasjon** — oppdater `compute-recipe-declaration` til å lese fra ny modell (inkl. ekstra-linjer)
+### 5. UI — "Brukes av"-banner på master-oppskrift
 
-Hvert steg er testbart for seg. Du godkjenner steg-for-steg som før.
+`RecipeProductLinks.tsx` finnes allerede med chips. Utvid med:
+- For hvert produkt: vis kort sammendrag av tillegg (`extra_lines.length` → "+ 2 tillegg") og lenke til produktets Deklarasjon-tab (`/varer/vareliste/:id?tab=deklarasjon`).
+- Info-tekst: "Endringer i denne oppskriften påvirker alle N produktene."
 
-## Det vi IKKE bygger nå
+### 6. Opprydning
 
-- Versjonering med rollback (kun forward — beholdes som i dagens spec)
-- Halvfabrikat-råvarer (oppskrift som blir råvare i annen oppskrift)
-- Faktisk PDF-utskrift av kalkyle (kun skjerm + CSV-eksport)
+- Frontend slutter å lese `recipes.declaration_mode` etc. — feltene blir default-arve.
+- Etter at all UI er flyttet og verifisert: slett gammel `compute-recipe-declaration` (egen oppfølging).
 
----
+### Definition of done
 
-Si fra om du vil justere noe (f.eks. felt-navn, om "ekstra-linjer" skal være egen tabell i stedet for jsonb, eller om vi skal starte med et annet steg) — ellers begynner jeg på **Steg 1: migrasjon**.
+- Deklarasjon/næring pr `product_recipe_link_id`.
+- `extra_lines` påvirker både næring, ingrediensliste og allergener.
+- QUID rangerer master + extra samlet.
+- Modus-velger støtter arv eller overstyring pr produkt; manuelle verdier vinner over master.
+- "Brukes av"-banner lenker til hvert produkts deklarasjon.
+- Datakvalitets-banner skiller master vs extra og varsler ved manglende `yield_weight_g`.
+- Eksisterende `recipe_declaration_overrides`-rader er migrert til `product_declaration_overrides` med korrekt `product_recipe_link_id`.
+
+### Ikke i scope nå
+
+- Ekte versjonshistorikk pr deklarasjon.
+- Sletting av default-feltene på `recipes` (beholdes som arv).
+- Bulk-redigering av deklarasjon på tvers av flere produkter samtidig.
