@@ -142,7 +142,7 @@ function ExtractionConfigCard({ existing, onSaved }: { existing: AiConfig | null
   }, [provider]);
 
   const test = async () => {
-    if (!apiKey) {
+    if (!apiKey && !existing) {
       toast.error("Lim inn API-key først");
       return;
     }
@@ -150,12 +150,28 @@ function ExtractionConfigCard({ existing, onSaved }: { existing: AiConfig | null
     try {
       const { data, error } = await supabase.functions.invoke("ai-config-test", {
         body: {
-          provider, api_key: apiKey, model,
+          provider,
+          api_key: apiKey || undefined, // tom = test lagret nøkkel
+          model,
+          purpose: "invoice_extraction",
           azure_endpoint: provider === "azure_openai" ? azureEndpoint : undefined,
           azure_deployment: provider === "azure_openai" ? azureDeployment : undefined,
         },
       });
-      if (error) throw error;
+      if (error) {
+        // Forsøk å hente serverfeil-detaljer
+        const ctxErr = (error as any)?.context;
+        let detail = (error as any)?.message ?? String(error);
+        try {
+          const txt = await ctxErr?.text?.();
+          if (txt) {
+            const parsed = JSON.parse(txt);
+            detail = parsed?.error ?? detail;
+          }
+        } catch { /* ignore */ }
+        setTestResult({ ok: false, message: detail });
+        return;
+      }
       const r = data as { ok: boolean; sample_response?: string; error?: string };
       if (r.ok) {
         setTestResult({ ok: true, message: `OK — modellen svarte: ${r.sample_response}` });
@@ -163,8 +179,7 @@ function ExtractionConfigCard({ existing, onSaved }: { existing: AiConfig | null
         setTestResult({ ok: false, message: r.error ?? "Ukjent feil" });
       }
     } catch (e: any) {
-      const msg = e?.context?.error ?? e?.message ?? String(e);
-      setTestResult({ ok: false, message: msg });
+      setTestResult({ ok: false, message: e?.message ?? String(e) });
     } finally {
       setTesting(false);
     }
@@ -301,9 +316,9 @@ function ExtractionConfigCard({ existing, onSaved }: { existing: AiConfig | null
 
         <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
           <div className="flex gap-2">
-            <Button variant="outline" onClick={test} disabled={testing || !apiKey} className="gap-2">
+            <Button variant="outline" onClick={test} disabled={testing || (!apiKey && !existing)} className="gap-2">
               {testing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Info className="h-4 w-4" />}
-              Test API-kall
+              {existing && !apiKey ? "Test lagret nøkkel" : "Test API-kall"}
             </Button>
             {existing && (
               <Button variant="ghost" onClick={() => remove.mutate()} disabled={remove.isPending} className="gap-2 text-destructive">
