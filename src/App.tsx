@@ -84,6 +84,9 @@ import RavarerLeverandorer from "@/ravarer/pages/Leverandorer";
 import RavarerAvtaler from "@/ravarer/pages/Avtaler";
 import RavarerDatabladEndringer from "@/ravarer/pages/DatabladEndringer";
 import RavarerDatabladBulk from "@/ravarer/pages/DatabladBulk";
+import RavarerForhandlingerList from "@/ravarer/pages/forhandlinger/ForhandlingerList";
+import RavarerForhandlingWizard from "@/ravarer/pages/forhandlinger/ForhandlingWizard";
+import RavarerForhandlingDetail from "@/ravarer/pages/forhandlinger/ForhandlingDetail";
 
 const KunderEntityProvider = ({ children }: { children: React.ReactNode }) => {
   const { user } = useNbhubAuth();
@@ -208,6 +211,10 @@ const App = () => (
               <Route path="/ravarer/avtaler" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><RavarerAvtaler /></RavarerProvider></AppAccessGuard></Shell>} />
               <Route path="/ravarer/datablad-endringer" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><RavarerDatabladEndringer /></RavarerProvider></AppAccessGuard></Shell>} />
               <Route path="/ravarer/datablad-bulk" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><RavarerDatabladBulk /></RavarerProvider></AppAccessGuard></Shell>} />
+              <Route path="/ravarer/forhandlinger" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><InvoiceAccessGuard><RavarerForhandlingerList /></InvoiceAccessGuard></RavarerProvider></AppAccessGuard></Shell>} />
+              <Route path="/ravarer/forhandlinger/ny" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><InvoiceAccessGuard><RavarerForhandlingWizard /></InvoiceAccessGuard></RavarerProvider></AppAccessGuard></Shell>} />
+              <Route path="/ravarer/forhandlinger/:id/rediger" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><InvoiceAccessGuard><RavarerForhandlingWizard /></InvoiceAccessGuard></RavarerProvider></AppAccessGuard></Shell>} />
+              <Route path="/ravarer/forhandlinger/:id" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><InvoiceAccessGuard><RavarerForhandlingDetail /></InvoiceAccessGuard></RavarerProvider></AppAccessGuard></Shell>} />
               <Route path="/ravarer/innstillinger/tripletex" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><TripletexSettings /></RavarerProvider></AppAccessGuard></Shell>} />
               <Route path="/ravarer/innstillinger/ai-tjenester" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><AiServicesSettings /></RavarerProvider></AppAccessGuard></Shell>} />
               <Route path="/ravarer/innstillinger/match-toleranser" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><MatchToleranserSettings /></RavarerProvider></AppAccessGuard></Shell>} />
