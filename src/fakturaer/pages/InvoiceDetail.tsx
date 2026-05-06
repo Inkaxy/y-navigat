@@ -1,16 +1,23 @@
+import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Loader2, LineChart as LineChartIcon } from "lucide-react";
+import { ArrowLeft, Loader2, LineChart as LineChartIcon, CheckCircle2, Flag } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { FakturaerHeaderBanner } from "@/fakturaer/components/FakturaerHeaderBanner";
 import { InvoiceStatusBadge } from "@/fakturaer/components/InvoiceStatusBadge";
+import { ConfirmReconcileDialog } from "@/fakturaer/components/ConfirmReconcileDialog";
+import { FlagInvoiceDialog } from "@/fakturaer/components/FlagInvoiceDialog";
+import { useFakturaer } from "@/fakturaer/context/FakturaerContext";
 import { formatNok, formatDate, INVOICE_SOURCES } from "@/fakturaer/lib/constants";
 
 export default function InvoiceDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { canReconcile, canWrite } = useFakturaer();
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [flagOpen, setFlagOpen] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["invoice", id],
