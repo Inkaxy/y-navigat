@@ -17,9 +17,12 @@ import { formatNok, formatDate, INVOICE_SOURCES } from "@/fakturaer/lib/constant
 export default function InvoiceDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { canReconcile, canWrite } = useFakturaer();
+  const qc = useQueryClient();
+  const { canReconcile, canWrite, hasInvoiceAccess } = useFakturaer();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [flagOpen, setFlagOpen] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [selected, setSelected] = useState<Record<string, boolean>>({});
 
   const { data, isLoading } = useQuery({
     queryKey: ["invoice", id],
