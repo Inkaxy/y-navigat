@@ -97,7 +97,7 @@ export function SkuConflictDialog({ open, onOpenChange, line, onOpenMatchDrawer 
               Det er en ny vare → finn / opprett råvare
             </Button>
             <Button className="w-full justify-start" variant="outline" onClick={() => setShowMail((v) => !v)}>
-              Reklamer til leverandør
+              Send oppfølging til leverandør
             </Button>
           </div>
           {showMail && (
