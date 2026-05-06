@@ -242,7 +242,6 @@ export default function ImportPdfPage({ embedded = false }: { embedded?: boolean
         if (linesErr) throw linesErr;
       }
 
-      toast.success("Faktura opprettet");
       if (lines.length === 0) {
         toast.success("Faktura opprettet — registrer linjer");
         navigate(`/ravarer/fakturaer/${invoice.id}/registrer-linjer`);
