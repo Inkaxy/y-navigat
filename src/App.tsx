@@ -74,6 +74,7 @@ import FakturaerDetail from "@/fakturaer/pages/InvoiceDetail";
 import FakturaerReviewQueue from "@/fakturaer/pages/ReviewQueue";
 import { InvoiceAccessGuard } from "@/ravarer/components/InvoiceAccessGuard";
 import TripletexSettings from "@/ravarer/pages/innstillinger/TripletexSettings";
+import AiServicesSettings from "@/ravarer/pages/innstillinger/AiServicesSettings";
 
 const KunderEntityProvider = ({ children }: { children: React.ReactNode }) => {
   const { user } = useNbhubAuth();
@@ -190,6 +191,7 @@ const App = () => (
               <Route path="/ravarer/fakturaer/:id" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><InvoiceAccessGuard><FakturaerProvider><FakturaerDetail /></FakturaerProvider></InvoiceAccessGuard></RavarerProvider></AppAccessGuard></Shell>} />
               <Route path="/ravarer/innstillinger" element={<Navigate to="/ravarer/innstillinger/tripletex" replace />} />
               <Route path="/ravarer/innstillinger/tripletex" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><TripletexSettings /></RavarerProvider></AppAccessGuard></Shell>} />
+              <Route path="/ravarer/innstillinger/ai-tjenester" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><AiServicesSettings /></RavarerProvider></AppAccessGuard></Shell>} />
 
               {/* Backward-compat redirects fra gamle /fakturaer/* */}
               <Route path="/fakturaer" element={<Navigate to="/ravarer/fakturaer" replace />} />
