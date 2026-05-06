@@ -6119,6 +6119,7 @@ export type Database = {
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
       unaccent: { Args: { "": string }; Returns: string }
+      user_has_invoice_access: { Args: never; Returns: boolean }
       verify_gtin: { Args: { p_gtin: string }; Returns: boolean }
     }
     Enums: {
