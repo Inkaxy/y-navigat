@@ -151,6 +151,7 @@ export default function InvoiceDetailPage() {
               <table className="w-full text-sm">
                 <thead className="bg-muted/30 text-left text-xs uppercase tracking-wider text-ink-secondary">
                   <tr>
+                    {canBulkImport && <th className="w-8 px-2 py-3"></th>}
                     <th className="px-4 py-3">SKU</th>
                     <th className="px-4 py-3">Beskrivelse / råvare</th>
                     <th className="px-4 py-3 text-right">Antall</th>
