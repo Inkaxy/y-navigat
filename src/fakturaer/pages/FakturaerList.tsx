@@ -50,6 +50,8 @@ export default function FakturaerListPage() {
         }
       />
 
+      <TripletexStatusCard />
+
       {totalReview > 0 && (
         <div
           className="flex cursor-pointer items-center justify-between rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm transition-colors hover:bg-warning/15"
