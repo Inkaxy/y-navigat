@@ -53,12 +53,16 @@ Deno.serve(async (req) => {
     }
 
     if (action === "save") {
-      const { provider, api_key, model, max_tokens, temperature, purpose, azure_endpoint, azure_deployment } = body;
+      const { provider, model, max_tokens, temperature, purpose, azure_endpoint, azure_deployment } = body;
+      const api_key = (body.api_key ?? "").trim();
       if (!provider || !api_key || !model || !purpose) {
         return jsonErr("provider, api_key, model og purpose er påkrevd", 400);
       }
       if (!["anthropic", "openai", "azure_openai"].includes(provider)) {
         return jsonErr("Ugyldig provider", 400);
+      }
+      if (provider === "anthropic" && !api_key.startsWith("sk-ant-")) {
+        return jsonErr("Anthropic-nøkkel skal starte med 'sk-ant-'. Sjekk at du limte inn riktig key fra console.anthropic.com.", 400);
       }
       const encrypted = await encryptWithKey(api_key, "AI_CONFIG_ENCRYPTION_KEY");
 
