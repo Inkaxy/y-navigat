@@ -86,6 +86,11 @@ const KunderEntityProvider = ({ children }: { children: React.ReactNode }) => {
 
 const queryClient = new QueryClient();
 
+const RedirectFakturaer = () => {
+  const { id } = useParams();
+  return <Navigate to={`/ravarer/fakturaer/${id}`} replace />;
+};
+
 const Shell = ({ children }: { children: React.ReactNode }) => (
   <ProtectedRoute>
     <AppShell>{children}</AppShell>
