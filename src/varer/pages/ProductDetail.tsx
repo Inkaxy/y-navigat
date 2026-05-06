@@ -390,7 +390,7 @@ export default function ProductDetail() {
   // (Ctrl+S-handler ligger nå før early-return for å overholde Rules of Hooks)
 
   // Skjul Oppskrift for varianter
-  const visibleTabs = TABS.filter((t) => !(t.type === "tab" && t.id === "oppskrift" && product.variant_of_product_id));
+  const visibleTabs = TABS.filter((t) => !(t.type === "tab" && (t.id === "oppskrift" || t.id === "deklarasjon") && product.variant_of_product_id));
 
   const lookups = lookupsQuery.data;
   const productOptions = lookups?.allProducts ?? [];
