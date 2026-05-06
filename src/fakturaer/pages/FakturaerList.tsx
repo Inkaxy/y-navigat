@@ -102,7 +102,7 @@ export default function FakturaerListPage() {
             <FileText className="mb-3 h-10 w-10 text-ink-secondary" />
             <p className="text-ink-secondary">Ingen fakturaer enda.</p>
             {canWrite && (
-              <button onClick={() => navigate("/ravarer/fakturaer/ny")} className="mt-3 text-sm font-medium text-primary hover:underline">
+              <button onClick={() => navigate("/ravarer/fakturaer/import")} className="mt-3 text-sm font-medium text-primary hover:underline">
                 Registrer første faktura
               </button>
             )}
