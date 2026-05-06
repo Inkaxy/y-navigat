@@ -3,10 +3,13 @@ import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Loader2, FileText } from "lucide-react";
+import { Search, Loader2, FileText, Plus } from "lucide-react";
 import { RavarerHeaderBanner } from "@/ravarer/components/RavarerHeaderBanner";
 import { useAgreements, type AgreementRow } from "@/ravarer/hooks/useAgreements";
+import { useRavarer } from "@/ravarer/context/RavarerContext";
+import { NewAgreementDialog } from "@/ravarer/components/NewAgreementDialog";
 import { formatNok, formatDate } from "@/fakturaer/lib/constants";
 
 type Status = "active" | "expiring_soon" | "expiring" | "expired";
