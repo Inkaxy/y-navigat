@@ -19,6 +19,7 @@ import {
   AlertTriangle,
   Loader2,
   RotateCcw,
+  ScrollText,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -43,6 +44,7 @@ import { LeveranseTab } from "@/varer/components/products/detail/tabs/LeveranseT
 import { PakkeTab, type PackageItem } from "@/varer/components/products/detail/tabs/PakkeTab";
 import { ReturTab } from "@/varer/components/products/detail/tabs/ReturTab";
 import { RecipeEditor } from "@/varer/components/products/RecipeEditor";
+import { DeclarationTab } from "@/varer/components/products/DeclarationTab";
 import { useNavigate as useNav } from "react-router-dom";
 
 const TABS: TabConfig[] = [
@@ -56,6 +58,7 @@ const TABS: TabConfig[] = [
   { type: "separator", id: "sep1" },
   { type: "tab", id: "varianter", label: "Varianter", icon: GitBranch },
   { type: "tab", id: "oppskrift", label: "Oppskrift", icon: ChefHat },
+  { type: "tab", id: "deklarasjon", label: "Deklarasjon", icon: ScrollText },
   { type: "tab", id: "priser", label: "Priser", icon: Receipt },
   { type: "separator", id: "sep2" },
   { type: "tab", id: "sortiment", label: "Sortiment", icon: ListChecks },
@@ -387,7 +390,7 @@ export default function ProductDetail() {
   // (Ctrl+S-handler ligger nå før early-return for å overholde Rules of Hooks)
 
   // Skjul Oppskrift for varianter
-  const visibleTabs = TABS.filter((t) => !(t.type === "tab" && t.id === "oppskrift" && product.variant_of_product_id));
+  const visibleTabs = TABS.filter((t) => !(t.type === "tab" && (t.id === "oppskrift" || t.id === "deklarasjon") && product.variant_of_product_id));
 
   const lookups = lookupsQuery.data;
   const productOptions = lookups?.allProducts ?? [];
@@ -461,6 +464,9 @@ export default function ProductDetail() {
         {tab === "varianter" && <VariantsTab product={product} variants={variantsQuery.data ?? []} />}
         {tab === "oppskrift" && !product.variant_of_product_id && (
           <RecipeEditor productId={product.id} productName={product.display_name} canWrite={canWrite} />
+        )}
+        {tab === "deklarasjon" && !product.variant_of_product_id && (
+          <DeclarationTab productId={product.id} productName={product.display_name} canWrite={canWrite} />
         )}
         {tab === "priser" && (
           <Card>
