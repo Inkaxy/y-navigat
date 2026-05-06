@@ -352,6 +352,9 @@ function RecipeForm({ recipe, productName, canWrite }: { recipe: any; productNam
           waste_percent: Number(l.waste_percent) || 0,
           sort_order: l.sort_order,
           notes: l.notes ?? null,
+          include_in_declaration: l.include_in_declaration !== false,
+          is_quid_relevant: !!l.is_quid_relevant,
+          custom_declaration_text: l.custom_declaration_text || null,
         };
         if (l._new) {
           await supabase.from("recipe_lines").insert(payload as never);
