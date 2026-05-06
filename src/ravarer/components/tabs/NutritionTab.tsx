@@ -11,6 +11,7 @@ import { ALLERGENS, ALLERGEN_PRESENCE, COUNTRY_OPTIONS, calcEnergyKj, kjToKcal }
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { Sparkles, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { DatasheetSection } from "./DatasheetSection";
 
 interface Props { rawMaterialId: string; }
 
