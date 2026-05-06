@@ -39,7 +39,7 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>;
 
-export default function NewInvoicePage() {
+export default function NewInvoicePage({ embedded = false }: { embedded?: boolean } = {}) {
   const navigate = useNavigate();
   const { canWrite } = useFakturaer();
   const { data: entities = [] } = useFakturaerLegalEntities();
