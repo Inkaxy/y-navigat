@@ -16,9 +16,20 @@ export default function RawMaterialDetail() {
   const [searchParams, setSearchParams] = useSearchParams();
   const tabFromUrl = searchParams.get("tab") ?? "overview";
   const { data: rm, isLoading } = useRawMaterial(id);
+  const rename = useRenameRawMaterial();
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState("");
 
   if (isLoading) return <div className="flex justify-center p-12"><Loader2 className="h-5 w-5 animate-spin" /></div>;
   if (!rm) return <Card className="p-8 text-center text-ink-secondary">Råvaren ble ikke funnet.</Card>;
+
+  const startEdit = () => { setNameDraft(rm.name); setEditingName(true); };
+  const saveName = async () => {
+    const v = nameDraft.trim();
+    if (!v || v === rm.name) { setEditingName(false); return; }
+    await rename.mutateAsync({ id: rm.id, name: v });
+    setEditingName(false);
+  };
 
   return (
     <div className="space-y-5">
