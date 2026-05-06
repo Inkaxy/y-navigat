@@ -247,11 +247,11 @@ Deno.serve(async (req) => {
         invoice_id: invoice.id,
         line_number: idx + 1,
         description: desc,
-        supplier_item_number: supplierItemNumber,
+        supplier_sku: supplierItemNumber,
         quantity: qty,
         unit: unitCode,
         unit_price: unitPrice,
-        line_net: lineNet,
+        total_amount: lineNet,
       };
     });
 
