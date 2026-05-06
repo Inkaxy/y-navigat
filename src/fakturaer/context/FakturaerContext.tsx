@@ -4,6 +4,8 @@ import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { APP_CODE } from "@/fakturaer/lib/constants";
 
+// Access-nivåer matcher app_access_level i DB. "approve" beholdes for kompatibilitet
+// men brukes i NBhub-kontekst som rett til å avstemme/reconciliere fakturaer mot avtaler.
 export type AccessLevel = "none" | "read" | "write" | "approve" | "admin";
 
 interface FakturaerContextValue {
@@ -12,7 +14,7 @@ interface FakturaerContextValue {
   accessLevel: AccessLevel;
   canRead: boolean;
   canWrite: boolean;
-  canApprove: boolean;
+  canReconcile: boolean;
   canAdmin: boolean;
 }
 
