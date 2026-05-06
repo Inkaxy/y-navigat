@@ -2,10 +2,11 @@ import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Upload, Loader2, FileText, Check, RefreshCw, AlertCircle } from "lucide-react";
+import { Upload, Loader2, FileText, Check, RefreshCw, AlertCircle, Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
+import { CreateRawMaterialFromDatasheetDialog, type DatasheetExtract } from "@/ravarer/components/CreateRawMaterialFromDatasheetDialog";
 
 interface FileRow {
   file: File;
@@ -13,6 +14,7 @@ interface FileRow {
   stage?: "upload" | "extract" | "match" | "apply";
   storage_path?: string;
   datasheet_id?: string;
+  extracted?: DatasheetExtract;
   candidates?: { id: string; name: string; sku: string; score: number }[];
   selectedRm?: string;
   error?: string;
