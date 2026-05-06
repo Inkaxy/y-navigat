@@ -1,1 +1,7 @@
 project_id = "xpgoztaraqdvliitkkfv"
+
+[functions.validate-rfq-access]
+verify_jwt = false
+
+[functions.submit-negotiation-response]
+verify_jwt = false
