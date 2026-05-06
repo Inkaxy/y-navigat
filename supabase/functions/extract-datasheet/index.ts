@@ -157,8 +157,10 @@ Deno.serve(async (req) => {
     if (aiResp.status === 402) return json({ error: "AI-kreditt brukt opp" }, 402);
     if (!aiResp.ok) {
       const t = await aiResp.text();
-      console.error("AI error", t);
-      return json({ error: "AI gateway error" }, 500);
+      console.error("AI error", aiResp.status, t);
+      let msg = t;
+      try { msg = JSON.parse(t)?.error?.message ?? t; } catch { /* */ }
+      return json({ error: `AI: ${msg}` }, 500);
     }
 
     const aiData = await aiResp.json();
