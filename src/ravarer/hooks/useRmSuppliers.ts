@@ -29,8 +29,10 @@ export interface PriceHistoryRow {
   effective_date: string;
   source: string;
   source_reference: string | null;
+  invoice_id: string | null;
   notes: string | null;
   created_at: string;
+  invoices?: { invoice_number: string | null } | null;
 }
 
 export function useRawMaterialSuppliers(rawMaterialId: string | undefined) {
