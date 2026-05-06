@@ -11,6 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import { ArrowLeft, ArrowRight, Send, Loader2, Copy, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { RavarerHeaderBanner } from "@/ravarer/components/RavarerHeaderBanner";
+import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { useRawMaterials } from "@/ravarer/hooks/useRawMaterials";
 import { useSuppliers } from "@/ravarer/hooks/useSuppliers";
 import {
