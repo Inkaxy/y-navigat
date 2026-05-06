@@ -1,5 +1,6 @@
 import { NavLink, useLocation } from "react-router-dom";
 import { useAccessibleApps } from "@/hooks/useAccessibleApps";
+import { useReviewCount } from "@/fakturaer/hooks/useReviewCount";
 import { cn } from "@/lib/utils";
 
 interface SubItem {
@@ -34,10 +35,10 @@ const SUBMENUS: Record<string, { prefix: string; appSlug: string; items: SubItem
     appSlug: "fakturaer",
     items: [
       { to: "/fakturaer", label: "Alle fakturaer" },
+      { to: "/fakturaer/til-behandling", label: "Til behandling" },
       { to: "/fakturaer/ny", label: "Ny faktura" },
       { to: "/fakturaer/import-ehf", label: "Importer EHF" },
       { to: "/fakturaer/import-pdf", label: "Last opp PDF" },
-      // { to: "/fakturaer/til-behandling", label: "Til behandling" }, // kommer i Steg 3
     ],
   },
   kunder: {
@@ -71,6 +72,7 @@ const SUBMENUS: Record<string, { prefix: string; appSlug: string; items: SubItem
 export function SubAppNav() {
   const { pathname } = useLocation();
   const { data: apps } = useAccessibleApps();
+  const { data: reviewCount = 0 } = useReviewCount();
 
   const match = Object.values(SUBMENUS).find(
     (s) => pathname === s.prefix || pathname.startsWith(s.prefix + "/"),
@@ -112,6 +114,11 @@ export function SubAppNav() {
                 }
               >
                 {item.label}
+                {item.to === "/fakturaer/til-behandling" && reviewCount > 0 && (
+                  <span className={cn("ml-2 rounded-full px-1.5 py-0.5 text-[10px] font-semibold", reviewCount > 10 ? "bg-destructive text-destructive-foreground" : "bg-warning/20 text-warning")}>
+                    {reviewCount}
+                  </span>
+                )}
               </NavLink>
             </li>
           );
