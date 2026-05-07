@@ -652,6 +652,36 @@ export default function OrdersList() {
                         <TableCell className="px-3 py-1.5 text-right font-medium tabular-nums">
                           {formatNOK(r.total_incl_vat)}
                         </TableCell>
+                        {acceptanceOnly && (
+                          <TableCell
+                            className="px-3 py-1.5 text-right"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {r.status === "awaiting_confirmation" ? (
+                              <div className="flex items-center justify-end gap-1.5">
+                                <Button
+                                  size="sm"
+                                  className="h-7 gap-1 px-2 text-caption"
+                                  onClick={() => openAccept(r)}
+                                >
+                                  <Check className="h-3.5 w-3.5" />
+                                  Aksepter
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  className="h-7 gap-1 px-2 text-caption"
+                                  onClick={() => openReject(r)}
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                  Avvis
+                                </Button>
+                              </div>
+                            ) : (
+                              <span className="text-caption text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+                        )}
                       </TableRow>
                     );
                   })
