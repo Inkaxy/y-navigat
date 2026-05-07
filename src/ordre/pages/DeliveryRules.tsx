@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Plus, Pencil, Trash2, Loader2, ListChecks, Search } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, ListChecks, Search, Copy } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { AppBanner } from "@/ordre/components/shell/AppBanner";
