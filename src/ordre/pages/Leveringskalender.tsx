@@ -834,6 +834,7 @@ function MatrixGrid({
   addedIds,
   getValue,
   isDirty,
+  isFallback,
   onChange,
   hasMerknad,
   hasData,
@@ -852,6 +853,7 @@ function MatrixGrid({
   addedIds: Set<string>;
   getValue: (key: CellKey) => string;
   isDirty: (key: CellKey) => boolean;
+  isFallback: (key: CellKey) => boolean;
   onChange: (key: CellKey, value: string) => void;
   hasMerknad: (key: CellKey) => boolean;
   hasData: (key: CellKey) => boolean;
