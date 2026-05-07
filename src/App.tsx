@@ -80,6 +80,7 @@ import OrdreDeliveryNoteSettings from "@/ordre/pages/DeliveryNoteSettings";
 import OrdrePlaceholder from "@/ordre/pages/Placeholder";
 import OrdreInnstillinger from "@/ordre/pages/Innstillinger";
 import M365Callback from "@/ordre/pages/M365Callback";
+import OrdrePortalTest from "@/ordre/pages/PortalTest";
 
 import { RavarerProvider } from "@/ravarer/context/RavarerContext";
 import RavarerVareliste from "@/ravarer/pages/Vareliste";
