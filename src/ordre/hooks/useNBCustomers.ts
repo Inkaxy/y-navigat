@@ -20,6 +20,8 @@ export type CustomerOption = {
   invoice_recipient_customer_id: string | null;
   default_price_list_id: string | null;
   status: string;
+  geocode_latitude: number | null;
+  geocode_longitude: number | null;
 };
 
 /** Henter aktive kunder for NB AS — brukes til ordre-opprettelse */
