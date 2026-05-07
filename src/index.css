@@ -11,47 +11,51 @@
 
 @layer base {
   :root {
-    /* ---- Surfaces (lys, modernisert: ren off-white, mindre gult) ---- */
-    --surface-canvas:        220 20% 98%;     /* #F7F8FA — sideflate */
-    --surface-raised:        0 0% 100%;       /* #FFFFFF — kort */
-    --surface-sunken:        220 16% 95%;     /* #EEF0F4 — innfelt */
-    --surface-overlay:       0 0% 100%;
-    --surface-muted:         220 14% 96%;
+    /* ---- Surfaces — naturpapir / emballasje ---- */
+    --surface-canvas:        38 38% 95%;      /* #F4EEDF — varm cream / naturpapir */
+    --surface-raised:        40 50% 97%;      /* #FBF6EA — etikett-papir */
+    --surface-sunken:        36 28% 90%;      /* #ECE3CE — innfelt papir */
+    --surface-overlay:       40 50% 97%;
+    --surface-muted:         36 30% 92%;
 
-    /* ---- Borders (myke, kjølige nøytraler) ---- */
-    --border-subtle:         220 14% 92%;
-    --border-default:        220 13% 88%;
-    --border-strong:         220 12% 78%;
+    /* ---- Borders — tynne kraft-linjer ---- */
+    --border-subtle:         32 22% 84%;
+    --border-default:        30 20% 76%;
+    --border-strong:         28 24% 58%;
 
-    /* ---- Text (kjølig grå-skala for moderne look) ---- */
-    --text-primary:          222 25% 12%;
-    --text-secondary:        220 12% 38%;
-    --text-tertiary:         220 9%  52%;
-    --text-on-accent:        0   0%  100%;
+    /* ---- Text — espresso-skala ---- */
+    --text-primary:          24 30% 12%;      /* dyp espresso */
+    --text-secondary:        26 18% 30%;
+    --text-tertiary:         28 14% 44%;
+    --text-on-accent:        38 45% 95%;
 
-    /* ---- App-farge (dynamisk via AppColorProvider) ---- */
-    --app-color:             221 83% 53%;     /* moderne blå default */
-    --app-color-deep:        222 76% 40%;
-    --app-color-soft:        221 83% 53%;
+    /* ---- App-farge (dynamisk via AppColorProvider) — bronze default ---- */
+    --app-color:             26 48% 43%;      /* bronze */
+    --app-color-deep:        24 50% 32%;      /* dyp bronze */
+    --app-color-soft:        26 48% 55%;
 
-    /* ---- Bakeri-aksent (varm wheat/gold) — brukt i topbar/submenu ---- */
-    --bakery-wheat:          35  65% 55%;     /* varm gold */
-    --bakery-crust:          28  45% 42%;     /* dypere crust */
-    --bakery-cream:          40  55% 96%;     /* myk papir */
-    --bakery-cream-deep:     38  40% 92%;
+    /* ---- Bakeri-aksent (legacy alias — peker på brand-tokens) ---- */
+    --bakery-wheat:          35 55% 50%;
+    --bakery-crust:          24 50% 32%;
+    --bakery-cream:          38 45% 94%;
+    --bakery-cream-deep:     36 28% 88%;
 
-    /* ---- Brand (Nøtterø Bakeri) ---- */
-    --brand-ink:             24  22% 11%;     /* dyp espresso fra wordmark */
-    --brand-cream:           38  45% 94%;     /* offisiell papir-cream */
-    --brand-bronze:          26  48% 43%;     /* #a36c3a — bronze accent */
-    --brand-bronze-soft:     26  48% 55%;
+    /* ---- Brand (Nøtterø Bakeri — emballasje-paletten) ---- */
+    --brand-ink:             214 38% 14%;     /* #16243A — emballasje-navy */
+    --brand-ink-deep:        216 42% 9%;      /* dypere navy for kontrast */
+    --brand-cream:           38 50% 92%;      /* offisiell papir-cream */
+    --brand-cream-deep:      36 32% 84%;      /* mørkere kraftpapir */
+    --brand-bronze:          26 52% 42%;      /* bronze stempel */
+    --brand-bronze-soft:     28 50% 56%;
+    --brand-bronze-deep:     24 56% 30%;
+    --brand-gold:            38 62% 50%;      /* warm gold accent */
 
-    /* ---- States (litt mer mettet, moderne) ---- */
-    --state-danger:          0   72% 51%;
-    --state-warning:         32  95% 50%;
-    --state-success:         142 71% 38%;
-    --state-neutral:         220 9%  52%;
-    --state-info:            217 91% 55%;
+    /* ---- States ---- */
+    --state-danger:          4 62% 48%;
+    --state-warning:         32 80% 48%;
+    --state-success:         140 38% 38%;
+    --state-neutral:         28 14% 44%;
+    --state-info:            210 50% 42%;
 
     /* ---- Radii (større/mykere — Apple-aktig) ---- */
     --radius-sm: 8px;
