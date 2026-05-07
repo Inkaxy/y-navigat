@@ -282,6 +282,21 @@ export default function LiveForhandlingWorkspace() {
           </div>
         </div>
         <div className="flex gap-2">
+          <Button size="sm" variant="outline" className="rounded-full" onClick={() => setTimelineOpen(true)}>
+            <History className="mr-1.5 h-4 w-4" /> Tidslinje
+          </Button>
+          {!isEnded && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="rounded-full"
+              onClick={handleTogglePause}
+              disabled={pausing}
+            >
+              {isPaused ? <Play className="mr-1.5 h-4 w-4" /> : <Pause className="mr-1.5 h-4 w-4" />}
+              {isPaused ? "Gjenoppta" : "Pause"}
+            </Button>
+          )}
           {!isEnded && (
             <Button size="sm" className="rounded-full" onClick={() => setEndOpen(true)}>
               <Flag className="mr-1.5 h-4 w-4" /> Avslutt →
@@ -289,6 +304,12 @@ export default function LiveForhandlingWorkspace() {
           )}
         </div>
       </Card>
+
+      {isPaused && !isEnded && (
+        <Card className="border-warning/40 bg-warning/10 p-3 text-sm text-warning">
+          Møtet er pauset. Klikk «Gjenoppta» når dere er tilbake.
+        </Card>
+      )}
 
       {/* Search */}
       {!isEnded && (
