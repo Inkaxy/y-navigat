@@ -8,8 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Trophy, Check, X, Loader2, Flag } from "lucide-react";
+import { ArrowLeft, Trophy, Check, X, Loader2, Flag, History, Send, FileCheck, Clock, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
+import { LiveTidslinjeDrawer } from "./components/LiveTidslinjeDrawer";
 import { RavarerHeaderBanner } from "@/ravarer/components/RavarerHeaderBanner";
 import {
   useNegotiation,
