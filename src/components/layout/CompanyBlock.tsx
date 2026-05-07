@@ -69,9 +69,9 @@ export function CompanyBlock({ className }: { className?: string }) {
     <DropdownMenu>
       <DropdownMenuTrigger
         className={cn(
-          "group flex items-center gap-1.5 py-1.5 pl-1 pr-3.5 text-ink-primary transition-colors",
-          "focus:outline-none focus-visible:ring-2 focus-visible:ring-app/40 rounded-md",
-          "border-r border-line-subtle hover:bg-bakery-cream-deep",
+          "group flex items-center gap-1.5 py-1.5 pl-1 pr-3.5 text-brand-cream transition-colors",
+          "focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-bronze/50 rounded-md",
+          "border-r border-brand-cream/10 hover:bg-brand-cream/[0.06]",
           className,
         )}
       >
