@@ -1,108 +1,103 @@
-## Status
+# Ordre — visuell redesign (kun utseende)
 
-Phase A er ferdig: modus-velger, `LiveForhandlingSetup`, `LiveForhandlingWorkspace` med søk, faktagrunnlag, Avtalt/Park/Avslå, sanntids-besparelse, og avslutning som kopierer sammendrag / mailto.
+Mål: Gi ordre-appen et varmt, håndverksbasert "Nøtterø Bakeri"-uttrykk inspirert av emballasje, etiketter og papirposer. **Ingen funksjonell endring** — alle knapper, felt, filtre, menyer, statuser, kolonner, handlinger og data­visning forblir identisk. Kun layout, kort, spacing, typografi, rammer, ikoner og overflater endres.
 
-Denne planen dekker Phase B – det som gjenstår fra spesifikasjonen.
+## Designspråk (anvendelse av eksisterende brand-tokens)
 
-## Datamodell
+Bruker tokens som allerede finnes i `index.css` / `tailwind.config.ts` — ingen nye farger:
 
-**Migrasjon — utvide `negotiation_items`:**
-- `live_status` utvides med verdier: `unconfirmed_active`, `confirmed`
-- `live_confirmed_at timestamptz`, `live_confirmed_by_supplier boolean default false`
-- `live_supplier_note text` (notat fra leverandør under bekreftelse)
-- `live_datasheet_url text` (peker til opplastet PDF i Storage)
-- `live_datasheet_skipped boolean default false` ("sendes separat")
+- **Canvas**: `--surface-canvas` (papir-cream) med eksisterende subtil prikket papir-tekstur (allerede aktiv på `body`).
+- **Kort/paneler** = "papirlapper": `--surface-raised`, `rounded-[14px]`, tynn `--brand-bronze/20` border + indre `--brand-cream/40` ring (allerede definert i `Card`).
+- **Eyebrows / labels** = etikett-aktige: utility-klassen `.label-rule` (bronze, uppercase, 0.24em letter-spacing, tynne sidelinjer) og `.eyebrow` for mindre seksjonstitler.
+- **Overskrifter**: `font-display` (Fraunces) for sidetittel + dialog-titler; `Inter` 600 for tabell-headers og knapper (uendret).
+- **Stempel-frame**: `.stamp-frame` på status-badges og dato-tabs der det gir mening (subtil dobbel-ring som ligner et stempel-aftrykk).
+- **Diamond-mønster**: `.pattern-diamond-soft` som veldig svak bakgrunn på utvalgte tomme tilstander / sticky-headers.
+- **Skygger**: `shadow-card` / `shadow-elevated` (varme, organiske) i stedet for harde grå skygger.
+- **Eksisterende app-farger og status-farger beholdes 1:1** (gul = fastordre, lilla = retur, blå = pakkseddel, rød = destructive, grønn = success). Disse brukes som fyll/aksent som i dag.
 
-**Migrasjon — utvide `negotiations`:**
-- `live_session_paused boolean default false`
-- `live_confirmation_deadline timestamptz`
-- `live_auto_apply_on_confirm boolean default true`
-- `live_send_reminder_after_days int default 7`
+## Berørte filer (kun presentasjon)
 
-**Storage:**
-- Ny bucket `negotiation-datasheets` (private). RLS: leverandør med gyldig token kan upload (via signed URL fra edge function); legal entity-medlemmer kan lese.
+```text
+src/ordre/components/shell/PageHeader.tsx       — etikett-stil header
+src/ordre/components/shell/AppBanner.tsx        — wrapper, ingen API-endring
+src/ordre/components/shell/DateContextChips.tsx — chips som "tape-tabs"
+src/ordre/components/orders/StatusBadge.tsx     — stempel-look
+src/ordre/components/ui/status-pill.tsx         — papir-pill med tynn ring
+src/ordre/pages/Dashboard.tsx                   — kort som "etikettpaneler"
+src/ordre/pages/OrdersList.tsx                  — listrader som papir-strimler
+src/ordre/pages/OrderDetail.tsx                 — seksjoner som "pakkseddel-paneler"
+src/ordre/pages/Leveringskalender.tsx           — matrise: header som etikett-strip,
+                                                   kolonne-ikoner i tape-rad,
+                                                   sticky "Handling"-pille
+src/ordre/pages/NewOrder.tsx                    — handlekurv-panel + linjer
+src/ordre/pages/DeliveryNoteDashboard.tsx       — runde-kort som "stempel-kort"
+src/ordre/pages/DeliveryNoteDetail.tsx          — pakkseddel som faktisk seddel
+src/ordre/pages/RecurringOrders.tsx             — kort-grid med etikett-feel
+src/ordre/pages/Tours.tsx, DeliveryRules.tsx,
+  CustomerOrders.tsx, DeliveryNotesList.tsx,
+  DeliveryNoteCorrections.tsx,
+  DeliveryNoteSettings.tsx                      — samme språk konsistent
+src/ordre/components/orders/CustomerOrderModal.tsx,
+  MerknadDialog.tsx, ChangeTourDialog.tsx, m.fl. — dialog-shell-stil
+src/ordre/components/orders/matrix/*.tsx        — kolonne-ikoner, dialoger
+```
 
-**RLS:** Eksisterende `negotiation_live_events` og `negotiation_items` policies gjenbrukes. Tokenisert tilgang gjøres via service-role i edge functions (samme mønster som RFQ).
+Ingen DB-endringer. Ingen hooks-endringer. Ingen RPC-endringer. Ingen routing-endringer.
 
-## Edge functions
+## Konkret per side
 
-**Ny: `validate-live-confirmation-access`**
-Kopi av `validate-rfq-access`-mønster: tar token + passord, validerer mot eksisterende `negotiation_recipients` (gjenbruker token-feltene), returnerer signed session-token + minimal forhandlings-data (kun avtalte items).
+**Leveringskalender (matrise) — hovedjobb**
+- Topbar (Kunde + Ordre fra dato + dager + turer + retur + Ny ordre + Handling) pakkes inn i et "papir-panel" med tynn bronze-border + indre cream-ring og soft skygge — samme felter, samme rekkefølge.
+- "Lagre / Avbryt" sentrert som i dag, men knappene får eksisterende `brand`/`outline`-varianter med en hårfin bronze-aksent under aktiv hover.
+- Kolonne-headers blir til "etikett-strips": dato + ukedag i `font-display`, bronze-divider over, dagens kolonne får en bronze underline i stedet for gul fyll (gul fyll beholdes som "har ordre"-indikator nederst i header).
+- Ikon-raden (Copy / Comment / Delete / Pakkseddel) får mer luft, hover-tint i bronze, og tooltips med ink-bg.
+- Tabellrader: alternerende `--surface-raised` / `--surface-canvas` med 1px `--border-subtle` — føles som papir-linjer, ikke admin-grid.
+- "Vis sammendrag" / "Vis hele varenavn" / "Skjul erstattede" (gear-meny) får dropdown med ink-bg + cream tekst som per memory.
+- Vær-ikoner beholdes uendret men temperaturen settes i `font-display`.
+- Sticky "Handling"-knapp og "Ny ordre" beholder fargene (grønn brand-CTA fra dagens stil bevares — disse er funksjonelle signaler), men får rounded-[10px], shadow-card og bronze focus-ring.
+- Dato-chips ("i dag / fra i morgen / denne uken / neste uke") får `.label-rule`-typografi.
 
-**Ny: `submit-live-confirmation`**
-Tar session-token + array av `{ negotiation_item_id, confirmed: bool, supplier_note?, datasheet_path?, datasheet_skipped? }` + payment_terms_days. Per linje:
-- Hvis `confirmed=true`: sett `live_status='confirmed'`, `live_confirmed_at=now()`.
-- Hvis avvist med notat: behold `tentatively_agreed`, lagre `live_supplier_note`.
-- Logger event `confirmation_submitted` per linje.
-- Når alle `tentatively_agreed`/`unconfirmed_active` er løst: hvis alle confirmed og `live_auto_apply_on_confirm=true`, kall internt `apply-negotiation-outcome`-logikk for hver linje (eller marker `negotiations.status='concluded'` + `concluded_at`).
+**NewOrder / OrderDetail**
+- Handlekurv-tittel "Ordre for {kunde} ({nr})" får `font-display` + lite bronze cart-emblem.
+- "Lørdag 09.05.2026 - tur 1 (ekstra)" formes som en stempel-rad: tynn dobbeltlinje (stamp-frame) + dato i `font-display`.
+- "Ny ordrelinje"-input får cream-bg, bronze focus-ring.
+- Pris-summering får etikett-look: `.eyebrow` over "Pris ordre", verdier i `font-display tabular-nums`.
+- "Slett / Lag pakkseddel / Kopiere ordren" beholder fargene (rød/gul/outline) — samme `Button`-varianter som i dag.
 
-**Ny: `request-live-datasheet-upload`**
-Tar session-token + `negotiation_item_id`, returnerer signed upload URL til `negotiation-datasheets/<negotiation_id>/<item_id>.pdf`.
+**Dashboard / DeliveryNoteDashboard**
+- "FASTORDRE / DATERTE / RETUR / PAKKSEDLER"-kortene beholder farger 1:1 men får `stamp-frame`-ring, `font-display` tall og `.eyebrow` for label.
+- Info-bånd ("Hovedkjøring er kjørt for turer: 1, 2, 3", "Leveransepauser ...") blir cream-tape med bronze-ramme i stedet for blå/grønn rektangel — fargene beholdes som tynn venstre-bord (color-strip).
 
-**Utvide `generate-rfq-credentials`** (eller ny `generate-live-credentials` som wrapper) til å håndtere `negotiation_mode='live'` — samme token/passord-mekanisme, bare annen e-post-template.
+**Pakkseddel-detalj**
+- Ligner en faktisk seddel: cream-papirlap med bronze stempel-ring rundt tittel, monospace-aktig tall-kolonne, tynne stiplede linjer mellom rader.
 
-## Frontend
+**Lister (OrdersList, RecurringOrders, CustomerOrders, DeliveryNotesList, Tours, DeliveryRules)**
+- Toolbar over listen samles i et papir-panel.
+- Rader får mer vertikal luft, kundenavn i `font-display`, sekundærdata i `text-muted-foreground tabular-nums`.
+- Status-badges via felles `StatusBadge`/`StatusPill` får stamp-look (tynn ring + uppercase 10px letter-spaced label) — fargene styres fortsatt av dagens token-mapping.
 
-**Endring i `LiveForhandlingWorkspace` avslutnings-dialog:**
-Erstatt nåværende "kopier/mailto" med ekte avslutnings-modal:
-- Sammendrag (avtalt/parket/urørt + total besparelse)
-- Mottaker-felt (forhåndsutfylt fra recipient, redigerbart)
-- Frist for bekreftelse (default 14 dager)
-- Toggles: vis pris-snapshot, auto-oppdater `raw_material_suppliers`, send påminnelse etter 7 dager
-- "Avslutt og send →":
-  1. Setter `live_session_ended_at`, `status='awaiting_confirmation'`, `live_confirmation_deadline`
-  2. Kaller `generate-rfq-credentials` (eller ny wrapper) for å lage token + passord
-  3. Kopierer ferdig e-post-tekst (med token-URL `https://nbhub.no/bekreftelse/<token>`) til utklippstavle + tilbyr mailto
+**Dialoger (Ordreinfo, Merknad, Pris-regulering, Endre tur, Slett, m.fl.)**
+- Dialog-header: `font-display` tittel, `.label-rule` evt. underrubrikk.
+- Tabellaktige innhold (Pris-regulering / Reguler fastordre): rader med papir-linjer, input-felt med cream-bg + bronze focus.
+- Bekreft-knapp = `brand` (bronze), avbryt = `outline`.
 
-**Pause-knapp:** legg til i live-header — toggler `live_session_paused`, viser "Pauset"-banner.
+## Teknisk
 
-**Re-åpne behandlede:** Klikk på rad i "Allerede behandlet" → setter `live_status='discussing'`, logger `item_reopened`. Krever liten endring i `LiveForhandlingWorkspace`.
+- Kun klasser, små JSX-wrappers og typografi-bytter. Ingen logikk-endringer, ingen prop-API-endringer, ingen nye avhengigheter.
+- All farge går via tokens (`bg-card`, `bg-background`, `text-foreground`, `border-border`, `text-primary`, `bg-warning`, osv.) — ingen hardkodede HEX/HSL.
+- Knapp-varianter beholdes (`default` = app-primary, `brand`, `destructive`, `outline`, `secondary`, `ghost`).
+- Status-tokens i `orderStatus.ts` og `deliveryNoteStatus.ts` røres ikke — bare `StatusPill`-rendringen pyntes.
+- Ingen endringer i `index.css` eller `tailwind.config.ts` utover evt. én ny utility (`paper-row` for alternerende stripe) hvis nødvendig.
 
-**Park/Avslå begrunnelse:** vis lite prompt (textarea) når park/avslå klikkes — lagres i `live_notes`.
+## Out of scope
 
-**Ny: `LiveTidslinje`-komponent** (drawer i `ForhandlingDetail`) som viser kronologisk `negotiation_live_events` med ikon per `event_type`.
+- Mobil-redesign (kommer som egen fase).
+- Logikk, RPC, hooks, ruter, data, beregninger, tilstand — uendret.
+- Ingen endring av app-farger eller status-farger.
+- Ingen AI / nye features.
 
-**Endring i `ForhandlingDetail`:** når `negotiation_mode='live'` og status er `awaiting_confirmation` eller `concluded`, vis live-spesifikk visning:
-- Liste over avtalte items med bekreftelses-status (✅ confirmed / ⏳ venter / ⚠️ supplier-notat)
-- Knapper: "Send påminnelse" (mailto), "Aktiver bekreftede selv om alt ikke er bekreftet" (kaller funksjon som setter ubekreftede til `unconfirmed_active` og kjører apply for confirmed)
-- "Vis møte-tidslinje" → `LiveTidslinje`-drawer
+## Verifikasjon
 
-**Ny rute `/bekreftelse/:token`** — `LiveConfirmationPortal`:
-- Login (token + passord) via `validate-live-confirmation-access`
-- Liste over avtalte items, hver med:
-  - Snapshot av avtalt pris/pakning/avtale-måneder
-  - Sjekkboks "Jeg bekrefter"
-  - PDF-opplastings-knapp (kaller `request-live-datasheet-upload`, så direkte upload til signed URL) + sjekkboks "Datablad sendes separat"
-  - Notat-felt
-- Generelle vilkår: betalingsdager
-- "Bekreft alle"-snarvei + "Lagre kladd" (lagrer i localStorage)
-- "Send bekreftelse" → `submit-live-confirmation`. Validering: hver bekreftet linje må ha datablad eller "sendes separat".
-
-## Filer
-
-**Nye:**
-- `supabase/migrations/<ts>_live_confirmation.sql`
-- `supabase/functions/validate-live-confirmation-access/index.ts`
-- `supabase/functions/submit-live-confirmation/index.ts`
-- `supabase/functions/request-live-datasheet-upload/index.ts`
-- `src/ravarer/pages/forhandlinger/LiveConfirmationPortal.tsx`
-- `src/ravarer/pages/forhandlinger/components/LiveEndSessionDialog.tsx`
-- `src/ravarer/pages/forhandlinger/components/LiveTidslinjeDrawer.tsx`
-- `src/ravarer/pages/forhandlinger/components/LiveConfirmationStatusList.tsx`
-- `src/ravarer/hooks/useLiveConfirmation.ts`
-
-**Endrede:**
-- `src/App.tsx` — rute `/bekreftelse/:token`
-- `src/ravarer/pages/forhandlinger/LiveForhandlingWorkspace.tsx` — pause, re-åpne, park/avslå-begrunnelse, ny avslutnings-dialog
-- `src/ravarer/pages/forhandlinger/ForhandlingDetail.tsx` — live-spesifikk visning ved awaiting_confirmation/concluded
-- `src/ravarer/hooks/useNegotiations.ts` — type-utvidelser
-
-## Levering
-
-Stort omfang — foreslår å splitte i to PRs hvis ønsket:
-
-**B1 (nå):** Migrasjon + avslutnings-dialog + edge functions + leverandør-portal + grunnleggende status-visning. Pause/re-åpne/tidslinje kan komme i B2.
-
-**B2 (etterpå):** Pause, re-åpne, park-begrunnelse, møte-tidslinje, påminnelses-flyt, manuell aktivering ved delvis bekreftelse, "datablad allerede aktuelt"-gjenbruk.
-
-Si fra om du vil at jeg leverer alt i én eller splitter — så kjører jeg i gang.
+- Visuell sjekk i preview på 1434×1097 av: Leveringskalender, NewOrder, OrderDetail, Dashboard, DeliveryNoteDashboard, OrdersList, RecurringOrders, en pakkseddel, en ordreinfo-dialog, og pris-regulerings-dialog.
+- Bekreftelse at alle eksisterende knapper/felt/menyer fortsatt finnes på samme sted med samme labels.
+- Spot-check at dark-mode fortsatt fungerer (UserMenu-toggle).
