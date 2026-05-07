@@ -42,34 +42,95 @@ export function useNBProducts(search?: string) {
 }
 
 export type EffectivePrice = {
+  /** Eks-MVA pris klar for lagring i order_lines.unit_price */
   price: number;
-  is_net: boolean;
+  vat_rate: number;
   source: string;
   special_price_id: string | null;
   price_list_id: string | null;
+  is_fallback: boolean;
 };
 
-/** Henter effektiv pris via RPC. Brukes når man legger til linje. */
+export type PriceCaller =
+  | "matrix_save"
+  | "customer_order_create"
+  | "customer_order_update"
+  | "new_order_form"
+  | "fastordre_instantiation"
+  | "unknown";
+
+/**
+ * Henter effektiv enhets-pris (eks-MVA) for én kunde + ett produkt på en gitt dato.
+ * Bruker den sentrale RPC-en `get_customer_unit_price` som respekterer hele
+ * precedence-hierarkiet (special_prices → prislister → fallback_zero).
+ */
 export async function fetchEffectivePrice(params: {
   productId: string;
   customerId: string;
   date: string;
+  caller?: PriceCaller;
 }): Promise<EffectivePrice | null> {
-  const { data, error } = await supabase.rpc("get_effective_price", {
-    p_product_id: params.productId,
+  const { data, error } = await supabase.rpc("get_customer_unit_price", {
     p_customer_id: params.customerId,
+    p_product_id: params.productId,
     p_date: params.date,
+    p_caller: params.caller ?? "unknown",
   });
   if (error) throw error;
   if (!data || data.length === 0) return null;
-  const row = data[0];
+  const row = data[0] as {
+    unit_price_excl_mva: number | string;
+    vat_rate: number | string;
+    source: string;
+    special_price_id: string | null;
+    price_list_id: string | null;
+    is_fallback: boolean;
+  };
   return {
-    price: Number(row.price),
-    is_net: Boolean(row.is_net),
+    price: Number(row.unit_price_excl_mva),
+    vat_rate: Number(row.vat_rate),
     source: String(row.source),
     special_price_id: row.special_price_id,
     price_list_id: row.price_list_id,
+    is_fallback: Boolean(row.is_fallback),
   };
+}
+
+/** Batch-variant: én RPC-runde for mange produkter (samme kunde + dato). */
+export async function fetchEffectivePricesBatch(params: {
+  productIds: string[];
+  customerId: string;
+  date: string;
+  caller?: PriceCaller;
+}): Promise<Map<string, EffectivePrice>> {
+  const out = new Map<string, EffectivePrice>();
+  if (params.productIds.length === 0) return out;
+  const { data, error } = await supabase.rpc("get_customer_unit_prices_batch", {
+    p_customer_id: params.customerId,
+    p_product_ids: params.productIds,
+    p_date: params.date,
+    p_caller: params.caller ?? "unknown",
+  });
+  if (error) throw error;
+  for (const row of (data ?? []) as Array<{
+    product_id: string;
+    unit_price_excl_mva: number | string;
+    vat_rate: number | string;
+    source: string;
+    special_price_id: string | null;
+    price_list_id: string | null;
+    is_fallback: boolean;
+  }>) {
+    out.set(row.product_id, {
+      price: Number(row.unit_price_excl_mva),
+      vat_rate: Number(row.vat_rate),
+      source: String(row.source),
+      special_price_id: row.special_price_id,
+      price_list_id: row.price_list_id,
+      is_fallback: Boolean(row.is_fallback),
+    });
+  }
+  return out;
 }
 
 /** Mapper get_effective_price.source → enkel "kategori" for badge-fargekoding */

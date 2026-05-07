@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
+import { fetchEffectivePricesBatch, type PriceCaller } from "@/ordre/hooks/useNBProducts";
 
 export type CustomerOrderRow = {
   id: string;
@@ -266,11 +267,25 @@ export function useCreateCustomerOrder() {
         .single();
       if (orderErr) throw orderErr;
 
-      // 3. Insert lines
+      // 3. Hent priser sentralisert (1 batch-RPC for hele ordren)
+      const fallbackLineIndices: number[] = [];
+      let priceMap = new Map<string, { price: number; vat_rate: number; source: string; special_price_id: string | null; price_list_id: string | null; is_fallback: boolean }>();
       if (input.lines.length > 0) {
+        priceMap = await fetchEffectivePricesBatch({
+          productIds: Array.from(new Set(input.lines.map((l) => l.product_id))),
+          customerId: input.customerId,
+          date: input.deliveryDate,
+          caller: "customer_order_create" as PriceCaller,
+        });
+
         const lineRows = input.lines.map((l, idx) => {
-          const subtotal = l.quantity * l.unit_price;
-          const vatRate = l.product_mva_rate ?? 15;
+          const ep = priceMap.get(l.product_id);
+          const unitPrice = ep ? ep.price : 0;
+          const vatRate = ep?.vat_rate ?? l.product_mva_rate ?? 15;
+          const source = ep?.source ?? "fallback_zero";
+          const sourceId = ep?.special_price_id ?? ep?.price_list_id ?? null;
+          if (!ep || ep.is_fallback) fallbackLineIndices.push(idx);
+          const subtotal = l.quantity * unitPrice;
           const vat = subtotal * (vatRate / 100);
           return {
             order_id: orderRow.id,
@@ -285,9 +300,9 @@ export function useCreateCustomerOrder() {
             },
             quantity: l.quantity,
             sales_unit: l.product_unit_of_sale,
-            unit_price: l.unit_price,
-            unit_price_source: "default",
-            unit_price_source_id: null,
+            unit_price: unitPrice,
+            unit_price_source: source,
+            unit_price_source_id: sourceId,
             discount_percent: 0,
             line_subtotal_excl_vat: Number(subtotal.toFixed(2)),
             vat_rate: vatRate,
@@ -299,7 +314,7 @@ export function useCreateCustomerOrder() {
         if (linesErr) throw linesErr;
       }
 
-      return orderRow;
+      return { ...orderRow, has_zero_fallback_lines: fallbackLineIndices };
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["customer-orders"] });
@@ -335,10 +350,23 @@ export function useUpdateCustomerOrder() {
       const { error: delErr } = await supabase.from("order_lines").delete().eq("order_id", orderId);
       if (delErr) throw delErr;
 
+      const fallbackLineIndices: number[] = [];
       if (input.lines.length > 0) {
+        const priceMap = await fetchEffectivePricesBatch({
+          productIds: Array.from(new Set(input.lines.map((l) => l.product_id))),
+          customerId: input.customerId,
+          date: input.deliveryDate,
+          caller: "customer_order_update" as PriceCaller,
+        });
+
         const lineRows = input.lines.map((l, idx) => {
-          const subtotal = l.quantity * l.unit_price;
-          const vatRate = l.product_mva_rate ?? 15;
+          const ep = priceMap.get(l.product_id);
+          const unitPrice = ep ? ep.price : 0;
+          const vatRate = ep?.vat_rate ?? l.product_mva_rate ?? 15;
+          const source = ep?.source ?? "fallback_zero";
+          const sourceId = ep?.special_price_id ?? ep?.price_list_id ?? null;
+          if (!ep || ep.is_fallback) fallbackLineIndices.push(idx);
+          const subtotal = l.quantity * unitPrice;
           const vat = subtotal * (vatRate / 100);
           return {
             order_id: orderId,
@@ -353,9 +381,9 @@ export function useUpdateCustomerOrder() {
             },
             quantity: l.quantity,
             sales_unit: l.product_unit_of_sale,
-            unit_price: l.unit_price,
-            unit_price_source: "default",
-            unit_price_source_id: null,
+            unit_price: unitPrice,
+            unit_price_source: source,
+            unit_price_source_id: sourceId,
             discount_percent: 0,
             line_subtotal_excl_vat: Number(subtotal.toFixed(2)),
             vat_rate: vatRate,
@@ -367,7 +395,7 @@ export function useUpdateCustomerOrder() {
         if (insErr) throw insErr;
       }
 
-      return { orderId };
+      return { orderId, has_zero_fallback_lines: fallbackLineIndices };
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["customer-orders"] });

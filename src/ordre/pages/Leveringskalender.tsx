@@ -245,6 +245,19 @@ export default function MatrixPage() {
     return map;
   }, [matrix]);
 
+  /** Celler der lagret pris er 0 og mengde > 0 — visuell rød advarsel ("Pris ikke funnet"). */
+  const fallbackCells = useMemo(() => {
+    const map: Record<CellKey, true> = {};
+    if (!matrix) return map;
+    for (const c of matrix.existing_cells) {
+      if (!c.delivery_tour_id) continue;
+      if (Number(c.quantity) > 0 && Number(c.unit_price) === 0) {
+        map[ckey(c.delivery_date, c.delivery_tour_id, c.product_id)] = true;
+      }
+    }
+    return map;
+  }, [matrix]);
+
   function getCellValue(key: CellKey): string {
     if (key in edits) return edits[key];
     const v = existingQty[key];
@@ -334,6 +347,7 @@ export default function MatrixPage() {
         lines_created?: number;
         lines_updated?: number;
         lines_deleted?: number;
+        has_zero_fallback_lines?: string[] | null;
       } | null;
       toast.success("Matrise lagret", {
         description: r
@@ -342,6 +356,13 @@ export default function MatrixPage() {
             }`
           : undefined,
       });
+      const fbCount = r?.has_zero_fallback_lines?.length ?? 0;
+      if (fbCount > 0) {
+        toast.warning(
+          `${fbCount} linje(r) fikk pris 0 — mangler prisliste-rad eller spesialpris`,
+          { description: "Sett opp pris i prisliste eller special_prices for å rydde." },
+        );
+      }
     } catch (err) {
       toast.error("Kunne ikke lagre", { description: (err as Error).message });
     }
@@ -669,6 +690,7 @@ export default function MatrixPage() {
               addedIds={new Set(addedProducts.map((p) => p.id))}
               getValue={getCellValue}
               isDirty={isDirty}
+              isFallback={(key) => !!fallbackCells[key]}
               onChange={setCellValue}
               hasMerknad={(key) => !!existingMerknad[key]}
               hasData={(key) => getEffectiveQty(key) > 0 || !!existingMerknad[key]}
@@ -812,6 +834,7 @@ function MatrixGrid({
   addedIds,
   getValue,
   isDirty,
+  isFallback,
   onChange,
   hasMerknad,
   hasData,
@@ -830,6 +853,7 @@ function MatrixGrid({
   addedIds: Set<string>;
   getValue: (key: CellKey) => string;
   isDirty: (key: CellKey) => boolean;
+  isFallback: (key: CellKey) => boolean;
   onChange: (key: CellKey, value: string) => void;
   hasMerknad: (key: CellKey) => boolean;
   hasData: (key: CellKey) => boolean;
@@ -967,6 +991,7 @@ function MatrixGrid({
                   const cellHasData = hasData(key);
                   const pause = isPaused(pauseMap, c.date, c.tour.id);
                   const ghost = !value && !pause ? ghostMap?.get(key) : undefined;
+                  const fb = isFallback(key);
                   return (
                     <td
                       key={key}
@@ -974,8 +999,15 @@ function MatrixGrid({
                         "group relative border-b border-r border-border p-0",
                         dirty && "bg-warning/10",
                         pause && "bg-sky-50 dark:bg-sky-950/30",
+                        fb && "outline outline-2 -outline-offset-2 outline-destructive/70",
                       )}
-                      title={pause ? (pause.reason ? `Leveransepause: ${pause.reason}` : "Leveransepause") : undefined}
+                      title={
+                        fb
+                          ? "Pris ikke funnet — mangler prisliste-rad eller spesialpris"
+                          : pause
+                            ? pause.reason ? `Leveransepause: ${pause.reason}` : "Leveransepause"
+                            : undefined
+                      }
                     >
                       <Input
                         type="text"

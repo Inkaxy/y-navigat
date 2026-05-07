@@ -67,6 +67,8 @@ type LineDraft = {
   product_mva_rate?: number | null;
   quantity: string;
   unit_price: string;
+  /** true når sentralisert prisoppslag faller tilbake til 0 — vises som rød advarsel */
+  is_fallback?: boolean;
 };
 
 function newLine(): LineDraft {
@@ -75,6 +77,7 @@ function newLine(): LineDraft {
     product: null,
     quantity: "1",
     unit_price: "0",
+    is_fallback: false,
   };
 }
 
@@ -223,6 +226,7 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
       productId: p.id,
       customerId: customer.id,
       date: deliveryDate,
+      caller: isEdit ? "customer_order_update" : "customer_order_create",
     }).catch(() => null);
     setLines((prev) =>
       prev.map((l) =>
@@ -235,6 +239,7 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
               product_unit_of_sale: p.unit_of_sale,
               product_mva_rate: p.mva_rate,
               unit_price: ep ? String(ep.price) : "0",
+              is_fallback: !ep || ep.is_fallback,
             }
           : l,
       ),
@@ -315,8 +320,10 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
     if (!input) return;
     setSubmitting(true);
     try {
+      let fallbackCount = 0;
       if (isEdit && orderId) {
-        await updateMut.mutateAsync({ orderId, input });
+        const res = await updateMut.mutateAsync({ orderId, input });
+        fallbackCount = res?.has_zero_fallback_lines?.length ?? 0;
         await logAudit({
           action: "updated",
           entity_type: "order",
@@ -328,6 +335,7 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
         toast.success("Kundeordre oppdatert");
       } else {
         const row = await createMut.mutateAsync(input);
+        fallbackCount = row?.has_zero_fallback_lines?.length ?? 0;
         await logAudit({
           action: "created",
           entity_type: "order",
@@ -341,6 +349,11 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
           },
         });
         toast.success(`Kundeordre ${row.order_number} opprettet`);
+      }
+      if (fallbackCount > 0) {
+        toast.warning(
+          `${fallbackCount} linje(r) fikk pris 0 — mangler prisliste-rad eller spesialpris`,
+        );
       }
       setDirty(false);
       onOpenChange(false);
@@ -535,7 +548,10 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
                   {lines.map((l) => (
                     <div
                       key={l.uid}
-                      className="flex items-end gap-2 rounded-md border border-border bg-card p-2"
+                      className={`flex items-end gap-2 rounded-md border bg-card p-2 ${
+                        l.is_fallback ? "border-destructive ring-1 ring-destructive/40" : "border-border"
+                      }`}
+                      title={l.is_fallback ? "Pris ikke funnet — mangler prisliste-rad eller spesialpris" : undefined}
                     >
                       <div className="flex-1">
                         <Label className="text-xs">Produkt</Label>
