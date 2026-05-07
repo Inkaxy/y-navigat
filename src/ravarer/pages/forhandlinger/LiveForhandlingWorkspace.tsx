@@ -457,6 +457,10 @@ export default function LiveForhandlingWorkspace() {
                     className="mt-1 block w-32 rounded-md border border-input bg-background px-3 py-2 text-sm"
                   />
                 </div>
+                <label className="flex items-center gap-2 text-sm">
+                  <Checkbox checked={autoApply} onCheckedChange={(v) => setAutoApply(!!v)} />
+                  <span>Aktivér leverandør-priser automatisk når alle linjer er bekreftet</span>
+                </label>
               </>
             )}
             {credentials && (
