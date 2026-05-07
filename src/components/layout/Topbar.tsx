@@ -6,6 +6,7 @@ import { CommandPalette } from "./CommandPalette";
 import { UserMenu } from "./UserMenu";
 import { OutletSelector } from "./OutletSelector";
 import { AppTabs } from "./AppTabs";
+import { AppSwitcher } from "./AppSwitcher";
 import { MobileMenu } from "./MobileMenu";
 import { Logo } from "@/components/brand/Logo";
 
