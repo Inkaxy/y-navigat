@@ -141,16 +141,35 @@ export default function MatrixPage() {
   const { data: matrix, isLoading } = useMatrixData(customerId, dateFrom, dateTo);
   const { data: addableProducts } = useAddableProducts(customerId, !!customerId);
   const saveMatrix = useSaveMatrix();
+  const upsertColumnComment = useUpsertColumnComment();
+  const deleteMatrixColumn = useDeleteMatrixColumn();
+  const generateNotes = useGenerateDeliveryNotes();
+  const navigate = useNavigate();
   const customerLat = selectedCustomer?.geocode_latitude ?? null;
   const customerLon = selectedCustomer?.geocode_longitude ?? null;
   const { data: weatherMap } = useWeatherForecast(customerLat, customerLon);
   const { data: ghostMap } = useRecurringGhost(customerId, dateFrom, dateTo);
   const { data: pauseMap } = useDeliveryPausesForCustomer(customerId, dateFrom, dateTo);
+  const { data: columnComments } = useColumnComments(customerId, dateFrom, dateTo);
 
   const [edits, setEdits] = useState<Record<CellKey, string>>({});
   const [addedProducts, setAddedProducts] = useState<MatrixProduct[]>([]);
   const [addOpen, setAddOpen] = useState(false);
   const [discardOpen, setDiscardOpen] = useState(false);
+
+  // Column action dialog state
+  const [copyColCol, setCopyColCol] = useState<{ date: string; tour: MatrixTour } | null>(null);
+  const [commentCol, setCommentCol] = useState<{ date: string; tour: MatrixTour } | null>(null);
+  const [deleteColConfirm, setDeleteColConfirm] = useState<{ date: string; tour: MatrixTour } | null>(null);
+
+  // Handling-meny dialog state
+  const [setForAllOpen, setSetForAllOpen] = useState(false);
+  const [removeProdOpen, setRemoveProdOpen] = useState(false);
+  const [moveProdOpen, setMoveProdOpen] = useState(false);
+  const [pauseOpen, setPauseOpen] = useState(false);
+  const [correctionsOpen, setCorrectionsOpen] = useState(false);
+  const [flatView, setFlatView] = useState(false);
+  const [showAllProducts, setShowAllProducts] = useState(false);
 
   // Merknad dialog state
   const [merknadCell, setMerknadCell] = useState<CellTarget | null>(null);
