@@ -2,17 +2,71 @@ import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
-const Table = React.forwardRef<HTMLTableElement, React.HTMLAttributes<HTMLTableElement>>(
-  ({ className, ...props }, ref) => (
-    <div className="relative w-full overflow-auto">
-      <table ref={ref} className={cn("w-full caption-bottom text-sm", className)} {...props} />
-    </div>
-  ),
+/**
+ * NBhub-tabell — paper-feel rader, eyebrow-headere, sticky-støtte og bronze
+ * selection-aksent. API-kompatibel med shadcn/ui sin Table — ingen kalle-side
+ * må endres. Nye props:
+ *   - <Table density="comfortable|compact">          (default comfortable)
+ *   - <TableHeader sticky>                            (kleber til toppen)
+ *   - <TableRow interactive>                          (cursor-pointer + sterkere hover)
+ */
+
+type Density = "comfortable" | "compact";
+const DensityCtx = React.createContext<Density>("comfortable");
+
+interface TableProps extends React.HTMLAttributes<HTMLTableElement> {
+  density?: Density;
+  /** Pakk inn i et kort med ramme + skygge (paper-feel). Default true. */
+  card?: boolean;
+  wrapperClassName?: string;
+}
+
+const Table = React.forwardRef<HTMLTableElement, TableProps>(
+  ({ className, density = "comfortable", card = true, wrapperClassName, ...props }, ref) => {
+    const inner = (
+      <table
+        ref={ref}
+        className={cn("w-full caption-bottom text-sm", className)}
+        {...props}
+      />
+    );
+    return (
+      <DensityCtx.Provider value={density}>
+        {card ? (
+          <div
+            className={cn(
+              "relative w-full overflow-auto rounded-xl border border-line-subtle bg-card",
+              "shadow-[var(--shadow-xs)]",
+              wrapperClassName,
+            )}
+          >
+            {inner}
+          </div>
+        ) : (
+          <div className={cn("relative w-full overflow-auto", wrapperClassName)}>{inner}</div>
+        )}
+      </DensityCtx.Provider>
+    );
+  },
 );
 Table.displayName = "Table";
 
-const TableHeader = React.forwardRef<HTMLTableSectionElement, React.HTMLAttributes<HTMLTableSectionElement>>(
-  ({ className, ...props }, ref) => <thead ref={ref} className={cn("[&_tr]:border-b", className)} {...props} />,
+interface TableHeaderProps extends React.HTMLAttributes<HTMLTableSectionElement> {
+  sticky?: boolean;
+}
+
+const TableHeader = React.forwardRef<HTMLTableSectionElement, TableHeaderProps>(
+  ({ className, sticky, ...props }, ref) => (
+    <thead
+      ref={ref}
+      className={cn(
+        "[&_tr]:border-b [&_tr]:border-line-subtle bg-muted/40",
+        sticky && "sticky top-0 z-10 backdrop-blur",
+        className,
+      )}
+      {...props}
+    />
+  ),
 );
 TableHeader.displayName = "TableHeader";
 
@@ -25,16 +79,37 @@ TableBody.displayName = "TableBody";
 
 const TableFooter = React.forwardRef<HTMLTableSectionElement, React.HTMLAttributes<HTMLTableSectionElement>>(
   ({ className, ...props }, ref) => (
-    <tfoot ref={ref} className={cn("border-t bg-muted/50 font-medium [&>tr]:last:border-b-0", className)} {...props} />
+    <tfoot
+      ref={ref}
+      className={cn(
+        "border-t border-line-subtle bg-muted/30 font-medium [&>tr]:last:border-b-0",
+        className,
+      )}
+      {...props}
+    />
   ),
 );
 TableFooter.displayName = "TableFooter";
 
-const TableRow = React.forwardRef<HTMLTableRowElement, React.HTMLAttributes<HTMLTableRowElement>>(
-  ({ className, ...props }, ref) => (
+interface TableRowProps extends React.HTMLAttributes<HTMLTableRowElement> {
+  interactive?: boolean;
+}
+
+const TableRow = React.forwardRef<HTMLTableRowElement, TableRowProps>(
+  ({ className, interactive, ...props }, ref) => (
     <tr
       ref={ref}
-      className={cn("border-b transition-colors data-[state=selected]:bg-muted hover:bg-muted/50", className)}
+      className={cn(
+        "border-b border-line-subtle transition-colors",
+        // Bronze selection-aksent
+        "data-[state=selected]:bg-[hsl(var(--brand-bronze)/0.08)]",
+        "data-[state=selected]:shadow-[inset_3px_0_0_0_hsl(var(--brand-bronze))]",
+        // Hover
+        interactive
+          ? "cursor-pointer hover:bg-muted/60"
+          : "hover:bg-muted/40",
+        className,
+      )}
       {...props}
     />
   ),
@@ -42,23 +117,39 @@ const TableRow = React.forwardRef<HTMLTableRowElement, React.HTMLAttributes<HTML
 TableRow.displayName = "TableRow";
 
 const TableHead = React.forwardRef<HTMLTableCellElement, React.ThHTMLAttributes<HTMLTableCellElement>>(
-  ({ className, ...props }, ref) => (
-    <th
-      ref={ref}
-      className={cn(
-        "h-12 px-4 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0",
-        className,
-      )}
-      {...props}
-    />
-  ),
+  ({ className, ...props }, ref) => {
+    const density = React.useContext(DensityCtx);
+    return (
+      <th
+        ref={ref}
+        className={cn(
+          density === "compact" ? "h-9 px-3" : "h-11 px-4",
+          "text-left align-middle text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground",
+          "[&:has([role=checkbox])]:pr-0",
+          className,
+        )}
+        {...props}
+      />
+    );
+  },
 );
 TableHead.displayName = "TableHead";
 
 const TableCell = React.forwardRef<HTMLTableCellElement, React.TdHTMLAttributes<HTMLTableCellElement>>(
-  ({ className, ...props }, ref) => (
-    <td ref={ref} className={cn("p-4 align-middle [&:has([role=checkbox])]:pr-0", className)} {...props} />
-  ),
+  ({ className, ...props }, ref) => {
+    const density = React.useContext(DensityCtx);
+    return (
+      <td
+        ref={ref}
+        className={cn(
+          density === "compact" ? "px-3 py-2" : "px-4 py-3",
+          "align-middle [&:has([role=checkbox])]:pr-0",
+          className,
+        )}
+        {...props}
+      />
+    );
+  },
 );
 TableCell.displayName = "TableCell";
 
