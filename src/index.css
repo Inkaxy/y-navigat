@@ -57,17 +57,17 @@
     --state-neutral:         28 14% 44%;
     --state-info:            210 50% 42%;
 
-    /* ---- Radii (større/mykere — Apple-aktig) ---- */
-    --radius-sm: 8px;
-    --radius-md: 12px;
-    --radius-lg: 16px;
-    --radius:    12px;
+    /* ---- Radii — moderate, etikett-aktig ---- */
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 14px;
+    --radius:    10px;
 
-    /* ---- Elevation (subtile, lagdelte skygger) ---- */
-    --shadow-xs: 0 1px 2px 0 hsl(220 30% 10% / 0.04);
-    --shadow-sm: 0 1px 2px 0 hsl(220 30% 10% / 0.05), 0 1px 3px 0 hsl(220 30% 10% / 0.04);
-    --shadow-md: 0 4px 12px -2px hsl(220 30% 10% / 0.06), 0 2px 4px -2px hsl(220 30% 10% / 0.04);
-    --shadow-lg: 0 12px 32px -8px hsl(220 30% 10% / 0.10), 0 4px 12px -4px hsl(220 30% 10% / 0.06);
+    /* ---- Elevation — varme, organiske skygger ---- */
+    --shadow-xs: 0 1px 2px 0 hsl(24 30% 12% / 0.05);
+    --shadow-sm: 0 1px 2px 0 hsl(24 30% 12% / 0.06), 0 1px 3px 0 hsl(24 30% 12% / 0.04);
+    --shadow-md: 0 6px 16px -4px hsl(24 30% 12% / 0.10), 0 2px 6px -2px hsl(24 30% 12% / 0.06);
+    --shadow-lg: 0 18px 40px -12px hsl(24 30% 12% / 0.18), 0 6px 14px -6px hsl(24 30% 12% / 0.08);
 
     /* ---- Shadcn aliases ---- */
     --background:            var(--surface-canvas);
