@@ -242,8 +242,8 @@ export default function ForhandlingDetail() {
         </table>
       </Card>
 
-      {/* Comparison matrix */}
-      <Card className="overflow-x-auto">
+      {/* Comparison matrix - only RFQ */}
+      {!isLive && <Card className="overflow-x-auto">
         <div className="border-b border-line-subtle p-4 font-semibold">Tilbudssammenligning</div>
         <table className="w-full text-sm">
           <thead className="bg-surface-muted/50 text-xs uppercase tracking-wide text-ink-secondary">
