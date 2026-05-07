@@ -96,13 +96,19 @@ export default function OrdersList() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearch, statuses, source, deliveryFrom, deliveryTo, tourIds, page]);
 
+  const effectiveStatuses: OrderStatus[] | undefined = acceptanceOnly
+    ? ["awaiting_confirmation"]
+    : statuses.length === ORDER_STATUSES.length
+      ? undefined
+      : statuses;
+
   const { data, isLoading, isFetching } = useOrderList({
     search: debouncedSearch,
-    statuses: statuses.length === ORDER_STATUSES.length ? undefined : statuses,
-    source,
-    deliveryFrom: deliveryFrom || null,
-    deliveryTo: deliveryTo || null,
-    tourIds: tourIds.length > 0 ? tourIds : undefined,
+    statuses: effectiveStatuses,
+    source: acceptanceOnly ? "all" : source,
+    deliveryFrom: acceptanceOnly ? null : deliveryFrom || null,
+    deliveryTo: acceptanceOnly ? null : deliveryTo || null,
+    tourIds: acceptanceOnly ? undefined : tourIds.length > 0 ? tourIds : undefined,
     page,
     pageSize: PAGE_SIZE,
   });
