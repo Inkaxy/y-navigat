@@ -7876,6 +7876,7 @@ export type Database = {
       save_matrix_changes: {
         Args: { p_changes: Json; p_customer_id: string }
         Returns: {
+          has_zero_fallback_lines: string[]
           lines_created: number
           lines_deleted: number
           lines_updated: number
