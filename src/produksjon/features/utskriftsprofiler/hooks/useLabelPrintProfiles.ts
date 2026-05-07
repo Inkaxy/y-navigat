@@ -48,7 +48,7 @@ export function useLabelPrintProfiles(legalEntityId: string | undefined) {
   useEffect(() => {
     if (!legalEntityId) return;
     const channel = supabase
-      .channel(`label_print_profiles:${legalEntityId}`)
+      .channel(`label_print_profiles:${legalEntityId}:${crypto.randomUUID()}`)
       .on(
         "postgres_changes",
         {
