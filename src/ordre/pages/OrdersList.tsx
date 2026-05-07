@@ -163,7 +163,7 @@ export default function OrdersList() {
 
   function handleSearchKey(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === "Enter" && rows.length > 0) {
-      navigate(`/ordrer/${rows[0].id}`);
+      navigate(`/ordre/ordrer/${rows[0].id}`);
     }
   }
 
@@ -174,7 +174,7 @@ export default function OrdersList() {
         subtitle={undefined}
         actions={
           <Button asChild size="sm" className="gap-2">
-            <Link to="/ordrer/ny">
+            <Link to="/ordre/ordrer/ny">
               <Plus className="h-4 w-4" />
               Ny ordre
             </Link>
@@ -526,7 +526,7 @@ export default function OrdersList() {
                     return (
                       <TableRow
                         key={r.id}
-                        onClick={() => navigate(`/ordrer/${r.id}`)}
+                        onClick={() => navigate(`/ordre/ordrer/${r.id}`)}
                         data-state={isSelected ? "selected" : undefined}
                         className={cn(
                           "h-10 cursor-pointer hover:bg-accent/40",
@@ -553,7 +553,7 @@ export default function OrdersList() {
                         </TableCell>
                         <TableCell className="px-3 py-1.5 font-mono text-caption">
                           <Link
-                            to={`/ordrer/${r.id}`}
+                            to={`/ordre/ordrer/${r.id}`}
                             onClick={(e) => e.stopPropagation()}
                             className={cn(
                               "text-primary hover:underline",

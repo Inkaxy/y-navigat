@@ -107,7 +107,7 @@ export default function OrderDetail() {
         />
         <div className="container mx-auto px-4 py-6">
           <Button asChild variant="outline">
-            <Link to="/ordrer">
+            <Link to="/ordre/ordrer">
               <ArrowLeft className="mr-2 h-4 w-4" /> Tilbake til ordrer
             </Link>
           </Button>
@@ -253,7 +253,7 @@ export default function OrderDetail() {
     }
     toast.success("Ordre slettet");
     await qc.invalidateQueries({ queryKey: ["orders"] });
-    navigate("/ordrer");
+    navigate("/ordre/ordrer");
   }
 
   return (
@@ -263,7 +263,7 @@ export default function OrderDetail() {
         subtitle={`${customerName} · Levering ${formatDateLong(order.delivery_date)}`}
         actions={
           <Button asChild variant="outline" size="sm" className="gap-2">
-            <Link to="/ordrer">
+            <Link to="/ordre/ordrer">
               <ArrowLeft className="h-4 w-4" /> Ordrer
             </Link>
           </Button>

@@ -72,7 +72,7 @@ export default function DeliveryNoteCorrections() {
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-2">
-            <Link to="/pakksedler">
+            <Link to="/ordre/pakksedler">
               <Button variant="ghost" size="sm" className="gap-1">
                 <ArrowLeft className="h-4 w-4" /> Tilbake
               </Button>
@@ -101,7 +101,7 @@ export default function DeliveryNoteCorrections() {
             <div className="flex items-center justify-between border-b bg-muted/30 px-4 py-2">
               <div className="font-semibold">{formatDate(date)}</div>
               <Link
-                to={`/pakksedler/liste?date=${date}&tour=all`}
+                to={`/ordre/pakksedler/liste?date=${date}&tour=all`}
                 className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
               >
                 Se pakksedler <ExternalLink className="h-3.5 w-3.5" />

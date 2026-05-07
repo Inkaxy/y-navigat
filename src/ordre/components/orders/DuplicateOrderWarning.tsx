@@ -28,7 +28,7 @@ export function DuplicateOrderWarning({
           {duplicates.map((d) => (
             <li key={d.id} className="flex flex-wrap items-center gap-2">
               <Link
-                to={`/ordrer/${d.id}`}
+                to={`/ordre/ordrer/${d.id}`}
                 target="_blank"
                 rel="noreferrer"
                 className="font-mono font-medium underline-offset-2 hover:underline"

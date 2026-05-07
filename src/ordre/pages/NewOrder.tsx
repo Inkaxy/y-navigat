@@ -581,7 +581,7 @@ export default function NewOrder() {
       });
 
       toast.success(`Ordre ${numRow.order_number} opprettet`);
-      navigate("/ordrer");
+      navigate("/ordre/ordrer");
     } catch (e) {
       console.error(e);
       toast.error(e instanceof Error ? e.message : "Kunne ikke lagre ordre");
@@ -600,7 +600,7 @@ export default function NewOrder() {
         subtitle="Manuell registrering av salgsordre"
         actions={
           <Button asChild variant="outline" className="gap-2 border-white/40 bg-transparent text-white hover:bg-white/10 hover:text-white">
-            <Link to="/ordrer">
+            <Link to="/ordre/ordrer">
               <ArrowLeft className="h-4 w-4" /> Tilbake
             </Link>
           </Button>
@@ -893,7 +893,7 @@ export default function NewOrder() {
             {lines.filter((l) => l.product).length} linjer · {formatNOK(totals.total)}
           </div>
           <Button variant="ghost" asChild>
-            <Link to="/ordrer">Avbryt</Link>
+            <Link to="/ordre/ordrer">Avbryt</Link>
           </Button>
           <Button
             onClick={() => save()}

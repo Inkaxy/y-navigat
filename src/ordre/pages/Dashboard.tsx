@@ -42,7 +42,7 @@ export default function Dashboard() {
       <AppBanner
         actions={
           <Button asChild size="sm" className="gap-2">
-            <Link to="/ordrer/ny">
+            <Link to="/ordre/ordrer/ny">
               <Plus className="h-4 w-4" />
               Ny ordre
             </Link>
@@ -100,7 +100,7 @@ export default function Dashboard() {
                     return (
                       <Link
                         key={status}
-                        to={`/ordrer?status=${status}&deliveryFrom=${contextDate}&deliveryTo=${contextDate}`}
+                        to={`/ordre/ordrer?status=${status}&deliveryFrom=${contextDate}&deliveryTo=${contextDate}`}
                         className={cn(
                           "rounded-md border border-border bg-background px-2.5 py-2 transition-colors hover:border-primary/50 hover:bg-muted/50",
                           c === 0 && "opacity-50",
@@ -147,7 +147,7 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <Link
-                to={`/ordrer?deliveryFrom=${tom}&deliveryTo=${tom}`}
+                to={`/ordre/ordrer?deliveryFrom=${tom}&deliveryTo=${tom}`}
                 className="inline-flex items-center gap-1 text-body text-primary hover:underline"
               >
                 Vis ordrer for i morgen
@@ -169,7 +169,7 @@ export default function Dashboard() {
               count={queue?.onHold ?? 0}
               loading={queueLoading}
               tokenVar="--status-on-hold"
-              to="/ordrer?status=on_hold"
+              to="/ordre/ordrer?status=on_hold"
             />
             {(queue?.drafts ?? 0) > 0 && (
               <ActionTile
@@ -178,7 +178,7 @@ export default function Dashboard() {
                 count={queue?.drafts ?? 0}
                 loading={queueLoading}
                 tokenVar="--status-draft"
-                to="/ordrer?status=draft"
+                to="/ordre/ordrer?status=draft"
               />
             )}
             <ActionTile
@@ -187,7 +187,7 @@ export default function Dashboard() {
               count={queue?.packedToday ?? 0}
               loading={queueLoading}
               tokenVar="--status-packed"
-              to={`/ordrer?status=packed&deliveryFrom=${today}&deliveryTo=${today}`}
+              to={`/ordre/ordrer?status=packed&deliveryFrom=${today}&deliveryTo=${today}`}
             />
           </div>
         </section>
@@ -210,7 +210,7 @@ export default function Dashboard() {
                 return (
                   <Link
                     key={s.value}
-                    to={`/ordrer?status=${s.value}`}
+                    to={`/ordre/ordrer?status=${s.value}`}
                     className={cn(
                       "group rounded-md border border-border bg-card px-2.5 py-2 transition-all hover:border-primary/50 hover:shadow-sm",
                       count === 0 && "opacity-60",
