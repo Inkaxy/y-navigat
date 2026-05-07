@@ -29,6 +29,7 @@ import { useAllRawMaterialPurchaseStats } from "@/ravarer/hooks/usePurchaseStats
 import { LiveTimer } from "./components/LiveTimer";
 import { LiveItemSearch } from "./components/LiveItemSearch";
 import { LiveItemCard } from "./components/LiveItemCard";
+import { LiveTidslinjeDrawer } from "./components/LiveTidslinjeDrawer";
 import { formatNok } from "@/ravarer/lib/constants";
 
 export default function LiveForhandlingWorkspace() {
