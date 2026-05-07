@@ -7353,6 +7353,33 @@ export type Database = {
           section: string
         }[]
       }
+      get_customer_unit_price: {
+        Args: { p_customer_id: string; p_date?: string; p_product_id: string }
+        Returns: {
+          is_fallback: boolean
+          price_list_id: string
+          source: string
+          special_price_id: string
+          unit_price_excl_mva: number
+          vat_rate: number
+        }[]
+      }
+      get_customer_unit_prices_batch: {
+        Args: {
+          p_customer_id: string
+          p_date?: string
+          p_product_ids: string[]
+        }
+        Returns: {
+          is_fallback: boolean
+          price_list_id: string
+          product_id: string
+          source: string
+          special_price_id: string
+          unit_price_excl_mva: number
+          vat_rate: number
+        }[]
+      }
       get_effective_price: {
         Args: {
           p_customer_id?: string
