@@ -12,6 +12,7 @@ import { CompanyBlock } from "./CompanyBlock";
 import { AppTabs } from "./AppTabs";
 import { OutletSelector } from "./OutletSelector";
 import { UserMenu } from "./UserMenu";
+import { MobileAppWheel } from "./MobileAppWheel";
 
 interface Props {
   onOpenPalette: () => void;
