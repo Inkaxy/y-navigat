@@ -904,6 +904,75 @@ export default function MatrixPage() {
               {saveMatrix.isPending ? <Loader2 className="animate-spin" /> : <Save />}
               Lagre
             </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" disabled={!customerId}>
+                  Handling <ChevronDown className="ml-1 h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64">
+                <DropdownMenuLabel>Opprette nytt</DropdownMenuLabel>
+                <DropdownMenuItem
+                  disabled={!customerId}
+                  onSelect={() => navigate(`/ordre/ordrer/ny?customer_id=${customerId}`)}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Ny ordre
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={!customerId}
+                  onSelect={() => navigate(`/ordre/ordrer/ny?customer_id=${customerId}&is_return=true`)}
+                >
+                  <RotateCcw className="h-4 w-4 mr-2" />
+                  Lag ny returordre
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>Batch-operasjoner</DropdownMenuLabel>
+                <DropdownMenuItem onSelect={() => setSetForAllOpen(true)} disabled={!canEdit || allProducts.length === 0}>
+                  <Copy className="h-4 w-4 mr-2" />
+                  For alle dager
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={(e) => { e.preventDefault(); toggleShowAllProducts(); }}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Vis alle varer {showAllProducts ? "✓" : ""}
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setRemoveProdOpen(true)} disabled={!canEdit || allProducts.length === 0}>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Fjern produkt fra ordre
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setMoveProdOpen(true)} disabled={!canEdit || allProducts.length === 0}>
+                  <ArrowRight className="h-4 w-4 mr-2" />
+                  Flytt produkt mellom turer
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>Kontekst</DropdownMenuLabel>
+                <DropdownMenuItem onSelect={() => setPauseOpen(true)} disabled={!canEdit}>
+                  <PackageCheck className="h-4 w-4 mr-2" />
+                  Leveransepause
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setCorrectionsOpen(true)}>
+                  <MessageSquare className="h-4 w-4 mr-2" />
+                  Se korrigeringer
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => navigate("/ordre/kundeordrer")}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Kundeordre
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>Visning</DropdownMenuLabel>
+                <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setFlatView((v) => !v); }}>
+                  <Grid3x3 className="h-4 w-4 mr-2" />
+                  {flatView ? "Til matrise" : "Til enkel tabell"}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem disabled title="Kommer i senere fase">
+                  Utsalgssteder
+                </DropdownMenuItem>
+                <DropdownMenuItem disabled title="Kommer i senere fase">
+                  Importere ordre
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </div>
