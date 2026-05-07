@@ -1012,6 +1012,8 @@ export default function MatrixPage() {
               </Button>
             </div>
           </div>
+        ) : flatView && matrix ? (
+          <FlatLinesView cells={matrix.existing_cells} products={allProducts} tours={matrix.tours} />
         ) : (
           <>
             <MatrixGrid
@@ -1033,6 +1035,13 @@ export default function MatrixPage() {
               hasCustomerCoords={hasCustomerCoords}
               ghostMap={ghostMap}
               pauseMap={pauseMap}
+              columnComments={columnComments}
+              onColCopy={(date, tour) => setCopyColCol({ date, tour })}
+              onColComment={(date, tour) => setCommentCol({ date, tour })}
+              onColDelete={(date, tour) => setDeleteColConfirm({ date, tour })}
+              onColPackingNote={(date, tour) => generatePackingNoteForColumn(date, tour)}
+              colHasData={colHasAnyData}
+              canEdit={canEdit}
             />
             <div className="sticky left-0 flex flex-wrap items-center gap-2 border-t border-border bg-card px-4 py-3 sm:px-6">
               {hasAddable ? (
