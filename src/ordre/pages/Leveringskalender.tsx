@@ -52,12 +52,18 @@ import {
   type AddableProduct,
 } from "@/ordre/hooks/useMatrix";
 import { useDebouncedValue } from "@/ordre/hooks/useDebouncedValue";
+import { useProductsByIds } from "@/ordre/hooks/useProductsByIds";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserAccess } from "@/ordre/hooks/useUserAccess";
 import { useWeatherForecast, type WeatherMap } from "@/ordre/hooks/useWeatherForecast";
-import { useWeatherLocation } from "@/ordre/hooks/useLegalEntitySettings";
 import { WeatherCell } from "@/ordre/components/orders/WeatherCell";
-import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
+import { useRecurringGhost, type RecurringGhostMap } from "@/ordre/hooks/useRecurringGhost";
+import {
+  useDeliveryPausesForCustomer,
+  isPaused,
+  type PauseMap,
+  type PauseInfo,
+} from "@/ordre/hooks/useDeliveryPausesForCustomer";
 import { formatNOK, todayISO } from "@/ordre/lib/format";
 import { cn } from "@/lib/utils";
 import { type Merknad, isMerknadEmpty, parseMerknad } from "@/ordre/lib/merknad";
@@ -112,8 +118,11 @@ export default function MatrixPage() {
   const { data: matrix, isLoading } = useMatrixData(customerId, dateFrom, dateTo);
   const { data: addableProducts } = useAddableProducts(customerId, !!customerId);
   const saveMatrix = useSaveMatrix();
-  const weatherLoc = useWeatherLocation(NB_LEGAL_ENTITY_ID);
-  const { data: weatherMap } = useWeatherForecast(weatherLoc.lat, weatherLoc.lon);
+  const customerLat = selectedCustomer?.geocode_latitude ?? null;
+  const customerLon = selectedCustomer?.geocode_longitude ?? null;
+  const { data: weatherMap } = useWeatherForecast(customerLat, customerLon);
+  const { data: ghostMap } = useRecurringGhost(customerId, dateFrom, dateTo);
+  const { data: pauseMap } = useDeliveryPausesForCustomer(customerId, dateFrom, dateTo);
 
   const [edits, setEdits] = useState<Record<CellKey, string>>({});
   const [addedProducts, setAddedProducts] = useState<MatrixProduct[]>([]);
@@ -168,10 +177,27 @@ export default function MatrixPage() {
     setAddedProducts((prev) => prev.filter((p) => !matrix.products.some((mp) => mp.id === p.id)));
   }, [matrix]);
 
+  // Ghost-only products: ids fra fastordre som ikke allerede er i matrix.products
+  const ghostOnlyIds = useMemo(() => {
+    if (!ghostMap || !matrix) return [] as string[];
+    const known = new Set<string>([
+      ...matrix.products.map((p) => p.id),
+      ...addedProducts.map((p) => p.id),
+    ]);
+    const out = new Set<string>();
+    for (const key of ghostMap.keys()) {
+      const productId = key.split("|")[2];
+      if (!known.has(productId)) out.add(productId);
+    }
+    return [...out];
+  }, [ghostMap, matrix, addedProducts]);
+
+  const { data: ghostProducts } = useProductsByIds(ghostOnlyIds);
+
   const allProducts = useMemo<MatrixProduct[]>(() => {
     if (!matrix) return [];
-    return [...matrix.products, ...addedProducts];
-  }, [matrix, addedProducts]);
+    return [...matrix.products, ...addedProducts, ...(ghostProducts ?? [])];
+  }, [matrix, addedProducts, ghostProducts]);
 
   const productById = useMemo(() => {
     const m = new Map<string, MatrixProduct>();
@@ -498,6 +524,7 @@ export default function MatrixPage() {
 
   const hasAddable = (addableProducts?.length ?? 0) > 0;
   const isEmptyMatrix = !!matrix && allProducts.length === 0;
+  const hasCustomerCoords = customerLat != null && customerLon != null;
 
   return (
     <div className="flex h-full flex-col">
@@ -651,8 +678,11 @@ export default function MatrixPage() {
               colTotals={totals.colTotals}
               grandTotal={totals.grand}
               weatherMap={weatherMap}
+              hasCustomerCoords={hasCustomerCoords}
+              ghostMap={ghostMap}
+              pauseMap={pauseMap}
             />
-            <div className="sticky left-0 flex items-center gap-2 border-t border-border bg-card px-4 py-3 sm:px-6">
+            <div className="sticky left-0 flex flex-wrap items-center gap-2 border-t border-border bg-card px-4 py-3 sm:px-6">
               {hasAddable ? (
                 <Button variant="outline" size="sm" onClick={() => setAddOpen(true)} disabled={!canEdit}>
                   <Plus />
@@ -661,6 +691,9 @@ export default function MatrixPage() {
               ) : (
                 <span className="text-xs text-muted-foreground">Alle aktive produkter er i matrisen.</span>
               )}
+              <span className="ml-auto text-[11px] text-muted-foreground/70">
+                Værvarsel fra Yr levert av Meteorologisk institutt og NRK
+              </span>
             </div>
           </>
         )}
@@ -788,6 +821,9 @@ function MatrixGrid({
   colTotals,
   grandTotal,
   weatherMap,
+  hasCustomerCoords,
+  ghostMap,
+  pauseMap,
 }: {
   columns: { date: string; tour: MatrixTour }[];
   products: MatrixProduct[];
@@ -803,6 +839,9 @@ function MatrixGrid({
   colTotals: Record<string, number>;
   grandTotal: number;
   weatherMap: WeatherMap | undefined;
+  hasCustomerCoords: boolean;
+  ghostMap: RecurringGhostMap | undefined;
+  pauseMap: PauseMap | undefined;
 }) {
   const dateGroups = useMemo(() => {
     const groups: { date: string; count: number }[] = [];
@@ -838,7 +877,10 @@ function MatrixGrid({
                     isWeekend ? "bg-muted/60" : "bg-card",
                   )}
                 >
-                  <WeatherCell forecast={weatherMap?.get(g.date)} />
+                  <WeatherCell
+                    forecast={weatherMap?.get(g.date)}
+                    emptyReason={!hasCustomerCoords ? "Kundens adresse mangler koordinater" : undefined}
+                  />
                   <div className="text-muted-foreground">{DAY_LABELS[dow]}</div>
                   <div className="tabular-nums">
                     {new Intl.DateTimeFormat("nb-NO", { day: "2-digit", month: "2-digit" }).format(d)}
@@ -854,15 +896,26 @@ function MatrixGrid({
             </th>
           </tr>
           <tr>
-            {columns.map((c) => (
-              <th
-                key={`${c.date}-${c.tour.id}`}
-                className="border-b border-r border-border bg-card/80 px-1 py-1 text-center text-[11px] font-medium text-muted-foreground"
-                title={`${c.tour.display_name} (${c.tour.time_from.slice(0, 5)}–${c.tour.time_to.slice(0, 5)})`}
-              >
-                T{c.tour.tour_number}
-              </th>
-            ))}
+            {columns.map((c) => {
+              const pause = isPaused(pauseMap, c.date, c.tour.id);
+              return (
+                <th
+                  key={`${c.date}-${c.tour.id}`}
+                  className={cn(
+                    "border-b border-r border-border px-1 py-1 text-center text-[11px] font-medium text-muted-foreground",
+                    pause ? "bg-sky-100 dark:bg-sky-950/40" : "bg-card/80",
+                  )}
+                  title={`${c.tour.display_name} (${c.tour.time_from.slice(0, 5)}–${c.tour.time_to.slice(0, 5)})${pause?.reason ? ` · Pause: ${pause.reason}` : pause ? " · Pause" : ""}`}
+                >
+                  <div>T{c.tour.tour_number}</div>
+                  {pause && (
+                    <div className="mt-0.5 inline-block rounded-sm bg-sky-200/80 px-1 text-[9px] font-semibold uppercase tracking-wide text-sky-900 dark:bg-sky-800/60 dark:text-sky-100">
+                      Pause
+                    </div>
+                  )}
+                </th>
+              );
+            })}
           </tr>
         </thead>
         <tbody>
@@ -912,24 +965,50 @@ function MatrixGrid({
                   const dirty = isDirty(key);
                   const hasM = hasMerknad(key);
                   const cellHasData = hasData(key);
+                  const pause = isPaused(pauseMap, c.date, c.tour.id);
+                  const ghost = !value && !pause ? ghostMap?.get(key) : undefined;
                   return (
                     <td
                       key={key}
                       className={cn(
                         "group relative border-b border-r border-border p-0",
                         dirty && "bg-warning/10",
+                        pause && "bg-sky-50 dark:bg-sky-950/30",
                       )}
+                      title={pause ? (pause.reason ? `Leveransepause: ${pause.reason}` : "Leveransepause") : undefined}
                     >
                       <Input
                         type="text"
                         inputMode="decimal"
                         value={value}
-                        onChange={(e) => onChange(key, e.target.value)}
+                        readOnly={!!pause}
+                        onChange={(e) => {
+                          if (pause) return;
+                          onChange(key, e.target.value);
+                        }}
+                        onMouseDown={(e) => {
+                          if (pause) {
+                            e.preventDefault();
+                            toast.info("Leveransepause", {
+                              description: "Fjern pausen først om kunden likevel skal få leveranse.",
+                            });
+                          }
+                        }}
+                        placeholder={ghost ? String(ghost) : ""}
                         className={cn(
                           "h-9 w-16 rounded-none border-0 bg-transparent px-1 text-center tabular-nums shadow-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-0",
                           dirty && "font-semibold text-warning-foreground",
+                          pause && "cursor-not-allowed",
+                          ghost && "placeholder:italic placeholder:text-muted-foreground/60",
                         )}
                       />
+                      {ghost && !value && (
+                        <span
+                          className="pointer-events-none absolute inset-0 flex items-center justify-center"
+                          title="Fastordre-forslag — klikk for å bekrefte"
+                          aria-hidden
+                        />
+                      )}
                       {hasM && (
                         <span
                           className="pointer-events-none absolute right-0.5 top-0.5 text-primary"
@@ -939,7 +1018,7 @@ function MatrixGrid({
                           <StickyNote className="h-2.5 w-2.5" />
                         </span>
                       )}
-                      {cellHasData && (
+                      {cellHasData && !pause && (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <button

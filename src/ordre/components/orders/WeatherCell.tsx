@@ -54,10 +54,26 @@ function labelFor(symbolCode: string): string {
 
 type Props = {
   forecast: DayForecast | undefined;
+  /** Vis "—" + tooltip når kunden mangler koordinater. */
+  emptyReason?: string;
 };
 
-export function WeatherCell({ forecast }: Props) {
-  if (!forecast) return <div className="h-5" aria-hidden />;
+export function WeatherCell({ forecast, emptyReason }: Props) {
+  if (!forecast) {
+    if (emptyReason) {
+      return (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="flex items-center justify-center text-[11px] font-medium text-muted-foreground/60">
+              <span aria-hidden>—</span>
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="top">{emptyReason}</TooltipContent>
+        </Tooltip>
+      );
+    }
+    return <div className="h-5" aria-hidden />;
+  }
   const Icon = iconFor(forecast.symbolCode);
   const label = labelFor(forecast.symbolCode);
   return (
@@ -74,3 +90,4 @@ export function WeatherCell({ forecast }: Props) {
     </Tooltip>
   );
 }
+

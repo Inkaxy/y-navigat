@@ -67,7 +67,7 @@ import OrdreDashboard from "@/ordre/pages/Dashboard";
 import OrdreOrdersList from "@/ordre/pages/OrdersList";
 import OrdreNewOrder from "@/ordre/pages/NewOrder";
 import OrdreOrderDetail from "@/ordre/pages/OrderDetail";
-import OrdreMatrix from "@/ordre/pages/Matrix";
+import OrdreLeveringskalender from "@/ordre/pages/Leveringskalender";
 import OrdreCustomerOrders from "@/ordre/pages/CustomerOrders";
 import OrdreTours from "@/ordre/pages/Tours";
 import OrdreDeliveryRules from "@/ordre/pages/DeliveryRules";
@@ -259,7 +259,7 @@ const App = () => (
               <Route path="/ordre/ordrer" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreOrdersList /></AppAccessGuard></Shell>} />
               <Route path="/ordre/ordrer/ny" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreNewOrder /></AppAccessGuard></Shell>} />
               <Route path="/ordre/ordrer/:id" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreOrderDetail /></AppAccessGuard></Shell>} />
-              <Route path="/ordre/matrise" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreMatrix /></AppAccessGuard></Shell>} />
+              <Route path="/ordre/matrise" element={<Navigate to="/ordre/leveringskalender" replace />} />
               <Route path="/ordre/kundeordrer" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreCustomerOrders /></AppAccessGuard></Shell>} />
               <Route path="/ordre/turer" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreTours /></AppAccessGuard></Shell>} />
               <Route path="/ordre/leveringsregler" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreDeliveryRules /></AppAccessGuard></Shell>} />
@@ -269,7 +269,7 @@ const App = () => (
               <Route path="/ordre/pakksedler/korrigeringer" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreDeliveryNoteCorrections /></AppAccessGuard></Shell>} />
               <Route path="/ordre/pakksedler/innstillinger" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreDeliveryNoteSettings /></AppAccessGuard></Shell>} />
               <Route path="/ordre/pakksedler/:id" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreDeliveryNoteDetail /></AppAccessGuard></Shell>} />
-              <Route path="/ordre/leveringskalender" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdrePlaceholder title="Leveringskalender" subtitle="Kommer i en senere fase" /></AppAccessGuard></Shell>} />
+              <Route path="/ordre/leveringskalender" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreLeveringskalender /></AppAccessGuard></Shell>} />
               <Route path="/ordre/ticket" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdrePlaceholder title="Ticket" subtitle="Kommer i en senere fase" /></AppAccessGuard></Shell>} />
               <Route path="/ordre/ai-forslag" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdrePlaceholder title="AI-forslag" subtitle="Kommer i en senere fase" /></AppAccessGuard></Shell>} />
               <Route path="/ordre/avvik" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdrePlaceholder title="Avvik" subtitle="Kommer i en senere fase" /></AppAccessGuard></Shell>} />
