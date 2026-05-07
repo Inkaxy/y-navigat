@@ -88,6 +88,8 @@ import RavarerForhandlingerList from "@/ravarer/pages/forhandlinger/Forhandlinge
 import RavarerForhandlingWizard from "@/ravarer/pages/forhandlinger/ForhandlingWizard";
 import RavarerForhandlingDetail from "@/ravarer/pages/forhandlinger/ForhandlingDetail";
 import RavarerSupplierPortal from "@/ravarer/pages/forhandlinger/SupplierPortal";
+import RavarerLiveForhandlingSetup from "@/ravarer/pages/forhandlinger/LiveForhandlingSetup";
+import RavarerLiveForhandlingWorkspace from "@/ravarer/pages/forhandlinger/LiveForhandlingWorkspace";
 
 const KunderEntityProvider = ({ children }: { children: React.ReactNode }) => {
   const { user } = useNbhubAuth();
