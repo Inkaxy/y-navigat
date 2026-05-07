@@ -20,8 +20,7 @@ interface Props {
 
 export function MobileMenu({ onOpenPalette }: Props) {
   const [open, setOpen] = useState(false);
-  const navigate = useNavigate();
-  const { pathname } = useLocation();
+  const { pathname: _pathname } = useLocation();
 
   return (
     <div className="flex w-full items-center justify-between md:hidden">
