@@ -965,24 +965,50 @@ function MatrixGrid({
                   const dirty = isDirty(key);
                   const hasM = hasMerknad(key);
                   const cellHasData = hasData(key);
+                  const pause = isPaused(pauseMap, c.date, c.tour.id);
+                  const ghost = !value && !pause ? ghostMap?.get(key) : undefined;
                   return (
                     <td
                       key={key}
                       className={cn(
                         "group relative border-b border-r border-border p-0",
                         dirty && "bg-warning/10",
+                        pause && "bg-sky-50 dark:bg-sky-950/30",
                       )}
+                      title={pause ? (pause.reason ? `Leveransepause: ${pause.reason}` : "Leveransepause") : undefined}
                     >
                       <Input
                         type="text"
                         inputMode="decimal"
                         value={value}
-                        onChange={(e) => onChange(key, e.target.value)}
+                        readOnly={!!pause}
+                        onChange={(e) => {
+                          if (pause) return;
+                          onChange(key, e.target.value);
+                        }}
+                        onMouseDown={(e) => {
+                          if (pause) {
+                            e.preventDefault();
+                            toast.info("Leveransepause", {
+                              description: "Fjern pausen først om kunden likevel skal få leveranse.",
+                            });
+                          }
+                        }}
+                        placeholder={ghost ? String(ghost) : ""}
                         className={cn(
                           "h-9 w-16 rounded-none border-0 bg-transparent px-1 text-center tabular-nums shadow-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-0",
                           dirty && "font-semibold text-warning-foreground",
+                          pause && "cursor-not-allowed",
+                          ghost && "placeholder:italic placeholder:text-muted-foreground/60",
                         )}
                       />
+                      {ghost && !value && (
+                        <span
+                          className="pointer-events-none absolute inset-0 flex items-center justify-center"
+                          title="Fastordre-forslag — klikk for å bekrefte"
+                          aria-hidden
+                        />
+                      )}
                       {hasM && (
                         <span
                           className="pointer-events-none absolute right-0.5 top-0.5 text-primary"
@@ -992,7 +1018,7 @@ function MatrixGrid({
                           <StickyNote className="h-2.5 w-2.5" />
                         </span>
                       )}
-                      {cellHasData && (
+                      {cellHasData && !pause && (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <button
