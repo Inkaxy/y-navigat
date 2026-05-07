@@ -678,8 +678,11 @@ export default function MatrixPage() {
               colTotals={totals.colTotals}
               grandTotal={totals.grand}
               weatherMap={weatherMap}
+              hasCustomerCoords={hasCustomerCoords}
+              ghostMap={ghostMap}
+              pauseMap={pauseMap}
             />
-            <div className="sticky left-0 flex items-center gap-2 border-t border-border bg-card px-4 py-3 sm:px-6">
+            <div className="sticky left-0 flex flex-wrap items-center gap-2 border-t border-border bg-card px-4 py-3 sm:px-6">
               {hasAddable ? (
                 <Button variant="outline" size="sm" onClick={() => setAddOpen(true)} disabled={!canEdit}>
                   <Plus />
@@ -688,6 +691,9 @@ export default function MatrixPage() {
               ) : (
                 <span className="text-xs text-muted-foreground">Alle aktive produkter er i matrisen.</span>
               )}
+              <span className="ml-auto text-[11px] text-muted-foreground/70">
+                Værvarsel fra Yr levert av Meteorologisk institutt og NRK
+              </span>
             </div>
           </>
         )}
