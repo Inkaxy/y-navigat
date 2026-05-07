@@ -62,6 +62,23 @@ import ProduksjonsavdelingerPage from "@/produksjon/pages/innstillinger/Produksj
 import PakkeomraderPage from "@/produksjon/pages/innstillinger/PakkeomraderPage";
 import UtskriftsprofilerPage from "@/produksjon/pages/innstillinger/UtskriftsprofilerPage";
 
+// Ordre-app
+import OrdreDashboard from "@/ordre/pages/Dashboard";
+import OrdreOrdersList from "@/ordre/pages/OrdersList";
+import OrdreNewOrder from "@/ordre/pages/NewOrder";
+import OrdreOrderDetail from "@/ordre/pages/OrderDetail";
+import OrdreMatrix from "@/ordre/pages/Matrix";
+import OrdreCustomerOrders from "@/ordre/pages/CustomerOrders";
+import OrdreTours from "@/ordre/pages/Tours";
+import OrdreDeliveryRules from "@/ordre/pages/DeliveryRules";
+import OrdreRecurringOrders from "@/ordre/pages/RecurringOrders";
+import OrdreDeliveryNoteDashboard from "@/ordre/pages/DeliveryNoteDashboard";
+import OrdreDeliveryNotesList from "@/ordre/pages/DeliveryNotesList";
+import OrdreDeliveryNoteDetail from "@/ordre/pages/DeliveryNoteDetail";
+import OrdreDeliveryNoteCorrections from "@/ordre/pages/DeliveryNoteCorrections";
+import OrdreDeliveryNoteSettings from "@/ordre/pages/DeliveryNoteSettings";
+import OrdrePlaceholder from "@/ordre/pages/Placeholder";
+
 import { RavarerProvider } from "@/ravarer/context/RavarerContext";
 import RavarerVareliste from "@/ravarer/pages/Vareliste";
 import RavarerDetail from "@/ravarer/pages/RawMaterialDetail";
