@@ -88,12 +88,22 @@ export default function ForhandlingDetail() {
 
   // Conclusion modal
   const [concludeOpen, setConcludeOpen] = useState(false);
+  const [timelineOpen, setTimelineOpen] = useState(false);
+  const [activating, setActivating] = useState(false);
+
+  const isLive = (neg as any)?.negotiation_mode === "live";
 
   useEffect(() => {
-    if (neg && (neg as any).negotiation_mode === "live" && neg.status !== "concluded" && neg.status !== "cancelled") {
+    if (
+      neg &&
+      isLive &&
+      neg.status !== "concluded" &&
+      neg.status !== "cancelled" &&
+      neg.status !== "awaiting_confirmation"
+    ) {
       navigate(`/ravarer/forhandlinger/live/${id}`, { replace: true });
     }
-  }, [neg, id, navigate]);
+  }, [neg, id, navigate, isLive]);
 
   if (!neg) {
     return (
