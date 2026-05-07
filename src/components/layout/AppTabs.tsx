@@ -1,17 +1,14 @@
-import { useMemo } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { LayoutDashboard, Box, ChevronDown, Check } from "lucide-react";
+import { LayoutDashboard, Box, MoreHorizontal } from "lucide-react";
 import * as Icons from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAccessibleApps, type AccessibleApp } from "@/hooks/useAccessibleApps";
-import { getPageLabel } from "@/lib/pageLabels";
 import { cn } from "@/lib/utils";
 
 const iconMap = Icons as unknown as Record<string, React.ComponentType<{ className?: string }>>;
@@ -22,7 +19,6 @@ const INTERNAL_ROUTES: Record<string, string> = {
   varer: "/varer",
   kunder: "/kunder",
   ravarer: "/ravarer/vareliste",
-  
   ordre: "/ordre",
   produksjon: "/produksjon",
 };
@@ -42,27 +38,32 @@ export function AppTabs() {
   const navigate = useNavigate();
 
   const entries: Entry[] = useMemo(() => {
-    const nbhubApp = (apps ?? []).find((a) => a.slug === "nbhub");
-    const nbhub: Entry = {
-      key: "nbhub",
-      label: nbhubApp?.display_name ?? "NBHub",
-      to: "/",
-      color: nbhubApp?.color_hex ?? "#0ea5e9",
-      icon: nbhubApp ? (iconMap[nbhubApp.icon_name] ?? LayoutDashboard) : LayoutDashboard,
-    };
-    const appEntries: Entry[] = (apps ?? [])
+    const list = (apps ?? [])
       .filter((a) => a.status === "active" || a.status === "in_development")
       .filter((a) => a.access_level && (a.access_level as string) !== "none")
-      .filter((a) => a.slug !== "nbhub")
       .map((a: AccessibleApp) => ({
         key: a.slug,
         label: a.display_name,
         to: INTERNAL_ROUTES[a.slug],
         external: INTERNAL_ROUTES[a.slug] ? undefined : `${a.deploy_url}${a.start_path}`,
-        color: a.color_hex ?? "#64748b",
+        color: a.color_hex ?? "#a47236",
         icon: iconMap[a.icon_name] ?? Box,
       }));
-    return [nbhub, ...appEntries];
+    // Sørg for at NBhub alltid vises først hvis vi har den
+    const nbhubIdx = list.findIndex((e) => e.key === "nbhub");
+    if (nbhubIdx > 0) {
+      const [nb] = list.splice(nbhubIdx, 1);
+      list.unshift(nb);
+    } else if (nbhubIdx === -1) {
+      list.unshift({
+        key: "nbhub",
+        label: "NBHub",
+        to: "/",
+        color: "#a47236",
+        icon: LayoutDashboard,
+      });
+    }
+    return list;
   }, [apps]);
 
   const isActive = (e: Entry) => {
@@ -71,55 +72,168 @@ export function AppTabs() {
     return pathname === e.to || pathname.startsWith(e.to + "/");
   };
 
-  const active = entries.find(isActive) ?? entries[0];
-  const ActiveIcon = active.icon;
-  
+  // Overflow-måling
+  const containerRef = useRef<HTMLDivElement>(null);
+  const measureRef = useRef<HTMLDivElement>(null);
+  const [visibleCount, setVisibleCount] = useState(entries.length);
+
+  useLayoutEffect(() => {
+    setVisibleCount(entries.length);
+  }, [entries.length]);
+
+  useEffect(() => {
+    if (!containerRef.current || !measureRef.current) return;
+    const el = containerRef.current;
+    const measure = () => {
+      const available = el.clientWidth;
+      const items = Array.from(measureRef.current!.children) as HTMLElement[];
+      const overflowReserve = 56; // plass til "Flere"-knapp
+      let used = 0;
+      let count = 0;
+      for (let i = 0; i < items.length; i++) {
+        const w = items[i].offsetWidth + 4; // gap
+        if (used + w > available - overflowReserve && i < items.length - 1) break;
+        used += w;
+        count++;
+      }
+      if (count >= items.length) count = items.length;
+      setVisibleCount(count);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [entries]);
+
+  // Sørg for at aktiv tab alltid er synlig — om aktiv havner i overflow, swap inn
+  const arranged = useMemo(() => {
+    const visible = entries.slice(0, visibleCount);
+    const overflow = entries.slice(visibleCount);
+    const activeInOverflow = overflow.find(isActive);
+    if (activeInOverflow && visible.length > 0) {
+      // bytt ut siste synlige med aktiv
+      const last = visible[visible.length - 1];
+      const newVisible = [...visible.slice(0, -1), activeInOverflow];
+      const newOverflow = overflow.map((e) => (e.key === activeInOverflow.key ? last : e));
+      return { visible: newVisible, overflow: newOverflow };
+    }
+    return { visible, overflow };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entries, visibleCount, pathname]);
+
+  const goTo = (e: Entry) => {
+    if (e.external) window.location.href = e.external;
+    else if (e.to) navigate(e.to);
+  };
 
   return (
-    <div className="flex flex-1 items-center justify-center">
-      <DropdownMenu>
-        <DropdownMenuTrigger
-          className={cn(
-            "flex items-center gap-2.5 rounded-full px-4 py-2 text-sm font-semibold",
-            "text-ink-primary bg-surface-raised border border-line-subtle",
-            "transition-all hover:bg-bakery-cream hover:border-bakery-wheat/40 hover:shadow-card",
-            "focus:outline-none focus-visible:ring-2 focus-visible:ring-app/40",
-          )}
-          style={{ boxShadow: `inset 0 -2px 0 0 ${active.color}` }}
-        >
-          <span style={{ color: active.color }} className="inline-flex"><ActiveIcon className="h-4 w-4" /></span>
-          <span>{active.label}</span>
-          <ChevronDown className="h-4 w-4 opacity-60" />
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-64">
-          <DropdownMenuLabel className="text-xs text-muted-foreground">Apper</DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          {entries.map((e) => {
-            const Icon = e.icon;
-            const act = isActive(e);
-            const onSelect = () => {
-              if (e.external) window.location.href = e.external;
-              else if (e.to) navigate(e.to);
-            };
-            return (
-              <DropdownMenuItem key={e.key} onSelect={onSelect} className="flex items-center gap-2">
-                <span
-                  className="inline-block h-2 w-2 rounded-full"
-                  style={{ backgroundColor: e.color }}
-                  aria-hidden
-                />
-                <Icon className="h-4 w-4 opacity-80" />
-                <span className="flex-1">{e.label}</span>
-                {act && <Check className="h-4 w-4 text-app" />}
-              </DropdownMenuItem>
-            );
-          })}
-        </DropdownMenuContent>
-      </DropdownMenu>
-      {/* Hidden Link nodes ensure router prefetch & SSR-safe navigation alternative */}
+    <div ref={containerRef} className="relative flex min-w-0 flex-1 items-center">
+      {/* Skjult måle-rad */}
+      <div
+        ref={measureRef}
+        aria-hidden
+        className="pointer-events-none absolute left-0 top-0 flex gap-1 opacity-0"
+        style={{ visibility: "hidden" }}
+      >
+        {entries.map((e) => (
+          <TabButton key={e.key} entry={e} active={false} />
+        ))}
+      </div>
+
+      <div className="flex min-w-0 items-center gap-1">
+        {arranged.visible.map((e) => (
+          <TabButton key={e.key} entry={e} active={isActive(e)} onClick={() => goTo(e)} />
+        ))}
+        {arranged.overflow.length > 0 && (
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              className={cn(
+                "flex h-9 items-center justify-center rounded-lg px-2",
+                "text-brand-cream/70 hover:bg-brand-cream/10 hover:text-brand-cream/90",
+                "transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-bronze/50",
+              )}
+              aria-label="Flere apper"
+            >
+              <MoreHorizontal className="h-4 w-4" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="end"
+              className="min-w-[200px] border-brand-cream/10 bg-brand-ink text-brand-cream"
+            >
+              {arranged.overflow.map((e) => {
+                const Icon = e.icon;
+                return (
+                  <DropdownMenuItem
+                    key={e.key}
+                    onSelect={() => goTo(e)}
+                    className="cursor-pointer focus:bg-brand-cream/10 focus:text-brand-cream"
+                  >
+                    <span style={{ color: e.color }} className="mr-2 inline-flex">
+                      <Icon className="h-4 w-4" />
+                    </span>
+                    <span className="flex-1">{e.label}</span>
+                  </DropdownMenuItem>
+                );
+              })}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+      </div>
+
+      {/* Skjulte router-lenker for prefetch */}
       <span className="sr-only">
-        {entries.map((e) => e.to ? <Link key={e.key} to={e.to}>{e.label}</Link> : null)}
+        {entries.map((e) =>
+          e.to ? (
+            <Link key={e.key} to={e.to}>
+              {e.label}
+            </Link>
+          ) : null,
+        )}
       </span>
     </div>
+  );
+}
+
+function TabButton({
+  entry,
+  active,
+  onClick,
+}: {
+  entry: Entry;
+  active: boolean;
+  onClick?: () => void;
+}) {
+  const Icon = entry.icon;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-current={active ? "page" : undefined}
+      className={cn(
+        "relative flex h-9 shrink-0 items-center gap-2 rounded-lg px-2.5 py-1.5",
+        "text-[13px] font-medium transition-all duration-150",
+        "focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-bronze/50",
+        "active:scale-[0.98]",
+        active
+          ? "text-brand-cream"
+          : "text-brand-cream/70 hover:bg-brand-cream/[0.06] hover:text-brand-cream/90",
+      )}
+      style={
+        active
+          ? {
+              backgroundColor: `${entry.color}1a`,
+              boxShadow: `inset 0 -2px 0 0 ${entry.color}`,
+            }
+          : undefined
+      }
+    >
+      <span
+        className="inline-flex"
+        style={{ color: active ? entry.color : undefined }}
+      >
+        <Icon className={cn("h-4 w-4", !active && "opacity-70")} />
+      </span>
+      <span>{entry.label}</span>
+    </button>
   );
 }
