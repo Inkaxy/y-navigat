@@ -181,15 +181,23 @@ export default function DeliveryRules() {
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<DeliveryRule | null>(null);
+  const [template, setTemplate] = useState<DeliveryRule | null>(null);
   const [deleting, setDeleting] = useState<DeliveryRule | null>(null);
   const [busy, setBusy] = useState(false);
 
   function openNew() {
     setEditing(null);
+    setTemplate(null);
     setFormOpen(true);
   }
   function openEdit(r: DeliveryRule) {
     setEditing(r);
+    setTemplate(null);
+    setFormOpen(true);
+  }
+  function openDuplicate(r: DeliveryRule) {
+    setEditing(null);
+    setTemplate(r);
     setFormOpen(true);
   }
 
