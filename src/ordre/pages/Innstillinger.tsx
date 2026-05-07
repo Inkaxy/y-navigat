@@ -13,27 +13,29 @@ import { Mail, ShieldCheck, FileText, AlertCircle, CheckCircle2 } from "lucide-r
 import { useOrdreEmailSettings } from "@/ordre/hooks/useOrdreEmailSettings";
 import { useEmailTemplates } from "@/ordre/hooks/useEmailTemplates";
 
+import { useToast } from "@/components/ui/use-toast";
+
 export default function OrdreInnstillingerPage() {
-  const { account, signature, loading, saving, saveSignature, startMicrosoftOAuth, completeMicrosoftOAuth, disconnectMicrosoft } = useOrdreEmailSettings();
+  const { account, signature, loading, saving, saveSignature, startMicrosoftOAuth, disconnectMicrosoft, reload } = useOrdreEmailSettings();
   const [searchParams, setSearchParams] = useSearchParams();
   const [sigDraft, setSigDraft] = useState("");
+  const { toast } = useToast();
 
   useEffect(() => {
     setSigDraft(signature);
   }, [signature]);
 
-  // OAuth callback handling
+  // Les query-params satt av M365Callback
   useEffect(() => {
-    const code = searchParams.get("code");
-    const state = searchParams.get("state");
-    if (code && state) {
-      const stored = sessionStorage.getItem("m365_oauth_state");
-      if (stored && stored === state) {
-        void completeMicrosoftOAuth(code, state).then(() => {
-          sessionStorage.removeItem("m365_oauth_state");
-          setSearchParams({});
-        });
-      }
+    const connected = searchParams.get("connected");
+    const error = searchParams.get("error");
+    if (connected === "true") {
+      toast({ title: "Koblet til Microsoft 365 ✓" });
+      void reload();
+      setSearchParams({}, { replace: true });
+    } else if (error) {
+      toast({ title: "Tilkobling feilet", description: error, variant: "destructive" });
+      setSearchParams({}, { replace: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
