@@ -37,10 +37,11 @@ export function Topbar() {
 
         <div className="hidden shrink-0 items-center gap-2 md:flex">
           <CompanyBlock />
-          <AppSwitcher />
         </div>
 
-        <div className="hidden min-w-0 flex-1 md:flex" />
+        <div className="hidden min-w-0 flex-1 items-center justify-center md:flex">
+          <AppSwitcher />
+        </div>
 
         <div className="hidden shrink-0 items-center justify-end gap-2 md:flex">
           <CommandTrigger onClick={() => setPaletteOpen(true)} />
