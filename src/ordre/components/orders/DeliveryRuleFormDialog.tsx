@@ -33,6 +33,8 @@ type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   rule: DeliveryRule | null;
+  /** Når satt og rule=null: forhåndsfyller skjemaet fra denne regelen (brukes for "Lag kopi"). */
+  template?: DeliveryRule | null;
   onSaved: () => void;
 };
 
@@ -80,15 +82,23 @@ function fromRule(r: DeliveryRule): Form {
   };
 }
 
-export function DeliveryRuleFormDialog({ open, onOpenChange, rule, onSaved }: Props) {
+export function DeliveryRuleFormDialog({ open, onOpenChange, rule, template, onSaved }: Props) {
   const qc = useQueryClient();
   const [form, setForm] = useState<Form>(EMPTY);
   const [busy, setBusy] = useState(false);
   const isEdit = !!rule;
 
   useEffect(() => {
-    if (open) setForm(rule ? fromRule(rule) : EMPTY);
-  }, [open, rule]);
+    if (!open) return;
+    if (rule) {
+      setForm(fromRule(rule));
+    } else if (template) {
+      const base = fromRule(template);
+      setForm({ ...base, name: `${base.name} (kopi)` });
+    } else {
+      setForm(EMPTY);
+    }
+  }, [open, rule, template]);
 
   // Tur-data
   const { data: tours = [] } = useDeliveryTours({ activeOnly: true });

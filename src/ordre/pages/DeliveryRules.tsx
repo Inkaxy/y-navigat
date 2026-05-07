@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Plus, Pencil, Trash2, Loader2, ListChecks, Search } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, ListChecks, Search, Copy } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { AppBanner } from "@/ordre/components/shell/AppBanner";
@@ -181,15 +181,23 @@ export default function DeliveryRules() {
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<DeliveryRule | null>(null);
+  const [template, setTemplate] = useState<DeliveryRule | null>(null);
   const [deleting, setDeleting] = useState<DeliveryRule | null>(null);
   const [busy, setBusy] = useState(false);
 
   function openNew() {
     setEditing(null);
+    setTemplate(null);
     setFormOpen(true);
   }
   function openEdit(r: DeliveryRule) {
     setEditing(r);
+    setTemplate(null);
+    setFormOpen(true);
+  }
+  function openDuplicate(r: DeliveryRule) {
+    setEditing(null);
+    setTemplate(r);
     setFormOpen(true);
   }
 
@@ -356,6 +364,16 @@ export default function DeliveryRules() {
                       >
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => openDuplicate(r)}
+                        className="h-7 w-7 p-0"
+                        aria-label="Lag kopi av regel"
+                        title="Lag kopi"
+                      >
+                        <Copy className="h-3.5 w-3.5" />
+                      </Button>
                       {r.is_active && (
                         <Button
                           size="sm"
@@ -380,6 +398,7 @@ export default function DeliveryRules() {
         open={formOpen}
         onOpenChange={setFormOpen}
         rule={editing}
+        template={template}
         onSaved={refresh}
       />
 
