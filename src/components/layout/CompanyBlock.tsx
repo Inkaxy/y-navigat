@@ -88,8 +88,8 @@ export function CompanyBlock({ className }: { className?: string }) {
                 fontWeight: 500,
                 marginLeft: "3px",
                 verticalAlign: "super",
-                color: "hsl(var(--bakery-crust))",
-                opacity: 0.85,
+                color: "hsl(var(--brand-bronze-soft))",
+                opacity: 0.95,
               }}
             >
               {year}
