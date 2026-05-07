@@ -67,6 +67,8 @@ type LineDraft = {
   product_mva_rate?: number | null;
   quantity: string;
   unit_price: string;
+  /** true når sentralisert prisoppslag faller tilbake til 0 — vises som rød advarsel */
+  is_fallback?: boolean;
 };
 
 function newLine(): LineDraft {
@@ -75,6 +77,7 @@ function newLine(): LineDraft {
     product: null,
     quantity: "1",
     unit_price: "0",
+    is_fallback: false,
   };
 }
 
