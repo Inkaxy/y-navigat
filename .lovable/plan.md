@@ -1,113 +1,108 @@
-## Oversikt
+## Status
 
-Bygger en ny "Live forhandling"-modus (over bordet) som komplement til eksisterende RFQ-flyt. Bruker fører forhandlingen i sanntid, søker opp råvarer, ser faktagrunnlag, og fyller inn avtalt pris fortløpende. Etter møtet sendes oppsummering til leverandør for bekreftelse.
+Phase A er ferdig: modus-velger, `LiveForhandlingSetup`, `LiveForhandlingWorkspace` med søk, faktagrunnlag, Avtalt/Park/Avslå, sanntids-besparelse, og avslutning som kopierer sammendrag / mailto.
+
+Denne planen dekker Phase B – det som gjenstår fra spesifikasjonen.
 
 ## Datamodell
 
-**Migrasjon 1 — utvide `negotiations`:**
-- `negotiation_mode text not null default 'rfq'` ('rfq' | 'live')
-- `live_session_started_at timestamptz`
-- `live_session_ended_at timestamptz`
-- `live_facilitator_id uuid` (auth.users)
-- `live_location_format text` ('physical' | 'video' | 'phone')
+**Migrasjon — utvide `negotiation_items`:**
+- `live_status` utvides med verdier: `unconfirmed_active`, `confirmed`
+- `live_confirmed_at timestamptz`, `live_confirmed_by_supplier boolean default false`
+- `live_supplier_note text` (notat fra leverandør under bekreftelse)
+- `live_datasheet_url text` (peker til opplastet PDF i Storage)
+- `live_datasheet_skipped boolean default false` ("sendes separat")
 
-**Migrasjon 2 — utvide `negotiation_items`:**
-- `live_status text default 'pending'` (pending | discussing | tentatively_agreed | agreed | declined | parked)
-- `live_agreed_price numeric`, `live_agreed_price_unit text`
-- `live_agreed_package_size numeric`, `live_agreed_package_unit text`
-- `live_agreed_price_per_base_unit numeric`
-- `live_agreed_contract_months int`
-- `live_agreed_min_volume numeric`, `live_agreed_min_volume_unit text`
-- `live_agreed_payment_terms_days int`
-- `live_agreed_at timestamptz`, `live_agreed_by uuid`
-- `live_notes text`
+**Migrasjon — utvide `negotiations`:**
+- `live_session_paused boolean default false`
+- `live_confirmation_deadline timestamptz`
+- `live_auto_apply_on_confirm boolean default true`
+- `live_send_reminder_after_days int default 7`
 
-**Migrasjon 3 — ny tabell `negotiation_live_events`:**
-Felter: `id`, `negotiation_id` (FK cascade), `negotiation_item_id` (FK cascade nullable), `event_type`, `event_data jsonb`, `note text`, `created_by`, `created_at`. Indeks på `(negotiation_id, created_at)`.
+**Storage:**
+- Ny bucket `negotiation-datasheets` (private). RLS: leverandør med gyldig token kan upload (via signed URL fra edge function); legal entity-medlemmer kan lese.
 
-**RLS:** Samme mønster som eksisterende negotiation-tabeller — knyttet til `legal_entity_id` via `negotiations`-relasjon.
+**RLS:** Eksisterende `negotiation_live_events` og `negotiation_items` policies gjenbrukes. Tokenisert tilgang gjøres via service-role i edge functions (samme mønster som RFQ).
 
-## UI-flyt
+## Edge functions
 
-### 1. Type-velger (modal)
-Når bruker klikker "+ Forhandling" i `ForhandlingerList`, åpne dialog som tilbyr:
-- **RFQ** (eksisterende wizard) → navigerer til `/ravarer/forhandlinger/ny`
-- **Live forhandling** → navigerer til `/ravarer/forhandlinger/live/ny`
+**Ny: `validate-live-confirmation-access`**
+Kopi av `validate-rfq-access`-mønster: tar token + passord, validerer mot eksisterende `negotiation_recipients` (gjenbruker token-feltene), returnerer signed session-token + minimal forhandlings-data (kun avtalte items).
 
-### 2. Live forberedelse-side (`LiveForhandlingSetup`)
-- Velg leverandør (dropdown med søk)
-- Tittel (auto-foreslått: "Q{kvartal} reforhandling {leverandør}")
-- Sted/format (radio: fysisk/video/telefon)
-- Notater (textarea)
-- Checkbox: "Forhåndslast alle aktive råvarer fra {leverandør}" (viser antall via `useRmSuppliers`)
-- "Start forhandling" → opprett negotiation + items + event 'session_started' → naviger til arbeidsflate
+**Ny: `submit-live-confirmation`**
+Tar session-token + array av `{ negotiation_item_id, confirmed: bool, supplier_note?, datasheet_path?, datasheet_skipped? }` + payment_terms_days. Per linje:
+- Hvis `confirmed=true`: sett `live_status='confirmed'`, `live_confirmed_at=now()`.
+- Hvis avvist med notat: behold `tentatively_agreed`, lagre `live_supplier_note`.
+- Logger event `confirmation_submitted` per linje.
+- Når alle `tentatively_agreed`/`unconfirmed_active` er løst: hvis alle confirmed og `live_auto_apply_on_confirm=true`, kall internt `apply-negotiation-outcome`-logikk for hver linje (eller marker `negotiations.status='concluded'` + `concluded_at`).
 
-### 3. Live arbeidsflate (`LiveForhandlingWorkspace`)
-Egen layout, minimalt menystøy. Topp:
-- Rød pulsindikator + "LIVE FORHANDLING · {leverandør} · {Xt min}" (live timer)
-- Fasilitator-navn + leverandør
-- Knapper: "Pause", "Avslutt →"
+**Ny: `request-live-datasheet-upload`**
+Tar session-token + `negotiation_item_id`, returnerer signed upload URL til `negotiation-datasheets/<negotiation_id>/<item_id>.pdf`.
 
-Hovedinnhold (tre seksjoner i prioritert rekkefølge):
+**Utvide `generate-rfq-credentials`** (eller ny `generate-live-credentials` som wrapper) til å håndtere `negotiation_mode='live'` — samme token/passord-mekanisme, bare annen e-post-template.
 
-**A. Søk og legg til** (Command-stil søk)
-- Input: skriv navn → liste over råvarer (filter: ikke allerede i forhandling)
-- "Legg til" → setter `live_status='discussing'`, åpner kort
+## Frontend
 
-**B. Aktivt diskusjons-kort** (`LiveItemCard`, status=discussing)
-- Stort råvare-navn
-- Faktagrunnlag-blokk: bruker `usePurchaseStats` for volum 12mnd, kostnad, snittpris; eksisterende avtalt pris fra `useRmSuppliers`; trend 24mnd
-- Forslag: enkel beregning (f.eks. snittpris - 5%)
-- Inputs: pris, prisenhet, pakning, pakningsenhet, avtalemåneder, min ordre, betalingsdager
-- Auto-beregner `live_agreed_price_per_base_unit` via `_shared/units.ts`-mønster
-- Notat-felt
-- Knapper: **Avtalt** / **Park** / **Avslå** (skriver event + oppdaterer item)
+**Endring i `LiveForhandlingWorkspace` avslutnings-dialog:**
+Erstatt nåværende "kopier/mailto" med ekte avslutnings-modal:
+- Sammendrag (avtalt/parket/urørt + total besparelse)
+- Mottaker-felt (forhåndsutfylt fra recipient, redigerbart)
+- Frist for bekreftelse (default 14 dager)
+- Toggles: vis pris-snapshot, auto-oppdater `raw_material_suppliers`, send påminnelse etter 7 dager
+- "Avslutt og send →":
+  1. Setter `live_session_ended_at`, `status='awaiting_confirmation'`, `live_confirmation_deadline`
+  2. Kaller `generate-rfq-credentials` (eller ny wrapper) for å lage token + passord
+  3. Kopierer ferdig e-post-tekst (med token-URL `https://nbhub.no/bekreftelse/<token>`) til utklippstavle + tilbyr mailto
 
-**C. Behandlet-liste**
-- Kompakt liste over items med status agreed/parked/declined
-- Klikk → utvid for å redigere
+**Pause-knapp:** legg til i live-header — toggler `live_session_paused`, viser "Pauset"-banner.
 
-**Footer:**
-- "{X} av {Y} råvarer behandlet · Total besparelse: {kr}/år"
+**Re-åpne behandlede:** Klikk på rad i "Allerede behandlet" → setter `live_status='discussing'`, logger `item_reopened`. Krever liten endring i `LiveForhandlingWorkspace`.
 
-### 4. Avslutt-flyt (`LiveForhandlingSummary`)
-- Sett `live_session_ended_at`, status=concluded
-- Vis sammendrag: alle agreed items, totale besparelser
-- Knapp: "Send oppsummering til leverandør for bekreftelse" → bruker eksisterende RFQ-credentials-flyt for å gi leverandør tilgang til en bekreftelses-portal (kan komme i senere iterasjon — for nå: kopier sammendrag til utklippstavle + send via mailto)
+**Park/Avslå begrunnelse:** vis lite prompt (textarea) når park/avslå klikkes — lagres i `live_notes`.
+
+**Ny: `LiveTidslinje`-komponent** (drawer i `ForhandlingDetail`) som viser kronologisk `negotiation_live_events` med ikon per `event_type`.
+
+**Endring i `ForhandlingDetail`:** når `negotiation_mode='live'` og status er `awaiting_confirmation` eller `concluded`, vis live-spesifikk visning:
+- Liste over avtalte items med bekreftelses-status (✅ confirmed / ⏳ venter / ⚠️ supplier-notat)
+- Knapper: "Send påminnelse" (mailto), "Aktiver bekreftede selv om alt ikke er bekreftet" (kaller funksjon som setter ubekreftede til `unconfirmed_active` og kjører apply for confirmed)
+- "Vis møte-tidslinje" → `LiveTidslinje`-drawer
+
+**Ny rute `/bekreftelse/:token`** — `LiveConfirmationPortal`:
+- Login (token + passord) via `validate-live-confirmation-access`
+- Liste over avtalte items, hver med:
+  - Snapshot av avtalt pris/pakning/avtale-måneder
+  - Sjekkboks "Jeg bekrefter"
+  - PDF-opplastings-knapp (kaller `request-live-datasheet-upload`, så direkte upload til signed URL) + sjekkboks "Datablad sendes separat"
+  - Notat-felt
+- Generelle vilkår: betalingsdager
+- "Bekreft alle"-snarvei + "Lagre kladd" (lagrer i localStorage)
+- "Send bekreftelse" → `submit-live-confirmation`. Validering: hver bekreftet linje må ha datablad eller "sendes separat".
 
 ## Filer
 
 **Nye:**
-- `src/ravarer/pages/forhandlinger/NewNegotiationTypeDialog.tsx` — type-velger
-- `src/ravarer/pages/forhandlinger/LiveForhandlingSetup.tsx`
-- `src/ravarer/pages/forhandlinger/LiveForhandlingWorkspace.tsx`
-- `src/ravarer/pages/forhandlinger/LiveForhandlingSummary.tsx`
-- `src/ravarer/pages/forhandlinger/components/LiveItemCard.tsx`
-- `src/ravarer/pages/forhandlinger/components/LiveItemSearch.tsx`
-- `src/ravarer/pages/forhandlinger/components/LiveTimer.tsx`
-- `src/ravarer/hooks/useLiveNegotiation.ts` — CRUD for live-state, events, items
-- `supabase/migrations/...sql` — schema-utvidelser + RLS
+- `supabase/migrations/<ts>_live_confirmation.sql`
+- `supabase/functions/validate-live-confirmation-access/index.ts`
+- `supabase/functions/submit-live-confirmation/index.ts`
+- `supabase/functions/request-live-datasheet-upload/index.ts`
+- `src/ravarer/pages/forhandlinger/LiveConfirmationPortal.tsx`
+- `src/ravarer/pages/forhandlinger/components/LiveEndSessionDialog.tsx`
+- `src/ravarer/pages/forhandlinger/components/LiveTidslinjeDrawer.tsx`
+- `src/ravarer/pages/forhandlinger/components/LiveConfirmationStatusList.tsx`
+- `src/ravarer/hooks/useLiveConfirmation.ts`
 
 **Endrede:**
-- `src/App.tsx` — nye ruter `/ravarer/forhandlinger/live/ny` og `/ravarer/forhandlinger/live/:id`
-- `src/ravarer/pages/forhandlinger/ForhandlingerList.tsx` — bruk type-velger; vis mode-badge på rader; klikk på live-forhandling → workspace istedenfor detail
-- `src/ravarer/pages/forhandlinger/ForhandlingDetail.tsx` — render forskjellig basert på `negotiation_mode` (live viser oppsummering med events, RFQ uendret)
-- `src/ravarer/hooks/useNegotiations.ts` — utvid `NegotiationRow` og `NegotiationItemRow` med nye felt
+- `src/App.tsx` — rute `/bekreftelse/:token`
+- `src/ravarer/pages/forhandlinger/LiveForhandlingWorkspace.tsx` — pause, re-åpne, park/avslå-begrunnelse, ny avslutnings-dialog
+- `src/ravarer/pages/forhandlinger/ForhandlingDetail.tsx` — live-spesifikk visning ved awaiting_confirmation/concluded
+- `src/ravarer/hooks/useNegotiations.ts` — type-utvidelser
 
-**Ingen endring i:** RFQ-wizard, supplier portal, eksisterende edge functions.
+## Levering
 
-## Tekniske detaljer
+Stort omfang — foreslår å splitte i to PRs hvis ønsket:
 
-- **Live timer:** `useEffect` med `setInterval(1000)` som regner ut diff mot `live_session_started_at`
-- **Optimistic updates:** Bruk `useMutation` med `onMutate` for snappy UX i workspace
-- **Event logging:** Hver knappetrykk (avtalt/park/avslå/note) logges automatisk via en `logLiveEvent`-helper
-- **Søk:** Reuse `useRawMaterials` med klient-side fuzzy filter (cmdk-stil); ekskluder råvarer som allerede har item i denne forhandlingen
-- **Faktagrunnlag:** Reuse `usePurchaseStats` per råvare (kjører for aktivt kort)
-- **Ingen sanntids-multibruker**: Én fasilitator i taget; ingen Supabase realtime-abonnement i denne iterasjonen
-- **Leverandør-bekreftelse:** Iterasjon 1 — mailto + utklippstavle; iterasjon 2 (senere) — gjenbruke RFQ-token-mekanisme for confirm-portal
+**B1 (nå):** Migrasjon + avslutnings-dialog + edge functions + leverandør-portal + grunnleggende status-visning. Pause/re-åpne/tidslinje kan komme i B2.
 
-## Levering i to faser
+**B2 (etterpå):** Pause, re-åpne, park-begrunnelse, møte-tidslinje, påminnelses-flyt, manuell aktivering ved delvis bekreftelse, "datablad allerede aktuelt"-gjenbruk.
 
-**Fase A (denne PR):** Migrasjoner + type-velger + setup + workspace + lagring av events/agreements + ny rute. Avslutt-knappen lukker sesjonen og setter status=concluded med klipp/mailto-summary.
-
-**Fase B (senere, ved ditt klarsignal):** Confirm-portal for leverandør med token-tilgang og datablad-opplasting per item, samt automatisk push til `raw_material_suppliers` (parallell til `apply-negotiation-outcome`).
+Si fra om du vil at jeg leverer alt i én eller splitter — så kjører jeg i gang.
