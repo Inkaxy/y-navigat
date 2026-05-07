@@ -61,7 +61,7 @@ export default function LiveForhandlingWorkspace() {
     const groups: Record<string, typeof items> = { pending: [], discussing: [], processed: [] };
     for (const it of items) {
       const s = it.live_status ?? "pending";
-      if (s === "agreed" || s === "parked" || s === "declined" || s === "tentatively_agreed") {
+      if (s === "agreed" || s === "parked" || s === "declined" || s === "tentatively_agreed" || s === "confirmed" || s === "unconfirmed_active") {
         groups.processed.push(it);
       } else if (s === "discussing") {
         groups.discussing.push(it);
