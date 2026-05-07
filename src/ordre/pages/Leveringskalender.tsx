@@ -1134,6 +1134,86 @@ export default function MatrixPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {copyColCol && matrix && (
+        <CopyColumnDialog
+          open={!!copyColCol}
+          onOpenChange={(v) => !v && setCopyColCol(null)}
+          sourceDate={copyColCol.date}
+          sourceTour={copyColCol.tour}
+          visibleDates={visibleDatesArr}
+          tours={matrix.tours}
+          targetHasData={(d, t) => colHasAnyData(d, t)}
+          onConfirm={(input) => executeColumnCopy(copyColCol, input)}
+          isSaving={saveMatrix.isPending}
+        />
+      )}
+
+      {commentCol && (
+        <ColumnCommentDialog
+          open={!!commentCol}
+          onOpenChange={(v) => !v && setCommentCol(null)}
+          date={commentCol.date}
+          tourLabel={`T${commentCol.tour.tour_number} ${commentCol.tour.display_name}`}
+          initial={columnComments?.get(`${commentCol.date}|${commentCol.tour.id}`) ?? ""}
+          onSave={saveColumnComment}
+          isSaving={upsertColumnComment.isPending}
+        />
+      )}
+
+      <AlertDialog open={!!deleteColConfirm} onOpenChange={(v) => !v && setDeleteColConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Slett alle ordrer for kolonnen?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteColConfirm && `${formatDateNO(deleteColConfirm.date)} · T${deleteColConfirm.tour.tour_number} ${deleteColConfirm.tour.display_name}. Dette kan ikke angres.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Avbryt</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteColumn}>Slett</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <SetForAllDaysDialog
+        open={setForAllOpen}
+        onOpenChange={setSetForAllOpen}
+        products={allProducts}
+        onConfirm={handleSetForAllDays}
+        isSaving={saveMatrix.isPending}
+      />
+      <RemoveProductDialog
+        open={removeProdOpen}
+        onOpenChange={setRemoveProdOpen}
+        products={allProducts}
+        onConfirm={handleRemoveProduct}
+        isSaving={saveMatrix.isPending}
+      />
+      <MoveProductDialog
+        open={moveProdOpen}
+        onOpenChange={setMoveProdOpen}
+        products={allProducts}
+        tours={matrix?.tours ?? []}
+        onConfirm={handleMoveProduct}
+        isSaving={saveMatrix.isPending}
+      />
+      <PauseDialog
+        open={pauseOpen}
+        onOpenChange={setPauseOpen}
+        tours={matrix?.tours ?? []}
+        defaultFrom={dateFrom}
+        defaultTo={dateTo}
+        onConfirm={handleCreatePause}
+        isSaving={false}
+      />
+      <CorrectionsDialog
+        open={correctionsOpen}
+        onOpenChange={setCorrectionsOpen}
+        customerId={customerId}
+        dateFrom={dateFrom}
+        dateTo={dateTo}
+      />
     </div>
   );
 }
