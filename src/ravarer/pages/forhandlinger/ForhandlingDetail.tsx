@@ -88,6 +88,12 @@ export default function ForhandlingDetail() {
   // Conclusion modal
   const [concludeOpen, setConcludeOpen] = useState(false);
 
+  useEffect(() => {
+    if (neg && (neg as any).negotiation_mode === "live" && neg.status !== "concluded" && neg.status !== "cancelled") {
+      navigate(`/ravarer/forhandlinger/live/${id}`, { replace: true });
+    }
+  }, [neg, id, navigate]);
+
   if (!neg) {
     return (
       <div className="p-6">
