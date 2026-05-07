@@ -51,6 +51,8 @@ export default function LiveForhandlingWorkspace() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [endOpen, setEndOpen] = useState(false);
   const [ending, setEnding] = useState(false);
+  const [deadlineDays, setDeadlineDays] = useState<string>("14");
+  const [credentials, setCredentials] = useState<{ url: string; password: string; email: string | null } | null>(null);
 
   const supplierId = recipients[0]?.supplier_id ?? "";
   const supplierName = suppliers.find((s) => s.id === supplierId)?.name ?? "—";
@@ -59,7 +61,7 @@ export default function LiveForhandlingWorkspace() {
     const groups: Record<string, typeof items> = { pending: [], discussing: [], processed: [] };
     for (const it of items) {
       const s = it.live_status ?? "pending";
-      if (s === "agreed" || s === "parked" || s === "declined" || s === "tentatively_agreed") {
+      if (s === "agreed" || s === "parked" || s === "declined" || s === "tentatively_agreed" || s === "confirmed" || s === "unconfirmed_active") {
         groups.processed.push(it);
       } else if (s === "discussing") {
         groups.discussing.push(it);
@@ -81,7 +83,10 @@ export default function LiveForhandlingWorkspace() {
   const totalSavings = useMemo(() => {
     let saved = 0;
     for (const it of items) {
-      if (it.live_status !== "agreed" || it.live_agreed_price_per_base_unit == null) continue;
+      if (
+        (it.live_status !== "agreed" && it.live_status !== "tentatively_agreed" && it.live_status !== "confirmed") ||
+        it.live_agreed_price_per_base_unit == null
+      ) continue;
       const stats = statsMap?.get(it.raw_material_id);
       if (!stats?.avg_price_per_base_unit_12m || !stats.quantity_12m) continue;
       saved += (Number(stats.avg_price_per_base_unit_12m) - Number(it.live_agreed_price_per_base_unit)) * Number(stats.quantity_12m);
@@ -142,21 +147,32 @@ export default function LiveForhandlingWorkspace() {
   async function handleEndSession() {
     setEnding(true);
     try {
+      const days = Math.max(1, Number(deadlineDays) || 14);
+      const deadline = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
       await updateNeg.mutateAsync({
         id,
         patch: {
-          status: "concluded",
+          status: "awaiting_confirmation",
           live_session_ended_at: new Date().toISOString(),
-          concluded_at: new Date().toISOString(),
+          live_confirmation_deadline: deadline,
         } as any,
       });
+      // Generate supplier credentials (reuses RFQ token mechanism)
+      const { data: credRes, error: credErr } = await supabase.functions.invoke(
+        "generate-rfq-credentials",
+        { body: { negotiation_id: id } },
+      );
+      if (credErr) throw credErr;
+      const cred = credRes?.credentials?.[0];
+      if (cred) {
+        const url = `${window.location.origin}/bekreftelse/${cred.access_token}`;
+        setCredentials({ url, password: cred.password, email: cred.contact_email ?? null });
+      }
       await logEvent.mutateAsync({
         negotiation_id: id,
         event_type: "session_ended",
         event_data: { processed: processedCount, total: totalCount, total_savings: totalSavings },
       });
-      setEndOpen(false);
-      navigate(`/ravarer/forhandlinger/${id}`);
     } catch (e: any) {
       toast.error(e?.message ?? "Kunne ikke avslutte");
     } finally {
@@ -169,13 +185,18 @@ export default function LiveForhandlingWorkspace() {
     lines.push(`Forhandling: ${neg?.title ?? ""}`);
     lines.push(`Leverandør: ${supplierName}`);
     lines.push("");
-    lines.push("Avtalte poster:");
-    for (const it of items.filter((i) => i.live_status === "agreed")) {
+    lines.push("Avtalte poster (venter bekreftelse):");
+    for (const it of items.filter((i) => i.live_status === "tentatively_agreed" || i.live_status === "agreed" || i.live_status === "confirmed")) {
       const rm = rawMaterials.find((r) => r.id === it.raw_material_id);
       lines.push(`- ${rm?.name ?? "?"}: ${it.live_agreed_price ?? "?"} ${it.live_agreed_price_unit ?? ""} (${it.live_agreed_contract_months ?? "?"} mnd)`);
     }
     lines.push("");
     lines.push(`Total estimert besparelse: ${formatNok(totalSavings)}/år`);
+    if (credentials) {
+      lines.push("");
+      lines.push(`Bekreftelses-lenke: ${credentials.url}`);
+      lines.push(`Passord (send i separat e-post): ${credentials.password}`);
+    }
     return lines.join("\n");
   }
 
@@ -345,17 +366,39 @@ export default function LiveForhandlingWorkspace() {
       </Card>
 
       {/* End dialog */}
-      <Dialog open={endOpen} onOpenChange={setEndOpen}>
+      <Dialog open={endOpen} onOpenChange={(o) => { setEndOpen(o); if (!o && credentials) { setCredentials(null); navigate(`/ravarer/forhandlinger/${id}`); } }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Avslutt forhandling</DialogTitle>
+            <DialogTitle>{credentials ? "Send bekreftelse til leverandør" : "Avslutt forhandling"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 text-sm">
-            <p>
-              Avslutter live-sesjonen og låser status til <strong>concluded</strong>.{" "}
-              {processedCount} av {totalCount} råvarer er behandlet med estimert besparelse{" "}
-              <strong>{formatNok(totalSavings)}/år</strong>.
-            </p>
+            {!credentials && (
+              <>
+                <p>
+                  Avslutter live-sesjonen og setter status til <strong>awaiting_confirmation</strong>.{" "}
+                  {processedCount} av {totalCount} råvarer er behandlet med estimert besparelse{" "}
+                  <strong>{formatNok(totalSavings)}/år</strong>.
+                </p>
+                <div>
+                  <label className="text-xs text-ink-secondary">Frist for bekreftelse (dager)</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={deadlineDays}
+                    onChange={(e) => setDeadlineDays(e.target.value)}
+                    className="mt-1 block w-32 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  />
+                </div>
+              </>
+            )}
+            {credentials && (
+              <div className="space-y-2 rounded-md border border-success/30 bg-success/5 p-3 text-xs">
+                <p className="font-semibold text-success">Lenke og passord generert</p>
+                <p>Send til: <strong>{credentials.email ?? "—"}</strong></p>
+                <p className="break-all">Lenke: <code>{credentials.url}</code></p>
+                <p>Passord (separat e-post): <code className="rounded bg-surface-muted px-1 py-0.5">{credentials.password}</code></p>
+              </div>
+            )}
             <Card className="max-h-48 overflow-auto whitespace-pre-wrap p-3 font-mono text-xs">
               {summaryText()}
             </Card>
@@ -365,16 +408,16 @@ export default function LiveForhandlingWorkspace() {
                 size="sm"
                 onClick={() => {
                   navigator.clipboard.writeText(summaryText());
-                  toast.success("Sammendrag kopiert");
+                  toast.success("Kopiert");
                 }}
               >
                 Kopier sammendrag
               </Button>
-              {recipients[0]?.contact_email && (
+              {recipients[0]?.contact_email && credentials && (
                 <Button asChild variant="outline" size="sm">
                   <a
                     href={`mailto:${recipients[0].contact_email}?subject=${encodeURIComponent(
-                      "Forhandlings-oppsummering: " + (neg.title ?? "")
+                      "Bekreftelse av avtaler: " + (neg.title ?? "")
                     )}&body=${encodeURIComponent(summaryText())}`}
                   >
                     Send på e-post
@@ -385,12 +428,14 @@ export default function LiveForhandlingWorkspace() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEndOpen(false)}>
-              Avbryt
+              {credentials ? "Lukk" : "Avbryt"}
             </Button>
-            <Button onClick={handleEndSession} disabled={ending}>
-              {ending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Avslutt sesjon
-            </Button>
+            {!credentials && (
+              <Button onClick={handleEndSession} disabled={ending}>
+                {ending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Avslutt og generer lenke
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

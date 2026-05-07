@@ -6,3 +6,12 @@ verify_jwt = false
 [functions.submit-negotiation-response]
 verify_jwt = false
 
+
+[functions.validate-live-confirmation-access]
+verify_jwt = false
+
+[functions.submit-live-confirmation]
+verify_jwt = false
+
+[functions.request-live-datasheet-upload]
+verify_jwt = false

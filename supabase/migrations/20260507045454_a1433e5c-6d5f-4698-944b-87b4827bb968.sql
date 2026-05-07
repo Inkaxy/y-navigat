@@ -1,0 +1,1 @@
+alter type negotiation_status add value if not exists 'awaiting_confirmation';

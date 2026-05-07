@@ -84,17 +84,17 @@ export function LiveItemCard({ item, rawMaterial, supplierId, facilitatorId, onS
     };
   }
 
-  async function setStatus(status: "agreed" | "parked" | "declined") {
+  async function setStatus(status: "tentatively_agreed" | "parked" | "declined") {
     const patch: Record<string, any> = {
       ...buildPatch(),
       live_status: status,
     };
-    if (status === "agreed") {
+    if (status === "tentatively_agreed") {
       patch.live_agreed_at = new Date().toISOString();
       patch.live_agreed_by = facilitatorId;
     }
     const eventType =
-      status === "agreed" ? "price_agreed" : status === "parked" ? "item_parked" : "item_declined";
+      status === "tentatively_agreed" ? "price_agreed" : status === "parked" ? "item_parked" : "item_declined";
     await onSave(patch, eventType, { price: patch.live_agreed_price, status }, note || null);
   }
 
@@ -162,7 +162,7 @@ export function LiveItemCard({ item, rawMaterial, supplierId, facilitatorId, onS
       </div>
 
       <div className="flex gap-2">
-        <Button onClick={() => setStatus("agreed")} disabled={saving} className="flex-1">
+        <Button onClick={() => setStatus("tentatively_agreed")} disabled={saving} className="flex-1">
           {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
           Avtalt
         </Button>

@@ -43,7 +43,7 @@ export interface NegotiationItemRow {
   suggested_package_unit: string | null;
   notes: string | null;
   sort_order: number;
-  live_status?: "pending" | "discussing" | "tentatively_agreed" | "agreed" | "declined" | "parked";
+  live_status?: "pending" | "discussing" | "tentatively_agreed" | "agreed" | "declined" | "parked" | "confirmed" | "unconfirmed_active";
   live_agreed_price?: number | null;
   live_agreed_price_unit?: string | null;
   live_agreed_package_size?: number | null;
@@ -56,6 +56,11 @@ export interface NegotiationItemRow {
   live_agreed_at?: string | null;
   live_agreed_by?: string | null;
   live_notes?: string | null;
+  live_confirmed_at?: string | null;
+  live_confirmed_by_supplier?: boolean | null;
+  live_supplier_note?: string | null;
+  live_datasheet_path?: string | null;
+  live_datasheet_skipped?: boolean | null;
 }
 
 export interface NegotiationRecipientRow {
