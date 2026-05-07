@@ -16,7 +16,7 @@ export function Topbar() {
   return (
     <>
       <header
-        className="sticky top-0 z-40 flex items-center backdrop-blur-md md:grid"
+        className="sticky top-0 z-40 flex items-center backdrop-blur-md"
         style={{
           height: "60px",
           padding: "0 16px",
@@ -24,7 +24,6 @@ export function Topbar() {
           borderBottom: "1px solid hsl(var(--brand-cream) / 0.10)",
           boxShadow: "0 1px 0 0 hsl(var(--brand-bronze) / 0.25), 0 2px 8px -2px hsl(0 0% 0% / 0.30)",
           color: "hsl(var(--brand-cream))",
-          gridTemplateColumns: "auto auto 1fr auto",
         }}
       >
         <MobileMenu onOpenPalette={() => setPaletteOpen(true)} />
@@ -32,20 +31,21 @@ export function Topbar() {
         <Link
           to="/"
           aria-label="Nøtterø Bakeri — hjem"
-          className="hidden items-center pr-4 text-brand-cream md:flex"
+          className="hidden shrink-0 items-center pr-3 text-brand-cream md:flex"
         >
           <Logo variant="horizontal" className="h-8 w-auto" />
         </Link>
 
-        <div className="hidden items-center justify-start gap-3 md:flex">
+        <div className="hidden shrink-0 items-center gap-2 md:flex">
           <CompanyBlock />
+          <AppSwitcher />
         </div>
 
-        <div className="hidden min-w-0 items-center justify-start md:flex">
+        <div className="hidden min-w-0 flex-1 items-center justify-start pl-3 md:flex">
           <AppTabs />
         </div>
 
-        <div className="hidden items-center justify-end gap-2 md:flex">
+        <div className="hidden shrink-0 items-center justify-end gap-2 md:flex">
           <CommandTrigger onClick={() => setPaletteOpen(true)} />
           <OutletSelector />
           <UserMenu />
