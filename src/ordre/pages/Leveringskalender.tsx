@@ -821,6 +821,9 @@ function MatrixGrid({
   colTotals,
   grandTotal,
   weatherMap,
+  hasCustomerCoords,
+  ghostMap,
+  pauseMap,
 }: {
   columns: { date: string; tour: MatrixTour }[];
   products: MatrixProduct[];
@@ -836,6 +839,9 @@ function MatrixGrid({
   colTotals: Record<string, number>;
   grandTotal: number;
   weatherMap: WeatherMap | undefined;
+  hasCustomerCoords: boolean;
+  ghostMap: RecurringGhostMap | undefined;
+  pauseMap: PauseMap | undefined;
 }) {
   const dateGroups = useMemo(() => {
     const groups: { date: string; count: number }[] = [];
