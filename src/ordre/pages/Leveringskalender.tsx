@@ -577,8 +577,8 @@ export default function MatrixPage() {
             }}
             disabled={!customerId}
           >
-            <ToggleGroupItem value="today" size="sm" variant="outline" aria-label="I dag">
-              I dag
+            <ToggleGroupItem value="today" size="sm" variant="outline" aria-label="I morgen">
+              I morgen
             </ToggleGroupItem>
             <ToggleGroupItem value="this_week" size="sm" variant="outline" aria-label="Denne uken">
               Denne uken
