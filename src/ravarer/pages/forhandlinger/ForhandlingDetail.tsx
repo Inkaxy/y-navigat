@@ -127,11 +127,18 @@ export default function ForhandlingDetail() {
         actions={
           <>
             <Badge variant="outline">{neg.status}</Badge>
-            <Button size="sm" variant="outline" className="rounded-full"
-              onClick={() => navigate(`/ravarer/forhandlinger/${id}/rediger`)}>
-              Rediger
-            </Button>
-            {neg.status !== "concluded" && neg.status !== "cancelled" && (
+            {isLive && (
+              <Button size="sm" variant="outline" className="rounded-full" onClick={() => setTimelineOpen(true)}>
+                <History className="mr-1.5 h-4 w-4" /> Tidslinje
+              </Button>
+            )}
+            {!isLive && (
+              <Button size="sm" variant="outline" className="rounded-full"
+                onClick={() => navigate(`/ravarer/forhandlinger/${id}/rediger`)}>
+                Rediger
+              </Button>
+            )}
+            {!isLive && neg.status !== "concluded" && neg.status !== "cancelled" && (
               <Button size="sm" className="rounded-full" onClick={() => setConcludeOpen(true)}>
                 <Flag className="mr-1.5 h-4 w-4" /> Avslutt
               </Button>
@@ -139,6 +146,55 @@ export default function ForhandlingDetail() {
           </>
         }
       />
+
+      {isLive && <LiveConfirmationStatus
+        neg={neg}
+        items={items}
+        recipients={recipients}
+        rmName={rmName}
+        supName={supName}
+        activating={activating}
+        onActivate={async (onlyConfirmed) => {
+          setActivating(true);
+          try {
+            const targets = onlyConfirmed
+              ? items.filter((i) => i.live_status === "confirmed")
+              : items.filter((i) => i.live_status === "confirmed" || i.live_status === "tentatively_agreed");
+            if (targets.length === 0) { toast.info("Ingen linjer å aktivere"); return; }
+            const rec = recipients[0];
+            const outcomes = targets.map((it: any) => ({
+              negotiation_item_id: it.id,
+              winner_recipient_id: rec?.id ?? null,
+              winner_response_id: null,
+              agreed_price: it.live_agreed_price_per_base_unit ?? it.live_agreed_price,
+              agreed_package_size: it.live_agreed_package_size,
+              agreed_package_unit: it.live_agreed_package_unit,
+              set_as_primary: false,
+              apply_to_supplier: true,
+            }));
+            const { data, error } = await supabase.functions.invoke("apply-negotiation-outcome", {
+              body: { negotiation_id: id, outcomes },
+            });
+            if (error) throw error;
+            if (!data?.success) throw new Error(data?.error ?? "Feil");
+            // Mark unconfirmed tentative items as unconfirmed_active
+            if (!onlyConfirmed) {
+              await supabase
+                .from("negotiation_items" as any)
+                .update({ live_status: "unconfirmed_active" } as any)
+                .eq("negotiation_id", id)
+                .eq("live_status", "tentatively_agreed");
+            }
+            qc.invalidateQueries({ queryKey: ["negotiation-items", id] });
+            qc.invalidateQueries({ queryKey: ["negotiation", id] });
+            toast.success("Aktivert");
+          } catch (e: any) {
+            toast.error(e?.message ?? "Aktivering feilet");
+          } finally {
+            setActivating(false);
+          }
+        }}
+      />}
 
       <div className="grid gap-4 md:grid-cols-4">
         <Card className="p-4">
