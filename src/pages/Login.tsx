@@ -98,9 +98,9 @@ export default function Login() {
       <div className="w-full max-w-md space-y-6 animate-fade-in">
         <div className="flex flex-col items-center text-center">
           <Logo
-            variant="seal"
+            variant="horizontal"
             title="Nøtterø Bakeri"
-            className="h-64 w-64 md:h-72 md:w-72 text-brand-cream"
+            className="h-64 w-auto md:h-72 text-brand-cream"
           />
           <p className="mt-3 text-xs uppercase tracking-[0.18em] text-brand-cream/70">
             NBHub · Driftshjernen
