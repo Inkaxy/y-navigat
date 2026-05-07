@@ -26,7 +26,7 @@ export function MobileMenu({ onOpenPalette }: Props) {
     <div className="flex w-full items-center justify-between md:hidden">
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetTrigger
-          className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-line-subtle bg-surface-raised text-ink-primary hover:bg-bakery-cream"
+          className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-brand-cream/15 bg-brand-cream/[0.04] text-brand-cream hover:bg-brand-cream/[0.08]"
           aria-label="Åpne meny"
         >
           <Menu className="h-5 w-5" />
