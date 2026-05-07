@@ -55,9 +55,14 @@ import { useDebouncedValue } from "@/ordre/hooks/useDebouncedValue";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserAccess } from "@/ordre/hooks/useUserAccess";
 import { useWeatherForecast, type WeatherMap } from "@/ordre/hooks/useWeatherForecast";
-import { useWeatherLocation } from "@/ordre/hooks/useLegalEntitySettings";
 import { WeatherCell } from "@/ordre/components/orders/WeatherCell";
-import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
+import { useRecurringGhost, type RecurringGhostMap } from "@/ordre/hooks/useRecurringGhost";
+import {
+  useDeliveryPausesForCustomer,
+  isPaused,
+  type PauseMap,
+  type PauseInfo,
+} from "@/ordre/hooks/useDeliveryPausesForCustomer";
 import { formatNOK, todayISO } from "@/ordre/lib/format";
 import { cn } from "@/lib/utils";
 import { type Merknad, isMerknadEmpty, parseMerknad } from "@/ordre/lib/merknad";
@@ -112,8 +117,11 @@ export default function MatrixPage() {
   const { data: matrix, isLoading } = useMatrixData(customerId, dateFrom, dateTo);
   const { data: addableProducts } = useAddableProducts(customerId, !!customerId);
   const saveMatrix = useSaveMatrix();
-  const weatherLoc = useWeatherLocation(NB_LEGAL_ENTITY_ID);
-  const { data: weatherMap } = useWeatherForecast(weatherLoc.lat, weatherLoc.lon);
+  const customerLat = selectedCustomer?.geocode_latitude ?? null;
+  const customerLon = selectedCustomer?.geocode_longitude ?? null;
+  const { data: weatherMap } = useWeatherForecast(customerLat, customerLon);
+  const { data: ghostMap } = useRecurringGhost(customerId, dateFrom, dateTo);
+  const { data: pauseMap } = useDeliveryPausesForCustomer(customerId, dateFrom, dateTo);
 
   const [edits, setEdits] = useState<Record<CellKey, string>>({});
   const [addedProducts, setAddedProducts] = useState<MatrixProduct[]>([]);
