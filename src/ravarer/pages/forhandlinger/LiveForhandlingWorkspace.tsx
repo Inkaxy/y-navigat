@@ -55,10 +55,14 @@ export default function LiveForhandlingWorkspace() {
   const [endOpen, setEndOpen] = useState(false);
   const [ending, setEnding] = useState(false);
   const [deadlineDays, setDeadlineDays] = useState<string>("14");
+  const [autoApply, setAutoApply] = useState(true);
+  const [timelineOpen, setTimelineOpen] = useState(false);
+  const [pausing, setPausing] = useState(false);
   const [credentials, setCredentials] = useState<{ url: string; password: string; email: string | null } | null>(null);
 
   const supplierId = recipients[0]?.supplier_id ?? "";
   const supplierName = suppliers.find((s) => s.id === supplierId)?.name ?? "—";
+  const isPaused = !!neg?.live_session_paused;
 
   const itemsByStatus = useMemo(() => {
     const groups: Record<string, typeof items> = { pending: [], discussing: [], processed: [] };
