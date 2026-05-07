@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Grid3x3,
   ChevronLeft,
@@ -10,6 +11,11 @@ import {
   StickyNote,
   ArrowRight,
   MoreHorizontal,
+  Copy,
+  MessageSquare,
+  Trash2,
+  PackageCheck,
+  ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AppBanner } from "@/ordre/components/shell/AppBanner";
@@ -35,8 +41,25 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { AddProductDialog } from "@/ordre/components/orders/AddProductDialog";
 import { MerknadDialog } from "@/ordre/components/orders/MerknadDialog";
+import { ColumnCommentDialog } from "@/ordre/components/orders/matrix/ColumnCommentDialog";
+import { CopyColumnDialog, type CopyColumnInput } from "@/ordre/components/orders/matrix/CopyColumnDialog";
+import {
+  SetForAllDaysDialog,
+  RemoveProductDialog,
+  MoveProductDialog,
+  PauseDialog,
+} from "@/ordre/components/orders/matrix/MatrixActionDialogs";
+import { CorrectionsDialog } from "@/ordre/components/orders/matrix/CorrectionsDialog";
+import { FlatLinesView } from "@/ordre/components/orders/matrix/FlatLinesView";
+import {
+  useColumnComments,
+  useUpsertColumnComment,
+  useDeleteMatrixColumn,
+} from "@/ordre/hooks/useColumnComments";
+import { useGenerateDeliveryNotes } from "@/ordre/hooks/useGenerateDeliveryNotes";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useNBCustomers, useCustomerById } from "@/ordre/hooks/useNBCustomers";
 import {
