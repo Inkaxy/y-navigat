@@ -86,14 +86,7 @@ export function MobileMenu({ onOpenPalette }: Props) {
         </SheetContent>
       </Sheet>
 
-      <button
-        type="button"
-        onClick={() => navigate("/")}
-        className="text-sm font-semibold tracking-tight text-ink-primary"
-        aria-label="Hjem"
-      >
-        NBHub
-      </button>
+      <MobileAppWheel />
 
       <button
         type="button"
