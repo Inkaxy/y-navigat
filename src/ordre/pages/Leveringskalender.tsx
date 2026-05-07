@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Grid3x3,
   ChevronLeft,
@@ -10,8 +11,14 @@ import {
   StickyNote,
   ArrowRight,
   MoreHorizontal,
+  Copy,
+  MessageSquare,
+  Trash2,
+  PackageCheck,
+  ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 import { AppBanner } from "@/ordre/components/shell/AppBanner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,8 +42,25 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { AddProductDialog } from "@/ordre/components/orders/AddProductDialog";
 import { MerknadDialog } from "@/ordre/components/orders/MerknadDialog";
+import { ColumnCommentDialog } from "@/ordre/components/orders/matrix/ColumnCommentDialog";
+import { CopyColumnDialog, type CopyColumnInput } from "@/ordre/components/orders/matrix/CopyColumnDialog";
+import {
+  SetForAllDaysDialog,
+  RemoveProductDialog,
+  MoveProductDialog,
+  PauseDialog,
+} from "@/ordre/components/orders/matrix/MatrixActionDialogs";
+import { CorrectionsDialog } from "@/ordre/components/orders/matrix/CorrectionsDialog";
+import { FlatLinesView } from "@/ordre/components/orders/matrix/FlatLinesView";
+import {
+  useColumnComments,
+  useUpsertColumnComment,
+  useDeleteMatrixColumn,
+} from "@/ordre/hooks/useColumnComments";
+import { useGenerateDeliveryNotes } from "@/ordre/hooks/useGenerateDeliveryNotes";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useNBCustomers, useCustomerById } from "@/ordre/hooks/useNBCustomers";
 import {
@@ -118,16 +142,35 @@ export default function MatrixPage() {
   const { data: matrix, isLoading } = useMatrixData(customerId, dateFrom, dateTo);
   const { data: addableProducts } = useAddableProducts(customerId, !!customerId);
   const saveMatrix = useSaveMatrix();
+  const upsertColumnComment = useUpsertColumnComment();
+  const deleteMatrixColumn = useDeleteMatrixColumn();
+  const generateNotes = useGenerateDeliveryNotes();
+  const navigate = useNavigate();
   const customerLat = selectedCustomer?.geocode_latitude ?? null;
   const customerLon = selectedCustomer?.geocode_longitude ?? null;
   const { data: weatherMap } = useWeatherForecast(customerLat, customerLon);
   const { data: ghostMap } = useRecurringGhost(customerId, dateFrom, dateTo);
   const { data: pauseMap } = useDeliveryPausesForCustomer(customerId, dateFrom, dateTo);
+  const { data: columnComments } = useColumnComments(customerId, dateFrom, dateTo);
 
   const [edits, setEdits] = useState<Record<CellKey, string>>({});
   const [addedProducts, setAddedProducts] = useState<MatrixProduct[]>([]);
   const [addOpen, setAddOpen] = useState(false);
   const [discardOpen, setDiscardOpen] = useState(false);
+
+  // Column action dialog state
+  const [copyColCol, setCopyColCol] = useState<{ date: string; tour: MatrixTour } | null>(null);
+  const [commentCol, setCommentCol] = useState<{ date: string; tour: MatrixTour } | null>(null);
+  const [deleteColConfirm, setDeleteColConfirm] = useState<{ date: string; tour: MatrixTour } | null>(null);
+
+  // Handling-meny dialog state
+  const [setForAllOpen, setSetForAllOpen] = useState(false);
+  const [removeProdOpen, setRemoveProdOpen] = useState(false);
+  const [moveProdOpen, setMoveProdOpen] = useState(false);
+  const [pauseOpen, setPauseOpen] = useState(false);
+  const [correctionsOpen, setCorrectionsOpen] = useState(false);
+  const [flatView, setFlatView] = useState(false);
+  const [showAllProducts, setShowAllProducts] = useState(false);
 
   // Merknad dialog state
   const [merknadCell, setMerknadCell] = useState<CellTarget | null>(null);
@@ -543,6 +586,224 @@ export default function MatrixPage() {
     }
   }
 
+  // === Per-kolonne aksjoner ===
+
+  const visibleDatesArr = useMemo(() => [...new Set(columns.map((c) => c.date))], [columns]);
+
+  const colHasAnyData = useCallback(
+    (date: string, tourId: string): boolean => {
+      if (!matrix) return false;
+      for (const c of matrix.existing_cells) {
+        if (c.delivery_date === date && c.delivery_tour_id === tourId && Number(c.quantity) > 0) return true;
+      }
+      return false;
+    },
+    [matrix],
+  );
+
+  async function executeColumnCopy(source: { date: string; tour: MatrixTour }, input: CopyColumnInput) {
+    if (!customerId || !matrix) return;
+    const sourceLines = matrix.existing_cells.filter(
+      (c) => c.delivery_date === source.date && c.delivery_tour_id === source.tour.id,
+    );
+    if (sourceLines.length === 0) {
+      toast.info("Kilde-kolonnen er tom.");
+      return;
+    }
+    const existingTargetByProduct = new Map<string, number>();
+    for (const c of matrix.existing_cells) {
+      if (c.delivery_date === input.targetDate && c.delivery_tour_id === input.targetTourId) {
+        existingTargetByProduct.set(c.product_id, Number(c.quantity));
+      }
+    }
+    const changes: MatrixChange[] = sourceLines.map((c) => {
+      const existing = existingTargetByProduct.get(c.product_id) ?? 0;
+      const qty = input.mode === "sum" ? existing + Number(c.quantity) : Number(c.quantity);
+      const change: MatrixChange = {
+        date: input.targetDate,
+        tour_id: input.targetTourId,
+        product_id: c.product_id,
+        quantity: qty,
+      };
+      if (input.includeMerknad && c.merknad) {
+        change.merknad = c.merknad as Record<string, unknown>;
+      }
+      return change;
+    });
+    try {
+      await saveMatrix.mutateAsync({ customerId, changes });
+      toast.success(`Kopiert ${changes.length} linjer til ${input.targetDate}.`);
+      setCopyColCol(null);
+    } catch (err) {
+      toast.error("Kunne ikke kopiere kolonne", { description: (err as Error).message });
+    }
+  }
+
+  async function saveColumnComment(text: string) {
+    if (!commentCol || !customerId) return;
+    try {
+      await upsertColumnComment.mutateAsync({
+        customerId,
+        date: commentCol.date,
+        tourId: commentCol.tour.id,
+        comment: text,
+      });
+      toast.success("Kommentar lagret");
+      setCommentCol(null);
+    } catch (err) {
+      toast.error("Kunne ikke lagre kommentar", { description: (err as Error).message });
+    }
+  }
+
+  async function confirmDeleteColumn() {
+    if (!deleteColConfirm || !customerId) return;
+    try {
+      const r = await deleteMatrixColumn.mutateAsync({
+        customerId,
+        date: deleteColConfirm.date,
+        tourId: deleteColConfirm.tour.id,
+      });
+      toast.success(`Slettet ${r.lines_deleted} linjer${r.order_deleted ? " (ordre fjernet)" : ""}.`);
+      setDeleteColConfirm(null);
+    } catch (err) {
+      toast.error("Kunne ikke slette", { description: (err as Error).message });
+    }
+  }
+
+  async function generatePackingNoteForColumn(date: string, tour: MatrixTour) {
+    try {
+      const r = await generateNotes.mutateAsync({ date, tourFilter: [tour.id], runType: "main" });
+      toast.success(`Pakkseddel laget: ${r.notes_generated} stk for T${tour.tour_number} ${date}`);
+    } catch (err) {
+      toast.error("Kunne ikke lage pakkseddel", { description: (err as Error).message });
+    }
+  }
+
+  // === Handling-meny aksjoner ===
+
+  // localStorage-toggle for "Vis alle varer"
+  useEffect(() => {
+    if (!customerId) return;
+    const stored = localStorage.getItem(`matrix_show_all_products_${customerId}`);
+    setShowAllProducts(stored === "true");
+  }, [customerId]);
+  function toggleShowAllProducts() {
+    if (!customerId) return;
+    setShowAllProducts((prev) => {
+      const next = !prev;
+      localStorage.setItem(`matrix_show_all_products_${customerId}`, String(next));
+      if (next && addableProducts) {
+        // Legg alle addable inn som lokale rader (de filtres ut når de dukker i serverdata)
+        setAddedProducts((existing) => {
+          const knownIds = new Set([
+            ...(matrix?.products.map((p) => p.id) ?? []),
+            ...existing.map((p) => p.id),
+          ]);
+          const extra = addableProducts
+            .filter((p) => !knownIds.has(p.id))
+            .map((p) => ({
+              id: p.id,
+              display_number: p.display_number,
+              code: "",
+              display_name: p.display_name,
+              sales_unit: p.sales_unit,
+              mva_rate: 0,
+              unit_price: p.unit_price,
+              price_source: p.unit_price == null ? "none" : "default",
+            } as MatrixProduct));
+          return [...existing, ...extra];
+        });
+      }
+      return next;
+    });
+  }
+
+  async function handleSetForAllDays(productId: string, qty: number) {
+    if (!customerId) return;
+    const changes: MatrixChange[] = columns.map((c) => ({
+      date: c.date,
+      tour_id: c.tour.id,
+      product_id: productId,
+      quantity: qty,
+    }));
+    try {
+      await saveMatrix.mutateAsync({ customerId, changes });
+      toast.success(`Satt ${qty} på ${changes.length} kolonner`);
+      setSetForAllOpen(false);
+    } catch (err) {
+      toast.error("Kunne ikke sette mengde", { description: (err as Error).message });
+    }
+  }
+
+  async function handleRemoveProduct(productId: string) {
+    if (!customerId || !matrix) return;
+    const targets = matrix.existing_cells.filter((c) => c.product_id === productId && c.delivery_tour_id);
+    if (targets.length === 0) {
+      toast.info("Ingen linjer å slette i synlig periode.");
+      return;
+    }
+    const changes: MatrixChange[] = targets.map((c) => ({
+      date: c.delivery_date,
+      tour_id: c.delivery_tour_id,
+      product_id: c.product_id,
+      quantity: 0,
+    }));
+    try {
+      await saveMatrix.mutateAsync({ customerId, changes });
+      toast.success(`Slettet ${changes.length} linjer`);
+      setRemoveProdOpen(false);
+    } catch (err) {
+      toast.error("Kunne ikke slette", { description: (err as Error).message });
+    }
+  }
+
+  async function handleMoveProduct(input: { productId: string; sourceTourId: string; targetTourId: string }) {
+    if (!customerId || !matrix) return;
+    const sourceCells = matrix.existing_cells.filter(
+      (c) => c.product_id === input.productId && c.delivery_tour_id === input.sourceTourId,
+    );
+    if (sourceCells.length === 0) {
+      toast.info("Ingen linjer å flytte.");
+      return;
+    }
+    // Bygg én combined batch: 0 i kilde + qty i mål for samme dato. save_matrix_changes kjører i én transaksjon.
+    const changes: MatrixChange[] = [];
+    for (const c of sourceCells) {
+      changes.push({ date: c.delivery_date, tour_id: input.sourceTourId, product_id: c.product_id, quantity: 0 });
+      changes.push({ date: c.delivery_date, tour_id: input.targetTourId, product_id: c.product_id, quantity: Number(c.quantity), ...(c.merknad ? { merknad: c.merknad as Record<string, unknown> } : {}) });
+    }
+    try {
+      await saveMatrix.mutateAsync({ customerId, changes });
+      toast.success(`Flyttet ${sourceCells.length} linjer`);
+      setMoveProdOpen(false);
+    } catch (err) {
+      toast.error("Kunne ikke flytte", { description: (err as Error).message });
+    }
+  }
+
+  async function handleCreatePause(input: { from: string; to: string; reason: string; tourFilter: string[] | null }) {
+    if (!customerId || !selectedCustomer) return;
+    try {
+      const { error } = await supabase
+        .from("delivery_pauses")
+        .insert({
+          legal_entity_id: (selectedCustomer as unknown as { legal_entity_id: string }).legal_entity_id,
+          customer_id: customerId,
+          pause_from: input.from,
+          pause_to: input.to || null,
+          reason: input.reason || null,
+          tour_filter: input.tourFilter,
+        });
+      if (error) throw error;
+      toast.success("Leveransepause opprettet");
+      setPauseOpen(false);
+      // Refresh
+      void Promise.resolve();
+    } catch (err) {
+      toast.error("Kunne ikke opprette pause", { description: (err as Error).message });
+    }
+  }
+
   const hasAddable = (addableProducts?.length ?? 0) > 0;
   const isEmptyMatrix = !!matrix && allProducts.length === 0;
   const hasCustomerCoords = customerLat != null && customerLon != null;
@@ -643,6 +904,75 @@ export default function MatrixPage() {
               {saveMatrix.isPending ? <Loader2 className="animate-spin" /> : <Save />}
               Lagre
             </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" disabled={!customerId}>
+                  Handling <ChevronDown className="ml-1 h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64">
+                <DropdownMenuLabel>Opprette nytt</DropdownMenuLabel>
+                <DropdownMenuItem
+                  disabled={!customerId}
+                  onSelect={() => navigate(`/ordre/ordrer/ny?customer_id=${customerId}`)}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Ny ordre
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={!customerId}
+                  onSelect={() => navigate(`/ordre/ordrer/ny?customer_id=${customerId}&is_return=true`)}
+                >
+                  <RotateCcw className="h-4 w-4 mr-2" />
+                  Lag ny returordre
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>Batch-operasjoner</DropdownMenuLabel>
+                <DropdownMenuItem onSelect={() => setSetForAllOpen(true)} disabled={!canEdit || allProducts.length === 0}>
+                  <Copy className="h-4 w-4 mr-2" />
+                  For alle dager
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={(e) => { e.preventDefault(); toggleShowAllProducts(); }}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Vis alle varer {showAllProducts ? "✓" : ""}
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setRemoveProdOpen(true)} disabled={!canEdit || allProducts.length === 0}>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Fjern produkt fra ordre
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setMoveProdOpen(true)} disabled={!canEdit || allProducts.length === 0}>
+                  <ArrowRight className="h-4 w-4 mr-2" />
+                  Flytt produkt mellom turer
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>Kontekst</DropdownMenuLabel>
+                <DropdownMenuItem onSelect={() => setPauseOpen(true)} disabled={!canEdit}>
+                  <PackageCheck className="h-4 w-4 mr-2" />
+                  Leveransepause
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setCorrectionsOpen(true)}>
+                  <MessageSquare className="h-4 w-4 mr-2" />
+                  Se korrigeringer
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => navigate("/ordre/kundeordrer")}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Kundeordre
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>Visning</DropdownMenuLabel>
+                <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setFlatView((v) => !v); }}>
+                  <Grid3x3 className="h-4 w-4 mr-2" />
+                  {flatView ? "Til matrise" : "Til enkel tabell"}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem disabled title="Kommer i senere fase">
+                  Utsalgssteder
+                </DropdownMenuItem>
+                <DropdownMenuItem disabled title="Kommer i senere fase">
+                  Importere ordre
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </div>
@@ -682,6 +1012,8 @@ export default function MatrixPage() {
               </Button>
             </div>
           </div>
+        ) : flatView && matrix ? (
+          <FlatLinesView cells={matrix.existing_cells} products={allProducts} tours={matrix.tours} />
         ) : (
           <>
             <MatrixGrid
@@ -703,6 +1035,13 @@ export default function MatrixPage() {
               hasCustomerCoords={hasCustomerCoords}
               ghostMap={ghostMap}
               pauseMap={pauseMap}
+              columnComments={columnComments}
+              onColCopy={(date, tour) => setCopyColCol({ date, tour })}
+              onColComment={(date, tour) => setCommentCol({ date, tour })}
+              onColDelete={(date, tour) => setDeleteColConfirm({ date, tour })}
+              onColPackingNote={(date, tour) => generatePackingNoteForColumn(date, tour)}
+              colHasData={colHasAnyData}
+              canEdit={canEdit}
             />
             <div className="sticky left-0 flex flex-wrap items-center gap-2 border-t border-border bg-card px-4 py-3 sm:px-6">
               {hasAddable ? (
@@ -795,6 +1134,86 @@ export default function MatrixPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {copyColCol && matrix && (
+        <CopyColumnDialog
+          open={!!copyColCol}
+          onOpenChange={(v) => !v && setCopyColCol(null)}
+          sourceDate={copyColCol.date}
+          sourceTour={copyColCol.tour}
+          visibleDates={visibleDatesArr}
+          tours={matrix.tours}
+          targetHasData={(d, t) => colHasAnyData(d, t)}
+          onConfirm={(input) => executeColumnCopy(copyColCol, input)}
+          isSaving={saveMatrix.isPending}
+        />
+      )}
+
+      {commentCol && (
+        <ColumnCommentDialog
+          open={!!commentCol}
+          onOpenChange={(v) => !v && setCommentCol(null)}
+          date={commentCol.date}
+          tourLabel={`T${commentCol.tour.tour_number} ${commentCol.tour.display_name}`}
+          initial={columnComments?.get(`${commentCol.date}|${commentCol.tour.id}`) ?? ""}
+          onSave={saveColumnComment}
+          isSaving={upsertColumnComment.isPending}
+        />
+      )}
+
+      <AlertDialog open={!!deleteColConfirm} onOpenChange={(v) => !v && setDeleteColConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Slett alle ordrer for kolonnen?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteColConfirm && `${formatDateNO(deleteColConfirm.date)} · T${deleteColConfirm.tour.tour_number} ${deleteColConfirm.tour.display_name}. Dette kan ikke angres.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Avbryt</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteColumn}>Slett</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <SetForAllDaysDialog
+        open={setForAllOpen}
+        onOpenChange={setSetForAllOpen}
+        products={allProducts}
+        onConfirm={handleSetForAllDays}
+        isSaving={saveMatrix.isPending}
+      />
+      <RemoveProductDialog
+        open={removeProdOpen}
+        onOpenChange={setRemoveProdOpen}
+        products={allProducts}
+        onConfirm={handleRemoveProduct}
+        isSaving={saveMatrix.isPending}
+      />
+      <MoveProductDialog
+        open={moveProdOpen}
+        onOpenChange={setMoveProdOpen}
+        products={allProducts}
+        tours={matrix?.tours ?? []}
+        onConfirm={handleMoveProduct}
+        isSaving={saveMatrix.isPending}
+      />
+      <PauseDialog
+        open={pauseOpen}
+        onOpenChange={setPauseOpen}
+        tours={matrix?.tours ?? []}
+        defaultFrom={dateFrom}
+        defaultTo={dateTo}
+        onConfirm={handleCreatePause}
+        isSaving={false}
+      />
+      <CorrectionsDialog
+        open={correctionsOpen}
+        onOpenChange={setCorrectionsOpen}
+        customerId={customerId}
+        dateFrom={dateFrom}
+        dateTo={dateTo}
+      />
     </div>
   );
 }
@@ -847,6 +1266,13 @@ function MatrixGrid({
   hasCustomerCoords,
   ghostMap,
   pauseMap,
+  columnComments,
+  onColCopy,
+  onColComment,
+  onColDelete,
+  onColPackingNote,
+  colHasData,
+  canEdit,
 }: {
   columns: { date: string; tour: MatrixTour }[];
   products: MatrixProduct[];
@@ -866,6 +1292,13 @@ function MatrixGrid({
   hasCustomerCoords: boolean;
   ghostMap: RecurringGhostMap | undefined;
   pauseMap: PauseMap | undefined;
+  columnComments: Map<string, string> | undefined;
+  onColCopy: (date: string, tour: MatrixTour) => void;
+  onColComment: (date: string, tour: MatrixTour) => void;
+  onColDelete: (date: string, tour: MatrixTour) => void;
+  onColPackingNote: (date: string, tour: MatrixTour) => void;
+  colHasData: (date: string, tourId: string) => boolean;
+  canEdit: boolean;
 }) {
   const dateGroups = useMemo(() => {
     const groups: { date: string; count: number }[] = [];
@@ -922,6 +1355,8 @@ function MatrixGrid({
           <tr>
             {columns.map((c) => {
               const pause = isPaused(pauseMap, c.date, c.tour.id);
+              const hasComment = columnComments?.has(`${c.date}|${c.tour.id}`);
+              const colHas = colHasData(c.date, c.tour.id);
               return (
                 <th
                   key={`${c.date}-${c.tour.id}`}
@@ -929,7 +1364,7 @@ function MatrixGrid({
                     "border-b border-r border-border px-1 py-1 text-center text-[11px] font-medium text-muted-foreground",
                     pause ? "bg-sky-100 dark:bg-sky-950/40" : "bg-card/80",
                   )}
-                  title={`${c.tour.display_name} (${c.tour.time_from.slice(0, 5)}–${c.tour.time_to.slice(0, 5)})${pause?.reason ? ` · Pause: ${pause.reason}` : pause ? " · Pause" : ""}`}
+                  title={`${c.tour.display_name} (${c.tour.time_from.slice(0, 5)}–${c.tour.time_to.slice(0, 5)})${pause?.reason ? ` · Pause: ${pause.reason}` : pause ? " · Pause" : ""}${hasComment ? `\nKommentar: ${columnComments?.get(`${c.date}|${c.tour.id}`)}` : ""}`}
                 >
                   <div>T{c.tour.tour_number}</div>
                   {pause && (
@@ -937,6 +1372,20 @@ function MatrixGrid({
                       Pause
                     </div>
                   )}
+                  <div className="mt-1 flex items-center justify-center gap-0.5">
+                    <button type="button" disabled={!canEdit || !colHas} onClick={() => onColCopy(c.date, c.tour)} className="rounded p-0.5 text-muted-foreground/70 hover:bg-accent hover:text-foreground disabled:opacity-30" title="Kopier kolonne">
+                      <Copy className="h-3 w-3" />
+                    </button>
+                    <button type="button" disabled={!canEdit} onClick={() => onColComment(c.date, c.tour)} className={cn("rounded p-0.5 hover:bg-accent disabled:opacity-30", hasComment ? "text-primary" : "text-muted-foreground/70 hover:text-foreground")} title={hasComment ? "Rediger kommentar" : "Legg til kommentar"}>
+                      <MessageSquare className="h-3 w-3" />
+                    </button>
+                    <button type="button" disabled={!canEdit || !colHas} onClick={() => onColDelete(c.date, c.tour)} className="rounded p-0.5 text-muted-foreground/70 hover:bg-destructive/10 hover:text-destructive disabled:opacity-30" title="Slett kolonne">
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                    <button type="button" disabled={!colHas} onClick={() => onColPackingNote(c.date, c.tour)} className="rounded p-0.5 text-muted-foreground/70 hover:bg-accent hover:text-foreground disabled:opacity-30" title="Lag pakkseddel">
+                      <PackageCheck className="h-3 w-3" />
+                    </button>
+                  </div>
                 </th>
               );
             })}

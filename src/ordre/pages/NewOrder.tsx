@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Loader2, Plus, Trash2, AlertTriangle, Check, Search, Copy } from "lucide-react";
 import { AppBanner } from "@/ordre/components/shell/AppBanner";
 import { Button } from "@/components/ui/button";
@@ -217,7 +217,27 @@ function PriceSourceBadge({ source }: { source: string | null }) {
 
 export default function NewOrder() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const prefilledCustomerId = searchParams.get("customer_id");
+  const isReturnFromUrl = searchParams.get("is_return") === "true";
   const [customer, setCustomer] = useState<CustomerOption | null>(null);
+  const [isReturn] = useState<boolean>(isReturnFromUrl);
+
+  // Pre-velg kunde fra URL-param ved første render
+  useEffect(() => {
+    if (!prefilledCustomerId || customer) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("customers")
+        .select("id, customer_number, display_name, organization_number, primary_contact_name, primary_contact_email, invoice_recipient_customer_id, delivery_address_line1, delivery_address_line2, delivery_postal_code, delivery_city, delivery_country, delivery_instructions")
+        .eq("id", prefilledCustomerId)
+        .maybeSingle();
+      if (cancelled || !data) return;
+      setCustomer(data as unknown as CustomerOption);
+    })();
+    return () => { cancelled = true; };
+  }, [prefilledCustomerId, customer]);
   const [deliveryDate, setDeliveryDate] = useState<string>(tomorrow());
   const [deliveryTime, setDeliveryTime] = useState<string>("");
   const [useCustomerAddress, setUseCustomerAddress] = useState(true);
@@ -535,6 +555,7 @@ export default function NewOrder() {
           })(),
           customer_notes: customerNotes || null,
           delivery_tour_id: manualTourId, // null lar trigger auto-tildele
+          is_return: isReturn,
           created_by: userId,
         })
         .select("id")
@@ -598,8 +619,8 @@ export default function NewOrder() {
   return (
     <>
       <AppBanner
-        title="Ny ordre"
-        subtitle="Manuell registrering av salgsordre"
+        title={isReturn ? "Ny returordre" : "Ny ordre"}
+        subtitle={isReturn ? "Manuell registrering av returordre" : "Manuell registrering av salgsordre"}
         actions={
           <Button asChild variant="outline" className="gap-2 border-white/40 bg-transparent text-white hover:bg-white/10 hover:text-white">
             <Link to="/ordre/ordrer">
