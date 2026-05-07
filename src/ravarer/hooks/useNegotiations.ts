@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { toast } from "sonner";
 
-export type NegotiationStatus = "draft" | "invited" | "in_progress" | "concluded" | "cancelled";
+export type NegotiationStatus = "draft" | "invited" | "in_progress" | "awaiting_confirmation" | "concluded" | "cancelled";
 
 export interface NegotiationRow {
   id: string;
@@ -27,6 +27,9 @@ export interface NegotiationRow {
   live_session_ended_at?: string | null;
   live_facilitator_id?: string | null;
   live_location_format?: "physical" | "video" | "phone" | null;
+  live_session_paused?: boolean | null;
+  live_confirmation_deadline?: string | null;
+  live_auto_apply_on_confirm?: boolean | null;
 }
 
 export interface NegotiationItemRow {
