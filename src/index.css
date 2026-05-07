@@ -38,6 +38,12 @@
     --bakery-cream:          40  55% 96%;     /* myk papir */
     --bakery-cream-deep:     38  40% 92%;
 
+    /* ---- Brand (Nøtterø Bakeri) ---- */
+    --brand-ink:             24  22% 11%;     /* dyp espresso fra wordmark */
+    --brand-cream:           38  45% 94%;     /* offisiell papir-cream */
+    --brand-bronze:          26  48% 43%;     /* #a36c3a — bronze accent */
+    --brand-bronze-soft:     26  48% 55%;
+
     /* ---- States (litt mer mettet, moderne) ---- */
     --state-danger:          0   72% 51%;
     --state-warning:         32  95% 50%;
@@ -106,17 +112,20 @@
   }
 
   .dark {
-    --surface-canvas:        222 24% 7%;
-    --surface-raised:        222 22% 10%;
-    --surface-sunken:        222 20% 13%;
-    --surface-muted:         222 20% 12%;
-    --border-subtle:         222 16% 18%;
-    --border-default:        222 15% 22%;
-    --border-strong:         222 14% 30%;
-    --text-primary:          220 20% 96%;
-    --text-secondary:        220 12% 70%;
-    --text-tertiary:         220 9%  55%;
-    --text-on-accent:        0   0%  100%;
+    /* Brand-ink basert mørk modus — varmere enn ren blå-grå */
+    --surface-canvas:        24 18% 8%;
+    --surface-raised:        24 16% 11%;
+    --surface-sunken:        24 14% 14%;
+    --surface-muted:         24 14% 13%;
+    --border-subtle:         24 12% 18%;
+    --border-default:        24 11% 22%;
+    --border-strong:         24 10% 30%;
+    --text-primary:          38 35% 95%;
+    --text-secondary:        38 15% 72%;
+    --text-tertiary:         30 10% 56%;
+    --text-on-accent:        0  0%  100%;
+    --bakery-cream:          24 16% 14%;
+    --bakery-cream-deep:     24 14% 17%;
 
     --shadow-xs: 0 1px 2px 0 hsl(0 0% 0% / 0.30);
     --shadow-sm: 0 1px 2px 0 hsl(0 0% 0% / 0.35), 0 1px 3px 0 hsl(0 0% 0% / 0.25);

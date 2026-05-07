@@ -13,7 +13,9 @@ import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { AppHeaderBanner } from "@/components/layout/AppHeaderBanner";
-import { User } from "lucide-react";
+import { User, Sun, Moon, Monitor } from "lucide-react";
+import { useTheme, type ThemeMode } from "@/providers/ThemeProvider";
+import { cn } from "@/lib/utils";
 
 export default function MinProfil() {
   const { data: profile, isLoading } = useCurrentUser();
@@ -156,6 +158,8 @@ export default function MinProfil() {
         </CardContent>
       </Card>
 
+      <ThemePreferenceCard />
+
       <Card>
         <CardHeader>
           <CardTitle>Mine stillinger</CardTitle>
@@ -193,5 +197,51 @@ export default function MinProfil() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function ThemePreferenceCard() {
+  const { mode, setMode } = useTheme();
+  const options: { value: ThemeMode; label: string; desc: string; icon: typeof Sun }[] = [
+    { value: "dark", label: "Mørkt", desc: "Standard for nye brukere", icon: Moon },
+    { value: "light", label: "Lyst", desc: "Klassisk lys flate", icon: Sun },
+    { value: "system", label: "System", desc: "Følger operativsystem", icon: Monitor },
+  ];
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Utseende</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <p className="mb-4 text-sm text-muted-foreground">
+          Velg standard tema for kontoen din. Valget lagres i nettleseren.
+        </p>
+        <div className="grid gap-3 sm:grid-cols-3">
+          {options.map((opt) => {
+            const Icon = opt.icon;
+            const active = mode === opt.value;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setMode(opt.value)}
+                className={cn(
+                  "flex flex-col items-start gap-2 rounded-lg border p-4 text-left transition-all",
+                  active
+                    ? "border-primary bg-primary/5 ring-2 ring-primary/30"
+                    : "border-border hover:border-primary/40 hover:bg-accent",
+                )}
+              >
+                <Icon className="h-5 w-5 text-primary" />
+                <div>
+                  <div className="text-sm font-semibold">{opt.label}</div>
+                  <div className="text-xs text-muted-foreground">{opt.desc}</div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
   );
 }

@@ -52,6 +52,14 @@ export default {
           "cream-deep": "hsl(var(--bakery-cream-deep))",
         },
 
+        // Brand (Nøtterø Bakeri)
+        brand: {
+          ink: "hsl(var(--brand-ink))",
+          cream: "hsl(var(--brand-cream))",
+          bronze: "hsl(var(--brand-bronze))",
+          "bronze-soft": "hsl(var(--brand-bronze-soft))",
+        },
+
         // Dynamic app color (set by AppColorProvider). Beholder legacy aliases
         // (foreground/dark/light/pastel/pastel-border) for eldre komponenter.
         app: {
