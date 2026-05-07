@@ -64,8 +64,8 @@ export function OutletSelector() {
     <DropdownMenu>
       <DropdownMenuTrigger
         className={cn(
-          "flex items-center gap-2 rounded-full border border-line-subtle bg-surface-raised px-3 py-1.5 text-sm",
-          "text-ink-primary transition-all hover:bg-bakery-cream hover:border-bakery-wheat/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-app/40",
+          "flex items-center gap-2 rounded-full border border-brand-cream/15 bg-brand-cream/[0.04] px-3 py-1.5 text-sm",
+          "text-brand-cream/85 transition-all hover:bg-brand-cream/[0.08] hover:border-brand-bronze/40 hover:text-brand-cream focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-bronze/50",
         )}
       >
         <Store className="h-4 w-4 opacity-70 sm:hidden" />

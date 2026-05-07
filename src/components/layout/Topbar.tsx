@@ -19,12 +19,11 @@ export function Topbar() {
         style={{
           height: "60px",
           padding: "0 16px",
-          background:
-            "linear-gradient(180deg, hsl(var(--bakery-cream)) 0%, hsl(var(--surface-raised) / 0.92) 100%)",
-          borderBottom: "1px solid hsl(var(--border-subtle))",
-          boxShadow: "0 1px 0 0 hsl(var(--brand-bronze) / 0.18), var(--shadow-xs)",
-          color: "hsl(var(--text-primary))",
-          gridTemplateColumns: "auto 1fr auto 1fr",
+          background: "hsl(var(--brand-ink))",
+          borderBottom: "1px solid hsl(var(--brand-cream) / 0.10)",
+          boxShadow: "0 1px 0 0 hsl(var(--brand-bronze) / 0.25), 0 2px 8px -2px hsl(0 0% 0% / 0.30)",
+          color: "hsl(var(--brand-cream))",
+          gridTemplateColumns: "auto auto 1fr auto",
         }}
       >
         <MobileMenu onOpenPalette={() => setPaletteOpen(true)} />
@@ -32,16 +31,16 @@ export function Topbar() {
         <Link
           to="/"
           aria-label="Nøtterø Bakeri — hjem"
-          className="hidden items-center pr-3 text-brand-ink dark:text-brand-cream md:flex"
+          className="hidden items-center pr-4 text-brand-cream md:flex"
         >
           <Logo variant="horizontal" className="h-8 w-auto" />
         </Link>
 
-        <div className="hidden items-center justify-start md:flex">
+        <div className="hidden items-center justify-start gap-3 md:flex">
           <CompanyBlock />
         </div>
 
-        <div className="hidden items-center justify-center md:flex">
+        <div className="hidden min-w-0 items-center justify-start md:flex">
           <AppTabs />
         </div>
 

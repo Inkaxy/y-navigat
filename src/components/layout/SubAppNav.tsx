@@ -248,18 +248,30 @@ function NavBar({ appSlug, items }: { appSlug: string; items: NavItem[] }) {
     cn(
       "flex items-center whitespace-nowrap rounded-full text-sm transition-all",
       active
-        ? "font-semibold shadow-xs"
-        : "text-ink-secondary font-medium hover:bg-bakery-cream hover:text-ink-primary",
+        ? "font-semibold text-brand-cream"
+        : "text-brand-cream/70 font-medium hover:bg-brand-cream/[0.06] hover:text-brand-cream/90",
     );
   const baseStyle = (active: boolean) =>
     active
-      ? { padding: "7px 14px", color, backgroundColor: `${color}14`, border: `1px solid ${color}33` }
+      ? {
+          padding: "7px 14px",
+          color: "hsl(var(--brand-cream))",
+          backgroundColor: `${color}1f`,
+          boxShadow: `inset 0 -2px 0 0 ${color}`,
+          border: "1px solid transparent",
+        }
       : { padding: "7px 14px", border: "1px solid transparent" };
 
   return (
     <nav
-      className="border-b border-line-subtle bg-surface-raised/70 backdrop-blur-sm"
-      style={{ padding: "8px 16px" }}
+      className="border-b border-brand-cream/10"
+      style={{
+        padding: "8px 16px",
+        background: "hsl(var(--brand-ink))",
+        // tone-on-tone: lyset opp 4% via en subtil overlay
+        backgroundImage:
+          "linear-gradient(180deg, hsl(var(--brand-cream) / 0.03) 0%, hsl(var(--brand-cream) / 0) 100%)",
+      }}
     >
       <ul className="no-scrollbar mx-auto flex max-w-[1280px] items-stretch gap-1 overflow-x-auto">
         {items.map((item) => {
