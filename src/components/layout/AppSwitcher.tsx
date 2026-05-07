@@ -404,13 +404,10 @@ export function AppSwitcher() {
                   className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
                   style={{
                     backgroundColor: `${a.color_hex ?? "#a47236"}24`,
+                    color: a.color_hex ?? "#a47236",
                   }}
                 >
-                  <Icon
-                    className="h-[18px] w-[18px]"
-                    // @ts-expect-error — color via inline style on parent span instead
-                  />
-                  <style>{""}</style>
+                  <Icon className="h-[18px] w-[18px]" />
                 </span>
                 {/* Use color via wrapper to avoid currentColor conflicts */}
                 <span className="sr-only">{a.display_name}</span>
