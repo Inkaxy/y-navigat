@@ -8,7 +8,10 @@ export type QuickRange = "today" | "this_week" | "next_week";
 
 export function rangeFor(kind: QuickRange): { from: string; to: string } {
   const today = todayISO();
-  if (kind === "today") return { from: today, to: today };
+  if (kind === "today") {
+    const tomorrow = addDays(today, 1);
+    return { from: tomorrow, to: tomorrow };
+  }
   if (kind === "this_week") {
     const mon = isoWeekMonday(today);
     return { from: mon, to: addDays(mon, 6) };
