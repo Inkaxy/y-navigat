@@ -100,7 +100,7 @@ export default function Login() {
           <Logo
             variant="horizontal"
             title="Nøtterø Bakeri"
-            className="h-64 w-auto md:h-72 text-brand-cream"
+            className="h-64 w-auto md:h-72 text-brand-cream text-2xl font-bold"
           />
           <p className="mt-3 text-xs uppercase tracking-[0.18em] text-brand-cream/70">
             NBHub · Driftshjernen
