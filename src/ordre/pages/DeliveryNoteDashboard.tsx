@@ -24,21 +24,21 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useDeliveryTours, sortToursByPriority } from "@/hooks/useDeliveryTours";
-import { useDeliveryNoteCounts } from "@/hooks/useDeliveryNoteCounts";
-import { useGenerateDeliveryNotes } from "@/hooks/useGenerateDeliveryNotes";
-import { todayISO, formatDate } from "@/lib/format";
-import { relativeDateLabel, shiftIsoDate } from "@/lib/relativeDate";
+import { useDeliveryTours, sortToursByPriority } from "@/ordre/hooks/useDeliveryTours";
+import { useDeliveryNoteCounts } from "@/ordre/hooks/useDeliveryNoteCounts";
+import { useGenerateDeliveryNotes } from "@/ordre/hooks/useGenerateDeliveryNotes";
+import { todayISO, formatDate } from "@/ordre/lib/format";
+import { relativeDateLabel, shiftIsoDate } from "@/ordre/lib/relativeDate";
 import { format as fmt } from "date-fns";
 import { nb } from "date-fns/locale";
-import { RunStatusBanner } from "@/components/pakksedler/RunStatusBanner";
-import { ActivePausesPanel } from "@/components/pakksedler/ActivePausesPanel";
-import { TourRunStatus } from "@/components/pakksedler/TourRunStatus";
-import { useTourRunStatus, NULL_TOUR_KEY } from "@/hooks/useTourRunStatus";
-import { BulkPakkseddelPDFButton } from "@/components/pakksedler/BulkPakkseddelPDFButton";
-import { DateContextChips } from "@/components/shell/DateContextChips";
-import { WeekMonthQuickPicker } from "@/components/shell/WeekMonthQuickPicker";
-import { NB_LEGAL_ENTITY_ID } from "@/lib/constants";
+import { RunStatusBanner } from "@/ordre/components/pakksedler/RunStatusBanner";
+import { ActivePausesPanel } from "@/ordre/components/pakksedler/ActivePausesPanel";
+import { TourRunStatus } from "@/ordre/components/pakksedler/TourRunStatus";
+import { useTourRunStatus, NULL_TOUR_KEY } from "@/ordre/hooks/useTourRunStatus";
+import { BulkPakkseddelPDFButton } from "@/ordre/components/pakksedler/BulkPakkseddelPDFButton";
+import { DateContextChips } from "@/ordre/components/shell/DateContextChips";
+import { WeekMonthQuickPicker } from "@/ordre/components/shell/WeekMonthQuickPicker";
+import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
 
 // HANDLING_ITEMS bygges nå dynamisk inni komponenten — for å støtte tilstand-aware
 // handlinger (Tilleggkjøring/Korreksjonskjøring krever at hovedkjøring er kjørt).

@@ -1,8 +1,8 @@
 import { useMemo } from "react";
-import { useDeliveryTours, type DeliveryTour } from "@/hooks/useDeliveryTours";
-import { useTourOrderCounts } from "@/hooks/useDeliveryTours";
-import { useCompletedMainRuns, type CompletedMainRun } from "@/hooks/useCompletedRuns";
-import { NB_LEGAL_ENTITY_ID } from "@/lib/constants";
+import { useDeliveryTours, type DeliveryTour } from "@/ordre/hooks/useDeliveryTours";
+import { useTourOrderCounts } from "@/ordre/hooks/useDeliveryTours";
+import { useCompletedMainRuns, type CompletedMainRun } from "@/ordre/hooks/useCompletedRuns";
+import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
 
 /** Pseudo-tur-ID for ordre med delivery_tour_id IS NULL. */
 export const NULL_TOUR_KEY = "__null__";

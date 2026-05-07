@@ -12,7 +12,7 @@ import {
   MoreHorizontal,
 } from "lucide-react";
 import { toast } from "sonner";
-import { AppBanner } from "@/components/shell/AppBanner";
+import { AppBanner } from "@/ordre/components/shell/AppBanner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -35,10 +35,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { AddProductDialog } from "@/components/orders/AddProductDialog";
-import { MerknadDialog } from "@/components/orders/MerknadDialog";
+import { AddProductDialog } from "@/ordre/components/orders/AddProductDialog";
+import { MerknadDialog } from "@/ordre/components/orders/MerknadDialog";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { useNBCustomers, useCustomerById } from "@/hooks/useNBCustomers";
+import { useNBCustomers, useCustomerById } from "@/ordre/hooks/useNBCustomers";
 import {
   useMatrixData,
   useSaveMatrix,
@@ -50,17 +50,17 @@ import {
   type MatrixTour,
   type MatrixProduct,
   type AddableProduct,
-} from "@/hooks/useMatrix";
-import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+} from "@/ordre/hooks/useMatrix";
+import { useDebouncedValue } from "@/ordre/hooks/useDebouncedValue";
 import { useAuth } from "@/hooks/useAuth";
-import { useUserAccess } from "@/hooks/useUserAccess";
-import { useWeatherForecast, type WeatherMap } from "@/hooks/useWeatherForecast";
-import { useWeatherLocation } from "@/hooks/useLegalEntitySettings";
-import { WeatherCell } from "@/components/orders/WeatherCell";
-import { NB_LEGAL_ENTITY_ID } from "@/lib/constants";
-import { formatNOK, todayISO } from "@/lib/format";
+import { useUserAccess } from "@/ordre/hooks/useUserAccess";
+import { useWeatherForecast, type WeatherMap } from "@/ordre/hooks/useWeatherForecast";
+import { useWeatherLocation } from "@/ordre/hooks/useLegalEntitySettings";
+import { WeatherCell } from "@/ordre/components/orders/WeatherCell";
+import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
+import { formatNOK, todayISO } from "@/ordre/lib/format";
 import { cn } from "@/lib/utils";
-import { type Merknad, isMerknadEmpty, parseMerknad } from "@/lib/merknad";
+import { type Merknad, isMerknadEmpty, parseMerknad } from "@/ordre/lib/merknad";
 import {
   type QuickRange,
   rangeFor,
@@ -68,7 +68,7 @@ import {
   saveStoredRange,
   buildDateRange,
   formatKrNetto,
-} from "@/lib/dateRanges";
+} from "@/ordre/lib/dateRanges";
 
 const DAY_LABELS = ["Ma", "Ti", "On", "To", "Fr", "Lø", "Sø"];
 

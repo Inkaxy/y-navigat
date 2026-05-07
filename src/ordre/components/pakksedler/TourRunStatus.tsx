@@ -1,6 +1,6 @@
 import { Check, AlertTriangle, Minus } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useTourRunStatus, type TourStatusRow } from "@/hooks/useTourRunStatus";
+import { useTourRunStatus, type TourStatusRow } from "@/ordre/hooks/useTourRunStatus";
 
 type Props = {
   date: string; // ISO yyyy-MM-dd

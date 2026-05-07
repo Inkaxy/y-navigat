@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { NB_LEGAL_ENTITY_ID } from "@/lib/constants";
-import type { PakkseddelPDFData, PakkseddelPDFLine } from "@/hooks/usePakkseddelPDF";
+import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
+import type { PakkseddelPDFData, PakkseddelPDFLine } from "@/ordre/hooks/usePakkseddelPDF";
 
 export type BulkTourGroup = {
   /** delivery_tour_id, eller null for "Uten tur" */

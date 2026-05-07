@@ -1,8 +1,8 @@
 // Date-range helpers for the matrix quick-filter chips.
 // All ISO YYYY-MM-DD strings, ISO week (Monday=1).
 
-import { addDays, isoWeekMonday } from "@/hooks/useMatrix";
-import { todayISO } from "@/lib/format";
+import { addDays, isoWeekMonday } from "@/ordre/hooks/useMatrix";
+import { todayISO } from "@/ordre/lib/format";
 
 export type QuickRange = "today" | "this_week" | "next_week";
 

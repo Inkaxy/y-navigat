@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { useDebouncedValue } from "@/ordre/hooks/useDebouncedValue";
 
 export type OrderDeadlineViolation = {
   rule_id: string;

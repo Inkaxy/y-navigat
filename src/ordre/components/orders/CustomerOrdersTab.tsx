@@ -6,12 +6,12 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { StatusBadge } from "@/components/orders/StatusBadge";
-import { CustomerOrderModal } from "@/components/orders/CustomerOrderModal";
-import { useCustomerOrders } from "@/hooks/useCustomerOrders";
-import type { CustomerOption } from "@/hooks/useNBCustomers";
-import { todayISO, formatDate } from "@/lib/format";
-import { isoWeekMonday, addDays } from "@/hooks/useMatrix";
+import { StatusBadge } from "@/ordre/components/orders/StatusBadge";
+import { CustomerOrderModal } from "@/ordre/components/orders/CustomerOrderModal";
+import { useCustomerOrders } from "@/ordre/hooks/useCustomerOrders";
+import type { CustomerOption } from "@/ordre/hooks/useNBCustomers";
+import { todayISO, formatDate } from "@/ordre/lib/format";
+import { isoWeekMonday, addDays } from "@/ordre/hooks/useMatrix";
 
 type QuickRange = "today" | "tomorrow" | "this_week" | "next_week" | null;
 

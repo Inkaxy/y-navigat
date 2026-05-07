@@ -5,12 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useDeliveryNotesList } from "@/hooks/useDeliveryNotesList";
-import { useDeliveryTours } from "@/hooks/useDeliveryTours";
-import { formatDate, formatNOK, todayISO } from "@/lib/format";
+import { useDeliveryNotesList } from "@/ordre/hooks/useDeliveryNotesList";
+import { useDeliveryTours } from "@/ordre/hooks/useDeliveryTours";
+import { formatDate, formatNOK, todayISO } from "@/ordre/lib/format";
 import { cn } from "@/lib/utils";
-import { BulkPakkseddelPDFButton } from "@/components/pakksedler/BulkPakkseddelPDFButton";
-import { NULL_TOUR_KEY } from "@/hooks/useTourRunStatus";
+import { BulkPakkseddelPDFButton } from "@/ordre/components/pakksedler/BulkPakkseddelPDFButton";
+import { NULL_TOUR_KEY } from "@/ordre/hooks/useTourRunStatus";
 
 function statusVariant(status: string): { label: string; cls: string } {
   switch (status) {

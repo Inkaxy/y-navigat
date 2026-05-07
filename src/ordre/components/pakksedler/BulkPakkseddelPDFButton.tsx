@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Printer, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { useBulkPakksedlerPDF, type BulkScope } from "@/hooks/useBulkPakksedlerPDF";
+import { useBulkPakksedlerPDF, type BulkScope } from "@/ordre/hooks/useBulkPakksedlerPDF";
 
 interface Props {
   scope: BulkScope;

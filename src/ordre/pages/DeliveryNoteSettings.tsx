@@ -10,8 +10,8 @@ import {
   useLegalEntitySettings,
   useUpdateLegalEntitySettings,
   useWeatherLocation,
-} from "@/hooks/useLegalEntitySettings";
-import { NB_LEGAL_ENTITY_ID } from "@/lib/constants";
+} from "@/ordre/hooks/useLegalEntitySettings";
+import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
 
 export default function DeliveryNoteSettings() {
   const settingsQ = useLegalEntitySettings(NB_LEGAL_ENTITY_ID);

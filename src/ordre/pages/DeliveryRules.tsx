@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Plus, Pencil, Trash2, Loader2, ListChecks, Search } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { AppBanner } from "@/components/shell/AppBanner";
+import { AppBanner } from "@/ordre/components/shell/AppBanner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -32,19 +32,19 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
-import { NB_LEGAL_ENTITY_ID } from "@/lib/constants";
-import { formatDateLong } from "@/lib/format";
-import { logAudit } from "@/lib/audit";
+import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
+import { formatDateLong } from "@/ordre/lib/format";
+import { logAudit } from "@/ordre/lib/audit";
 import {
   useDeliveryRules,
   formatDeadlineDefinition,
   WEEKDAY_LABELS_LONG,
   type DeliveryRule,
   type DeliveryRuleFilter,
-} from "@/hooks/useDeliveryRules";
-import { useDeliveryTours, sortToursByPriority } from "@/hooks/useDeliveryTours";
+} from "@/ordre/hooks/useDeliveryRules";
+import { useDeliveryTours, sortToursByPriority } from "@/ordre/hooks/useDeliveryTours";
 import { useQuery } from "@tanstack/react-query";
-import { DeliveryRuleFormDialog } from "@/components/orders/DeliveryRuleFormDialog";
+import { DeliveryRuleFormDialog } from "@/ordre/components/orders/DeliveryRuleFormDialog";
 
 function RuleTypeBadge({ type }: { type: DeliveryRule["rule_type"] }) {
   if (type === "order_deadline") {

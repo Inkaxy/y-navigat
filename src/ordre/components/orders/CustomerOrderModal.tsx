@@ -33,9 +33,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useNBProducts, fetchEffectivePrice, type ProductOption } from "@/hooks/useNBProducts";
-import { useDeliveryTours, tourMatches, trimSec } from "@/hooks/useDeliveryTours";
-import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { useNBProducts, fetchEffectivePrice, type ProductOption } from "@/ordre/hooks/useNBProducts";
+import { useDeliveryTours, tourMatches, trimSec } from "@/ordre/hooks/useDeliveryTours";
+import { useDebouncedValue } from "@/ordre/hooks/useDebouncedValue";
 import {
   useFinalCustomerSuggestions,
   useCreateCustomerOrder,
@@ -44,11 +44,11 @@ import {
   useCustomerOrderDetail,
   type CustomerOrderInput,
   type CustomerOrderLineInput,
-} from "@/hooks/useCustomerOrders";
-import type { CustomerOption } from "@/hooks/useNBCustomers";
-import { tomorrow } from "@/lib/format";
-import { logAudit } from "@/lib/audit";
-import { NB_LEGAL_ENTITY_ID } from "@/lib/constants";
+} from "@/ordre/hooks/useCustomerOrders";
+import type { CustomerOption } from "@/ordre/hooks/useNBCustomers";
+import { tomorrow } from "@/ordre/lib/format";
+import { logAudit } from "@/ordre/lib/audit";
+import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
 
 type Props = {
   open: boolean;

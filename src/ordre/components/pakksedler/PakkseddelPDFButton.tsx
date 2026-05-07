@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Printer, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { usePakkseddelPDF } from "@/hooks/usePakkseddelPDF";
+import { usePakkseddelPDF } from "@/ordre/hooks/usePakkseddelPDF";
 
 interface Props {
   id: string;

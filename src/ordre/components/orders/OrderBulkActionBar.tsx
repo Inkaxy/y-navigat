@@ -12,9 +12,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { supabase } from "@/integrations/supabase/client";
-import { ORDER_STATUSES, type OrderStatus } from "@/lib/orderStatus";
-import { logAudit } from "@/lib/audit";
-import type { OrderListRow } from "@/hooks/useOrders";
+import { ORDER_STATUSES, type OrderStatus } from "@/ordre/lib/orderStatus";
+import { logAudit } from "@/ordre/lib/audit";
+import type { OrderListRow } from "@/ordre/hooks/useOrders";
 
 interface Props {
   selected: OrderListRow[];

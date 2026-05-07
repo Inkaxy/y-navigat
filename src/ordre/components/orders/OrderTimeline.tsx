@@ -1,9 +1,9 @@
 import { Check, Package, Truck, ShoppingCart, Pause, X, FileEdit, Receipt, AlertCircle, ArrowRight, Route } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { getStatusMeta } from "@/lib/orderStatus";
-import { formatDateTime, formatRelative, initialsOf } from "@/lib/format";
-import type { OrderEvent } from "@/hooks/useOrderDetail";
+import { getStatusMeta } from "@/ordre/lib/orderStatus";
+import { formatDateTime, formatRelative, initialsOf } from "@/ordre/lib/format";
+import type { OrderEvent } from "@/ordre/hooks/useOrderDetail";
 
 function eventIcon(toStatus: string) {
   const map: Record<string, React.ReactNode> = {

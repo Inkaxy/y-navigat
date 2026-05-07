@@ -38,16 +38,16 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { useNBCustomers } from "@/hooks/useNBCustomers";
-import { useNBProducts } from "@/hooks/useNBProducts";
-import { useDeliveryTours, sortToursByPriority } from "@/hooks/useDeliveryTours";
+import { useNBCustomers } from "@/ordre/hooks/useNBCustomers";
+import { useNBProducts } from "@/ordre/hooks/useNBProducts";
+import { useDeliveryTours, sortToursByPriority } from "@/ordre/hooks/useDeliveryTours";
 import {
   WEEKDAY_SHORT,
   WEEKDAY_LONG,
   useRecurringScheduleDetail,
   useSaveRecurringSchedule,
   type RecurringScheduleWithCustomer,
-} from "@/hooks/useRecurringOrders";
+} from "@/ordre/hooks/useRecurringOrders";
 import { cn } from "@/lib/utils";
 
 type Editing = RecurringScheduleWithCustomer | null;

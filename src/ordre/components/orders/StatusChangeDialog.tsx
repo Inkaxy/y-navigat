@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Loader2, AlertTriangle } from "lucide-react";
-import { getStatusMeta, type OrderStatus } from "@/lib/orderStatus";
+import { getStatusMeta, type OrderStatus } from "@/ordre/lib/orderStatus";
 
 export type StatusChangeIntent = {
   to: OrderStatus;

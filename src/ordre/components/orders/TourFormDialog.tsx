@@ -16,9 +16,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { NB_LEGAL_ENTITY_ID } from "@/lib/constants";
-import { logAudit } from "@/lib/audit";
-import { type DeliveryTour, DAY_LABELS, trimSec } from "@/hooks/useDeliveryTours";
+import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
+import { logAudit } from "@/ordre/lib/audit";
+import { type DeliveryTour, DAY_LABELS, trimSec } from "@/ordre/hooks/useDeliveryTours";
 
 type Props = {
   open: boolean;
