@@ -334,6 +334,7 @@ export default function MatrixPage() {
         lines_created?: number;
         lines_updated?: number;
         lines_deleted?: number;
+        has_zero_fallback_lines?: string[] | null;
       } | null;
       toast.success("Matrise lagret", {
         description: r
@@ -342,6 +343,13 @@ export default function MatrixPage() {
             }`
           : undefined,
       });
+      const fbCount = r?.has_zero_fallback_lines?.length ?? 0;
+      if (fbCount > 0) {
+        toast.warning(
+          `${fbCount} linje(r) fikk pris 0 — mangler prisliste-rad eller spesialpris`,
+          { description: "Sett opp pris i prisliste eller special_prices for å rydde." },
+        );
+      }
     } catch (err) {
       toast.error("Kunne ikke lagre", { description: (err as Error).message });
     }
