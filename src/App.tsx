@@ -90,6 +90,7 @@ import RavarerForhandlingDetail from "@/ravarer/pages/forhandlinger/ForhandlingD
 import RavarerSupplierPortal from "@/ravarer/pages/forhandlinger/SupplierPortal";
 import RavarerLiveForhandlingSetup from "@/ravarer/pages/forhandlinger/LiveForhandlingSetup";
 import RavarerLiveForhandlingWorkspace from "@/ravarer/pages/forhandlinger/LiveForhandlingWorkspace";
+import RavarerLiveConfirmationPortal from "@/ravarer/pages/forhandlinger/LiveConfirmationPortal";
 
 const KunderEntityProvider = ({ children }: { children: React.ReactNode }) => {
   const { user } = useNbhubAuth();
