@@ -233,7 +233,7 @@ function ProfilePill({
   if (!hasAnyProfiles) {
     return (
       <a
-        href="/innstillinger/utskriftsprofiler"
+        href="/produksjon/innstillinger/utskriftsprofiler"
         target="_blank"
         rel="noopener noreferrer"
         className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground underline"
