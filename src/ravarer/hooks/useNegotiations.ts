@@ -22,6 +22,11 @@ export interface NegotiationRow {
   updated_at: string;
   concluded_at: string | null;
   archived_at: string | null;
+  negotiation_mode?: "rfq" | "live";
+  live_session_started_at?: string | null;
+  live_session_ended_at?: string | null;
+  live_facilitator_id?: string | null;
+  live_location_format?: "physical" | "video" | "phone" | null;
 }
 
 export interface NegotiationItemRow {
