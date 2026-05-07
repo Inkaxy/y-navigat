@@ -30,6 +30,5 @@ export const ordreRoutes = {
   avvik: `${ORDRE_BASE}/avvik`,
 
   // Hjelpe-sider
-  matrise: `${ORDRE_BASE}/matrise`,
   kundeordrer: `${ORDRE_BASE}/kundeordrer`,
 } as const;
