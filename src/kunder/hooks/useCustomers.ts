@@ -16,6 +16,8 @@ export type CustomerListRow = {
   default_price_list_id: string | null;
   status: string;
   allows_returns: boolean;
+  geocode_latitude: number | null;
+  geocode_longitude: number | null;
 };
 
 export type CustomerFilters = {
@@ -34,7 +36,7 @@ export function useCustomers(scope: string | null, filters: CustomerFilters) {
       let q = supabase
         .from("customers")
         .select(
-          "id, customer_number, display_name, customer_type, organization_number, primary_contact_name, primary_contact_email, legal_entity_id, credit_limit, credit_hold, default_price_list_id, status, allows_returns",
+          "id, customer_number, display_name, customer_type, organization_number, primary_contact_name, primary_contact_email, legal_entity_id, credit_limit, credit_hold, default_price_list_id, status, allows_returns, geocode_latitude, geocode_longitude",
         )
         .order("display_name", { ascending: true })
         .limit(500);
