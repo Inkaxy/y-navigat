@@ -619,8 +619,8 @@ export default function NewOrder() {
   return (
     <>
       <AppBanner
-        title="Ny ordre"
-        subtitle="Manuell registrering av salgsordre"
+        title={isReturn ? "Ny returordre" : "Ny ordre"}
+        subtitle={isReturn ? "Manuell registrering av returordre" : "Manuell registrering av salgsordre"}
         actions={
           <Button asChild variant="outline" className="gap-2 border-white/40 bg-transparent text-white hover:bg-white/10 hover:text-white">
             <Link to="/ordre/ordrer">
