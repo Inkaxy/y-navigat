@@ -85,6 +85,34 @@ export default function SupplierPortal() {
     setResponses((prev) => ({ ...prev, [itemId]: { ...prev[itemId], [field]: value } }));
   }
 
+  async function handleUpload(itemId: string, file: File) {
+    try {
+      const res = await fetch(`${FN_BASE}/request-rfq-datasheet-upload`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, password, negotiation_item_id: itemId, filename: file.name }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.result !== "ok") {
+        toast.error("Kunne ikke starte opplasting");
+        return;
+      }
+      const put = await fetch(data.signedUrl ?? data.signed_url, {
+        method: "PUT",
+        headers: { "Content-Type": file.type || "application/pdf" },
+        body: file,
+      });
+      if (!put.ok) {
+        toast.error("Opplasting feilet");
+        return;
+      }
+      update(itemId, "datasheet_url", data.path);
+      toast.success(`Lastet opp: ${file.name}`);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Opplasting feilet");
+    }
+  }
+
   async function save(finalize: boolean) {
     if (finalize && !confirm("Er du sikker? Etter sending kan du ikke endre tilbudet uten å kontakte oss.")) return;
     setLoading(true);
