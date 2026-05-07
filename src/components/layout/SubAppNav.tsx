@@ -54,6 +54,7 @@ const STATIC_SUBMENUS: Record<string, { prefix: string; appSlug: string; items: 
       { kind: "link", to: "/ordre/ticket", label: "Ticket" },
       { kind: "link", to: "/ordre/ai-forslag", label: "AI-forslag" },
       { kind: "link", to: "/ordre/avvik", label: "Avvik" },
+      { kind: "link", to: "/ordre/innstillinger", label: "Innstillinger" },
     ],
   },
   produksjon: {
