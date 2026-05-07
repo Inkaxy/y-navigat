@@ -548,7 +548,10 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
                   {lines.map((l) => (
                     <div
                       key={l.uid}
-                      className="flex items-end gap-2 rounded-md border border-border bg-card p-2"
+                      className={`flex items-end gap-2 rounded-md border bg-card p-2 ${
+                        l.is_fallback ? "border-destructive ring-1 ring-destructive/40" : "border-border"
+                      }`}
+                      title={l.is_fallback ? "Pris ikke funnet — mangler prisliste-rad eller spesialpris" : undefined}
                     >
                       <div className="flex-1">
                         <Label className="text-xs">Produkt</Label>
