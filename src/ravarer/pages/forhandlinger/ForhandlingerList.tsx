@@ -13,6 +13,7 @@ const STATUS_META: Record<NegotiationStatus, { label: string; cls: string }> = {
   draft: { label: "Kladd", cls: "border-line-strong bg-surface-muted text-ink-secondary" },
   invited: { label: "Sendt ut", cls: "border-primary/30 bg-primary/10 text-primary" },
   in_progress: { label: "Pågår", cls: "border-warning/30 bg-warning/10 text-warning" },
+  awaiting_confirmation: { label: "Venter bekreftelse", cls: "border-primary/30 bg-primary/10 text-primary" },
   concluded: { label: "Avsluttet", cls: "border-success/30 bg-success/10 text-success" },
   cancelled: { label: "Kansellert", cls: "border-destructive/40 bg-destructive/10 text-destructive" },
 };
