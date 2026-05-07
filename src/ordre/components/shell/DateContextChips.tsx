@@ -27,17 +27,14 @@ function chipMatches(kind: DateChipKind, date: string): boolean {
 }
 
 /**
- * DateContextChips — hurtig dato-chips + sentrert dato med relativ tekst.
- * Brukes i header på operative sider (Dashbord, Pakksedler, Matrise).
- *
- * A.5.5.6 STEG 2.3
+ * DateContextChips — "tape-tabs": etikett-typografi (uppercase, spor),
+ * aktiv chip i bronze på cream, inaktiv outline.
  */
 export function DateContextChips({
   date,
   onChange,
   className,
 }: {
-  /** Aktiv dato (YYYY-MM-DD) */
   date: string;
   onChange: (date: string) => void;
   className?: string;
@@ -50,15 +47,18 @@ export function DateContextChips({
   }
   return (
     <div className={cn("flex flex-wrap items-center gap-3", className)}>
-      <div className="flex flex-wrap gap-1">
+      <div className="flex flex-wrap gap-1.5">
         {CHIPS.map((c) => {
           const active = chipMatches(c.kind, date);
           return (
             <Button
               key={c.kind}
               size="sm"
-              variant={active ? "default" : "outline"}
-              className="h-7 px-2.5 text-caption"
+              variant={active ? "brand" : "outline"}
+              className={cn(
+                "h-7 rounded-[8px] px-2.5 text-[10px] font-semibold uppercase tracking-[0.16em]",
+                !active && "border-brand-bronze/30 text-brand-bronze hover:bg-brand-bronze/5",
+              )}
               onClick={() => onChange(dateForChip(c.kind))}
             >
               {c.label}
@@ -67,9 +67,13 @@ export function DateContextChips({
         })}
       </div>
       <div className="flex flex-col leading-tight">
-        <span className="text-body font-medium text-foreground">{formatDateLong(date)}</span>
+        <span className="font-display text-base font-semibold tracking-tight text-foreground">
+          {formatDateLong(date)}
+        </span>
         {safeRelative && (
-          <span className="text-caption text-muted-foreground">{safeRelative}</span>
+          <span className="text-[11px] uppercase tracking-[0.18em] text-brand-bronze/80">
+            {safeRelative}
+          </span>
         )}
       </div>
     </div>
