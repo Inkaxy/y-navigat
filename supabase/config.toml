@@ -18,3 +18,6 @@ verify_jwt = false
 
 [functions.request-rfq-datasheet-upload]
 verify_jwt = false
+
+[functions.process-email-outbox]
+verify_jwt = false
