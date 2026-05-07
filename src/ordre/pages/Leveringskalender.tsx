@@ -176,10 +176,27 @@ export default function MatrixPage() {
     setAddedProducts((prev) => prev.filter((p) => !matrix.products.some((mp) => mp.id === p.id)));
   }, [matrix]);
 
+  // Ghost-only products: ids fra fastordre som ikke allerede er i matrix.products
+  const ghostOnlyIds = useMemo(() => {
+    if (!ghostMap || !matrix) return [] as string[];
+    const known = new Set<string>([
+      ...matrix.products.map((p) => p.id),
+      ...addedProducts.map((p) => p.id),
+    ]);
+    const out = new Set<string>();
+    for (const key of ghostMap.keys()) {
+      const productId = key.split("|")[2];
+      if (!known.has(productId)) out.add(productId);
+    }
+    return [...out];
+  }, [ghostMap, matrix, addedProducts]);
+
+  const { data: ghostProducts } = useProductsByIds(ghostOnlyIds);
+
   const allProducts = useMemo<MatrixProduct[]>(() => {
     if (!matrix) return [];
-    return [...matrix.products, ...addedProducts];
-  }, [matrix, addedProducts]);
+    return [...matrix.products, ...addedProducts, ...(ghostProducts ?? [])];
+  }, [matrix, addedProducts, ghostProducts]);
 
   const productById = useMemo(() => {
     const m = new Map<string, MatrixProduct>();
