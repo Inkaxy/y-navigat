@@ -52,6 +52,7 @@ import {
   type AddableProduct,
 } from "@/ordre/hooks/useMatrix";
 import { useDebouncedValue } from "@/ordre/hooks/useDebouncedValue";
+import { useProductsByIds } from "@/ordre/hooks/useProductsByIds";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserAccess } from "@/ordre/hooks/useUserAccess";
 import { useWeatherForecast, type WeatherMap } from "@/ordre/hooks/useWeatherForecast";
