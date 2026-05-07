@@ -95,12 +95,12 @@ export default function Login() {
           "radial-gradient(ellipse at top, hsl(var(--brand-ink)) 0%, hsl(24 24% 6%) 70%)",
       }}
     >
-      <div className="w-full max-w-xl space-y-4 animate-fade-in">
+      <div className="w-full max-w-3xl space-y-4 animate-fade-in">
         <div className="flex flex-col items-center text-center">
           <Logo
             variant="horizontal"
             title="Nøtterø Bakeri"
-            className="h-80 w-auto md:h-[28rem] lg:h-[32rem] text-brand-cream drop-shadow-[0_8px_30px_hsl(var(--brand-bronze)/0.25)]"
+            className="h-[40rem] w-auto md:h-[56rem] lg:h-[64rem] text-brand-cream drop-shadow-[0_8px_30px_hsl(var(--brand-bronze)/0.25)]"
           />
         </div>
 
