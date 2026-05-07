@@ -322,7 +322,7 @@ export default function NewOrder() {
 
   async function selectProductForLine(uid: string, p: ProductOption) {
     const ep = customer
-      ? await fetchEffectivePrice({ productId: p.id, customerId: customer.id, date: deliveryDate }).catch(() => null)
+      ? await fetchEffectivePrice({ productId: p.id, customerId: customer.id, date: deliveryDate, caller: "new_order_form" }).catch(() => null)
       : null;
     setLines((prev) =>
       prev.map((l) =>
