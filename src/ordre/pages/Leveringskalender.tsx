@@ -976,6 +976,7 @@ export default function MatrixPage() {
             </DropdownMenu>
           </div>
         </div>
+        </div>
       </div>
 
       <div className="flex-1 overflow-auto">
