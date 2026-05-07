@@ -1,0 +1,920 @@
+import { useState, useEffect, useRef } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { ArrowLeft, Loader2, Plus, Trash2, AlertTriangle, Check, Search, Copy } from "lucide-react";
+import { AppBanner } from "@/components/shell/AppBanner";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { NB_LEGAL_ENTITY_ID } from "@/lib/constants";
+import { tomorrow, todayISO, formatNOK } from "@/lib/format";
+import { useNBCustomers, type CustomerOption } from "@/hooks/useNBCustomers";
+import { useNBProducts, fetchEffectivePrice, categorizePriceSource, type ProductOption } from "@/hooks/useNBProducts";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { logAudit } from "@/lib/audit";
+import { TourPicker } from "@/components/orders/TourPicker";
+import { CopyFromPreviousOrderDialog } from "@/components/orders/CopyFromPreviousOrderDialog";
+import { DuplicateOrderWarning } from "@/components/orders/DuplicateOrderWarning";
+import { useDuplicateOrderCheck } from "@/hooks/useDuplicateOrderCheck";
+import { OrderDeadlineWarning } from "@/components/orders/OrderDeadlineWarning";
+import { useOrderDeadlineCheck } from "@/hooks/useOrderDeadlineCheck";
+import type { CopyableOrderLine } from "@/hooks/useRecentOrdersForCustomer";
+
+type LineDraft = {
+  uid: string;
+  product: ProductOption | null;
+  quantity: string;
+  unit_price: string;
+  unit_price_source: string | null;
+  unit_price_source_id: string | null;
+  effective_price: number | null;
+  discount_percent: string;
+  vat_rate: number;
+  notes: string;
+};
+
+function newLine(): LineDraft {
+  return {
+    uid: crypto.randomUUID(),
+    product: null,
+    quantity: "1",
+    unit_price: "0",
+    unit_price_source: null,
+    unit_price_source_id: null,
+    effective_price: null,
+    discount_percent: "0",
+    vat_rate: 15,
+    notes: "",
+  };
+}
+
+function calcLineTotals(line: LineDraft) {
+  const qty = Number(line.quantity) || 0;
+  const price = Number(line.unit_price) || 0;
+  const disc = Number(line.discount_percent) || 0;
+  const subtotal = qty * price * (1 - disc / 100);
+  const vat = subtotal * (Number(line.vat_rate) / 100);
+  return { subtotal, vat, total: subtotal + vat };
+}
+
+function CustomerCombobox({
+  value,
+  onSelect,
+}: {
+  value: CustomerOption | null;
+  onSelect: (c: CustomerOption | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const debouncedQ = useDebouncedValue(q, 250);
+  const { data: customers, isLoading } = useNBCustomers(debouncedQ);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" role="combobox" className="w-full justify-between">
+          {value ? `${value.customer_number} — ${value.display_name}` : "Velg kunde..."}
+          <Search className="ml-2 h-4 w-4 opacity-60" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-[420px] p-0">
+        <div className="border-b border-border p-2">
+          <Input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Søk navn, kundenr, orgnr..."
+            autoFocus
+          />
+        </div>
+        <div className="max-h-[320px] overflow-y-auto">
+          {isLoading ? (
+            <div className="p-4 text-center text-sm text-muted-foreground">
+              <Loader2 className="mx-auto h-4 w-4 animate-spin" />
+            </div>
+          ) : !customers || customers.length === 0 ? (
+            <div className="p-4 text-center text-sm text-muted-foreground">Ingen treff</div>
+          ) : (
+            customers.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                className="flex w-full items-start gap-2 border-b border-border px-3 py-2 text-left text-sm hover:bg-accent"
+                onClick={() => {
+                  onSelect(c);
+                  setOpen(false);
+                }}
+              >
+                <div className="flex-1">
+                  <div className="font-medium">{c.display_name}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {c.customer_number}
+                    {c.organization_number ? ` · ${c.organization_number}` : ""}
+                  </div>
+                </div>
+                {value?.id === c.id && <Check className="h-4 w-4 text-primary" />}
+              </button>
+            ))
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function ProductCombobox({
+  onSelect,
+  autoFocus,
+}: {
+  onSelect: (p: ProductOption) => void;
+  autoFocus?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const debouncedQ = useDebouncedValue(q, 250);
+  const { data: products, isLoading } = useNBProducts(debouncedQ);
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    // Shortcut 6.4: Enter i produktsøk velger første treff
+    if (e.key === "Enter" && products && products.length > 0) {
+      e.preventDefault();
+      onSelect(products[0]);
+      setOpen(false);
+    }
+  }
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" size="sm" className="h-8 w-full justify-start text-left" autoFocus={autoFocus}>
+          <Search className="mr-1.5 h-3.5 w-3.5" />
+          <span className="truncate text-xs text-muted-foreground">Velg produkt...</span>
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-[420px] p-0">
+        <div className="border-b border-border p-2">
+          <Input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Søk produktnavn eller kode... (Enter velger første treff)"
+            autoFocus
+          />
+        </div>
+        <div className="max-h-[320px] overflow-y-auto">
+          {isLoading ? (
+            <div className="p-4 text-center text-sm text-muted-foreground">
+              <Loader2 className="mx-auto h-4 w-4 animate-spin" />
+            </div>
+          ) : !products || products.length === 0 ? (
+            <div className="p-4 text-center text-sm text-muted-foreground">Ingen treff</div>
+          ) : (
+            products.map((p, idx) => (
+              <button
+                key={p.id}
+                type="button"
+                className={`flex w-full items-start gap-2 border-b border-border px-3 py-2 text-left text-sm hover:bg-accent ${idx === 0 ? "bg-accent/30" : ""}`}
+                onClick={() => {
+                  onSelect(p);
+                  setOpen(false);
+                }}
+              >
+                <div className="flex-1">
+                  <div className="font-medium">{p.display_name}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {p.code} · {p.unit_of_sale} · MVA {p.mva_rate}%
+                  </div>
+                </div>
+                {idx === 0 && <span className="text-[10px] uppercase text-muted-foreground">↵</span>}
+              </button>
+            ))
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function PriceSourceBadge({ source }: { source: string | null }) {
+  const cat = categorizePriceSource(source);
+  const styles: Record<string, string> = {
+    standard: "bg-muted text-muted-foreground",
+    special_general: "bg-warning/15 text-warning",
+    special_customer: "bg-primary/15 text-primary",
+    manual: "bg-destructive/15 text-destructive",
+    none: "bg-muted text-muted-foreground",
+  };
+  return (
+    <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ${styles[cat.category]}`}>
+      {cat.label}
+    </span>
+  );
+}
+
+export default function NewOrder() {
+  const navigate = useNavigate();
+  const [customer, setCustomer] = useState<CustomerOption | null>(null);
+  const [deliveryDate, setDeliveryDate] = useState<string>(tomorrow());
+  const [deliveryTime, setDeliveryTime] = useState<string>("");
+  const [useCustomerAddress, setUseCustomerAddress] = useState(true);
+  const [delAddr, setDelAddr] = useState({
+    line1: "",
+    line2: "",
+    postal: "",
+    city: "",
+    country: "NO",
+  });
+  const [deliveryInstructions, setDeliveryInstructions] = useState("");
+  const [internalNotes, setInternalNotes] = useState("");
+  const [customerNotes, setCustomerNotes] = useState("");
+  const [manualTourId, setManualTourId] = useState<string | null>(null);
+  const [lines, setLines] = useState<LineDraft[]>([newLine()]);
+  const [submitting, setSubmitting] = useState(false);
+  const [copyDialogOpen, setCopyDialogOpen] = useState(false);
+  const submittingRef = useRef(submitting);
+  submittingRef.current = submitting;
+  const today = todayISO();
+
+  // 6.2 Dublett-sjekk
+  const { data: duplicates = [] } = useDuplicateOrderCheck(customer?.id ?? null, deliveryDate);
+
+  // A.5.5.6.2 — Ordrefrist-sjekk
+  const productIdsForCheck = lines
+    .map((l) => l.product?.id)
+    .filter((id): id is string => !!id);
+  const { data: deadlineViolations = [] } = useOrderDeadlineCheck({
+    legalEntityId: NB_LEGAL_ENTITY_ID,
+    customerId: customer?.id ?? null,
+    deliveryDate: deliveryDate || null,
+    deliveryTourId: manualTourId,
+    productIds: productIdsForCheck,
+  });
+  const passedDeadlines = deadlineViolations.filter((v) => v.minutes_over > 0);
+
+  // Når kunde endres: pre-fyll adresse
+  useEffect(() => {
+    if (customer) {
+      setDelAddr({
+        line1: customer.delivery_address_line1 ?? "",
+        line2: customer.delivery_address_line2 ?? "",
+        postal: customer.delivery_postal_code ?? "",
+        city: customer.delivery_city ?? "",
+        country: customer.delivery_country ?? "NO",
+      });
+      setDeliveryInstructions(customer.delivery_instructions ?? "");
+    }
+  }, [customer]);
+
+  // Re-trekk priser hvis kunde eller dato endres
+  useEffect(() => {
+    if (!customer) return;
+    setLines((prev) => prev.map((l) => (l.product ? { ...l, _refetch: Date.now() } as LineDraft : l)));
+    // For hver linje med produkt: hent ny pris
+    void (async () => {
+      const updates = await Promise.all(
+        lines.map(async (l) => {
+          if (!l.product || l.unit_price_source === "manual_override") return l;
+          try {
+            const ep = await fetchEffectivePrice({
+              productId: l.product.id,
+              customerId: customer.id,
+              date: deliveryDate,
+            });
+            if (!ep) return l;
+            return {
+              ...l,
+              unit_price: String(ep.price ?? 0),
+              unit_price_source: ep.source,
+              unit_price_source_id: ep.special_price_id ?? ep.price_list_id ?? null,
+              effective_price: ep.price,
+            };
+          } catch {
+            return l;
+          }
+        }),
+      );
+      setLines(updates);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customer?.id, deliveryDate]);
+
+  // 6.4 Keyboard shortcut: Cmd/Ctrl+Enter = opprett ordre
+  // (A.5.5.8: interne ordre opprettes alltid som confirmed; ingen "lagre som utkast")
+  const saveRef = useRef<() => Promise<void>>(async () => {});
+
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      const isMod = e.metaKey || e.ctrlKey;
+      if (!isMod) return;
+      if (e.key === "Enter") {
+        e.preventDefault();
+        if (!submittingRef.current) void saveRef.current();
+      }
+    }
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, []);
+
+  async function selectProductForLine(uid: string, p: ProductOption) {
+    const ep = customer
+      ? await fetchEffectivePrice({ productId: p.id, customerId: customer.id, date: deliveryDate }).catch(() => null)
+      : null;
+    setLines((prev) =>
+      prev.map((l) =>
+        l.uid === uid
+          ? {
+              ...l,
+              product: p,
+              vat_rate: Number(p.mva_rate),
+              unit_price: ep ? String(ep.price ?? 0) : "0",
+              unit_price_source: ep?.source ?? null,
+              unit_price_source_id: ep?.special_price_id ?? ep?.price_list_id ?? null,
+              effective_price: ep?.price ?? null,
+            }
+          : l,
+      ),
+    );
+  }
+
+  function updateLine(uid: string, patch: Partial<LineDraft>) {
+    setLines((prev) => prev.map((l) => (l.uid === uid ? { ...l, ...patch } : l)));
+  }
+
+  function setManualPrice(uid: string, value: string) {
+    setLines((prev) =>
+      prev.map((l) => {
+        if (l.uid !== uid) return l;
+        const isOverride = l.effective_price !== null && Number(value) !== Number(l.effective_price);
+        return {
+          ...l,
+          unit_price: value,
+          unit_price_source: isOverride ? "manual_override" : l.unit_price_source,
+        };
+      }),
+    );
+  }
+
+  function removeLine(uid: string) {
+    setLines((prev) => prev.filter((l) => l.uid !== uid));
+  }
+
+  function addEmptyLine() {
+    setLines((p) => [...p, newLine()]);
+  }
+
+  // 6.1 Kopier linjer fra tidligere ordre
+  async function copyLinesFromOrder(copied: CopyableOrderLine[], orderNumber: string) {
+    // Hent produkt-detaljer for hver linje
+    const productIds = Array.from(new Set(copied.map((l) => l.product_id)));
+    const { data: products, error } = await supabase
+      .from("products")
+      .select("id, code, display_name, display_number, unit_of_sale, mva_rate, status, is_for_sale")
+      .in("id", productIds);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    const productMap = new Map((products ?? []).map((p) => [p.id, p]));
+
+    const newLines: LineDraft[] = copied.map((cl) => {
+      const p = productMap.get(cl.product_id);
+      const productOption: ProductOption | null = p
+        ? {
+            id: p.id,
+            code: p.code,
+            display_name: p.display_name,
+            display_number: p.display_number,
+            unit_of_sale: p.unit_of_sale,
+            mva_rate: Number(p.mva_rate),
+            status: p.status,
+            is_for_sale: p.is_for_sale,
+          }
+        : null;
+      return {
+        uid: crypto.randomUUID(),
+        product: productOption,
+        quantity: String(cl.quantity),
+        unit_price: String(cl.unit_price),
+        unit_price_source: cl.unit_price_source,
+        unit_price_source_id: cl.unit_price_source_id,
+        effective_price: cl.unit_price,
+        discount_percent: String(cl.discount_percent),
+        vat_rate: cl.vat_rate,
+        notes: cl.notes ?? "",
+      };
+    });
+
+    // Erstatt eksisterende tomme linjer hvis det bare er én tom rad
+    setLines((prev) => {
+      const hasOnlyEmpty = prev.length === 1 && prev[0].product === null;
+      return hasOnlyEmpty ? newLines : [...prev, ...newLines];
+    });
+
+    // Re-trekk priser for ny kunde/dato (samme logikk som i useEffect)
+    if (customer) {
+      void (async () => {
+        const refreshed = await Promise.all(
+          newLines.map(async (l) => {
+            if (!l.product) return l;
+            try {
+              const ep = await fetchEffectivePrice({
+                productId: l.product.id,
+                customerId: customer.id,
+                date: deliveryDate,
+              });
+              if (!ep) return l;
+              return {
+                ...l,
+                unit_price: String(ep.price ?? 0),
+                unit_price_source: ep.source,
+                unit_price_source_id: ep.special_price_id ?? ep.price_list_id ?? null,
+                effective_price: ep.price,
+              };
+            } catch {
+              return l;
+            }
+          }),
+        );
+        setLines((prev) => {
+          // Bare oppdater de nye linjene
+          const newUids = new Set(newLines.map((l) => l.uid));
+          return prev.map((l) => (newUids.has(l.uid) ? refreshed.find((r) => r.uid === l.uid) ?? l : l));
+        });
+      })();
+    }
+  }
+
+  // Totaler
+  const totals = lines.reduce(
+    (acc, l) => {
+      if (!l.product) return acc;
+      const t = calcLineTotals(l);
+      acc.subtotal += t.subtotal;
+      acc.vat += t.vat;
+      acc.total += t.total;
+      const qty = Number(l.quantity) || 0;
+      const price = Number(l.unit_price) || 0;
+      const disc = Number(l.discount_percent) || 0;
+      acc.discount += qty * price * (disc / 100);
+      return acc;
+    },
+    { subtotal: 0, vat: 0, total: 0, discount: 0 },
+  );
+
+  async function save() {
+    if (!customer) {
+      toast.error("Velg en kunde");
+      return;
+    }
+    if (!deliveryDate || deliveryDate < today) {
+      toast.error("Leveringsdato kan ikke være i fortiden");
+      return;
+    }
+    const validLines = lines.filter((l) => l.product && Number(l.quantity) > 0);
+    if (validLines.length === 0) {
+      toast.error("Du må legge til minst én ordrelinje for å opprette ordren");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      // Hent ordrenummer
+      const { data: numData, error: numErr } = await supabase.rpc("next_order_number", {
+        p_legal_entity_id: NB_LEGAL_ENTITY_ID,
+      });
+      if (numErr) throw numErr;
+      const numRow = numData?.[0];
+      if (!numRow) throw new Error("Kunne ikke generere ordrenummer");
+
+      const { data: userRes } = await supabase.auth.getUser();
+      const userId = userRes.user?.id ?? null;
+
+      const customerSnapshot = {
+        customer_number: customer.customer_number,
+        display_name: customer.display_name,
+        organization_number: customer.organization_number,
+        primary_contact_name: customer.primary_contact_name,
+        primary_contact_email: customer.primary_contact_email,
+      };
+
+      // Opprett ordre
+      const { data: orderRow, error: orderErr } = await supabase
+        .from("orders")
+        .insert({
+          legal_entity_id: NB_LEGAL_ENTITY_ID,
+          order_number: numRow.order_number,
+          order_year: numRow.order_year,
+          order_sequence: numRow.order_sequence,
+          source: "manual",
+          customer_id: customer.id,
+          customer_snapshot: customerSnapshot,
+          invoice_recipient_customer_id: customer.invoice_recipient_customer_id,
+          status: "confirmed",
+          status_changed_by: userId,
+          delivery_date: deliveryDate,
+          delivery_time: deliveryTime || null,
+          delivery_address_line1: useCustomerAddress ? customer.delivery_address_line1 : delAddr.line1 || null,
+          delivery_address_line2: useCustomerAddress ? customer.delivery_address_line2 : delAddr.line2 || null,
+          delivery_postal_code: useCustomerAddress ? customer.delivery_postal_code : delAddr.postal || null,
+          delivery_city: useCustomerAddress ? customer.delivery_city : delAddr.city || null,
+          delivery_country: useCustomerAddress ? customer.delivery_country : delAddr.country || "NO",
+          delivery_instructions: deliveryInstructions || null,
+          use_customer_default_address: useCustomerAddress,
+          internal_notes: (() => {
+            const breach = passedDeadlines.length > 0
+              ? `Lagret med ordrefrist-brudd: ${passedDeadlines.map((v) => `«${v.rule_name}»`).join(", ")}`
+              : null;
+            const parts = [internalNotes?.trim(), breach].filter(Boolean);
+            return parts.length > 0 ? parts.join("\n\n") : null;
+          })(),
+          customer_notes: customerNotes || null,
+          delivery_tour_id: manualTourId, // null lar trigger auto-tildele
+          created_by: userId,
+        })
+        .select("id")
+        .single();
+      if (orderErr) throw orderErr;
+
+      // Sett inn linjer
+      if (validLines.length > 0) {
+        const lineRows = validLines.map((l, idx) => {
+          const t = calcLineTotals(l);
+          return {
+            order_id: orderRow.id,
+            line_number: idx + 1,
+            product_id: l.product!.id,
+            product_snapshot: {
+              display_number: l.product!.display_number,
+              display_name: l.product!.display_name,
+              code: l.product!.code,
+              unit_of_sale: l.product!.unit_of_sale,
+              mva_rate: l.product!.mva_rate,
+            },
+            quantity: Number(l.quantity),
+            sales_unit: l.product!.unit_of_sale,
+            unit_price: Number(l.unit_price),
+            unit_price_source: l.unit_price_source,
+            unit_price_source_id: l.unit_price_source_id,
+            discount_percent: Number(l.discount_percent),
+            line_subtotal_excl_vat: Number(t.subtotal.toFixed(2)),
+            vat_rate: Number(l.vat_rate),
+            line_vat: Number(t.vat.toFixed(2)),
+            line_total_incl_vat: Number(t.total.toFixed(2)),
+            notes: l.notes || null,
+          };
+        });
+        const { error: lineErr } = await supabase.from("order_lines").insert(lineRows);
+        if (lineErr) throw lineErr;
+      }
+
+      await logAudit({
+        action: "created",
+        entity_type: "order",
+        entity_id: orderRow.id,
+        entity_display_reference: `${numRow.order_number} — ${customer.display_name}`,
+        legal_entity_id: NB_LEGAL_ENTITY_ID,
+        changes: { status: "confirmed", line_count: validLines.length },
+      });
+
+      toast.success(`Ordre ${numRow.order_number} opprettet`);
+      navigate("/ordrer");
+    } catch (e) {
+      console.error(e);
+      toast.error(e instanceof Error ? e.message : "Kunne ikke lagre ordre");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  // Bind save til ref for keyboard shortcuts
+  saveRef.current = save;
+
+  return (
+    <>
+      <AppBanner
+        title="Ny ordre"
+        subtitle="Manuell registrering av salgsordre"
+        actions={
+          <Button asChild variant="outline" className="gap-2 border-white/40 bg-transparent text-white hover:bg-white/10 hover:text-white">
+            <Link to="/ordrer">
+              <ArrowLeft className="h-4 w-4" /> Tilbake
+            </Link>
+          </Button>
+        }
+      />
+      <div className="container mx-auto max-w-5xl space-y-4 px-4 py-6 sm:px-6">
+        {/* Seksjon 1: Kunde */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="text-base">1. Kunde</CardTitle>
+            {customer && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5"
+                onClick={() => setCopyDialogOpen(true)}
+              >
+                <Copy className="h-3.5 w-3.5" />
+                Kopier fra tidligere ordre
+              </Button>
+            )}
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <CustomerCombobox value={customer} onSelect={setCustomer} />
+            {customer && (
+              <div className="rounded-lg border border-border bg-muted/30 p-3 text-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="font-medium">{customer.display_name}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {customer.customer_number}
+                      {customer.organization_number ? ` · ${customer.organization_number}` : ""}
+                    </div>
+                    {customer.primary_contact_name && (
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        Kontakt: {customer.primary_contact_name}
+                        {customer.primary_contact_email ? ` · ${customer.primary_contact_email}` : ""}
+                      </div>
+                    )}
+                  </div>
+                  {customer.credit_hold && (
+                    <span className="inline-flex items-center gap-1 rounded bg-destructive/10 px-2 py-1 text-xs font-medium text-destructive">
+                      <AlertTriangle className="h-3 w-3" /> Kredittstopp
+                    </span>
+                  )}
+                </div>
+                {customer.invoice_recipient_customer_id && (
+                  <div className="mt-2 text-xs text-muted-foreground">
+                    Faktura sendes til annen mottaker (innstilt på kunden).
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* 6.2 Dublett-advarsel */}
+        {customer && deliveryDate && duplicates.length > 0 && (
+          <DuplicateOrderWarning
+            duplicates={duplicates}
+            customerName={customer.display_name}
+            deliveryDate={deliveryDate}
+          />
+        )}
+
+        {/* A.5.5.6.2 Ordrefrist-advarsel */}
+        {customer && deliveryDate && deadlineViolations.length > 0 && (
+          <OrderDeadlineWarning violations={deadlineViolations} />
+        )}
+
+        {/* Seksjon 2: Levering */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">2. Leveringsinfo</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <Label htmlFor="del-date">Leveringsdato</Label>
+                <Input
+                  id="del-date"
+                  type="date"
+                  min={today}
+                  value={deliveryDate}
+                  onChange={(e) => setDeliveryDate(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="del-time">Leveringstid (valgfri)</Label>
+                <Input
+                  id="del-time"
+                  type="time"
+                  value={deliveryTime}
+                  onChange={(e) => setDeliveryTime(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <TourPicker
+              deliveryDate={deliveryDate}
+              deliveryTime={deliveryTime}
+              manualTourId={manualTourId}
+              onChangeManual={setManualTourId}
+            />
+
+            <div className="flex items-center justify-between rounded-lg border border-border p-3">
+              <div>
+                <div className="text-sm font-medium">Bruk kundens leveringsadresse</div>
+                <div className="text-xs text-muted-foreground">
+                  Slå av for å overstyre adressen for denne ordren.
+                </div>
+              </div>
+              <Switch checked={useCustomerAddress} onCheckedChange={setUseCustomerAddress} />
+            </div>
+
+            {useCustomerAddress ? (
+              customer && (
+                <div className="rounded-lg border border-border bg-muted/30 p-3 text-sm">
+                  <div>{customer.delivery_address_line1 || <em className="text-muted-foreground">— ingen adresse —</em>}</div>
+                  {customer.delivery_address_line2 && <div>{customer.delivery_address_line2}</div>}
+                  <div>
+                    {customer.delivery_postal_code} {customer.delivery_city}
+                  </div>
+                  <div className="text-xs text-muted-foreground">{customer.delivery_country}</div>
+                </div>
+              )
+            ) : (
+              <div className="grid gap-2 sm:grid-cols-2">
+                <Input placeholder="Adresselinje 1" value={delAddr.line1} onChange={(e) => setDelAddr({ ...delAddr, line1: e.target.value })} />
+                <Input placeholder="Adresselinje 2" value={delAddr.line2} onChange={(e) => setDelAddr({ ...delAddr, line2: e.target.value })} />
+                <Input placeholder="Postnr" value={delAddr.postal} onChange={(e) => setDelAddr({ ...delAddr, postal: e.target.value })} />
+                <Input placeholder="Sted" value={delAddr.city} onChange={(e) => setDelAddr({ ...delAddr, city: e.target.value })} />
+                <Input placeholder="Land" value={delAddr.country} onChange={(e) => setDelAddr({ ...delAddr, country: e.target.value })} />
+              </div>
+            )}
+
+            <div>
+              <Label htmlFor="instr">Merknader til sjåfør</Label>
+              <Textarea
+                id="instr"
+                rows={2}
+                value={deliveryInstructions}
+                onChange={(e) => setDeliveryInstructions(e.target.value)}
+                placeholder="F.eks. portkode, bakdør, leveringssted..."
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Seksjon 3: Linjer */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="text-base">3. Ordrelinjer</CardTitle>
+            <Button size="sm" variant="outline" onClick={() => setLines((p) => [...p, newLine()])} className="gap-1">
+              <Plus className="h-3.5 w-3.5" /> Legg til linje
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {lines.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
+                Legg til første ordrelinje for å komme i gang.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="grid grid-cols-[1fr_80px_80px_120px_70px_100px_40px] gap-2 border-b border-border pb-2 text-xs font-medium text-muted-foreground">
+                  <div>Produkt</div>
+                  <div className="text-right">Mengde</div>
+                  <div className="text-right">Enhet</div>
+                  <div className="text-right">Pris/enhet</div>
+                  <div className="text-right">Rabatt %</div>
+                  <div className="text-right">Sum</div>
+                  <div></div>
+                </div>
+                {lines.map((l) => {
+                  const t = calcLineTotals(l);
+                  const overridden = l.unit_price_source === "manual_override";
+                  return (
+                    <div key={l.uid} className="space-y-1.5">
+                      <div className="grid grid-cols-[1fr_80px_80px_120px_70px_100px_40px] items-center gap-2">
+                        <div>
+                          {l.product ? (
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 truncate text-sm">
+                                <span className="font-medium">{l.product.display_name}</span>
+                                <span className="ml-2 text-xs text-muted-foreground">{l.product.code}</span>
+                              </div>
+                              <Button size="sm" variant="ghost" onClick={() => updateLine(l.uid, { product: null, unit_price: "0", effective_price: null, unit_price_source: null })} className="h-6 px-1 text-xs">Bytt</Button>
+                            </div>
+                          ) : (
+                            <ProductCombobox onSelect={(p) => selectProductForLine(l.uid, p)} />
+                          )}
+                        </div>
+                        <Input
+                          type="number"
+                          step="0.001"
+                          value={l.quantity}
+                          onChange={(e) => updateLine(l.uid, { quantity: e.target.value })}
+                          className="h-8 text-right text-sm"
+                        />
+                        <div className="text-right text-xs text-muted-foreground">{l.product?.unit_of_sale ?? "—"}</div>
+                        <Input
+                          type="number"
+                          step="0.0001"
+                          value={l.unit_price}
+                          onChange={(e) => setManualPrice(l.uid, e.target.value)}
+                          disabled={!l.product}
+                          className="h-8 text-right text-sm"
+                        />
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          max="100"
+                          value={l.discount_percent}
+                          onChange={(e) => updateLine(l.uid, { discount_percent: e.target.value })}
+                          disabled={!l.product}
+                          className="h-8 text-right text-sm"
+                        />
+                        <div className="text-right text-sm font-medium">{formatNOK(t.total)}</div>
+                        <Button size="sm" variant="ghost" onClick={() => removeLine(l.uid)} className="h-7 w-7 p-0 text-destructive hover:bg-destructive/10">
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                      {l.product && (
+                        <div className="flex items-center gap-2 pl-1 text-xs">
+                          <PriceSourceBadge source={l.unit_price_source} />
+                          {overridden && l.effective_price !== null && (
+                            <span className="text-warning">
+                              <AlertTriangle className="mr-0.5 inline h-3 w-3" />
+                              Overstyrt fra {formatNOK(l.effective_price)}
+                            </span>
+                          )}
+                          <span className="text-muted-foreground">MVA {l.vat_rate}%</span>
+                          <Input
+                            value={l.notes}
+                            onChange={(e) => updateLine(l.uid, { notes: e.target.value })}
+                            placeholder="Notat på linje..."
+                            className="h-6 max-w-[280px] text-xs"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Totaler */}
+            <div className="mt-4 ml-auto max-w-xs space-y-1 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Sum eks. mva</span>
+                <span>{formatNOK(totals.subtotal)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Rabatt</span>
+                <span>{formatNOK(totals.discount)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">MVA</span>
+                <span>{formatNOK(totals.vat)}</span>
+              </div>
+              <div className="flex justify-between border-t border-border pt-1.5 text-base font-semibold">
+                <span>Sum inkl. mva</span>
+                <span>{formatNOK(totals.total)}</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Seksjon 4: Notater */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">4. Notater</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div>
+              <Label htmlFor="internal">Internt notat (ikke synlig for kunde)</Label>
+              <Textarea id="internal" rows={2} value={internalNotes} onChange={(e) => setInternalNotes(e.target.value)} />
+            </div>
+            <div>
+              <Label htmlFor="customer-notes">Notat fra kunde</Label>
+              <Textarea id="customer-notes" rows={2} value={customerNotes} onChange={(e) => setCustomerNotes(e.target.value)} />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Knapper */}
+        <div className="sticky bottom-0 -mx-4 flex flex-wrap items-center justify-end gap-2 border-t border-border bg-background/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6">
+          <div className="mr-auto text-sm text-muted-foreground">
+            {lines.filter((l) => l.product).length} linjer · {formatNOK(totals.total)}
+          </div>
+          <Button variant="ghost" asChild>
+            <Link to="/ordrer">Avbryt</Link>
+          </Button>
+          <Button
+            onClick={() => save()}
+            disabled={submitting || !customer}
+            title="⌘Enter / Ctrl+Enter"
+          >
+            {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Opprett ordre
+            <kbd className="ml-2 hidden rounded border border-primary-foreground/30 bg-primary-foreground/10 px-1.5 py-0.5 text-[10px] sm:inline">⌘↵</kbd>
+          </Button>
+        </div>
+      </div>
+
+      {/* 6.1 Kopier fra tidligere ordre */}
+      <CopyFromPreviousOrderDialog
+        open={copyDialogOpen}
+        onOpenChange={setCopyDialogOpen}
+        customerId={customer?.id ?? null}
+        customerName={customer?.display_name ?? null}
+        onCopy={copyLinesFromOrder}
+      />
+    </>
+  );
+}
