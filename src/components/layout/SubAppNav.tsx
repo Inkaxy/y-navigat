@@ -46,7 +46,7 @@ const STATIC_SUBMENUS: Record<string, { prefix: string; appSlug: string; items: 
     items: [
       { kind: "link", to: "/ordre/dashbord", label: "Dashbord" },
       { kind: "link", to: "/ordre/leveringskalender", label: "Leveringskalender" },
-      { kind: "link", to: "/ordre/ordrer", label: "Ordrer" },
+      { kind: "link", to: "/ordre/ordrer", label: "Bestillinger" },
       { kind: "link", to: "/ordre/pakksedler", label: "Pakksedler" },
       { kind: "link", to: "/ordre/turer", label: "Turer" },
       { kind: "link", to: "/ordre/leveringsregler", label: "Leveringsregler" },

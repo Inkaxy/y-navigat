@@ -1563,6 +1563,51 @@ export type Database = {
           },
         ]
       }
+      email_outbox: {
+        Row: {
+          attempt_count: number
+          created_at: string
+          error_message: string | null
+          id: string
+          last_attempt_at: string | null
+          recipient_email: string
+          related_entity_id: string | null
+          related_entity_type: string | null
+          sent_at: string | null
+          status: string
+          template_key: string
+          variables: Json
+        }
+        Insert: {
+          attempt_count?: number
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          last_attempt_at?: string | null
+          recipient_email: string
+          related_entity_id?: string | null
+          related_entity_type?: string | null
+          sent_at?: string | null
+          status?: string
+          template_key: string
+          variables?: Json
+        }
+        Update: {
+          attempt_count?: number
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          last_attempt_at?: string | null
+          recipient_email?: string
+          related_entity_id?: string | null
+          related_entity_type?: string | null
+          sent_at?: string | null
+          status?: string
+          template_key?: string
+          variables?: Json
+        }
+        Relationships: []
+      }
       email_templates: {
         Row: {
           available_variables: Json
@@ -3190,6 +3235,7 @@ export type Database = {
           send_email_confirm: boolean
           send_sms_confirm: boolean
           source: string
+          source_external_id: string | null
           source_reference: string | null
           status: string
           status_changed_at: string
@@ -3242,6 +3288,7 @@ export type Database = {
           send_email_confirm?: boolean
           send_sms_confirm?: boolean
           source: string
+          source_external_id?: string | null
           source_reference?: string | null
           status?: string
           status_changed_at?: string
@@ -3294,6 +3341,7 @@ export type Database = {
           send_email_confirm?: boolean
           send_sms_confirm?: boolean
           source?: string
+          source_external_id?: string | null
           source_reference?: string | null
           status?: string
           status_changed_at?: string
@@ -7987,6 +8035,17 @@ export type Database = {
         Returns: string
       }
       user_has_invoice_access: { Args: never; Returns: boolean }
+      validate_order_delivery_rules: {
+        Args: {
+          p_customer_id: string
+          p_delivery_date: string
+          p_delivery_tour_id?: string
+          p_legal_entity_id: string
+          p_ordered_at?: string
+          p_product_ids?: string[]
+        }
+        Returns: Json
+      }
       verify_gtin: { Args: { p_gtin: string }; Returns: boolean }
     }
     Enums: {
