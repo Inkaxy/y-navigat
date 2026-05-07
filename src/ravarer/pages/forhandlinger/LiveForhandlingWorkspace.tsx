@@ -185,13 +185,18 @@ export default function LiveForhandlingWorkspace() {
     lines.push(`Forhandling: ${neg?.title ?? ""}`);
     lines.push(`Leverandør: ${supplierName}`);
     lines.push("");
-    lines.push("Avtalte poster:");
-    for (const it of items.filter((i) => i.live_status === "agreed")) {
+    lines.push("Avtalte poster (venter bekreftelse):");
+    for (const it of items.filter((i) => i.live_status === "tentatively_agreed" || i.live_status === "agreed" || i.live_status === "confirmed")) {
       const rm = rawMaterials.find((r) => r.id === it.raw_material_id);
       lines.push(`- ${rm?.name ?? "?"}: ${it.live_agreed_price ?? "?"} ${it.live_agreed_price_unit ?? ""} (${it.live_agreed_contract_months ?? "?"} mnd)`);
     }
     lines.push("");
     lines.push(`Total estimert besparelse: ${formatNok(totalSavings)}/år`);
+    if (credentials) {
+      lines.push("");
+      lines.push(`Bekreftelses-lenke: ${credentials.url}`);
+      lines.push(`Passord (send i separat e-post): ${credentials.password}`);
+    }
     return lines.join("\n");
   }
 
