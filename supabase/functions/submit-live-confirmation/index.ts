@@ -116,6 +116,13 @@ Deno.serve(async (req) => {
       .in("live_status", ["tentatively_agreed"]);
     const allDone = (pending?.length ?? 0) === 0;
     if (allDone) {
+      // Check auto-apply flag
+      const { data: negRow } = await admin
+        .from("negotiations")
+        .select("live_auto_apply_on_confirm")
+        .eq("id", negotiationId)
+        .maybeSingle();
+
       await admin
         .from("negotiations")
         .update({ status: "concluded", concluded_at: now } as any)
@@ -124,6 +131,46 @@ Deno.serve(async (req) => {
         negotiation_id: negotiationId,
         event_type: "all_confirmed",
       } as any);
+
+      if (negRow?.live_auto_apply_on_confirm) {
+        // Build outcomes from confirmed items
+        const { data: confItems } = await admin
+          .from("negotiation_items")
+          .select(
+            "id, raw_material_id, live_agreed_price, live_agreed_package_size, live_agreed_package_unit, live_agreed_price_per_base_unit",
+          )
+          .eq("negotiation_id", negotiationId)
+          .eq("live_status", "confirmed");
+        const { data: rec } = await admin
+          .from("negotiation_recipients")
+          .select("id")
+          .eq("negotiation_id", negotiationId)
+          .limit(1)
+          .maybeSingle();
+        const outcomes = (confItems ?? []).map((it: any) => ({
+          negotiation_item_id: it.id,
+          winner_recipient_id: rec?.id ?? null,
+          winner_response_id: null,
+          agreed_price: it.live_agreed_price_per_base_unit ?? it.live_agreed_price,
+          agreed_package_size: it.live_agreed_package_size,
+          agreed_package_unit: it.live_agreed_package_unit,
+          set_as_primary: false,
+          apply_to_supplier: true,
+        }));
+        try {
+          const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+          await fetch(`${supabaseUrl}/functions/v1/apply-negotiation-outcome`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!}`,
+            },
+            body: JSON.stringify({ negotiation_id: negotiationId, outcomes }),
+          });
+        } catch (e) {
+          console.error("auto-apply failed", e);
+        }
+      }
     }
 
     return new Response(JSON.stringify({ success: true, all_confirmed: allDone }), {
