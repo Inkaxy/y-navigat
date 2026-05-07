@@ -991,6 +991,7 @@ function MatrixGrid({
                   const cellHasData = hasData(key);
                   const pause = isPaused(pauseMap, c.date, c.tour.id);
                   const ghost = !value && !pause ? ghostMap?.get(key) : undefined;
+                  const fb = isFallback(key);
                   return (
                     <td
                       key={key}
@@ -998,8 +999,15 @@ function MatrixGrid({
                         "group relative border-b border-r border-border p-0",
                         dirty && "bg-warning/10",
                         pause && "bg-sky-50 dark:bg-sky-950/30",
+                        fb && "outline outline-2 -outline-offset-2 outline-destructive/70",
                       )}
-                      title={pause ? (pause.reason ? `Leveransepause: ${pause.reason}` : "Leveransepause") : undefined}
+                      title={
+                        fb
+                          ? "Pris ikke funnet — mangler prisliste-rad eller spesialpris"
+                          : pause
+                            ? pause.reason ? `Leveransepause: ${pause.reason}` : "Leveransepause"
+                            : undefined
+                      }
                     >
                       <Input
                         type="text"
