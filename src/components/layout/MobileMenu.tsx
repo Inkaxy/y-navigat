@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { Menu, Search, X } from "lucide-react";
 import {
   Sheet,
@@ -12,6 +12,7 @@ import { CompanyBlock } from "./CompanyBlock";
 import { AppTabs } from "./AppTabs";
 import { OutletSelector } from "./OutletSelector";
 import { UserMenu } from "./UserMenu";
+import { MobileAppWheel } from "./MobileAppWheel";
 
 interface Props {
   onOpenPalette: () => void;
@@ -19,8 +20,7 @@ interface Props {
 
 export function MobileMenu({ onOpenPalette }: Props) {
   const [open, setOpen] = useState(false);
-  const navigate = useNavigate();
-  const { pathname } = useLocation();
+  const { pathname: _pathname } = useLocation();
 
   return (
     <div className="flex w-full items-center justify-between md:hidden">
@@ -85,14 +85,7 @@ export function MobileMenu({ onOpenPalette }: Props) {
         </SheetContent>
       </Sheet>
 
-      <button
-        type="button"
-        onClick={() => navigate("/")}
-        className="text-sm font-semibold tracking-tight text-ink-primary"
-        aria-label="Hjem"
-      >
-        NBHub
-      </button>
+      <MobileAppWheel />
 
       <button
         type="button"
