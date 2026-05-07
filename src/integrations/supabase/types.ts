@@ -7354,7 +7354,12 @@ export type Database = {
         }[]
       }
       get_customer_unit_price: {
-        Args: { p_customer_id: string; p_date?: string; p_product_id: string }
+        Args: {
+          p_caller?: string
+          p_customer_id: string
+          p_date?: string
+          p_product_id: string
+        }
         Returns: {
           is_fallback: boolean
           price_list_id: string
@@ -7366,6 +7371,7 @@ export type Database = {
       }
       get_customer_unit_prices_batch: {
         Args: {
+          p_caller?: string
           p_customer_id: string
           p_date?: string
           p_product_ids: string[]
