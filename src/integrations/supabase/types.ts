@@ -7296,6 +7296,13 @@ export type Database = {
           entity: string
         }[]
       }
+      delete_matrix_column: {
+        Args: { p_customer_id: string; p_date: string; p_tour_id: string }
+        Returns: {
+          lines_deleted: number
+          order_deleted: boolean
+        }[]
+      }
       extract_legal_entity_id_from_path: {
         Args: { path: string }
         Returns: string
@@ -7888,6 +7895,15 @@ export type Database = {
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
       unaccent: { Args: { "": string }; Returns: string }
+      upsert_matrix_column_comment: {
+        Args: {
+          p_comment: string
+          p_customer_id: string
+          p_date: string
+          p_tour_id: string
+        }
+        Returns: string
+      }
       user_has_invoice_access: { Args: never; Returns: boolean }
       verify_gtin: { Args: { p_gtin: string }; Returns: boolean }
     }
