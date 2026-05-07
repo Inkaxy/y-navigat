@@ -287,7 +287,7 @@ export default function ForhandlingDetail() {
             })}
           </tbody>
         </table>
-      </Card>
+      </Card>}
 
       <ConcludeDialog
         open={concludeOpen}
@@ -305,7 +305,111 @@ export default function ForhandlingDetail() {
           toast.success("Forhandling avsluttet");
         }}
       />
+
+      {isLive && (
+        <LiveTidslinjeDrawer
+          open={timelineOpen}
+          onOpenChange={setTimelineOpen}
+          negotiationId={id}
+          rmName={rmName}
+          itemRawMaterialMap={new Map(items.map((i) => [i.id, i.raw_material_id]))}
+        />
+      )}
     </div>
+  );
+}
+
+function LiveConfirmationStatus({ neg, items, recipients, rmName, supName, activating, onActivate }: any) {
+  const tentative = items.filter((i: any) => i.live_status === "tentatively_agreed");
+  const confirmed = items.filter((i: any) => i.live_status === "confirmed");
+  const disputed = items.filter((i: any) => i.live_supplier_note && i.live_status === "tentatively_agreed");
+  const unconfActive = items.filter((i: any) => i.live_status === "unconfirmed_active");
+  const total = tentative.length + confirmed.length + unconfActive.length;
+  const recipient = recipients[0];
+  const deadline = neg.live_confirmation_deadline;
+  const overdue = deadline && new Date(deadline) < new Date();
+  const allConfirmed = tentative.length === 0;
+
+  const mailtoBody = encodeURIComponent(
+    `Hei,\n\nVennligst bekreft de avtalte prisene fra forhandlingen vår.\n\nFrist: ${deadline ? new Date(deadline).toLocaleDateString("nb-NO") : "—"}\n\nMvh.`
+  );
+  const mailtoSubject = encodeURIComponent(`Påminnelse: Bekreft forhandling - ${neg.title}`);
+
+  return (
+    <Card className="space-y-4 p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-xs uppercase tracking-wide text-ink-secondary">Bekreftelses-status</p>
+          <p className="mt-1 text-lg font-semibold">
+            {confirmed.length} av {total} bekreftet
+            {disputed.length > 0 && <span className="ml-2 text-warning">· {disputed.length} med innsigelse</span>}
+          </p>
+          {deadline && (
+            <p className={`mt-0.5 text-xs ${overdue ? "text-destructive" : "text-ink-secondary"}`}>
+              <Clock className="mr-1 inline h-3 w-3" />
+              Frist: {new Date(deadline).toLocaleDateString("nb-NO")}{overdue ? " (utløpt)" : ""}
+            </p>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {recipient?.contact_email && !allConfirmed && (
+            <Button asChild size="sm" variant="outline">
+              <a href={`mailto:${recipient.contact_email}?subject=${mailtoSubject}&body=${mailtoBody}`}>
+                <Send className="mr-1.5 h-4 w-4" /> Send påminnelse
+              </a>
+            </Button>
+          )}
+          {confirmed.length > 0 && tentative.length > 0 && neg.status !== "concluded" && (
+            <Button size="sm" variant="outline" onClick={() => onActivate(true)} disabled={activating}>
+              {activating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Aktiver kun bekreftede ({confirmed.length})
+            </Button>
+          )}
+          {tentative.length > 0 && neg.status !== "concluded" && (
+            <Button size="sm" onClick={() => onActivate(false)} disabled={activating}>
+              {activating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Aktiver alle uansett
+            </Button>
+          )}
+        </div>
+      </div>
+
+      <ul className="divide-y divide-line-subtle">
+        {[...confirmed, ...tentative, ...unconfActive].map((it: any) => {
+          const isConfirmed = it.live_status === "confirmed";
+          const isUnconf = it.live_status === "unconfirmed_active";
+          const hasDispute = !!it.live_supplier_note;
+          return (
+            <li key={it.id} className="flex items-start justify-between gap-3 py-2 text-sm">
+              <div className="flex items-start gap-2">
+                {isConfirmed ? (
+                  <FileCheck className="mt-0.5 h-4 w-4 text-success" />
+                ) : isUnconf || hasDispute ? (
+                  <AlertTriangle className="mt-0.5 h-4 w-4 text-warning" />
+                ) : (
+                  <Clock className="mt-0.5 h-4 w-4 text-ink-muted" />
+                )}
+                <div>
+                  <div className="font-medium">{rmName(it.raw_material_id)}</div>
+                  {it.live_supplier_note && (
+                    <div className="text-xs text-warning">"{it.live_supplier_note}"</div>
+                  )}
+                  {it.live_datasheet_path && (
+                    <div className="text-xs text-ink-muted">📎 Datablad mottatt</div>
+                  )}
+                  {it.live_datasheet_skipped && (
+                    <div className="text-xs text-ink-muted">Datablad sendes separat</div>
+                  )}
+                </div>
+              </div>
+              <div className="text-xs text-ink-secondary">
+                {isConfirmed ? "Bekreftet" : isUnconf ? "Aktivert uten bekreftelse" : "Venter"}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </Card>
   );
 }
 
