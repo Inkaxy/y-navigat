@@ -78,9 +78,16 @@ export default function OrdersList() {
   const [tourIds, setTourIds] = useState<string[]>([]);
   const [page, setPage] = useState(0);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [acceptanceOnly, setAcceptanceOnly] = useState(false);
+  const [acceptIntent, setAcceptIntent] = useState<{
+    intent: StatusChangeIntent;
+    row: OrderListRow;
+  } | null>(null);
 
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const { data: tours = [] } = useDeliveryTours();
+  const { data: queueCount = 0 } = useAcceptanceQueueCount();
   const tourMap = useMemo(() => new Map(tours.map((t) => [t.id, t])), [tours]);
 
   // B.3 — Deselect ved filter-endring (unngår skjulte valg som overrasker bulk-ops)
