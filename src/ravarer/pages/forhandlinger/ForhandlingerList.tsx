@@ -1,11 +1,13 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Loader2, Handshake } from "lucide-react";
+import { Plus, Loader2, Handshake, Radio } from "lucide-react";
 import { RavarerHeaderBanner } from "@/ravarer/components/RavarerHeaderBanner";
 import { useNegotiations, type NegotiationStatus } from "@/ravarer/hooks/useNegotiations";
 import { formatDate } from "@/ravarer/lib/constants";
+import NewNegotiationTypeDialog from "./NewNegotiationTypeDialog";
 
 const STATUS_META: Record<NegotiationStatus, { label: string; cls: string }> = {
   draft: { label: "Kladd", cls: "border-line-strong bg-surface-muted text-ink-secondary" },
@@ -17,7 +19,16 @@ const STATUS_META: Record<NegotiationStatus, { label: string; cls: string }> = {
 
 export default function ForhandlingerList() {
   const navigate = useNavigate();
+  const [pickerOpen, setPickerOpen] = useState(false);
   const { data: rows = [], isLoading } = useNegotiations();
+
+  function openNegotiation(n: any) {
+    if (n.negotiation_mode === "live" && n.status !== "concluded" && n.status !== "cancelled") {
+      navigate(`/ravarer/forhandlinger/live/${n.id}`);
+    } else {
+      navigate(`/ravarer/forhandlinger/${n.id}`);
+    }
+  }
 
   return (
     <div className="mx-auto max-w-[1280px] space-y-6 p-6">
@@ -25,7 +36,7 @@ export default function ForhandlingerList() {
         title="Forhandlinger"
         subtitle="Forbered, send og sammenlign tilbud fra leverandører"
         actions={
-          <Button size="sm" className="rounded-full" onClick={() => navigate("/ravarer/forhandlinger/ny")}>
+          <Button size="sm" className="rounded-full" onClick={() => setPickerOpen(true)}>
             <Plus className="mr-1.5 h-4 w-4" />
             Ny forhandling
           </Button>
@@ -44,9 +55,9 @@ export default function ForhandlingerList() {
             </div>
             <div>
               <p className="font-medium text-ink-primary">Ingen forhandlinger ennå</p>
-              <p className="text-sm text-ink-secondary">Kom i gang med din første RFQ.</p>
+              <p className="text-sm text-ink-secondary">Kom i gang med din første forhandling.</p>
             </div>
-            <Button size="sm" className="rounded-full" onClick={() => navigate("/ravarer/forhandlinger/ny")}>
+            <Button size="sm" className="rounded-full" onClick={() => setPickerOpen(true)}>
               <Plus className="mr-1.5 h-4 w-4" />
               Ny forhandling
             </Button>
@@ -56,6 +67,7 @@ export default function ForhandlingerList() {
             <thead className="bg-surface-muted/50 text-xs uppercase tracking-wide text-ink-secondary">
               <tr>
                 <th className="px-4 py-3 text-left">Tittel</th>
+                <th className="px-4 py-3 text-left">Type</th>
                 <th className="px-4 py-3 text-left">Status</th>
                 <th className="px-4 py-3 text-left">Frist</th>
                 <th className="px-4 py-3 text-left">Opprettet</th>
@@ -65,10 +77,19 @@ export default function ForhandlingerList() {
               {rows.map((n) => (
                 <tr
                   key={n.id}
-                  onClick={() => navigate(`/ravarer/forhandlinger/${n.id}`)}
+                  onClick={() => openNegotiation(n)}
                   className="cursor-pointer border-t border-line-subtle hover:bg-surface-muted/40"
                 >
                   <td className="px-4 py-3 font-medium text-ink-primary">{n.title}</td>
+                  <td className="px-4 py-3">
+                    {n.negotiation_mode === "live" ? (
+                      <Badge variant="outline" className="border-warning/30 bg-warning/10 text-warning">
+                        <Radio className="mr-1 h-3 w-3" /> Live
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline">RFQ</Badge>
+                    )}
+                  </td>
                   <td className="px-4 py-3">
                     <Badge variant="outline" className={STATUS_META[n.status].cls}>
                       {STATUS_META[n.status].label}
@@ -82,6 +103,8 @@ export default function ForhandlingerList() {
           </table>
         )}
       </Card>
+
+      <NewNegotiationTypeDialog open={pickerOpen} onOpenChange={setPickerOpen} />
     </div>
   );
 }
