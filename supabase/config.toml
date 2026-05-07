@@ -15,3 +15,6 @@ verify_jwt = false
 
 [functions.request-live-datasheet-upload]
 verify_jwt = false
+
+[functions.request-rfq-datasheet-upload]
+verify_jwt = false

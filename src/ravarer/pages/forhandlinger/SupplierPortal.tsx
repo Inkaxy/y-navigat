@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Lock, Send, Save, AlertTriangle } from "lucide-react";
+import { Loader2, Lock, Send, Save, AlertTriangle, Upload, FileText, X } from "lucide-react";
 import { toast } from "sonner";
 
 type Item = {
@@ -30,6 +30,7 @@ type ResponseRow = {
   payment_terms?: string | null;
   delivery_terms?: string | null;
   notes?: string | null;
+  datasheet_url?: string | null;
   status?: string;
 };
 
@@ -83,6 +84,34 @@ export default function SupplierPortal() {
 
   function update(itemId: string, field: keyof ResponseRow, value: any) {
     setResponses((prev) => ({ ...prev, [itemId]: { ...prev[itemId], [field]: value } }));
+  }
+
+  async function handleUpload(itemId: string, file: File) {
+    try {
+      const res = await fetch(`${FN_BASE}/request-rfq-datasheet-upload`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, password, negotiation_item_id: itemId, filename: file.name }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.result !== "ok") {
+        toast.error("Kunne ikke starte opplasting");
+        return;
+      }
+      const put = await fetch(data.signedUrl ?? data.signed_url, {
+        method: "PUT",
+        headers: { "Content-Type": file.type || "application/pdf" },
+        body: file,
+      });
+      if (!put.ok) {
+        toast.error("Opplasting feilet");
+        return;
+      }
+      update(itemId, "datasheet_url", data.path);
+      toast.success(`Lastet opp: ${file.name}`);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Opplasting feilet");
+    }
   }
 
   async function save(finalize: boolean) {
@@ -224,6 +253,41 @@ export default function SupplierPortal() {
                   <Label>Leveringsbetingelser</Label>
                   <Input disabled={submitted} value={r.delivery_terms ?? ""}
                     onChange={(e) => update(it.id, "delivery_terms", e.target.value)} placeholder="DDP, 1 lev/uke" />
+                </div>
+                <div className="sm:col-span-2">
+                  <Label>Datablad / deklarasjon / næringsinnhold (PDF)</Label>
+                  {r.datasheet_url ? (
+                    <div className="mt-1 flex items-center justify-between rounded-md border border-line-subtle bg-surface-subtle px-3 py-2 text-sm">
+                      <span className="flex items-center gap-2 truncate">
+                        <FileText className="h-4 w-4 text-ink-secondary" />
+                        <span className="truncate">{r.datasheet_url.split("/").pop()}</span>
+                      </span>
+                      {!submitted && (
+                        <Button variant="ghost" size="sm" onClick={() => update(it.id, "datasheet_url", null)}>
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  ) : (
+                    <label className={`mt-1 flex cursor-pointer items-center gap-2 rounded-md border border-dashed border-line-subtle px-3 py-3 text-sm text-ink-secondary hover:bg-surface-subtle ${submitted ? "pointer-events-none opacity-50" : ""}`}>
+                      <Upload className="h-4 w-4" />
+                      <span>Last opp PDF</span>
+                      <input
+                        type="file"
+                        accept="application/pdf"
+                        className="hidden"
+                        disabled={submitted}
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) handleUpload(it.id, f);
+                          e.target.value = "";
+                        }}
+                      />
+                    </label>
+                  )}
+                  <p className="mt-1 text-xs text-ink-secondary">
+                    Vedlegg datablad med deklarasjon, næringsinnhold og allergener for tilbudt vare.
+                  </p>
                 </div>
                 <div className="sm:col-span-2">
                   <Label>Notater</Label>
