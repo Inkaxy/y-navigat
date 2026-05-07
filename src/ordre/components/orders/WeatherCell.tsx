@@ -60,19 +60,26 @@ type Props = {
 
 export function WeatherCell({ forecast, emptyReason }: Props) {
   if (!forecast) {
-    if (emptyReason) {
-      return (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <div className="flex items-center justify-center text-[11px] font-medium text-muted-foreground/60">
-              <span aria-hidden>—</span>
-            </div>
-          </TooltipTrigger>
-          <TooltipContent side="top">{emptyReason}</TooltipContent>
-        </Tooltip>
-      );
-    }
-    return <div className="h-5" aria-hidden />;
+    const isExpectedEmpty = !!emptyReason;
+    const glyph = isExpectedEmpty ? "—" : "?";
+    const tooltip = isExpectedEmpty
+      ? emptyReason!
+      : "Værvarsel ikke lastet — sjekk kunde-koordinater";
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div
+            className={
+              "flex items-center justify-center text-[11px] font-medium " +
+              (isExpectedEmpty ? "text-muted-foreground/60" : "text-amber-600 dark:text-amber-400")
+            }
+          >
+            <span aria-hidden>{glyph}</span>
+          </div>
+        </TooltipTrigger>
+        <TooltipContent side="top">{tooltip}</TooltipContent>
+      </Tooltip>
+    );
   }
   const Icon = iconFor(forecast.symbolCode);
   const label = labelFor(forecast.symbolCode);

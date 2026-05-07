@@ -32,7 +32,7 @@ export function useNBCustomers(search?: string) {
       let q = supabase
         .from("customers")
         .select(
-          "id, customer_number, display_name, organization_number, primary_contact_name, primary_contact_email, delivery_address_line1, delivery_address_line2, delivery_postal_code, delivery_city, delivery_country, delivery_instructions, credit_hold, credit_hold_reason, invoice_recipient_customer_id, default_price_list_id, status",
+          "id, customer_number, display_name, organization_number, primary_contact_name, primary_contact_email, delivery_address_line1, delivery_address_line2, delivery_postal_code, delivery_city, delivery_country, delivery_instructions, credit_hold, credit_hold_reason, invoice_recipient_customer_id, default_price_list_id, status, geocode_latitude, geocode_longitude",
         )
         .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
         .eq("status", "active")
@@ -65,7 +65,7 @@ export function useCustomerById(id: string | null | undefined) {
       const { data, error } = await supabase
         .from("customers")
         .select(
-          "id, customer_number, display_name, organization_number, primary_contact_name, primary_contact_email, delivery_address_line1, delivery_address_line2, delivery_postal_code, delivery_city, delivery_country, delivery_instructions, credit_hold, credit_hold_reason, invoice_recipient_customer_id, default_price_list_id, status",
+          "id, customer_number, display_name, organization_number, primary_contact_name, primary_contact_email, delivery_address_line1, delivery_address_line2, delivery_postal_code, delivery_city, delivery_country, delivery_instructions, credit_hold, credit_hold_reason, invoice_recipient_customer_id, default_price_list_id, status, geocode_latitude, geocode_longitude",
         )
         .eq("id", id!)
         .maybeSingle();
