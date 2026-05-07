@@ -2390,8 +2390,13 @@ export type Database = {
           live_agreed_price: number | null
           live_agreed_price_per_base_unit: number | null
           live_agreed_price_unit: string | null
+          live_confirmed_at: string | null
+          live_confirmed_by_supplier: boolean
+          live_datasheet_path: string | null
+          live_datasheet_skipped: boolean
           live_notes: string | null
           live_status: string | null
+          live_supplier_note: string | null
           negotiation_id: string
           notes: string | null
           raw_material_id: string
@@ -2419,8 +2424,13 @@ export type Database = {
           live_agreed_price?: number | null
           live_agreed_price_per_base_unit?: number | null
           live_agreed_price_unit?: string | null
+          live_confirmed_at?: string | null
+          live_confirmed_by_supplier?: boolean
+          live_datasheet_path?: string | null
+          live_datasheet_skipped?: boolean
           live_notes?: string | null
           live_status?: string | null
+          live_supplier_note?: string | null
           negotiation_id: string
           notes?: string | null
           raw_material_id: string
@@ -2448,8 +2458,13 @@ export type Database = {
           live_agreed_price?: number | null
           live_agreed_price_per_base_unit?: number | null
           live_agreed_price_unit?: string | null
+          live_confirmed_at?: string | null
+          live_confirmed_by_supplier?: boolean
+          live_datasheet_path?: string | null
+          live_datasheet_skipped?: boolean
           live_notes?: string | null
           live_status?: string | null
+          live_supplier_note?: string | null
           negotiation_id?: string
           notes?: string | null
           raw_material_id?: string
@@ -2826,9 +2841,13 @@ export type Database = {
           created_by: string
           id: string
           legal_entity_id: string
+          live_auto_apply_on_confirm: boolean
+          live_confirmation_deadline: string | null
           live_facilitator_id: string | null
           live_location_format: string | null
+          live_send_reminder_after_days: number
           live_session_ended_at: string | null
+          live_session_paused: boolean
           live_session_started_at: string | null
           negotiation_mode: string
           notes: string | null
@@ -2849,9 +2868,13 @@ export type Database = {
           created_by?: string
           id?: string
           legal_entity_id: string
+          live_auto_apply_on_confirm?: boolean
+          live_confirmation_deadline?: string | null
           live_facilitator_id?: string | null
           live_location_format?: string | null
+          live_send_reminder_after_days?: number
           live_session_ended_at?: string | null
+          live_session_paused?: boolean
           live_session_started_at?: string | null
           negotiation_mode?: string
           notes?: string | null
@@ -2872,9 +2895,13 @@ export type Database = {
           created_by?: string
           id?: string
           legal_entity_id?: string
+          live_auto_apply_on_confirm?: boolean
+          live_confirmation_deadline?: string | null
           live_facilitator_id?: string | null
           live_location_format?: string | null
+          live_send_reminder_after_days?: number
           live_session_ended_at?: string | null
+          live_session_paused?: boolean
           live_session_started_at?: string | null
           negotiation_mode?: string
           notes?: string | null
