@@ -1186,6 +1186,13 @@ function MatrixGrid({
   hasCustomerCoords,
   ghostMap,
   pauseMap,
+  columnComments,
+  onColCopy,
+  onColComment,
+  onColDelete,
+  onColPackingNote,
+  colHasData,
+  canEdit,
 }: {
   columns: { date: string; tour: MatrixTour }[];
   products: MatrixProduct[];
@@ -1205,6 +1212,13 @@ function MatrixGrid({
   hasCustomerCoords: boolean;
   ghostMap: RecurringGhostMap | undefined;
   pauseMap: PauseMap | undefined;
+  columnComments: Map<string, string> | undefined;
+  onColCopy: (date: string, tour: MatrixTour) => void;
+  onColComment: (date: string, tour: MatrixTour) => void;
+  onColDelete: (date: string, tour: MatrixTour) => void;
+  onColPackingNote: (date: string, tour: MatrixTour) => void;
+  colHasData: (date: string, tourId: string) => boolean;
+  canEdit: boolean;
 }) {
   const dateGroups = useMemo(() => {
     const groups: { date: string; count: number }[] = [];
@@ -1261,6 +1275,8 @@ function MatrixGrid({
           <tr>
             {columns.map((c) => {
               const pause = isPaused(pauseMap, c.date, c.tour.id);
+              const hasComment = columnComments?.has(`${c.date}|${c.tour.id}`);
+              const colHas = colHasData(c.date, c.tour.id);
               return (
                 <th
                   key={`${c.date}-${c.tour.id}`}
@@ -1268,7 +1284,7 @@ function MatrixGrid({
                     "border-b border-r border-border px-1 py-1 text-center text-[11px] font-medium text-muted-foreground",
                     pause ? "bg-sky-100 dark:bg-sky-950/40" : "bg-card/80",
                   )}
-                  title={`${c.tour.display_name} (${c.tour.time_from.slice(0, 5)}–${c.tour.time_to.slice(0, 5)})${pause?.reason ? ` · Pause: ${pause.reason}` : pause ? " · Pause" : ""}`}
+                  title={`${c.tour.display_name} (${c.tour.time_from.slice(0, 5)}–${c.tour.time_to.slice(0, 5)})${pause?.reason ? ` · Pause: ${pause.reason}` : pause ? " · Pause" : ""}${hasComment ? `\nKommentar: ${columnComments?.get(`${c.date}|${c.tour.id}`)}` : ""}`}
                 >
                   <div>T{c.tour.tour_number}</div>
                   {pause && (
@@ -1276,6 +1292,20 @@ function MatrixGrid({
                       Pause
                     </div>
                   )}
+                  <div className="mt-1 flex items-center justify-center gap-0.5">
+                    <button type="button" disabled={!canEdit || !colHas} onClick={() => onColCopy(c.date, c.tour)} className="rounded p-0.5 text-muted-foreground/70 hover:bg-accent hover:text-foreground disabled:opacity-30" title="Kopier kolonne">
+                      <Copy className="h-3 w-3" />
+                    </button>
+                    <button type="button" disabled={!canEdit} onClick={() => onColComment(c.date, c.tour)} className={cn("rounded p-0.5 hover:bg-accent disabled:opacity-30", hasComment ? "text-primary" : "text-muted-foreground/70 hover:text-foreground")} title={hasComment ? "Rediger kommentar" : "Legg til kommentar"}>
+                      <MessageSquare className="h-3 w-3" />
+                    </button>
+                    <button type="button" disabled={!canEdit || !colHas} onClick={() => onColDelete(c.date, c.tour)} className="rounded p-0.5 text-muted-foreground/70 hover:bg-destructive/10 hover:text-destructive disabled:opacity-30" title="Slett kolonne">
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                    <button type="button" disabled={!colHas} onClick={() => onColPackingNote(c.date, c.tour)} className="rounded p-0.5 text-muted-foreground/70 hover:bg-accent hover:text-foreground disabled:opacity-30" title="Lag pakkseddel">
+                      <PackageCheck className="h-3 w-3" />
+                    </button>
+                  </div>
                 </th>
               );
             })}
