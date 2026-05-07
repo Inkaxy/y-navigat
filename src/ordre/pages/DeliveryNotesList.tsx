@@ -142,7 +142,7 @@ export default function DeliveryNotesList() {
                     // ikke naviger hvis brukeren klikker checkboks-cellen
                     const target = e.target as HTMLElement;
                     if (target.closest("[data-row-checkbox]")) return;
-                    navigate(`/pakksedler/${r.id}`);
+                    navigate(`/ordre/pakksedler/${r.id}`);
                   }}
                 >
                   <TableCell data-row-checkbox onClick={(e) => e.stopPropagation()}>

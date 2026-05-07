@@ -53,7 +53,7 @@ export default function DeliveryNoteSettings() {
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-6 space-y-6">
       <div>
-        <Link to="/pakksedler">
+        <Link to="/ordre/pakksedler">
           <Button variant="ghost" size="sm" className="gap-1">
             <ArrowLeft className="h-4 w-4" /> Tilbake
           </Button>

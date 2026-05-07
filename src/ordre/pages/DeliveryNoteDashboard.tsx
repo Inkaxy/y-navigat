@@ -188,7 +188,7 @@ export default function DeliveryNoteDashboard() {
       classes: "bg-yellow-200 text-yellow-950 hover:bg-yellow-300",
       span: 1,
       onClick: () =>
-        navigate(`/pakksedler/liste?date=${date}&tour=${tourId}&type=fast`),
+        navigate(`/ordre/pakksedler/liste?date=${date}&tour=${tourId}&type=fast`),
     },
     {
       key: "datert",
@@ -198,7 +198,7 @@ export default function DeliveryNoteDashboard() {
         "bg-background border border-border text-foreground hover:bg-muted",
       span: 1,
       onClick: () =>
-        navigate(`/pakksedler/liste?date=${date}&tour=${tourId}&type=datert`),
+        navigate(`/ordre/pakksedler/liste?date=${date}&tour=${tourId}&type=datert`),
     },
     {
       key: "retur",
@@ -207,7 +207,7 @@ export default function DeliveryNoteDashboard() {
       classes: "bg-purple-200 text-purple-950 hover:bg-purple-300",
       span: 1,
       onClick: () =>
-        navigate(`/pakksedler/liste?date=${date}&tour=${tourId}&type=retur`),
+        navigate(`/ordre/pakksedler/liste?date=${date}&tour=${tourId}&type=retur`),
     },
     {
       key: "pakk",
@@ -217,7 +217,7 @@ export default function DeliveryNoteDashboard() {
       classes:
         "bg-[hsl(var(--status-confirmed))] text-white hover:brightness-110 ring-1 ring-[hsl(var(--status-confirmed))]/40",
       span: 2,
-      onClick: () => navigate(`/pakksedler/liste?date=${date}&tour=${tourId}`),
+      onClick: () => navigate(`/ordre/pakksedler/liste?date=${date}&tour=${tourId}`),
     },
   ];
 
@@ -417,7 +417,7 @@ export default function DeliveryNoteDashboard() {
                   Skriv ut kundeordrer
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  onSelect={() => navigate(`/pakksedler/korrigeringer?date=${date}`)}
+                  onSelect={() => navigate(`/ordre/pakksedler/korrigeringer?date=${date}`)}
                 >
                   Se korrigeringer
                 </DropdownMenuItem>
@@ -426,10 +426,10 @@ export default function DeliveryNoteDashboard() {
                 <DropdownMenuItem disabled title="Kommer senere">
                   Kalkulere priser på nytt
                 </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => navigate("/pakksedler/innstillinger")}>
+                <DropdownMenuItem onSelect={() => navigate("/ordre/pakksedler/innstillinger")}>
                   Innstillinger
                 </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => navigate("/turer")}>
+                <DropdownMenuItem onSelect={() => navigate("/ordre/turer")}>
                   Turnavn
                 </DropdownMenuItem>
                 <DropdownMenuItem disabled title="Kommer senere">

@@ -43,7 +43,7 @@ export function RunStatusBanner({ legalEntityId, date, className }: Props) {
         Hovedkjøring er kjørt for turer: <span className="font-semibold">{tourLabel}</span>
       </span>
       <Link
-        to={`/pakksedler/liste?date=${date}&tour=all`}
+        to={`/ordre/pakksedler/liste?date=${date}&tour=all`}
         aria-label="Se pakksedler"
         className="rounded p-1 text-green-900 hover:bg-green-100"
       >

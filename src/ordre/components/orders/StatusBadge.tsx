@@ -1,5 +1,5 @@
 import { getStatusMeta } from "@/ordre/lib/orderStatus";
-import { StatusPill } from "@/components/ui/status-pill";
+import { StatusPill } from "@/ordre/components/ui/status-pill";
 
 /**
  * StatusBadge (ordre-domenet) — wrapper rundt delt <StatusPill>.
