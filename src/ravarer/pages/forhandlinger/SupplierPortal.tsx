@@ -30,6 +30,7 @@ type ResponseRow = {
   payment_terms?: string | null;
   delivery_terms?: string | null;
   notes?: string | null;
+  datasheet_url?: string | null;
   status?: string;
 };
 
