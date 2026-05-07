@@ -151,6 +151,39 @@ export default function LiveForhandlingWorkspace() {
     }
   }
 
+  async function handleTogglePause() {
+    setPausing(true);
+    try {
+      const next = !isPaused;
+      await updateNeg.mutateAsync({
+        id,
+        patch: { live_session_paused: next } as any,
+      });
+      await logEvent.mutateAsync({
+        negotiation_id: id,
+        event_type: next ? "session_paused" : "session_resumed",
+      });
+    } catch (e: any) {
+      toast.error(e?.message ?? "Kunne ikke pause");
+    } finally {
+      setPausing(false);
+    }
+  }
+
+  async function handleReopen(itemId: string) {
+    await updateItem.mutateAsync({
+      id: itemId,
+      negotiation_id: id,
+      patch: { live_status: "discussing" },
+    });
+    await logEvent.mutateAsync({
+      negotiation_id: id,
+      negotiation_item_id: itemId,
+      event_type: "item_reopened",
+    });
+    setActiveId(itemId);
+  }
+
   async function handleEndSession() {
     setEnding(true);
     try {
@@ -162,6 +195,7 @@ export default function LiveForhandlingWorkspace() {
           status: "awaiting_confirmation",
           live_session_ended_at: new Date().toISOString(),
           live_confirmation_deadline: deadline,
+          live_auto_apply_on_confirm: autoApply,
         } as any,
       });
       // Generate supplier credentials (reuses RFQ token mechanism)
