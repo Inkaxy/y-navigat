@@ -212,6 +212,27 @@ export default function OrdersList() {
           {isFetching && !isLoading && (
             <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
           )}
+          <Button
+            type="button"
+            variant={acceptanceOnly ? "default" : "outline"}
+            size="sm"
+            onClick={() => {
+              setAcceptanceOnly((v) => !v);
+              setPage(0);
+            }}
+            className="ml-2 h-7 gap-1.5 px-2 text-caption"
+          >
+            <Inbox className="h-3.5 w-3.5" />
+            Aksept-kø
+            {queueCount > 0 && (
+              <Badge
+                variant={acceptanceOnly ? "secondary" : "default"}
+                className="h-4 px-1 font-mono text-[10px]"
+              >
+                {queueCount}
+              </Badge>
+            )}
+          </Button>
           {activeFilterCount > 0 && (
             <Button
               variant="ghost"
