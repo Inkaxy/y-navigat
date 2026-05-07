@@ -41,9 +41,16 @@ export function useEmailTemplates() {
   const saveTemplate = async (id: string, patch: Partial<Pick<EmailTemplate, "subject_template" | "body_html_template" | "body_text_template" | "is_active">>) => {
     setSaving(true);
     const { data: u } = await supabase.auth.getUser();
+    const normalized: typeof patch & { updated_by?: string } = { ...patch, updated_by: u.user?.id };
+    if ("body_text_template" in normalized) {
+      const v = normalized.body_text_template;
+      if (typeof v === "string" && v.trim() === "") {
+        (normalized as Record<string, unknown>).body_text_template = null;
+      }
+    }
     const { error } = await supabase
       .from("email_templates")
-      .update({ ...patch, updated_by: u.user?.id })
+      .update(normalized as never)
       .eq("id", id);
     setSaving(false);
     if (error) {

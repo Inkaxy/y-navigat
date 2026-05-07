@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
+import DOMPurify from "dompurify";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Mail, ShieldCheck, FileText, AlertCircle, CheckCircle2 } from "lucide-react";
 import { useOrdreEmailSettings } from "@/ordre/hooks/useOrdreEmailSettings";
 import { useEmailTemplates } from "@/ordre/hooks/useEmailTemplates";
@@ -140,16 +142,25 @@ export default function OrdreInnstillingerPage() {
   );
 }
 
+function renderTemplate(tpl: string, vars: Record<string, string>): string {
+  return tpl.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (match, key) => {
+    return Object.prototype.hasOwnProperty.call(vars, key) ? vars[key] : match;
+  });
+}
+
 function TemplateEditorCard() {
   const { templates, loading, saving, saveTemplate } = useEmailTemplates();
   const [selectedId, setSelectedId] = useState<string>("");
   const [subjectDraft, setSubjectDraft] = useState("");
   const [bodyDraft, setBodyDraft] = useState("");
+  const [textDraft, setTextDraft] = useState("");
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
+  const textRef = useRef<HTMLTextAreaElement>(null);
+  const subjectRef = useRef<HTMLInputElement>(null);
+  const lastFocusedRef = useRef<"subject" | "body" | "text">("body");
 
   useEffect(() => {
-    if (!selectedId && templates.length) {
-      setSelectedId(templates[0].id);
-    }
+    if (!selectedId && templates.length) setSelectedId(templates[0].id);
   }, [templates, selectedId]);
 
   const selected = templates.find((t) => t.id === selectedId);
@@ -158,10 +169,67 @@ function TemplateEditorCard() {
     if (selected) {
       setSubjectDraft(selected.subject_template);
       setBodyDraft(selected.body_html_template);
+      setTextDraft(selected.body_text_template ?? "");
     }
   }, [selected]);
 
-  const dirty = selected && (subjectDraft !== selected.subject_template || bodyDraft !== selected.body_html_template);
+  const dirty = !!selected && (
+    subjectDraft !== selected.subject_template ||
+    bodyDraft !== selected.body_html_template ||
+    textDraft !== (selected.body_text_template ?? "")
+  );
+
+  const exampleVars = useMemo(() => {
+    const out: Record<string, string> = {};
+    selected?.available_variables?.forEach((v) => {
+      out[v.key] = v.example ?? `{{${v.key}}}`;
+    });
+    return out;
+  }, [selected]);
+
+  const renderedSubject = useMemo(() => renderTemplate(subjectDraft, exampleVars), [subjectDraft, exampleVars]);
+  const renderedHtml = useMemo(
+    () => DOMPurify.sanitize(renderTemplate(bodyDraft, exampleVars), { USE_PROFILES: { html: true } }),
+    [bodyDraft, exampleVars]
+  );
+  const renderedText = useMemo(() => renderTemplate(textDraft, exampleVars), [textDraft, exampleVars]);
+
+  const insertVariable = (key: string) => {
+    const token = `{{${key}}}`;
+    const target = lastFocusedRef.current;
+    if (target === "subject") {
+      const el = subjectRef.current;
+      if (!el) return;
+      const start = el.selectionStart ?? subjectDraft.length;
+      const end = el.selectionEnd ?? subjectDraft.length;
+      const next = subjectDraft.slice(0, start) + token + subjectDraft.slice(end);
+      setSubjectDraft(next);
+      requestAnimationFrame(() => {
+        el.focus();
+        el.setSelectionRange(start + token.length, start + token.length);
+      });
+    } else if (target === "text") {
+      const el = textRef.current;
+      const start = el?.selectionStart ?? textDraft.length;
+      const end = el?.selectionEnd ?? textDraft.length;
+      const next = textDraft.slice(0, start) + token + textDraft.slice(end);
+      setTextDraft(next);
+      requestAnimationFrame(() => {
+        el?.focus();
+        el?.setSelectionRange(start + token.length, start + token.length);
+      });
+    } else {
+      const el = bodyRef.current;
+      const start = el?.selectionStart ?? bodyDraft.length;
+      const end = el?.selectionEnd ?? bodyDraft.length;
+      const next = bodyDraft.slice(0, start) + token + bodyDraft.slice(end);
+      setBodyDraft(next);
+      requestAnimationFrame(() => {
+        el?.focus();
+        el?.setSelectionRange(start + token.length, start + token.length);
+      });
+    }
+  };
 
   return (
     <Card>
@@ -192,51 +260,115 @@ function TemplateEditorCard() {
             </div>
 
             {selected && (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor="subject">Emne</Label>
-                  <Input id="subject" value={subjectDraft} onChange={(e) => setSubjectDraft(e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="body">HTML-innhold</Label>
-                  <Textarea
-                    id="body"
-                    value={bodyDraft}
-                    onChange={(e) => setBodyDraft(e.target.value)}
-                    rows={12}
-                    className="font-mono text-xs"
-                  />
-                </div>
-                {selected.available_variables?.length > 0 && (
-                  <div className="rounded-md border bg-muted/40 p-3">
-                    <div className="text-xs font-medium mb-2">Tilgjengelige variabler</div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {selected.available_variables.map((v) => (
-                        <Badge key={v.key} variant="outline" className="font-mono text-xs" title={v.description}>
-                          {`{{${v.key}}}`}
-                        </Badge>
-                      ))}
-                    </div>
+              <Tabs defaultValue="edit" className="w-full">
+                <TabsList>
+                  <TabsTrigger value="edit">Rediger</TabsTrigger>
+                  <TabsTrigger value="preview">Forhåndsvisning</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="edit" className="space-y-3 mt-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="subject">Emne</Label>
+                    <Input
+                      id="subject"
+                      ref={subjectRef}
+                      value={subjectDraft}
+                      onChange={(e) => setSubjectDraft(e.target.value)}
+                      onFocus={() => (lastFocusedRef.current = "subject")}
+                    />
                   </div>
-                )}
-                <div className="flex gap-2">
-                  <Button
-                    onClick={() => void saveTemplate(selected.id, {
-                      subject_template: subjectDraft,
-                      body_html_template: bodyDraft,
-                    })}
-                    disabled={saving || !dirty}
-                  >
-                    Lagre mal
-                  </Button>
-                  <Button variant="ghost" onClick={() => {
-                    setSubjectDraft(selected.subject_template);
-                    setBodyDraft(selected.body_html_template);
-                  }} disabled={!dirty}>
-                    Tilbakestill
-                  </Button>
-                </div>
-              </>
+                  <div className="space-y-2">
+                    <Label htmlFor="body">HTML-innhold</Label>
+                    <Textarea
+                      id="body"
+                      ref={bodyRef}
+                      value={bodyDraft}
+                      onChange={(e) => setBodyDraft(e.target.value)}
+                      onFocus={() => (lastFocusedRef.current = "body")}
+                      rows={12}
+                      className="font-mono text-xs"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="text">Plain text-versjon (valgfri)</Label>
+                    <Textarea
+                      id="text"
+                      ref={textRef}
+                      value={textDraft}
+                      onChange={(e) => setTextDraft(e.target.value)}
+                      onFocus={() => (lastFocusedRef.current = "text")}
+                      rows={6}
+                      placeholder="Brukes som fallback for e-postklienter uten HTML-støtte og for tilgjengelighet"
+                      className="font-mono text-xs"
+                    />
+                  </div>
+
+                  {selected.available_variables?.length > 0 && (
+                    <div className="rounded-md border bg-muted/40 p-3">
+                      <div className="text-xs font-medium mb-2">Tilgjengelige variabler (klikk for å sette inn)</div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {selected.available_variables.map((v) => (
+                          <Badge
+                            key={v.key}
+                            variant="outline"
+                            className="font-mono text-xs cursor-pointer hover:bg-accent"
+                            title={v.description}
+                            onClick={() => insertVariable(v.key)}
+                          >
+                            {`{{${v.key}}}`}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={() => void saveTemplate(selected.id, {
+                        subject_template: subjectDraft,
+                        body_html_template: bodyDraft,
+                        body_text_template: textDraft,
+                      })}
+                      disabled={saving || !dirty}
+                    >
+                      Lagre mal
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      onClick={() => {
+                        setSubjectDraft(selected.subject_template);
+                        setBodyDraft(selected.body_html_template);
+                        setTextDraft(selected.body_text_template ?? "");
+                      }}
+                      disabled={!dirty}
+                    >
+                      Tilbakestill
+                    </Button>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="preview" className="space-y-4 mt-3">
+                  <div className="space-y-1">
+                    <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Emne (rendret)</div>
+                    <div className="rounded-md border bg-background p-3 text-sm">{renderedSubject}</div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">HTML (rendret)</div>
+                    <div
+                      className="rounded-md border bg-background p-4 text-sm prose prose-sm max-w-none"
+                      dangerouslySetInnerHTML={{ __html: renderedHtml }}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Plain text (rendret)</div>
+                    {renderedText.trim() ? (
+                      <pre className="rounded-md border bg-muted/40 p-3 text-sm font-mono whitespace-pre-wrap">{renderedText}</pre>
+                    ) : (
+                      <p className="text-sm text-muted-foreground italic">Ingen plain text-versjon definert.</p>
+                    )}
+                  </div>
+                </TabsContent>
+              </Tabs>
             )}
           </>
         )}
