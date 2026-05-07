@@ -809,14 +809,15 @@ export default function MatrixPage() {
   const hasCustomerCoords = customerLat != null && customerLon != null;
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col bg-background">
       <AppBanner
-        title="Matrise"
+        title="Leveringskalender"
         subtitle="Ukentlig ordre-inntasting per kunde — produkter × (dato, tur)"
         icon={Grid3x3}
       />
 
-      <div className="border-b border-border bg-card px-4 py-3 sm:px-6">
+      <div className="px-page py-4">
+        <div className="rounded-[14px] border border-brand-bronze/20 bg-card p-3 shadow-card ring-1 ring-inset ring-brand-cream/40">
         <div className="flex flex-wrap items-center gap-3">
           <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
             <PopoverTrigger asChild>
