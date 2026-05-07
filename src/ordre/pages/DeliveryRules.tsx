@@ -398,6 +398,7 @@ export default function DeliveryRules() {
         open={formOpen}
         onOpenChange={setFormOpen}
         rule={editing}
+        template={template}
         onSaved={refresh}
       />
 
