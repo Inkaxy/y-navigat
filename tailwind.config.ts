@@ -55,9 +55,13 @@ export default {
         // Brand (Nøtterø Bakeri)
         brand: {
           ink: "hsl(var(--brand-ink))",
+          "ink-deep": "hsl(var(--brand-ink-deep))",
           cream: "hsl(var(--brand-cream))",
+          "cream-deep": "hsl(var(--brand-cream-deep))",
           bronze: "hsl(var(--brand-bronze))",
           "bronze-soft": "hsl(var(--brand-bronze-soft))",
+          "bronze-deep": "hsl(var(--brand-bronze-deep))",
+          gold: "hsl(var(--brand-gold))",
         },
 
         // Dynamic app color (set by AppColorProvider). Beholder legacy aliases
