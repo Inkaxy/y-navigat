@@ -188,6 +188,59 @@ export default function OrdersList() {
     }
   }
 
+  function openAccept(row: OrderListRow) {
+    setAcceptIntent({
+      row,
+      intent: {
+        to: "confirmed",
+        label: "Aksepter",
+      },
+    });
+  }
+
+  function openReject(row: OrderListRow) {
+    setAcceptIntent({
+      row,
+      intent: {
+        to: "cancelled",
+        label: "Avvis",
+        requireComment: true,
+        commentLabel: "Hvorfor avvises bestillingen?",
+        confirmVariant: "destructive",
+        specialEffect: "cancel",
+      },
+    });
+  }
+
+  async function performAcceptanceChange(comment: string) {
+    if (!acceptIntent) return;
+    const { row, intent } = acceptIntent;
+    try {
+      await changeOrderStatus({
+        orderId: row.id,
+        orderNumber: row.order_number,
+        customerName: row.customer_snapshot?.display_name ?? "Ukjent kunde",
+        fromStatus: row.status,
+        toStatus: intent.to,
+        comment: comment || undefined,
+        userId: user?.id ?? null,
+        isCancel: intent.specialEffect === "cancel",
+      });
+      toast.success(
+        intent.to === "confirmed"
+          ? `Bestilling ${row.order_number} akseptert`
+          : `Bestilling ${row.order_number} avvist`,
+      );
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["orders"] }),
+        queryClient.invalidateQueries({ queryKey: ["orders", "acceptance-queue-count"] }),
+      ]);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e));
+      throw e;
+    }
+  }
+
   return (
     <>
       <AppBanner
