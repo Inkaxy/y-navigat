@@ -378,17 +378,21 @@ export default function LiveForhandlingWorkspace() {
                   : it.live_status === "parked"
                   ? "text-warning"
                   : "text-destructive";
+              const reopenable = !isEnded && (it.live_status === "agreed" || it.live_status === "tentatively_agreed" || it.live_status === "parked" || it.live_status === "declined");
               return (
                 <li
                   key={it.id}
-                  className="flex items-center justify-between border-t border-line-subtle px-4 py-2 text-sm first:border-0"
+                  className={`group flex items-center justify-between border-t border-line-subtle px-4 py-2 text-sm first:border-0 ${reopenable ? "cursor-pointer hover:bg-surface-muted/40" : ""}`}
+                  onClick={() => { if (reopenable) handleReopen(it.id); }}
+                  title={reopenable ? "Klikk for å gjenåpne" : undefined}
                 >
                   <span className="flex items-center gap-2">
                     <Icon className={`h-4 w-4 ${cls}`} />
                     <span className="font-medium">{rm?.name ?? "—"}</span>
+                    {reopenable && <RotateCcw className="h-3 w-3 text-ink-muted opacity-0 group-hover:opacity-100" />}
                   </span>
                   <span className="text-ink-secondary tabular-nums">
-                    {it.live_status === "agreed" && newPrice != null ? (
+                    {(it.live_status === "agreed" || it.live_status === "tentatively_agreed") && newPrice != null ? (
                       <>
                         {formatNok(newPrice)}/{rm?.base_unit ?? "kg"}
                         {pct != null && (
@@ -403,8 +407,10 @@ export default function LiveForhandlingWorkspace() {
                       </>
                     ) : it.live_status === "parked" ? (
                       "Parket"
-                    ) : (
+                    ) : it.live_status === "declined" ? (
                       "Avslått"
+                    ) : (
+                      it.live_status ?? "—"
                     )}
                   </span>
                 </li>
