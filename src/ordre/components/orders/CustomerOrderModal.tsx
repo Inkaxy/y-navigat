@@ -226,6 +226,7 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
       productId: p.id,
       customerId: customer.id,
       date: deliveryDate,
+      caller: isEdit ? "customer_order_update" : "customer_order_create",
     }).catch(() => null);
     setLines((prev) =>
       prev.map((l) =>
@@ -238,6 +239,7 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
               product_unit_of_sale: p.unit_of_sale,
               product_mva_rate: p.mva_rate,
               unit_price: ep ? String(ep.price) : "0",
+              is_fallback: !ep || ep.is_fallback,
             }
           : l,
       ),
