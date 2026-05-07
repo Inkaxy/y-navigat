@@ -85,8 +85,16 @@ export function LiveItemCard({ item, rawMaterial, supplierId, facilitatorId, onS
   }
 
   async function setStatus(status: "tentatively_agreed" | "parked" | "declined") {
+    let finalNote = note;
+    if (status === "parked" || status === "declined") {
+      const label = status === "parked" ? "park" : "avslå";
+      const promptNote = window.prompt(`Begrunnelse for å ${label} (valgfri):`, note ?? "");
+      if (promptNote === null) return; // cancelled
+      finalNote = promptNote;
+    }
     const patch: Record<string, any> = {
       ...buildPatch(),
+      live_notes: finalNote || null,
       live_status: status,
     };
     if (status === "tentatively_agreed") {
@@ -95,7 +103,7 @@ export function LiveItemCard({ item, rawMaterial, supplierId, facilitatorId, onS
     }
     const eventType =
       status === "tentatively_agreed" ? "price_agreed" : status === "parked" ? "item_parked" : "item_declined";
-    await onSave(patch, eventType, { price: patch.live_agreed_price, status }, note || null);
+    await onSave(patch, eventType, { price: patch.live_agreed_price, status }, finalNote || null);
   }
 
   return (

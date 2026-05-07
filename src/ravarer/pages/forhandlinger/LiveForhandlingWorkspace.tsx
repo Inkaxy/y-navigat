@@ -5,7 +5,9 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { ArrowLeft, Loader2, Radio, Flag, Check, Pause, X } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
+import { ArrowLeft, Loader2, Radio, Flag, Check, Pause, Play, X, History, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
@@ -27,6 +29,7 @@ import { useAllRawMaterialPurchaseStats } from "@/ravarer/hooks/usePurchaseStats
 import { LiveTimer } from "./components/LiveTimer";
 import { LiveItemSearch } from "./components/LiveItemSearch";
 import { LiveItemCard } from "./components/LiveItemCard";
+import { LiveTidslinjeDrawer } from "./components/LiveTidslinjeDrawer";
 import { formatNok } from "@/ravarer/lib/constants";
 
 export default function LiveForhandlingWorkspace() {
@@ -52,10 +55,14 @@ export default function LiveForhandlingWorkspace() {
   const [endOpen, setEndOpen] = useState(false);
   const [ending, setEnding] = useState(false);
   const [deadlineDays, setDeadlineDays] = useState<string>("14");
+  const [autoApply, setAutoApply] = useState(true);
+  const [timelineOpen, setTimelineOpen] = useState(false);
+  const [pausing, setPausing] = useState(false);
   const [credentials, setCredentials] = useState<{ url: string; password: string; email: string | null } | null>(null);
 
   const supplierId = recipients[0]?.supplier_id ?? "";
   const supplierName = suppliers.find((s) => s.id === supplierId)?.name ?? "—";
+  const isPaused = !!neg?.live_session_paused;
 
   const itemsByStatus = useMemo(() => {
     const groups: Record<string, typeof items> = { pending: [], discussing: [], processed: [] };
@@ -144,6 +151,39 @@ export default function LiveForhandlingWorkspace() {
     }
   }
 
+  async function handleTogglePause() {
+    setPausing(true);
+    try {
+      const next = !isPaused;
+      await updateNeg.mutateAsync({
+        id,
+        patch: { live_session_paused: next } as any,
+      });
+      await logEvent.mutateAsync({
+        negotiation_id: id,
+        event_type: next ? "session_paused" : "session_resumed",
+      });
+    } catch (e: any) {
+      toast.error(e?.message ?? "Kunne ikke pause");
+    } finally {
+      setPausing(false);
+    }
+  }
+
+  async function handleReopen(itemId: string) {
+    await updateItem.mutateAsync({
+      id: itemId,
+      negotiation_id: id,
+      patch: { live_status: "discussing" },
+    });
+    await logEvent.mutateAsync({
+      negotiation_id: id,
+      negotiation_item_id: itemId,
+      event_type: "item_reopened",
+    });
+    setActiveId(itemId);
+  }
+
   async function handleEndSession() {
     setEnding(true);
     try {
@@ -155,6 +195,7 @@ export default function LiveForhandlingWorkspace() {
           status: "awaiting_confirmation",
           live_session_ended_at: new Date().toISOString(),
           live_confirmation_deadline: deadline,
+          live_auto_apply_on_confirm: autoApply,
         } as any,
       });
       // Generate supplier credentials (reuses RFQ token mechanism)
@@ -241,6 +282,21 @@ export default function LiveForhandlingWorkspace() {
           </div>
         </div>
         <div className="flex gap-2">
+          <Button size="sm" variant="outline" className="rounded-full" onClick={() => setTimelineOpen(true)}>
+            <History className="mr-1.5 h-4 w-4" /> Tidslinje
+          </Button>
+          {!isEnded && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="rounded-full"
+              onClick={handleTogglePause}
+              disabled={pausing}
+            >
+              {isPaused ? <Play className="mr-1.5 h-4 w-4" /> : <Pause className="mr-1.5 h-4 w-4" />}
+              {isPaused ? "Gjenoppta" : "Pause"}
+            </Button>
+          )}
           {!isEnded && (
             <Button size="sm" className="rounded-full" onClick={() => setEndOpen(true)}>
               <Flag className="mr-1.5 h-4 w-4" /> Avslutt →
@@ -248,6 +304,12 @@ export default function LiveForhandlingWorkspace() {
           )}
         </div>
       </Card>
+
+      {isPaused && !isEnded && (
+        <Card className="border-warning/40 bg-warning/10 p-3 text-sm text-warning">
+          Møtet er pauset. Klikk «Gjenoppta» når dere er tilbake.
+        </Card>
+      )}
 
       {/* Search */}
       {!isEnded && (
@@ -316,17 +378,21 @@ export default function LiveForhandlingWorkspace() {
                   : it.live_status === "parked"
                   ? "text-warning"
                   : "text-destructive";
+              const reopenable = !isEnded && (it.live_status === "agreed" || it.live_status === "tentatively_agreed" || it.live_status === "parked" || it.live_status === "declined");
               return (
                 <li
                   key={it.id}
-                  className="flex items-center justify-between border-t border-line-subtle px-4 py-2 text-sm first:border-0"
+                  className={`group flex items-center justify-between border-t border-line-subtle px-4 py-2 text-sm first:border-0 ${reopenable ? "cursor-pointer hover:bg-surface-muted/40" : ""}`}
+                  onClick={() => { if (reopenable) handleReopen(it.id); }}
+                  title={reopenable ? "Klikk for å gjenåpne" : undefined}
                 >
                   <span className="flex items-center gap-2">
                     <Icon className={`h-4 w-4 ${cls}`} />
                     <span className="font-medium">{rm?.name ?? "—"}</span>
+                    {reopenable && <RotateCcw className="h-3 w-3 text-ink-muted opacity-0 group-hover:opacity-100" />}
                   </span>
                   <span className="text-ink-secondary tabular-nums">
-                    {it.live_status === "agreed" && newPrice != null ? (
+                    {(it.live_status === "agreed" || it.live_status === "tentatively_agreed") && newPrice != null ? (
                       <>
                         {formatNok(newPrice)}/{rm?.base_unit ?? "kg"}
                         {pct != null && (
@@ -341,8 +407,10 @@ export default function LiveForhandlingWorkspace() {
                       </>
                     ) : it.live_status === "parked" ? (
                       "Parket"
-                    ) : (
+                    ) : it.live_status === "declined" ? (
                       "Avslått"
+                    ) : (
+                      it.live_status ?? "—"
                     )}
                   </span>
                 </li>
@@ -389,6 +457,10 @@ export default function LiveForhandlingWorkspace() {
                     className="mt-1 block w-32 rounded-md border border-input bg-background px-3 py-2 text-sm"
                   />
                 </div>
+                <label className="flex items-center gap-2 text-sm">
+                  <Checkbox checked={autoApply} onCheckedChange={(v) => setAutoApply(!!v)} />
+                  <span>Aktivér leverandør-priser automatisk når alle linjer er bekreftet</span>
+                </label>
               </>
             )}
             {credentials && (
@@ -439,6 +511,14 @@ export default function LiveForhandlingWorkspace() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <LiveTidslinjeDrawer
+        open={timelineOpen}
+        onOpenChange={setTimelineOpen}
+        negotiationId={id}
+        rmName={(rid) => rawMaterials.find((r) => r.id === rid)?.name ?? "—"}
+        itemRawMaterialMap={new Map(items.map((i) => [i.id, i.raw_material_id]))}
+      />
     </div>
   );
 }
