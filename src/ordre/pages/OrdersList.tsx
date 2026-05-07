@@ -1,6 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { Plus, Search, X, Loader2, ChevronDown } from "lucide-react";
+import { Plus, Search, X, Loader2, ChevronDown, Check, Inbox } from "lucide-react";
+import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
+import { useAcceptanceQueueCount } from "@/ordre/hooks/useAcceptanceQueueCount";
+import { changeOrderStatus } from "@/ordre/lib/changeOrderStatus";
+import {
+  StatusChangeDialog,
+  type StatusChangeIntent,
+} from "@/ordre/components/orders/StatusChangeDialog";
 import { AppBanner } from "@/ordre/components/shell/AppBanner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -70,9 +78,16 @@ export default function OrdersList() {
   const [tourIds, setTourIds] = useState<string[]>([]);
   const [page, setPage] = useState(0);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [acceptanceOnly, setAcceptanceOnly] = useState(false);
+  const [acceptIntent, setAcceptIntent] = useState<{
+    intent: StatusChangeIntent;
+    row: OrderListRow;
+  } | null>(null);
 
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const { data: tours = [] } = useDeliveryTours();
+  const { data: queueCount = 0 } = useAcceptanceQueueCount();
   const tourMap = useMemo(() => new Map(tours.map((t) => [t.id, t])), [tours]);
 
   // B.3 — Deselect ved filter-endring (unngår skjulte valg som overrasker bulk-ops)
@@ -81,13 +96,19 @@ export default function OrdersList() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearch, statuses, source, deliveryFrom, deliveryTo, tourIds, page]);
 
+  const effectiveStatuses: OrderStatus[] | undefined = acceptanceOnly
+    ? ["awaiting_confirmation"]
+    : statuses.length === ORDER_STATUSES.length
+      ? undefined
+      : statuses;
+
   const { data, isLoading, isFetching } = useOrderList({
     search: debouncedSearch,
-    statuses: statuses.length === ORDER_STATUSES.length ? undefined : statuses,
-    source,
-    deliveryFrom: deliveryFrom || null,
-    deliveryTo: deliveryTo || null,
-    tourIds: tourIds.length > 0 ? tourIds : undefined,
+    statuses: effectiveStatuses,
+    source: acceptanceOnly ? "all" : source,
+    deliveryFrom: acceptanceOnly ? null : deliveryFrom || null,
+    deliveryTo: acceptanceOnly ? null : deliveryTo || null,
+    tourIds: acceptanceOnly ? undefined : tourIds.length > 0 ? tourIds : undefined,
     page,
     pageSize: PAGE_SIZE,
   });
@@ -167,6 +188,59 @@ export default function OrdersList() {
     }
   }
 
+  function openAccept(row: OrderListRow) {
+    setAcceptIntent({
+      row,
+      intent: {
+        to: "confirmed",
+        label: "Aksepter",
+      },
+    });
+  }
+
+  function openReject(row: OrderListRow) {
+    setAcceptIntent({
+      row,
+      intent: {
+        to: "cancelled",
+        label: "Avvis",
+        requireComment: true,
+        commentLabel: "Hvorfor avvises bestillingen?",
+        confirmVariant: "destructive",
+        specialEffect: "cancel",
+      },
+    });
+  }
+
+  async function performAcceptanceChange(comment: string) {
+    if (!acceptIntent) return;
+    const { row, intent } = acceptIntent;
+    try {
+      await changeOrderStatus({
+        orderId: row.id,
+        orderNumber: row.order_number,
+        customerName: row.customer_snapshot?.display_name ?? "Ukjent kunde",
+        fromStatus: row.status,
+        toStatus: intent.to,
+        comment: comment || undefined,
+        userId: user?.id ?? null,
+        isCancel: intent.specialEffect === "cancel",
+      });
+      toast.success(
+        intent.to === "confirmed"
+          ? `Bestilling ${row.order_number} akseptert`
+          : `Bestilling ${row.order_number} avvist`,
+      );
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["orders"] }),
+        queryClient.invalidateQueries({ queryKey: ["orders", "acceptance-queue-count"] }),
+      ]);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e));
+      throw e;
+    }
+  }
+
   return (
     <>
       <AppBanner
@@ -191,6 +265,27 @@ export default function OrdersList() {
           {isFetching && !isLoading && (
             <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
           )}
+          <Button
+            type="button"
+            variant={acceptanceOnly ? "default" : "outline"}
+            size="sm"
+            onClick={() => {
+              setAcceptanceOnly((v) => !v);
+              setPage(0);
+            }}
+            className="ml-2 h-7 gap-1.5 px-2 text-caption"
+          >
+            <Inbox className="h-3.5 w-3.5" />
+            Aksept-kø
+            {queueCount > 0 && (
+              <Badge
+                variant={acceptanceOnly ? "secondary" : "default"}
+                className="h-4 px-1 font-mono text-[10px]"
+              >
+                {queueCount}
+              </Badge>
+            )}
+          </Button>
           {activeFilterCount > 0 && (
             <Button
               variant="ghost"
@@ -488,6 +583,9 @@ export default function OrdersList() {
                   <TableHead className="h-9 px-3 text-caption">Kilde</TableHead>
                   <TableHead className="h-9 px-3 text-right text-caption">Linjer</TableHead>
                   <TableHead className="h-9 px-3 text-right text-caption">Sum</TableHead>
+                  {acceptanceOnly && (
+                    <TableHead className="h-9 px-3 text-right text-caption">Aksjon</TableHead>
+                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -607,6 +705,36 @@ export default function OrdersList() {
                         <TableCell className="px-3 py-1.5 text-right font-medium tabular-nums">
                           {formatNOK(r.total_incl_vat)}
                         </TableCell>
+                        {acceptanceOnly && (
+                          <TableCell
+                            className="px-3 py-1.5 text-right"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {r.status === "awaiting_confirmation" ? (
+                              <div className="flex items-center justify-end gap-1.5">
+                                <Button
+                                  size="sm"
+                                  className="h-7 gap-1 px-2 text-caption"
+                                  onClick={() => openAccept(r)}
+                                >
+                                  <Check className="h-3.5 w-3.5" />
+                                  Aksepter
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  className="h-7 gap-1 px-2 text-caption"
+                                  onClick={() => openReject(r)}
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                  Avvis
+                                </Button>
+                              </div>
+                            ) : (
+                              <span className="text-caption text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+                        )}
                       </TableRow>
                     );
                   })
@@ -647,6 +775,16 @@ export default function OrdersList() {
           </div>
         </Card>
       </div>
+
+      <StatusChangeDialog
+        open={!!acceptIntent}
+        onOpenChange={(o) => !o && setAcceptIntent(null)}
+        intent={acceptIntent?.intent ?? null}
+        currentStatus={(acceptIntent?.row.status ?? "awaiting_confirmation") as OrderStatus}
+        orderNumber={acceptIntent?.row.order_number ?? ""}
+        customerName={acceptIntent?.row.customer_snapshot?.display_name ?? ""}
+        onConfirm={performAcceptanceChange}
+      />
     </>
   );
 }
