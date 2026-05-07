@@ -118,25 +118,25 @@
   }
 
   .dark {
-    /* Brand-ink basert mørk modus — varmere enn ren blå-grå */
-    --surface-canvas:        24 18% 8%;
-    --surface-raised:        24 16% 11%;
-    --surface-sunken:        24 14% 14%;
-    --surface-muted:         24 14% 13%;
-    --border-subtle:         24 12% 18%;
-    --border-default:        24 11% 22%;
-    --border-strong:         24 10% 30%;
-    --text-primary:          38 35% 95%;
-    --text-secondary:        38 15% 72%;
-    --text-tertiary:         30 10% 56%;
-    --text-on-accent:        0  0%  100%;
-    --bakery-cream:          24 16% 14%;
-    --bakery-cream-deep:     24 14% 17%;
+    /* Emballasje-navy basert mørk modus */
+    --surface-canvas:        214 38% 10%;
+    --surface-raised:        214 36% 13%;
+    --surface-sunken:        214 32% 16%;
+    --surface-muted:         214 30% 15%;
+    --border-subtle:         214 24% 22%;
+    --border-default:        214 22% 28%;
+    --border-strong:         214 20% 38%;
+    --text-primary:          38 40% 94%;
+    --text-secondary:        38 18% 72%;
+    --text-tertiary:         32 12% 58%;
+    --text-on-accent:        38 50% 95%;
+    --bakery-cream:          214 32% 16%;
+    --bakery-cream-deep:     214 30% 19%;
 
-    --shadow-xs: 0 1px 2px 0 hsl(0 0% 0% / 0.30);
-    --shadow-sm: 0 1px 2px 0 hsl(0 0% 0% / 0.35), 0 1px 3px 0 hsl(0 0% 0% / 0.25);
-    --shadow-md: 0 4px 12px -2px hsl(0 0% 0% / 0.40), 0 2px 4px -2px hsl(0 0% 0% / 0.25);
-    --shadow-lg: 0 12px 32px -8px hsl(0 0% 0% / 0.55), 0 4px 12px -4px hsl(0 0% 0% / 0.35);
+    --shadow-xs: 0 1px 2px 0 hsl(0 0% 0% / 0.32);
+    --shadow-sm: 0 1px 2px 0 hsl(0 0% 0% / 0.40), 0 1px 3px 0 hsl(0 0% 0% / 0.28);
+    --shadow-md: 0 6px 16px -4px hsl(0 0% 0% / 0.45), 0 2px 6px -2px hsl(0 0% 0% / 0.28);
+    --shadow-lg: 0 18px 40px -12px hsl(0 0% 0% / 0.60), 0 6px 14px -6px hsl(0 0% 0% / 0.40);
   }
 }
 
