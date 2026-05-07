@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Plus, Pencil, Trash2, Loader2, Truck } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { AppBanner } from "@/components/shell/AppBanner";
+import { AppBanner } from "@/ordre/components/shell/AppBanner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -24,9 +24,9 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { NB_LEGAL_ENTITY_ID } from "@/lib/constants";
-import { todayISO } from "@/lib/format";
-import { logAudit } from "@/lib/audit";
+import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
+import { todayISO } from "@/ordre/lib/format";
+import { logAudit } from "@/ordre/lib/audit";
 import {
   DAY_LABELS,
   trimSec,
@@ -34,8 +34,8 @@ import {
   useTourOrderCounts,
   sortToursByPriority,
   type DeliveryTour,
-} from "@/hooks/useDeliveryTours";
-import { TourFormDialog } from "@/components/orders/TourFormDialog";
+} from "@/ordre/hooks/useDeliveryTours";
+import { TourFormDialog } from "@/ordre/components/orders/TourFormDialog";
 
 const DAY_FIELDS = [
   "active_monday",

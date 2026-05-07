@@ -1,11 +1,11 @@
 import { Fragment } from "react";
 import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { getStatusMeta, type OrderStatus } from "@/lib/orderStatus";
-import { MAIN_FLOW, SIDE_BRANCHES, flowIndex } from "@/lib/statusTransitions";
+import { getStatusMeta, type OrderStatus } from "@/ordre/lib/orderStatus";
+import { MAIN_FLOW, SIDE_BRANCHES, flowIndex } from "@/ordre/lib/statusTransitions";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import type { OrderEvent } from "@/hooks/useOrderDetail";
-import { formatDateTime } from "@/lib/format";
+import type { OrderEvent } from "@/ordre/hooks/useOrderDetail";
+import { formatDateTime } from "@/ordre/lib/format";
 import { StatusBadge } from "./StatusBadge";
 
 export function StatusFlowBar({

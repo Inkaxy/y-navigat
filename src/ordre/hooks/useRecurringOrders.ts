@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { NB_LEGAL_ENTITY_ID } from "@/lib/constants";
+import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
 
 export type RecurringSchedule = {
   id: string;

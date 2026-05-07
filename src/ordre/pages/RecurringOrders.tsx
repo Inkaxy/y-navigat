@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { CalendarRange, Loader2, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { AppBanner } from "@/components/shell/AppBanner";
+import { AppBanner } from "@/ordre/components/shell/AppBanner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -35,9 +35,9 @@ import {
   useRecurringSchedules,
   type RecurringScheduleFilter,
   type RecurringScheduleWithCustomer,
-} from "@/hooks/useRecurringOrders";
-import { formatDateLong } from "@/lib/format";
-import { RecurringScheduleDialog } from "@/components/orders/RecurringScheduleDialog";
+} from "@/ordre/hooks/useRecurringOrders";
+import { formatDateLong } from "@/ordre/lib/format";
+import { RecurringScheduleDialog } from "@/ordre/components/orders/RecurringScheduleDialog";
 
 export default function RecurringOrders() {
   const [search, setSearch] = useState("");

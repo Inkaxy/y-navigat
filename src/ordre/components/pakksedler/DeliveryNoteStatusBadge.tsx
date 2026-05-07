@@ -1,4 +1,4 @@
-import { getDeliveryNoteStatusMeta } from "@/lib/deliveryNoteStatus";
+import { getDeliveryNoteStatusMeta } from "@/ordre/lib/deliveryNoteStatus";
 import { StatusPill } from "@/components/ui/status-pill";
 
 /**

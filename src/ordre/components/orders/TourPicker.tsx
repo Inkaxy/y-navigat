@@ -11,7 +11,7 @@ import {
   tourMatches,
   trimSec,
   useDeliveryTours,
-} from "@/hooks/useDeliveryTours";
+} from "@/ordre/hooks/useDeliveryTours";
 
 type Props = {
   /** ISO date YYYY-MM-DD */

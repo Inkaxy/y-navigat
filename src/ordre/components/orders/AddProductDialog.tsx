@@ -8,8 +8,8 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { useAddableProducts, type AddableProduct } from "@/hooks/useMatrix";
-import { formatNOK } from "@/lib/format";
+import { useAddableProducts, type AddableProduct } from "@/ordre/hooks/useMatrix";
+import { formatNOK } from "@/ordre/lib/format";
 
 export function AddProductDialog({
   open,

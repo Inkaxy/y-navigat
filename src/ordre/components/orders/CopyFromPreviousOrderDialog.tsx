@@ -8,10 +8,10 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { StatusBadge } from "@/components/orders/StatusBadge";
-import { useRecentOrdersForCustomer, fetchOrderLinesForCopy, type CopyableOrderLine } from "@/hooks/useRecentOrdersForCustomer";
-import { formatNOK, formatDateLong } from "@/lib/format";
-import type { OrderStatus } from "@/lib/orderStatus";
+import { StatusBadge } from "@/ordre/components/orders/StatusBadge";
+import { useRecentOrdersForCustomer, fetchOrderLinesForCopy, type CopyableOrderLine } from "@/ordre/hooks/useRecentOrdersForCustomer";
+import { formatNOK, formatDateLong } from "@/ordre/lib/format";
+import type { OrderStatus } from "@/ordre/lib/orderStatus";
 import { toast } from "sonner";
 
 export function CopyFromPreviousOrderDialog({

@@ -2,7 +2,7 @@ import * as React from "react";
 import { Document } from "@react-pdf/renderer";
 import { PakkseddelPDFPage } from "./PakkseddelPDFDocument";
 import { SkillearkPDFPage } from "./SkillearkPDFPage";
-import type { BulkPakksedlerPDFData } from "@/hooks/useBulkPakksedlerPDF";
+import type { BulkPakksedlerPDFData } from "@/ordre/hooks/useBulkPakksedlerPDF";
 
 interface Props {
   data: BulkPakksedlerPDFData;

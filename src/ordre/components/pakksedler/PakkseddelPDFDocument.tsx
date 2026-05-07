@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
-import type { PakkseddelPDFData } from "@/hooks/usePakkseddelPDF";
+import type { PakkseddelPDFData } from "@/ordre/hooks/usePakkseddelPDF";
 
 // NOTE: Use neutral palette only — @react-pdf/renderer doesn't read CSS tokens.
 // Layout mirrors F82 DN_*.pdf in structure (not pixel-perfect).

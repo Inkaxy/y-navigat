@@ -4,12 +4,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { formatDateLong, formatNOK, formatNumber } from "@/lib/format";
-import { useCustomerById } from "@/hooks/useNBCustomers";
-import { categorizePriceSource } from "@/hooks/useNBProducts";
-import { useDeliveryTours, trimSec } from "@/hooks/useDeliveryTours";
-import { ChangeTourDialog } from "@/components/orders/ChangeTourDialog";
-import type { OrderDetail, OrderLineDetail } from "@/hooks/useOrderDetail";
+import { formatDateLong, formatNOK, formatNumber } from "@/ordre/lib/format";
+import { useCustomerById } from "@/ordre/hooks/useNBCustomers";
+import { categorizePriceSource } from "@/ordre/hooks/useNBProducts";
+import { useDeliveryTours, trimSec } from "@/ordre/hooks/useDeliveryTours";
+import { ChangeTourDialog } from "@/ordre/components/orders/ChangeTourDialog";
+import type { OrderDetail, OrderLineDetail } from "@/ordre/hooks/useOrderDetail";
 
 const KUNDER_APP_BASE = "https://kunder.nbos.app"; // ekstern app — kommer som env-konfig senere
 

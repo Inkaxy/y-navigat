@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
-import { useActivePauses } from "@/hooks/useActivePauses";
-import { useDeliveryTours } from "@/hooks/useDeliveryTours";
+import { useActivePauses } from "@/ordre/hooks/useActivePauses";
+import { useDeliveryTours } from "@/ordre/hooks/useDeliveryTours";
 
 type Props = {
   legalEntityId: string;

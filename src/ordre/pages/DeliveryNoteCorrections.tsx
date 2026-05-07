@@ -6,9 +6,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { NB_LEGAL_ENTITY_ID } from "@/lib/constants";
-import { formatDate } from "@/lib/format";
-import { useDeliveryTours } from "@/hooks/useDeliveryTours";
+import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
+import { formatDate } from "@/ordre/lib/format";
+import { useDeliveryTours } from "@/ordre/hooks/useDeliveryTours";
 
 type CorrectionRun = {
   id: string;

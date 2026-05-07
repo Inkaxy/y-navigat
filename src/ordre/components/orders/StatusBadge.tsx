@@ -1,4 +1,4 @@
-import { getStatusMeta } from "@/lib/orderStatus";
+import { getStatusMeta } from "@/ordre/lib/orderStatus";
 import { StatusPill } from "@/components/ui/status-pill";
 
 /**

@@ -20,8 +20,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
-import { useDeliveryTours, trimSec } from "@/hooks/useDeliveryTours";
-import { logAudit } from "@/lib/audit";
+import { useDeliveryTours, trimSec } from "@/ordre/hooks/useDeliveryTours";
+import { logAudit } from "@/ordre/lib/audit";
 
 type Props = {
   open: boolean;

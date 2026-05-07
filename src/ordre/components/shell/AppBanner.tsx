@@ -1,6 +1,6 @@
 import { ShoppingCart, type LucideIcon } from "lucide-react";
-import { useOrdreApp } from "@/hooks/useOrdreApp";
-import { NB_LEGAL_NAME } from "@/lib/constants";
+import { useOrdreApp } from "@/ordre/hooks/useOrdreApp";
+import { NB_LEGAL_NAME } from "@/ordre/lib/constants";
 import { PageHeader } from "./PageHeader";
 
 /**

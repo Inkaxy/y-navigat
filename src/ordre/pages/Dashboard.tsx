@@ -8,17 +8,17 @@ import {
   Package,
   ArrowRight,
 } from "lucide-react";
-import { AppBanner } from "@/components/shell/AppBanner";
-import { DateContextChips } from "@/components/shell/DateContextChips";
+import { AppBanner } from "@/ordre/components/shell/AppBanner";
+import { DateContextChips } from "@/ordre/components/shell/DateContextChips";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   useStatusCounts,
   useDeliveryDayStats,
   useActionQueueCounts,
-} from "@/hooks/useOrders";
-import { ORDER_STATUSES } from "@/lib/orderStatus";
-import { formatNOK, todayISO, tomorrow, formatDateLong } from "@/lib/format";
+} from "@/ordre/hooks/useOrders";
+import { ORDER_STATUSES } from "@/ordre/lib/orderStatus";
+import { formatNOK, todayISO, tomorrow, formatDateLong } from "@/ordre/lib/format";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 

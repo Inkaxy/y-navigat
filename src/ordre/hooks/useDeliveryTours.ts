@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { NB_LEGAL_ENTITY_ID } from "@/lib/constants";
+import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
 
 export type DeliveryTour = {
   id: string;

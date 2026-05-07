@@ -18,16 +18,16 @@ import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { supabase } from "@/integrations/supabase/client";
-import { NB_LEGAL_ENTITY_ID } from "@/lib/constants";
-import { logAudit } from "@/lib/audit";
-import { useDeliveryTours, sortToursByPriority, trimSec } from "@/hooks/useDeliveryTours";
-import { useNBCustomers } from "@/hooks/useNBCustomers";
-import { useNBProducts } from "@/hooks/useNBProducts";
-import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
+import { logAudit } from "@/ordre/lib/audit";
+import { useDeliveryTours, sortToursByPriority, trimSec } from "@/ordre/hooks/useDeliveryTours";
+import { useNBCustomers } from "@/ordre/hooks/useNBCustomers";
+import { useNBProducts } from "@/ordre/hooks/useNBProducts";
+import { useDebouncedValue } from "@/ordre/hooks/useDebouncedValue";
 import {
   WEEKDAY_LABELS,
   type DeliveryRule,
-} from "@/hooks/useDeliveryRules";
+} from "@/ordre/hooks/useDeliveryRules";
 
 type Props = {
   open: boolean;

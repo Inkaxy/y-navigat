@@ -2,8 +2,8 @@ import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useCompletedMainRuns } from "@/hooks/useCompletedRuns";
-import { useDeliveryTours } from "@/hooks/useDeliveryTours";
+import { useCompletedMainRuns } from "@/ordre/hooks/useCompletedRuns";
+import { useDeliveryTours } from "@/ordre/hooks/useDeliveryTours";
 
 type Props = {
   legalEntityId: string;

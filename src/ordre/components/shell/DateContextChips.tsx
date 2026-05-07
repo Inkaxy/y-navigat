@@ -1,8 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { todayISO, tomorrow, formatDateLong } from "@/lib/format";
-import { rangeFor } from "@/lib/dateRanges";
-import { relativeDateLabel } from "@/lib/relativeDate";
+import { todayISO, tomorrow, formatDateLong } from "@/ordre/lib/format";
+import { rangeFor } from "@/ordre/lib/dateRanges";
+import { relativeDateLabel } from "@/ordre/lib/relativeDate";
 
 export type DateChipKind = "today" | "tomorrow" | "this_week" | "next_week";
 

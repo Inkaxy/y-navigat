@@ -1,10 +1,10 @@
 import { AlertTriangle } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Card } from "@/components/ui/card";
-import { StatusBadge } from "@/components/orders/StatusBadge";
-import type { OrderStatus } from "@/lib/orderStatus";
-import { formatNOK, formatDateLong } from "@/lib/format";
-import type { DuplicateOrder } from "@/hooks/useDuplicateOrderCheck";
+import { StatusBadge } from "@/ordre/components/orders/StatusBadge";
+import type { OrderStatus } from "@/ordre/lib/orderStatus";
+import { formatNOK, formatDateLong } from "@/ordre/lib/format";
+import type { DuplicateOrder } from "@/ordre/hooks/useDuplicateOrderCheck";
 
 export function DuplicateOrderWarning({
   duplicates,

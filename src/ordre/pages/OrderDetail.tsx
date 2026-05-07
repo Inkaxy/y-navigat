@@ -9,7 +9,7 @@ import {
   RefreshCw,
   History,
 } from "lucide-react";
-import { AppBanner } from "@/components/shell/AppBanner";
+import { AppBanner } from "@/ordre/components/shell/AppBanner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/sheet";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { useUserAccess } from "@/hooks/useUserAccess";
+import { useUserAccess } from "@/ordre/hooks/useUserAccess";
 import { useAuth } from "@/hooks/useAuth";
 import {
   useOrderDetail,
@@ -37,26 +37,26 @@ import {
   useOrderLines,
   useOrderRealtime,
   useUserDisplayNames,
-} from "@/hooks/useOrderDetail";
-import { StatusBadge } from "@/components/orders/StatusBadge";
-import { StatusFlowBar } from "@/components/orders/StatusFlowBar";
+} from "@/ordre/hooks/useOrderDetail";
+import { StatusBadge } from "@/ordre/components/orders/StatusBadge";
+import { StatusFlowBar } from "@/ordre/components/orders/StatusFlowBar";
 import {
   StatusChangeDialog,
   type StatusChangeIntent,
-} from "@/components/orders/StatusChangeDialog";
-import { DeleteOrderDialog } from "@/components/orders/DeleteOrderDialog";
-import { OrderTimeline } from "@/components/orders/OrderTimeline";
-import { OrderDetailsTab } from "@/components/orders/OrderDetailsTab";
+} from "@/ordre/components/orders/StatusChangeDialog";
+import { DeleteOrderDialog } from "@/ordre/components/orders/DeleteOrderDialog";
+import { OrderTimeline } from "@/ordre/components/orders/OrderTimeline";
+import { OrderDetailsTab } from "@/ordre/components/orders/OrderDetailsTab";
 import {
   canCancel,
   canDelete,
   getStatusActions,
   flowIndex,
-} from "@/lib/statusTransitions";
-import { getStatusMeta, type OrderStatus } from "@/lib/orderStatus";
-import { formatDateLong, formatNOK } from "@/lib/format";
-import { logAudit } from "@/lib/audit";
-import { NB_LEGAL_ENTITY_ID } from "@/lib/constants";
+} from "@/ordre/lib/statusTransitions";
+import { getStatusMeta, type OrderStatus } from "@/ordre/lib/orderStatus";
+import { formatDateLong, formatNOK } from "@/ordre/lib/format";
+import { logAudit } from "@/ordre/lib/audit";
+import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
 import { useQueryClient } from "@tanstack/react-query";
 
 export default function OrderDetail() {

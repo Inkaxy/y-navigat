@@ -6,10 +6,10 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useDeliveryNoteDetail } from "@/hooks/useDeliveryNoteDetail";
-import { formatDate, formatNOK, formatNumber } from "@/lib/format";
+import { useDeliveryNoteDetail } from "@/ordre/hooks/useDeliveryNoteDetail";
+import { formatDate, formatNOK, formatNumber } from "@/ordre/lib/format";
 import { cn } from "@/lib/utils";
-import { PakkseddelPDFButton } from "@/components/pakksedler/PakkseddelPDFButton";
+import { PakkseddelPDFButton } from "@/ordre/components/pakksedler/PakkseddelPDFButton";
 
 const PRICE_TOGGLE_STORAGE_KEY = "nbos.order.showInternalPrices";
 

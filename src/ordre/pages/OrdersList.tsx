@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Plus, Search, X, Loader2, ChevronDown } from "lucide-react";
-import { AppBanner } from "@/components/shell/AppBanner";
+import { AppBanner } from "@/ordre/components/shell/AppBanner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -21,8 +21,8 @@ import {
 } from "@/components/ui/table";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useOrderList, type OrderListRow } from "@/hooks/useOrders";
-import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { useOrderList, type OrderListRow } from "@/ordre/hooks/useOrders";
+import { useDebouncedValue } from "@/ordre/hooks/useDebouncedValue";
 import {
   DEFAULT_EXCLUDED_STATUSES,
   ORDER_STATUSES,
@@ -30,9 +30,9 @@ import {
   getSourceLabel,
   getStatusMeta,
   type OrderStatus,
-} from "@/lib/orderStatus";
-import { StatusBadge } from "@/components/orders/StatusBadge";
-import { formatDate, formatNOK } from "@/lib/format";
+} from "@/ordre/lib/orderStatus";
+import { StatusBadge } from "@/ordre/components/orders/StatusBadge";
+import { formatDate, formatNOK } from "@/ordre/lib/format";
 import {
   Popover,
   PopoverContent,
@@ -40,11 +40,11 @@ import {
 } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { useDeliveryTours } from "@/hooks/useDeliveryTours";
+import { useDeliveryTours } from "@/ordre/hooks/useDeliveryTours";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
-import { OrderBulkActionBar } from "@/components/orders/OrderBulkActionBar";
+import { OrderBulkActionBar } from "@/ordre/components/orders/OrderBulkActionBar";
 
 const PAGE_SIZE = 50;
 

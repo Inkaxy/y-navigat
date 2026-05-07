@@ -1,6 +1,6 @@
 import { AlertTriangle, Clock } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import type { OrderDeadlineViolation } from "@/hooks/useOrderDeadlineCheck";
+import type { OrderDeadlineViolation } from "@/ordre/hooks/useOrderDeadlineCheck";
 
 function formatHM(timestamp: string): string {
   const d = new Date(timestamp);
