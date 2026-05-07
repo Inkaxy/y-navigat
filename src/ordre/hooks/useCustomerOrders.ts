@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
+import { fetchEffectivePricesBatch, type PriceCaller } from "@/ordre/hooks/useNBProducts";
 
 export type CustomerOrderRow = {
   id: string;
