@@ -81,7 +81,10 @@ export default function LiveForhandlingWorkspace() {
   const totalSavings = useMemo(() => {
     let saved = 0;
     for (const it of items) {
-      if (it.live_status !== "agreed" || it.live_agreed_price_per_base_unit == null) continue;
+      if (
+        (it.live_status !== "agreed" && it.live_status !== "tentatively_agreed" && it.live_status !== "confirmed") ||
+        it.live_agreed_price_per_base_unit == null
+      ) continue;
       const stats = statsMap?.get(it.raw_material_id);
       if (!stats?.avg_price_per_base_unit_12m || !stats.quantity_12m) continue;
       saved += (Number(stats.avg_price_per_base_unit_12m) - Number(it.live_agreed_price_per_base_unit)) * Number(stats.quantity_12m);
