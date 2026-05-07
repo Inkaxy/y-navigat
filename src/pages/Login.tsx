@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { UserCircle2 } from "lucide-react";
+import { Logo } from "@/components/brand/Logo";
 
 const DEMO_PASSWORD = "Demo2026!";
 
@@ -87,14 +88,23 @@ export default function Login() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+    <div
+      className="flex min-h-screen items-center justify-center px-4 py-10"
+      style={{
+        background:
+          "radial-gradient(ellipse at top, hsl(var(--brand-ink)) 0%, hsl(24 24% 6%) 70%)",
+      }}
+    >
       <div className="w-full max-w-md space-y-6 animate-fade-in">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold tracking-tight">
-            <span className="text-foreground">NB</span>
-            <span className="text-primary">Hub</span>
-          </h1>
-          <p className="mt-2 text-sm text-muted-foreground">Nøtterø Bakeri-konsernet</p>
+        <div className="flex flex-col items-center text-center">
+          <Logo
+            variant="seal"
+            title="Nøtterø Bakeri"
+            className="h-32 w-32 text-brand-cream"
+          />
+          <p className="mt-3 text-xs uppercase tracking-[0.18em] text-brand-cream/70">
+            NBHub · Driftshjernen
+          </p>
         </div>
 
         <Card className="shadow-elevated">
