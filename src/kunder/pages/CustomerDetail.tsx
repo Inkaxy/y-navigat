@@ -404,7 +404,7 @@ export default function CustomerDetail() {
   }
 
   const entityShortCode = useMemo(() => {
-    if (!customer || !access) return null;
+    if (!customer || !access?.entities) return null;
     return access.entities.find((e) => e.id === customer.legal_entity_id)?.short_code ?? null;
   }, [customer, access]);
 
