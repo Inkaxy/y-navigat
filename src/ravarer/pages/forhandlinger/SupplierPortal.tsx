@@ -255,6 +255,41 @@ export default function SupplierPortal() {
                     onChange={(e) => update(it.id, "delivery_terms", e.target.value)} placeholder="DDP, 1 lev/uke" />
                 </div>
                 <div className="sm:col-span-2">
+                  <Label>Datablad / deklarasjon / næringsinnhold (PDF)</Label>
+                  {r.datasheet_url ? (
+                    <div className="mt-1 flex items-center justify-between rounded-md border border-line-subtle bg-surface-subtle px-3 py-2 text-sm">
+                      <span className="flex items-center gap-2 truncate">
+                        <FileText className="h-4 w-4 text-ink-secondary" />
+                        <span className="truncate">{r.datasheet_url.split("/").pop()}</span>
+                      </span>
+                      {!submitted && (
+                        <Button variant="ghost" size="sm" onClick={() => update(it.id, "datasheet_url", null)}>
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  ) : (
+                    <label className={`mt-1 flex cursor-pointer items-center gap-2 rounded-md border border-dashed border-line-subtle px-3 py-3 text-sm text-ink-secondary hover:bg-surface-subtle ${submitted ? "pointer-events-none opacity-50" : ""}`}>
+                      <Upload className="h-4 w-4" />
+                      <span>Last opp PDF</span>
+                      <input
+                        type="file"
+                        accept="application/pdf"
+                        className="hidden"
+                        disabled={submitted}
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) handleUpload(it.id, f);
+                          e.target.value = "";
+                        }}
+                      />
+                    </label>
+                  )}
+                  <p className="mt-1 text-xs text-ink-secondary">
+                    Vedlegg datablad med deklarasjon, næringsinnhold og allergener for tilbudt vare.
+                  </p>
+                </div>
+                <div className="sm:col-span-2">
                   <Label>Notater</Label>
                   <Textarea rows={2} disabled={submitted} value={r.notes ?? ""}
                     onChange={(e) => update(it.id, "notes", e.target.value)} />
