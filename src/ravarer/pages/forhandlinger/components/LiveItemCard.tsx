@@ -162,7 +162,7 @@ export function LiveItemCard({ item, rawMaterial, supplierId, facilitatorId, onS
       </div>
 
       <div className="flex gap-2">
-        <Button onClick={() => setStatus("agreed")} disabled={saving} className="flex-1">
+        <Button onClick={() => setStatus("tentatively_agreed")} disabled={saving} className="flex-1">
           {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
           Avtalt
         </Button>
