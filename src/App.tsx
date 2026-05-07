@@ -78,6 +78,7 @@ import OrdreDeliveryNoteDetail from "@/ordre/pages/DeliveryNoteDetail";
 import OrdreDeliveryNoteCorrections from "@/ordre/pages/DeliveryNoteCorrections";
 import OrdreDeliveryNoteSettings from "@/ordre/pages/DeliveryNoteSettings";
 import OrdrePlaceholder from "@/ordre/pages/Placeholder";
+import OrdreInnstillinger from "@/ordre/pages/Innstillinger";
 
 import { RavarerProvider } from "@/ravarer/context/RavarerContext";
 import RavarerVareliste from "@/ravarer/pages/Vareliste";
