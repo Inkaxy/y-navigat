@@ -51,6 +51,8 @@ export default function LiveForhandlingWorkspace() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [endOpen, setEndOpen] = useState(false);
   const [ending, setEnding] = useState(false);
+  const [deadlineDays, setDeadlineDays] = useState<string>("14");
+  const [credentials, setCredentials] = useState<{ url: string; password: string; email: string | null } | null>(null);
 
   const supplierId = recipients[0]?.supplier_id ?? "";
   const supplierName = suppliers.find((s) => s.id === supplierId)?.name ?? "—";
