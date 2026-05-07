@@ -1563,6 +1563,48 @@ export type Database = {
           },
         ]
       }
+      email_templates: {
+        Row: {
+          available_variables: Json
+          body_html_template: string
+          body_text_template: string | null
+          created_at: string
+          display_name: string
+          id: string
+          is_active: boolean
+          subject_template: string
+          template_key: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          available_variables?: Json
+          body_html_template: string
+          body_text_template?: string | null
+          created_at?: string
+          display_name: string
+          id?: string
+          is_active?: boolean
+          subject_template: string
+          template_key: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          available_variables?: Json
+          body_html_template?: string
+          body_text_template?: string | null
+          created_at?: string
+          display_name?: string
+          id?: string
+          is_active?: boolean
+          subject_template?: string
+          template_key?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       integration_events: {
         Row: {
           audit_log_id: string | null
@@ -2369,6 +2411,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      microsoft_oauth_tokens: {
+        Row: {
+          access_token_encrypted: string
+          account_email: string
+          created_at: string
+          expires_at: string
+          id: string
+          last_refresh_at: string | null
+          refresh_token_encrypted: string
+          scope: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          access_token_encrypted: string
+          account_email: string
+          created_at?: string
+          expires_at: string
+          id?: string
+          last_refresh_at?: string | null
+          refresh_token_encrypted: string
+          scope: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          access_token_encrypted?: string
+          account_email?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          last_refresh_at?: string | null
+          refresh_token_encrypted?: string
+          scope?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       negotiation_items: {
         Row: {
@@ -7508,6 +7589,7 @@ export type Database = {
         Args: { _legal_entity_id: string }
         Returns: boolean
       }
+      has_ordre_settings_access: { Args: never; Returns: boolean }
       has_position_in_entity: {
         Args: { p_legal_entity_id: string }
         Returns: boolean
