@@ -530,6 +530,9 @@ export default function OrdersList() {
                   <TableHead className="h-9 px-3 text-caption">Kilde</TableHead>
                   <TableHead className="h-9 px-3 text-right text-caption">Linjer</TableHead>
                   <TableHead className="h-9 px-3 text-right text-caption">Sum</TableHead>
+                  {acceptanceOnly && (
+                    <TableHead className="h-9 px-3 text-right text-caption">Aksjon</TableHead>
+                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
