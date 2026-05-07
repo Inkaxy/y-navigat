@@ -134,7 +134,7 @@ export default function Login() {
                   onChange={(e) => setPassword(e.target.value)}
                 />
               </div>
-              <Button type="submit" className="w-full" disabled={submitting}>
+              <Button type="submit" variant="brand" className="w-full" disabled={submitting}>
                 {submitting ? "Logger inn…" : "Logg inn"}
               </Button>
             </form>
