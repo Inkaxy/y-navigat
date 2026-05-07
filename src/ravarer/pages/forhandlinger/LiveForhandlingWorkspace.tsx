@@ -147,21 +147,32 @@ export default function LiveForhandlingWorkspace() {
   async function handleEndSession() {
     setEnding(true);
     try {
+      const days = Math.max(1, Number(deadlineDays) || 14);
+      const deadline = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
       await updateNeg.mutateAsync({
         id,
         patch: {
-          status: "concluded",
+          status: "awaiting_confirmation",
           live_session_ended_at: new Date().toISOString(),
-          concluded_at: new Date().toISOString(),
+          live_confirmation_deadline: deadline,
         } as any,
       });
+      // Generate supplier credentials (reuses RFQ token mechanism)
+      const { data: credRes, error: credErr } = await supabase.functions.invoke(
+        "generate-rfq-credentials",
+        { body: { negotiation_id: id } },
+      );
+      if (credErr) throw credErr;
+      const cred = credRes?.credentials?.[0];
+      if (cred) {
+        const url = `${window.location.origin}/bekreftelse/${cred.access_token}`;
+        setCredentials({ url, password: cred.password, email: cred.contact_email ?? null });
+      }
       await logEvent.mutateAsync({
         negotiation_id: id,
         event_type: "session_ended",
         event_data: { processed: processedCount, total: totalCount, total_savings: totalSavings },
       });
-      setEndOpen(false);
-      navigate(`/ravarer/forhandlinger/${id}`);
     } catch (e: any) {
       toast.error(e?.message ?? "Kunne ikke avslutte");
     } finally {
