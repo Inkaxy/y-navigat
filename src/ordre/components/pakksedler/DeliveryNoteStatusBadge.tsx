@@ -1,5 +1,5 @@
 import { getDeliveryNoteStatusMeta } from "@/ordre/lib/deliveryNoteStatus";
-import { StatusPill } from "@/components/ui/status-pill";
+import { StatusPill } from "@/ordre/components/ui/status-pill";
 
 /**
  * DeliveryNoteStatusBadge — wrapper rundt delt <StatusPill>.
