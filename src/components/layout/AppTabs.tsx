@@ -59,6 +59,7 @@ export function AppTabs() {
         key: "nbhub",
         label: "NBHub",
         to: "/",
+        external: undefined,
         color: "#a47236",
         icon: LayoutDashboard,
       });
