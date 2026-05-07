@@ -5,7 +5,6 @@ import { CommandTrigger } from "./CommandTrigger";
 import { CommandPalette } from "./CommandPalette";
 import { UserMenu } from "./UserMenu";
 import { OutletSelector } from "./OutletSelector";
-import { AppTabs } from "./AppTabs";
 import { AppSwitcher } from "./AppSwitcher";
 import { MobileMenu } from "./MobileMenu";
 import { Logo } from "@/components/brand/Logo";
@@ -41,9 +40,7 @@ export function Topbar() {
           <AppSwitcher />
         </div>
 
-        <div className="hidden min-w-0 flex-1 items-center justify-start pl-3 md:flex">
-          <AppTabs />
-        </div>
+        <div className="hidden min-w-0 flex-1 md:flex" />
 
         <div className="hidden shrink-0 items-center justify-end gap-2 md:flex">
           <CommandTrigger onClick={() => setPaletteOpen(true)} />
