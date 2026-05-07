@@ -320,8 +320,10 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
     if (!input) return;
     setSubmitting(true);
     try {
+      let fallbackCount = 0;
       if (isEdit && orderId) {
-        await updateMut.mutateAsync({ orderId, input });
+        const res = await updateMut.mutateAsync({ orderId, input });
+        fallbackCount = res?.has_zero_fallback_lines?.length ?? 0;
         await logAudit({
           action: "updated",
           entity_type: "order",
@@ -333,6 +335,7 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
         toast.success("Kundeordre oppdatert");
       } else {
         const row = await createMut.mutateAsync(input);
+        fallbackCount = row?.has_zero_fallback_lines?.length ?? 0;
         await logAudit({
           action: "created",
           entity_type: "order",
@@ -346,6 +349,11 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
           },
         });
         toast.success(`Kundeordre ${row.order_number} opprettet`);
+      }
+      if (fallbackCount > 0) {
+        toast.warning(
+          `${fallbackCount} linje(r) fikk pris 0 — mangler prisliste-rad eller spesialpris`,
+        );
       }
       setDirty(false);
       onOpenChange(false);
