@@ -366,17 +366,39 @@ export default function LiveForhandlingWorkspace() {
       </Card>
 
       {/* End dialog */}
-      <Dialog open={endOpen} onOpenChange={setEndOpen}>
+      <Dialog open={endOpen} onOpenChange={(o) => { setEndOpen(o); if (!o && credentials) { setCredentials(null); navigate(`/ravarer/forhandlinger/${id}`); } }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Avslutt forhandling</DialogTitle>
+            <DialogTitle>{credentials ? "Send bekreftelse til leverandør" : "Avslutt forhandling"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 text-sm">
-            <p>
-              Avslutter live-sesjonen og låser status til <strong>concluded</strong>.{" "}
-              {processedCount} av {totalCount} råvarer er behandlet med estimert besparelse{" "}
-              <strong>{formatNok(totalSavings)}/år</strong>.
-            </p>
+            {!credentials && (
+              <>
+                <p>
+                  Avslutter live-sesjonen og setter status til <strong>awaiting_confirmation</strong>.{" "}
+                  {processedCount} av {totalCount} råvarer er behandlet med estimert besparelse{" "}
+                  <strong>{formatNok(totalSavings)}/år</strong>.
+                </p>
+                <div>
+                  <label className="text-xs text-ink-secondary">Frist for bekreftelse (dager)</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={deadlineDays}
+                    onChange={(e) => setDeadlineDays(e.target.value)}
+                    className="mt-1 block w-32 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  />
+                </div>
+              </>
+            )}
+            {credentials && (
+              <div className="space-y-2 rounded-md border border-success/30 bg-success/5 p-3 text-xs">
+                <p className="font-semibold text-success">Lenke og passord generert</p>
+                <p>Send til: <strong>{credentials.email ?? "—"}</strong></p>
+                <p className="break-all">Lenke: <code>{credentials.url}</code></p>
+                <p>Passord (separat e-post): <code className="rounded bg-surface-muted px-1 py-0.5">{credentials.password}</code></p>
+              </div>
+            )}
             <Card className="max-h-48 overflow-auto whitespace-pre-wrap p-3 font-mono text-xs">
               {summaryText()}
             </Card>
@@ -386,16 +408,16 @@ export default function LiveForhandlingWorkspace() {
                 size="sm"
                 onClick={() => {
                   navigator.clipboard.writeText(summaryText());
-                  toast.success("Sammendrag kopiert");
+                  toast.success("Kopiert");
                 }}
               >
                 Kopier sammendrag
               </Button>
-              {recipients[0]?.contact_email && (
+              {recipients[0]?.contact_email && credentials && (
                 <Button asChild variant="outline" size="sm">
                   <a
                     href={`mailto:${recipients[0].contact_email}?subject=${encodeURIComponent(
-                      "Forhandlings-oppsummering: " + (neg.title ?? "")
+                      "Bekreftelse av avtaler: " + (neg.title ?? "")
                     )}&body=${encodeURIComponent(summaryText())}`}
                   >
                     Send på e-post
@@ -406,7 +428,7 @@ export default function LiveForhandlingWorkspace() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEndOpen(false)}>
-              Avbryt
+              {credentials ? "Lukk" : "Avbryt"}
             </Button>
             <Button onClick={handleEndSession} disabled={ending}>
               {ending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
