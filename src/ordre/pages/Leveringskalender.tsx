@@ -585,6 +585,224 @@ export default function MatrixPage() {
     }
   }
 
+  // === Per-kolonne aksjoner ===
+
+  const visibleDatesArr = useMemo(() => [...new Set(columns.map((c) => c.date))], [columns]);
+
+  const colHasAnyData = useCallback(
+    (date: string, tourId: string): boolean => {
+      if (!matrix) return false;
+      for (const c of matrix.existing_cells) {
+        if (c.delivery_date === date && c.delivery_tour_id === tourId && Number(c.quantity) > 0) return true;
+      }
+      return false;
+    },
+    [matrix],
+  );
+
+  async function executeColumnCopy(source: { date: string; tour: MatrixTour }, input: CopyColumnInput) {
+    if (!customerId || !matrix) return;
+    const sourceLines = matrix.existing_cells.filter(
+      (c) => c.delivery_date === source.date && c.delivery_tour_id === source.tour.id,
+    );
+    if (sourceLines.length === 0) {
+      toast.info("Kilde-kolonnen er tom.");
+      return;
+    }
+    const existingTargetByProduct = new Map<string, number>();
+    for (const c of matrix.existing_cells) {
+      if (c.delivery_date === input.targetDate && c.delivery_tour_id === input.targetTourId) {
+        existingTargetByProduct.set(c.product_id, Number(c.quantity));
+      }
+    }
+    const changes: MatrixChange[] = sourceLines.map((c) => {
+      const existing = existingTargetByProduct.get(c.product_id) ?? 0;
+      const qty = input.mode === "sum" ? existing + Number(c.quantity) : Number(c.quantity);
+      const change: MatrixChange = {
+        date: input.targetDate,
+        tour_id: input.targetTourId,
+        product_id: c.product_id,
+        quantity: qty,
+      };
+      if (input.includeMerknad && c.merknad) {
+        change.merknad = c.merknad as Record<string, unknown>;
+      }
+      return change;
+    });
+    try {
+      await saveMatrix.mutateAsync({ customerId, changes });
+      toast.success(`Kopiert ${changes.length} linjer til ${input.targetDate}.`);
+      setCopyColCol(null);
+    } catch (err) {
+      toast.error("Kunne ikke kopiere kolonne", { description: (err as Error).message });
+    }
+  }
+
+  async function saveColumnComment(text: string) {
+    if (!commentCol || !customerId) return;
+    try {
+      await upsertColumnComment.mutateAsync({
+        customerId,
+        date: commentCol.date,
+        tourId: commentCol.tour.id,
+        comment: text,
+      });
+      toast.success("Kommentar lagret");
+      setCommentCol(null);
+    } catch (err) {
+      toast.error("Kunne ikke lagre kommentar", { description: (err as Error).message });
+    }
+  }
+
+  async function confirmDeleteColumn() {
+    if (!deleteColConfirm || !customerId) return;
+    try {
+      const r = await deleteMatrixColumn.mutateAsync({
+        customerId,
+        date: deleteColConfirm.date,
+        tourId: deleteColConfirm.tour.id,
+      });
+      toast.success(`Slettet ${r.lines_deleted} linjer${r.order_deleted ? " (ordre fjernet)" : ""}.`);
+      setDeleteColConfirm(null);
+    } catch (err) {
+      toast.error("Kunne ikke slette", { description: (err as Error).message });
+    }
+  }
+
+  async function generatePackingNoteForColumn(date: string, tour: MatrixTour) {
+    try {
+      const r = await generateNotes.mutateAsync({ date, tourFilter: [tour.id], runType: "main" });
+      toast.success(`Pakkseddel laget: ${r.notes_generated} stk for T${tour.tour_number} ${date}`);
+    } catch (err) {
+      toast.error("Kunne ikke lage pakkseddel", { description: (err as Error).message });
+    }
+  }
+
+  // === Handling-meny aksjoner ===
+
+  // localStorage-toggle for "Vis alle varer"
+  useEffect(() => {
+    if (!customerId) return;
+    const stored = localStorage.getItem(`matrix_show_all_products_${customerId}`);
+    setShowAllProducts(stored === "true");
+  }, [customerId]);
+  function toggleShowAllProducts() {
+    if (!customerId) return;
+    setShowAllProducts((prev) => {
+      const next = !prev;
+      localStorage.setItem(`matrix_show_all_products_${customerId}`, String(next));
+      if (next && addableProducts) {
+        // Legg alle addable inn som lokale rader (de filtres ut når de dukker i serverdata)
+        setAddedProducts((existing) => {
+          const knownIds = new Set([
+            ...(matrix?.products.map((p) => p.id) ?? []),
+            ...existing.map((p) => p.id),
+          ]);
+          const extra = addableProducts
+            .filter((p) => !knownIds.has(p.id))
+            .map((p) => ({
+              id: p.id,
+              display_number: p.display_number,
+              code: "",
+              display_name: p.display_name,
+              sales_unit: p.sales_unit,
+              mva_rate: 0,
+              unit_price: p.unit_price,
+              price_source: p.unit_price == null ? "none" : "default",
+            } as MatrixProduct));
+          return [...existing, ...extra];
+        });
+      }
+      return next;
+    });
+  }
+
+  async function handleSetForAllDays(productId: string, qty: number) {
+    if (!customerId) return;
+    const changes: MatrixChange[] = columns.map((c) => ({
+      date: c.date,
+      tour_id: c.tour.id,
+      product_id: productId,
+      quantity: qty,
+    }));
+    try {
+      await saveMatrix.mutateAsync({ customerId, changes });
+      toast.success(`Satt ${qty} på ${changes.length} kolonner`);
+      setSetForAllOpen(false);
+    } catch (err) {
+      toast.error("Kunne ikke sette mengde", { description: (err as Error).message });
+    }
+  }
+
+  async function handleRemoveProduct(productId: string) {
+    if (!customerId || !matrix) return;
+    const targets = matrix.existing_cells.filter((c) => c.product_id === productId && c.delivery_tour_id);
+    if (targets.length === 0) {
+      toast.info("Ingen linjer å slette i synlig periode.");
+      return;
+    }
+    const changes: MatrixChange[] = targets.map((c) => ({
+      date: c.delivery_date,
+      tour_id: c.delivery_tour_id,
+      product_id: c.product_id,
+      quantity: 0,
+    }));
+    try {
+      await saveMatrix.mutateAsync({ customerId, changes });
+      toast.success(`Slettet ${changes.length} linjer`);
+      setRemoveProdOpen(false);
+    } catch (err) {
+      toast.error("Kunne ikke slette", { description: (err as Error).message });
+    }
+  }
+
+  async function handleMoveProduct(input: { productId: string; sourceTourId: string; targetTourId: string }) {
+    if (!customerId || !matrix) return;
+    const sourceCells = matrix.existing_cells.filter(
+      (c) => c.product_id === input.productId && c.delivery_tour_id === input.sourceTourId,
+    );
+    if (sourceCells.length === 0) {
+      toast.info("Ingen linjer å flytte.");
+      return;
+    }
+    // Bygg én combined batch: 0 i kilde + qty i mål for samme dato. save_matrix_changes kjører i én transaksjon.
+    const changes: MatrixChange[] = [];
+    for (const c of sourceCells) {
+      changes.push({ date: c.delivery_date, tour_id: input.sourceTourId, product_id: c.product_id, quantity: 0 });
+      changes.push({ date: c.delivery_date, tour_id: input.targetTourId, product_id: c.product_id, quantity: Number(c.quantity), ...(c.merknad ? { merknad: c.merknad as Record<string, unknown> } : {}) });
+    }
+    try {
+      await saveMatrix.mutateAsync({ customerId, changes });
+      toast.success(`Flyttet ${sourceCells.length} linjer`);
+      setMoveProdOpen(false);
+    } catch (err) {
+      toast.error("Kunne ikke flytte", { description: (err as Error).message });
+    }
+  }
+
+  async function handleCreatePause(input: { from: string; to: string; reason: string; tourFilter: string[] | null }) {
+    if (!customerId || !selectedCustomer) return;
+    try {
+      const { error } = await supabase
+        .from("delivery_pauses")
+        .insert({
+          legal_entity_id: (selectedCustomer as unknown as { legal_entity_id: string }).legal_entity_id,
+          customer_id: customerId,
+          pause_from: input.from,
+          pause_to: input.to || null,
+          reason: input.reason || null,
+          tour_filter: input.tourFilter,
+        });
+      if (error) throw error;
+      toast.success("Leveransepause opprettet");
+      setPauseOpen(false);
+      // Refresh
+      void Promise.resolve();
+    } catch (err) {
+      toast.error("Kunne ikke opprette pause", { description: (err as Error).message });
+    }
+  }
+
   const hasAddable = (addableProducts?.length ?? 0) > 0;
   const isEmptyMatrix = !!matrix && allProducts.length === 0;
   const hasCustomerCoords = customerLat != null && customerLon != null;
