@@ -511,6 +511,14 @@ export default function LiveForhandlingWorkspace() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <LiveTidslinjeDrawer
+        open={timelineOpen}
+        onOpenChange={setTimelineOpen}
+        negotiationId={id}
+        rmName={(rid) => rawMaterials.find((r) => r.id === rid)?.name ?? "—"}
+        itemRawMaterialMap={new Map(items.map((i) => [i.id, i.raw_material_id]))}
+      />
     </div>
   );
 }
