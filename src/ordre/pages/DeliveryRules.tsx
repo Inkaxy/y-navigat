@@ -364,6 +364,16 @@ export default function DeliveryRules() {
                       >
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => openDuplicate(r)}
+                        className="h-7 w-7 p-0"
+                        aria-label="Lag kopi av regel"
+                        title="Lag kopi"
+                      >
+                        <Copy className="h-3.5 w-3.5" />
+                      </Button>
                       {r.is_active && (
                         <Button
                           size="sm"
