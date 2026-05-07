@@ -170,13 +170,13 @@ export default function OrdersList() {
   return (
     <>
       <AppBanner
-        title="Ordrer"
+        title="Bestillinger"
         subtitle={undefined}
         actions={
           <Button asChild size="sm" className="gap-2">
             <Link to="/ordre/ordrer/ny">
               <Plus className="h-4 w-4" />
-              Ny ordre
+              Ny bestilling
             </Link>
           </Button>
         }
@@ -184,7 +184,7 @@ export default function OrdersList() {
       <div className="container mx-auto space-y-3 px-page py-4 sm:px-page">
         {/* Tittelrad med antallsteller og loader */}
         <div className="flex items-center gap-2">
-          <h2 className="text-title font-semibold text-foreground">Ordrer</h2>
+          <h2 className="text-title font-semibold text-foreground">Bestillinger</h2>
           <Badge variant="secondary" className="font-mono text-caption">
             {total}
           </Badge>
