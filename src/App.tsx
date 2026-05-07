@@ -164,6 +164,7 @@ const App = () => (
               <Route path="/embed/kakebygger/:categoryId" element={<VarerAppProvider><VarerCakeBuilderEmbed /></VarerAppProvider>} />
               {/* Public supplier RFQ portal — no shell, no auth */}
               <Route path="/tilbud/:token" element={<RavarerSupplierPortal />} />
+              <Route path="/bekreftelse/:token" element={<RavarerLiveConfirmationPortal />} />
 
               {/* Varer sub-routes */}
               <Route path="/varer" element={<Shell><AppAccessGuard appCode="varer" appName="Varer"><VarerAppProvider><Navigate to="/varer/vareliste" replace /></VarerAppProvider></AppAccessGuard></Shell>} />
