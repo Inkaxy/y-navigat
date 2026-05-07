@@ -775,6 +775,16 @@ export default function OrdersList() {
           </div>
         </Card>
       </div>
+
+      <StatusChangeDialog
+        open={!!acceptIntent}
+        onOpenChange={(o) => !o && setAcceptIntent(null)}
+        intent={acceptIntent?.intent ?? null}
+        currentStatus={(acceptIntent?.row.status ?? "awaiting_confirmation") as OrderStatus}
+        orderNumber={acceptIntent?.row.order_number ?? ""}
+        customerName={acceptIntent?.row.customer_snapshot?.display_name ?? ""}
+        onConfirm={performAcceptanceChange}
+      />
     </>
   );
 }
