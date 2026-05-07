@@ -72,9 +72,16 @@ function aggregate(series: MetTimeseriesEntry[]): WeatherMap {
   return out;
 }
 
-export function useWeatherForecast(lat = 59.22, lon = 10.42) {
+/**
+ * Henter værvarsel for et koordinatpar. Når lat/lon mangler (typisk: kunde
+ * uten geokoding), returnerer hook-en `data: undefined` og kjører ingen
+ * fetch. Caller må selv vise tom-tilstand.
+ */
+export function useWeatherForecast(lat: number | null | undefined, lon: number | null | undefined) {
+  const enabled = typeof lat === "number" && typeof lon === "number";
   return useQuery({
-    queryKey: ["weather-forecast", lat, lon],
+    queryKey: ["weather-forecast", lat ?? null, lon ?? null],
+    enabled,
     staleTime: 3 * 60 * 60 * 1000, // 3 hours
     gcTime: 6 * 60 * 60 * 1000,
     retry: 1,
@@ -89,3 +96,4 @@ export function useWeatherForecast(lat = 59.22, lon = 10.42) {
     },
   });
 }
+
