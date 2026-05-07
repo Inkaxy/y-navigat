@@ -690,6 +690,7 @@ export default function MatrixPage() {
               addedIds={new Set(addedProducts.map((p) => p.id))}
               getValue={getCellValue}
               isDirty={isDirty}
+              isFallback={(key) => !!fallbackCells[key]}
               onChange={setCellValue}
               hasMerknad={(key) => !!existingMerknad[key]}
               hasData={(key) => getEffectiveQty(key) > 0 || !!existingMerknad[key]}
