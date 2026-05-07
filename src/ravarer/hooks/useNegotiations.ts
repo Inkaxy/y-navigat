@@ -22,6 +22,11 @@ export interface NegotiationRow {
   updated_at: string;
   concluded_at: string | null;
   archived_at: string | null;
+  negotiation_mode?: "rfq" | "live";
+  live_session_started_at?: string | null;
+  live_session_ended_at?: string | null;
+  live_facilitator_id?: string | null;
+  live_location_format?: "physical" | "video" | "phone" | null;
 }
 
 export interface NegotiationItemRow {
@@ -38,6 +43,19 @@ export interface NegotiationItemRow {
   suggested_package_unit: string | null;
   notes: string | null;
   sort_order: number;
+  live_status?: "pending" | "discussing" | "tentatively_agreed" | "agreed" | "declined" | "parked";
+  live_agreed_price?: number | null;
+  live_agreed_price_unit?: string | null;
+  live_agreed_package_size?: number | null;
+  live_agreed_package_unit?: string | null;
+  live_agreed_price_per_base_unit?: number | null;
+  live_agreed_contract_months?: number | null;
+  live_agreed_min_volume?: number | null;
+  live_agreed_min_volume_unit?: string | null;
+  live_agreed_payment_terms_days?: number | null;
+  live_agreed_at?: string | null;
+  live_agreed_by?: string | null;
+  live_notes?: string | null;
 }
 
 export interface NegotiationRecipientRow {

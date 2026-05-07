@@ -2379,6 +2379,19 @@ export type Database = {
           expected_annual_volume: number | null
           expected_annual_volume_unit: string | null
           id: string
+          live_agreed_at: string | null
+          live_agreed_by: string | null
+          live_agreed_contract_months: number | null
+          live_agreed_min_volume: number | null
+          live_agreed_min_volume_unit: string | null
+          live_agreed_package_size: number | null
+          live_agreed_package_unit: string | null
+          live_agreed_payment_terms_days: number | null
+          live_agreed_price: number | null
+          live_agreed_price_per_base_unit: number | null
+          live_agreed_price_unit: string | null
+          live_notes: string | null
+          live_status: string | null
           negotiation_id: string
           notes: string | null
           raw_material_id: string
@@ -2395,6 +2408,19 @@ export type Database = {
           expected_annual_volume?: number | null
           expected_annual_volume_unit?: string | null
           id?: string
+          live_agreed_at?: string | null
+          live_agreed_by?: string | null
+          live_agreed_contract_months?: number | null
+          live_agreed_min_volume?: number | null
+          live_agreed_min_volume_unit?: string | null
+          live_agreed_package_size?: number | null
+          live_agreed_package_unit?: string | null
+          live_agreed_payment_terms_days?: number | null
+          live_agreed_price?: number | null
+          live_agreed_price_per_base_unit?: number | null
+          live_agreed_price_unit?: string | null
+          live_notes?: string | null
+          live_status?: string | null
           negotiation_id: string
           notes?: string | null
           raw_material_id: string
@@ -2411,6 +2437,19 @@ export type Database = {
           expected_annual_volume?: number | null
           expected_annual_volume_unit?: string | null
           id?: string
+          live_agreed_at?: string | null
+          live_agreed_by?: string | null
+          live_agreed_contract_months?: number | null
+          live_agreed_min_volume?: number | null
+          live_agreed_min_volume_unit?: string | null
+          live_agreed_package_size?: number | null
+          live_agreed_package_unit?: string | null
+          live_agreed_payment_terms_days?: number | null
+          live_agreed_price?: number | null
+          live_agreed_price_per_base_unit?: number | null
+          live_agreed_price_unit?: string | null
+          live_notes?: string | null
+          live_status?: string | null
           negotiation_id?: string
           notes?: string | null
           raw_material_id?: string
@@ -2432,6 +2471,54 @@ export type Database = {
             columns: ["raw_material_id"]
             isOneToOne: false
             referencedRelation: "raw_materials"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      negotiation_live_events: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          event_data: Json | null
+          event_type: string
+          id: string
+          negotiation_id: string
+          negotiation_item_id: string | null
+          note: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          event_data?: Json | null
+          event_type: string
+          id?: string
+          negotiation_id: string
+          negotiation_item_id?: string | null
+          note?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          event_data?: Json | null
+          event_type?: string
+          id?: string
+          negotiation_id?: string
+          negotiation_item_id?: string | null
+          note?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "negotiation_live_events_negotiation_id_fkey"
+            columns: ["negotiation_id"]
+            isOneToOne: false
+            referencedRelation: "negotiations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "negotiation_live_events_negotiation_item_id_fkey"
+            columns: ["negotiation_item_id"]
+            isOneToOne: false
+            referencedRelation: "negotiation_items"
             referencedColumns: ["id"]
           },
         ]
@@ -2739,6 +2826,11 @@ export type Database = {
           created_by: string
           id: string
           legal_entity_id: string
+          live_facilitator_id: string | null
+          live_location_format: string | null
+          live_session_ended_at: string | null
+          live_session_started_at: string | null
+          negotiation_mode: string
           notes: string | null
           purpose: string | null
           response_deadline: string | null
@@ -2757,6 +2849,11 @@ export type Database = {
           created_by?: string
           id?: string
           legal_entity_id: string
+          live_facilitator_id?: string | null
+          live_location_format?: string | null
+          live_session_ended_at?: string | null
+          live_session_started_at?: string | null
+          negotiation_mode?: string
           notes?: string | null
           purpose?: string | null
           response_deadline?: string | null
@@ -2775,6 +2872,11 @@ export type Database = {
           created_by?: string
           id?: string
           legal_entity_id?: string
+          live_facilitator_id?: string | null
+          live_location_format?: string | null
+          live_session_ended_at?: string | null
+          live_session_started_at?: string | null
+          negotiation_mode?: string
           notes?: string | null
           purpose?: string | null
           response_deadline?: string | null

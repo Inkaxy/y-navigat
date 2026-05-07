@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -87,6 +87,12 @@ export default function ForhandlingDetail() {
 
   // Conclusion modal
   const [concludeOpen, setConcludeOpen] = useState(false);
+
+  useEffect(() => {
+    if (neg && (neg as any).negotiation_mode === "live" && neg.status !== "concluded" && neg.status !== "cancelled") {
+      navigate(`/ravarer/forhandlinger/live/${id}`, { replace: true });
+    }
+  }, [neg, id, navigate]);
 
   if (!neg) {
     return (
