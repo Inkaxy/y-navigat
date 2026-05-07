@@ -29,7 +29,7 @@ export function UserMenu() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        className="flex items-center gap-1.5 rounded-full border border-line-subtle bg-surface-raised px-3 py-1.5 text-ink-primary transition-all hover:bg-bakery-cream hover:border-bakery-wheat/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-app/40"
+        className="flex items-center gap-1.5 rounded-full border border-brand-cream/15 bg-brand-cream/[0.04] px-3 py-1.5 text-brand-cream/85 transition-all hover:bg-brand-cream/[0.08] hover:border-brand-bronze/40 hover:text-brand-cream focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-bronze/50"
         style={{ fontFamily: "Inter, sans-serif", fontSize: "13px", fontWeight: 500 }}
       >
         <span className="max-w-[160px] truncate">{displayName}</span>
