@@ -245,6 +245,19 @@ export default function MatrixPage() {
     return map;
   }, [matrix]);
 
+  /** Celler der lagret pris er 0 og mengde > 0 — visuell rød advarsel ("Pris ikke funnet"). */
+  const fallbackCells = useMemo(() => {
+    const map: Record<CellKey, true> = {};
+    if (!matrix) return map;
+    for (const c of matrix.existing_cells) {
+      if (!c.delivery_tour_id) continue;
+      if (Number(c.quantity) > 0 && Number(c.unit_price) === 0) {
+        map[ckey(c.delivery_date, c.delivery_tour_id, c.product_id)] = true;
+      }
+    }
+    return map;
+  }, [matrix]);
+
   function getCellValue(key: CellKey): string {
     if (key in edits) return edits[key];
     const v = existingQty[key];
