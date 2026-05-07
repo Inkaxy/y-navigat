@@ -524,6 +524,7 @@ export default function MatrixPage() {
 
   const hasAddable = (addableProducts?.length ?? 0) > 0;
   const isEmptyMatrix = !!matrix && allProducts.length === 0;
+  const hasCustomerCoords = customerLat != null && customerLon != null;
 
   return (
     <div className="flex h-full flex-col">
