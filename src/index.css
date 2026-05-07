@@ -151,37 +151,102 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
-    font-feature-settings: "cv11", "ss01", "ss03";
+    font-feature-settings: "ss01", "cv11";
+  }
+
+  /* Subtilt papir-tekstur over hele canvas */
+  body {
+    background-image:
+      radial-gradient(hsl(24 30% 12% / 0.025) 1px, transparent 1px),
+      radial-gradient(hsl(24 30% 12% / 0.018) 1px, transparent 1px);
+    background-size: 28px 28px, 14px 14px;
+    background-position: 0 0, 7px 7px;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, "SF Pro Display", sans-serif;
+    font-family: 'Fraunces', 'Inter', ui-serif, Georgia, serif;
     font-weight: 600;
-    letter-spacing: -0.018em;
+    letter-spacing: -0.012em;
     color: hsl(var(--text-primary));
+    font-feature-settings: "ss01", "ss02";
   }
-  h1 { font-size: 28px; line-height: 1.2; letter-spacing: -0.022em; font-weight: 600; }
-  h2 { font-size: 20px; line-height: 1.3; font-weight: 600; }
-  h3 { font-size: 16px; line-height: 1.35; font-weight: 600; }
+  h1 {
+    font-size: 32px; line-height: 1.1; letter-spacing: -0.022em; font-weight: 600;
+    font-variation-settings: 'opsz' 144;
+  }
+  h2 { font-size: 22px; line-height: 1.25; font-weight: 600; font-variation-settings: 'opsz' 72; }
+  h3 { font-size: 17px; line-height: 1.3; font-weight: 600; font-variation-settings: 'opsz' 36; }
 
-  ::selection { background: hsl(var(--app-color) / 0.18); color: hsl(var(--text-primary)); }
+  ::selection { background: hsl(var(--brand-bronze) / 0.22); color: hsl(var(--text-primary)); }
 }
 
 @layer utilities {
   .no-scrollbar::-webkit-scrollbar { display: none; }
   .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-  .font-display { font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; letter-spacing: -0.02em; }
-  .font-body    { font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; }
-  .font-serif   { font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; letter-spacing: -0.02em; }
+  .font-display {
+    font-family: 'Fraunces', 'Inter', ui-serif, Georgia, serif;
+    font-weight: 600; letter-spacing: -0.018em;
+    font-variation-settings: 'opsz' 144;
+  }
+  .font-body  { font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; }
+  .font-serif { font-family: 'Fraunces', ui-serif, Georgia, serif; font-variation-settings: 'opsz' 144; }
+  .font-mono-stamp {
+    font-family: 'Inter', sans-serif;
+    font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; font-size: 10px;
+  }
 
   .eyebrow {
     font-family: 'Inter', sans-serif;
-    font-weight: 500;
-    font-size: 11px;
+    font-weight: 600;
+    font-size: 10px;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: hsl(var(--text-tertiary));
+    letter-spacing: 0.22em;
+    color: hsl(var(--brand-bronze));
+  }
+
+  /* Etikett-stil eyebrow med tynne linjer på sidene */
+  .label-rule {
+    display: inline-flex; align-items: center; gap: 10px;
+    font-family: 'Inter', sans-serif; font-weight: 600;
+    font-size: 10px; letter-spacing: 0.24em; text-transform: uppercase;
+    color: hsl(var(--brand-bronze));
+  }
+  .label-rule::before, .label-rule::after {
+    content: ""; display: inline-block; width: 18px; height: 1px;
+    background: hsl(var(--brand-bronze) / 0.5);
+  }
+
+  /* Diamond/krydder-mønster — fra etiketter og pakkedesign */
+  .pattern-diamond {
+    background-color: transparent;
+    background-image:
+      linear-gradient(45deg, hsl(var(--brand-bronze) / 0.10) 25%, transparent 25%, transparent 75%, hsl(var(--brand-bronze) / 0.10) 75%),
+      linear-gradient(45deg, hsl(var(--brand-bronze) / 0.10) 25%, transparent 25%, transparent 75%, hsl(var(--brand-bronze) / 0.10) 75%);
+    background-size: 14px 14px;
+    background-position: 0 0, 7px 7px;
+  }
+  .pattern-diamond-soft {
+    background-image:
+      linear-gradient(45deg, hsl(var(--brand-bronze) / 0.06) 25%, transparent 25%, transparent 75%, hsl(var(--brand-bronze) / 0.06) 75%),
+      linear-gradient(45deg, hsl(var(--brand-bronze) / 0.06) 25%, transparent 25%, transparent 75%, hsl(var(--brand-bronze) / 0.06) 75%);
+    background-size: 18px 18px;
+    background-position: 0 0, 9px 9px;
+  }
+  .pattern-diamond-on-ink {
+    background-image:
+      linear-gradient(45deg, hsl(var(--brand-cream) / 0.05) 25%, transparent 25%, transparent 75%, hsl(var(--brand-cream) / 0.05) 75%),
+      linear-gradient(45deg, hsl(var(--brand-cream) / 0.05) 25%, transparent 25%, transparent 75%, hsl(var(--brand-cream) / 0.05) 75%);
+    background-size: 16px 16px;
+    background-position: 0 0, 8px 8px;
+  }
+
+  /* Tape-aksent: liten "stempel"-ramme */
+  .stamp-frame {
+    box-shadow:
+      0 0 0 1px hsl(var(--brand-bronze) / 0.25),
+      0 0 0 3px hsl(var(--surface-canvas)),
+      0 0 0 4px hsl(var(--brand-bronze) / 0.18);
   }
 
   .shadow-xs { box-shadow: var(--shadow-xs); }
