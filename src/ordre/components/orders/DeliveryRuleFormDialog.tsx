@@ -33,6 +33,8 @@ type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   rule: DeliveryRule | null;
+  /** Når satt og rule=null: forhåndsfyller skjemaet fra denne regelen (brukes for "Lag kopi"). */
+  template?: DeliveryRule | null;
   onSaved: () => void;
 };
 
