@@ -877,7 +877,10 @@ function MatrixGrid({
                     isWeekend ? "bg-muted/60" : "bg-card",
                   )}
                 >
-                  <WeatherCell forecast={weatherMap?.get(g.date)} />
+                  <WeatherCell
+                    forecast={weatherMap?.get(g.date)}
+                    emptyReason={!hasCustomerCoords ? "Kundens adresse mangler koordinater" : undefined}
+                  />
                   <div className="text-muted-foreground">{DAY_LABELS[dow]}</div>
                   <div className="tabular-nums">
                     {new Intl.DateTimeFormat("nb-NO", { day: "2-digit", month: "2-digit" }).format(d)}
@@ -893,15 +896,26 @@ function MatrixGrid({
             </th>
           </tr>
           <tr>
-            {columns.map((c) => (
-              <th
-                key={`${c.date}-${c.tour.id}`}
-                className="border-b border-r border-border bg-card/80 px-1 py-1 text-center text-[11px] font-medium text-muted-foreground"
-                title={`${c.tour.display_name} (${c.tour.time_from.slice(0, 5)}–${c.tour.time_to.slice(0, 5)})`}
-              >
-                T{c.tour.tour_number}
-              </th>
-            ))}
+            {columns.map((c) => {
+              const pause = isPaused(pauseMap, c.date, c.tour.id);
+              return (
+                <th
+                  key={`${c.date}-${c.tour.id}`}
+                  className={cn(
+                    "border-b border-r border-border px-1 py-1 text-center text-[11px] font-medium text-muted-foreground",
+                    pause ? "bg-sky-100 dark:bg-sky-950/40" : "bg-card/80",
+                  )}
+                  title={`${c.tour.display_name} (${c.tour.time_from.slice(0, 5)}–${c.tour.time_to.slice(0, 5)})${pause?.reason ? ` · Pause: ${pause.reason}` : pause ? " · Pause" : ""}`}
+                >
+                  <div>T{c.tour.tour_number}</div>
+                  {pause && (
+                    <div className="mt-0.5 inline-block rounded-sm bg-sky-200/80 px-1 text-[9px] font-semibold uppercase tracking-wide text-sky-900 dark:bg-sky-800/60 dark:text-sky-100">
+                      Pause
+                    </div>
+                  )}
+                </th>
+              );
+            })}
           </tr>
         </thead>
         <tbody>
