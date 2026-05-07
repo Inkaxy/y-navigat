@@ -264,7 +264,7 @@ export default function OrderDetail() {
         actions={
           <Button asChild variant="outline" size="sm" className="gap-2">
             <Link to="/ordre/ordrer">
-              <ArrowLeft className="h-4 w-4" /> Ordrer
+              <ArrowLeft className="h-4 w-4" /> Bestillinger
             </Link>
           </Button>
         }
