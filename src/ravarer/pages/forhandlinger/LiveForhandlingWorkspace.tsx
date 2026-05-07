@@ -430,10 +430,12 @@ export default function LiveForhandlingWorkspace() {
             <Button variant="outline" onClick={() => setEndOpen(false)}>
               {credentials ? "Lukk" : "Avbryt"}
             </Button>
-            <Button onClick={handleEndSession} disabled={ending}>
-              {ending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Avslutt sesjon
-            </Button>
+            {!credentials && (
+              <Button onClick={handleEndSession} disabled={ending}>
+                {ending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Avslutt og generer lenke
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
