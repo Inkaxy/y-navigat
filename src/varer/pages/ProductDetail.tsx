@@ -71,7 +71,7 @@ export default function ProductDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const { canWrite } = useAppContext();
+  const { canWrite, legalEntityId } = useAppContext();
   const [params, setParams] = useSearchParams();
   const tab = params.get("tab") ?? "navn";
   const [saving, setSaving] = useState(false);

@@ -38,7 +38,7 @@ const STATUS_BADGE: Record<ProductStatus, string> = {
 
 export default function ProductList() {
   const navigate = useNavigate();
-  const { canWrite } = useAppContext();
+  const { canWrite, legalEntityId } = useAppContext();
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<string>("all");
   const [status, setStatus] = useState<string>("all");

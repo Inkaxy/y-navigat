@@ -123,7 +123,7 @@ interface StepProductRow {
 export default function CakeBuilderDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { canWrite } = useAppContext();
+  const { canWrite, legalEntityId } = useAppContext();
   const { toast } = useToast();
   const qc = useQueryClient();
 

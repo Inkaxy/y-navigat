@@ -20,7 +20,7 @@ const STATUS_BADGE: Record<string, string> = {
 
 export default function CakeBuilderList() {
   const navigate = useNavigate();
-  const { canWrite } = useAppContext();
+  const { canWrite, legalEntityId } = useAppContext();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
 

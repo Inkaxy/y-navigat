@@ -66,7 +66,7 @@ type StatusFilter = "active" | "expired" | "future" | "all";
 
 export default function SpecialPrices() {
   const qc = useQueryClient();
-  const { canWrite } = useAppContext();
+  const { canWrite, legalEntityId } = useAppContext();
 
   const [search, setSearch] = useState("");
   const [filterCustomer, setFilterCustomer] = useState<string>(ALL);

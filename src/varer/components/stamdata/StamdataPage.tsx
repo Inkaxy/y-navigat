@@ -122,7 +122,7 @@ export function StamdataPage({
   extraColumns = [],
 }: StamdataPageProps) {
   const qc = useQueryClient();
-  const { canWrite } = useAppContext();
+  const { canWrite, legalEntityId } = useAppContext();
   const [search, setSearch] = useState("");
   const [editing, setEditing] = useState<StamdataRow | null>(null);
   const [creating, setCreating] = useState(false);

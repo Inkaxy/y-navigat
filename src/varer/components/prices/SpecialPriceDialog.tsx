@@ -142,7 +142,7 @@ export function SpecialPriceDialog({
   priceLists,
   onSaved,
 }: Props) {
-  const { canWrite } = useAppContext();
+  const { canWrite, legalEntityId } = useAppContext();
   const [form, setForm] = useState<SpecialPriceFormValues>(emptyForm);
   const [locks, setLocks] = useState<LockState>({});
   const [saving, setSaving] = useState(false);

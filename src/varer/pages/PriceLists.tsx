@@ -58,7 +58,7 @@ function formatNb(date: string): string {
 export default function PriceLists() {
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const { canWrite } = useAppContext();
+  const { canWrite, legalEntityId } = useAppContext();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const view: ViewMode =

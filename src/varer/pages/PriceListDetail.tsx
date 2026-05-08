@@ -19,7 +19,7 @@ export default function PriceListDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const { canWrite } = useAppContext();
+  const { canWrite, legalEntityId } = useAppContext();
   const [editing, setEditing] = useState<{ id: string; price: string } | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [addForm, setAddForm] = useState({ product_id: "", price: "" });
