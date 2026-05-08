@@ -20,12 +20,24 @@ type LE = {
   id: string;
   short_code: string;
   legal_name: string;
+  display_name: string | null;
   org_number: string;
+  gln: string | null;
   gs1_prefix: string | null;
   invoice_address_line1: string | null;
+  invoice_address_line2: string | null;
   invoice_postal_code: string | null;
   invoice_city: string | null;
   invoice_country: string;
+  contact_person: string | null;
+  contact_email: string | null;
+  contact_phone: string | null;
+  support_email: string | null;
+  support_phone: string | null;
+  bank_name: string | null;
+  bank_account: string | null;
+  iban: string | null;
+  swift: string | null;
   status: string;
   created_at: string;
 };
@@ -33,12 +45,24 @@ type LE = {
 const empty: Partial<LE> = {
   short_code: "",
   legal_name: "",
+  display_name: "",
   org_number: "",
+  gln: "",
   gs1_prefix: "",
   invoice_address_line1: "",
+  invoice_address_line2: "",
   invoice_postal_code: "",
   invoice_city: "",
   invoice_country: "NO",
+  contact_person: "",
+  contact_email: "",
+  contact_phone: "",
+  support_email: "",
+  support_phone: "",
+  bank_name: "",
+  bank_account: "",
+  iban: "",
+  swift: "",
   status: "active",
 };
 
