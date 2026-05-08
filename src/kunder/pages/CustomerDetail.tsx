@@ -843,31 +843,30 @@ export default function CustomerDetail() {
 
               <Card>
                 <CardHeader>
-                  <CardTitle>Hovedkontakt</CardTitle>
-                  <CardDescription>Primær kontaktperson — flere kan legges til under</CardDescription>
+                  <CardTitle>Kontaktpersoner</CardTitle>
+                  <CardDescription>Hovedkontakt og eventuelle tilleggskontakter</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-3">
-                  <Field label="Navn">
-                    <Input {...form.register("primary_contact_name")} disabled={!canWrite} />
-                  </Field>
-                  <div className="grid grid-cols-2 gap-3">
-                    <Field label="E-post" error={form.formState.errors.primary_contact_email?.message}>
-                      <Input type="email" {...form.register("primary_contact_email")} disabled={!canWrite} />
+                <CardContent className="space-y-4">
+                  <div className="space-y-3">
+                    <Field label="Navn">
+                      <Input {...form.register("primary_contact_name")} disabled={!canWrite} />
                     </Field>
-                    <Field label="Telefon">
-                      <Input {...form.register("primary_contact_phone")} disabled={!canWrite} />
+                    <div className="grid grid-cols-2 gap-3">
+                      <Field label="E-post" error={form.formState.errors.primary_contact_email?.message}>
+                        <Input type="email" {...form.register("primary_contact_email")} disabled={!canWrite} />
+                      </Field>
+                      <Field label="Telefon">
+                        <Input {...form.register("primary_contact_phone")} disabled={!canWrite} />
+                      </Field>
+                    </div>
+                    <Field label="Mobil">
+                      <Input {...form.register("mobile_phone")} disabled={!canWrite} />
                     </Field>
                   </div>
-                  <Field label="Mobil">
-                    <Input {...form.register("mobile_phone")} disabled={!canWrite} />
-                  </Field>
+                  <CustomerContactsCard customerId={customer.id} canWrite={canWrite} />
                 </CardContent>
               </Card>
 
-            </div>
-
-            <div className="mt-4">
-              <CustomerContactsCard customerId={customer.id} canWrite={canWrite} />
             </div>
           </TabsContent>
 
