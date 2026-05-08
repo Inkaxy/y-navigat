@@ -231,6 +231,8 @@ export default function CustomerDetail() {
 
   useEffect(() => {
     if (!customer) return;
+    // Ikke overskriv lokale ulagrede endringer hvis bruker har endret skjema/overrides
+    if (form.formState.isDirty || overridesDirty) return;
     const sameAsBilling =
       !customer.delivery_address_line1 &&
       !customer.delivery_address_line2 &&
@@ -276,7 +278,7 @@ export default function CustomerDetail() {
     });
     setOverrides((customer.profile_overrides as Record<string, unknown>) ?? {});
     setOverridesDirty(false);
-  }, [customer, form]);
+  }, [customer, form, overridesDirty]);
 
   const isDirty = form.formState.isDirty || overridesDirty;
   const watchSameAsBilling = form.watch("same_as_billing");
