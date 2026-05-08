@@ -371,6 +371,39 @@ export default function ProfileDetail() {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      if (!profile) throw new Error("Mangler profil");
+      // Rydd lenker først (ingen ON DELETE CASCADE)
+      const { error: linkErr } = await supabase
+        .from("customer_profile_price_lists")
+        .delete()
+        .eq("customer_profile_id", profile.id);
+      if (linkErr) throw linkErr;
+      const { error } = await supabase
+        .from("customer_profiles")
+        .delete()
+        .eq("id", profile.id);
+      if (error) throw error;
+      await logAudit({
+        action: "customer_profile.deleted",
+        entity_type: "customer_profile",
+        entity_id: profile.id,
+        entity_display_reference: `${profile.code} — ${profile.display_name}`,
+        legal_entity_id: profile.legal_entity_id,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["customer-profiles"] });
+      queryClient.invalidateQueries({ queryKey: ["customer-profile-usage"] });
+      toast.success("Profil slettet");
+      navigate("/kunder/profiler");
+    },
+    onError: (e: any) => {
+      toast.error(`Kunne ikke slette: ${e?.message ?? "Ukjent feil"}`);
+    },
+  });
+
   function handleBack() {
     if (isDirty) {
       const ok = window.confirm("Du har ulagrede endringer. Forlat siden likevel?");
