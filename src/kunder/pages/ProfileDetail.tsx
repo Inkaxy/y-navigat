@@ -898,6 +898,37 @@ export default function ProfileDetail() {
                     }
                     disabled={!canWrite}
                   />
+                  <div className="rounded-md border border-border bg-muted/30 p-3 space-y-3">
+                    <Field label="Sending av følgeseddel/utskrifter">
+                      <SelectField
+                        value={form.watch("packing_slip_delivery_mode") || "none"}
+                        onChange={(v) =>
+                          form.setValue("packing_slip_delivery_mode", v, { shouldDirty: true })
+                        }
+                        disabled={!canWrite}
+                        options={[
+                          { v: "none", l: "Ingen — kun manuell utskrift" },
+                          { v: "email", l: "E-post (PDF)" },
+                          { v: "print", l: "Utskrift" },
+                          { v: "both", l: "Både e-post og utskrift" },
+                        ]}
+                      />
+                    </Field>
+                    {(form.watch("packing_slip_delivery_mode") === "email" ||
+                      form.watch("packing_slip_delivery_mode") === "both") && (
+                      <Field label="E-poster for følgeseddel (komma-separert)">
+                        <Textarea
+                          {...form.register("packing_slip_emails")}
+                          disabled={!canWrite}
+                          rows={2}
+                          placeholder="post@kunde.no, daglig.leder@kunde.no"
+                        />
+                      </Field>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      Gjelder alle kunder som arver denne profilen. Kan overstyres per kunde.
+                    </p>
+                  </div>
                   <CheckboxField
                     label="Endringslogg på følgeseddel"
                     checked={form.watch("include_change_log_on_packing_slip")}
