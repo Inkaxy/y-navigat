@@ -173,6 +173,7 @@ export default function CustomerDetail() {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [changeProfileOpen, setChangeProfileOpen] = useState(false);
   const [confirmAction, setConfirmAction] = useState<"deactivate" | "delete" | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
 
   // Lokal state for overrides (separat fra react-hook-form for fleksibilitet)
   const [overrides, setOverrides] = useState<Record<string, unknown>>({});
