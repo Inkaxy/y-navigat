@@ -630,6 +630,65 @@ export type Database = {
           },
         ]
       }
+      customer_contacts: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          customer_id: string
+          email: string | null
+          id: string
+          is_primary: boolean
+          legal_entity_id: string
+          mobile: string | null
+          name: string
+          notes: string | null
+          phone: string | null
+          role: string | null
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          customer_id: string
+          email?: string | null
+          id?: string
+          is_primary?: boolean
+          legal_entity_id: string
+          mobile?: string | null
+          name: string
+          notes?: string | null
+          phone?: string | null
+          role?: string | null
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string
+          email?: string | null
+          id?: string
+          is_primary?: boolean
+          legal_entity_id?: string
+          mobile?: string | null
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          role?: string | null
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_contacts_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customer_group_members: {
         Row: {
           added_at: string
