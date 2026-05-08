@@ -2492,9 +2492,15 @@ export type Database = {
       legal_entities: {
         Row: {
           bank_account: string | null
+          bank_name: string | null
           breadscale_default_enabled: boolean
+          contact_email: string | null
+          contact_person: string | null
+          contact_phone: string | null
           created_at: string
+          display_name: string | null
           founded_year: number | null
+          gln: string | null
           gs1_prefix: string | null
           iban: string | null
           id: string
@@ -2512,15 +2518,23 @@ export type Database = {
           short_code: string
           signature_color: string | null
           status: string
+          support_email: string | null
+          support_phone: string | null
           swift: string | null
           updated_at: string
           vat_number: string | null
         }
         Insert: {
           bank_account?: string | null
+          bank_name?: string | null
           breadscale_default_enabled?: boolean
+          contact_email?: string | null
+          contact_person?: string | null
+          contact_phone?: string | null
           created_at?: string
+          display_name?: string | null
           founded_year?: number | null
+          gln?: string | null
           gs1_prefix?: string | null
           iban?: string | null
           id?: string
@@ -2538,15 +2552,23 @@ export type Database = {
           short_code: string
           signature_color?: string | null
           status?: string
+          support_email?: string | null
+          support_phone?: string | null
           swift?: string | null
           updated_at?: string
           vat_number?: string | null
         }
         Update: {
           bank_account?: string | null
+          bank_name?: string | null
           breadscale_default_enabled?: boolean
+          contact_email?: string | null
+          contact_person?: string | null
+          contact_phone?: string | null
           created_at?: string
+          display_name?: string | null
           founded_year?: number | null
+          gln?: string | null
           gs1_prefix?: string | null
           iban?: string | null
           id?: string
@@ -2564,6 +2586,8 @@ export type Database = {
           short_code?: string
           signature_color?: string | null
           status?: string
+          support_email?: string | null
+          support_phone?: string | null
           swift?: string | null
           updated_at?: string
           vat_number?: string | null
