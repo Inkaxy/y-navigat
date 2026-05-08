@@ -508,10 +508,21 @@ function TemplateEditorCard() {
 
                     {/* Sticky lagre-bar */}
                     <div className="sticky bottom-0 -mx-6 flex items-center justify-between gap-2 border-t bg-card/95 px-6 py-3 backdrop-blur">
-                      <p className="text-xs text-muted-foreground">
-                        {dirty ? "Du har ulagrede endringer." : "Alt er lagret."}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs text-muted-foreground">
+                          {dirty ? "Du har ulagrede endringer." : "Alt er lagret."}
+                        </p>
+                      </div>
                       <div className="flex gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setConfirmDelete(true)}
+                          disabled={saving}
+                          className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        >
+                          <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Slett
+                        </Button>
                         <Button
                           variant="ghost"
                           size="sm"
