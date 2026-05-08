@@ -1024,3 +1024,22 @@ function Field({
     </div>
   );
 }
+
+function CustomerHistoryTab({ customerId, legalEntityId }: { customerId: string; legalEntityId: string }) {
+  const { data, isLoading } = useCustomerActivityFeed({
+    legalEntityId,
+    customerId,
+    limit: 100,
+  });
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Historikk</CardTitle>
+        <CardDescription>Endringer, ordrer og fakturerte ordrer for denne kunden</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <ActivityTimeline items={data ?? []} isLoading={isLoading} showCustomerLink={false} />
+      </CardContent>
+    </Card>
+  );
+}
