@@ -245,7 +245,18 @@ export default function ImportPdfPage({ embedded = false }: { embedded?: boolean
         if (linesErr) throw linesErr;
       }
 
-      if (lines.length === 0) {
+      const newSavedIds = [...savedIds, invoice.id];
+      setSavedIds(newSavedIds);
+      const hasMore = queueIndex < queue.length - 1;
+
+      if (hasMore) {
+        toast.success(`Faktura ${queueIndex + 1} av ${queue.length} lagret — neste fil`);
+        resetFormForNext();
+        setQueueIndex(queueIndex + 1);
+      } else if (queue.length > 1) {
+        toast.success(`Alle ${queue.length} fakturaer lagret`);
+        navigate("/ravarer/fakturaer");
+      } else if (lines.length === 0) {
         toast.success("Faktura opprettet — registrer linjer");
         navigate(`/ravarer/fakturaer/${invoice.id}/registrer-linjer`);
       } else {
