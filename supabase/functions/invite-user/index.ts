@@ -93,7 +93,7 @@ Deno.serve(async (req) => {
       first_name: body.first_name,
       last_name: body.last_name,
       email,
-      status: "invited",
+      status: "onboarding",
     });
     if (insErr && !insErr.message.includes("duplicate")) {
       return json(500, { error: `Bruker opprettet i auth, men feilet å lagre profil: ${insErr.message}` });
