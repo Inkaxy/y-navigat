@@ -121,7 +121,7 @@ Deno.serve(async (req) => {
       assigned_by: callerId,
     }));
     const { error: posErr } = await admin.from("user_positions").insert(rows);
-    if (posErr) {
+    if (posErr && !posErr.message.includes("duplicate")) {
       return json(500, { error: `Stillinger kunne ikke tilordnes: ${posErr.message}` });
     }
 
