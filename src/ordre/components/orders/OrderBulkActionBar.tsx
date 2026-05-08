@@ -45,8 +45,52 @@ interface Props {
  */
 export function OrderBulkActionBar({ selected, onClear, onMutated, csvHeaders }: Props) {
   const [running, setRunning] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteText, setDeleteText] = useState("");
   const count = selected.length;
   if (count === 0) return null;
+
+  async function performBulkDelete() {
+    setRunning(true);
+    let ok = 0;
+    let failed = 0;
+    const toastId = toast.loading(`Sletter 0 av ${count}…`);
+    try {
+      for (let i = 0; i < selected.length; i++) {
+        const order = selected[i];
+        toast.loading(`Sletter ${i + 1} av ${count}…`, { id: toastId });
+        try {
+          await logAudit({
+            entity_type: "order",
+            entity_id: order.id,
+            entity_display_reference: order.order_number,
+            action: "bulk_delete",
+            changes: { order_snapshot: order as unknown as Record<string, unknown> },
+            reason: "Bulk-sletting fra ordreliste",
+          });
+          const { error: delErr } = await supabase.from("orders").delete().eq("id", order.id);
+          if (delErr) throw delErr;
+          ok++;
+        } catch (e: any) {
+          failed++;
+          // eslint-disable-next-line no-console
+          console.error(`Bulk-sletting feilet for ${order.order_number}`, e);
+        }
+      }
+      if (failed === 0) {
+        toast.success(`${ok} ordre slettet.`, { id: toastId });
+      } else {
+        toast.error(`${ok} slettet, ${failed} feilet. Sjekk konsollen.`, { id: toastId });
+      }
+      setDeleteOpen(false);
+      setDeleteText("");
+      onMutated();
+      onClear();
+    } finally {
+      setRunning(false);
+    }
+  }
+
 
   async function applyStatus(to: OrderStatus, toLabel: string) {
     if (!confirm(`Endre status til "${toLabel}" for ${count} valgte ordre?`)) return;
