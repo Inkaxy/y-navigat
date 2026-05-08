@@ -63,8 +63,11 @@ export function CommandPalette({ open, onOpenChange }: Props) {
     close();
   };
 
-  const handleAppSwitch = (appUrl: string, appPath: string) => {
-    window.location.href = `${appUrl}${appPath}?from=${CURRENT_APP_SLUG}`;
+  const handleAppSwitch = (slug: string) => {
+    const route = getAppInternalRoute(slug);
+    if (!route) return;
+    navigate(route);
+    close();
   };
 
   const handleCompany = (id: string) => {
