@@ -58,6 +58,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCustomer, usePriceLists } from "@/kunder/hooks/useCustomers";
 import { useCustomerProfile } from "@/kunder/hooks/useCustomerProfiles";
 import { usePickupLocations } from "@/kunder/hooks/usePickupLocations";
+import { CustomerContactsCard } from "@/kunder/components/customers/CustomerContactsCard";
 import { useUserAccess } from "@/kunder/hooks/useUserAccess";
 import { useAuth } from "@/hooks/useAuth";
 import { logAudit } from "@/kunder/lib/audit";
@@ -843,7 +844,7 @@ export default function CustomerDetail() {
               <Card>
                 <CardHeader>
                   <CardTitle>Hovedkontakt</CardTitle>
-                  <CardDescription>Foreløpig én kontaktperson</CardDescription>
+                  <CardDescription>Primær kontaktperson — flere kan legges til under</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <Field label="Navn">
@@ -863,6 +864,10 @@ export default function CustomerDetail() {
                 </CardContent>
               </Card>
 
+            </div>
+
+            <div className="mt-4">
+              <CustomerContactsCard customerId={customer.id} canWrite={canWrite} />
             </div>
           </TabsContent>
 
