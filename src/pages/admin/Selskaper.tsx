@@ -281,3 +281,12 @@ function Field({ label, value, onChange, className }: { label: string; value: st
     </div>
   );
 }
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">{title}</div>
+      {children}
+    </div>
+  );
+}
