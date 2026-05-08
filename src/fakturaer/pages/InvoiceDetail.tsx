@@ -4,13 +4,17 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ArrowLeft, Loader2, LineChart as LineChartIcon, CheckCircle2, Flag, Sparkles } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { ArrowLeft, Loader2, LineChart as LineChartIcon, CheckCircle2, Flag, Sparkles, Link2, Pencil, RefreshCw } from "lucide-react";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { FakturaerHeaderBanner } from "@/fakturaer/components/FakturaerHeaderBanner";
 import { InvoiceStatusBadge } from "@/fakturaer/components/InvoiceStatusBadge";
 import { ConfirmReconcileDialog } from "@/fakturaer/components/ConfirmReconcileDialog";
 import { FlagInvoiceDialog } from "@/fakturaer/components/FlagInvoiceDialog";
 import { BulkImportRawMaterialsDrawer } from "@/fakturaer/components/BulkImportRawMaterialsDrawer";
+import { MatchDrawer } from "@/fakturaer/components/MatchDrawer";
+import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
 import { useFakturaer } from "@/fakturaer/context/FakturaerContext";
 import { formatNok, formatDate, INVOICE_SOURCES } from "@/fakturaer/lib/constants";
 
@@ -23,6 +27,8 @@ export default function InvoiceDetailPage() {
   const [flagOpen, setFlagOpen] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
+  const [matchLineId, setMatchLineId] = useState<string | null>(null);
+  const [rematching, setRematching] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["invoice", id],
