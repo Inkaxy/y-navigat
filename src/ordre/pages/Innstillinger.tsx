@@ -279,15 +279,7 @@ function TemplateEditorCard() {
         el?.setSelectionRange(start + token.length, start + token.length);
       });
     } else {
-      const el = bodyRef.current;
-      const start = el?.selectionStart ?? bodyDraft.length;
-      const end = el?.selectionEnd ?? bodyDraft.length;
-      const next = bodyDraft.slice(0, start) + token + bodyDraft.slice(end);
-      setBodyDraft(next);
-      requestAnimationFrame(() => {
-        el?.focus();
-        el?.setSelectionRange(start + token.length, start + token.length);
-      });
+      bodyEditorRef.current?.insertText(token);
     }
   };
 
