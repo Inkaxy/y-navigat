@@ -114,8 +114,7 @@ export function AppTabs() {
   }, [entries, visibleCount, pathname]);
 
   const goTo = (e: Entry) => {
-    if (e.external) window.location.href = e.external;
-    else if (e.to) navigate(e.to);
+    if (e.to) navigate(e.to);
   };
 
   return (
