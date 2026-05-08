@@ -7,7 +7,7 @@ import {
   FileEdit,
   Package,
   ArrowRight,
-  Inbox,
+  
 } from "lucide-react";
 import { TicketsInbox } from "@/ordre/components/shell/TicketsInbox";
 import { AppBanner } from "@/ordre/components/shell/AppBanner";
