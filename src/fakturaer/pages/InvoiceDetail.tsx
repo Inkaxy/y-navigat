@@ -150,6 +150,12 @@ export default function InvoiceDetailPage() {
         actions={
           <div className="flex items-center gap-2">
             <InvoiceStatusBadge status={data.status} />
+            {!isFinal && canMatch && lines.length > 0 && (
+              <Button variant="outline" size="sm" onClick={rerunAutoMatch} disabled={rematching} className="gap-1.5">
+                {rematching ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                Kjør auto-match
+              </Button>
+            )}
             {!isFinal && canWrite && (
               <Button variant="outline" size="sm" onClick={() => setFlagOpen(true)} className="gap-1.5">
                 <Flag className="h-4 w-4" /> Flagg for oppfølging
