@@ -6830,6 +6830,187 @@ export type Database = {
           },
         ]
       }
+      ticket_attachments: {
+        Row: {
+          content_type: string | null
+          created_at: string
+          file_name: string
+          id: string
+          is_inline: boolean
+          microsoft_attachment_id: string | null
+          size_bytes: number | null
+          storage_path: string | null
+          ticket_id: string
+        }
+        Insert: {
+          content_type?: string | null
+          created_at?: string
+          file_name: string
+          id?: string
+          is_inline?: boolean
+          microsoft_attachment_id?: string | null
+          size_bytes?: number | null
+          storage_path?: string | null
+          ticket_id: string
+        }
+        Update: {
+          content_type?: string | null
+          created_at?: string
+          file_name?: string
+          id?: string
+          is_inline?: boolean
+          microsoft_attachment_id?: string | null
+          size_bytes?: number | null
+          storage_path?: string | null
+          ticket_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_attachments_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ticket_subscriptions: {
+        Row: {
+          client_state: string
+          created_at: string
+          expiration_date_time: string
+          id: string
+          last_renewed_at: string | null
+          microsoft_subscription_id: string
+          notification_url: string
+          resource: string
+        }
+        Insert: {
+          client_state: string
+          created_at?: string
+          expiration_date_time: string
+          id?: string
+          last_renewed_at?: string | null
+          microsoft_subscription_id: string
+          notification_url: string
+          resource: string
+        }
+        Update: {
+          client_state?: string
+          created_at?: string
+          expiration_date_time?: string
+          id?: string
+          last_renewed_at?: string | null
+          microsoft_subscription_id?: string
+          notification_url?: string
+          resource?: string
+        }
+        Relationships: []
+      }
+      tickets: {
+        Row: {
+          ai_analyzed_at: string | null
+          ai_cost_usd: number | null
+          ai_model: string | null
+          ai_provider: string | null
+          ai_status: string | null
+          ai_suggestion: Json | null
+          assigned_to: string | null
+          body_html: string | null
+          body_preview: string | null
+          body_text: string | null
+          cc_recipients: Json
+          conversation_id: string | null
+          created_at: string
+          has_attachments: boolean
+          id: string
+          importance: string | null
+          internal_notes: string | null
+          microsoft_internet_message_id: string | null
+          microsoft_message_id: string
+          priority: string
+          received_at: string
+          related_order_id: string | null
+          sender_email: string
+          sender_name: string | null
+          source_mailbox: string
+          status: string
+          subject: string | null
+          to_recipients: Json
+          updated_at: string
+        }
+        Insert: {
+          ai_analyzed_at?: string | null
+          ai_cost_usd?: number | null
+          ai_model?: string | null
+          ai_provider?: string | null
+          ai_status?: string | null
+          ai_suggestion?: Json | null
+          assigned_to?: string | null
+          body_html?: string | null
+          body_preview?: string | null
+          body_text?: string | null
+          cc_recipients?: Json
+          conversation_id?: string | null
+          created_at?: string
+          has_attachments?: boolean
+          id?: string
+          importance?: string | null
+          internal_notes?: string | null
+          microsoft_internet_message_id?: string | null
+          microsoft_message_id: string
+          priority?: string
+          received_at: string
+          related_order_id?: string | null
+          sender_email: string
+          sender_name?: string | null
+          source_mailbox?: string
+          status?: string
+          subject?: string | null
+          to_recipients?: Json
+          updated_at?: string
+        }
+        Update: {
+          ai_analyzed_at?: string | null
+          ai_cost_usd?: number | null
+          ai_model?: string | null
+          ai_provider?: string | null
+          ai_status?: string | null
+          ai_suggestion?: Json | null
+          assigned_to?: string | null
+          body_html?: string | null
+          body_preview?: string | null
+          body_text?: string | null
+          cc_recipients?: Json
+          conversation_id?: string | null
+          created_at?: string
+          has_attachments?: boolean
+          id?: string
+          importance?: string | null
+          internal_notes?: string | null
+          microsoft_internet_message_id?: string | null
+          microsoft_message_id?: string
+          priority?: string
+          received_at?: string
+          related_order_id?: string | null
+          sender_email?: string
+          sender_name?: string | null
+          source_mailbox?: string
+          status?: string
+          subject?: string | null
+          to_recipients?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tickets_related_order_id_fkey"
+            columns: ["related_order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tripletex_credentials: {
         Row: {
           consumer_token_encrypted: string | null

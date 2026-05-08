@@ -13,6 +13,7 @@ import { Mail, ShieldCheck, FileText, AlertCircle, CheckCircle2, Send } from "lu
 import { useOrdreEmailSettings } from "@/ordre/hooks/useOrdreEmailSettings";
 import { useEmailTemplates } from "@/ordre/hooks/useEmailTemplates";
 import { SendTestEmailDialog } from "@/ordre/components/shell/SendTestEmailDialog";
+import { EmailReceiveCard } from "@/ordre/components/shell/EmailReceiveCard";
 import { supabase } from "@/integrations/supabase/client";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -178,7 +179,10 @@ export default function OrdreInnstillingerPage() {
         </CardContent>
       </Card>
 
-      {/* Kort 3: Mal-editor */}
+      {/* Kort 3: E-post-mottak */}
+      <EmailReceiveCard accountConnected={!!account?.is_connected} />
+
+      {/* Kort 4: Mal-editor */}
       <TemplateEditorCard />
 
       <SendTestEmailDialog

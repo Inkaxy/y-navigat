@@ -219,9 +219,11 @@ export default function NewOrder() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const prefilledCustomerId = searchParams.get("customer_id");
+  const ticketId = searchParams.get("ticket_id");
   const isReturnFromUrl = searchParams.get("is_return") === "true";
   const [customer, setCustomer] = useState<CustomerOption | null>(null);
   const [isReturn] = useState<boolean>(isReturnFromUrl);
+  const [ticketBanner, setTicketBanner] = useState<string | null>(null);
 
   // Pre-velg kunde fra URL-param ved første render
   useEffect(() => {
@@ -238,6 +240,34 @@ export default function NewOrder() {
     })();
     return () => { cancelled = true; };
   }, [prefilledCustomerId, customer]);
+
+  // Pre-fyll fra ticket (hvis ticket_id i URL)
+  useEffect(() => {
+    if (!ticketId) return;
+    let cancelled = false;
+    (async () => {
+      const { data: t } = await supabase.from("tickets").select("subject, sender_email").eq("id", ticketId).maybeSingle();
+      if (cancelled || !t) return;
+      // Forsøk match på sender-email
+      if (!customer && !prefilledCustomerId) {
+        const { data: c } = await supabase
+          .from("customers")
+          .select("id, customer_number, display_name, organization_number, primary_contact_name, primary_contact_email, invoice_recipient_customer_id, delivery_address_line1, delivery_address_line2, delivery_postal_code, delivery_city, delivery_country, delivery_instructions")
+          .ilike("primary_contact_email", t.sender_email)
+          .maybeSingle();
+        if (cancelled) return;
+        if (c) {
+          setCustomer(c as unknown as CustomerOption);
+          setTicketBanner(`Pre-utfylt fra ticket: ${t.subject ?? "(uten emne)"}`);
+        } else {
+          setTicketBanner(`Avsender (${t.sender_email}) ikke matchet — velg kunde manuelt.`);
+        }
+      }
+      setInternalNotes((prev) => prev || `Opprettet fra ticket: ${t.subject ?? "(uten emne)"}`);
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ticketId]);
   const [deliveryDate, setDeliveryDate] = useState<string>(tomorrow());
   const [deliveryTime, setDeliveryTime] = useState<string>("");
   const [useCustomerAddress, setUseCustomerAddress] = useState(true);
@@ -603,6 +633,13 @@ export default function NewOrder() {
         changes: { status: "confirmed", line_count: validLines.length },
       });
 
+      // Hvis opprettet fra ticket: link ticket og sett status=in_progress
+      if (ticketId) {
+        await supabase.from("tickets")
+          .update({ related_order_id: orderRow.id, status: "in_progress" })
+          .eq("id", ticketId);
+      }
+
       toast.success(`Ordre ${numRow.order_number} opprettet`);
       navigate("/ordre/ordrer");
     } catch (e) {
@@ -630,6 +667,11 @@ export default function NewOrder() {
         }
       />
       <div className="container mx-auto max-w-5xl space-y-4 px-4 py-6 sm:px-6">
+        {ticketBanner && (
+          <div className="rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
+            {ticketBanner}
+          </div>
+        )}
         {/* Seksjon 1: Kunde */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
