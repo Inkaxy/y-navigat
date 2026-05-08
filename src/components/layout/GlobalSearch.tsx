@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
-import { useLocation } from "react-router-dom";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import * as Icons from "lucide-react";
 import { Search, Box, Home, LayoutGrid, User, Bell, HelpCircle, LogOut } from "lucide-react";
 import {
@@ -16,6 +15,7 @@ import { useAppTheme } from "@/providers/AppThemeProvider";
 import { useAccessibleApps, type AccessibleApp } from "@/hooks/useAccessibleApps";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
+import { getAppInternalRoute } from "@/lib/appRoutes";
 
 const iconMap = Icons as unknown as Record<string, React.ComponentType<{ className?: string }>>;
 
