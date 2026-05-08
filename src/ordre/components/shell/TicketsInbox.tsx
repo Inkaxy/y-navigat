@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Inbox, Paperclip, ArrowRight, AlertCircle, User as UserIcon } from "lucide-react";
 import { useState } from "react";
 import { useTickets, useTicketCounts, type TicketStatus } from "@/ordre/hooks/useTickets";
@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatRelative, initialsOf } from "@/ordre/lib/format";
 import { cn } from "@/lib/utils";
+import { TicketQuickActions } from "./TicketQuickActions";
 
 type Tab = "open" | "new" | "mine" | "unassigned";
 
@@ -30,6 +31,7 @@ const STATUS_TONE: Record<TicketStatus, string> = {
 export function TicketsInbox() {
   const [tab, setTab] = useState<Tab>("open");
   const { data: counts } = useTicketCounts();
+  const navigate = useNavigate();
 
   const filter =
     tab === "new"
@@ -119,9 +121,14 @@ export function TicketsInbox() {
               const isUrgent = t.priority === "urgent" || t.priority === "high";
               return (
                 <li key={t.id}>
-                  <Link
-                    to={`/ordre/ticket/${t.id}`}
-                    className="group flex items-start gap-3 px-3 py-2.5 transition-colors hover:bg-muted/60"
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => navigate(`/ordre/ticket/${t.id}`)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") navigate(`/ordre/ticket/${t.id}`);
+                    }}
+                    className="group flex cursor-pointer items-start gap-3 px-3 py-2.5 transition-colors hover:bg-muted/60 focus:outline-none focus-visible:bg-muted/60"
                   >
                     <span
                       className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-muted text-caption font-semibold text-muted-foreground"
@@ -171,9 +178,15 @@ export function TicketsInbox() {
                         ) : (
                           <span className="text-[10px] text-muted-foreground">Uten ansvarlig</span>
                         )}
+                        {t.related_order_id && (
+                          <span className="text-[10px] text-primary">· koblet til ordre</span>
+                        )}
                       </div>
                     </div>
-                  </Link>
+                    <div className="ml-2 flex-shrink-0 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+                      <TicketQuickActions ticket={t} />
+                    </div>
+                  </div>
                 </li>
               );
             })}
