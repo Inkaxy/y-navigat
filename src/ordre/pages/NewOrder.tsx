@@ -958,6 +958,37 @@ export default function NewOrder() {
           </CardHeader>
           <CardContent className="space-y-3">
             <div>
+              <Label htmlFor="customer-reference" className="flex items-center gap-1.5">
+                Kundereferanse
+                {enforceRef && (
+                  <span
+                    title="Fast referanse fra kundeprofil"
+                    className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-muted text-[10px] font-semibold text-muted-foreground"
+                  >
+                    i
+                  </span>
+                )}
+              </Label>
+              <Input
+                id="customer-reference"
+                value={enforceRef ? enforcedRefValue : customerReference}
+                onChange={(e) => setCustomerReference(e.target.value)}
+                readOnly={enforceRef}
+                disabled={enforceRef && !enforcedRefValue}
+                placeholder={enforceRef ? "(fast referanse fra kundeprofil)" : "PO-nummer e.l. (valgfritt)"}
+                className={enforceRef ? "bg-muted/40" : ""}
+                maxLength={100}
+              />
+              {enforceRef && enforcedRefValue && (
+                <p className="mt-1 text-xs text-muted-foreground">Fast referanse fra kundeprofil — kan ikke endres her.</p>
+              )}
+              {enforcedRefMissing && (
+                <p className="mt-1 text-xs text-warning">
+                  Kunden krever fast referanse, men ingen er satt på kundeprofilen — kontakt kundeansvarlig.
+                </p>
+              )}
+            </div>
+            <div>
               <Label htmlFor="internal">Internt notat (ikke synlig for kunde)</Label>
               <Textarea id="internal" rows={2} value={internalNotes} onChange={(e) => setInternalNotes(e.target.value)} />
             </div>
