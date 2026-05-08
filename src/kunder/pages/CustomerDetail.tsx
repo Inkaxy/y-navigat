@@ -1031,9 +1031,6 @@ export default function CustomerDetail() {
                     <Textarea rows={2} {...form.register("credit_hold_reason")} disabled={!canWrite} />
                   </Field>
                 )}
-                <Field label="Faktura-e-post" error={form.formState.errors.invoice_email?.message}>
-                  <Input type="email" {...form.register("invoice_email")} disabled={!canWrite} />
-                </Field>
                 <Field label="EHF-deltaker">
                   <Input placeholder="0192:123456789" {...form.register("ehf_participant")} disabled={!canWrite} />
                 </Field>
