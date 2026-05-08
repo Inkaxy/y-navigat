@@ -44,6 +44,22 @@ export default function InvoiceDetailPage() {
     },
   });
 
+  // Suggestions for currently-opened match line
+  const { data: matchLineSuggestions } = useQuery({
+    queryKey: ["invoice-line-suggestions", matchLineId],
+    enabled: !!matchLineId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("invoice_line_match_suggestions")
+        .select(`raw_material_id, confidence, match_reason, rank,
+                 raw_material:raw_materials(name, sku, category, current_cost_price)`)
+        .eq("invoice_line_id", matchLineId!)
+        .order("rank");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-12 text-ink-secondary">
@@ -63,6 +79,31 @@ export default function InvoiceDetailPage() {
   const selectedIds = Object.keys(selected).filter((k) => selected[k]);
   const selectedLines = unmatchedLines.filter((l) => selected[l.id]);
   const canBulkImport = canWrite && hasInvoiceAccess && unmatchedLines.length > 0;
+  const canMatch = canWrite && hasInvoiceAccess && !isFinal;
+
+  const matchLineRow: ReviewLineRow | null = useMemoMatchLine(matchLineId, lines, data, matchLineSuggestions ?? []);
+
+  async function rerunAutoMatch() {
+    setRematching(true);
+    try {
+      // Reset manual lines so the pipeline will re-evaluate them
+      const { error: resetErr } = await supabase
+        .from("invoice_lines")
+        .update({ match_confidence: "unmatched", requires_review: true, review_reason: "unmatched", resolved_at: null, resolved_by: null })
+        .eq("invoice_id", data.id)
+        .is("raw_material_id", null);
+      if (resetErr) throw resetErr;
+      const { error } = await supabase.functions.invoke("match-invoice-lines", { body: { invoice_id: data.id } });
+      if (error) throw error;
+      toast.success("Auto-match kjørt på nytt");
+      qc.invalidateQueries({ queryKey: ["invoice", id] });
+    } catch (e: any) {
+      toast.error(e.message ?? "Kunne ikke kjøre auto-match");
+    } finally {
+      setRematching(false);
+    }
+  }
+
 
 
   return (
