@@ -2,7 +2,8 @@ import { createContext, useContext, useEffect, useState, ReactNode } from "react
 import { useQuery } from "@tanstack/react-query";
 import type { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
-import { APP_CODE, NB_LEGAL_ENTITY_ID } from "@/ravarer/lib/constants";
+import { APP_CODE } from "@/ravarer/lib/constants";
+import { useSelection } from "@/providers/SelectionProvider";
 
 export type AccessLevel = "none" | "read" | "write" | "approve" | "admin";
 
@@ -11,6 +12,7 @@ interface RavarerContextValue {
   session: Session | null;
   user: User | null;
   legalEntityId: string;
+  hasLegalEntity: boolean;
   accessLevel: AccessLevel;
   canRead: boolean;
   canWrite: boolean;
@@ -22,6 +24,7 @@ const Ctx = createContext<RavarerContextValue | undefined>(undefined);
 export function RavarerProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const { legalEntityId: selectedLegalEntityId } = useSelection();
 
   useEffect(() => {
     const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
@@ -55,7 +58,8 @@ export function RavarerProvider({ children }: { children: ReactNode }) {
         loading,
         session,
         user: session?.user ?? null,
-        legalEntityId: NB_LEGAL_ENTITY_ID,
+        legalEntityId: selectedLegalEntityId ?? "",
+        hasLegalEntity: !!selectedLegalEntityId,
         accessLevel,
         canRead,
         canWrite,
