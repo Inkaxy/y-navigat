@@ -5,17 +5,19 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { TagsInput } from "../TagsInput";
-import { ImageOff, FileText } from "lucide-react";
+import { FileText } from "lucide-react";
 import type { ProductFormValues } from "@/varer/lib/productSchema";
+import { ProductImageUpload } from "@/varer/components/products/ProductImageUpload";
 
 interface Props {
   canWrite: boolean;
   keywords: string[];
   onKeywordsChange: (k: string[]) => void;
+  productId?: string;
 }
 
-export function VaredetaljerTab({ canWrite, keywords, onKeywordsChange }: Props) {
-  const { control, register, watch } = useFormContext<ProductFormValues>();
+export function VaredetaljerTab({ canWrite, keywords, onKeywordsChange, productId }: Props) {
+  const { control, register, watch, setValue } = useFormContext<ProductFormValues>();
   const imageUrl = watch("image_url");
   const datasheetUrl = watch("datasheet_url");
 
@@ -69,30 +71,20 @@ export function VaredetaljerTab({ canWrite, keywords, onKeywordsChange }: Props)
 
         {/* Bilde + datasheet */}
         <div className="md:col-span-2 space-y-4">
-          <div>
-            <Label>Bilde-URL</Label>
-            <Input {...register("image_url")} disabled={!canWrite} placeholder="https://…" />
-            <p className="text-xs text-muted-foreground mt-1">
-              Bildeopplasting kommer senere — lim inn URL for nå.
-            </p>
-            <div className="mt-2 aspect-square w-full rounded-md border border-border bg-muted/30 flex items-center justify-center overflow-hidden">
-              {imageUrl ? (
-                <img
-                  src={imageUrl}
-                  alt="Produktbilde"
-                  className="object-contain w-full h-full"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = "none";
-                  }}
-                />
-              ) : (
-                <div className="text-center text-muted-foreground text-sm">
-                  <ImageOff className="mx-auto h-8 w-8 mb-1 opacity-40" />
-                  Ingen bilde satt
-                </div>
-              )}
+          {productId ? (
+            <ProductImageUpload
+              productId={productId}
+              imageUrl={imageUrl}
+              canWrite={canWrite}
+              onChange={(url) => setValue("image_url", url ?? "", { shouldDirty: true })}
+            />
+          ) : (
+            <div>
+              <Label>Bilde-URL</Label>
+              <Input {...register("image_url")} disabled={!canWrite} placeholder="https://…" />
+              <p className="text-xs text-muted-foreground mt-1">Lagre varen først for å laste opp bilde.</p>
             </div>
-          </div>
+          )}
 
           <div>
             <Label>Produktark URL (PDF)</Label>
