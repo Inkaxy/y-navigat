@@ -32,6 +32,7 @@ export default function Dashboard() {
   const { data: ctxStats, isLoading: ctxLoading } = useDeliveryDayStats(contextDate);
   const { data: tomStats, isLoading: tomLoading } = useDeliveryDayStats(tom);
   const { data: queue, isLoading: queueLoading } = useActionQueueCounts();
+  const { data: tCounts } = useTicketCounts();
 
   const countOf = (status: string) => counts?.find((c) => c.status === status)?.count ?? 0;
   const ctxCountOf = (status: string) =>
@@ -192,6 +193,39 @@ export default function Dashboard() {
               to={`/ordre/ordrer?status=packed&deliveryFrom=${today}&deliveryTo=${today}`}
             />
           </div>
+        </section>
+
+        {/* Tickets å håndtere */}
+        <section>
+          <h2 className="mb-3 text-caption font-semibold uppercase tracking-wide text-muted-foreground">
+            Tickets å håndtere
+          </h2>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Link to="/ordre/ticket?status=new" className="rounded-lg border bg-card p-3 hover:border-primary/40 transition-colors">
+              <div className="flex items-center gap-2 text-caption text-muted-foreground"><Inbox className="h-3.5 w-3.5" /> Nye</div>
+              <div className="mt-1 text-title font-semibold">{tCounts?.newCount ?? 0}</div>
+            </Link>
+            <Link to="/ordre/ticket?status=in_progress" className="rounded-lg border bg-card p-3 hover:border-primary/40 transition-colors">
+              <div className="text-caption text-muted-foreground">Pågående</div>
+              <div className="mt-1 text-title font-semibold">{tCounts?.inProgressCount ?? 0}</div>
+            </Link>
+            <Link to="/ordre/ticket?assigned_to=mine" className="rounded-lg border bg-card p-3 hover:border-primary/40 transition-colors">
+              <div className="text-caption text-muted-foreground">Mine</div>
+              <div className="mt-1 text-title font-semibold">{tCounts?.mineCount ?? 0}</div>
+            </Link>
+          </div>
+          {(tCounts?.latestNew?.length ?? 0) > 0 && (
+            <ul className="mt-3 space-y-1 text-sm">
+              {tCounts!.latestNew.map((t) => (
+                <li key={t.id}>
+                  <Link to={`/ordre/ticket/${t.id}`} className="text-primary hover:underline">
+                    {t.subject ?? "(uten emne)"}
+                  </Link>
+                  <span className="text-xs text-muted-foreground ml-2">— {t.sender_name ?? t.sender_email}</span>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
 
         {/* Kompakt status-strip — alle 10 statuser */}
