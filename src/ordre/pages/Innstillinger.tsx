@@ -371,11 +371,6 @@ function TemplateEditorCard() {
                 <div className="flex items-baseline justify-between gap-3">
                   <div className="min-w-0">
                     <h3 className="truncate text-base font-semibold">{selected.display_name}</h3>
-                    {selected.description && (
-                      <p className="truncate text-xs text-muted-foreground">
-                        {selected.description}
-                      </p>
-                    )}
                   </div>
                   {dirty && (
                     <span className="inline-flex shrink-0 items-center gap-1 text-xs text-warning">
