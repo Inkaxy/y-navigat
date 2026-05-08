@@ -7,7 +7,9 @@ import {
   FileEdit,
   Package,
   ArrowRight,
+  Inbox,
 } from "lucide-react";
+import { useTicketCounts } from "@/ordre/hooks/useTickets";
 import { AppBanner } from "@/ordre/components/shell/AppBanner";
 import { DateContextChips } from "@/ordre/components/shell/DateContextChips";
 import { Button } from "@/components/ui/button";
