@@ -645,6 +645,19 @@ export default function ProfileDetail() {
                       ]}
                     />
                   </Field>
+                  {form.watch("invoice_method") === "email" && (
+                    <Field label="Faktura sendes til (e-post)">
+                      <Input
+                        type="email"
+                        placeholder="faktura@kunde.no"
+                        {...form.register("copy_invoice_to_email")}
+                        disabled={!canWrite}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Faktura sendes på PDF-format som vedlegg til denne e-postadressen.
+                      </p>
+                    </Field>
+                  )}
                   {(form.watch("invoice_method") === "ehf_batch" ||
                     form.watch("invoice_method") === "ehf_single") && (
                     <CheckboxField
