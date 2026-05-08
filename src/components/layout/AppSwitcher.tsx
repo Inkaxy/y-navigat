@@ -20,15 +20,7 @@ const iconMap = Icons as unknown as Record<
   React.ComponentType<{ className?: string }>
 >;
 
-const INTERNAL_ROUTES: Record<string, string> = {
-  nbhub: "/",
-  nbos: "/admin",
-  varer: "/varer",
-  kunder: "/kunder",
-  ravarer: "/ravarer/vareliste",
-  ordre: "/ordre",
-  produksjon: "/produksjon",
-};
+import { APP_INTERNAL_ROUTES as INTERNAL_ROUTES } from "@/lib/appRoutes";
 
 const RECENT_KEY = "nbhub.recent_apps";
 const MAX_RECENT = 5;
@@ -151,10 +143,10 @@ export function AppSwitcher() {
   const goTo = useCallback(
     (app: AccessibleApp) => {
       const route = INTERNAL_ROUTES[app.slug];
+      if (!route) return; // App ikke integrert ennå
       pushRecent(app.slug);
       setOpen(false);
-      if (route) navigate(route);
-      else if (app.deploy_url) window.location.href = `${app.deploy_url}${app.start_path ?? ""}`;
+      navigate(route);
     },
     [navigate],
   );

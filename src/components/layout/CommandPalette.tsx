@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSelection } from "@/providers/SelectionProvider";
 import { useTheme, type ThemeMode } from "@/providers/ThemeProvider";
 import { useAccessibleApps } from "@/hooks/useAccessibleApps";
+import { getAppInternalRoute } from "@/lib/appRoutes";
 import { Home, User, Bell, HelpCircle, type LucideIcon } from "lucide-react";
 
 const NAV_ITEMS: { to: string; label: string; icon: LucideIcon }[] = [
@@ -62,8 +63,11 @@ export function CommandPalette({ open, onOpenChange }: Props) {
     close();
   };
 
-  const handleAppSwitch = (appUrl: string, appPath: string) => {
-    window.location.href = `${appUrl}${appPath}?from=${CURRENT_APP_SLUG}`;
+  const handleAppSwitch = (slug: string) => {
+    const route = getAppInternalRoute(slug);
+    if (!route) return;
+    navigate(route);
+    close();
   };
 
   const handleCompany = (id: string) => {
@@ -112,10 +116,10 @@ export function CommandPalette({ open, onOpenChange }: Props) {
                   </PaletteItem>
                 );
               })}
-              {apps?.filter((a) => a.slug !== CURRENT_APP_SLUG).map((app) => (
+              {apps?.filter((a) => a.slug !== CURRENT_APP_SLUG && getAppInternalRoute(a.slug)).map((app) => (
                 <PaletteItem
                   key={app.id}
-                  onSelect={() => handleAppSwitch(app.deploy_url, app.start_path)}
+                  onSelect={() => handleAppSwitch(app.slug)}
                   value={`app ${app.display_name}`}
                 >
                   <ExternalLink className="h-4 w-4 opacity-70" />

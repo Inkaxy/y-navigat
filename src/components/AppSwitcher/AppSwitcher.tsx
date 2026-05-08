@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import * as Icons from "lucide-react";
 import { Check, ChevronDown, Search, Box } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -12,6 +12,7 @@ import {
   getCategoryLabel,
   type AccessibleApp,
 } from "@/hooks/useAccessibleApps";
+import { getAppInternalRoute } from "@/lib/appRoutes";
 
 // ----------------------------------------------------------------------------
 // PER-APP CONFIG — change ONLY this when copying to another app.
@@ -19,17 +20,6 @@ import {
 const CURRENT_APP_SLUG = "nbhub";
 const SHOW_ALL_APPS_LINK = true; // keep true only in NBHub
 const FALLBACK_COLOR = "#64748b";
-// Apps som bor i samme React-app (samme host) → naviger internt uansett deploy_url.
-const INTERNAL_ROUTES: Record<string, string> = {
-  nbhub: "/",
-  nbos: "/admin",
-  varer: "/varer",
-  kunder: "/kunder",
-  ravarer: "/ravarer/vareliste",
-  
-  ordre: "/ordre",
-  produksjon: "/produksjon",
-};
 // ----------------------------------------------------------------------------
 
 const iconMap = Icons as unknown as Record<string, React.ComponentType<{ className?: string }>>;
@@ -38,14 +28,12 @@ function getCurrentAppSlug(): string {
   return CURRENT_APP_SLUG;
 }
 
-function isActiveApp(app: AccessibleApp): boolean {
+function isActiveApp(app: AccessibleApp, pathname: string): boolean {
   if (app.slug === getCurrentAppSlug()) return true;
-  try {
-    const appHost = new URL(app.deploy_url).hostname;
-    return window.location.hostname === appHost;
-  } catch {
-    return false;
-  }
+  const route = getAppInternalRoute(app.slug);
+  if (!route) return false;
+  if (route === "/") return pathname === "/" || pathname === "/hjem";
+  return pathname === route || pathname.startsWith(route + "/");
 }
 
 function getAppDisplayName(apps: AccessibleApp[] | undefined): string {
@@ -64,6 +52,8 @@ export function AppSwitcher({ label, renderTrigger }: AppSwitcherProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const { data: apps, isLoading } = useAccessibleApps();
+  const { pathname } = useLocation();
+  const navigate = useNavigate();
 
   const triggerLabel = label ?? getAppDisplayName(apps);
   const currentApp = apps?.find((a) => a.slug === getCurrentAppSlug());
@@ -83,23 +73,10 @@ export function AppSwitcher({ label, renderTrigger }: AppSwitcherProps) {
   const grouped = useMemo(() => groupByCategory(filtered), [filtered]);
 
   const handleNavigate = (app: AccessibleApp) => {
-    if (isActiveApp(app)) return;
-    const internalPath = INTERNAL_ROUTES[app.slug];
-    if (internalPath) {
-      window.location.href = `${internalPath}?from=${getCurrentAppSlug()}`;
-      return;
-    }
-    try {
-      const target = new URL(app.deploy_url);
-      if (target.hostname === window.location.hostname) {
-        window.location.href = `${app.start_path}?from=${getCurrentAppSlug()}`;
-        return;
-      }
-    } catch {
-      // fall through
-    }
-    const url = `${app.deploy_url}${app.start_path}?from=${getCurrentAppSlug()}`;
-    window.location.href = url;
+    if (isActiveApp(app, pathname)) return;
+    const internalPath = getAppInternalRoute(app.slug);
+    if (!internalPath) return; // App ikke integrert ennå — vises disabled
+    navigate(internalPath);
   };
 
   return (
@@ -179,7 +156,9 @@ export function AppSwitcher({ label, renderTrigger }: AppSwitcherProps) {
                   {getCategoryLabel(category)}
                 </div>
                 {list.map((app) => {
-                  const active = isActiveApp(app);
+                  const active = isActiveApp(app, pathname);
+                  const integrated = getAppInternalRoute(app.slug) !== null;
+                  const disabled = active || !integrated;
                   const IconComponent = iconMap[app.icon_name] ?? Box;
                   const dotColor = app.color_hex ?? FALLBACK_COLOR;
                   return (
@@ -187,10 +166,12 @@ export function AppSwitcher({ label, renderTrigger }: AppSwitcherProps) {
                       key={app.id}
                       type="button"
                       onClick={() => {
+                        if (disabled) return;
                         handleNavigate(app);
                         setOpen(false);
                       }}
-                      disabled={active}
+                      disabled={disabled}
+                      title={!integrated ? "Kommer snart — ikke integrert ennå" : undefined}
                       className={cn(
                         "group flex w-full items-center gap-3 rounded-md px-2 py-2 text-left",
                         "transition-colors hover:bg-accent",
@@ -216,7 +197,12 @@ export function AppSwitcher({ label, renderTrigger }: AppSwitcherProps) {
                       {active && (
                         <Check className="h-4 w-4 shrink-0 text-primary" aria-label="Du er her" />
                       )}
-                      {!active && app.access_level === "admin" && (
+                      {!active && !integrated && (
+                        <Badge variant="outline" className="shrink-0 text-[10px]">
+                          Kommer
+                        </Badge>
+                      )}
+                      {!active && integrated && app.access_level === "admin" && (
                         <Badge variant="secondary" className="shrink-0 text-[10px]">
                           Admin
                         </Badge>

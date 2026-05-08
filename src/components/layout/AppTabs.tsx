@@ -13,21 +13,12 @@ import { cn } from "@/lib/utils";
 
 const iconMap = Icons as unknown as Record<string, React.ComponentType<{ className?: string }>>;
 
-const INTERNAL_ROUTES: Record<string, string> = {
-  nbhub: "/",
-  nbos: "/admin",
-  varer: "/varer",
-  kunder: "/kunder",
-  ravarer: "/ravarer/vareliste",
-  ordre: "/ordre",
-  produksjon: "/produksjon",
-};
+import { APP_INTERNAL_ROUTES as INTERNAL_ROUTES } from "@/lib/appRoutes";
 
 interface Entry {
   key: string;
   label: string;
   to?: string;
-  external?: string;
   color: string;
   icon: React.ComponentType<{ className?: string }>;
 }
@@ -41,11 +32,12 @@ export function AppTabs() {
     const list = (apps ?? [])
       .filter((a) => a.status === "active" || a.status === "in_development")
       .filter((a) => a.access_level && (a.access_level as string) !== "none")
+      // Kun apper som faktisk er integrert i NBhub (har en intern rute)
+      .filter((a) => INTERNAL_ROUTES[a.slug] !== undefined)
       .map((a: AccessibleApp) => ({
         key: a.slug,
         label: a.display_name,
         to: INTERNAL_ROUTES[a.slug],
-        external: INTERNAL_ROUTES[a.slug] ? undefined : `${a.deploy_url}${a.start_path}`,
         color: a.color_hex ?? "#a47236",
         icon: iconMap[a.icon_name] ?? Box,
       }));
@@ -59,7 +51,6 @@ export function AppTabs() {
         key: "nbhub",
         label: "NBHub",
         to: "/",
-        external: undefined,
         color: "#a47236",
         icon: LayoutDashboard,
       });
@@ -123,8 +114,7 @@ export function AppTabs() {
   }, [entries, visibleCount, pathname]);
 
   const goTo = (e: Entry) => {
-    if (e.external) window.location.href = e.external;
-    else if (e.to) navigate(e.to);
+    if (e.to) navigate(e.to);
   };
 
   return (

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import * as Icons from "lucide-react";
 import { Search, Box, Home, LayoutGrid, User, Bell, HelpCircle, LogOut } from "lucide-react";
 import {
@@ -15,6 +15,7 @@ import { useAppTheme } from "@/providers/AppThemeProvider";
 import { useAccessibleApps, type AccessibleApp } from "@/hooks/useAccessibleApps";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
+import { getAppInternalRoute } from "@/lib/appRoutes";
 
 const iconMap = Icons as unknown as Record<string, React.ComponentType<{ className?: string }>>;
 
@@ -28,19 +29,18 @@ const PAGES = [
   { label: "Hjelp", path: "/hjelp", icon: HelpCircle },
 ];
 
-function isActiveApp(app: AccessibleApp): boolean {
-  if (app.slug === CURRENT_APP_SLUG) return true;
-  try {
-    return window.location.hostname === new URL(app.deploy_url).hostname;
-  } catch {
-    return false;
-  }
+function isActiveApp(app: AccessibleApp, pathname: string): boolean {
+  if (app.slug === CURRENT_APP_SLUG) return pathname === "/" || pathname === "/hjem";
+  const route = getAppInternalRoute(app.slug);
+  if (!route) return false;
+  return pathname === route || pathname.startsWith(route + "/");
 }
 
 export function GlobalSearch() {
   const { appName } = useAppTheme();
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const { signOut } = useAuth();
   const { data: apps } = useAccessibleApps();
 
@@ -56,8 +56,10 @@ export function GlobalSearch() {
   }, []);
 
   const navigateToApp = (app: AccessibleApp) => {
-    if (isActiveApp(app)) return;
-    window.location.href = `${app.deploy_url}${app.start_path}?from=${CURRENT_APP_SLUG}`;
+    if (isActiveApp(app, pathname)) return;
+    const route = getAppInternalRoute(app.slug);
+    if (!route) return;
+    navigate(route);
   };
 
   return (
@@ -89,27 +91,29 @@ export function GlobalSearch() {
 
           {apps && apps.length > 0 && (
             <CommandGroup heading="Apper">
-              {apps.map((app) => {
-                const IconComponent = iconMap[app.icon_name] ?? Box;
-                const active = isActiveApp(app);
-                return (
-                  <CommandItem
-                    key={app.id}
-                    value={`app ${app.slug} ${app.display_name} ${app.category}`}
-                    onSelect={() => {
-                      setOpen(false);
-                      navigateToApp(app);
-                    }}
-                    disabled={active}
-                  >
-                    <IconComponent className="mr-2 h-4 w-4" />
-                    <span>{app.display_name}</span>
-                    <span className="ml-auto text-xs text-muted-foreground">
-                      {active ? "Du er her" : app.category}
-                    </span>
-                  </CommandItem>
-                );
-              })}
+              {apps
+                .filter((a) => getAppInternalRoute(a.slug) !== null)
+                .map((app) => {
+                  const IconComponent = iconMap[app.icon_name] ?? Box;
+                  const active = isActiveApp(app, pathname);
+                  return (
+                    <CommandItem
+                      key={app.id}
+                      value={`app ${app.slug} ${app.display_name} ${app.category}`}
+                      onSelect={() => {
+                        setOpen(false);
+                        navigateToApp(app);
+                      }}
+                      disabled={active}
+                    >
+                      <IconComponent className="mr-2 h-4 w-4" />
+                      <span>{app.display_name}</span>
+                      <span className="ml-auto text-xs text-muted-foreground">
+                        {active ? "Du er her" : app.category}
+                      </span>
+                    </CommandItem>
+                  );
+                })}
             </CommandGroup>
           )}
 
