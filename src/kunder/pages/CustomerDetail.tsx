@@ -843,7 +843,7 @@ export default function CustomerDetail() {
               <Card>
                 <CardHeader>
                   <CardTitle>Hovedkontakt</CardTitle>
-                  <CardDescription>Foreløpig én kontaktperson</CardDescription>
+                  <CardDescription>Primær kontaktperson — flere kan legges til under</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <Field label="Navn">
@@ -863,6 +863,10 @@ export default function CustomerDetail() {
                 </CardContent>
               </Card>
 
+            </div>
+
+            <div className="mt-4">
+              <CustomerContactsCard customerId={customer.id} canWrite={canWrite} />
             </div>
           </TabsContent>
 
