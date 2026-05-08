@@ -597,6 +597,9 @@ export default function NewOrder() {
             return parts.length > 0 ? parts.join("\n\n") : null;
           })(),
           customer_notes: customerNotes || null,
+          customer_reference: (customer.enforce_custom_reference
+            ? (customer.custom_reference?.trim() || null)
+            : (customerReference.trim() || null)),
           delivery_tour_id: manualTourId, // null lar trigger auto-tildele
           is_return: isReturn,
           created_by: userId,
