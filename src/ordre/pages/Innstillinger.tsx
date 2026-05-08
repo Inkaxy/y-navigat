@@ -214,7 +214,7 @@ function TemplateEditorCard() {
   const [textDraft, setTextDraft] = useState("");
   const [newDialogOpen, setNewDialogOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const bodyRef = useRef<HTMLTextAreaElement>(null);
+  const bodyEditorRef = useRef<RichTextEditorHandle>(null);
   const textRef = useRef<HTMLTextAreaElement>(null);
   const subjectRef = useRef<HTMLInputElement>(null);
   const lastFocusedRef = useRef<"subject" | "body" | "text">("body");
