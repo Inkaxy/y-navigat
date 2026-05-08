@@ -48,6 +48,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { logAudit } from "@/kunder/lib/audit";
 import { OverrideField } from "@/kunder/components/customers/OverrideField";
 import { ChangeProfileDialog } from "@/kunder/components/customers/ChangeProfileDialog";
+import { ActivityTimeline } from "@/kunder/components/activity/ActivityTimeline";
+import { useCustomerActivityFeed } from "@/kunder/hooks/useCustomerActivityFeed";
 import {
   ALL_OVERRIDABLE_FIELDS,
   DELIVERY_FIELDS,
@@ -977,17 +979,7 @@ export default function CustomerDetail() {
 
           {/* TAB 5: HISTORIKK */}
           <TabsContent value="history" className="mt-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Historikk</CardTitle>
-                <CardDescription>Endringslogg, ordrer og fakturaer</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  Kommer i Fase C — venter på Ordre/Faktura-appene og full audit-visning.
-                </p>
-              </CardContent>
-            </Card>
+            <CustomerHistoryTab customerId={customer.id} legalEntityId={customer.legal_entity_id} />
           </TabsContent>
         </Tabs>
       </div>
@@ -1030,5 +1022,24 @@ function Field({
       {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
       {error && <p className="text-xs text-destructive">{error}</p>}
     </div>
+  );
+}
+
+function CustomerHistoryTab({ customerId, legalEntityId }: { customerId: string; legalEntityId: string }) {
+  const { data, isLoading } = useCustomerActivityFeed({
+    legalEntityId,
+    customerId,
+    limit: 100,
+  });
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Historikk</CardTitle>
+        <CardDescription>Endringer, ordrer og fakturerte ordrer for denne kunden</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <ActivityTimeline items={data ?? []} isLoading={isLoading} showCustomerLink={false} />
+      </CardContent>
+    </Card>
   );
 }

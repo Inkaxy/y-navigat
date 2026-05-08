@@ -630,6 +630,95 @@ export type Database = {
           },
         ]
       }
+      customer_group_members: {
+        Row: {
+          added_at: string
+          added_by: string | null
+          customer_id: string
+          group_id: string
+        }
+        Insert: {
+          added_at?: string
+          added_by?: string | null
+          customer_id: string
+          group_id: string
+        }
+        Update: {
+          added_at?: string
+          added_by?: string | null
+          customer_id?: string
+          group_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_group_members_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_group_members_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "customer_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customer_groups: {
+        Row: {
+          code: string
+          color_hex: string | null
+          created_at: string
+          created_by: string | null
+          default_price_list_id: string | null
+          description: string | null
+          display_name: string
+          id: string
+          legal_entity_id: string
+          sort_order: number
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          color_hex?: string | null
+          created_at?: string
+          created_by?: string | null
+          default_price_list_id?: string | null
+          description?: string | null
+          display_name: string
+          id?: string
+          legal_entity_id: string
+          sort_order?: number
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          color_hex?: string | null
+          created_at?: string
+          created_by?: string | null
+          default_price_list_id?: string | null
+          description?: string | null
+          display_name?: string
+          id?: string
+          legal_entity_id?: string
+          sort_order?: number
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_groups_default_price_list_id_fkey"
+            columns: ["default_price_list_id"]
+            isOneToOne: false
+            referencedRelation: "price_lists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customer_portal_accounts: {
         Row: {
           created_at: string
@@ -7598,6 +7687,10 @@ export type Database = {
           outlet_scope: string
           position_code: string
         }[]
+      }
+      customer_effective_price_list: {
+        Args: { _customer_id: string }
+        Returns: string
       }
       delete_demo_data: {
         Args: never
