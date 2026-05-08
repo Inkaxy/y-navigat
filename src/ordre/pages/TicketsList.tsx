@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { format, formatDistanceToNow } from "date-fns";
 import { nb } from "date-fns/locale";
 import { Inbox, Paperclip, Search, X } from "lucide-react";
