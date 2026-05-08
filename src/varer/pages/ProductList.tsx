@@ -55,7 +55,7 @@ export default function ProductList() {
       const { data, error } = await supabase
         .from("products")
         .select(
-          "id, display_number, code, display_name, product_category, product_subcategory, unit_of_sale, status, variant_of_product_id, variant_label, label_mode, is_cake_component, cake_role",
+          "id, display_number, code, display_name, product_category, product_subcategory, unit_of_sale, status, variant_of_product_id, variant_label, label_mode, is_cake_component, cake_role, image_url",
         )
         .eq("legal_entity_id", legalEntityId)
         .order("display_number", { ascending: true })
