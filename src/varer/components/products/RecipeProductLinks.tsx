@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useAppContext } from "@/varer/context/AppContext";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
@@ -20,7 +21,7 @@ import {
 import { Users, Plus, Trash2, ExternalLink, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { NB_LEGAL_ENTITY_ID } from "@/varer/lib/constants";
+
 
 interface Props {
   recipeId: string;
@@ -48,12 +49,12 @@ export function RecipeProductLinks({ recipeId, currentProductId, canWrite }: Pro
   });
 
   const productsQuery = useQuery({
-    queryKey: ["all-products-for-link", NB_LEGAL_ENTITY_ID],
+    queryKey: ["all-products-for-link", legalEntityId],
     queryFn: async () => {
       const { data } = await supabase
         .from("products")
         .select("id, display_name, display_number")
-        .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
+        .eq("legal_entity_id", legalEntityId)
         .neq("status", "discontinued")
         .order("display_name");
       return data ?? [];

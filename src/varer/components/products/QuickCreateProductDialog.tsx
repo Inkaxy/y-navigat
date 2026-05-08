@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useAppContext } from "@/varer/context/AppContext";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -24,7 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ProductSearchSelect, ProductOption } from "./detail/ProductSearchSelect";
-import { NB_LEGAL_ENTITY_ID, UNITS_OF_SALE } from "@/varer/lib/constants";
+import { UNITS_OF_SALE } from "@/varer/lib/constants";
 import { logAudit } from "@/varer/lib/audit";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
@@ -64,12 +65,12 @@ export function QuickCreateProductDialog({ open, onOpenChange, productOptions }:
   const [submitting, setSubmitting] = useState(false);
 
   const mainCategoriesQuery = useQuery({
-    queryKey: ["main-categories", NB_LEGAL_ENTITY_ID],
+    queryKey: ["main-categories", legalEntityId],
     queryFn: async () => {
       const { data } = await supabase
         .from("product_main_categories")
         .select("id, display_name")
-        .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
+        .eq("legal_entity_id", legalEntityId)
         .eq("status", "active")
         .order("sort_order");
       return data ?? [];
@@ -101,7 +102,7 @@ export function QuickCreateProductDialog({ open, onOpenChange, productOptions }:
     const { data, error } = await supabase
       .from("products")
       .insert({
-        legal_entity_id: NB_LEGAL_ENTITY_ID,
+        legal_entity_id: legalEntityId,
         code: v.code,
         display_name: v.display_name,
         unit_of_sale: v.unit_of_sale,

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useAppContext } from "@/varer/context/AppContext";
 import { Controller, useFormContext } from "react-hook-form";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
@@ -16,7 +17,7 @@ import {
 import { Loader2, Sparkles, ShieldCheck, AlertCircle, CheckCircle2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { MVA_RATES, NB_LEGAL_ENTITY_ID, UNITS_OF_SALE } from "@/varer/lib/constants";
+import { MVA_RATES, UNITS_OF_SALE } from "@/varer/lib/constants";
 import type { ProductFormValues } from "@/varer/lib/productSchema";
 
 interface Props {
@@ -43,7 +44,7 @@ export function NavnOgNummerTab({ product, canWrite, hasGs1Prefix }: Props) {
   async function generateGtin() {
     setGenerating(true);
     const { data, error } = await supabase.rpc("generate_next_gtin", {
-      p_legal_entity_id: NB_LEGAL_ENTITY_ID,
+      p_legal_entity_id: legalEntityId,
     });
     setGenerating(false);
     if (error) {

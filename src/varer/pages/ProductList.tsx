@@ -10,7 +10,7 @@ import { Card } from "@/components/ui/card";
 import { QuickCreateProductDialog } from "@/varer/components/products/QuickCreateProductDialog";
 import { Search, Loader2, Tag, Cake } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { NB_LEGAL_ENTITY_ID, PRODUCT_STATUS_LABEL, ProductStatus, CAKE_ROLE_LABEL, CakeRole } from "@/varer/lib/constants";
+import { PRODUCT_STATUS_LABEL, ProductStatus, CAKE_ROLE_LABEL, CakeRole } from "@/varer/lib/constants";
 import { useAppContext } from "@/varer/context/AppContext";
 
 type ProductRow = {
@@ -46,14 +46,14 @@ export default function ProductList() {
   const [wizardOpen, setWizardOpen] = useState(false);
 
   const productsQuery = useQuery({
-    queryKey: ["products", NB_LEGAL_ENTITY_ID],
+    queryKey: ["products", legalEntityId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")
         .select(
           "id, display_number, code, display_name, product_category, product_subcategory, unit_of_sale, status, variant_of_product_id, variant_label, label_mode, is_cake_component, cake_role",
         )
-        .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
+        .eq("legal_entity_id", legalEntityId)
         .order("display_number", { ascending: true })
         .limit(500);
       if (error) throw error;
@@ -114,12 +114,12 @@ export default function ProductList() {
 
   // Default-prisliste for å vise pris-kolonne
   const defaultPriceList = useQuery({
-    queryKey: ["default-pricelist", NB_LEGAL_ENTITY_ID],
+    queryKey: ["default-pricelist", legalEntityId],
     queryFn: async () => {
       const { data } = await supabase
         .from("price_lists")
         .select("id, display_name")
-        .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
+        .eq("legal_entity_id", legalEntityId)
         .eq("is_default", true)
         .maybeSingle();
       return data;

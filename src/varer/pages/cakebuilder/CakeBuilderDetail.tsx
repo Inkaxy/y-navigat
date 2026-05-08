@@ -62,16 +62,7 @@ import {
   Search,
   Trash2,
 } from "lucide-react";
-import {
-  CAKE_LABEL_FIELD_OPTIONS,
-  CAKE_ROLE_LABEL,
-  CAKE_ROLE_OPTIONS,
-  CAKE_SELECTION_TYPE_OPTIONS,
-  CAKE_CATEGORY_STATUS_LABEL,
-  CakeRole,
-  CakeSelectionType,
-  NB_LEGAL_ENTITY_ID,
-} from "@/varer/lib/constants";
+import { CAKE_LABEL_FIELD_OPTIONS, CAKE_ROLE_LABEL, CAKE_ROLE_OPTIONS, CAKE_SELECTION_TYPE_OPTIONS, CAKE_CATEGORY_STATUS_LABEL, CakeRole, CakeSelectionType } from "@/varer/lib/constants";
 import { useAppContext } from "@/varer/context/AppContext";
 import { useToast } from "@/hooks/use-toast";
 import { logAudit } from "@/varer/lib/audit";
@@ -1212,13 +1203,13 @@ function AddProductDialog({
   const [search, setSearch] = useState("");
 
   const candidates = useQuery({
-    queryKey: ["cake-candidate-products", NB_LEGAL_ENTITY_ID, existingProductIds.join(",")],
+    queryKey: ["cake-candidate-products", legalEntityId, existingProductIds.join(",")],
     enabled: open,
     queryFn: async () => {
       let q = supabase
         .from("products")
         .select("id, display_number, display_name, cake_role, code")
-        .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
+        .eq("legal_entity_id", legalEntityId)
         .eq("is_cake_component", true)
         .order("display_number", { ascending: true })
         .limit(500);
@@ -1594,13 +1585,13 @@ function LinkToProductDialog({
   const [search, setSearch] = useState("");
 
   const candidates = useQuery({
-    queryKey: ["cake-link-candidates", NB_LEGAL_ENTITY_ID],
+    queryKey: ["cake-link-candidates", legalEntityId],
     enabled: !!row,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")
         .select("id, display_number, display_name, cake_role, code")
-        .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
+        .eq("legal_entity_id", legalEntityId)
         .eq("is_cake_component", true)
         .order("display_number", { ascending: true })
         .limit(500);

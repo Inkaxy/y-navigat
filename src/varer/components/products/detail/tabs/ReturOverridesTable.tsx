@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from "react";
+import { useAppContext } from "@/varer/context/AppContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { NB_LEGAL_ENTITY_ID } from "@/varer/lib/constants";
+
 import { formatKr, roundPrice } from "@/varer/lib/pricing";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -45,7 +46,7 @@ export function ReturOverridesTable({
         supabase
           .from("price_lists")
           .select("id, code, display_name, list_number, price_list_type")
-          .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
+          .eq("legal_entity_id", legalEntityId)
           .eq("status", "active")
           .order("list_number", { ascending: true, nullsFirst: false }),
         supabase

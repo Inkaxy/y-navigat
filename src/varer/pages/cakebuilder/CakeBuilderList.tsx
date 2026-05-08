@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Cake, Plus, Loader2, Eye } from "lucide-react";
-import { NB_LEGAL_ENTITY_ID, CAKE_CATEGORY_STATUS_LABEL } from "@/varer/lib/constants";
+import { CAKE_CATEGORY_STATUS_LABEL } from "@/varer/lib/constants";
 import { useAppContext } from "@/varer/context/AppContext";
 import { NewCategoryDialog } from "./NewCategoryDialog";
 import { CakeBuilderPreview } from "./CakeBuilderPreview";
@@ -25,10 +25,10 @@ export default function CakeBuilderList() {
   const [previewOpen, setPreviewOpen] = useState(false);
 
   const categories = useQuery({
-    queryKey: ["cake-categories", NB_LEGAL_ENTITY_ID],
+    queryKey: ["cake-categories", legalEntityId],
     queryFn: async () => {
       const { data, error } = await supabase.rpc("get_cake_categories_with_counts", {
-        p_legal_entity_id: NB_LEGAL_ENTITY_ID,
+        p_legal_entity_id: legalEntityId,
       });
       if (error) throw error;
       return data ?? [];

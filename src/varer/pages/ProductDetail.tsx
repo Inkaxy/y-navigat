@@ -31,7 +31,7 @@ import {
 } from "@/varer/lib/productSchema";
 import { logAudit } from "@/varer/lib/audit";
 import { useAppContext } from "@/varer/context/AppContext";
-import { NB_LEGAL_ENTITY_ID, ProductStatus } from "@/varer/lib/constants";
+import { ProductStatus } from "@/varer/lib/constants";
 import { useUnsavedChangesWarning } from "@/varer/hooks/useUnsavedChangesWarning";
 import { DetailLayout } from "@/varer/components/products/detail/DetailLayout";
 import type { TabConfig } from "@/varer/components/products/detail/TabNavItem";
@@ -97,17 +97,17 @@ export default function ProductDetail() {
   });
 
   const lookupsQuery = useQuery({
-    queryKey: ["product-lookups", NB_LEGAL_ENTITY_ID],
+    queryKey: ["product-lookups", legalEntityId],
     queryFn: async () => {
       const [main, sub, pages, sales, prod, le, allProducts, depts] = await Promise.all([
-        supabase.from("product_main_categories").select("id, display_name").eq("legal_entity_id", NB_LEGAL_ENTITY_ID).eq("status", "active").order("sort_order"),
-        supabase.from("product_sub_categories").select("id, display_name, main_category_id").eq("legal_entity_id", NB_LEGAL_ENTITY_ID).eq("status", "active").order("sort_order"),
-        supabase.from("product_pages").select("id, display_name").eq("legal_entity_id", NB_LEGAL_ENTITY_ID).eq("status", "active").order("sort_order"),
-        supabase.from("sales_groups").select("id, display_name").eq("legal_entity_id", NB_LEGAL_ENTITY_ID).eq("status", "active").order("sort_order"),
-        supabase.from("production_groups").select("id, display_name").eq("legal_entity_id", NB_LEGAL_ENTITY_ID).eq("status", "active").order("sort_order"),
-        supabase.from("legal_entities").select("gs1_prefix").eq("id", NB_LEGAL_ENTITY_ID).maybeSingle(),
-        supabase.from("products").select("id, display_name, display_number, code").eq("legal_entity_id", NB_LEGAL_ENTITY_ID).order("display_number"),
-        supabase.from("production_departments").select("id, code, display_name").eq("legal_entity_id", NB_LEGAL_ENTITY_ID).eq("status", "active").order("sort_order"),
+        supabase.from("product_main_categories").select("id, display_name").eq("legal_entity_id", legalEntityId).eq("status", "active").order("sort_order"),
+        supabase.from("product_sub_categories").select("id, display_name, main_category_id").eq("legal_entity_id", legalEntityId).eq("status", "active").order("sort_order"),
+        supabase.from("product_pages").select("id, display_name").eq("legal_entity_id", legalEntityId).eq("status", "active").order("sort_order"),
+        supabase.from("sales_groups").select("id, display_name").eq("legal_entity_id", legalEntityId).eq("status", "active").order("sort_order"),
+        supabase.from("production_groups").select("id, display_name").eq("legal_entity_id", legalEntityId).eq("status", "active").order("sort_order"),
+        supabase.from("legal_entities").select("gs1_prefix").eq("id", legalEntityId).maybeSingle(),
+        supabase.from("products").select("id, display_name, display_number, code").eq("legal_entity_id", legalEntityId).order("display_number"),
+        supabase.from("production_departments").select("id, code, display_name").eq("legal_entity_id", legalEntityId).eq("status", "active").order("sort_order"),
       ]);
       return {
         mainCategories: main.data ?? [],
