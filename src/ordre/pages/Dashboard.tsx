@@ -56,6 +56,9 @@ export default function Dashboard() {
         {/* Dato-kontekst */}
         <DateContextChips date={contextDate} onChange={setContextDate} />
 
+        {/* Hero: Innboks (tickets) — ordrekontorets primære arbeidsflate */}
+        <TicketsInbox />
+
         {/* Hero-rad: valgt dato + i morgen + tiltakskø */}
         <section className="grid gap-4 lg:grid-cols-3">
           {/* Valgt dato (default i dag) */}
