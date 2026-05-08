@@ -353,11 +353,6 @@ function TemplateEditorCard() {
                         )}
                       >
                         <span className="font-medium leading-tight">{t.display_name}</span>
-                        {t.description && (
-                          <span className="line-clamp-2 text-xs text-muted-foreground">
-                            {t.description}
-                          </span>
-                        )}
                       </button>
                     );
                   })}
