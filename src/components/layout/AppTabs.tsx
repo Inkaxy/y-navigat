@@ -13,21 +13,12 @@ import { cn } from "@/lib/utils";
 
 const iconMap = Icons as unknown as Record<string, React.ComponentType<{ className?: string }>>;
 
-const INTERNAL_ROUTES: Record<string, string> = {
-  nbhub: "/",
-  nbos: "/admin",
-  varer: "/varer",
-  kunder: "/kunder",
-  ravarer: "/ravarer/vareliste",
-  ordre: "/ordre",
-  produksjon: "/produksjon",
-};
+import { APP_INTERNAL_ROUTES as INTERNAL_ROUTES } from "@/lib/appRoutes";
 
 interface Entry {
   key: string;
   label: string;
   to?: string;
-  external?: string;
   color: string;
   icon: React.ComponentType<{ className?: string }>;
 }
