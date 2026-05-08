@@ -10,7 +10,10 @@ import { useAuth } from "@/hooks/useAuth";
 import { UserCircle2 } from "lucide-react";
 import { Logo } from "@/components/brand/Logo";
 
-const DEMO_PASSWORD = "Demo2026!";
+// Demo-panel er kun synlig i utvikling og bare hvis VITE_DEMO_PASSWORD er satt
+// som build-secret. Passordet bundles ikke i prod-byggene.
+const DEMO_PASSWORD = (import.meta.env.VITE_DEMO_PASSWORD as string | undefined) ?? "";
+const DEMO_ENABLED = import.meta.env.DEV && DEMO_PASSWORD.length > 0;
 
 const ALLOWED_RETURN_HOSTS = /^https:\/\/([a-z0-9-]+\.)?nbhub\.no(\/|$)/;
 
@@ -24,16 +27,18 @@ const DEMO_USERS: Array<{
   name: string;
   role: string;
   entity: string;
-}> = [
-  { email: "kari.berg@demo.no",     name: "Kari Berg",     role: "Daglig leder",   entity: "Nøtterø Bakeri (NB)" },
-  { email: "lars.solheim@demo.no",  name: "Lars Solheim",  role: "Ordrekontor",    entity: "Nøtterø Bakeri (NB)" },
-  { email: "maja.lund@demo.no",     name: "Maja Lund",     role: "HR-ansvarlig",   entity: "Nøtterø Bakeri (NB)" },
-  { email: "anne.hansen@demo.no",   name: "Anne Hansen",   role: "Butikkleder",    entity: "Is & Bakevarer (IB)" },
-  { email: "ole.nilsen@demo.no",    name: "Ole Nilsen",    role: "Butikkleder",    entity: "Nøtterø Kafeer (NK)" },
-  { email: "per.olsen@demo.no",     name: "Per Olsen",     role: "Baker",          entity: "Nøtterø Bakeri (NB)" },
-  { email: "ida.strand@demo.no",    name: "Ida Strand",    role: "Konditor",       entity: "Mellom Kafé (MK)" },
-  { email: "tom.eriksen@demo.no",   name: "Tom Eriksen",   role: "Sjåfør",         entity: "Nøtterø Bakeri (NB)" },
-];
+}> = DEMO_ENABLED
+  ? [
+      { email: "kari.berg@demo.no",     name: "Kari Berg",     role: "Daglig leder",   entity: "Nøtterø Bakeri (NB)" },
+      { email: "lars.solheim@demo.no",  name: "Lars Solheim",  role: "Ordrekontor",    entity: "Nøtterø Bakeri (NB)" },
+      { email: "maja.lund@demo.no",     name: "Maja Lund",     role: "HR-ansvarlig",   entity: "Nøtterø Bakeri (NB)" },
+      { email: "anne.hansen@demo.no",   name: "Anne Hansen",   role: "Butikkleder",    entity: "Is & Bakevarer (IB)" },
+      { email: "ole.nilsen@demo.no",    name: "Ole Nilsen",    role: "Butikkleder",    entity: "Nøtterø Kafeer (NK)" },
+      { email: "per.olsen@demo.no",     name: "Per Olsen",     role: "Baker",          entity: "Nøtterø Bakeri (NB)" },
+      { email: "ida.strand@demo.no",    name: "Ida Strand",    role: "Konditor",       entity: "Mellom Kafé (MK)" },
+      { email: "tom.eriksen@demo.no",   name: "Tom Eriksen",   role: "Sjåfør",         entity: "Nøtterø Bakeri (NB)" },
+    ]
+  : [];
 
 export default function Login() {
   const navigate = useNavigate();
@@ -65,7 +70,13 @@ export default function Login() {
     });
     setSubmitting(false);
     if (error) {
-      toast.error("Innlogging mislyktes", { description: error.message });
+      if (import.meta.env.DEV) {
+        // eslint-disable-next-line no-console
+        console.warn("[auth] sign-in failed:", error.message);
+      }
+      toast.error("Innlogging mislyktes", {
+        description: "E-postadresse eller passord er feil.",
+      });
       return;
     }
     const target = resolveReturnTarget(params.get("return"));
@@ -141,34 +152,36 @@ export default function Login() {
           </CardContent>
         </Card>
 
-        <Card className="border-dashed">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold">Demo-brukere</CardTitle>
-            <CardDescription className="text-xs">
-              Klikk for å logge inn som testbruker. Kun for demonstrasjon.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {DEMO_USERS.map((u) => (
-              <button
-                key={u.email}
-                type="button"
-                onClick={() => handleDemoLogin(u.email)}
-                disabled={submitting}
-                className="flex w-full items-center gap-3 rounded-md border border-border bg-background px-3 py-2 text-left transition-colors hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <UserCircle2 className="h-8 w-8 shrink-0 text-muted-foreground" aria-hidden="true" />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="truncate text-sm font-medium">{u.name}</span>
-                    <span className="shrink-0 text-xs text-muted-foreground">{u.role}</span>
+        {DEMO_ENABLED && (
+          <Card className="border-dashed">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-semibold">Demo-brukere</CardTitle>
+              <CardDescription className="text-xs">
+                Klikk for å logge inn som testbruker. Kun for demonstrasjon.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {DEMO_USERS.map((u) => (
+                <button
+                  key={u.email}
+                  type="button"
+                  onClick={() => handleDemoLogin(u.email)}
+                  disabled={submitting}
+                  className="flex w-full items-center gap-3 rounded-md border border-border bg-background px-3 py-2 text-left transition-colors hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <UserCircle2 className="h-8 w-8 shrink-0 text-muted-foreground" aria-hidden="true" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="truncate text-sm font-medium">{u.name}</span>
+                      <span className="shrink-0 text-xs text-muted-foreground">{u.role}</span>
+                    </div>
+                    <div className="truncate text-xs text-muted-foreground">{u.entity}</div>
                   </div>
-                  <div className="truncate text-xs text-muted-foreground">{u.entity}</div>
-                </div>
-              </button>
-            ))}
-          </CardContent>
-        </Card>
+                </button>
+              ))}
+            </CardContent>
+          </Card>
+        )}
 
         <p className="text-center text-xs text-muted-foreground">
           Glemt passord? Ta kontakt med plattform-ansvarlig.

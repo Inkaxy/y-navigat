@@ -52,7 +52,8 @@ export function BugReportButton() {
     });
     setSubmitting(false);
     if (error) {
-      toast.error("Kunne ikke sende rapport", { description: error.message });
+      if (import.meta.env.DEV) console.warn("[bug-report] failed:", error.message);
+      toast.error("Kunne ikke sende rapport", { description: "Noe gikk galt, prøv igjen." });
       return;
     }
     toast.success("Takk! Feilen er rapportert.");
