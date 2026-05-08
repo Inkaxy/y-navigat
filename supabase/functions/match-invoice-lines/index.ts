@@ -168,6 +168,9 @@ Deno.serve(async (req) => {
           manualUpdate.variance_status = expected == null ? "no_baseline" : "no_baseline";
           manualUpdate.price_variance_pct = null;
         }
+        await syncRegisteredPrices(svc, inv, line, rm, rmsRow, actual, manualUpdate);
+        if (manualUpdate.requires_review) requiresReview = true;
+        if (manualUpdate.review_reason) manualUpdate.review_reason.split(",").forEach((r: string) => reviewReasons.add(r));
         manualUpdate.requires_review = requiresReview;
         manualUpdate.review_reason = reviewReasons.size ? Array.from(reviewReasons).join(",") : null;
 
@@ -412,6 +415,8 @@ Deno.serve(async (req) => {
         } else {
           update.variance_status = "no_baseline";
         }
+
+        await syncRegisteredPrices(svc, inv, line, rm, rmsRow, actual, update);
       }
 
       await applyUpdate(svc, line.id, update);
@@ -443,6 +448,38 @@ async function insertSuggestions(svc: any, rows: AnyRec[]) {
   if (!rows.length) return;
   await svc.from("invoice_line_match_suggestions").insert(rows);
 }
+
+async function syncRegisteredPrices(svc: any, inv: AnyRec, line: AnyRec, rm: AnyRec | undefined, rmsRow: AnyRec | undefined, actual: number | null, update: AnyRec) {
+  if (!rm || actual == null || !Number.isFinite(actual)) return;
+
+  const registered = rm.current_cost_price != null ? Number(rm.current_cost_price) : null;
+  const supplierRegistered = rmsRow?.agreed_price_per_base_unit != null ? Number(rmsRow.agreed_price_per_base_unit) : null;
+  if ((registered != null && actual > registered) || (supplierRegistered != null && actual > supplierRegistered)) {
+    update.requires_review = true;
+    update.review_reason = update.review_reason
+      ? Array.from(new Set(`${update.review_reason},price_increase`.split(","))).join(",")
+      : "price_increase";
+  }
+
+  await svc.from("raw_material_suppliers").upsert({
+    raw_material_id: rm.id,
+    supplier_id: inv.supplier_id,
+    supplier_sku: line.supplier_sku,
+    supplier_product_name: line.description,
+    agreed_price_per_base_unit: actual,
+    updated_at: new Date().toISOString(),
+  }, { onConflict: "raw_material_id,supplier_id" });
+
+  if (!rm.primary_supplier_id || rm.primary_supplier_id === inv.supplier_id || registered == null) {
+    await svc.from("raw_materials").update({
+      current_cost_price: actual,
+      price_source: "invoice",
+      price_updated_at: inv.invoice_date,
+      primary_supplier_id: rm.primary_supplier_id ?? inv.supplier_id,
+    }).eq("id", rm.id);
+  }
+}
+
 function json(body: any, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 }
