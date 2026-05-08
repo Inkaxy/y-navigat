@@ -309,7 +309,7 @@ export default function NewOrder() {
   });
   const passedDeadlines = deadlineViolations.filter((v) => v.minutes_over > 0);
 
-  // Når kunde endres: pre-fyll adresse
+  // Når kunde endres: pre-fyll adresse + håndter kunde-referanse
   useEffect(() => {
     if (customer) {
       setDelAddr({
@@ -320,8 +320,17 @@ export default function NewOrder() {
         country: customer.delivery_country ?? "NO",
       });
       setDeliveryInstructions(customer.delivery_instructions ?? "");
+      if (customer.enforce_custom_reference) {
+        const ref = customer.custom_reference?.trim() ?? "";
+        setCustomerReference(ref);
+        toast.message("Referanse oppdatert fra kundeprofilen", {
+          description: ref ? `Fast referanse: ${ref}` : "Kunden krever fast referanse, men ingen er satt på profilen.",
+        });
+      }
+      // Hvis ikke enforce: behold det brukeren evt. har skrevet (eller default tomt).
     }
-  }, [customer]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customer?.id]);
 
   // Re-trekk priser hvis kunde eller dato endres
   useEffect(() => {
