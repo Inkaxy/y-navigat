@@ -10,7 +10,10 @@ import { useAuth } from "@/hooks/useAuth";
 import { UserCircle2 } from "lucide-react";
 import { Logo } from "@/components/brand/Logo";
 
-const DEMO_PASSWORD = "Demo2026!";
+// Demo-panel er kun synlig i utvikling og bare hvis VITE_DEMO_PASSWORD er satt
+// som build-secret. Passordet bundles ikke i prod-byggene.
+const DEMO_PASSWORD = (import.meta.env.VITE_DEMO_PASSWORD as string | undefined) ?? "";
+const DEMO_ENABLED = import.meta.env.DEV && DEMO_PASSWORD.length > 0;
 
 const ALLOWED_RETURN_HOSTS = /^https:\/\/([a-z0-9-]+\.)?nbhub\.no(\/|$)/;
 
@@ -24,16 +27,18 @@ const DEMO_USERS: Array<{
   name: string;
   role: string;
   entity: string;
-}> = [
-  { email: "kari.berg@demo.no",     name: "Kari Berg",     role: "Daglig leder",   entity: "Nøtterø Bakeri (NB)" },
-  { email: "lars.solheim@demo.no",  name: "Lars Solheim",  role: "Ordrekontor",    entity: "Nøtterø Bakeri (NB)" },
-  { email: "maja.lund@demo.no",     name: "Maja Lund",     role: "HR-ansvarlig",   entity: "Nøtterø Bakeri (NB)" },
-  { email: "anne.hansen@demo.no",   name: "Anne Hansen",   role: "Butikkleder",    entity: "Is & Bakevarer (IB)" },
-  { email: "ole.nilsen@demo.no",    name: "Ole Nilsen",    role: "Butikkleder",    entity: "Nøtterø Kafeer (NK)" },
-  { email: "per.olsen@demo.no",     name: "Per Olsen",     role: "Baker",          entity: "Nøtterø Bakeri (NB)" },
-  { email: "ida.strand@demo.no",    name: "Ida Strand",    role: "Konditor",       entity: "Mellom Kafé (MK)" },
-  { email: "tom.eriksen@demo.no",   name: "Tom Eriksen",   role: "Sjåfør",         entity: "Nøtterø Bakeri (NB)" },
-];
+}> = DEMO_ENABLED
+  ? [
+      { email: "kari.berg@demo.no",     name: "Kari Berg",     role: "Daglig leder",   entity: "Nøtterø Bakeri (NB)" },
+      { email: "lars.solheim@demo.no",  name: "Lars Solheim",  role: "Ordrekontor",    entity: "Nøtterø Bakeri (NB)" },
+      { email: "maja.lund@demo.no",     name: "Maja Lund",     role: "HR-ansvarlig",   entity: "Nøtterø Bakeri (NB)" },
+      { email: "anne.hansen@demo.no",   name: "Anne Hansen",   role: "Butikkleder",    entity: "Is & Bakevarer (IB)" },
+      { email: "ole.nilsen@demo.no",    name: "Ole Nilsen",    role: "Butikkleder",    entity: "Nøtterø Kafeer (NK)" },
+      { email: "per.olsen@demo.no",     name: "Per Olsen",     role: "Baker",          entity: "Nøtterø Bakeri (NB)" },
+      { email: "ida.strand@demo.no",    name: "Ida Strand",    role: "Konditor",       entity: "Mellom Kafé (MK)" },
+      { email: "tom.eriksen@demo.no",   name: "Tom Eriksen",   role: "Sjåfør",         entity: "Nøtterø Bakeri (NB)" },
+    ]
+  : [];
 
 export default function Login() {
   const navigate = useNavigate();
