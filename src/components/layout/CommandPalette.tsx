@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSelection } from "@/providers/SelectionProvider";
 import { useTheme, type ThemeMode } from "@/providers/ThemeProvider";
 import { useAccessibleApps } from "@/hooks/useAccessibleApps";
+import { getAppInternalRoute } from "@/lib/appRoutes";
 import { Home, User, Bell, HelpCircle, type LucideIcon } from "lucide-react";
 
 const NAV_ITEMS: { to: string; label: string; icon: LucideIcon }[] = [
