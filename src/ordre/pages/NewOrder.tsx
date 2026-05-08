@@ -633,6 +633,13 @@ export default function NewOrder() {
         changes: { status: "confirmed", line_count: validLines.length },
       });
 
+      // Hvis opprettet fra ticket: link ticket og sett status=in_progress
+      if (ticketId) {
+        await supabase.from("tickets")
+          .update({ related_order_id: orderRow.id, status: "in_progress" })
+          .eq("id", ticketId);
+      }
+
       toast.success(`Ordre ${numRow.order_number} opprettet`);
       navigate("/ordre/ordrer");
     } catch (e) {
