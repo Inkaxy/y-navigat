@@ -31,6 +31,9 @@ type Row = {
 export default function Brukere() {
   const [search, setSearch] = useState("");
   const [companyId, setCompanyId] = useState<string>("all");
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const qc = useQueryClient();
+  const { data: isOwner = false } = useIsPlatformOwner();
 
   const { data: companies = [] } = useQuery({
     queryKey: ["admin-le-options"],
@@ -90,16 +93,11 @@ export default function Brukere() {
         title="Brukere"
         subtitle="Ansatte og deres stillinger."
         actions={
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span>
-                <Button size="sm" disabled>
-                  <UserPlus className="h-4 w-4" /> Inviter bruker
-                </Button>
-              </span>
-            </TooltipTrigger>
-            <TooltipContent>Krever Supabase admin-invite (kommer i senere fase)</TooltipContent>
-          </Tooltip>
+          isOwner ? (
+            <Button size="sm" onClick={() => setInviteOpen(true)}>
+              <UserPlus className="h-4 w-4" /> Inviter bruker
+            </Button>
+          ) : null
         }
       />
 
