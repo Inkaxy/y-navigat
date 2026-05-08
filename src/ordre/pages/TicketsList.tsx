@@ -152,33 +152,35 @@ export default function TicketsList() {
                 </TableRow>
               ) : (
                 tickets.map((t) => (
-                  <TableRow key={t.id} asChild className="cursor-pointer">
-                    <Link to={`/ordre/ticket/${t.id}`}>
-                      <TableCell>
-                        <div className="font-medium text-sm">{t.sender_name ?? t.sender_email}</div>
-                        {t.sender_name && <div className="text-xs text-muted-foreground">{t.sender_email}</div>}
-                      </TableCell>
-                      <TableCell className="max-w-md">
-                        <div className="truncate font-medium text-sm">{t.subject ?? "(uten emne)"}</div>
-                        {t.body_preview && (
-                          <div className="truncate text-xs text-muted-foreground">{t.body_preview}</div>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-sm whitespace-nowrap" title={format(new Date(t.received_at), "d. MMM yyyy HH:mm", { locale: nb })}>
-                        {formatDistanceToNow(new Date(t.received_at), { locale: nb, addSuffix: true })}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={cn("text-xs", STATUS_COLORS[t.status])}>
-                          {STATUS_LABELS[t.status]}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {PRIORITY_LABELS[t.priority]}
-                      </TableCell>
-                      <TableCell>
-                        {t.has_attachments && <Paperclip className="h-3.5 w-3.5 text-muted-foreground" />}
-                      </TableCell>
-                    </Link>
+                  <TableRow
+                    key={t.id}
+                    className="cursor-pointer"
+                    onClick={() => (window.location.href = `/ordre/ticket/${t.id}`)}
+                  >
+                    <TableCell>
+                      <div className="font-medium text-sm">{t.sender_name ?? t.sender_email}</div>
+                      {t.sender_name && <div className="text-xs text-muted-foreground">{t.sender_email}</div>}
+                    </TableCell>
+                    <TableCell className="max-w-md">
+                      <div className="truncate font-medium text-sm">{t.subject ?? "(uten emne)"}</div>
+                      {t.body_preview && (
+                        <div className="truncate text-xs text-muted-foreground">{t.body_preview}</div>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-sm whitespace-nowrap" title={format(new Date(t.received_at), "d. MMM yyyy HH:mm", { locale: nb })}>
+                      {formatDistanceToNow(new Date(t.received_at), { locale: nb, addSuffix: true })}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className={cn("text-xs", STATUS_COLORS[t.status])}>
+                        {STATUS_LABELS[t.status]}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {PRIORITY_LABELS[t.priority]}
+                    </TableCell>
+                    <TableCell>
+                      {t.has_attachments && <Paperclip className="h-3.5 w-3.5 text-muted-foreground" />}
+                    </TableCell>
                   </TableRow>
                 ))
               )}
