@@ -526,62 +526,82 @@ export default function CustomerDetail() {
                 <Repeat className="mr-1 h-4 w-4" /> Bytt profil
               </Button>
             )}
-            {canWrite && watchStatus === "active" && (
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button type="button" variant="outline" className="text-destructive hover:bg-destructive/5">
-                    De-aktiver
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>De-aktivere kunden?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Kunden vil skjules fra aktive lister, men data og historikk beholdes.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Avbryt</AlertDialogCancel>
-                    <AlertDialogAction onClick={() => deactivateMutation.mutate()}>
-                      De-aktiver
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            )}
             {canWrite && (
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="text-destructive hover:bg-destructive/5"
-                    disabled={deleteMutation.isPending}
-                  >
-                    <Trash2 className="mr-1 h-4 w-4" /> Slett
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Slette kunden permanent?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      «{customer.customer_number} — {customer.display_name}» slettes permanent
-                      sammen med tilhørende spesialpriser, faste bestillinger, gruppe-medlemskap
-                      og portal-konto. Hvis kunden har ordre eller pakksedler blokkeres slettingen
-                      — bruk «De-aktiver» i stedet. Kan ikke angres.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Avbryt</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={() => deleteMutation.mutate()}
-                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              <>
+                <AlertDialog open={confirmAction === "deactivate"} onOpenChange={(o) => !o && setConfirmAction(null)}>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>De-aktivere kunden?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Kunden vil skjules fra aktive lister, men data og historikk beholdes.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Avbryt</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => {
+                          deactivateMutation.mutate();
+                          setConfirmAction(null);
+                        }}
+                      >
+                        De-aktiver
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+                <AlertDialog open={confirmAction === "delete"} onOpenChange={(o) => !o && setConfirmAction(null)}>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Slette kunden permanent?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        «{customer.customer_number} — {customer.display_name}» slettes permanent
+                        sammen med tilhørende spesialpriser, faste bestillinger, gruppe-medlemskap
+                        og portal-konto. Hvis kunden har ordre eller pakksedler blokkeres slettingen
+                        — bruk «De-aktiver» i stedet. Kan ikke angres.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Avbryt</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => {
+                          deleteMutation.mutate();
+                          setConfirmAction(null);
+                        }}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        Slett permanent
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      aria-label="Flere handlinger"
+                      disabled={deleteMutation.isPending || deactivateMutation.isPending}
                     >
-                      Slett permanent
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    {watchStatus === "active" && (
+                      <DropdownMenuItem onSelect={() => setConfirmAction("deactivate")}>
+                        <Power className="mr-2 h-4 w-4" /> De-aktiver kunde
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onSelect={() => setConfirmAction("delete")}
+                      className="text-destructive focus:text-destructive"
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" /> Slett kunde permanent
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </>
             )}
             <Button type="button" variant="ghost" onClick={handleBack}>
               <X className="mr-1 h-4 w-4" /> Avbryt
