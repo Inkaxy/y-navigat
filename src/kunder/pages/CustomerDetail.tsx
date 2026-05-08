@@ -58,6 +58,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCustomer, usePriceLists } from "@/kunder/hooks/useCustomers";
 import { useCustomerProfile } from "@/kunder/hooks/useCustomerProfiles";
 import { usePickupLocations } from "@/kunder/hooks/usePickupLocations";
+import { CustomerContactsCard } from "@/kunder/components/customers/CustomerContactsCard";
 import { useUserAccess } from "@/kunder/hooks/useUserAccess";
 import { useAuth } from "@/hooks/useAuth";
 import { logAudit } from "@/kunder/lib/audit";
