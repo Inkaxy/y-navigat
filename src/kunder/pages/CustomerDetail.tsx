@@ -38,6 +38,14 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -173,6 +181,7 @@ export default function CustomerDetail() {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [changeProfileOpen, setChangeProfileOpen] = useState(false);
   const [confirmAction, setConfirmAction] = useState<"deactivate" | "delete" | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
 
   // Lokal state for overrides (separat fra react-hook-form for fleksibilitet)
   const [overrides, setOverrides] = useState<Record<string, unknown>>({});
@@ -550,31 +559,84 @@ export default function CustomerDetail() {
                     </AlertDialogFooter>
                   </AlertDialogContent>
                 </AlertDialog>
-                <AlertDialog open={confirmAction === "delete"} onOpenChange={(o) => !o && setConfirmAction(null)}>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Slette kunden permanent?</AlertDialogTitle>
-                      <AlertDialogDescription>
+                <Dialog
+                  open={confirmAction === "delete"}
+                  onOpenChange={(o) => {
+                    if (!o) {
+                      setConfirmAction(null);
+                      setDeleteConfirmText("");
+                    }
+                  }}
+                >
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle className="flex items-center gap-2">
+                        <Trash2 className="h-5 w-5 text-destructive" />
+                        Slett kunde permanent?
+                      </DialogTitle>
+                      <DialogDescription>
                         «{customer.customer_number} — {customer.display_name}» slettes permanent
                         sammen med tilhørende spesialpriser, faste bestillinger, gruppe-medlemskap
                         og portal-konto. Hvis kunden har ordre eller pakksedler blokkeres slettingen
                         — bruk «De-aktiver» i stedet. Kan ikke angres.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Avbryt</AlertDialogCancel>
-                      <AlertDialogAction
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-2">
+                      <Label htmlFor="delete-customer-confirm">
+                        Skriv <span className="font-mono font-semibold">Slett</span> for å bekrefte
+                      </Label>
+                      <Input
+                        id="delete-customer-confirm"
+                        value={deleteConfirmText}
+                        onChange={(e) => setDeleteConfirmText(e.target.value)}
+                        placeholder="Slett"
+                        autoFocus
+                        autoComplete="off"
+                      />
+                    </div>
+                    <DialogFooter>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setConfirmAction(null);
+                          setDeleteConfirmText("");
+                        }}
+                        disabled={deleteMutation.isPending}
+                      >
+                        Avbryt
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        disabled={
+                          deleteMutation.isPending ||
+                          deleteConfirmText.trim().toLowerCase() !== "slett"
+                        }
                         onClick={() => {
                           deleteMutation.mutate();
                           setConfirmAction(null);
+                          setDeleteConfirmText("");
                         }}
-                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                       >
+                        {deleteMutation.isPending && (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        )}
                         Slett permanent
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  onClick={() => setConfirmAction("delete")}
+                  disabled={deleteMutation.isPending || deactivateMutation.isPending}
+                >
+                  <Trash2 className="mr-1 h-4 w-4" /> Slett
+                </Button>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
