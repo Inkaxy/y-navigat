@@ -107,6 +107,8 @@ const schema = z.object({
   send_to_pos_system: z.boolean(),
   order_confirmation_mode: z.string().optional().or(z.literal("")),
   order_confirmation_emails: z.string().max(500).optional().or(z.literal("")),
+  packing_slip_delivery_mode: z.string().optional().or(z.literal("")),
+  packing_slip_emails: z.string().max(1000).optional().or(z.literal("")),
 
   expects_order_monday: z.boolean(),
   expects_order_tuesday: z.boolean(),
