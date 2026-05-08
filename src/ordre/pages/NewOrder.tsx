@@ -667,6 +667,11 @@ export default function NewOrder() {
         }
       />
       <div className="container mx-auto max-w-5xl space-y-4 px-4 py-6 sm:px-6">
+        {ticketBanner && (
+          <div className="rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
+            {ticketBanner}
+          </div>
+        )}
         {/* Seksjon 1: Kunde */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
