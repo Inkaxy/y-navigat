@@ -20,12 +20,24 @@ type LE = {
   id: string;
   short_code: string;
   legal_name: string;
+  display_name: string | null;
   org_number: string;
+  gln: string | null;
   gs1_prefix: string | null;
   invoice_address_line1: string | null;
+  invoice_address_line2: string | null;
   invoice_postal_code: string | null;
   invoice_city: string | null;
   invoice_country: string;
+  contact_person: string | null;
+  contact_email: string | null;
+  contact_phone: string | null;
+  support_email: string | null;
+  support_phone: string | null;
+  bank_name: string | null;
+  bank_account: string | null;
+  iban: string | null;
+  swift: string | null;
   status: string;
   created_at: string;
 };
@@ -33,12 +45,24 @@ type LE = {
 const empty: Partial<LE> = {
   short_code: "",
   legal_name: "",
+  display_name: "",
   org_number: "",
+  gln: "",
   gs1_prefix: "",
   invoice_address_line1: "",
+  invoice_address_line2: "",
   invoice_postal_code: "",
   invoice_city: "",
   invoice_country: "NO",
+  contact_person: "",
+  contact_email: "",
+  contact_phone: "",
+  support_email: "",
+  support_phone: "",
+  bank_name: "",
+  bank_account: "",
+  iban: "",
+  swift: "",
   status: "active",
 };
 
@@ -174,25 +198,69 @@ export default function Selskaper() {
       </div>
 
       <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editing?.id ? "Rediger selskap" : "Nytt selskap"}</DialogTitle>
           </DialogHeader>
           {editing && (
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Kode" value={editing.short_code ?? ""} onChange={(v) => setEditing({ ...editing, short_code: v })} />
-              <Field label="Org.nr" value={editing.org_number ?? ""} onChange={(v) => setEditing({ ...editing, org_number: v })} />
-              <Field
-                label="GS1-prefiks (GLN/GTIN-basis)"
-                value={editing.gs1_prefix ?? ""}
-                onChange={(v) => setEditing({ ...editing, gs1_prefix: v.replace(/\D/g, "") })}
-                className="col-span-2"
-              />
-              <Field label="Juridisk navn" value={editing.legal_name ?? ""} onChange={(v) => setEditing({ ...editing, legal_name: v })} className="col-span-2" />
-              <Field label="Adresse" value={editing.invoice_address_line1 ?? ""} onChange={(v) => setEditing({ ...editing, invoice_address_line1: v })} className="col-span-2" />
-              <Field label="Postnr" value={editing.invoice_postal_code ?? ""} onChange={(v) => setEditing({ ...editing, invoice_postal_code: v })} />
-              <Field label="By" value={editing.invoice_city ?? ""} onChange={(v) => setEditing({ ...editing, invoice_city: v })} />
-              <Field label="Land" value={editing.invoice_country ?? "NO"} onChange={(v) => setEditing({ ...editing, invoice_country: v })} />
+            <div className="space-y-5">
+              <Section title="Identitet">
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Kode" value={editing.short_code ?? ""} onChange={(v) => setEditing({ ...editing, short_code: v })} />
+                  <Field label="Org.nr" value={editing.org_number ?? ""} onChange={(v) => setEditing({ ...editing, org_number: v })} />
+                  <Field label="Juridisk navn" value={editing.legal_name ?? ""} onChange={(v) => setEditing({ ...editing, legal_name: v })} className="col-span-2" />
+                  <Field label="Visningsnavn" value={editing.display_name ?? ""} onChange={(v) => setEditing({ ...editing, display_name: v })} className="col-span-2" />
+                </div>
+              </Section>
+
+              <Section title="GS1">
+                <div className="grid grid-cols-2 gap-3">
+                  <Field
+                    label="GLN (GS1 lokasjonsnummer)"
+                    value={editing.gln ?? ""}
+                    onChange={(v) => setEditing({ ...editing, gln: v.replace(/\D/g, "") })}
+                  />
+                  <Field
+                    label="GS1 leverandørnummer (prefiks)"
+                    value={editing.gs1_prefix ?? ""}
+                    onChange={(v) => setEditing({ ...editing, gs1_prefix: v.replace(/\D/g, "") })}
+                  />
+                </div>
+              </Section>
+
+              <Section title="Adresse">
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Adresselinje 1" value={editing.invoice_address_line1 ?? ""} onChange={(v) => setEditing({ ...editing, invoice_address_line1: v })} className="col-span-2" />
+                  <Field label="Adresselinje 2" value={editing.invoice_address_line2 ?? ""} onChange={(v) => setEditing({ ...editing, invoice_address_line2: v })} className="col-span-2" />
+                  <Field label="Postnr" value={editing.invoice_postal_code ?? ""} onChange={(v) => setEditing({ ...editing, invoice_postal_code: v })} />
+                  <Field label="Poststed" value={editing.invoice_city ?? ""} onChange={(v) => setEditing({ ...editing, invoice_city: v })} />
+                  <Field label="Land" value={editing.invoice_country ?? "NO"} onChange={(v) => setEditing({ ...editing, invoice_country: v })} />
+                </div>
+              </Section>
+
+              <Section title="Kontakt">
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Kontaktperson" value={editing.contact_person ?? ""} onChange={(v) => setEditing({ ...editing, contact_person: v })} className="col-span-2" />
+                  <Field label="E-postadresse" value={editing.contact_email ?? ""} onChange={(v) => setEditing({ ...editing, contact_email: v })} />
+                  <Field label="Telefonnummer" value={editing.contact_phone ?? ""} onChange={(v) => setEditing({ ...editing, contact_phone: v })} />
+                </div>
+              </Section>
+
+              <Section title="Brukerstøtte">
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Brukerstøtte e-post" value={editing.support_email ?? ""} onChange={(v) => setEditing({ ...editing, support_email: v })} />
+                  <Field label="Brukerstøtte telefon" value={editing.support_phone ?? ""} onChange={(v) => setEditing({ ...editing, support_phone: v })} />
+                </div>
+              </Section>
+
+              <Section title="Bank">
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Banknavn" value={editing.bank_name ?? ""} onChange={(v) => setEditing({ ...editing, bank_name: v })} className="col-span-2" />
+                  <Field label="Kontonummer" value={editing.bank_account ?? ""} onChange={(v) => setEditing({ ...editing, bank_account: v })} />
+                  <Field label="BIC/SWIFT" value={editing.swift ?? ""} onChange={(v) => setEditing({ ...editing, swift: v })} />
+                  <Field label="IBAN" value={editing.iban ?? ""} onChange={(v) => setEditing({ ...editing, iban: v })} className="col-span-2" />
+                </div>
+              </Section>
             </div>
           )}
           <DialogFooter>
@@ -210,6 +278,15 @@ function Field({ label, value, onChange, className }: { label: string; value: st
     <div className={className}>
       <Label className="text-xs">{label}</Label>
       <Input value={value} onChange={(e) => onChange(e.target.value)} />
+    </div>
+  );
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">{title}</div>
+      {children}
     </div>
   );
 }
