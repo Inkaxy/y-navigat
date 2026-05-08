@@ -293,6 +293,8 @@ export default function ProfileDetail() {
         pickup_location_id: values.pickup_location_id || null,
         order_confirmation_mode: values.order_confirmation_mode || null,
         order_confirmation_emails: values.order_confirmation_emails?.trim() || null,
+        packing_slip_delivery_mode: values.packing_slip_delivery_mode || "none",
+        packing_slip_emails: values.packing_slip_emails?.trim() || null,
       };
 
       const { data, error } = await supabase
