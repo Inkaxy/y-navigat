@@ -156,7 +156,14 @@ export default function ProductList() {
   return (
     <>
       <AppHeaderBanner
-        actions={canWrite && <NewProductActionButton onClick={() => setWizardOpen(true)} />}
+        actions={canWrite && (
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setBulkImagesOpen(true)} className="gap-1.5 rounded-full">
+              <Images className="h-4 w-4" /> Massimport bilder
+            </Button>
+            <NewProductActionButton onClick={() => setWizardOpen(true)} />
+          </div>
+        )}
       />
 
       <div className="px-6 py-6">
