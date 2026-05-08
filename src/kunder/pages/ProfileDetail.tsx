@@ -107,6 +107,8 @@ const schema = z.object({
   send_to_pos_system: z.boolean(),
   order_confirmation_mode: z.string().optional().or(z.literal("")),
   order_confirmation_emails: z.string().max(500).optional().or(z.literal("")),
+  packing_slip_delivery_mode: z.string().optional().or(z.literal("")),
+  packing_slip_emails: z.string().max(1000).optional().or(z.literal("")),
 
   expects_order_monday: z.boolean(),
   expects_order_tuesday: z.boolean(),
@@ -180,6 +182,8 @@ export default function ProfileDetail() {
       send_to_pos_system: false,
       order_confirmation_mode: "",
       order_confirmation_emails: "",
+      packing_slip_delivery_mode: "none",
+      packing_slip_emails: "",
       expects_order_monday: false,
       expects_order_tuesday: false,
       expects_order_wednesday: false,
@@ -236,6 +240,8 @@ export default function ProfileDetail() {
       send_to_pos_system: !!profile.send_to_pos_system,
       order_confirmation_mode: profile.order_confirmation_mode ?? "",
       order_confirmation_emails: profile.order_confirmation_emails ?? "",
+      packing_slip_delivery_mode: (profile as any).packing_slip_delivery_mode ?? "none",
+      packing_slip_emails: (profile as any).packing_slip_emails ?? "",
       expects_order_monday: !!profile.expects_order_monday,
       expects_order_tuesday: !!profile.expects_order_tuesday,
       expects_order_wednesday: !!profile.expects_order_wednesday,
@@ -287,6 +293,8 @@ export default function ProfileDetail() {
         pickup_location_id: values.pickup_location_id || null,
         order_confirmation_mode: values.order_confirmation_mode || null,
         order_confirmation_emails: values.order_confirmation_emails?.trim() || null,
+        packing_slip_delivery_mode: values.packing_slip_delivery_mode || "none",
+        packing_slip_emails: values.packing_slip_emails?.trim() || null,
       };
 
       const { data, error } = await supabase
@@ -890,6 +898,37 @@ export default function ProfileDetail() {
                     }
                     disabled={!canWrite}
                   />
+                  <div className="rounded-md border border-border bg-muted/30 p-3 space-y-3">
+                    <Field label="Sending av følgeseddel/utskrifter">
+                      <SelectField
+                        value={form.watch("packing_slip_delivery_mode") || "none"}
+                        onChange={(v) =>
+                          form.setValue("packing_slip_delivery_mode", v, { shouldDirty: true })
+                        }
+                        disabled={!canWrite}
+                        options={[
+                          { v: "none", l: "Ingen — kun manuell utskrift" },
+                          { v: "email", l: "E-post (PDF)" },
+                          { v: "print", l: "Utskrift" },
+                          { v: "both", l: "Både e-post og utskrift" },
+                        ]}
+                      />
+                    </Field>
+                    {(form.watch("packing_slip_delivery_mode") === "email" ||
+                      form.watch("packing_slip_delivery_mode") === "both") && (
+                      <Field label="E-poster for følgeseddel (komma-separert)">
+                        <Textarea
+                          {...form.register("packing_slip_emails")}
+                          disabled={!canWrite}
+                          rows={2}
+                          placeholder="post@kunde.no, daglig.leder@kunde.no"
+                        />
+                      </Field>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      Gjelder alle kunder som arver denne profilen. Kan overstyres per kunde.
+                    </p>
+                  </div>
                   <CheckboxField
                     label="Endringslogg på følgeseddel"
                     checked={form.watch("include_change_log_on_packing_slip")}

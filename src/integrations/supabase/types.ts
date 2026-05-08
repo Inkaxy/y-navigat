@@ -830,6 +830,8 @@ export type Database = {
           only_products_with_price_in_offer_group: boolean | null
           order_confirmation_emails: string | null
           order_confirmation_mode: string | null
+          packing_slip_delivery_mode: string | null
+          packing_slip_emails: string | null
           payment_terms_days: number | null
           pickup_location_id: string | null
           price_on_packing_slip: boolean | null
@@ -883,6 +885,8 @@ export type Database = {
           only_products_with_price_in_offer_group?: boolean | null
           order_confirmation_emails?: string | null
           order_confirmation_mode?: string | null
+          packing_slip_delivery_mode?: string | null
+          packing_slip_emails?: string | null
           payment_terms_days?: number | null
           pickup_location_id?: string | null
           price_on_packing_slip?: boolean | null
@@ -936,6 +940,8 @@ export type Database = {
           only_products_with_price_in_offer_group?: boolean | null
           order_confirmation_emails?: string | null
           order_confirmation_mode?: string | null
+          packing_slip_delivery_mode?: string | null
+          packing_slip_emails?: string | null
           payment_terms_days?: number | null
           pickup_location_id?: string | null
           price_on_packing_slip?: boolean | null

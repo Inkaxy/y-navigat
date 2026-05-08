@@ -116,6 +116,23 @@ export const DELIVERY_FIELDS: ProfileFieldDef[] = [
   { key: "order_confirmation_mode", label: "Ordrebekreftelse", type: "select", options: orderConfirmationOptions },
   { key: "order_confirmation_emails", label: "E-post for ordrebekreftelse", type: "text", placeholder: "komma-separert" },
   {
+    key: "packing_slip_delivery_mode",
+    label: "Sending av følgeseddel/utskrifter",
+    type: "select",
+    options: [
+      { value: "none", label: "Ingen — kun manuell utskrift" },
+      { value: "email", label: "E-post (PDF)" },
+      { value: "print", label: "Utskrift" },
+      { value: "both", label: "Både e-post og utskrift" },
+    ],
+  },
+  {
+    key: "packing_slip_emails",
+    label: "E-poster for følgeseddel",
+    type: "text",
+    placeholder: "komma-separert",
+  },
+  {
     key: "print_declaration_labels",
     label: "Skriv ut varedeklarasjons-etiketter",
     type: "boolean",
