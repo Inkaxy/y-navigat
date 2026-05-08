@@ -11,10 +11,11 @@ import { Label } from "@/components/ui/label";
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
-import { Loader2, AlertTriangle, FileText, Eye, Save, Copy, Printer, Sparkles, ShieldCheck, Link2 } from "lucide-react";
+import { Loader2, AlertTriangle, FileText, Eye, Save, Copy, Printer, Sparkles, ShieldCheck, Link2, FileUp } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { logAudit } from "@/varer/lib/audit";
+import { PdfDeclarationImportDialog } from "@/varer/components/products/PdfDeclarationImportDialog";
 
 type Mode = "auto" | "manual" | "auto_with_overrides";
 
@@ -38,6 +39,7 @@ interface Props {
 
 export function DeclarationTab({ productId, productName, canWrite }: Props) {
   const qc = useQueryClient();
+  const [importOpen, setImportOpen] = useState(false);
 
   const linkQuery = useQuery({
     queryKey: ["product-recipe-link-decl", productId],
@@ -64,7 +66,29 @@ export function DeclarationTab({ productId, productName, canWrite }: Props) {
     );
   }
 
-  return <DeclarationView link={linkQuery.data} productName={productName} canWrite={canWrite} qc={qc} />;
+  return (
+    <>
+      {canWrite && linkQuery.data && (
+        <div className="mb-3 flex justify-end">
+          <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
+            <FileUp className="mr-1.5 h-4 w-4" /> Last opp PDF for AI-tolking
+          </Button>
+        </div>
+      )}
+      <DeclarationView link={linkQuery.data} productName={productName} canWrite={canWrite} qc={qc} />
+      <PdfDeclarationImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        productId={productId}
+        productName={productName}
+        productRecipeLinkId={linkQuery.data.id}
+        onApproved={() => {
+          qc.invalidateQueries({ queryKey: ["product-recipe-link-decl", productId] });
+          qc.invalidateQueries({ queryKey: ["compute-product-declaration", linkQuery.data.id] });
+        }}
+      />
+    </>
+  );
 }
 
 function DeclarationView({ link, productName, canWrite, qc }: { link: any; productName: string; canWrite: boolean; qc: ReturnType<typeof useQueryClient> }) {
