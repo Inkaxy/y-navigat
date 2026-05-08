@@ -36,11 +36,11 @@ export function MobileAppWheel() {
     const list = (apps ?? [])
       .filter((a) => a.status === "active" || a.status === "in_development")
       .filter((a) => a.access_level && (a.access_level as string) !== "none")
+      .filter((a) => INTERNAL_ROUTES[a.slug] !== undefined)
       .map((a: AccessibleApp) => ({
         key: a.slug,
         label: a.display_name,
         to: INTERNAL_ROUTES[a.slug],
-        external: INTERNAL_ROUTES[a.slug] ? undefined : `${a.deploy_url}${a.start_path}`,
         color: a.color_hex ?? "#a47236",
         icon: iconMap[a.icon_name] ?? Box,
       }));
