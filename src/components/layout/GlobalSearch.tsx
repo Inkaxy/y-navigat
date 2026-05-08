@@ -91,27 +91,29 @@ export function GlobalSearch() {
 
           {apps && apps.length > 0 && (
             <CommandGroup heading="Apper">
-              {apps.map((app) => {
-                const IconComponent = iconMap[app.icon_name] ?? Box;
-                const active = isActiveApp(app);
-                return (
-                  <CommandItem
-                    key={app.id}
-                    value={`app ${app.slug} ${app.display_name} ${app.category}`}
-                    onSelect={() => {
-                      setOpen(false);
-                      navigateToApp(app);
-                    }}
-                    disabled={active}
-                  >
-                    <IconComponent className="mr-2 h-4 w-4" />
-                    <span>{app.display_name}</span>
-                    <span className="ml-auto text-xs text-muted-foreground">
-                      {active ? "Du er her" : app.category}
-                    </span>
-                  </CommandItem>
-                );
-              })}
+              {apps
+                .filter((a) => getAppInternalRoute(a.slug) !== null)
+                .map((app) => {
+                  const IconComponent = iconMap[app.icon_name] ?? Box;
+                  const active = isActiveApp(app, pathname);
+                  return (
+                    <CommandItem
+                      key={app.id}
+                      value={`app ${app.slug} ${app.display_name} ${app.category}`}
+                      onSelect={() => {
+                        setOpen(false);
+                        navigateToApp(app);
+                      }}
+                      disabled={active}
+                    >
+                      <IconComponent className="mr-2 h-4 w-4" />
+                      <span>{app.display_name}</span>
+                      <span className="ml-auto text-xs text-muted-foreground">
+                        {active ? "Du er her" : app.category}
+                      </span>
+                    </CommandItem>
+                  );
+                })}
             </CommandGroup>
           )}
 
