@@ -781,23 +781,13 @@ export default function ProfileDetail() {
           <TabsContent value="pricing" className="space-y-4">
             <div className="grid gap-4 lg:grid-cols-2">
               <Card>
-                <CardHeader>
-                  <CardTitle>MVA og prislister</CardTitle>
+                 <CardHeader>
+                  <CardTitle>Prislister</CardTitle>
+                  <p className="text-xs text-muted-foreground pt-1">
+                    MVA-kode følger alltid varekortet og settes ikke per kundeprofil.
+                  </p>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <Field label="MVA-kode">
-                    <SelectField
-                      value={form.watch("mva_code")}
-                      onChange={(v) => form.setValue("mva_code", v, { shouldDirty: true })}
-                      disabled={!canWrite}
-                      options={[
-                        { v: "H", l: "H — Høy (25%)" },
-                        { v: "F", l: "F — Mat (15%)" },
-                        { v: "L", l: "L — Lav (12%)" },
-                        { v: "N", l: "N — Null/fritatt" },
-                      ]}
-                    />
-                  </Field>
                   <CheckboxField
                     label="Bruk utsalgspris"
                     checked={form.watch("use_retail_price")}
