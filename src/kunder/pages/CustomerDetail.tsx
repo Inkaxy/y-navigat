@@ -231,6 +231,8 @@ export default function CustomerDetail() {
 
   useEffect(() => {
     if (!customer) return;
+    // Ikke overskriv lokale ulagrede endringer hvis bruker har endret skjema/overrides
+    if (form.formState.isDirty || overridesDirty) return;
     const sameAsBilling =
       !customer.delivery_address_line1 &&
       !customer.delivery_address_line2 &&
@@ -276,7 +278,7 @@ export default function CustomerDetail() {
     });
     setOverrides((customer.profile_overrides as Record<string, unknown>) ?? {});
     setOverridesDirty(false);
-  }, [customer, form]);
+  }, [customer, form, overridesDirty]);
 
   const isDirty = form.formState.isDirty || overridesDirty;
   const watchSameAsBilling = form.watch("same_as_billing");
@@ -947,19 +949,47 @@ export default function CustomerDetail() {
                   Klikk hengelås for å overstyre på denne kunden.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="grid gap-4 md:grid-cols-2">
-                {filterFields(INVOICE_FIELDS, showAdvanced).map((f) => (
-                  <OverrideField
-                    key={f.key}
-                    field={f}
-                    inheritedValue={(profile as any)?.[f.key] ?? null}
-                    overrideValue={overrides[f.key]}
-                    isOverridden={f.key in overrides}
-                    disabled={!canWrite}
-                    onOverride={(v) => setOverride(f.key, v)}
-                    onClear={() => clearOverride(f.key)}
-                  />
-                ))}
+              <CardContent className="space-y-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  {filterFields(INVOICE_FIELDS, showAdvanced).map((f) => (
+                    <OverrideField
+                      key={f.key}
+                      field={f}
+                      inheritedValue={(profile as any)?.[f.key] ?? null}
+                      overrideValue={overrides[f.key]}
+                      isOverridden={f.key in overrides}
+                      disabled={!canWrite}
+                      onOverride={(v) => setOverride(f.key, v)}
+                      onClear={() => clearOverride(f.key)}
+                    />
+                  ))}
+                </div>
+                {(() => {
+                  const effectiveMethod =
+                    "invoice_method" in overrides
+                      ? overrides.invoice_method
+                      : (profile as any)?.invoice_method;
+                  if (effectiveMethod !== "email_pdf") return null;
+                  return (
+                    <div className="rounded-md border border-warning/30 bg-warning/5 p-3">
+                      <Field
+                        label="Faktura sendes til (e-post)"
+                        error={form.formState.errors.invoice_email?.message as any}
+                      >
+                        <Input
+                          type="email"
+                          placeholder="faktura@kunde.no"
+                          {...form.register("invoice_email")}
+                          disabled={!canWrite}
+                        />
+                      </Field>
+                      <p className="mt-1.5 text-[11px] text-muted-foreground">
+                        Fakturametoden er satt til <span className="font-medium">Epost-faktura</span>.
+                        Denne adressen brukes som hovedmottaker.
+                      </p>
+                    </div>
+                  );
+                })()}
               </CardContent>
             </Card>
 
