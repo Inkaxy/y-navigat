@@ -180,6 +180,12 @@ export default function OrdreInnstillingerPage() {
 
       {/* Kort 3: Mal-editor */}
       <TemplateEditorCard />
+
+      <SendTestEmailDialog
+        open={testDialogOpen}
+        onOpenChange={setTestDialogOpen}
+        defaultRecipient={userEmail}
+      />
     </div>
   );
 }
