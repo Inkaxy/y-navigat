@@ -21,6 +21,7 @@ type LE = {
   short_code: string;
   legal_name: string;
   org_number: string;
+  gs1_prefix: string | null;
   invoice_address_line1: string | null;
   invoice_postal_code: string | null;
   invoice_city: string | null;
@@ -33,6 +34,7 @@ const empty: Partial<LE> = {
   short_code: "",
   legal_name: "",
   org_number: "",
+  gs1_prefix: "",
   invoice_address_line1: "",
   invoice_postal_code: "",
   invoice_city: "",
