@@ -339,3 +339,15 @@ export default function InvoiceDetailPage() {
     </div>
   );
 }
+
+function ConfidenceBadge({ value }: { value: string }) {
+  const map: Record<string, { label: string; variant: "default" | "secondary" | "outline" | "destructive" }> = {
+    auto_high: { label: "auto · høy", variant: "secondary" },
+    auto_medium: { label: "auto · medium", variant: "outline" },
+    auto_low: { label: "auto · lav", variant: "outline" },
+    not_applicable: { label: "ikke aktuell", variant: "secondary" },
+  };
+  const m = map[value];
+  if (!m) return null;
+  return <Badge variant={m.variant} className="text-[10px]">{m.label}</Badge>;
+}
