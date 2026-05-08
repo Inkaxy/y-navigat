@@ -557,10 +557,10 @@ export default function ProfileDetail() {
       <div className="container py-6">
         <Tabs defaultValue="basic" className="w-full">
           <TabsList className="mb-4">
-            <TabsTrigger value="basic">Navn og nummer</TabsTrigger>
-            <TabsTrigger value="invoice">Faktura</TabsTrigger>
+            <TabsTrigger value="basic">Navn, nummer og kontaktinfo</TabsTrigger>
+            <TabsTrigger value="invoice">Faktura- og betalingsinfo</TabsTrigger>
             <TabsTrigger value="pricing">Prising</TabsTrigger>
-            <TabsTrigger value="delivery">Utkjøring</TabsTrigger>
+            <TabsTrigger value="delivery">Utkjøring / utskrifter</TabsTrigger>
           </TabsList>
 
           {/* TAB 1 */}
