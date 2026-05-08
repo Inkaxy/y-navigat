@@ -684,11 +684,13 @@ export default function CustomerDetail() {
       <div className="container space-y-4 py-6">
         <Tabs value={tab} onValueChange={setTab} className="w-full">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <TabsList>
-              <TabsTrigger value="info">Info</TabsTrigger>
-              <TabsTrigger value="invoice">Faktura</TabsTrigger>
-              <TabsTrigger value="pricing">Pris</TabsTrigger>
-              <TabsTrigger value="delivery">Utkjøring</TabsTrigger>
+            <TabsList className="flex-wrap h-auto">
+              <TabsTrigger value="info">Navn, nummer og kontaktinfo</TabsTrigger>
+              <TabsTrigger value="addresses">Adresser</TabsTrigger>
+              <TabsTrigger value="invoice">Faktura- og betalingsinfo</TabsTrigger>
+              <TabsTrigger value="pricing">Prising</TabsTrigger>
+              <TabsTrigger value="delivery">Utkjøring / utskrifter</TabsTrigger>
+              <TabsTrigger value="notes">Notater</TabsTrigger>
               <TabsTrigger value="history">
                 <History className="mr-1 h-3.5 w-3.5" /> Historikk
               </TabsTrigger>
@@ -859,6 +861,12 @@ export default function CustomerDetail() {
                 </CardContent>
               </Card>
 
+            </div>
+          </TabsContent>
+
+          {/* TAB: ADRESSER */}
+          <TabsContent value="addresses" className="mt-4">
+            <div className="grid gap-4 lg:grid-cols-2">
               <Card>
                 <CardHeader>
                   <CardTitle>Fakturaadresse</CardTitle>
@@ -923,18 +931,10 @@ export default function CustomerDetail() {
                   </Field>
                 </CardContent>
               </Card>
-
-              <Card className="lg:col-span-2">
-                <CardHeader>
-                  <CardTitle>Notater</CardTitle>
-                  <CardDescription>Internt — ikke synlig for kunden</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Textarea rows={4} {...form.register("notes")} disabled={!canWrite} />
-                </CardContent>
-              </Card>
             </div>
           </TabsContent>
+
+          {/* TAB: NOTATER (flyttet til egen tab nederst) */}
 
           {/* TAB 2: FAKTURA */}
           <TabsContent value="invoice" className="mt-4 space-y-4">
@@ -1138,7 +1138,20 @@ export default function CustomerDetail() {
             </Card>
           </TabsContent>
 
-          {/* TAB 5: HISTORIKK */}
+          {/* TAB: NOTATER */}
+          <TabsContent value="notes" className="mt-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Notater</CardTitle>
+                <CardDescription>Internt — ikke synlig for kunden</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Textarea rows={10} {...form.register("notes")} disabled={!canWrite} />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* TAB: HISTORIKK */}
           <TabsContent value="history" className="mt-4">
             <CustomerHistoryTab customerId={customer.id} legalEntityId={customer.legal_entity_id} />
           </TabsContent>
