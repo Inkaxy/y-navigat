@@ -4,6 +4,7 @@
  * Kaller edge function `import_products_prices` for transaksjonell import.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useAppContext } from "@/varer/context/AppContext";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 

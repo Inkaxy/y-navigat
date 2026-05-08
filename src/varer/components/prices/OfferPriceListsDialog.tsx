@@ -3,6 +3,7 @@
  * Base-prislister (Engros, Utsalg) vises og redigeres ikke her — beskyttet i DB-trigger.
  */
 import { useEffect, useState } from "react";
+import { useAppContext } from "@/varer/context/AppContext";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
