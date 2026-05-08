@@ -232,7 +232,7 @@ export default function NewOrder() {
     (async () => {
       const { data } = await supabase
         .from("customers")
-        .select("id, customer_number, display_name, organization_number, primary_contact_name, primary_contact_email, invoice_recipient_customer_id, delivery_address_line1, delivery_address_line2, delivery_postal_code, delivery_city, delivery_country, delivery_instructions")
+        .select("id, customer_number, display_name, organization_number, primary_contact_name, primary_contact_email, invoice_recipient_customer_id, delivery_address_line1, delivery_address_line2, delivery_postal_code, delivery_city, delivery_country, delivery_instructions, custom_reference, enforce_custom_reference")
         .eq("id", prefilledCustomerId)
         .maybeSingle();
       if (cancelled || !data) return;
@@ -252,7 +252,7 @@ export default function NewOrder() {
       if (!customer && !prefilledCustomerId) {
         const { data: c } = await supabase
           .from("customers")
-          .select("id, customer_number, display_name, organization_number, primary_contact_name, primary_contact_email, invoice_recipient_customer_id, delivery_address_line1, delivery_address_line2, delivery_postal_code, delivery_city, delivery_country, delivery_instructions")
+          .select("id, customer_number, display_name, organization_number, primary_contact_name, primary_contact_email, invoice_recipient_customer_id, delivery_address_line1, delivery_address_line2, delivery_postal_code, delivery_city, delivery_country, delivery_instructions, custom_reference, enforce_custom_reference")
           .ilike("primary_contact_email", t.sender_email)
           .maybeSingle();
         if (cancelled) return;
@@ -281,6 +281,10 @@ export default function NewOrder() {
   const [deliveryInstructions, setDeliveryInstructions] = useState("");
   const [internalNotes, setInternalNotes] = useState("");
   const [customerNotes, setCustomerNotes] = useState("");
+  const [customerReference, setCustomerReference] = useState("");
+  const enforceRef = !!customer?.enforce_custom_reference;
+  const enforcedRefValue = customer?.custom_reference?.trim() ?? "";
+  const enforcedRefMissing = enforceRef && !enforcedRefValue;
   const [manualTourId, setManualTourId] = useState<string | null>(null);
   const [lines, setLines] = useState<LineDraft[]>([newLine()]);
   const [submitting, setSubmitting] = useState(false);
@@ -305,7 +309,7 @@ export default function NewOrder() {
   });
   const passedDeadlines = deadlineViolations.filter((v) => v.minutes_over > 0);
 
-  // Når kunde endres: pre-fyll adresse
+  // Når kunde endres: pre-fyll adresse + håndter kunde-referanse
   useEffect(() => {
     if (customer) {
       setDelAddr({
@@ -316,8 +320,17 @@ export default function NewOrder() {
         country: customer.delivery_country ?? "NO",
       });
       setDeliveryInstructions(customer.delivery_instructions ?? "");
+      if (customer.enforce_custom_reference) {
+        const ref = customer.custom_reference?.trim() ?? "";
+        setCustomerReference(ref);
+        toast.message("Referanse oppdatert fra kundeprofilen", {
+          description: ref ? `Fast referanse: ${ref}` : "Kunden krever fast referanse, men ingen er satt på profilen.",
+        });
+      }
+      // Hvis ikke enforce: behold det brukeren evt. har skrevet (eller default tomt).
     }
-  }, [customer]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customer?.id]);
 
   // Re-trekk priser hvis kunde eller dato endres
   useEffect(() => {
@@ -584,6 +597,9 @@ export default function NewOrder() {
             return parts.length > 0 ? parts.join("\n\n") : null;
           })(),
           customer_notes: customerNotes || null,
+          customer_reference: (customer.enforce_custom_reference
+            ? (customer.custom_reference?.trim() || null)
+            : (customerReference.trim() || null)),
           delivery_tour_id: manualTourId, // null lar trigger auto-tildele
           is_return: isReturn,
           created_by: userId,
@@ -941,6 +957,37 @@ export default function NewOrder() {
             <CardTitle className="text-base">4. Notater</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
+            <div>
+              <Label htmlFor="customer-reference" className="flex items-center gap-1.5">
+                Kundereferanse
+                {enforceRef && (
+                  <span
+                    title="Fast referanse fra kundeprofil"
+                    className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-muted text-[10px] font-semibold text-muted-foreground"
+                  >
+                    i
+                  </span>
+                )}
+              </Label>
+              <Input
+                id="customer-reference"
+                value={enforceRef ? enforcedRefValue : customerReference}
+                onChange={(e) => setCustomerReference(e.target.value)}
+                readOnly={enforceRef}
+                disabled={enforceRef && !enforcedRefValue}
+                placeholder={enforceRef ? "(fast referanse fra kundeprofil)" : "PO-nummer e.l. (valgfritt)"}
+                className={enforceRef ? "bg-muted/40" : ""}
+                maxLength={100}
+              />
+              {enforceRef && enforcedRefValue && (
+                <p className="mt-1 text-xs text-muted-foreground">Fast referanse fra kundeprofil — kan ikke endres her.</p>
+              )}
+              {enforcedRefMissing && (
+                <p className="mt-1 text-xs text-warning">
+                  Kunden krever fast referanse, men ingen er satt på kundeprofilen — kontakt kundeansvarlig.
+                </p>
+              )}
+            </div>
             <div>
               <Label htmlFor="internal">Internt notat (ikke synlig for kunde)</Label>
               <Textarea id="internal" rows={2} value={internalNotes} onChange={(e) => setInternalNotes(e.target.value)} />

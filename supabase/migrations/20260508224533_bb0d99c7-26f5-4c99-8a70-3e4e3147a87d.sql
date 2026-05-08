@@ -1,0 +1,2 @@
+ALTER TABLE public.orders ADD COLUMN customer_reference text;
+COMMENT ON COLUMN public.orders.customer_reference IS 'Kundens egen referanse (PO-nummer e.l.). Auto-fylles fra customers.custom_reference når customers.enforce_custom_reference=true.';

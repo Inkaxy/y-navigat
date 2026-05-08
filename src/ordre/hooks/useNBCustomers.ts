@@ -22,6 +22,8 @@ export type CustomerOption = {
   status: string;
   geocode_latitude: number | null;
   geocode_longitude: number | null;
+  custom_reference: string | null;
+  enforce_custom_reference: boolean;
 };
 
 /** Henter aktive kunder for NB AS — brukes til ordre-opprettelse */

@@ -91,6 +91,17 @@ export function OrderDetailsTab({ order, lines }: { order: OrderDetail; lines: O
               {snap.primary_contact_email && <span>{snap.primary_contact_email}</span>}
             </div>
           )}
+          {(order as OrderDetail & { customer_reference?: string | null }).customer_reference && (
+            <div className="text-xs">
+              <span className="text-muted-foreground">Kundereferanse:</span>{" "}
+              <span className="font-medium">
+                {(order as OrderDetail & { customer_reference?: string | null }).customer_reference}
+              </span>
+              {liveCustomer?.enforce_custom_reference && (
+                <span className="ml-1 text-muted-foreground">(fast referanse)</span>
+              )}
+            </div>
+          )}
           {invSnap && (
             <div className="rounded-md border border-border bg-muted/30 p-2 text-xs">
               <span className="font-medium">Faktura går til:</span>{" "}
