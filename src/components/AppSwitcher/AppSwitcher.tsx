@@ -52,6 +52,8 @@ export function AppSwitcher({ label, renderTrigger }: AppSwitcherProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const { data: apps, isLoading } = useAccessibleApps();
+  const { pathname } = useLocation();
+  const navigate = useNavigate();
 
   const triggerLabel = label ?? getAppDisplayName(apps);
   const currentApp = apps?.find((a) => a.slug === getCurrentAppSlug());
@@ -71,23 +73,10 @@ export function AppSwitcher({ label, renderTrigger }: AppSwitcherProps) {
   const grouped = useMemo(() => groupByCategory(filtered), [filtered]);
 
   const handleNavigate = (app: AccessibleApp) => {
-    if (isActiveApp(app)) return;
-    const internalPath = INTERNAL_ROUTES[app.slug];
-    if (internalPath) {
-      window.location.href = `${internalPath}?from=${getCurrentAppSlug()}`;
-      return;
-    }
-    try {
-      const target = new URL(app.deploy_url);
-      if (target.hostname === window.location.hostname) {
-        window.location.href = `${app.start_path}?from=${getCurrentAppSlug()}`;
-        return;
-      }
-    } catch {
-      // fall through
-    }
-    const url = `${app.deploy_url}${app.start_path}?from=${getCurrentAppSlug()}`;
-    window.location.href = url;
+    if (isActiveApp(app, pathname)) return;
+    const internalPath = getAppInternalRoute(app.slug);
+    if (!internalPath) return; // App ikke integrert ennå — vises disabled
+    navigate(internalPath);
   };
 
   return (
