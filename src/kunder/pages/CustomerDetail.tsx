@@ -1138,7 +1138,20 @@ export default function CustomerDetail() {
             </Card>
           </TabsContent>
 
-          {/* TAB 5: HISTORIKK */}
+          {/* TAB: NOTATER */}
+          <TabsContent value="notes" className="mt-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Notater</CardTitle>
+                <CardDescription>Internt — ikke synlig for kunden</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Textarea rows={10} {...form.register("notes")} disabled={!canWrite} />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* TAB: HISTORIKK */}
           <TabsContent value="history" className="mt-4">
             <CustomerHistoryTab customerId={customer.id} legalEntityId={customer.legal_entity_id} />
           </TabsContent>
