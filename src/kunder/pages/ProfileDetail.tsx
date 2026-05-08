@@ -497,6 +497,40 @@ export default function ProfileDetail() {
                 </AlertDialogContent>
               </AlertDialog>
             )}
+            {canWrite && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="text-destructive hover:bg-destructive/5"
+                    disabled={customerCount > 0 || deleteMutation.isPending}
+                    title={customerCount > 0 ? "Kan ikke slette: profilen er i bruk" : "Slett profil permanent"}
+                  >
+                    <Trash2 className="mr-1 h-4 w-4" /> Slett
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Slette profilen permanent?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      «{profile.code} — {profile.display_name}» og alle prisliste-koblinger
+                      slettes permanent. Kan ikke angres. Hvis profilen er i bruk av kunder,
+                      bør du heller deaktivere.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Avbryt</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => deleteMutation.mutate()}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      Slett permanent
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
             <Button type="button" variant="ghost" onClick={handleBack}>
               <X className="mr-1 h-4 w-4" /> Avbryt
             </Button>
