@@ -231,7 +231,62 @@ export function OrderBulkActionBar({ selected, onClear, onMutated, csvHeaders }:
           <Download className="h-3.5 w-3.5" />
           Eksporter CSV
         </Button>
+
+        <Button
+          variant="destructive"
+          size="sm"
+          onClick={() => {
+            setDeleteText("");
+            setDeleteOpen(true);
+          }}
+          disabled={running}
+          className="h-8 gap-1.5"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+          Slett
+        </Button>
       </div>
+
+      <Dialog open={deleteOpen} onOpenChange={(o) => !running && setDeleteOpen(o)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              Slett {count} {count === 1 ? "ordre" : "ordrer"}?
+            </DialogTitle>
+            <DialogDescription>
+              Dette sletter de valgte ordrene og alle ordrelinjer permanent. Handlingen kan ikke angres.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2">
+            <Label htmlFor="bulk-delete-confirm">
+              Skriv <span className="font-mono font-semibold">SLETT</span> for å bekrefte
+            </Label>
+            <Input
+              id="bulk-delete-confirm"
+              value={deleteText}
+              onChange={(e) => setDeleteText(e.target.value)}
+              placeholder="SLETT"
+              autoFocus
+            />
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteOpen(false)} disabled={running}>
+              Avbryt
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={performBulkDelete}
+              disabled={running || deleteText.trim().toUpperCase() !== "SLETT"}
+            >
+              {running && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Slett {count} {count === 1 ? "ordre" : "ordrer"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
