@@ -62,34 +62,23 @@ export function SendTestEmailDialog({ open, onOpenChange, defaultRecipient = "" 
     }
     setSending(true);
     try {
-      // 1) insert outbox-rad
-      const { data: row, error: insErr } = await supabase
-        .from("email_outbox")
-        .insert([{
+      const { data, error } = await supabase.functions.invoke("send-test-email", {
+        body: {
           template_key: templateKey,
           recipient_email: recipient,
-          variables: parsedVars as never,
-          status: "pending",
-          related_entity_type: "test",
-        }])
-        .select("id")
-        .single();
-      if (insErr || !row) throw new Error(insErr?.message ?? "Kunne ikke opprette outbox-rad");
-
-      // 2) trigger Edge Function direkte
-      const { data, error } = await supabase.functions.invoke("process-email-outbox", {
-        body: { outbox_id: row.id },
+          variables: parsedVars,
+        },
       });
       if (error) throw new Error(error.message);
+      if (data?.error) throw new Error(data.error);
 
-      const result = (data?.results ?? [])[0];
-      if (result?.status === "sent") {
+      if (data?.success) {
         toast({ title: "Test-mail sendt", description: `Sjekk innboksen til ${recipient}.` });
         onOpenChange(false);
       } else {
         toast({
           title: "Send feilet",
-          description: result?.error ?? "Ukjent feil — sjekk email_outbox.",
+          description: data?.error ?? `Status: ${data?.status ?? "ukjent"}`,
           variant: "destructive",
         });
       }
