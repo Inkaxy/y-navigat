@@ -143,10 +143,10 @@ export function AppSwitcher() {
   const goTo = useCallback(
     (app: AccessibleApp) => {
       const route = INTERNAL_ROUTES[app.slug];
+      if (!route) return; // App ikke integrert ennå
       pushRecent(app.slug);
       setOpen(false);
-      if (route) navigate(route);
-      else if (app.deploy_url) window.location.href = `${app.deploy_url}${app.start_path ?? ""}`;
+      navigate(route);
     },
     [navigate],
   );
