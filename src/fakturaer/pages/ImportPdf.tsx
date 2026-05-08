@@ -165,6 +165,25 @@ export default function ImportPdfPage({ embedded = false }: { embedded?: boolean
   const addLine = () =>
     setLines((prev) => [...prev, { description: "", sku: null, quantity: null, unit: null, unit_price: null, total_amount: null, vat_rate: null }]);
 
+  const resetFormForNext = () => {
+    setParseResult(null);
+    if (pdfPreviewUrl) URL.revokeObjectURL(pdfPreviewUrl);
+    setPdfPreviewUrl(null);
+    setSupplierMode("existing");
+    setSupplierId("");
+    setNewSupplierName("");
+    setNewSupplierOrgNr("");
+    setInvoiceNumber("");
+    setInvoiceDate(todayIso());
+    setDueDate("");
+    setTotalAmount("");
+    setTotalVat("");
+    setCurrency("NOK");
+    setKid("");
+    setAccountNumber("");
+    setLines([]);
+  };
+
   const submit = async () => {
     if (!file || !legalEntityId || !invoiceNumber || !invoiceDate) {
       toast.error("Fyll inn fakturanr og fakturadato");
