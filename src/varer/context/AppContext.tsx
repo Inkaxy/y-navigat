@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { APP_CODE, NB_LEGAL_ENTITY_ID } from "@/varer/lib/constants";
+import { useSelection } from "@/providers/SelectionProvider";
 import { setAppThemeFromHex } from "@/varer/lib/theme";
 
 export type AccessLevel = "none" | "read" | "write" | "approve" | "admin";
@@ -26,6 +27,9 @@ interface AppContextValue {
   accessLevel: AccessLevel;
   canWrite: boolean;
   canRead: boolean;
+  /** Aktivt valgt selskap fra Shell. `null` hvis ingen er valgt. */
+  legalEntityId: string | null;
+  hasLegalEntity: boolean;
 }
 
 const AppContext = createContext<AppContextValue | undefined>(undefined);
@@ -33,6 +37,7 @@ const AppContext = createContext<AppContextValue | undefined>(undefined);
 export function AppProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const { legalEntityId } = useSelection();
 
   useEffect(() => {
     const { data: sub } = supabase.auth.onAuthStateChange((_evt, s) => {
@@ -121,6 +126,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         accessLevel,
         canWrite,
         canRead,
+        legalEntityId,
+        hasLegalEntity: !!legalEntityId,
       }}
     >
       {children}
