@@ -227,6 +227,20 @@ export default function ImportPdfPage({ embedded = false }: { embedded?: boolean
         return;
       }
 
+      // 1b. Duplicate-check: same supplier + invoice_number already exists?
+      const { data: dup } = await supabase
+        .from("invoices")
+        .select("id, invoice_date")
+        .eq("legal_entity_id", legalEntityId)
+        .eq("supplier_id", resolvedSupplierId)
+        .eq("invoice_number", invoiceNumber.trim())
+        .maybeSingle();
+      if (dup) {
+        toast.error(`Fakturanr ${invoiceNumber} finnes allerede for denne leverandøren`);
+        setBusy(false);
+        return;
+      }
+
       // 2. Upload PDF to storage
       const path = `${legalEntityId}/${Date.now()}_${file.name}`;
       const { error: upErr } = await supabase.storage.from("invoice-pdfs").upload(path, file);
