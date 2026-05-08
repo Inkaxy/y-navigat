@@ -4,7 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { ArrowLeft, History, Loader2, Repeat, Save, Settings2, X } from "lucide-react";
+import { ArrowLeft, History, Loader2, Repeat, Save, Settings2, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -397,6 +397,43 @@ export default function CustomerDetail() {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      if (!customer) throw new Error("Mangler kunde");
+      // Sjekk ordrer og pakksedler — blokker hard delete hvis noen finnes
+      const [ordersRes, dnRes] = await Promise.all([
+        supabase.from("orders").select("id", { count: "exact", head: true }).eq("customer_id", customer.id),
+        supabase.from("delivery_notes").select("id", { count: "exact", head: true }).eq("customer_id", customer.id),
+      ]);
+      if (ordersRes.error) throw ordersRes.error;
+      if (dnRes.error) throw dnRes.error;
+      const orderCount = ordersRes.count ?? 0;
+      const dnCount = dnRes.count ?? 0;
+      if (orderCount + dnCount > 0) {
+        throw new Error(
+          `Kunden har ${orderCount} ordre og ${dnCount} pakksedler. Deaktiver i stedet, eller slett ordrene først.`,
+        );
+      }
+      const { error } = await supabase.from("customers").delete().eq("id", customer.id);
+      if (error) throw error;
+      await logAudit({
+        action: "customer.deleted",
+        entity_type: "customer",
+        entity_id: customer.id,
+        entity_display_reference: `${customer.customer_number} — ${customer.display_name}`,
+        legal_entity_id: customer.legal_entity_id,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["customers"] });
+      toast.success("Kunde slettet");
+      navigate("/kunder/kundeliste");
+    },
+    onError: (e: any) => {
+      toast.error(`Kunne ikke slette: ${e?.message ?? "Ukjent feil"}`);
+    },
+  });
+
   function handleBack() {
     if (isDirty) {
       const ok = window.confirm("Du har ulagrede endringer. Forlat siden likevel?");
@@ -500,6 +537,40 @@ export default function CustomerDetail() {
                     <AlertDialogCancel>Avbryt</AlertDialogCancel>
                     <AlertDialogAction onClick={() => deactivateMutation.mutate()}>
                       De-aktiver
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+            {canWrite && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="text-destructive hover:bg-destructive/5"
+                    disabled={deleteMutation.isPending}
+                  >
+                    <Trash2 className="mr-1 h-4 w-4" /> Slett
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Slette kunden permanent?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      «{customer.customer_number} — {customer.display_name}» slettes permanent
+                      sammen med tilhørende spesialpriser, faste bestillinger, gruppe-medlemskap
+                      og portal-konto. Hvis kunden har ordre eller pakksedler blokkeres slettingen
+                      — bruk «De-aktiver» i stedet. Kan ikke angres.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Avbryt</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => deleteMutation.mutate()}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      Slett permanent
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
