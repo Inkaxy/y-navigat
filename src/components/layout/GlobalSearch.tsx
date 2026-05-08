@@ -29,19 +29,18 @@ const PAGES = [
   { label: "Hjelp", path: "/hjelp", icon: HelpCircle },
 ];
 
-function isActiveApp(app: AccessibleApp): boolean {
-  if (app.slug === CURRENT_APP_SLUG) return true;
-  try {
-    return window.location.hostname === new URL(app.deploy_url).hostname;
-  } catch {
-    return false;
-  }
+function isActiveApp(app: AccessibleApp, pathname: string): boolean {
+  if (app.slug === CURRENT_APP_SLUG) return pathname === "/" || pathname === "/hjem";
+  const route = getAppInternalRoute(app.slug);
+  if (!route) return false;
+  return pathname === route || pathname.startsWith(route + "/");
 }
 
 export function GlobalSearch() {
   const { appName } = useAppTheme();
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const { signOut } = useAuth();
   const { data: apps } = useAccessibleApps();
 
@@ -57,8 +56,10 @@ export function GlobalSearch() {
   }, []);
 
   const navigateToApp = (app: AccessibleApp) => {
-    if (isActiveApp(app)) return;
-    window.location.href = `${app.deploy_url}${app.start_path}?from=${CURRENT_APP_SLUG}`;
+    if (isActiveApp(app, pathname)) return;
+    const route = getAppInternalRoute(app.slug);
+    if (!route) return;
+    navigate(route);
   };
 
   return (
