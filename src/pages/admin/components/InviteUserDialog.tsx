@@ -11,6 +11,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { Plus, Trash2 } from "lucide-react";
 
 interface Props {
   open: boolean;
@@ -18,18 +19,22 @@ interface Props {
   onInvited?: () => void;
 }
 
+type Assignment = { legal_entity_id: string; position_id: string };
+
 export function InviteUserDialog({ open, onOpenChange, onInvited }: Props) {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
-  const [legalEntityId, setLegalEntityId] = useState<string>("");
-  const [positionId, setPositionId] = useState<string>("");
+  const [assignments, setAssignments] = useState<Assignment[]>([
+    { legal_entity_id: "", position_id: "" },
+  ]);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (!open) {
       setFirstName(""); setLastName(""); setEmail("");
-      setLegalEntityId(""); setPositionId(""); setSubmitting(false);
+      setAssignments([{ legal_entity_id: "", position_id: "" }]);
+      setSubmitting(false);
     }
   }, [open]);
 
@@ -60,19 +65,42 @@ export function InviteUserDialog({ open, onOpenChange, onInvited }: Props) {
     enabled: open,
   });
 
+  const updateAssignment = (idx: number, patch: Partial<Assignment>) => {
+    setAssignments((prev) => prev.map((a, i) => (i === idx ? { ...a, ...patch } : a)));
+  };
+  const addRow = () =>
+    setAssignments((prev) => [...prev, { legal_entity_id: "", position_id: "" }]);
+  const removeRow = (idx: number) =>
+    setAssignments((prev) => prev.filter((_, i) => i !== idx));
+
   const submit = async () => {
-    if (!firstName || !lastName || !email || !legalEntityId || !positionId) {
-      toast.error("Alle felt er påkrevd");
+    if (!firstName || !lastName || !email) {
+      toast.error("Navn og e-post er påkrevd");
       return;
     }
+    const cleaned = assignments.filter((a) => a.legal_entity_id && a.position_id);
+    if (cleaned.length === 0) {
+      toast.error("Minst én stilling må fylles ut");
+      return;
+    }
+    // Dedup på (selskap, stilling)
+    const seen = new Set<string>();
+    for (const a of cleaned) {
+      const key = `${a.legal_entity_id}:${a.position_id}`;
+      if (seen.has(key)) {
+        toast.error("Samme stilling i samme selskap er lagt til to ganger");
+        return;
+      }
+      seen.add(key);
+    }
+
     setSubmitting(true);
     const { data, error } = await supabase.functions.invoke("invite-user", {
       body: {
         email,
         first_name: firstName,
         last_name: lastName,
-        legal_entity_id: legalEntityId,
-        position_id: positionId,
+        assignments: cleaned,
       },
     });
     setSubmitting(false);
@@ -89,11 +117,12 @@ export function InviteUserDialog({ open, onOpenChange, onInvited }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Inviter ny bruker</DialogTitle>
           <DialogDescription>
-            Brukeren mottar en e-post med lenke for å sette passord.
+            Brukeren mottar en e-post med lenke for å sette passord. Du kan tilordne
+            flere selskap og stillinger.
           </DialogDescription>
         </DialogHeader>
 
@@ -112,27 +141,53 @@ export function InviteUserDialog({ open, onOpenChange, onInvited }: Props) {
             <Label htmlFor="email">E-post</Label>
             <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
           </div>
-          <div className="space-y-1.5">
-            <Label>Selskap</Label>
-            <Select value={legalEntityId} onValueChange={setLegalEntityId}>
-              <SelectTrigger><SelectValue placeholder="Velg selskap" /></SelectTrigger>
-              <SelectContent>
-                {companies.map((c: any) => (
-                  <SelectItem key={c.id} value={c.id}>{c.short_code} — {c.legal_name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1.5">
-            <Label>Stilling</Label>
-            <Select value={positionId} onValueChange={setPositionId}>
-              <SelectTrigger><SelectValue placeholder="Velg stilling" /></SelectTrigger>
-              <SelectContent>
-                {positions.map((p: any) => (
-                  <SelectItem key={p.id} value={p.id}>{p.display_name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label>Stillinger</Label>
+              <Button type="button" variant="ghost" size="sm" onClick={addRow}>
+                <Plus className="h-4 w-4" /> Legg til
+              </Button>
+            </div>
+            {assignments.map((a, idx) => (
+              <div key={idx} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-center">
+                <Select
+                  value={a.legal_entity_id}
+                  onValueChange={(v) => updateAssignment(idx, { legal_entity_id: v })}
+                >
+                  <SelectTrigger><SelectValue placeholder="Selskap" /></SelectTrigger>
+                  <SelectContent>
+                    {companies.map((c: any) => (
+                      <SelectItem key={c.id} value={c.id}>{c.short_code}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={a.position_id}
+                  onValueChange={(v) => updateAssignment(idx, { position_id: v })}
+                >
+                  <SelectTrigger><SelectValue placeholder="Stilling" /></SelectTrigger>
+                  <SelectContent>
+                    {positions.map((p: any) => (
+                      <SelectItem key={p.id} value={p.id}>{p.display_name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => removeRow(idx)}
+                  disabled={assignments.length === 1}
+                  aria-label="Fjern stilling"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+            <p className="text-xs text-muted-foreground">
+              Første rad blir markert som primær stilling.
+            </p>
           </div>
         </div>
 

@@ -6,12 +6,15 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+interface Assignment {
+  legal_entity_id: string;
+  position_id: string;
+}
 interface InvitePayload {
   email: string;
   first_name: string;
   last_name: string;
-  legal_entity_id: string;
-  position_id: string;
+  assignments: Assignment[];
 }
 
 const json = (status: number, body: unknown) =>
@@ -50,10 +53,18 @@ Deno.serve(async (req) => {
 
     // Validate payload
     const body = (await req.json()) as Partial<InvitePayload>;
-    const required = ["email", "first_name", "last_name", "legal_entity_id", "position_id"] as const;
+    const required = ["email", "first_name", "last_name"] as const;
     for (const f of required) {
       if (!body[f] || typeof body[f] !== "string") {
         return json(400, { error: `Mangler felt: ${f}` });
+      }
+    }
+    if (!Array.isArray(body.assignments) || body.assignments.length === 0) {
+      return json(400, { error: "Minst én stilling må oppgis" });
+    }
+    for (const a of body.assignments) {
+      if (!a?.legal_entity_id || !a?.position_id) {
+        return json(400, { error: "Hver stilling må ha selskap og stilling" });
       }
     }
     const email = body.email!.trim().toLowerCase();
