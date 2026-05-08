@@ -81,7 +81,39 @@ export default function InvoiceDetailPage() {
   const canBulkImport = canWrite && hasInvoiceAccess && unmatchedLines.length > 0;
   const canMatch = canWrite && hasInvoiceAccess && !isFinal;
 
-  const matchLineRow: ReviewLineRow | null = useMemoMatchLine(matchLineId, lines, data, matchLineSuggestions ?? []);
+  const matchLineRaw = matchLineId ? lines.find((l) => l.id === matchLineId) : null;
+  const matchLineRow: ReviewLineRow | null = matchLineRaw
+    ? {
+        id: matchLineRaw.id,
+        invoice_id: data.id,
+        line_number: matchLineRaw.line_number,
+        supplier_sku: matchLineRaw.supplier_sku,
+        description: matchLineRaw.description,
+        quantity: matchLineRaw.quantity,
+        unit: matchLineRaw.unit,
+        unit_price: matchLineRaw.unit_price,
+        total_amount: matchLineRaw.total_amount,
+        match_confidence: matchLineRaw.match_confidence,
+        raw_material_id: matchLineRaw.raw_material_id,
+        price_per_base_unit: matchLineRaw.price_per_base_unit,
+        expected_price_per_base_unit: matchLineRaw.expected_price_per_base_unit,
+        price_variance_pct: matchLineRaw.price_variance_pct,
+        variance_status: matchLineRaw.variance_status,
+        review_reason: matchLineRaw.review_reason,
+        invoice: {
+          id: data.id,
+          invoice_number: data.invoice_number,
+          invoice_date: data.invoice_date,
+          legal_entity_id: data.legal_entity_id,
+          supplier_id: data.supplier_id,
+          source: data.source,
+          source_document_url: data.source_document_url,
+          supplier: data.suppliers ? { name: data.suppliers.name, contact_email: data.suppliers.contact_email ?? null } : null,
+          legal_entity: data.legal_entities ? { legal_name: data.legal_entities.legal_name, short_code: null } : null,
+        },
+        suggestions: (matchLineSuggestions ?? []) as any,
+      }
+    : null;
 
   async function rerunAutoMatch() {
     setRematching(true);
