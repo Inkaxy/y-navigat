@@ -861,6 +861,12 @@ export default function CustomerDetail() {
                 </CardContent>
               </Card>
 
+            </div>
+          </TabsContent>
+
+          {/* TAB: ADRESSER */}
+          <TabsContent value="addresses" className="mt-4">
+            <div className="grid gap-4 lg:grid-cols-2">
               <Card>
                 <CardHeader>
                   <CardTitle>Fakturaadresse</CardTitle>
@@ -925,18 +931,10 @@ export default function CustomerDetail() {
                   </Field>
                 </CardContent>
               </Card>
-
-              <Card className="lg:col-span-2">
-                <CardHeader>
-                  <CardTitle>Notater</CardTitle>
-                  <CardDescription>Internt — ikke synlig for kunden</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Textarea rows={4} {...form.register("notes")} disabled={!canWrite} />
-                </CardContent>
-              </Card>
             </div>
           </TabsContent>
+
+          {/* TAB: NOTATER (flyttet til egen tab nederst) */}
 
           {/* TAB 2: FAKTURA */}
           <TabsContent value="invoice" className="mt-4 space-y-4">
