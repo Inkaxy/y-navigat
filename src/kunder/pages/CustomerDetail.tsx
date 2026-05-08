@@ -542,6 +542,40 @@ export default function CustomerDetail() {
                 </AlertDialogContent>
               </AlertDialog>
             )}
+            {canWrite && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="text-destructive hover:bg-destructive/5"
+                    disabled={deleteMutation.isPending}
+                  >
+                    <Trash2 className="mr-1 h-4 w-4" /> Slett
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Slette kunden permanent?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      «{customer.customer_number} — {customer.display_name}» slettes permanent
+                      sammen med tilhørende spesialpriser, faste bestillinger, gruppe-medlemskap
+                      og portal-konto. Hvis kunden har ordre eller pakksedler blokkeres slettingen
+                      — bruk «De-aktiver» i stedet. Kan ikke angres.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Avbryt</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => deleteMutation.mutate()}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      Slett permanent
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
             <Button type="button" variant="ghost" onClick={handleBack}>
               <X className="mr-1 h-4 w-4" /> Avbryt
             </Button>
