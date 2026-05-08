@@ -4,13 +4,17 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ArrowLeft, Loader2, LineChart as LineChartIcon, CheckCircle2, Flag, Sparkles } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { ArrowLeft, Loader2, LineChart as LineChartIcon, CheckCircle2, Flag, Sparkles, Link2, Pencil, RefreshCw } from "lucide-react";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { FakturaerHeaderBanner } from "@/fakturaer/components/FakturaerHeaderBanner";
 import { InvoiceStatusBadge } from "@/fakturaer/components/InvoiceStatusBadge";
 import { ConfirmReconcileDialog } from "@/fakturaer/components/ConfirmReconcileDialog";
 import { FlagInvoiceDialog } from "@/fakturaer/components/FlagInvoiceDialog";
 import { BulkImportRawMaterialsDrawer } from "@/fakturaer/components/BulkImportRawMaterialsDrawer";
+import { MatchDrawer } from "@/fakturaer/components/MatchDrawer";
+import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
 import { useFakturaer } from "@/fakturaer/context/FakturaerContext";
 import { formatNok, formatDate, INVOICE_SOURCES } from "@/fakturaer/lib/constants";
 
@@ -23,6 +27,8 @@ export default function InvoiceDetailPage() {
   const [flagOpen, setFlagOpen] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
+  const [matchLineId, setMatchLineId] = useState<string | null>(null);
+  const [rematching, setRematching] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["invoice", id],
@@ -35,6 +41,22 @@ export default function InvoiceDetailPage() {
         .single();
       if (error) throw error;
       return data as any;
+    },
+  });
+
+  // Suggestions for currently-opened match line
+  const { data: matchLineSuggestions } = useQuery({
+    queryKey: ["invoice-line-suggestions", matchLineId],
+    enabled: !!matchLineId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("invoice_line_match_suggestions")
+        .select(`raw_material_id, confidence, match_reason, rank,
+                 raw_material:raw_materials(name, sku, category, current_cost_price)`)
+        .eq("invoice_line_id", matchLineId!)
+        .order("rank");
+      if (error) throw error;
+      return data ?? [];
     },
   });
 
@@ -57,6 +79,63 @@ export default function InvoiceDetailPage() {
   const selectedIds = Object.keys(selected).filter((k) => selected[k]);
   const selectedLines = unmatchedLines.filter((l) => selected[l.id]);
   const canBulkImport = canWrite && hasInvoiceAccess && unmatchedLines.length > 0;
+  const canMatch = canWrite && hasInvoiceAccess && !isFinal;
+
+  const matchLineRaw = matchLineId ? lines.find((l) => l.id === matchLineId) : null;
+  const matchLineRow: ReviewLineRow | null = matchLineRaw
+    ? {
+        id: matchLineRaw.id,
+        invoice_id: data.id,
+        line_number: matchLineRaw.line_number,
+        supplier_sku: matchLineRaw.supplier_sku,
+        description: matchLineRaw.description,
+        quantity: matchLineRaw.quantity,
+        unit: matchLineRaw.unit,
+        unit_price: matchLineRaw.unit_price,
+        total_amount: matchLineRaw.total_amount,
+        match_confidence: matchLineRaw.match_confidence,
+        raw_material_id: matchLineRaw.raw_material_id,
+        price_per_base_unit: matchLineRaw.price_per_base_unit,
+        expected_price_per_base_unit: matchLineRaw.expected_price_per_base_unit,
+        price_variance_pct: matchLineRaw.price_variance_pct,
+        variance_status: matchLineRaw.variance_status,
+        review_reason: matchLineRaw.review_reason,
+        invoice: {
+          id: data.id,
+          invoice_number: data.invoice_number,
+          invoice_date: data.invoice_date,
+          legal_entity_id: data.legal_entity_id,
+          supplier_id: data.supplier_id,
+          source: data.source,
+          source_document_url: data.source_document_url,
+          supplier: data.suppliers ? { name: data.suppliers.name, contact_email: data.suppliers.contact_email ?? null } : null,
+          legal_entity: data.legal_entities ? { legal_name: data.legal_entities.legal_name, short_code: null } : null,
+        },
+        suggestions: (matchLineSuggestions ?? []) as any,
+      }
+    : null;
+
+  async function rerunAutoMatch() {
+    setRematching(true);
+    try {
+      // Reset manual lines so the pipeline will re-evaluate them
+      const { error: resetErr } = await supabase
+        .from("invoice_lines")
+        .update({ match_confidence: "unmatched", requires_review: true, review_reason: "unmatched", resolved_at: null, resolved_by: null })
+        .eq("invoice_id", data.id)
+        .is("raw_material_id", null);
+      if (resetErr) throw resetErr;
+      const { error } = await supabase.functions.invoke("match-invoice-lines", { body: { invoice_id: data.id } });
+      if (error) throw error;
+      toast.success("Auto-match kjørt på nytt");
+      qc.invalidateQueries({ queryKey: ["invoice", id] });
+    } catch (e: any) {
+      toast.error(e.message ?? "Kunne ikke kjøre auto-match");
+    } finally {
+      setRematching(false);
+    }
+  }
+
 
 
   return (
@@ -71,6 +150,12 @@ export default function InvoiceDetailPage() {
         actions={
           <div className="flex items-center gap-2">
             <InvoiceStatusBadge status={data.status} />
+            {!isFinal && canMatch && lines.length > 0 && (
+              <Button variant="outline" size="sm" onClick={rerunAutoMatch} disabled={rematching} className="gap-1.5">
+                {rematching ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                Kjør auto-match
+              </Button>
+            )}
             {!isFinal && canWrite && (
               <Button variant="outline" size="sm" onClick={() => setFlagOpen(true)} className="gap-1.5">
                 <Flag className="h-4 w-4" /> Flagg for oppfølging
@@ -180,16 +265,31 @@ export default function InvoiceDetailPage() {
                         <td className="px-4 py-3">
                           {rm ? (
                             <div className="space-y-0.5">
-                              <Link
-                                to={`/ravarer/vareliste/${rm.id}`}
-                                className="font-medium text-app underline-offset-2 hover:underline"
-                              >
-                                {rm.name}
-                              </Link>
+                              <div className="flex items-center gap-2">
+                                <Link
+                                  to={`/ravarer/vareliste/${rm.id}`}
+                                  className="font-medium text-app underline-offset-2 hover:underline"
+                                >
+                                  {rm.name}
+                                </Link>
+                                {l.match_confidence && l.match_confidence !== "manual" && (
+                                  <ConfidenceBadge value={l.match_confidence} />
+                                )}
+                                {l.match_confidence === "manual" && (
+                                  <Badge variant="secondary" className="text-[10px]">manuell</Badge>
+                                )}
+                              </div>
                               <div className="text-xs text-ink-secondary">{l.description}</div>
                             </div>
                           ) : (
-                            <span>{l.description}</span>
+                            <div className="space-y-1">
+                              <span>{l.description}</span>
+                              {l.review_reason && (
+                                <div className="text-[10px] uppercase tracking-wider text-warning">
+                                  {l.review_reason.replace(/,/g, " · ")}
+                                </div>
+                              )}
+                            </div>
                           )}
                         </td>
                         <td className="px-4 py-3 text-right tabular-nums">{l.quantity}</td>
@@ -197,13 +297,25 @@ export default function InvoiceDetailPage() {
                         <td className="px-4 py-3 text-right tabular-nums">{formatNok(l.unit_price)}</td>
                         <td className="px-4 py-3 text-right tabular-nums">{formatNok(l.total_amount)}</td>
                         <td className="px-4 py-3 text-right">
-                          {rm && (
-                            <Button variant="ghost" size="icon" asChild title="Se prishistorikk">
-                              <Link to={`/ravarer/vareliste/${rm.id}?tab=suppliers`}>
-                                <LineChartIcon className="h-4 w-4" />
-                              </Link>
-                            </Button>
-                          )}
+                          <div className="flex items-center justify-end gap-1">
+                            {canMatch && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                title={rm ? "Endre match" : "Match mot råvare"}
+                                onClick={() => setMatchLineId(l.id)}
+                              >
+                                {rm ? <Pencil className="h-4 w-4" /> : <Link2 className="h-4 w-4" />}
+                              </Button>
+                            )}
+                            {rm && (
+                              <Button variant="ghost" size="icon" asChild title="Se prishistorikk">
+                                <Link to={`/ravarer/vareliste/${rm.id}?tab=suppliers`}>
+                                  <LineChartIcon className="h-4 w-4" />
+                                </Link>
+                              </Button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -215,9 +327,27 @@ export default function InvoiceDetailPage() {
         </Card>
       </div>
 
+      <MatchDrawer
+        open={!!matchLineId}
+        onOpenChange={(v) => { if (!v) setMatchLineId(null); }}
+        line={matchLineRow}
+      />
+
       <p className="text-center text-xs text-ink-secondary">
         Avstemming og prisavviks-håndtering kommer i neste pulje. Faktura-lifecycle eies av Tripletex.
       </p>
     </div>
   );
+}
+
+function ConfidenceBadge({ value }: { value: string }) {
+  const map: Record<string, { label: string; variant: "default" | "secondary" | "outline" | "destructive" }> = {
+    auto_high: { label: "auto · høy", variant: "secondary" },
+    auto_medium: { label: "auto · medium", variant: "outline" },
+    auto_low: { label: "auto · lav", variant: "outline" },
+    not_applicable: { label: "ikke aktuell", variant: "secondary" },
+  };
+  const m = map[value];
+  if (!m) return null;
+  return <Badge variant={m.variant} className="text-[10px]">{m.label}</Badge>;
 }
