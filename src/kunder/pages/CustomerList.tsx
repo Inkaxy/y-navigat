@@ -82,6 +82,7 @@ export default function CustomerList() {
       <AppBanner
         actions={
           <Button
+            variant="brand"
             onClick={() => setOpenNew(true)}
             disabled={!canCreateInScope}
             title={
@@ -89,7 +90,6 @@ export default function CustomerList() {
                 ? "Velg ett spesifikt selskap og ha skrive-tilgang for å opprette kunde"
                 : undefined
             }
-            className="bg-white text-primary hover:bg-white/90"
           >
             <Plus className="mr-2 h-4 w-4" /> Ny kunde
           </Button>
