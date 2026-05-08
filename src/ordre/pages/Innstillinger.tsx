@@ -302,15 +302,22 @@ function TemplateEditorCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <FileText className="h-5 w-5" />
-          E-post-maler
-        </CardTitle>
-        <CardDescription>
-          Velg en mal til venstre, rediger emne og innhold til høyre. Variabler i krøllparenteser
-          (f.eks. <code className="rounded bg-muted px-1 py-0.5 text-xs">{`{{kunde_navn}}`}</code>)
-          fylles inn automatisk når mailen sendes.
-        </CardDescription>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              E-post-maler
+            </CardTitle>
+            <CardDescription className="mt-1">
+              Velg en mal til venstre, rediger emne og innhold til høyre. Variabler i krøllparenteser
+              (f.eks. <code className="rounded bg-muted px-1 py-0.5 text-xs">{`{{kunde_navn}}`}</code>)
+              fylles inn automatisk når mailen sendes.
+            </CardDescription>
+          </div>
+          <Button size="sm" onClick={() => setNewDialogOpen(true)} className="shrink-0">
+            <Plus className="mr-1.5 h-4 w-4" /> Ny mal
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
         {loading ? (
@@ -323,9 +330,12 @@ function TemplateEditorCard() {
             <div>
               <p className="text-sm font-medium">Ingen e-post-maler ennå</p>
               <p className="text-xs text-muted-foreground">
-                Maler opprettes automatisk første gang en e-posttype tas i bruk.
+                Klikk «Ny mal» for å opprette din første mal.
               </p>
             </div>
+            <Button size="sm" onClick={() => setNewDialogOpen(true)}>
+              <Plus className="mr-1.5 h-4 w-4" /> Opprett mal
+            </Button>
           </div>
         ) : (
           <div className="grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
