@@ -1,0 +1,227 @@
+import { useEffect, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import DOMPurify from "dompurify";
+import { format, formatDistanceToNow } from "date-fns";
+import { nb } from "date-fns/locale";
+import { ArrowLeft, Download, Loader2, Mail, Paperclip, PlusCircle } from "lucide-react";
+import { AppBanner } from "@/ordre/components/shell/AppBanner";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/components/ui/use-toast";
+import {
+  useTicket, useUpdateTicket, getTicketAttachmentSignedUrl,
+  type TicketStatus, type TicketPriority,
+} from "@/ordre/hooks/useTickets";
+
+const STATUS_OPTS: { value: TicketStatus; label: string }[] = [
+  { value: "new", label: "Ny" },
+  { value: "in_progress", label: "Pågår" },
+  { value: "resolved", label: "Løst" },
+  { value: "closed", label: "Lukket" },
+  { value: "spam", label: "Spam" },
+];
+
+const PRIO_OPTS: { value: TicketPriority; label: string }[] = [
+  { value: "low", label: "Lav" },
+  { value: "normal", label: "Normal" },
+  { value: "high", label: "Høy" },
+  { value: "urgent", label: "Haster" },
+];
+
+export default function TicketDetail() {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const { data, isLoading } = useTicket(id);
+  const update = useUpdateTicket();
+  const [notesDraft, setNotesDraft] = useState("");
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (data?.ticket) setNotesDraft(data.ticket.internal_notes ?? "");
+  }, [data?.ticket?.id]);
+
+  if (isLoading) {
+    return (
+      <>
+        <AppBanner title="Ticket" />
+        <div className="container mx-auto p-6 space-y-3"><Skeleton className="h-40 w-full" /></div>
+      </>
+    );
+  }
+  if (!data?.ticket) {
+    return (
+      <>
+        <AppBanner title="Ticket" />
+        <div className="container mx-auto p-6">
+          <p>Ticket ikke funnet.</p>
+          <Button variant="outline" asChild className="mt-3"><Link to="/ordre/ticket"><ArrowLeft className="mr-2 h-4 w-4" />Tilbake</Link></Button>
+        </div>
+      </>
+    );
+  }
+
+  const { ticket, attachments } = data;
+  const sanitizedHtml = ticket.body_html
+    ? DOMPurify.sanitize(ticket.body_html, { USE_PROFILES: { html: true } })
+    : null;
+
+  const onDownload = async (attId: string) => {
+    setDownloadingId(attId);
+    try {
+      const url = await getTicketAttachmentSignedUrl(attId);
+      window.open(url, "_blank");
+    } catch (e) {
+      toast({ title: "Kunne ikke laste ned vedlegg", description: String(e), variant: "destructive" });
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
+  const setStatus = (status: TicketStatus) => {
+    update.mutate({ id: ticket.id, patch: { status } as never }, {
+      onSuccess: () => toast({ title: "Status oppdatert" }),
+    });
+  };
+  const setPriority = (priority: TicketPriority) => {
+    update.mutate({ id: ticket.id, patch: { priority } as never }, {
+      onSuccess: () => toast({ title: "Prioritet oppdatert" }),
+    });
+  };
+
+  const saveNotes = () => {
+    update.mutate({ id: ticket.id, patch: { internal_notes: notesDraft } as never }, {
+      onSuccess: () => toast({ title: "Notat lagret" }),
+    });
+  };
+
+  return (
+    <>
+      <AppBanner
+        title={ticket.subject ?? "(uten emne)"}
+        subtitle={`Fra ${ticket.sender_email}`}
+        actions={
+          <Button asChild variant="outline" size="sm" className="gap-2 border-white/40 bg-transparent text-white hover:bg-white/10 hover:text-white">
+            <Link to="/ordre/ticket"><ArrowLeft className="h-4 w-4" /> Tilbake</Link>
+          </Button>
+        }
+      />
+      <div className="container mx-auto max-w-5xl p-4 space-y-4">
+        {/* Handlings-rad */}
+        <Card>
+          <CardContent className="pt-4 flex flex-wrap items-end gap-3">
+            <div className="space-y-1">
+              <Label className="text-xs">Status</Label>
+              <Select value={ticket.status} onValueChange={(v) => setStatus(v as TicketStatus)}>
+                <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+                <SelectContent>{STATUS_OPTS.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Prioritet</Label>
+              <Select value={ticket.priority} onValueChange={(v) => setPriority(v as TicketPriority)}>
+                <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+                <SelectContent>{PRIO_OPTS.map((p) => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div className="ml-auto flex gap-2">
+              {ticket.related_order_id ? (
+                <Button asChild variant="outline">
+                  <Link to={`/ordre/ordrer/${ticket.related_order_id}`}>Vis tilknyttet ordre</Link>
+                </Button>
+              ) : (
+                <Button onClick={() => navigate(`/ordre/ordrer/ny?ticket_id=${ticket.id}`)}>
+                  <PlusCircle className="mr-2 h-4 w-4" /> Opprett ordre fra ticket
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* E-post-tråd */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Mail className="h-4 w-4" />
+              {ticket.subject ?? "(uten emne)"}
+            </CardTitle>
+            <div className="text-xs text-muted-foreground space-y-0.5">
+              <div><strong>Fra:</strong> {ticket.sender_name ? `${ticket.sender_name} <${ticket.sender_email}>` : ticket.sender_email}</div>
+              <div><strong>Mottatt:</strong> {format(new Date(ticket.received_at), "d. MMM yyyy HH:mm", { locale: nb })} ({formatDistanceToNow(new Date(ticket.received_at), { locale: nb, addSuffix: true })})</div>
+              {Array.isArray(ticket.to_recipients) && ticket.to_recipients.length > 0 && (
+                <div><strong>Til:</strong> {(ticket.to_recipients as Array<{ emailAddress?: { address?: string } }>).map((r) => r?.emailAddress?.address).filter(Boolean).join(", ")}</div>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent>
+            {sanitizedHtml ? (
+              <div className="prose prose-sm max-w-none dark:prose-invert" dangerouslySetInnerHTML={{ __html: sanitizedHtml }} />
+            ) : (
+              <pre className="whitespace-pre-wrap text-sm font-sans">{ticket.body_text ?? ticket.body_preview ?? "(tom)"}</pre>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Vedlegg */}
+        {attachments.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm flex items-center gap-2"><Paperclip className="h-4 w-4" /> Vedlegg ({attachments.length})</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ul className="space-y-2">
+                {attachments.map((a) => (
+                  <li key={a.id} className="flex items-center justify-between gap-3 text-sm border rounded-md p-2">
+                    <div className="min-w-0">
+                      <div className="truncate font-medium">{a.file_name}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {a.content_type ?? "ukjent type"}
+                        {a.size_bytes ? ` · ${(a.size_bytes / 1024).toFixed(0)} kB` : ""}
+                        {!a.storage_path && " · for stor (ikke lagret)"}
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={!a.storage_path || downloadingId === a.id}
+                      onClick={() => onDownload(a.id)}
+                    >
+                      {downloadingId === a.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Internt notat */}
+        <Card>
+          <CardHeader><CardTitle className="text-sm">Internt notat</CardTitle></CardHeader>
+          <CardContent className="space-y-2">
+            <Textarea
+              value={notesDraft}
+              onChange={(e) => setNotesDraft(e.target.value)}
+              rows={4}
+              placeholder="Notater for ordrekontoret …"
+            />
+            <Button
+              size="sm"
+              onClick={saveNotes}
+              disabled={update.isPending || notesDraft === (ticket.internal_notes ?? "")}
+            >
+              Lagre notat
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    </>
+  );
+}
