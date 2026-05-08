@@ -182,6 +182,8 @@ export default function ProfileDetail() {
       send_to_pos_system: false,
       order_confirmation_mode: "",
       order_confirmation_emails: "",
+      packing_slip_delivery_mode: "none",
+      packing_slip_emails: "",
       expects_order_monday: false,
       expects_order_tuesday: false,
       expects_order_wednesday: false,
