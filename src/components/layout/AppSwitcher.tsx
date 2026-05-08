@@ -20,15 +20,7 @@ const iconMap = Icons as unknown as Record<
   React.ComponentType<{ className?: string }>
 >;
 
-const INTERNAL_ROUTES: Record<string, string> = {
-  nbhub: "/",
-  nbos: "/admin",
-  varer: "/varer",
-  kunder: "/kunder",
-  ravarer: "/ravarer/vareliste",
-  ordre: "/ordre",
-  produksjon: "/produksjon",
-};
+import { APP_INTERNAL_ROUTES as INTERNAL_ROUTES } from "@/lib/appRoutes";
 
 const RECENT_KEY = "nbhub.recent_apps";
 const MAX_RECENT = 5;
