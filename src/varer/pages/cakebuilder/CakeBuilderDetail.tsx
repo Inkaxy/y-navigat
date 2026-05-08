@@ -1200,6 +1200,7 @@ function AddProductDialog({
   onAdded: () => void;
 }) {
   const { toast } = useToast();
+  const { legalEntityId } = useAppContext();
   const [search, setSearch] = useState("");
 
   const candidates = useQuery({
@@ -1582,6 +1583,7 @@ function LinkToProductDialog({
   onOpenChange: (open: boolean) => void;
   onLink: (productId: string) => void;
 }) {
+  const { legalEntityId } = useAppContext();
   const [search, setSearch] = useState("");
 
   const candidates = useQuery({
