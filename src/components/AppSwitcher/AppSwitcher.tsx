@@ -28,14 +28,12 @@ function getCurrentAppSlug(): string {
   return CURRENT_APP_SLUG;
 }
 
-function isActiveApp(app: AccessibleApp): boolean {
+function isActiveApp(app: AccessibleApp, pathname: string): boolean {
   if (app.slug === getCurrentAppSlug()) return true;
-  try {
-    const appHost = new URL(app.deploy_url).hostname;
-    return window.location.hostname === appHost;
-  } catch {
-    return false;
-  }
+  const route = getAppInternalRoute(app.slug);
+  if (!route) return false;
+  if (route === "/") return pathname === "/" || pathname === "/hjem";
+  return pathname === route || pathname.startsWith(route + "/");
 }
 
 function getAppDisplayName(apps: AccessibleApp[] | undefined): string {
