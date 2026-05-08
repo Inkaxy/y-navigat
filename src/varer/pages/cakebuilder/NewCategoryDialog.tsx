@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useAppContext } from "@/varer/context/AppContext";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -14,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Loader2, Upload, X } from "lucide-react";
-import { NB_LEGAL_ENTITY_ID } from "@/varer/lib/constants";
+
 import { logAudit } from "@/varer/lib/audit";
 import { useToast } from "@/hooks/use-toast";
 
@@ -34,6 +35,7 @@ interface Props {
 }
 
 export function NewCategoryDialog({ open, onOpenChange, category, onSaved }: Props) {
+  const { legalEntityId } = useAppContext();
   const isEdit = !!category;
   const qc = useQueryClient();
   const { toast } = useToast();
@@ -55,7 +57,7 @@ export function NewCategoryDialog({ open, onOpenChange, category, onSaved }: Pro
     setUploading(true);
     try {
       const ext = file.name.split(".").pop() ?? "jpg";
-      const path = `${NB_LEGAL_ENTITY_ID}/${crypto.randomUUID()}.${ext}`;
+      const path = `${legalEntityId}/${crypto.randomUUID()}.${ext}`;
       const { error } = await supabase.storage.from(BUCKET).upload(path, file, {
         cacheControl: "3600",
         upsert: false,
@@ -103,7 +105,7 @@ export function NewCategoryDialog({ open, onOpenChange, category, onSaved }: Pro
       const { data: maxRow } = await supabase
         .from("cake_categories")
         .select("sort_order")
-        .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
+        .eq("legal_entity_id", legalEntityId)
         .order("sort_order", { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -112,7 +114,7 @@ export function NewCategoryDialog({ open, onOpenChange, category, onSaved }: Pro
       const { data, error } = await supabase
         .from("cake_categories")
         .insert({
-          legal_entity_id: NB_LEGAL_ENTITY_ID,
+          legal_entity_id: legalEntityId,
           name: trimmedName,
           description: description.trim() || null,
           image_url: imageUrl,

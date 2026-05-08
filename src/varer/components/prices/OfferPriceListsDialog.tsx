@@ -3,11 +3,12 @@
  * Base-prislister (Engros, Utsalg) vises og redigeres ikke her — beskyttet i DB-trigger.
  */
 import { useEffect, useState } from "react";
+import { useAppContext } from "@/varer/context/AppContext";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { NB_LEGAL_ENTITY_ID } from "@/varer/lib/constants";
+
 import { logAudit } from "@/varer/lib/audit";
 import {
   Dialog,
@@ -48,18 +49,19 @@ function slugifyCode(name: string): string {
 }
 
 export function OfferPriceListsDialog({ open, onOpenChange }: Props) {
+  const { legalEntityId } = useAppContext();
   const qc = useQueryClient();
   const [rows, setRows] = useState<OfferRow[]>([]);
   const [saving, setSaving] = useState(false);
 
   const listsQuery = useQuery({
-    queryKey: ["offer-price-lists", NB_LEGAL_ENTITY_ID],
+    queryKey: ["offer-price-lists", legalEntityId],
     enabled: open,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("price_lists")
         .select("id, display_name, list_number, price_list_type, status")
-        .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
+        .eq("legal_entity_id", legalEntityId)
         .eq("price_list_type", "offer")
         .eq("status", "active")
         .order("list_number", { ascending: true });
@@ -194,7 +196,7 @@ export function OfferPriceListsDialog({ open, onOpenChange }: Props) {
           const { data, error } = await supabase
             .from("price_lists")
             .insert({
-              legal_entity_id: NB_LEGAL_ENTITY_ID,
+              legal_entity_id: legalEntityId,
               code,
               display_name: fullName,
               list_number: num,

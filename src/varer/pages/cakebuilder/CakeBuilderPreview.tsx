@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useAppContext } from "@/varer/context/AppContext";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -6,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Cake, Eye, Loader2 } from "lucide-react";
-import { NB_LEGAL_ENTITY_ID } from "@/varer/lib/constants";
+
 import { CakeBuilder } from "@/varer/features/cakeBuilder/CakeBuilder";
 import { toast } from "sonner";
 
@@ -30,6 +31,7 @@ export function CakeBuilderPreview({
   onOpenChange: (o: boolean) => void;
   initialCategoryId?: string | null;
 }) {
+  const { legalEntityId } = useAppContext();
   const [categoryId, setCategoryId] = useState<string | null>(initialCategoryId ?? null);
 
   // Reset på open / endret initialCategoryId
@@ -39,13 +41,13 @@ export function CakeBuilderPreview({
 
   // Slå opp default-prisliste for entiteten — det samme oppslaget som tidligere preview gjorde.
   const priceListQuery = useQuery({
-    queryKey: ["preview-default-price-list", NB_LEGAL_ENTITY_ID],
+    queryKey: ["preview-default-price-list", legalEntityId],
     enabled: open,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("price_lists")
         .select("id")
-        .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
+        .eq("legal_entity_id", legalEntityId)
         .eq("is_default", true)
         .maybeSingle();
       if (error) throw error;
@@ -55,13 +57,13 @@ export function CakeBuilderPreview({
 
   // Aktive kategorier — vises som et grid hvis ingen kategori er valgt.
   const categoriesQuery = useQuery({
-    queryKey: ["preview-cake-categories", NB_LEGAL_ENTITY_ID],
+    queryKey: ["preview-cake-categories", legalEntityId],
     enabled: open && !categoryId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("cake_categories")
         .select("id, name, description, image_url, status")
-        .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
+        .eq("legal_entity_id", legalEntityId)
         .eq("status", "active")
         .order("sort_order", { ascending: true });
       if (error) throw error;
@@ -162,7 +164,7 @@ export function CakeBuilderPreview({
                 <CakeBuilder
                   categoryId={categoryId}
                   priceListId={priceListQuery.data}
-                  legalEntityId={NB_LEGAL_ENTITY_ID}
+                  legalEntityId={legalEntityId}
                   showVatToggle
                   onComplete={(result) => {
                     toast.success(

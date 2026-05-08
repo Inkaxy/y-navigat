@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useAppContext } from "@/varer/context/AppContext";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -6,9 +7,10 @@ import { AppHeaderBanner } from "@/varer/components/layout/AppHeaderBanner";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Search, Loader2, ChefHat } from "lucide-react";
-import { NB_LEGAL_ENTITY_ID } from "@/varer/lib/constants";
+
 
 export default function Recipes() {
+  const { legalEntityId } = useAppContext();
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
 
@@ -18,7 +20,7 @@ export default function Recipes() {
       const { data } = await supabase
         .from("recipes")
         .select("id, version, valid_from, valid_to, yield_quantity, yield_unit, products!inner(id, display_name, code, product_category, legal_entity_id)")
-        .eq("products.legal_entity_id", NB_LEGAL_ENTITY_ID)
+        .eq("products.legal_entity_id", legalEntityId)
         .order("created_at", { ascending: false });
       return data ?? [];
     },

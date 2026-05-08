@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { NB_LEGAL_ENTITY_ID } from "@/varer/lib/constants";
+
 import { logAudit } from "@/varer/lib/audit";
 import { useAppContext } from "@/varer/context/AppContext";
 import { AppHeaderBanner } from "@/varer/components/layout/AppHeaderBanner";
@@ -58,7 +58,7 @@ function formatNb(date: string): string {
 export default function PriceLists() {
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const { canWrite } = useAppContext();
+  const { canWrite, legalEntityId } = useAppContext();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const view: ViewMode =
@@ -207,14 +207,14 @@ export default function PriceLists() {
 
   /* ----- Prislister ----- */
   const listsQuery = useQuery({
-    queryKey: ["price-lists-full", NB_LEGAL_ENTITY_ID],
+    queryKey: ["price-lists-full", legalEntityId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("price_lists")
         .select(
           "id, code, display_name, is_default, prices_include_mva, status, list_number, price_list_type, updated_at",
         )
-        .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
+        .eq("legal_entity_id", legalEntityId)
         .order("list_number", { ascending: true, nullsFirst: false });
       if (error) throw error;
       return data ?? [];
@@ -239,14 +239,14 @@ export default function PriceLists() {
 
   /* ----- Varer + kategori-koder ----- */
   const productsQuery = useQuery({
-    queryKey: ["matrix-products", NB_LEGAL_ENTITY_ID],
+    queryKey: ["matrix-products", legalEntityId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")
         .select(
           "id, display_number, display_name, unit_of_sale, is_for_sale, mva_rate, main_category_id, sub_category_id, status",
         )
-        .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
+        .eq("legal_entity_id", legalEntityId)
         .neq("status", "discontinued")
         .order("display_number");
       if (error) throw error;
@@ -255,30 +255,30 @@ export default function PriceLists() {
   });
 
   const mainCatsQuery = useQuery({
-    queryKey: ["main-cats", NB_LEGAL_ENTITY_ID],
+    queryKey: ["main-cats", legalEntityId],
     queryFn: async () => {
       const { data } = await supabase
         .from("product_main_categories")
         .select("id, code, display_name")
-        .eq("legal_entity_id", NB_LEGAL_ENTITY_ID);
+        .eq("legal_entity_id", legalEntityId);
       return data ?? [];
     },
   });
 
   const subCatsQuery = useQuery({
-    queryKey: ["sub-cats", NB_LEGAL_ENTITY_ID],
+    queryKey: ["sub-cats", legalEntityId],
     queryFn: async () => {
       const { data } = await supabase
         .from("product_sub_categories")
         .select("id, code, display_name, main_category_id")
-        .eq("legal_entity_id", NB_LEGAL_ENTITY_ID);
+        .eq("legal_entity_id", legalEntityId);
       return data ?? [];
     },
   });
 
   /* ----- Priser for matrix-visning (kun gyldig på priceDate) ----- */
   const pricesQuery = useQuery({
-    queryKey: ["matrix-prices", NB_LEGAL_ENTITY_ID, priceDate],
+    queryKey: ["matrix-prices", legalEntityId, priceDate],
     enabled: view === "matrix",
     queryFn: async () => {
       const { data, error } = await supabase
@@ -305,7 +305,7 @@ export default function PriceLists() {
 
   /* ----- Aggregater for enkel-visning ----- */
   const itemsAggQuery = useQuery({
-    queryKey: ["price-list-items-agg", NB_LEGAL_ENTITY_ID],
+    queryKey: ["price-list-items-agg", legalEntityId],
     enabled: view === "simple",
     queryFn: async () => {
       const { data, error } = await supabase
@@ -330,13 +330,13 @@ export default function PriceLists() {
 
   /* ----- Spesialpris-flagg for matrix ----- */
   const specialFlagsQuery = useQuery({
-    queryKey: ["matrix-special-flags", NB_LEGAL_ENTITY_ID, priceDate],
+    queryKey: ["matrix-special-flags", legalEntityId, priceDate],
     enabled: view === "matrix",
     queryFn: async () => {
       const { data, error } = await supabase
         .from("special_prices")
         .select("product_id, price_list_id, customer_id, customer:customers(display_name)")
-        .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
+        .eq("legal_entity_id", legalEntityId)
         .or(`valid_from.is.null,valid_from.lte.${priceDate}`)
         .or(`valid_to.is.null,valid_to.gte.${priceDate}`);
       if (error) throw error;

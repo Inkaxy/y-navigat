@@ -4,9 +4,10 @@
  * Kaller edge function `import_products_prices` for transaksjonell import.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useAppContext } from "@/varer/context/AppContext";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { NB_LEGAL_ENTITY_ID } from "@/varer/lib/constants";
+
 import {
   Dialog,
   DialogContent,
@@ -80,9 +81,10 @@ const MOMSKODE_LABEL: Record<"F" | "H" | "P" | "null", string> = {
 };
 
 export function ImportPricesDialog({ open, onOpenChange, onComplete }: Props) {
+  const { legalEntityId: activeLegalEntityId } = useAppContext();
   const [step, setStep] = useState<Step>(1);
   const [file, setFile] = useState<File | null>(null);
-  const [legalEntityId, setLegalEntityId] = useState<string>(NB_LEGAL_ENTITY_ID);
+  const [legalEntityId, setLegalEntityId] = useState<string>(activeLegalEntityId ?? "");
   const [parsing, setParsing] = useState(false);
   const [parseResult, setParseResult] = useState<ParseResult | null>(null);
 

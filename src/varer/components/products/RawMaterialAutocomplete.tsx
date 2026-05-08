@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useAppContext } from "@/varer/context/AppContext";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, ChevronsUpDown, Plus, Loader2, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { NB_LEGAL_ENTITY_ID } from "@/varer/lib/constants";
+
 import { toast } from "sonner";
 
 export interface RawMaterialOption {
@@ -58,18 +59,19 @@ export function RawMaterialAutocomplete({
   placeholder = "Velg råvare…",
   allowClear = true,
 }: Props) {
+  const { legalEntityId } = useAppContext();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [prefilledName, setPrefilledName] = useState("");
 
   const query = useQuery({
-    queryKey: ["raw_materials_autocomplete", NB_LEGAL_ENTITY_ID],
+    queryKey: ["raw_materials_autocomplete", legalEntityId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("raw_materials")
         .select("id, sku, name, category, base_unit, current_cost_price")
-        .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
+        .eq("legal_entity_id", legalEntityId)
         .eq("is_active", true)
         .order("name", { ascending: true });
       if (error) throw error;
@@ -199,6 +201,7 @@ function QuickCreateRawMaterialDialog({
   prefilledName: string;
   onCreated: (opt: RawMaterialOption) => void;
 }) {
+  const { legalEntityId } = useAppContext();
   const qc = useQueryClient();
   const [name, setName] = useState("");
   const [sku, setSku] = useState("");
@@ -231,7 +234,7 @@ function QuickCreateRawMaterialDialog({
     const { data, error } = await supabase
       .from("raw_materials")
       .insert({
-        legal_entity_id: NB_LEGAL_ENTITY_ID,
+        legal_entity_id: legalEntityId,
         created_by: userData.user?.id ?? null,
         sku: sku.trim(),
         name: name.trim(),

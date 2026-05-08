@@ -61,7 +61,7 @@ export function MatrixView({
   highlightPriceListId,
   showInclMva = false,
 }: Props) {
-  const { canWrite } = useAppContext();
+  const { canWrite, legalEntityId } = useAppContext();
   const [editing, setEditing] = useState<{ key: string; value: string } | null>(null);
 
   const allSelected = products.length > 0 && products.every((p) => selectedIds.has(p.id));

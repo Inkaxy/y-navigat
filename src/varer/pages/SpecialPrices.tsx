@@ -17,7 +17,7 @@ import {
   Check,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { NB_LEGAL_ENTITY_ID } from "@/varer/lib/constants";
+
 import { logAudit } from "@/varer/lib/audit";
 import { useAppContext } from "@/varer/context/AppContext";
 import { AppHeaderBanner } from "@/varer/components/layout/AppHeaderBanner";
@@ -66,7 +66,7 @@ type StatusFilter = "active" | "expired" | "future" | "all";
 
 export default function SpecialPrices() {
   const qc = useQueryClient();
-  const { canWrite } = useAppContext();
+  const { canWrite, legalEntityId } = useAppContext();
 
   const [search, setSearch] = useState("");
   const [filterCustomer, setFilterCustomer] = useState<string>(ALL);
@@ -83,12 +83,12 @@ export default function SpecialPrices() {
 
   // Lookups
   const productsQuery = useQuery({
-    queryKey: ["sp-products", NB_LEGAL_ENTITY_ID],
+    queryKey: ["sp-products", legalEntityId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")
         .select("id, display_number, display_name, code")
-        .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
+        .eq("legal_entity_id", legalEntityId)
         .order("display_number");
       if (error) throw error;
       return (data ?? []) as ProductLite[];
@@ -96,12 +96,12 @@ export default function SpecialPrices() {
   });
 
   const customersQuery = useQuery({
-    queryKey: ["sp-customers", NB_LEGAL_ENTITY_ID],
+    queryKey: ["sp-customers", legalEntityId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("customers")
         .select("id, customer_number, display_name")
-        .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
+        .eq("legal_entity_id", legalEntityId)
         .order("customer_number");
       if (error) throw error;
       return (data ?? []) as CustomerLite[];
@@ -109,12 +109,12 @@ export default function SpecialPrices() {
   });
 
   const priceListsQuery = useQuery({
-    queryKey: ["sp-pricelists", NB_LEGAL_ENTITY_ID],
+    queryKey: ["sp-pricelists", legalEntityId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("price_lists")
         .select("id, display_name")
-        .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
+        .eq("legal_entity_id", legalEntityId)
         .eq("status", "active")
         .order("display_name");
       if (error) throw error;
@@ -123,14 +123,14 @@ export default function SpecialPrices() {
   });
 
   const specialPricesQuery = useQuery({
-    queryKey: ["special-prices", NB_LEGAL_ENTITY_ID],
+    queryKey: ["special-prices", legalEntityId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("special_prices")
         .select(
           "id, product_id, customer_id, price_list_id, valid_from, valid_to, weekday, precedence_over_weekday, price, is_net_price, notes, created_at",
         )
-        .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
+        .eq("legal_entity_id", legalEntityId)
         .order("valid_from", { ascending: false, nullsFirst: false });
       if (error) throw error;
       return (data ?? []) as (SpecialPriceRow & { created_at: string })[];

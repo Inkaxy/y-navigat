@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useAppContext } from "@/varer/context/AppContext";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -8,19 +9,20 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Search, Loader2, AlertTriangle, Wrench, ArrowRight } from "lucide-react";
-import { NB_LEGAL_ENTITY_ID } from "@/varer/lib/constants";
+
 
 export default function RecipesCleanup() {
+  const { legalEntityId } = useAppContext();
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
 
   const query = useQuery({
-    queryKey: ["recipes-cleanup", NB_LEGAL_ENTITY_ID],
+    queryKey: ["recipes-cleanup", legalEntityId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("recipes")
         .select("id, version, yield_quantity, yield_unit, requires_cleanup, products!inner(id, display_name, code, product_category, legal_entity_id), recipe_lines(id, raw_material_id, ingredient_name)")
-        .eq("products.legal_entity_id", NB_LEGAL_ENTITY_ID)
+        .eq("products.legal_entity_id", legalEntityId)
         .eq("requires_cleanup", true)
         .is("valid_to", null)
         .order("created_at", { ascending: false });

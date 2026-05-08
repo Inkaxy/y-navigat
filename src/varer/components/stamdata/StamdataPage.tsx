@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { LucideIcon } from "lucide-react";
 import { Loader2, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { NB_LEGAL_ENTITY_ID } from "@/varer/lib/constants";
+
 import { logAudit, type AuditEntityType } from "@/varer/lib/audit";
 import { useAppContext } from "@/varer/context/AppContext";
 import { Button } from "@/components/ui/button";
@@ -122,7 +122,7 @@ export function StamdataPage({
   extraColumns = [],
 }: StamdataPageProps) {
   const qc = useQueryClient();
-  const { canWrite } = useAppContext();
+  const { canWrite, legalEntityId } = useAppContext();
   const [search, setSearch] = useState("");
   const [editing, setEditing] = useState<StamdataRow | null>(null);
   const [creating, setCreating] = useState(false);
@@ -133,12 +133,12 @@ export function StamdataPage({
 
   /* ----- Hovedliste ----- */
   const listQuery = useQuery({
-    queryKey: ["stamdata", tableName, NB_LEGAL_ENTITY_ID],
+    queryKey: ["stamdata", tableName, legalEntityId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from(tableName as never)
         .select("*")
-        .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
+        .eq("legal_entity_id", legalEntityId)
         .order("sort_order")
         .order("code");
       if (error) throw error;
@@ -148,7 +148,7 @@ export function StamdataPage({
 
   /* ----- Bruks-tellinger (én query per usageCheck-tabell) ----- */
   const usageQuery = useQuery({
-    queryKey: ["stamdata-usage", tableName, NB_LEGAL_ENTITY_ID],
+    queryKey: ["stamdata-usage", tableName, legalEntityId],
     enabled: !!listQuery.data,
     queryFn: async () => {
       const counts: Record<string, number> = {};
@@ -180,7 +180,7 @@ export function StamdataPage({
   );
 
   const lookupQueries = useQuery({
-    queryKey: ["stamdata-lookups", lookupTables, NB_LEGAL_ENTITY_ID],
+    queryKey: ["stamdata-lookups", lookupTables, legalEntityId],
     enabled: lookupTables.length > 0,
     queryFn: async () => {
       const results: Record<string, StamdataRow[]> = {};
@@ -188,7 +188,7 @@ export function StamdataPage({
         const { data, error } = await supabase
           .from(t as never)
           .select("*")
-          .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
+          .eq("legal_entity_id", legalEntityId)
           .order("sort_order")
           .order("display_name");
         if (error) {
@@ -275,7 +275,7 @@ export function StamdataPage({
     }
 
     const payload: Record<string, unknown> = {
-      legal_entity_id: NB_LEGAL_ENTITY_ID,
+      legal_entity_id: legalEntityId,
       code: form.code.trim(),
       display_name: form.display_name.trim(),
       description: form.description.trim() || null,

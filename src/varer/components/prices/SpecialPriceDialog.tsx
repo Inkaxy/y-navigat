@@ -12,7 +12,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2, Lock, LockOpen } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { NB_LEGAL_ENTITY_ID } from "@/varer/lib/constants";
+
 import { logAudit } from "@/varer/lib/audit";
 import { useAppContext } from "@/varer/context/AppContext";
 import {
@@ -142,7 +142,7 @@ export function SpecialPriceDialog({
   priceLists,
   onSaved,
 }: Props) {
-  const { canWrite } = useAppContext();
+  const { canWrite, legalEntityId } = useAppContext();
   const [form, setForm] = useState<SpecialPriceFormValues>(emptyForm);
   const [locks, setLocks] = useState<LockState>({});
   const [saving, setSaving] = useState(false);
@@ -212,7 +212,7 @@ export function SpecialPriceDialog({
       let q = supabase
         .from("special_prices")
         .select("id, valid_from, valid_to, price, weekday")
-        .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
+        .eq("legal_entity_id", legalEntityId)
         .eq("product_id", form.product_id!);
 
       if (form.customer_id) q = q.eq("customer_id", form.customer_id);
@@ -267,7 +267,7 @@ export function SpecialPriceDialog({
     }
 
     const payload = {
-      legal_entity_id: NB_LEGAL_ENTITY_ID,
+      legal_entity_id: legalEntityId,
       product_id: form.product_id!,
       customer_id: form.customer_id,
       price_list_id: form.price_list_id === NONE ? null : form.price_list_id,

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useAppContext } from "@/varer/context/AppContext";
 import { Controller, useFormContext } from "react-hook-form";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -24,7 +25,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Cake, Plus, Trash2 } from "lucide-react";
-import { CAKE_ROLE_OPTIONS, NB_LEGAL_ENTITY_ID } from "@/varer/lib/constants";
+import { CAKE_ROLE_OPTIONS } from "@/varer/lib/constants";
 import type { ProductFormValues } from "@/varer/lib/productSchema";
 
 /** Lokal modell for valgte kategori/steg-koblinger.
@@ -49,6 +50,7 @@ export function CakeBuilderSection({
   originalLinks,
   onLinksChange,
 }: Props) {
+  const { legalEntityId } = useAppContext();
   const { watch, setValue } = useFormContext<ProductFormValues>();
   const isComponent = watch("is_cake_component");
   const role = watch("cake_role");
@@ -56,13 +58,13 @@ export function CakeBuilderSection({
 
   // Last alle aktive kake-kategorier + steg for samme legal_entity
   const catsQuery = useQuery({
-    queryKey: ["cake-categories-with-steps", NB_LEGAL_ENTITY_ID],
+    queryKey: ["cake-categories-with-steps", legalEntityId],
     queryFn: async () => {
       const [catsRes, stepsRes] = await Promise.all([
         supabase
           .from("cake_categories")
           .select("id, name, status")
-          .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
+          .eq("legal_entity_id", legalEntityId)
           .neq("status", "discontinued")
           .order("sort_order", { ascending: true }),
         supabase
