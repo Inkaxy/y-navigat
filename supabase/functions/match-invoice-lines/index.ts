@@ -62,7 +62,7 @@ Deno.serve(async (req) => {
       .eq("id", invoiceId).single();
     if (invErr || !inv) return json({ error: "Invoice not found" }, 404);
 
-    const { data: accessLevel } = await userClient.rpc("app_access_level", { p_app_code: "fakturaer" });
+    const { data: accessLevel } = await userClient.rpc("app_access_level", { p_app_code: "ravarer" });
     const lvl = (accessLevel as string) ?? "none";
     if (!["write", "approve", "admin"].includes(lvl)) return json({ error: "Forbidden" }, 403);
 
