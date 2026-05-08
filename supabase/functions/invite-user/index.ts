@@ -6,12 +6,15 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+interface Assignment {
+  legal_entity_id: string;
+  position_id: string;
+}
 interface InvitePayload {
   email: string;
   first_name: string;
   last_name: string;
-  legal_entity_id: string;
-  position_id: string;
+  assignments: Assignment[];
 }
 
 const json = (status: number, body: unknown) =>
@@ -50,10 +53,18 @@ Deno.serve(async (req) => {
 
     // Validate payload
     const body = (await req.json()) as Partial<InvitePayload>;
-    const required = ["email", "first_name", "last_name", "legal_entity_id", "position_id"] as const;
+    const required = ["email", "first_name", "last_name"] as const;
     for (const f of required) {
       if (!body[f] || typeof body[f] !== "string") {
         return json(400, { error: `Mangler felt: ${f}` });
+      }
+    }
+    if (!Array.isArray(body.assignments) || body.assignments.length === 0) {
+      return json(400, { error: "Minst én stilling må oppgis" });
+    }
+    for (const a of body.assignments) {
+      if (!a?.legal_entity_id || !a?.position_id) {
+        return json(400, { error: "Hver stilling må ha selskap og stilling" });
       }
     }
     const email = body.email!.trim().toLowerCase();
@@ -88,18 +99,19 @@ Deno.serve(async (req) => {
       return json(500, { error: `Bruker opprettet i auth, men feilet å lagre profil: ${insErr.message}` });
     }
 
-    // Insert user_position
+    // Insert user_positions (én per assignment)
     const today = new Date().toISOString().slice(0, 10);
-    const { error: posErr } = await admin.from("user_positions").insert({
+    const rows = body.assignments!.map((a, idx) => ({
       user_id: newUserId,
-      position_id: body.position_id,
-      legal_entity_id: body.legal_entity_id,
-      is_primary: true,
+      position_id: a.position_id,
+      legal_entity_id: a.legal_entity_id,
+      is_primary: idx === 0,
       valid_from: today,
       assigned_by: callerId,
-    });
+    }));
+    const { error: posErr } = await admin.from("user_positions").insert(rows);
     if (posErr) {
-      return json(500, { error: `Stilling kunne ikke tilordnes: ${posErr.message}` });
+      return json(500, { error: `Stillinger kunne ikke tilordnes: ${posErr.message}` });
     }
 
     return json(200, { success: true, user_id: newUserId });
