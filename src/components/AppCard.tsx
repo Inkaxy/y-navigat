@@ -4,7 +4,6 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowRight, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getAppIcon } from "@/lib/appIcons";
-import { getAppIconBySlug } from "@/lib/appIcons";
 import type { AppWithAccess } from "@/hooks/useApps";
 import { getAppInternalRoute } from "@/lib/appRoutes";
 
