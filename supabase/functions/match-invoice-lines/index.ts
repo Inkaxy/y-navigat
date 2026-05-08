@@ -169,7 +169,6 @@ Deno.serve(async (req) => {
           manualUpdate.price_variance_pct = null;
         }
         await syncRegisteredPrices(svc, inv, line, rm, rmsRow, actual, manualUpdate);
-        manualUpdate.requires_review = requiresReview;
         if (manualUpdate.requires_review) requiresReview = true;
         if (manualUpdate.review_reason) manualUpdate.review_reason.split(",").forEach((r: string) => reviewReasons.add(r));
         manualUpdate.requires_review = requiresReview;
