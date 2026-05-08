@@ -47,6 +47,7 @@ export default function ProductList() {
   const [status, setStatus] = useState<string>("all");
   const [variantFilter, setVariantFilter] = useState<string>("all");
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [bulkImagesOpen, setBulkImagesOpen] = useState(false);
 
   const productsQuery = useQuery({
     queryKey: ["products", legalEntityId],
