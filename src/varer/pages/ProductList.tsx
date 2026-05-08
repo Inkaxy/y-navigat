@@ -202,8 +202,13 @@ export default function ProductList() {
               </SelectContent>
             </Select>
 
-            <div className="ml-auto text-sm text-muted-foreground">
-              {filtered.length} treff
+            <div className="ml-auto flex items-center gap-3">
+              {canWrite && (
+                <Button variant="outline" size="sm" onClick={() => setBulkImagesOpen(true)} className="gap-1.5">
+                  <Images className="h-4 w-4" /> Massimport bilder
+                </Button>
+              )}
+              <span className="text-sm text-muted-foreground">{filtered.length} treff</span>
             </div>
           </div>
 
