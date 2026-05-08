@@ -206,11 +206,13 @@ function renderTemplate(tpl: string, vars: Record<string, string>): string {
 }
 
 function TemplateEditorCard() {
-  const { templates, loading, saving, saveTemplate } = useEmailTemplates();
+  const { templates, loading, saving, saveTemplate, deleteTemplate } = useEmailTemplates();
   const [selectedId, setSelectedId] = useState<string>("");
   const [subjectDraft, setSubjectDraft] = useState("");
   const [bodyDraft, setBodyDraft] = useState("");
   const [textDraft, setTextDraft] = useState("");
+  const [newDialogOpen, setNewDialogOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const textRef = useRef<HTMLTextAreaElement>(null);
   const subjectRef = useRef<HTMLInputElement>(null);
