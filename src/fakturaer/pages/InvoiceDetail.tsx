@@ -263,18 +263,34 @@ export default function InvoiceDetailPage() {
                         )}
                         <td className="px-4 py-3 font-mono text-xs">{l.supplier_sku ?? "—"}</td>
                         <td className="px-4 py-3">
+                        <td className="px-4 py-3">
                           {rm ? (
                             <div className="space-y-0.5">
-                              <Link
-                                to={`/ravarer/vareliste/${rm.id}`}
-                                className="font-medium text-app underline-offset-2 hover:underline"
-                              >
-                                {rm.name}
-                              </Link>
+                              <div className="flex items-center gap-2">
+                                <Link
+                                  to={`/ravarer/vareliste/${rm.id}`}
+                                  className="font-medium text-app underline-offset-2 hover:underline"
+                                >
+                                  {rm.name}
+                                </Link>
+                                {l.match_confidence && l.match_confidence !== "manual" && (
+                                  <ConfidenceBadge value={l.match_confidence} />
+                                )}
+                                {l.match_confidence === "manual" && (
+                                  <Badge variant="secondary" className="text-[10px]">manuell</Badge>
+                                )}
+                              </div>
                               <div className="text-xs text-ink-secondary">{l.description}</div>
                             </div>
                           ) : (
-                            <span>{l.description}</span>
+                            <div className="space-y-1">
+                              <span>{l.description}</span>
+                              {l.review_reason && (
+                                <div className="text-[10px] uppercase tracking-wider text-warning">
+                                  {l.review_reason.replace(/,/g, " · ")}
+                                </div>
+                              )}
+                            </div>
                           )}
                         </td>
                         <td className="px-4 py-3 text-right tabular-nums">{l.quantity}</td>
@@ -282,13 +298,25 @@ export default function InvoiceDetailPage() {
                         <td className="px-4 py-3 text-right tabular-nums">{formatNok(l.unit_price)}</td>
                         <td className="px-4 py-3 text-right tabular-nums">{formatNok(l.total_amount)}</td>
                         <td className="px-4 py-3 text-right">
-                          {rm && (
-                            <Button variant="ghost" size="icon" asChild title="Se prishistorikk">
-                              <Link to={`/ravarer/vareliste/${rm.id}?tab=suppliers`}>
-                                <LineChartIcon className="h-4 w-4" />
-                              </Link>
-                            </Button>
-                          )}
+                          <div className="flex items-center justify-end gap-1">
+                            {canMatch && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                title={rm ? "Endre match" : "Match mot råvare"}
+                                onClick={() => setMatchLineId(l.id)}
+                              >
+                                {rm ? <Pencil className="h-4 w-4" /> : <Link2 className="h-4 w-4" />}
+                              </Button>
+                            )}
+                            {rm && (
+                              <Button variant="ghost" size="icon" asChild title="Se prishistorikk">
+                                <Link to={`/ravarer/vareliste/${rm.id}?tab=suppliers`}>
+                                  <LineChartIcon className="h-4 w-4" />
+                                </Link>
+                              </Button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -299,6 +327,12 @@ export default function InvoiceDetailPage() {
           )}
         </Card>
       </div>
+
+      <MatchDrawer
+        open={!!matchLineId}
+        onOpenChange={(v) => { if (!v) setMatchLineId(null); }}
+        line={matchLineRow}
+      />
 
       <p className="text-center text-xs text-ink-secondary">
         Avstemming og prisavviks-håndtering kommer i neste pulje. Faktura-lifecycle eies av Tripletex.
