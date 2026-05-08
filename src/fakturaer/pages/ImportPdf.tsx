@@ -103,6 +103,14 @@ export default function ImportPdfPage({ embedded = false }: { embedded?: boolean
 
   useEffect(() => () => { if (pdfPreviewUrl) URL.revokeObjectURL(pdfPreviewUrl); }, [pdfPreviewUrl]);
 
+  // Auto-parse next file in queue after first save
+  useEffect(() => {
+    if (queueIndex > 0 && !parseResult && !parsing && file) {
+      runParse();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queueIndex]);
+
   const { data: suppliers = [], refetch: refetchSuppliers } = useSuppliersFor(legalEntityId || null);
 
   const conf = (field: string) => {
