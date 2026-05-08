@@ -121,7 +121,8 @@ export const DELIVERY_FIELDS: ProfileFieldDef[] = [
     type: "select",
     options: [
       { value: "none", label: "Ingen — kun manuell utskrift" },
-      { value: "email", label: "E-post (PDF)" },
+      { value: "per_customer", label: "Per kunde — bruk innstillinger fra kundekortet" },
+      { value: "email", label: "E-post (PDF) — felles for alle" },
       { value: "print", label: "Utskrift" },
       { value: "both", label: "Både e-post og utskrift" },
     ],
