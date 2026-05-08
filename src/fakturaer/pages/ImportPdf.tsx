@@ -290,10 +290,23 @@ export default function ImportPdfPage({ embedded = false }: { embedded?: boolean
               </Select>
             </div>
             <div>
-              <Label>PDF-fil *</Label>
-              <Input type="file" accept="application/pdf,.pdf" disabled={!legalEntityId || parsing}
-                onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-              {file && <p className="mt-1 text-xs text-ink-secondary">{file.name} ({(file.size / 1024).toFixed(0)} kB)</p>}
+              <Label>PDF-fil(er) *</Label>
+              <Input type="file" accept="application/pdf,.pdf" multiple disabled={!legalEntityId || parsing}
+                onChange={(e) => {
+                  const files = Array.from(e.target.files ?? []);
+                  setQueue(files);
+                  setQueueIndex(0);
+                  setSavedIds([]);
+                }} />
+              {queue.length > 0 && (
+                <div className="mt-1 space-y-0.5">
+                  <p className="text-xs text-ink-secondary">
+                    {queue.length === 1
+                      ? `${queue[0].name} (${(queue[0].size / 1024).toFixed(0)} kB)`
+                      : `${queue.length} filer valgt — bekreftes én etter én`}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 
@@ -301,7 +314,7 @@ export default function ImportPdfPage({ embedded = false }: { embedded?: boolean
             <Button variant="outline" onClick={() => navigate("/ravarer/fakturaer")}>Avbryt</Button>
             <Button onClick={runParse} disabled={!file || !legalEntityId || parsing} className="gap-2">
               {parsing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-              Les og fortsett
+              {queue.length > 1 ? `Les første (1 av ${queue.length})` : "Les og fortsett"}
             </Button>
           </div>
         </Card>
