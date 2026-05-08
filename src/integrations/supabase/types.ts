@@ -6041,6 +6041,79 @@ export type Database = {
           },
         ]
       }
+      raw_material_purchases: {
+        Row: {
+          created_at: string
+          id: string
+          invoice_id: string
+          invoice_line_id: string
+          legal_entity_id: string
+          price_per_base_unit: number | null
+          purchase_date: string
+          quantity: number
+          raw_material_id: string
+          supplier_id: string
+          total_amount: number | null
+          unit: string | null
+          unit_price: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          invoice_id: string
+          invoice_line_id: string
+          legal_entity_id: string
+          price_per_base_unit?: number | null
+          purchase_date: string
+          quantity: number
+          raw_material_id: string
+          supplier_id: string
+          total_amount?: number | null
+          unit?: string | null
+          unit_price?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          invoice_id?: string
+          invoice_line_id?: string
+          legal_entity_id?: string
+          price_per_base_unit?: number | null
+          purchase_date?: string
+          quantity?: number
+          raw_material_id?: string
+          supplier_id?: string
+          total_amount?: number | null
+          unit?: string | null
+          unit_price?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "raw_material_purchases_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "raw_material_purchases_invoice_line_id_fkey"
+            columns: ["invoice_line_id"]
+            isOneToOne: true
+            referencedRelation: "invoice_lines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "raw_material_purchases_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "raw_materials"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       raw_material_supplier_aliases: {
         Row: {
           alias_type: Database["public"]["Enums"]["alias_type"]
