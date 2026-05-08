@@ -19,6 +19,7 @@ import {
   useTicket, useUpdateTicket, getTicketAttachmentSignedUrl,
   type TicketStatus, type TicketPriority,
 } from "@/ordre/hooks/useTickets";
+import { TicketPresenceBanner } from "@/ordre/components/shell/TicketPresenceBanner";
 
 const STATUS_OPTS: { value: TicketStatus; label: string }[] = [
   { value: "new", label: "Ny" },
@@ -114,6 +115,9 @@ export default function TicketDetail() {
         }
       />
       <div className="container mx-auto max-w-5xl p-4 space-y-4">
+        {/* Sanntids-presence: hvem andre er inne nå */}
+        <TicketPresenceBanner ticketId={ticket.id} />
+
         {/* Handlings-rad */}
         <Card>
           <CardContent className="pt-4 flex flex-wrap items-end gap-3">
