@@ -62,5 +62,53 @@ export function useEmailTemplates() {
     return true;
   };
 
-  return { templates, loading, saving, saveTemplate, reload };
+  const createTemplate = async (input: {
+    template_key: string;
+    display_name: string;
+    subject_template: string;
+    body_html_template: string;
+    body_text_template?: string | null;
+    available_variables?: EmailTemplate["available_variables"];
+  }): Promise<EmailTemplate | null> => {
+    setSaving(true);
+    const { data: u } = await supabase.auth.getUser();
+    const payload = {
+      template_key: input.template_key,
+      display_name: input.display_name,
+      subject_template: input.subject_template,
+      body_html_template: input.body_html_template,
+      body_text_template: input.body_text_template?.trim() ? input.body_text_template : null,
+      available_variables: (input.available_variables ?? []) as never,
+      is_active: true,
+      updated_by: u.user?.id ?? null,
+    };
+    const { data, error } = await supabase
+      .from("email_templates")
+      .insert(payload as never)
+      .select()
+      .single();
+    setSaving(false);
+    if (error) {
+      toast({ title: "Kunne ikke opprette mal", description: error.message, variant: "destructive" });
+      return null;
+    }
+    toast({ title: "Mal opprettet" });
+    await reload();
+    return data as unknown as EmailTemplate;
+  };
+
+  const deleteTemplate = async (id: string) => {
+    setSaving(true);
+    const { error } = await supabase.from("email_templates").delete().eq("id", id);
+    setSaving(false);
+    if (error) {
+      toast({ title: "Sletting feilet", description: error.message, variant: "destructive" });
+      return false;
+    }
+    toast({ title: "Mal slettet" });
+    await reload();
+    return true;
+  };
+
+  return { templates, loading, saving, saveTemplate, createTemplate, deleteTemplate, reload };
 }

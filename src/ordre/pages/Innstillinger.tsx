@@ -9,7 +9,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Mail, ShieldCheck, FileText, AlertCircle, CheckCircle2, Send, Eye, Code2, Type, RotateCcw, Save, Plus, Search, Loader2 } from "lucide-react";
+import { Mail, ShieldCheck, FileText, AlertCircle, CheckCircle2, Send, Eye, Code2, Type, RotateCcw, Save, Plus, Search, Loader2, Trash2 } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { NewEmailTemplateDialog } from "@/ordre/components/shell/NewEmailTemplateDialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
@@ -204,11 +206,13 @@ function renderTemplate(tpl: string, vars: Record<string, string>): string {
 }
 
 function TemplateEditorCard() {
-  const { templates, loading, saving, saveTemplate } = useEmailTemplates();
+  const { templates, loading, saving, saveTemplate, deleteTemplate } = useEmailTemplates();
   const [selectedId, setSelectedId] = useState<string>("");
   const [subjectDraft, setSubjectDraft] = useState("");
   const [bodyDraft, setBodyDraft] = useState("");
   const [textDraft, setTextDraft] = useState("");
+  const [newDialogOpen, setNewDialogOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const textRef = useRef<HTMLTextAreaElement>(null);
   const subjectRef = useRef<HTMLInputElement>(null);
@@ -298,15 +302,22 @@ function TemplateEditorCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <FileText className="h-5 w-5" />
-          E-post-maler
-        </CardTitle>
-        <CardDescription>
-          Velg en mal til venstre, rediger emne og innhold til høyre. Variabler i krøllparenteser
-          (f.eks. <code className="rounded bg-muted px-1 py-0.5 text-xs">{`{{kunde_navn}}`}</code>)
-          fylles inn automatisk når mailen sendes.
-        </CardDescription>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              E-post-maler
+            </CardTitle>
+            <CardDescription className="mt-1">
+              Velg en mal til venstre, rediger emne og innhold til høyre. Variabler i krøllparenteser
+              (f.eks. <code className="rounded bg-muted px-1 py-0.5 text-xs">{`{{kunde_navn}}`}</code>)
+              fylles inn automatisk når mailen sendes.
+            </CardDescription>
+          </div>
+          <Button size="sm" onClick={() => setNewDialogOpen(true)} className="shrink-0">
+            <Plus className="mr-1.5 h-4 w-4" /> Ny mal
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
         {loading ? (
@@ -319,9 +330,12 @@ function TemplateEditorCard() {
             <div>
               <p className="text-sm font-medium">Ingen e-post-maler ennå</p>
               <p className="text-xs text-muted-foreground">
-                Maler opprettes automatisk første gang en e-posttype tas i bruk.
+                Klikk «Ny mal» for å opprette din første mal.
               </p>
             </div>
+            <Button size="sm" onClick={() => setNewDialogOpen(true)}>
+              <Plus className="mr-1.5 h-4 w-4" /> Opprett mal
+            </Button>
           </div>
         ) : (
           <div className="grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
@@ -494,10 +508,21 @@ function TemplateEditorCard() {
 
                     {/* Sticky lagre-bar */}
                     <div className="sticky bottom-0 -mx-6 flex items-center justify-between gap-2 border-t bg-card/95 px-6 py-3 backdrop-blur">
-                      <p className="text-xs text-muted-foreground">
-                        {dirty ? "Du har ulagrede endringer." : "Alt er lagret."}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs text-muted-foreground">
+                          {dirty ? "Du har ulagrede endringer." : "Alt er lagret."}
+                        </p>
+                      </div>
                       <div className="flex gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setConfirmDelete(true)}
+                          disabled={saving}
+                          className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        >
+                          <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Slett
+                        </Button>
                         <Button
                           variant="ghost"
                           size="sm"
@@ -578,6 +603,39 @@ function TemplateEditorCard() {
           </div>
         )}
       </CardContent>
+
+      <NewEmailTemplateDialog
+        open={newDialogOpen}
+        onOpenChange={setNewDialogOpen}
+        onCreated={(id) => setSelectedId(id)}
+      />
+
+      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Slett mal?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Dette sletter malen «{selected?.display_name}» permanent. Eventuell kode som refererer til
+              <code className="mx-1 rounded bg-muted px-1 py-0.5 text-xs">{selected?.template_key}</code>
+              vil slutte å fungere.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Avbryt</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                if (!selected) return;
+                const ok = await deleteTemplate(selected.id);
+                if (ok) setSelectedId("");
+                setConfirmDelete(false);
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Slett mal
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }
