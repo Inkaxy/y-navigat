@@ -4,7 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { ArrowLeft, Loader2, Save, X } from "lucide-react";
+import { ArrowLeft, Loader2, Save, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -371,6 +371,39 @@ export default function ProfileDetail() {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      if (!profile) throw new Error("Mangler profil");
+      // Rydd lenker først (ingen ON DELETE CASCADE)
+      const { error: linkErr } = await supabase
+        .from("customer_profile_price_lists")
+        .delete()
+        .eq("customer_profile_id", profile.id);
+      if (linkErr) throw linkErr;
+      const { error } = await supabase
+        .from("customer_profiles")
+        .delete()
+        .eq("id", profile.id);
+      if (error) throw error;
+      await logAudit({
+        action: "customer_profile.deleted",
+        entity_type: "customer_profile",
+        entity_id: profile.id,
+        entity_display_reference: `${profile.code} — ${profile.display_name}`,
+        legal_entity_id: profile.legal_entity_id,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["customer-profiles"] });
+      queryClient.invalidateQueries({ queryKey: ["customer-profile-usage"] });
+      toast.success("Profil slettet");
+      navigate("/kunder/profiler");
+    },
+    onError: (e: any) => {
+      toast.error(`Kunne ikke slette: ${e?.message ?? "Ukjent feil"}`);
+    },
+  });
+
   function handleBack() {
     if (isDirty) {
       const ok = window.confirm("Du har ulagrede endringer. Forlat siden likevel?");
@@ -459,6 +492,40 @@ export default function ProfileDetail() {
                     <AlertDialogCancel>Avbryt</AlertDialogCancel>
                     <AlertDialogAction onClick={() => deactivateMutation.mutate()}>
                       De-aktiver
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+            {canWrite && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="text-destructive hover:bg-destructive/5"
+                    disabled={customerCount > 0 || deleteMutation.isPending}
+                    title={customerCount > 0 ? "Kan ikke slette: profilen er i bruk" : "Slett profil permanent"}
+                  >
+                    <Trash2 className="mr-1 h-4 w-4" /> Slett
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Slette profilen permanent?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      «{profile.code} — {profile.display_name}» og alle prisliste-koblinger
+                      slettes permanent. Kan ikke angres. Hvis profilen er i bruk av kunder,
+                      bør du heller deaktivere.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Avbryt</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => deleteMutation.mutate()}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      Slett permanent
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
