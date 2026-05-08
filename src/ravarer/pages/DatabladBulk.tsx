@@ -53,7 +53,9 @@ export default function DatabladBulk() {
     try {
       if (!storage_path) {
         updateRow(i, { status: "uploading", stage: "upload", error: undefined });
-        storage_path = `bulk/${batch_id}/${Date.now()}-${row.file.name}`;
+        if (!legalEntityId) throw new Error("Mangler legal_entity_id");
+        const safeName = row.file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+        storage_path = `${legalEntityId}/bulk/${batch_id}/${Date.now()}-${safeName}`;
         const { error: upErr } = await supabase.storage.from("raw-material-datasheets").upload(storage_path, row.file);
         if (upErr) throw new Error(`Opplasting feilet: ${upErr.message}`);
         updateRow(i, { storage_path });
