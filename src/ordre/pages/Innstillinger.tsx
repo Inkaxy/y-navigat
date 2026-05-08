@@ -428,31 +428,45 @@ function TemplateEditorCard() {
 
                       {/* Variabel-panel */}
                       {selected.available_variables?.length > 0 && (
-                        <div className="space-y-2 rounded-lg border bg-muted/30 p-3">
-                          <div className="flex items-center gap-1.5 text-xs font-semibold">
-                            <Plus className="h-3.5 w-3.5" />
-                            Sett inn variabel
+                        <div className="relative space-y-2 overflow-hidden rounded-xl border border-primary/20 bg-gradient-to-br from-primary/[0.04] via-background to-background p-3 shadow-sm">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-1.5 text-xs font-semibold tracking-tight">
+                              <span className="inline-flex h-5 w-5 items-center justify-center rounded-md bg-primary/15 text-primary">
+                                <Plus className="h-3 w-3" />
+                              </span>
+                              Variabler
+                            </div>
+                            <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                              {selected.available_variables.length}
+                            </span>
                           </div>
                           <p className="text-[11px] leading-snug text-muted-foreground">
-                            Klikk for å sette inn der markøren står (emne, HTML eller plain text).
+                            Klikk for å sette inn der markøren står.
                           </p>
-                          <Separator />
-                          <ScrollArea className="h-[280px] -mx-1 px-1">
+                          <ScrollArea className="-mx-1 h-[300px] px-1">
                             <div className="space-y-1">
                               {selected.available_variables.map((v) => (
-                                <button
-                                  key={v.key}
-                                  type="button"
-                                  onClick={() => insertVariable(v.key)}
-                                  className="group flex w-full flex-col items-start gap-0.5 rounded-md border border-transparent bg-background/60 px-2 py-1.5 text-left transition-colors hover:border-border hover:bg-background"
-                                >
-                                  <code className="font-mono text-[11px] font-medium text-primary">{`{{${v.key}}}`}</code>
-                                  {v.description && (
-                                    <span className="text-[10px] leading-snug text-muted-foreground">
-                                      {v.description}
-                                    </span>
-                                  )}
-                                </button>
+                                <TooltipProvider key={v.key} delayDuration={200}>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <button
+                                        type="button"
+                                        onClick={() => insertVariable(v.key)}
+                                        className="group flex w-full items-center gap-2 rounded-lg border border-transparent bg-background/70 px-2.5 py-2 text-left transition-all hover:-translate-y-px hover:border-primary/40 hover:bg-background hover:shadow-sm active:translate-y-0"
+                                      >
+                                        <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground transition-colors group-hover:bg-primary/15 group-hover:text-primary">
+                                          <Plus className="h-3.5 w-3.5" />
+                                        </span>
+                                        <span className="min-w-0 flex-1 truncate text-xs font-medium leading-tight">
+                                          {v.description || v.key}
+                                        </span>
+                                      </button>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="left" className="font-mono text-[11px]">
+                                      {`{{${v.key}}}`}
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
                               ))}
                             </div>
                           </ScrollArea>
