@@ -32,7 +32,7 @@ export function Topbar() {
           aria-label="Nøtterø Bakeri — hjem"
           className="hidden shrink-0 items-center pr-3 text-brand-cream md:flex"
         >
-          <Logo variant="horizontal" className="h-8 w-auto" />
+          <Logo variant="horizontal" className="h-32 w-auto" />
         </Link>
 
         <div className="hidden shrink-0 items-center gap-2 md:flex">
