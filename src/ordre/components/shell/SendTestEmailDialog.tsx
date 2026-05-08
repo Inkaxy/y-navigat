@@ -65,13 +65,13 @@ export function SendTestEmailDialog({ open, onOpenChange, defaultRecipient = "" 
       // 1) insert outbox-rad
       const { data: row, error: insErr } = await supabase
         .from("email_outbox")
-        .insert({
+        .insert([{
           template_key: templateKey,
           recipient_email: recipient,
-          variables: parsedVars,
+          variables: parsedVars as never,
           status: "pending",
           related_entity_type: "test",
-        })
+        }])
         .select("id")
         .single();
       if (insErr || !row) throw new Error(insErr?.message ?? "Kunne ikke opprette outbox-rad");

@@ -9,17 +9,27 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Mail, ShieldCheck, FileText, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Mail, ShieldCheck, FileText, AlertCircle, CheckCircle2, Send } from "lucide-react";
 import { useOrdreEmailSettings } from "@/ordre/hooks/useOrdreEmailSettings";
 import { useEmailTemplates } from "@/ordre/hooks/useEmailTemplates";
+import { SendTestEmailDialog } from "@/ordre/components/shell/SendTestEmailDialog";
+import { supabase } from "@/integrations/supabase/client";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 import { useToast } from "@/components/ui/use-toast";
 
 export default function OrdreInnstillingerPage() {
   const { account, signature, loading, saving, saveSignature, startMicrosoftOAuth, disconnectMicrosoft, reload } = useOrdreEmailSettings();
+  const { templates } = useEmailTemplates();
   const [searchParams, setSearchParams] = useSearchParams();
   const [sigDraft, setSigDraft] = useState("");
+  const [testDialogOpen, setTestDialogOpen] = useState(false);
+  const [userEmail, setUserEmail] = useState<string>("");
   const { toast } = useToast();
+
+  useEffect(() => {
+    void supabase.auth.getUser().then(({ data }) => setUserEmail(data.user?.email ?? ""));
+  }, []);
 
   useEffect(() => {
     setSigDraft(signature);
@@ -86,6 +96,36 @@ export default function OrdreInnstillingerPage() {
               <div className="flex gap-2">
                 <Button variant="outline" onClick={() => void startMicrosoftOAuth()}>Koble til ny konto</Button>
                 <Button variant="destructive" onClick={() => void disconnectMicrosoft()}>Frakoble</Button>
+              </div>
+
+              <div className="border-t pt-4 mt-4 space-y-2">
+                <div className="text-sm font-medium">Test e-post-utsending</div>
+                <p className="text-xs text-muted-foreground">
+                  Send en test-mail for å verifisere at hele kjeden (token, mal-rendering, signatur, sending) fungerer.
+                </p>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="inline-block">
+                        <Button
+                          variant="outline"
+                          onClick={() => setTestDialogOpen(true)}
+                          disabled={!account?.is_connected || templates.length === 0}
+                        >
+                          <Send className="mr-2 h-4 w-4" />
+                          Send test-mail
+                        </Button>
+                      </span>
+                    </TooltipTrigger>
+                    {(!account?.is_connected || templates.length === 0) && (
+                      <TooltipContent>
+                        {!account?.is_connected
+                          ? "Microsoft 365 må være koblet til"
+                          : "Ingen e-post-maler er opprettet"}
+                      </TooltipContent>
+                    )}
+                  </Tooltip>
+                </TooltipProvider>
               </div>
             </>
           ) : (
