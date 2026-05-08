@@ -603,6 +603,39 @@ function TemplateEditorCard() {
           </div>
         )}
       </CardContent>
+
+      <NewEmailTemplateDialog
+        open={newDialogOpen}
+        onOpenChange={setNewDialogOpen}
+        onCreated={(id) => setSelectedId(id)}
+      />
+
+      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Slett mal?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Dette sletter malen «{selected?.display_name}» permanent. Eventuell kode som refererer til
+              <code className="mx-1 rounded bg-muted px-1 py-0.5 text-xs">{selected?.template_key}</code>
+              vil slutte å fungere.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Avbryt</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                if (!selected) return;
+                const ok = await deleteTemplate(selected.id);
+                if (ok) setSelectedId("");
+                setConfirmDelete(false);
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Slett mal
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }
