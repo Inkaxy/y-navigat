@@ -263,7 +263,6 @@ export default function InvoiceDetailPage() {
                         )}
                         <td className="px-4 py-3 font-mono text-xs">{l.supplier_sku ?? "—"}</td>
                         <td className="px-4 py-3">
-                        <td className="px-4 py-3">
                           {rm ? (
                             <div className="space-y-0.5">
                               <div className="flex items-center gap-2">
