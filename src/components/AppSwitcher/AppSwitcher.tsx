@@ -156,7 +156,9 @@ export function AppSwitcher({ label, renderTrigger }: AppSwitcherProps) {
                   {getCategoryLabel(category)}
                 </div>
                 {list.map((app) => {
-                  const active = isActiveApp(app);
+                  const active = isActiveApp(app, pathname);
+                  const integrated = getAppInternalRoute(app.slug) !== null;
+                  const disabled = active || !integrated;
                   const IconComponent = iconMap[app.icon_name] ?? Box;
                   const dotColor = app.color_hex ?? FALLBACK_COLOR;
                   return (
@@ -164,10 +166,12 @@ export function AppSwitcher({ label, renderTrigger }: AppSwitcherProps) {
                       key={app.id}
                       type="button"
                       onClick={() => {
+                        if (disabled) return;
                         handleNavigate(app);
                         setOpen(false);
                       }}
-                      disabled={active}
+                      disabled={disabled}
+                      title={!integrated ? "Kommer snart — ikke integrert ennå" : undefined}
                       className={cn(
                         "group flex w-full items-center gap-3 rounded-md px-2 py-2 text-left",
                         "transition-colors hover:bg-accent",
@@ -193,7 +197,12 @@ export function AppSwitcher({ label, renderTrigger }: AppSwitcherProps) {
                       {active && (
                         <Check className="h-4 w-4 shrink-0 text-primary" aria-label="Du er her" />
                       )}
-                      {!active && app.access_level === "admin" && (
+                      {!active && !integrated && (
+                        <Badge variant="outline" className="shrink-0 text-[10px]">
+                          Kommer
+                        </Badge>
+                      )}
+                      {!active && integrated && app.access_level === "admin" && (
                         <Badge variant="secondary" className="shrink-0 text-[10px]">
                           Admin
                         </Badge>
