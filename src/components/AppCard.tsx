@@ -1,9 +1,12 @@
+import { Link } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ExternalLink, Lock } from "lucide-react";
+import { ArrowRight, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getAppIcon } from "@/lib/appIcons";
+import { getAppIconBySlug } from "@/lib/appIcons";
 import type { AppWithAccess } from "@/hooks/useApps";
+import { getAppInternalRoute } from "@/lib/appRoutes";
 
 interface Props {
   app: AppWithAccess;
@@ -18,31 +21,12 @@ const accessClass: Record<string, string> = {
   read: "bg-muted text-muted-foreground",
 };
 
-const SOURCE_APP = "nbhub";
-
 export function AppCard({ app, showAccessBadge = true, showDescription = false }: Props) {
   const Icon = getAppIcon(app.icon, app.category);
   const noAccess = app.access_level === "none";
-  const planned = app.status === "planned" || !app.deploy_url;
-  const isClickable = !noAccess && !planned;
-
-  const buildHref = () => {
-    if (!app.deploy_url) return "#";
-    try {
-      const url = new URL(app.deploy_url);
-      url.searchParams.set("from", SOURCE_APP);
-      return url.toString();
-    } catch {
-      return app.deploy_url;
-    }
-  };
-
-  const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    if (!isClickable) {
-      e.preventDefault();
-      return;
-    }
-  };
+  const internalRoute = getAppInternalRoute(app.code);
+  const planned = app.status === "planned" || !internalRoute;
+  const isClickable = !noAccess && !planned && !!internalRoute;
 
   const content = (
     <CardContent className="flex items-start gap-3 p-4">
@@ -55,7 +39,7 @@ export function AppCard({ app, showAccessBadge = true, showDescription = false }
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
           <span className="truncate font-medium text-foreground">{app.display_name}</span>
-          {isClickable && <ExternalLink className="h-3 w-3 shrink-0 text-muted-foreground" />}
+          {isClickable && <ArrowRight className="h-3 w-3 shrink-0 text-muted-foreground" />}
         </div>
         <div className="text-xs text-muted-foreground capitalize">{app.category}</div>
         {showDescription && app.description && (
@@ -84,33 +68,38 @@ export function AppCard({ app, showAccessBadge = true, showDescription = false }
     </CardContent>
   );
 
-  return (
-    <a
-      href={isClickable ? buildHref() : undefined}
-      onClick={handleClick}
-      aria-disabled={!isClickable}
-      title={
-        noAccess
-          ? "Du har ikke tilgang til denne appen"
-          : planned
-          ? "Under utvikling — ikke tilgjengelig ennå"
-          : `Åpne ${app.display_name}`
-      }
-      className={cn(
-        "block rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-        !isClickable && "pointer-events-none",
-      )}
-    >
-      <Card
-        className={cn(
-          "relative shadow-card transition-all",
-          noAccess && "opacity-60",
-          isClickable && "cursor-pointer hover:-translate-y-0.5 hover:shadow-elevated",
-          planned && !noAccess && "opacity-70",
-        )}
+  const cardClasses = cn(
+    "relative shadow-card transition-all",
+    noAccess && "opacity-60",
+    isClickable && "cursor-pointer hover:-translate-y-0.5 hover:shadow-elevated",
+    planned && !noAccess && "opacity-70",
+  );
+
+  const title = noAccess
+    ? "Du har ikke tilgang til denne appen"
+    : planned
+    ? "Under utvikling — ikke tilgjengelig ennå"
+    : `Åpne ${app.display_name}`;
+
+  if (!isClickable) {
+    return (
+      <div
+        aria-disabled
+        title={title}
+        className="block rounded-lg pointer-events-none"
       >
-        {content}
-      </Card>
-    </a>
+        <Card className={cardClasses}>{content}</Card>
+      </div>
+    );
+  }
+
+  return (
+    <Link
+      to={internalRoute}
+      title={title}
+      className="block rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      <Card className={cardClasses}>{content}</Card>
+    </Link>
   );
 }
