@@ -915,7 +915,8 @@ export default function ProfileDetail() {
                         disabled={!canWrite}
                         options={[
                           { v: "none", l: "Ingen — kun manuell utskrift" },
-                          { v: "email", l: "E-post (PDF)" },
+                          { v: "per_customer", l: "Per kunde — bruk innstillinger fra kundekortet" },
+                          { v: "email", l: "E-post (PDF) — felles for alle" },
                           { v: "print", l: "Utskrift" },
                           { v: "both", l: "Både e-post og utskrift" },
                         ]}
@@ -932,9 +933,17 @@ export default function ProfileDetail() {
                         />
                       </Field>
                     )}
-                    <p className="text-xs text-muted-foreground">
-                      Gjelder alle kunder som arver denne profilen. Kan overstyres per kunde.
-                    </p>
+                    {form.watch("packing_slip_delivery_mode") === "per_customer" ? (
+                      <p className="text-xs text-muted-foreground">
+                        Hver kunde som arver profilen får følgeseddel/utskrifter sendt til e-postadressene
+                        som er registrert på sitt eget kundekort (feltet «E-poster for følgeseddel»). Kunder
+                        uten registrert e-post vil ikke få tilsendt noe automatisk.
+                      </p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        Gjelder alle kunder som arver denne profilen. Kan overstyres per kunde.
+                      </p>
+                    )}
                   </div>
                   <CheckboxField
                     label="Endringslogg på følgeseddel"
