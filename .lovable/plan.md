@@ -1,107 +1,59 @@
-# Plan: PDF-deklarasjon + bilder + egen AI-konfig
+# Aktiver "Inviter bruker"-knapp
 
-## Oversikt
+## Problem
+Knappen på `/admin/brukere` er hardkodet `disabled` med tooltip "Krever Supabase admin-invite (kommer i senere fase)". Den ble aldri koblet til en faktisk invitasjons-flow.
 
-Tre sammenhengende deler:
-1. **Bildeopplasting pr vare** (utvider `products.image_url`)
-2. **PDF-tolking av deklarasjon/næring** med AI → forhåndsvisning → godkjenning → lagres som manuell overstyring på produktet (`product_recipe_links.manual_*`)
-3. **Egen AI-konfig** under Varer-innstillinger (provider + modell + secret), med Lovable AI som default
+## Løsning
+Bygg en komplett invitasjons-flow basert på Supabase `auth.admin.inviteUserByEmail`. Tilgang begrenset til eiere (samme `is_owner`-sjekk som brukes i RLS i dag). Stilling og selskap er påkrevd i samme dialog så bruker er klar til bruk umiddelbart etter at de aksepterer.
 
-## Del 1 — Bilde pr vare
+## Komponenter
 
-**Storage**
-- Ny public bucket `product-images` (RLS: alle kan lese, kun innloggede kan skrive til `<product_id>/...`)
+### 1. Edge Function: `invite-user`
+Ny `supabase/functions/invite-user/index.ts` (verify_jwt på).
+- Henter caller fra JWT, sjekker at caller har `is_owner=true` via `user_positions` join (RPC eller direkte query med service_role). Returnerer 403 ellers.
+- Validerer payload: `email`, `first_name`, `last_name`, `legal_entity_id`, `position_id`, valgfritt `outlet_scope`/`outlet_ids`.
+- Kaller `supabase.auth.admin.inviteUserByEmail(email, { data: { first_name, last_name }, redirectTo: <site>/auth/accept-invite })` med service_role-klient.
+- På suksess: insert i `public.users` (id = auth-user.id, display_name, email, status='invited') og `public.user_positions` (user_id, position_id, legal_entity_id, is_primary=true, valid_from=today, assigned_by=caller).
+- Returnerer `{ success, user_id }`. Logger til audit.
 
-**UI**
-- Nytt kort "Bilde" i `VaredetaljerTab.tsx`:
-  - Drag-and-drop / fil-velger (jpg/png/webp, max 5 MB)
-  - Forhåndsvisning av nåværende `image_url`
-  - "Erstatt"-knapp / "Fjern bilde"
-- Ved opplasting: upload til `product-images/<product_id>/<timestamp>.<ext>` → `getPublicUrl` → `update products set image_url = ...`
+### 2. UI: `InviteUserDialog.tsx`
+Ny komponent `src/pages/admin/components/InviteUserDialog.tsx`:
+- Felter: Fornavn, Etternavn, E-post, Selskap (Select fra `legal_entities`), Stilling (Select fra `positions`, filtrert på valgt selskap hvis aktuelt).
+- Submit kaller `supabase.functions.invoke("invite-user", { body })`.
+- Suksess-toast: "Invitasjon sendt til {email}". Lukker dialog og refetcher brukerlisten.
+- Feil: vis serverfeil i toast (f.eks. 403, e-post finnes allerede).
 
-## Del 2 — PDF-deklarasjon med AI
+### 3. Endring i `Brukere.tsx`
+- Fjern `disabled` og Tooltip-wrapper på knappen.
+- Vis kun knappen hvis `useIsOwner()` (ny liten hook som kaller eksisterende RPC eller leser fra session-claims). Hvis ikke-eier: skjul helt.
+- Wire knapp til å åpne `InviteUserDialog`.
 
-**Storage**
-- Ny bucket `declaration-uploads` (privat, brukes kun midlertidig under tolkning)
-
-**Edge function: `parse-declaration-pdf`**
-- Input: `{ product_id, file_path }` (storage-path til opplastet PDF)
-- Henter PDF fra Storage med service-role
-- Leser AI-konfig fra `platform_settings` (category=`varer_ai`, key=`provider_config`)
-- Velger endpoint:
-  - `lovable` → `https://ai.gateway.lovable.dev/v1/chat/completions` med `LOVABLE_API_KEY`
-  - `openai` → `https://api.openai.com/v1/chat/completions` med `CUSTOM_AI_API_KEY`
-  - `anthropic` → Anthropic-API
-  - `custom` → bruker `base_url` fra config
-- Sender PDF som base64 + tool-call schema for strukturert output:
-  ```
-  { ingredient_declaration: string,
-    nutrition_per_100g: { energy_kj, energy_kcal, fat_g, saturated_fat_g, carbs_g, sugars_g, fiber_g, protein_g, salt_g },
-    allergens_contains: string[],
-    allergens_may_contain: string[],
-    confidence: { ingredient: number, nutrition: number, allergens: number },
-    notes: string }
-  ```
-- Default modell: `google/gemini-2.5-pro` (best multimodal for tabeller)
-- Returnerer parsed JSON + confidence-scores
-
-**UI — ny seksjon i `DeclarationTab.tsx`**
-- Knapp "Last opp PDF for AI-tolking" (over modus-velger)
-- Klikk → Dialog:
-  1. Drag-and-drop PDF
-  2. "Tolker …" spinner mens edge function kjører
-  3. Forhåndsvisning av AI-resultat (3 kolonner: Ingrediens / Næring / Allergener) med confidence-badges
-  4. Side-ved-side: "Nåværende verdi" vs "AI-forslag"
-  5. Brukeren kan redigere felter inline før godkjenning
-  6. Knapper: "Avbryt" / "Godkjenn og lagre"
-- Ved godkjenning:
-  - Set `declaration_mode = 'manual'` på `product_recipe_links`
-  - Skriv `manual_ingredient_declaration`, `manual_nutrition`, `manual_allergen_summary`
-  - Logg til `audit_log` (action: `ai_declaration_imported`, source-PDF-path som metadata)
-  - Slett midlertidig PDF fra `declaration-uploads`
-  - Toast + invalidate queries
-
-## Del 3 — Egen AI-konfig under innstillinger
-
-**DB**
-- Bruker eksisterende `platform_settings`-tabell
-- Ny rad: `category='varer_ai'`, `key='provider_config'`, `value = { provider, model, base_url? }`
-
-**Secrets**
-- `CUSTOM_AI_API_KEY` (legges til via secrets-tool når bruker velger noe annet enn `lovable`)
-
-**UI — ny side `/varer/innstillinger/ai`** (eller kort på eksisterende side)
-- Kort "AI for PDF-tolking":
-  - Select: provider (`Lovable AI (default)`, `OpenAI`, `Anthropic`, `Annet (kompatibel API)`)
-  - Input: modell (free text, med eksempler basert på provider)
-  - Input: base_url (kun synlig for `Annet`)
-  - Hvis ikke `Lovable`: knapp "Sett API-nøkkel" → trigger `add_secret` for `CUSTOM_AI_API_KEY`
-  - "Lagre"-knapp
-  - Status: viser om secret er konfigurert eller mangler
-- Default ved ny installasjon: `{ provider: 'lovable', model: 'google/gemini-2.5-pro' }`
+### 4. Akseptside (verifisering)
+Sjekk at det finnes en eksisterende rute som håndterer Supabase-recovery/invite-callback (typisk `/auth` eller `/auth/callback`). Hvis ja: bruk den som `redirectTo`. Hvis ikke: legg til kort `/auth/accept-invite`-side som setter passord via `supabase.auth.updateUser({ password })` etter at session er aktiv fra invite-lenken.
 
 ## Tekniske detaljer
 
-**Migrations**
-1. Opprett buckets `product-images` (public) og `declaration-uploads` (private) + RLS-policies
-2. Ingen schema-endringer på `products` eller `product_recipe_links` — alt finnes allerede
+**RLS:** `users` og `user_positions` har allerede policies som tillater eier å skrive — edge function bruker service_role uansett, så ingen RLS-endringer trengs.
 
-**Edge functions**
-- `parse-declaration-pdf` (ny, `verify_jwt = true`)
+**Selskap/stilling-data:** `Brukere.tsx` henter allerede `legal_entities`. Stillinger hentes fra `positions`-tabellen (ny query i dialog).
 
-**Filer som endres/opprettes**
-- ny: `supabase/functions/parse-declaration-pdf/index.ts`
-- ny: `src/varer/components/products/PdfDeclarationImportDialog.tsx`
-- ny: `src/varer/components/products/ProductImageUpload.tsx`
-- ny: `src/varer/pages/settings/SettingsAI.tsx` + route
-- endret: `src/varer/components/products/DeclarationTab.tsx` (legg til import-knapp)
-- endret: `src/varer/components/products/detail/tabs/VaredetaljerTab.tsx` (legg til bilde-kort)
-- endret: `src/varer/pages/settings/SettingsLayout.tsx` (ny menypunkt "AI")
-- endret: `src/App.tsx` eller varer-routes (ny route)
+**E-post-template:** Bruker default Supabase invite-mail i denne iterasjonen. (Egen branded mal kan legges til senere uten å endre flow.)
 
-## Avgrensninger (ikke i scope nå)
+**Sikkerhet:**
+- Function har `verify_jwt = true` i `config.toml`.
+- Eierrolle-sjekk inne i function — kan ikke omgås fra klient.
+- Service role brukes kun server-side i edge function.
 
-- Galleri / flere bilder pr vare (kan utvides senere ved behov)
-- Bulk-import av flere PDF-er
-- Auto-OCR av skannede bilder (PDFs forutsettes maskingenererte; AI håndterer enkel OCR via multimodal)
-- Versjonering/historikk av tidligere AI-importer (kun audit_log-innslag)
+## Filer som opprettes/endres
+- `supabase/functions/invite-user/index.ts` (ny)
+- `supabase/config.toml` (registrer function, verify_jwt=true)
+- `src/pages/admin/components/InviteUserDialog.tsx` (ny)
+- `src/pages/admin/Brukere.tsx` (aktiver knapp, hook for is_owner, åpne dialog)
+- Evt. `src/pages/auth/AcceptInvite.tsx` + rute i `App.tsx` (kun hvis ingen eksisterende callback finnes)
+
+## Akseptansekriterier
+- Eier ser aktiv "Inviter bruker"-knapp; ikke-eier ser ingen knapp.
+- Dialog krever e-post, navn, selskap og stilling før send.
+- Ved send: bruker mottar Supabase invite-mail, ny rad i `users` (status='invited') og `user_positions`.
+- Etter at invitert bruker setter passord via lenke kan de logge inn og bruker dukker opp som `active` i listen.
+- Forsøk på å invitere som ikke-eier returnerer 403.
