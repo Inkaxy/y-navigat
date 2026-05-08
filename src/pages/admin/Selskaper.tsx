@@ -21,6 +21,7 @@ type LE = {
   short_code: string;
   legal_name: string;
   org_number: string;
+  gs1_prefix: string | null;
   invoice_address_line1: string | null;
   invoice_postal_code: string | null;
   invoice_city: string | null;
@@ -33,6 +34,7 @@ const empty: Partial<LE> = {
   short_code: "",
   legal_name: "",
   org_number: "",
+  gs1_prefix: "",
   invoice_address_line1: "",
   invoice_postal_code: "",
   invoice_city: "",
@@ -180,6 +182,12 @@ export default function Selskaper() {
             <div className="grid grid-cols-2 gap-3">
               <Field label="Kode" value={editing.short_code ?? ""} onChange={(v) => setEditing({ ...editing, short_code: v })} />
               <Field label="Org.nr" value={editing.org_number ?? ""} onChange={(v) => setEditing({ ...editing, org_number: v })} />
+              <Field
+                label="GS1-prefiks (GLN/GTIN-basis)"
+                value={editing.gs1_prefix ?? ""}
+                onChange={(v) => setEditing({ ...editing, gs1_prefix: v.replace(/\D/g, "") })}
+                className="col-span-2"
+              />
               <Field label="Juridisk navn" value={editing.legal_name ?? ""} onChange={(v) => setEditing({ ...editing, legal_name: v })} className="col-span-2" />
               <Field label="Adresse" value={editing.invoice_address_line1 ?? ""} onChange={(v) => setEditing({ ...editing, invoice_address_line1: v })} className="col-span-2" />
               <Field label="Postnr" value={editing.invoice_postal_code ?? ""} onChange={(v) => setEditing({ ...editing, invoice_postal_code: v })} />
