@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { format, formatDistanceToNow } from "date-fns";
 import { nb } from "date-fns/locale";
 import { Inbox, Paperclip, Search, X } from "lucide-react";
@@ -39,6 +39,7 @@ const PRIORITY_LABELS: Record<TicketPriority, string> = {
 };
 
 export default function TicketsList() {
+  const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const initialStatus = (params.get("status")?.split(",") as TicketStatus[]) ?? [];
   const initialAssigned = (params.get("assigned_to") ?? "all") as "all" | "mine" | "unassigned";
@@ -155,7 +156,7 @@ export default function TicketsList() {
                   <TableRow
                     key={t.id}
                     className="cursor-pointer"
-                    onClick={() => (window.location.href = `/ordre/ticket/${t.id}`)}
+                    onClick={() => navigate(`/ordre/ticket/${t.id}`)}
                   >
                     <TableCell>
                       <div className="font-medium text-sm">{t.sender_name ?? t.sender_email}</div>
