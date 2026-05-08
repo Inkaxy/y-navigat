@@ -310,6 +310,19 @@ export default function ProductList() {
           code: p.code,
         }))}
       />
+
+      <BulkImageUploadDialog
+        open={bulkImagesOpen}
+        onOpenChange={setBulkImagesOpen}
+        products={all.map((p) => ({
+          id: p.id,
+          display_name: p.display_name,
+          display_number: p.display_number,
+          code: p.code,
+          image_url: p.image_url,
+        }))}
+        onComplete={() => productsQuery.refetch()}
+      />
     </>
   );
 }
