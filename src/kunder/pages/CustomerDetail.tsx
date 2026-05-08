@@ -867,7 +867,7 @@ export default function CustomerDetail() {
           {/* TAB: ADRESSER */}
           <TabsContent value="addresses" className="mt-4">
             <div className="grid gap-4 lg:grid-cols-2">
-              <Card>
+              <Card className={watchSameAsBilling ? "lg:order-1" : "lg:order-2"}>
                 <CardHeader>
                   <CardTitle>Fakturaadresse</CardTitle>
                 </CardHeader>
@@ -892,7 +892,7 @@ export default function CustomerDetail() {
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className={watchSameAsBilling ? "lg:order-2" : "lg:order-1"}>
                 <CardHeader>
                   <CardTitle>Leveringsadresse</CardTitle>
                 </CardHeader>
