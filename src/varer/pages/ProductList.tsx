@@ -8,7 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { QuickCreateProductDialog } from "@/varer/components/products/QuickCreateProductDialog";
-import { Search, Loader2, Tag, Cake } from "lucide-react";
+import { BulkImageUploadDialog } from "@/varer/components/products/BulkImageUploadDialog";
+import { Button } from "@/components/ui/button";
+import { Search, Loader2, Tag, Cake, Images } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { PRODUCT_STATUS_LABEL, ProductStatus, CAKE_ROLE_LABEL, CakeRole } from "@/varer/lib/constants";
 import { useAppContext } from "@/varer/context/AppContext";
