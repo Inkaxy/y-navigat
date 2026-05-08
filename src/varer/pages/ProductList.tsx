@@ -29,6 +29,7 @@ type ProductRow = {
   label_mode: string | null;
   is_cake_component: boolean | null;
   cake_role: CakeRole | null;
+  image_url: string | null;
 };
 
 const STATUS_BADGE: Record<ProductStatus, string> = {
