@@ -99,18 +99,19 @@ Deno.serve(async (req) => {
       return json(500, { error: `Bruker opprettet i auth, men feilet å lagre profil: ${insErr.message}` });
     }
 
-    // Insert user_position
+    // Insert user_positions (én per assignment)
     const today = new Date().toISOString().slice(0, 10);
-    const { error: posErr } = await admin.from("user_positions").insert({
+    const rows = body.assignments!.map((a, idx) => ({
       user_id: newUserId,
-      position_id: body.position_id,
-      legal_entity_id: body.legal_entity_id,
-      is_primary: true,
+      position_id: a.position_id,
+      legal_entity_id: a.legal_entity_id,
+      is_primary: idx === 0,
       valid_from: today,
       assigned_by: callerId,
-    });
+    }));
+    const { error: posErr } = await admin.from("user_positions").insert(rows);
     if (posErr) {
-      return json(500, { error: `Stilling kunne ikke tilordnes: ${posErr.message}` });
+      return json(500, { error: `Stillinger kunne ikke tilordnes: ${posErr.message}` });
     }
 
     return json(200, { success: true, user_id: newUserId });
