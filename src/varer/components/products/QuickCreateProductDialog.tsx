@@ -154,18 +154,9 @@ export function QuickCreateProductDialog({ open, onOpenChange, productOptions }:
             )}
           </div>
 
-          <div>
-            <Label>Kode *</Label>
-            <Input
-              {...form.register("code")}
-              onChange={(e) => { setCodeTouched(true); form.setValue("code", e.target.value); }}
-              placeholder="kneipp_helt"
-              className="font-mono"
-            />
-            {form.formState.errors.code && (
-              <p className="text-xs text-destructive mt-1">{form.formState.errors.code.message}</p>
-            )}
-          </div>
+          {form.formState.errors.code && (
+            <p className="text-xs text-destructive">{form.formState.errors.code.message}</p>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <div>
