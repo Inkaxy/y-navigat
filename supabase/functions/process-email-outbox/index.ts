@@ -1,10 +1,6 @@
 // process-email-outbox (B.1): Drainer email_outbox-tabellen.
-// - Henter pending-rader (max 20 per kjøring)
-// - Kaller microsoft-graph-send med service-role-token
-// - Oppdaterer status (sent / failed) + attempt_count
-// - Failed-rader med attempt_count >= 5 forblir failed (ikke re-prøvd)
-//
-// Tenkt kjørt periodisk via pg_cron — Henrik aktiverer separat.
+// - Default: henter pending-rader (max 20 per kjøring), kalles av pg_cron
+// - Med { outbox_id }: prosesser kun den raden (test-send fra UI)
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
@@ -22,18 +18,41 @@ Deno.serve(async (req) => {
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const admin = createClient(supabaseUrl, serviceKey);
 
-    const { data: rows, error } = await admin
-      .from("email_outbox")
-      .select("id, template_key, recipient_email, variables, attempt_count")
-      .eq("status", "pending")
-      .lt("attempt_count", MAX_ATTEMPTS)
-      .order("created_at", { ascending: true })
-      .limit(MAX_BATCH);
-    if (error) throw new Error(`Kunne ikke lese outbox: ${error.message}`);
+    let outboxId: string | undefined;
+    if (req.method === "POST") {
+      try {
+        const body = await req.json();
+        outboxId = body?.outbox_id;
+      } catch {
+        // ingen body — kjør default drain
+      }
+    }
 
-    const results: Array<{ id: string; status: string; error?: string }> = [];
+    let rows: Array<{ id: string; template_key: string; recipient_email: string; variables: Record<string, unknown> | null; attempt_count: number }> = [];
 
-    for (const row of rows ?? []) {
+    if (outboxId) {
+      const { data, error } = await admin
+        .from("email_outbox")
+        .select("id, template_key, recipient_email, variables, attempt_count")
+        .eq("id", outboxId)
+        .maybeSingle();
+      if (error) throw new Error(`Kunne ikke lese outbox-rad: ${error.message}`);
+      if (data) rows = [data as typeof rows[number]];
+    } else {
+      const { data, error } = await admin
+        .from("email_outbox")
+        .select("id, template_key, recipient_email, variables, attempt_count")
+        .eq("status", "pending")
+        .lt("attempt_count", MAX_ATTEMPTS)
+        .order("created_at", { ascending: true })
+        .limit(MAX_BATCH);
+      if (error) throw new Error(`Kunne ikke lese outbox: ${error.message}`);
+      rows = (data ?? []) as typeof rows;
+    }
+
+    const results: Array<{ outbox_id: string; status: string; error?: string }> = [];
+
+    for (const row of rows) {
       const newAttempt = (row.attempt_count ?? 0) + 1;
       try {
         const res = await fetch(`${supabaseUrl}/functions/v1/microsoft-graph-send`, {
@@ -66,7 +85,7 @@ Deno.serve(async (req) => {
             error_message: null,
           })
           .eq("id", row.id);
-        results.push({ id: row.id, status: "sent" });
+        results.push({ outbox_id: row.id, status: "sent" });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         const isFinal = newAttempt >= MAX_ATTEMPTS;
@@ -79,7 +98,7 @@ Deno.serve(async (req) => {
             error_message: msg.slice(0, 500),
           })
           .eq("id", row.id);
-        results.push({ id: row.id, status: isFinal ? "failed" : "retry", error: msg });
+        results.push({ outbox_id: row.id, status: isFinal ? "failed" : "retry", error: msg });
       }
     }
 
