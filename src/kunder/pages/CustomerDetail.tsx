@@ -397,6 +397,43 @@ export default function CustomerDetail() {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      if (!customer) throw new Error("Mangler kunde");
+      // Sjekk ordrer og pakksedler — blokker hard delete hvis noen finnes
+      const [ordersRes, dnRes] = await Promise.all([
+        supabase.from("orders").select("id", { count: "exact", head: true }).eq("customer_id", customer.id),
+        supabase.from("delivery_notes").select("id", { count: "exact", head: true }).eq("customer_id", customer.id),
+      ]);
+      if (ordersRes.error) throw ordersRes.error;
+      if (dnRes.error) throw dnRes.error;
+      const orderCount = ordersRes.count ?? 0;
+      const dnCount = dnRes.count ?? 0;
+      if (orderCount + dnCount > 0) {
+        throw new Error(
+          `Kunden har ${orderCount} ordre og ${dnCount} pakksedler. Deaktiver i stedet, eller slett ordrene først.`,
+        );
+      }
+      const { error } = await supabase.from("customers").delete().eq("id", customer.id);
+      if (error) throw error;
+      await logAudit({
+        action: "customer.deleted",
+        entity_type: "customer",
+        entity_id: customer.id,
+        entity_display_reference: `${customer.customer_number} — ${customer.display_name}`,
+        legal_entity_id: customer.legal_entity_id,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["customers"] });
+      toast.success("Kunde slettet");
+      navigate("/kunder/kundeliste");
+    },
+    onError: (e: any) => {
+      toast.error(`Kunne ikke slette: ${e?.message ?? "Ukjent feil"}`);
+    },
+  });
+
   function handleBack() {
     if (isDirty) {
       const ok = window.confirm("Du har ulagrede endringer. Forlat siden likevel?");
