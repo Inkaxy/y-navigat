@@ -71,8 +71,11 @@ export default function ImportPdfPage({ embedded = false }: { embedded?: boolean
 
   // Step 1
   const [legalEntityId, setLegalEntityId] = useState("");
-  const [file, setFile] = useState<File | null>(null);
+  const [queue, setQueue] = useState<File[]>([]);
+  const [queueIndex, setQueueIndex] = useState(0);
+  const file = queue[queueIndex] ?? null;
   const [parsing, setParsing] = useState(false);
+  const [savedIds, setSavedIds] = useState<string[]>([]);
 
   // Step 2 (after parse)
   const [parseResult, setParseResult] = useState<ParseResult | null>(null);
@@ -99,6 +102,14 @@ export default function ImportPdfPage({ embedded = false }: { embedded?: boolean
   }, [entities, legalEntityId]);
 
   useEffect(() => () => { if (pdfPreviewUrl) URL.revokeObjectURL(pdfPreviewUrl); }, [pdfPreviewUrl]);
+
+  // Auto-parse next file in queue after first save
+  useEffect(() => {
+    if (queueIndex > 0 && !parseResult && !parsing && file) {
+      runParse();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queueIndex]);
 
   const { data: suppliers = [], refetch: refetchSuppliers } = useSuppliersFor(legalEntityId || null);
 
@@ -161,6 +172,25 @@ export default function ImportPdfPage({ embedded = false }: { embedded?: boolean
   const removeLine = (idx: number) => setLines((prev) => prev.filter((_, i) => i !== idx));
   const addLine = () =>
     setLines((prev) => [...prev, { description: "", sku: null, quantity: null, unit: null, unit_price: null, total_amount: null, vat_rate: null }]);
+
+  const resetFormForNext = () => {
+    setParseResult(null);
+    if (pdfPreviewUrl) URL.revokeObjectURL(pdfPreviewUrl);
+    setPdfPreviewUrl(null);
+    setSupplierMode("existing");
+    setSupplierId("");
+    setNewSupplierName("");
+    setNewSupplierOrgNr("");
+    setInvoiceNumber("");
+    setInvoiceDate(todayIso());
+    setDueDate("");
+    setTotalAmount("");
+    setTotalVat("");
+    setCurrency("NOK");
+    setKid("");
+    setAccountNumber("");
+    setLines([]);
+  };
 
   const submit = async () => {
     if (!file || !legalEntityId || !invoiceNumber || !invoiceDate) {
@@ -242,7 +272,18 @@ export default function ImportPdfPage({ embedded = false }: { embedded?: boolean
         if (linesErr) throw linesErr;
       }
 
-      if (lines.length === 0) {
+      const newSavedIds = [...savedIds, invoice.id];
+      setSavedIds(newSavedIds);
+      const hasMore = queueIndex < queue.length - 1;
+
+      if (hasMore) {
+        toast.success(`Faktura ${queueIndex + 1} av ${queue.length} lagret — neste fil`);
+        resetFormForNext();
+        setQueueIndex(queueIndex + 1);
+      } else if (queue.length > 1) {
+        toast.success(`Alle ${queue.length} fakturaer lagret`);
+        navigate("/ravarer/fakturaer");
+      } else if (lines.length === 0) {
         toast.success("Faktura opprettet — registrer linjer");
         navigate(`/ravarer/fakturaer/${invoice.id}/registrer-linjer`);
       } else {
@@ -287,10 +328,23 @@ export default function ImportPdfPage({ embedded = false }: { embedded?: boolean
               </Select>
             </div>
             <div>
-              <Label>PDF-fil *</Label>
-              <Input type="file" accept="application/pdf,.pdf" disabled={!legalEntityId || parsing}
-                onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-              {file && <p className="mt-1 text-xs text-ink-secondary">{file.name} ({(file.size / 1024).toFixed(0)} kB)</p>}
+              <Label>PDF-fil(er) *</Label>
+              <Input type="file" accept="application/pdf,.pdf" multiple disabled={!legalEntityId || parsing}
+                onChange={(e) => {
+                  const files = Array.from(e.target.files ?? []);
+                  setQueue(files);
+                  setQueueIndex(0);
+                  setSavedIds([]);
+                }} />
+              {queue.length > 0 && (
+                <div className="mt-1 space-y-0.5">
+                  <p className="text-xs text-ink-secondary">
+                    {queue.length === 1
+                      ? `${queue[0].name} (${(queue[0].size / 1024).toFixed(0)} kB)`
+                      : `${queue.length} filer valgt — bekreftes én etter én`}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 
@@ -298,7 +352,7 @@ export default function ImportPdfPage({ embedded = false }: { embedded?: boolean
             <Button variant="outline" onClick={() => navigate("/ravarer/fakturaer")}>Avbryt</Button>
             <Button onClick={runParse} disabled={!file || !legalEntityId || parsing} className="gap-2">
               {parsing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-              Les og fortsett
+              {queue.length > 1 ? `Les første (1 av ${queue.length})` : "Les og fortsett"}
             </Button>
           </div>
         </Card>
@@ -312,10 +366,24 @@ export default function ImportPdfPage({ embedded = false }: { embedded?: boolean
 
   return (
     <div className="space-y-5">
-      <button onClick={() => { setParseResult(null); setLines([]); }}
-        className="flex items-center gap-1 text-sm text-ink-secondary hover:text-ink-primary">
-        <ArrowLeft className="h-4 w-4" /> Last opp en annen fil
-      </button>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <button onClick={() => { resetFormForNext(); setQueue([]); setQueueIndex(0); setSavedIds([]); }}
+          className="flex items-center gap-1 text-sm text-ink-secondary hover:text-ink-primary">
+          <ArrowLeft className="h-4 w-4" /> Last opp andre filer
+        </button>
+        {queue.length > 1 && (
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary">
+              Fil {queueIndex + 1} av {queue.length} · {file?.name}
+            </Badge>
+            {queueIndex < queue.length - 1 && (
+              <Button variant="outline" size="sm" onClick={() => { resetFormForNext(); setQueueIndex(queueIndex + 1); }}>
+                Hopp over
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
       {!embedded && (
         <FakturaerHeaderBanner title="Bekreft fakturadata" subtitle="Sjekk at AI har lest riktig før du lagrer" />
       )}
