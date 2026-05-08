@@ -358,10 +358,24 @@ export default function ImportPdfPage({ embedded = false }: { embedded?: boolean
 
   return (
     <div className="space-y-5">
-      <button onClick={() => { setParseResult(null); setLines([]); }}
-        className="flex items-center gap-1 text-sm text-ink-secondary hover:text-ink-primary">
-        <ArrowLeft className="h-4 w-4" /> Last opp en annen fil
-      </button>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <button onClick={() => { resetFormForNext(); setQueue([]); setQueueIndex(0); setSavedIds([]); }}
+          className="flex items-center gap-1 text-sm text-ink-secondary hover:text-ink-primary">
+          <ArrowLeft className="h-4 w-4" /> Last opp andre filer
+        </button>
+        {queue.length > 1 && (
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary">
+              Fil {queueIndex + 1} av {queue.length} · {file?.name}
+            </Badge>
+            {queueIndex < queue.length - 1 && (
+              <Button variant="outline" size="sm" onClick={() => { resetFormForNext(); setQueueIndex(queueIndex + 1); }}>
+                Hopp over
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
       {!embedded && (
         <FakturaerHeaderBanner title="Bekreft fakturadata" subtitle="Sjekk at AI har lest riktig før du lagrer" />
       )}
