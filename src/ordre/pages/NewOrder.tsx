@@ -281,6 +281,10 @@ export default function NewOrder() {
   const [deliveryInstructions, setDeliveryInstructions] = useState("");
   const [internalNotes, setInternalNotes] = useState("");
   const [customerNotes, setCustomerNotes] = useState("");
+  const [customerReference, setCustomerReference] = useState("");
+  const enforceRef = !!customer?.enforce_custom_reference;
+  const enforcedRefValue = customer?.custom_reference?.trim() ?? "";
+  const enforcedRefMissing = enforceRef && !enforcedRefValue;
   const [manualTourId, setManualTourId] = useState<string | null>(null);
   const [lines, setLines] = useState<LineDraft[]>([newLine()]);
   const [submitting, setSubmitting] = useState(false);
