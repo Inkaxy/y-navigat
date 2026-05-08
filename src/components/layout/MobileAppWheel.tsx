@@ -93,10 +93,9 @@ export function MobileAppWheel() {
 
   const confirm = () => {
     const e = entries[selectedIndex];
-    if (!e) return;
+    if (!e || !e.to) return;
     setOpen(false);
-    if (e.external) window.location.href = e.external;
-    else if (e.to) window.location.href = e.to;
+    window.location.href = e.to;
   };
 
   if (!current) {
