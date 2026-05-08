@@ -3382,6 +3382,7 @@ export type Database = {
           created_by: string | null
           customer_id: string
           customer_notes: string | null
+          customer_reference: string | null
           customer_snapshot: Json
           delivery_address_line1: string | null
           delivery_address_line2: string | null
@@ -3435,6 +3436,7 @@ export type Database = {
           created_by?: string | null
           customer_id: string
           customer_notes?: string | null
+          customer_reference?: string | null
           customer_snapshot?: Json
           delivery_address_line1?: string | null
           delivery_address_line2?: string | null
@@ -3488,6 +3490,7 @@ export type Database = {
           created_by?: string | null
           customer_id?: string
           customer_notes?: string | null
+          customer_reference?: string | null
           customer_snapshot?: Json
           delivery_address_line1?: string | null
           delivery_address_line2?: string | null
