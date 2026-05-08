@@ -8,7 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { QuickCreateProductDialog } from "@/varer/components/products/QuickCreateProductDialog";
-import { Search, Loader2, Tag, Cake } from "lucide-react";
+import { BulkImageUploadDialog } from "@/varer/components/products/BulkImageUploadDialog";
+import { Button } from "@/components/ui/button";
+import { Search, Loader2, Tag, Cake, Images } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { PRODUCT_STATUS_LABEL, ProductStatus, CAKE_ROLE_LABEL, CakeRole } from "@/varer/lib/constants";
 import { useAppContext } from "@/varer/context/AppContext";
@@ -27,6 +29,7 @@ type ProductRow = {
   label_mode: string | null;
   is_cake_component: boolean | null;
   cake_role: CakeRole | null;
+  image_url: string | null;
 };
 
 const STATUS_BADGE: Record<ProductStatus, string> = {
@@ -44,6 +47,7 @@ export default function ProductList() {
   const [status, setStatus] = useState<string>("all");
   const [variantFilter, setVariantFilter] = useState<string>("all");
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [bulkImagesOpen, setBulkImagesOpen] = useState(false);
 
   const productsQuery = useQuery({
     queryKey: ["products", legalEntityId],
@@ -51,7 +55,7 @@ export default function ProductList() {
       const { data, error } = await supabase
         .from("products")
         .select(
-          "id, display_number, code, display_name, product_category, product_subcategory, unit_of_sale, status, variant_of_product_id, variant_label, label_mode, is_cake_component, cake_role",
+          "id, display_number, code, display_name, product_category, product_subcategory, unit_of_sale, status, variant_of_product_id, variant_label, label_mode, is_cake_component, cake_role, image_url",
         )
         .eq("legal_entity_id", legalEntityId)
         .order("display_number", { ascending: true })
@@ -198,8 +202,13 @@ export default function ProductList() {
               </SelectContent>
             </Select>
 
-            <div className="ml-auto text-sm text-muted-foreground">
-              {filtered.length} treff
+            <div className="ml-auto flex items-center gap-3">
+              {canWrite && (
+                <Button variant="outline" size="sm" onClick={() => setBulkImagesOpen(true)} className="gap-1.5">
+                  <Images className="h-4 w-4" /> Massimport bilder
+                </Button>
+              )}
+              <span className="text-sm text-muted-foreground">{filtered.length} treff</span>
             </div>
           </div>
 
@@ -300,6 +309,19 @@ export default function ProductList() {
           display_number: p.display_number,
           code: p.code,
         }))}
+      />
+
+      <BulkImageUploadDialog
+        open={bulkImagesOpen}
+        onOpenChange={setBulkImagesOpen}
+        products={all.map((p) => ({
+          id: p.id,
+          display_name: p.display_name,
+          display_number: p.display_number,
+          code: p.code,
+          image_url: p.image_url,
+        }))}
+        onComplete={() => productsQuery.refetch()}
       />
     </>
   );
