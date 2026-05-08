@@ -48,6 +48,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { logAudit } from "@/kunder/lib/audit";
 import { OverrideField } from "@/kunder/components/customers/OverrideField";
 import { ChangeProfileDialog } from "@/kunder/components/customers/ChangeProfileDialog";
+import { ActivityTimeline } from "@/kunder/components/activity/ActivityTimeline";
+import { useCustomerActivityFeed } from "@/kunder/hooks/useCustomerActivityFeed";
 import {
   ALL_OVERRIDABLE_FIELDS,
   DELIVERY_FIELDS,
