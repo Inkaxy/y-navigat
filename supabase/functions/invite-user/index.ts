@@ -77,14 +77,25 @@ Deno.serve(async (req) => {
     const redirectTo = `${origin}/auth/accept-invite`;
 
     // Send Supabase invite
+    let newUserId: string | null = null;
     const { data: invited, error: inviteErr } = await admin.auth.admin.inviteUserByEmail(email, {
       data: { first_name: body.first_name, last_name: body.last_name, display_name },
       redirectTo,
     });
-    if (inviteErr || !invited?.user) {
+    if (invited?.user) {
+      newUserId = invited.user.id;
+    } else if (inviteErr && /already.*registered|already exists/i.test(inviteErr.message)) {
+      // Bruker finnes allerede i auth — finn id og fortsett med profil/stillinger
+      const { data: list, error: listErr } = await admin.auth.admin.listUsers({ page: 1, perPage: 200 });
+      if (listErr) return json(500, { error: listErr.message });
+      const existing = list.users.find((u) => u.email?.toLowerCase() === email);
+      if (!existing) {
+        return json(400, { error: "Bruker finnes i auth, men kunne ikke finnes via listUsers" });
+      }
+      newUserId = existing.id;
+    } else {
       return json(400, { error: inviteErr?.message ?? "Kunne ikke sende invitasjon" });
     }
-    const newUserId = invited.user.id;
 
     // Insert profile row in public.users
     const { error: insErr } = await admin.from("users").insert({
