@@ -63,7 +63,8 @@ export default function MinProfil() {
       .eq("id", profile.id);
     setSaving(false);
     if (error) {
-      toast.error("Kunne ikke lagre", { description: error.message });
+      if (import.meta.env.DEV) console.warn("[profile] save failed:", error.message);
+      toast.error("Kunne ikke lagre", { description: "Noe gikk galt, prøv igjen." });
       return;
     }
     toast.success("Profil oppdatert");
