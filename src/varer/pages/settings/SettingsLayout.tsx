@@ -6,6 +6,7 @@ import {
   LayoutGrid,
   Tag,
   Factory,
+  Sparkles,
 } from "lucide-react";
 import { AppHeaderBanner } from "@/varer/components/layout/AppHeaderBanner";
 import { cn } from "@/lib/utils";
@@ -17,6 +18,7 @@ const tabs = [
   { to: "/varer/innstillinger/varesider", label: "Varesider", icon: LayoutGrid },
   { to: "/varer/innstillinger/salgsgrupper", label: "Salgsgrupper", icon: Tag },
   { to: "/varer/innstillinger/produksjonsgrupper", label: "Produksjonsgrupper", icon: Factory },
+  { to: "/varer/innstillinger/ai", label: "AI", icon: Sparkles },
 ];
 
 export default function SettingsLayout() {
