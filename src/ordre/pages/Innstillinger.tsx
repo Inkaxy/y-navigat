@@ -290,10 +290,8 @@ function TemplateEditorCard() {
   const filteredTemplates = useMemo(() => {
     const f = filter.trim().toLowerCase();
     if (!f) return templates;
-    return templates.filter(
-      (t) =>
-        t.display_name.toLowerCase().includes(f) ||
-        (t.description?.toLowerCase().includes(f) ?? false),
+    return templates.filter((t) =>
+      t.display_name.toLowerCase().includes(f),
     );
   }, [templates, filter]);
 
