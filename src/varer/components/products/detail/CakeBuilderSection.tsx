@@ -50,6 +50,7 @@ export function CakeBuilderSection({
   originalLinks,
   onLinksChange,
 }: Props) {
+  const { legalEntityId } = useAppContext();
   const { watch, setValue } = useFormContext<ProductFormValues>();
   const isComponent = watch("is_cake_component");
   const role = watch("cake_role");

@@ -31,6 +31,7 @@ interface Props {
 }
 
 export function NavnOgNummerTab({ product, canWrite, hasGs1Prefix }: Props) {
+  const { legalEntityId } = useAppContext();
   const { control, register, watch, setValue, formState: { errors } } =
     useFormContext<ProductFormValues>();
   const qc = useQueryClient();

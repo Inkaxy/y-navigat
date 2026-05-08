@@ -59,6 +59,7 @@ export function RawMaterialAutocomplete({
   placeholder = "Velg råvare…",
   allowClear = true,
 }: Props) {
+  const { legalEntityId } = useAppContext();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
@@ -200,6 +201,7 @@ function QuickCreateRawMaterialDialog({
   prefilledName: string;
   onCreated: (opt: RawMaterialOption) => void;
 }) {
+  const { legalEntityId } = useAppContext();
   const qc = useQueryClient();
   const [name, setName] = useState("");
   const [sku, setSku] = useState("");

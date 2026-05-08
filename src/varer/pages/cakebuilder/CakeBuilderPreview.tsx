@@ -31,6 +31,7 @@ export function CakeBuilderPreview({
   onOpenChange: (o: boolean) => void;
   initialCategoryId?: string | null;
 }) {
+  const { legalEntityId } = useAppContext();
   const [categoryId, setCategoryId] = useState<string | null>(initialCategoryId ?? null);
 
   // Reset på open / endret initialCategoryId

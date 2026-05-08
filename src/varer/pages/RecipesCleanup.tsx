@@ -12,6 +12,7 @@ import { Search, Loader2, AlertTriangle, Wrench, ArrowRight } from "lucide-react
 
 
 export default function RecipesCleanup() {
+  const { legalEntityId } = useAppContext();
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
 

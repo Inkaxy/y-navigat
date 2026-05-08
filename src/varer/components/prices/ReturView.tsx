@@ -17,6 +17,7 @@ interface Props {
 }
 
 export function ReturView({ priceDate, search }: Props) {
+  const { legalEntityId } = useAppContext();
   const navigate = useNavigate();
 
   const productsQuery = useQuery({

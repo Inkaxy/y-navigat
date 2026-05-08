@@ -48,6 +48,7 @@ function slugifyCode(name: string): string {
 }
 
 export function OfferPriceListsDialog({ open, onOpenChange }: Props) {
+  const { legalEntityId } = useAppContext();
   const qc = useQueryClient();
   const [rows, setRows] = useState<OfferRow[]>([]);
   const [saving, setSaving] = useState(false);

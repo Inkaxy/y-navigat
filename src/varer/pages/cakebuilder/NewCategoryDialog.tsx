@@ -35,6 +35,7 @@ interface Props {
 }
 
 export function NewCategoryDialog({ open, onOpenChange, category, onSaved }: Props) {
+  const { legalEntityId } = useAppContext();
   const isEdit = !!category;
   const qc = useQueryClient();
   const { toast } = useToast();

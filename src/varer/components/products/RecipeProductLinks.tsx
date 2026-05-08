@@ -34,6 +34,7 @@ interface Props {
  * deler denne oppskriften, og lar brukeren koble flere produkter til.
  */
 export function RecipeProductLinks({ recipeId, currentProductId, canWrite }: Props) {
+  const { legalEntityId } = useAppContext();
   const navigate = useNavigate();
   const [pickerOpen, setPickerOpen] = useState(false);
 

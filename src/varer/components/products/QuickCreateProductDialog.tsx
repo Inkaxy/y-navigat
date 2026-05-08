@@ -60,6 +60,7 @@ interface Props {
 }
 
 export function QuickCreateProductDialog({ open, onOpenChange, productOptions }: Props) {
+  const { legalEntityId } = useAppContext();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [submitting, setSubmitting] = useState(false);

@@ -10,6 +10,7 @@ import { Search, Loader2, ChefHat } from "lucide-react";
 
 
 export default function Recipes() {
+  const { legalEntityId } = useAppContext();
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
 
