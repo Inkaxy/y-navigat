@@ -71,8 +71,11 @@ export default function ImportPdfPage({ embedded = false }: { embedded?: boolean
 
   // Step 1
   const [legalEntityId, setLegalEntityId] = useState("");
-  const [file, setFile] = useState<File | null>(null);
+  const [queue, setQueue] = useState<File[]>([]);
+  const [queueIndex, setQueueIndex] = useState(0);
+  const file = queue[queueIndex] ?? null;
   const [parsing, setParsing] = useState(false);
+  const [savedIds, setSavedIds] = useState<string[]>([]);
 
   // Step 2 (after parse)
   const [parseResult, setParseResult] = useState<ParseResult | null>(null);
