@@ -269,7 +269,7 @@ export default function ProductList() {
                           </span>
                           {p.variant_label && <span className="ml-2 text-xs text-muted-foreground">({p.variant_label})</span>}
                         </div>
-                        <div className="text-xs text-muted-foreground">{p.code}</div>
+                        
                       </td>
                       <td className="px-4 py-2.5 text-muted-foreground">{parent?.display_name ?? "—"}</td>
                       <td className="px-4 py-2.5">{p.product_category}</td>
