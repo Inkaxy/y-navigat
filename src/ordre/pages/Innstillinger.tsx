@@ -415,21 +415,17 @@ function TemplateEditorCard() {
                     <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_240px]">
                       <div className="space-y-1.5">
                         <div className="flex items-center justify-between">
-                          <Label htmlFor="body" className="text-xs font-medium">
-                            HTML-innhold
-                          </Label>
+                          <Label className="text-xs font-medium">Innhold</Label>
                           <span className="text-[10px] text-muted-foreground">
-                            Støtter HTML — bruk &lt;p&gt;, &lt;strong&gt;, &lt;a&gt; osv.
+                            Bruk verktøylinjen — som i Word.
                           </span>
                         </div>
-                        <Textarea
-                          id="body"
-                          ref={bodyRef}
+                        <RichTextEditor
+                          ref={bodyEditorRef}
                           value={bodyDraft}
-                          onChange={(e) => setBodyDraft(e.target.value)}
+                          onChange={setBodyDraft}
                           onFocus={() => (lastFocusedRef.current = "body")}
-                          rows={14}
-                          className="font-mono text-xs leading-relaxed"
+                          placeholder="Skriv e-postinnholdet her…"
                         />
                       </div>
 
