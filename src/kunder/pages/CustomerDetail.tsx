@@ -684,11 +684,13 @@ export default function CustomerDetail() {
       <div className="container space-y-4 py-6">
         <Tabs value={tab} onValueChange={setTab} className="w-full">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <TabsList>
-              <TabsTrigger value="info">Info</TabsTrigger>
-              <TabsTrigger value="invoice">Faktura</TabsTrigger>
-              <TabsTrigger value="pricing">Pris</TabsTrigger>
-              <TabsTrigger value="delivery">Utkjøring</TabsTrigger>
+            <TabsList className="flex-wrap h-auto">
+              <TabsTrigger value="info">Navn, nummer og kontaktinfo</TabsTrigger>
+              <TabsTrigger value="addresses">Adresser</TabsTrigger>
+              <TabsTrigger value="invoice">Faktura- og betalingsinfo</TabsTrigger>
+              <TabsTrigger value="pricing">Prising</TabsTrigger>
+              <TabsTrigger value="delivery">Utkjøring / utskrifter</TabsTrigger>
+              <TabsTrigger value="notes">Notater</TabsTrigger>
               <TabsTrigger value="history">
                 <History className="mr-1 h-3.5 w-3.5" /> Historikk
               </TabsTrigger>
