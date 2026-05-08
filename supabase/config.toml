@@ -21,3 +21,6 @@ verify_jwt = false
 
 [functions.process-email-outbox]
 verify_jwt = false
+
+[functions.invite-user]
+verify_jwt = true
