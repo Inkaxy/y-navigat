@@ -144,6 +144,12 @@ export default function Brukere() {
           </TableBody>
         </Table>
       </div>
+
+      <InviteUserDialog
+        open={inviteOpen}
+        onOpenChange={setInviteOpen}
+        onInvited={() => qc.invalidateQueries({ queryKey: ["admin-users"] })}
+      />
     </AdminLayout>
   );
 }
