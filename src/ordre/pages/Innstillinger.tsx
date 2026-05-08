@@ -286,6 +286,17 @@ function TemplateEditorCard() {
     }
   };
 
+  const [filter, setFilter] = useState("");
+  const filteredTemplates = useMemo(() => {
+    const f = filter.trim().toLowerCase();
+    if (!f) return templates;
+    return templates.filter(
+      (t) =>
+        t.display_name.toLowerCase().includes(f) ||
+        (t.description?.toLowerCase().includes(f) ?? false),
+    );
+  }, [templates, filter]);
+
   return (
     <Card>
       <CardHeader>
@@ -293,139 +304,276 @@ function TemplateEditorCard() {
           <FileText className="h-5 w-5" />
           E-post-maler
         </CardTitle>
-        <CardDescription>Maler brukes i Bestillinger, Ticket og Avvik. Variabler i krøllparenteser fylles inn ved sending.</CardDescription>
+        <CardDescription>
+          Velg en mal til venstre, rediger emne og innhold til høyre. Variabler i krøllparenteser
+          (f.eks. <code className="rounded bg-muted px-1 py-0.5 text-xs">{`{{kunde_navn}}`}</code>)
+          fylles inn automatisk når mailen sendes.
+        </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent>
         {loading ? (
-          <p className="text-sm text-muted-foreground">Laster maler …</p>
+          <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" /> Laster maler …
+          </div>
         ) : templates.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Ingen maler er opprettet ennå.</p>
+          <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed bg-muted/30 py-10 text-center">
+            <FileText className="h-8 w-8 text-muted-foreground" />
+            <div>
+              <p className="text-sm font-medium">Ingen e-post-maler ennå</p>
+              <p className="text-xs text-muted-foreground">
+                Maler opprettes automatisk første gang en e-posttype tas i bruk.
+              </p>
+            </div>
+          </div>
         ) : (
-          <>
+          <div className="grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
+            {/* Venstre: liste over maler */}
             <div className="space-y-2">
-              <Label>Velg mal</Label>
-              <Select value={selectedId} onValueChange={setSelectedId}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {templates.map((t) => (
-                    <SelectItem key={t.id} value={t.id}>{t.display_name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={filter}
+                  onChange={(e) => setFilter(e.target.value)}
+                  placeholder="Søk maler…"
+                  className="h-8 pl-7 text-xs"
+                />
+              </div>
+              <ScrollArea className="h-[460px] rounded-md border">
+                <div className="space-y-0.5 p-1">
+                  {filteredTemplates.map((t) => {
+                    const isActive = t.id === selectedId;
+                    return (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => setSelectedId(t.id)}
+                        className={cn(
+                          "flex w-full flex-col items-start gap-0.5 rounded-md px-2.5 py-2 text-left text-sm transition-colors",
+                          isActive
+                            ? "bg-accent text-accent-foreground ring-1 ring-primary/30"
+                            : "hover:bg-muted/60",
+                        )}
+                      >
+                        <span className="font-medium leading-tight">{t.display_name}</span>
+                        {t.description && (
+                          <span className="line-clamp-2 text-xs text-muted-foreground">
+                            {t.description}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                  {filteredTemplates.length === 0 && (
+                    <p className="px-2.5 py-3 text-xs text-muted-foreground">
+                      Ingen maler matcher «{filter}».
+                    </p>
+                  )}
+                </div>
+              </ScrollArea>
             </div>
 
-            {selected && (
-              <Tabs defaultValue="edit" className="w-full">
-                <TabsList>
-                  <TabsTrigger value="edit">Rediger</TabsTrigger>
-                  <TabsTrigger value="preview">Forhåndsvisning</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="edit" className="space-y-3 mt-3">
-                  <div className="space-y-2">
-                    <Label htmlFor="subject">Emne</Label>
-                    <Input
-                      id="subject"
-                      ref={subjectRef}
-                      value={subjectDraft}
-                      onChange={(e) => setSubjectDraft(e.target.value)}
-                      onFocus={() => (lastFocusedRef.current = "subject")}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="body">HTML-innhold</Label>
-                    <Textarea
-                      id="body"
-                      ref={bodyRef}
-                      value={bodyDraft}
-                      onChange={(e) => setBodyDraft(e.target.value)}
-                      onFocus={() => (lastFocusedRef.current = "body")}
-                      rows={12}
-                      className="font-mono text-xs"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="text">Plain text-versjon (valgfri)</Label>
-                    <Textarea
-                      id="text"
-                      ref={textRef}
-                      value={textDraft}
-                      onChange={(e) => setTextDraft(e.target.value)}
-                      onFocus={() => (lastFocusedRef.current = "text")}
-                      rows={6}
-                      placeholder="Brukes som fallback for e-postklienter uten HTML-støtte og for tilgjengelighet"
-                      className="font-mono text-xs"
-                    />
-                  </div>
-
-                  {selected.available_variables?.length > 0 && (
-                    <div className="rounded-md border bg-muted/40 p-3">
-                      <div className="text-xs font-medium mb-2">Tilgjengelige variabler (klikk for å sette inn)</div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {selected.available_variables.map((v) => (
-                          <Badge
-                            key={v.key}
-                            variant="outline"
-                            className="font-mono text-xs cursor-pointer hover:bg-accent"
-                            title={v.description}
-                            onClick={() => insertVariable(v.key)}
-                          >
-                            {`{{${v.key}}}`}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="flex gap-2">
-                    <Button
-                      onClick={() => void saveTemplate(selected.id, {
-                        subject_template: subjectDraft,
-                        body_html_template: bodyDraft,
-                        body_text_template: textDraft,
-                      })}
-                      disabled={saving || !dirty}
-                    >
-                      Lagre mal
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      onClick={() => {
-                        setSubjectDraft(selected.subject_template);
-                        setBodyDraft(selected.body_html_template);
-                        setTextDraft(selected.body_text_template ?? "");
-                      }}
-                      disabled={!dirty}
-                    >
-                      Tilbakestill
-                    </Button>
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="preview" className="space-y-4 mt-3">
-                  <div className="space-y-1">
-                    <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Emne (rendret)</div>
-                    <div className="rounded-md border bg-background p-3 text-sm">{renderedSubject}</div>
-                  </div>
-                  <div className="space-y-1">
-                    <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">HTML (rendret)</div>
-                    <div
-                      className="rounded-md border bg-background p-4 text-sm prose prose-sm max-w-none"
-                      dangerouslySetInnerHTML={{ __html: renderedHtml }}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Plain text (rendret)</div>
-                    {renderedText.trim() ? (
-                      <pre className="rounded-md border bg-muted/40 p-3 text-sm font-mono whitespace-pre-wrap">{renderedText}</pre>
-                    ) : (
-                      <p className="text-sm text-muted-foreground italic">Ingen plain text-versjon definert.</p>
+            {/* Høyre: editor + preview */}
+            {selected ? (
+              <div className="min-w-0 space-y-3">
+                <div className="flex items-baseline justify-between gap-3">
+                  <div className="min-w-0">
+                    <h3 className="truncate text-base font-semibold">{selected.display_name}</h3>
+                    {selected.description && (
+                      <p className="truncate text-xs text-muted-foreground">
+                        {selected.description}
+                      </p>
                     )}
                   </div>
-                </TabsContent>
-              </Tabs>
+                  {dirty && (
+                    <span className="inline-flex shrink-0 items-center gap-1 text-xs text-warning">
+                      <span className="h-1.5 w-1.5 rounded-full bg-warning" />
+                      Ulagrede endringer
+                    </span>
+                  )}
+                </div>
+
+                <Tabs defaultValue="edit" className="w-full">
+                  <TabsList className="grid w-full max-w-sm grid-cols-2">
+                    <TabsTrigger value="edit" className="gap-1.5">
+                      <Code2 className="h-3.5 w-3.5" /> Rediger
+                    </TabsTrigger>
+                    <TabsTrigger value="preview" className="gap-1.5">
+                      <Eye className="h-3.5 w-3.5" /> Forhåndsvisning
+                    </TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="edit" className="mt-3 space-y-3">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="subject" className="text-xs font-medium">
+                        Emne
+                      </Label>
+                      <Input
+                        id="subject"
+                        ref={subjectRef}
+                        value={subjectDraft}
+                        onChange={(e) => setSubjectDraft(e.target.value)}
+                        onFocus={() => (lastFocusedRef.current = "subject")}
+                        placeholder="F.eks. Bekreftelse på din ordre {{ordre_nr}}"
+                      />
+                    </div>
+
+                    <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_240px]">
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="body" className="text-xs font-medium">
+                            HTML-innhold
+                          </Label>
+                          <span className="text-[10px] text-muted-foreground">
+                            Støtter HTML — bruk &lt;p&gt;, &lt;strong&gt;, &lt;a&gt; osv.
+                          </span>
+                        </div>
+                        <Textarea
+                          id="body"
+                          ref={bodyRef}
+                          value={bodyDraft}
+                          onChange={(e) => setBodyDraft(e.target.value)}
+                          onFocus={() => (lastFocusedRef.current = "body")}
+                          rows={14}
+                          className="font-mono text-xs leading-relaxed"
+                        />
+                      </div>
+
+                      {/* Variabel-panel */}
+                      {selected.available_variables?.length > 0 && (
+                        <div className="space-y-2 rounded-lg border bg-muted/30 p-3">
+                          <div className="flex items-center gap-1.5 text-xs font-semibold">
+                            <Plus className="h-3.5 w-3.5" />
+                            Sett inn variabel
+                          </div>
+                          <p className="text-[11px] leading-snug text-muted-foreground">
+                            Klikk for å sette inn der markøren står (emne, HTML eller plain text).
+                          </p>
+                          <Separator />
+                          <ScrollArea className="h-[280px] -mx-1 px-1">
+                            <div className="space-y-1">
+                              {selected.available_variables.map((v) => (
+                                <button
+                                  key={v.key}
+                                  type="button"
+                                  onClick={() => insertVariable(v.key)}
+                                  className="group flex w-full flex-col items-start gap-0.5 rounded-md border border-transparent bg-background/60 px-2 py-1.5 text-left transition-colors hover:border-border hover:bg-background"
+                                >
+                                  <code className="font-mono text-[11px] font-medium text-primary">{`{{${v.key}}}`}</code>
+                                  {v.description && (
+                                    <span className="text-[10px] leading-snug text-muted-foreground">
+                                      {v.description}
+                                    </span>
+                                  )}
+                                </button>
+                              ))}
+                            </div>
+                          </ScrollArea>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label htmlFor="text" className="flex items-center gap-1.5 text-xs font-medium">
+                        <Type className="h-3.5 w-3.5" />
+                        Plain text-versjon
+                        <span className="font-normal text-muted-foreground">(valgfri)</span>
+                      </Label>
+                      <Textarea
+                        id="text"
+                        ref={textRef}
+                        value={textDraft}
+                        onChange={(e) => setTextDraft(e.target.value)}
+                        onFocus={() => (lastFocusedRef.current = "text")}
+                        rows={5}
+                        placeholder="Brukes som fallback for e-postklienter uten HTML-støtte og forbedrer tilgjengelighet."
+                        className="font-mono text-xs leading-relaxed"
+                      />
+                    </div>
+
+                    {/* Sticky lagre-bar */}
+                    <div className="sticky bottom-0 -mx-6 flex items-center justify-between gap-2 border-t bg-card/95 px-6 py-3 backdrop-blur">
+                      <p className="text-xs text-muted-foreground">
+                        {dirty ? "Du har ulagrede endringer." : "Alt er lagret."}
+                      </p>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setSubjectDraft(selected.subject_template);
+                            setBodyDraft(selected.body_html_template);
+                            setTextDraft(selected.body_text_template ?? "");
+                          }}
+                          disabled={!dirty}
+                        >
+                          <RotateCcw className="mr-1.5 h-3.5 w-3.5" /> Tilbakestill
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() =>
+                            void saveTemplate(selected.id, {
+                              subject_template: subjectDraft,
+                              body_html_template: bodyDraft,
+                              body_text_template: textDraft,
+                            })
+                          }
+                          disabled={saving || !dirty}
+                        >
+                          {saving ? (
+                            <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Save className="mr-1.5 h-3.5 w-3.5" />
+                          )}
+                          Lagre mal
+                        </Button>
+                      </div>
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="preview" className="mt-3 space-y-3">
+                    {/* Mail-aktig forhåndsvisning */}
+                    <div className="overflow-hidden rounded-lg border bg-background shadow-sm">
+                      <div className="space-y-1 border-b bg-muted/40 px-4 py-3">
+                        <div className="flex items-baseline gap-2 text-xs">
+                          <span className="w-12 shrink-0 text-muted-foreground">Fra:</span>
+                          <span className="font-medium">Nøtterø Bakeri &lt;noreply@nbhub.no&gt;</span>
+                        </div>
+                        <div className="flex items-baseline gap-2 text-xs">
+                          <span className="w-12 shrink-0 text-muted-foreground">Til:</span>
+                          <span className="font-medium">{exampleVars["kunde_epost"] ?? "kunde@eksempel.no"}</span>
+                        </div>
+                        <div className="flex items-baseline gap-2 pt-1 text-sm">
+                          <span className="w-12 shrink-0 text-xs text-muted-foreground">Emne:</span>
+                          <span className="font-semibold">{renderedSubject || <span className="italic text-muted-foreground">(tomt emne)</span>}</span>
+                        </div>
+                      </div>
+                      <div
+                        className="prose prose-sm max-w-none p-5 text-sm"
+                        dangerouslySetInnerHTML={{ __html: renderedHtml }}
+                      />
+                    </div>
+
+                    <details className="rounded-md border bg-muted/30">
+                      <summary className="cursor-pointer select-none px-3 py-2 text-xs font-medium text-muted-foreground hover:text-foreground">
+                        Vis plain text-versjon
+                      </summary>
+                      <div className="border-t p-3">
+                        {renderedText.trim() ? (
+                          <pre className="whitespace-pre-wrap font-mono text-xs leading-relaxed">{renderedText}</pre>
+                        ) : (
+                          <p className="text-xs italic text-muted-foreground">Ingen plain text-versjon definert.</p>
+                        )}
+                      </div>
+                    </details>
+                  </TabsContent>
+                </Tabs>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center rounded-md border border-dashed bg-muted/30 p-10 text-sm text-muted-foreground">
+                Velg en mal til venstre for å redigere.
+              </div>
             )}
-          </>
+          </div>
         )}
       </CardContent>
     </Card>
