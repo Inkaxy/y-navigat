@@ -128,13 +128,13 @@ export function CustomerContactsCard({ customerId, canWrite }: Props) {
 
   return (
     <>
-      <Card>
-        <CardHeader className="flex flex-row items-start justify-between gap-3">
+      <div className="space-y-3">
+        <div className="flex items-center justify-between gap-3 border-t border-border pt-3">
           <div>
-            <CardTitle>Flere kontaktpersoner</CardTitle>
-            <CardDescription>
-              Tilleggskontakter for denne kunden (i tillegg til hovedkontakt)
-            </CardDescription>
+            <h4 className="text-sm font-semibold">Flere kontaktpersoner</h4>
+            <p className="text-xs text-muted-foreground">
+              Tilleggskontakter (i tillegg til hovedkontakten over)
+            </p>
           </div>
           {canWrite && (
             <Button type="button" size="sm" variant="outline" onClick={openNew}>
@@ -142,91 +142,89 @@ export function CustomerContactsCard({ customerId, canWrite }: Props) {
               Ny kontakt
             </Button>
           )}
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" /> Laster …
-            </div>
-          ) : !contacts || contacts.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Ingen ekstra kontaktpersoner ennå.
-            </p>
-          ) : (
-            <ul className="divide-y divide-border rounded-md border border-border">
-              {contacts.map((c) => (
-                <li
-                  key={c.id}
-                  className="flex flex-col gap-2 p-3 sm:flex-row sm:items-start sm:justify-between"
-                >
-                  <div className="min-w-0 flex-1 space-y-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-medium">{c.name}</span>
-                      {c.role && (
-                        <span className="text-sm text-muted-foreground">
-                          — {c.role}
-                        </span>
-                      )}
-                      {c.is_primary && (
-                        <Badge variant="secondary" className="gap-1">
-                          <Star className="h-3 w-3" /> Primær
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                      {c.email && (
-                        <span className="inline-flex items-center gap-1">
-                          <Mail className="h-3 w-3" />
-                          {c.email}
-                        </span>
-                      )}
-                      {c.phone && (
-                        <span className="inline-flex items-center gap-1">
-                          <Phone className="h-3 w-3" />
-                          {c.phone}
-                        </span>
-                      )}
-                      {c.mobile && (
-                        <span className="inline-flex items-center gap-1">
-                          <Smartphone className="h-3 w-3" />
-                          {c.mobile}
-                        </span>
-                      )}
-                    </div>
-                    {c.notes && (
-                      <p className="whitespace-pre-wrap text-xs text-muted-foreground/90">
-                        {c.notes}
-                      </p>
+        </div>
+        {isLoading ? (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" /> Laster …
+          </div>
+        ) : !contacts || contacts.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            Ingen ekstra kontaktpersoner ennå.
+          </p>
+        ) : (
+          <ul className="divide-y divide-border rounded-md border border-border">
+            {contacts.map((c) => (
+              <li
+                key={c.id}
+                className="flex flex-col gap-2 p-3 sm:flex-row sm:items-start sm:justify-between"
+              >
+                <div className="min-w-0 flex-1 space-y-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium">{c.name}</span>
+                    {c.role && (
+                      <span className="text-sm text-muted-foreground">
+                        — {c.role}
+                      </span>
+                    )}
+                    {c.is_primary && (
+                      <Badge variant="secondary" className="gap-1">
+                        <Star className="h-3 w-3" /> Primær
+                      </Badge>
                     )}
                   </div>
-                  {canWrite && (
-                    <div className="flex shrink-0 gap-1">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => openEdit(c)}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-destructive hover:text-destructive"
-                        onClick={() => setConfirmDelete(c)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                    {c.email && (
+                      <span className="inline-flex items-center gap-1">
+                        <Mail className="h-3 w-3" />
+                        {c.email}
+                      </span>
+                    )}
+                    {c.phone && (
+                      <span className="inline-flex items-center gap-1">
+                        <Phone className="h-3 w-3" />
+                        {c.phone}
+                      </span>
+                    )}
+                    {c.mobile && (
+                      <span className="inline-flex items-center gap-1">
+                        <Smartphone className="h-3 w-3" />
+                        {c.mobile}
+                      </span>
+                    )}
+                  </div>
+                  {c.notes && (
+                    <p className="whitespace-pre-wrap text-xs text-muted-foreground/90">
+                      {c.notes}
+                    </p>
                   )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
+                </div>
+                {canWrite && (
+                  <div className="flex shrink-0 gap-1">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => openEdit(c)}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-destructive hover:text-destructive"
+                      onClick={() => setConfirmDelete(c)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
 
       <Dialog open={editorOpen} onOpenChange={setEditorOpen}>
         <DialogContent className="sm:max-w-lg">
