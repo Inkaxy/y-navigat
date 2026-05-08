@@ -557,10 +557,10 @@ export default function ProfileDetail() {
       <div className="container py-6">
         <Tabs defaultValue="basic" className="w-full">
           <TabsList className="mb-4">
-            <TabsTrigger value="basic">Navn og nummer</TabsTrigger>
-            <TabsTrigger value="invoice">Faktura</TabsTrigger>
+            <TabsTrigger value="basic">Navn, nummer og kontaktinfo</TabsTrigger>
+            <TabsTrigger value="invoice">Faktura- og betalingsinfo</TabsTrigger>
             <TabsTrigger value="pricing">Prising</TabsTrigger>
-            <TabsTrigger value="delivery">Utkjøring</TabsTrigger>
+            <TabsTrigger value="delivery">Utkjøring / utskrifter</TabsTrigger>
           </TabsList>
 
           {/* TAB 1 */}
@@ -636,16 +636,17 @@ export default function ProfileDetail() {
                       onChange={(v) => form.setValue("invoice_method", v, { shouldDirty: true })}
                       disabled={!canWrite}
                       options={[
-                        { v: "ehf_batch", l: "EHF samle" },
-                        { v: "ehf_single", l: "EHF enkelt" },
-                        { v: "email", l: "E-post" },
-                        { v: "bank_transfer", l: "Bankgiro" },
-                        { v: "print", l: "Utskrift" },
-                        { v: "none", l: "Ingen" },
+                        { v: "bankgiro", l: "0 — Bankgiro" },
+                        { v: "none", l: "1 — Sendes ikke" },
+                        { v: "chain_invoice", l: "5 — Kjedefaktura" },
+                        { v: "ehf", l: "6 — EHF" },
+                        { v: "ehf_bulk", l: "7 — EHF samle" },
+                        { v: "email_pdf", l: "8 — Epost-faktura" },
+                        { v: "e2b", l: "9 — e2b" },
                       ]}
                     />
                   </Field>
-                  {form.watch("invoice_method") === "email" && (
+                  {form.watch("invoice_method") === "email_pdf" && (
                     <Field label="Faktura sendes til (e-post)">
                       <Input
                         type="email"
@@ -655,11 +656,12 @@ export default function ProfileDetail() {
                       />
                       <p className="text-xs text-muted-foreground">
                         Faktura sendes på PDF-format som vedlegg til denne e-postadressen.
+                        Kan overstyres per kunde på kundekortet.
                       </p>
                     </Field>
                   )}
-                  {(form.watch("invoice_method") === "ehf_batch" ||
-                    form.watch("invoice_method") === "ehf_single") && (
+                  {(form.watch("invoice_method") === "ehf" ||
+                    form.watch("invoice_method") === "ehf_bulk") && (
                     <CheckboxField
                       label="Inkluder vedlegg i EHF"
                       checked={form.watch("include_attachments_in_ehf")}
