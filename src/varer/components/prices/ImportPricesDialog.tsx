@@ -80,10 +80,10 @@ const MOMSKODE_LABEL: Record<"F" | "H" | "P" | "null", string> = {
 };
 
 export function ImportPricesDialog({ open, onOpenChange, onComplete }: Props) {
-  const { legalEntityId } = useAppContext();
+  const { legalEntityId: activeLegalEntityId } = useAppContext();
   const [step, setStep] = useState<Step>(1);
   const [file, setFile] = useState<File | null>(null);
-  const [legalEntityId, setLegalEntityId] = useState<string>(legalEntityId);
+  const [legalEntityId, setLegalEntityId] = useState<string>(activeLegalEntityId ?? "");
   const [parsing, setParsing] = useState(false);
   const [parseResult, setParseResult] = useState<ParseResult | null>(null);
 
