@@ -1,5 +1,18 @@
 import { supabase } from "@/integrations/supabase/client";
-import { APP_SOURCE, NB_LEGAL_ENTITY_ID } from "./constants";
+import { APP_SOURCE } from "./constants";
+
+/** Leser aktivt selskap fra Shell-selection (localStorage). Returnerer null hvis ingen er valgt. */
+function readActiveLegalEntityId(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem("nbhub.selection");
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return typeof parsed?.legalEntityId === "string" ? parsed.legalEntityId : null;
+  } catch {
+    return null;
+  }
+}
 
 export type AuditAction =
   | "create"
@@ -87,7 +100,7 @@ export async function logAudit(input: LogAuditInput) {
       changes: (input.changes ?? null) as never,
       reason: input.reason ?? null,
       outlet_id: input.outlet_id ?? null,
-      legal_entity_id: NB_LEGAL_ENTITY_ID,
+      legal_entity_id: readActiveLegalEntityId(),
       source_app: APP_SOURCE,
       user_id: user?.id ?? null,
       user_display_name: display,
