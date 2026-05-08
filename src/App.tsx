@@ -46,6 +46,7 @@ import VarerSettingsSubCategories from "@/varer/pages/settings/SettingsSubCatego
 import VarerSettingsProductPages from "@/varer/pages/settings/SettingsProductPages";
 import VarerSettingsSalesGroups from "@/varer/pages/settings/SettingsSalesGroups";
 import VarerSettingsProductionGroups from "@/varer/pages/settings/SettingsProductionGroups";
+import VarerSettingsAI from "@/varer/pages/settings/SettingsAI";
 import VarerCakeBuilderEmbed from "@/varer/pages/embed/CakeBuilderEmbed";
 import { SelectedEntityProvider as KunderEntityProviderRaw } from "@/kunder/state/SelectedEntityContext";
 import KunderCustomerList from "@/kunder/pages/CustomerList";
@@ -207,6 +208,7 @@ const App = () => (
                 <Route path="varesider" element={<VarerSettingsProductPages />} />
                 <Route path="salgsgrupper" element={<VarerSettingsSalesGroups />} />
                 <Route path="produksjonsgrupper" element={<VarerSettingsProductionGroups />} />
+                <Route path="ai" element={<VarerSettingsAI />} />
               </Route>
               {/* Kunder sub-routes */}
               <Route path="/kunder" element={<Shell><AppAccessGuard appCode="kunder" appName="Kunder"><KunderEntityProvider><Navigate to="/kunder/kundeliste" replace /></KunderEntityProvider></AppAccessGuard></Shell>} />

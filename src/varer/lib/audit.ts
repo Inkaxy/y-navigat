@@ -8,6 +8,7 @@ export type AuditAction =
   | "pause"
   | "activate"
   | "discontinue"
+  | "ai_declaration_imported"
   | "price_adjusted"
   | "cake_role_changed"
   | "cake_step_products_added"

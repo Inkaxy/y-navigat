@@ -450,7 +450,7 @@ export default function ProductDetail() {
           />
         )}
         {tab === "varedetaljer" && (
-          <VaredetaljerTab canWrite={canWrite} keywords={keywords} onKeywordsChange={setKeywords} />
+          <VaredetaljerTab canWrite={canWrite} keywords={keywords} onKeywordsChange={setKeywords} productId={product.id} />
         )}
         {tab === "leveranse" && <LeveranseTab canWrite={canWrite} />}
         {tab === "pakke" && (
