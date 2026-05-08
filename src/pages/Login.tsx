@@ -70,7 +70,13 @@ export default function Login() {
     });
     setSubmitting(false);
     if (error) {
-      toast.error("Innlogging mislyktes", { description: error.message });
+      if (import.meta.env.DEV) {
+        // eslint-disable-next-line no-console
+        console.warn("[auth] sign-in failed:", error.message);
+      }
+      toast.error("Innlogging mislyktes", {
+        description: "E-postadresse eller passord er feil.",
+      });
       return;
     }
     const target = resolveReturnTarget(params.get("return"));
