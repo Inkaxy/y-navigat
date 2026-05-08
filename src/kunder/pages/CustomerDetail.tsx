@@ -979,17 +979,7 @@ export default function CustomerDetail() {
 
           {/* TAB 5: HISTORIKK */}
           <TabsContent value="history" className="mt-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Historikk</CardTitle>
-                <CardDescription>Endringslogg, ordrer og fakturaer</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  Kommer i Fase C — venter på Ordre/Faktura-appene og full audit-visning.
-                </p>
-              </CardContent>
-            </Card>
+            <CustomerHistoryTab customerId={customer.id} legalEntityId={customer.legal_entity_id} />
           </TabsContent>
         </Tabs>
       </div>
