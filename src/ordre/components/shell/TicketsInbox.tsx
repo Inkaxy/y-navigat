@@ -1,10 +1,19 @@
 import { Link, useNavigate } from "react-router-dom";
-import { Inbox, Paperclip, ArrowRight, AlertCircle, User as UserIcon } from "lucide-react";
-import { useState } from "react";
-import { useTickets, useTicketCounts, type TicketStatus } from "@/ordre/hooks/useTickets";
+import {
+  Inbox, Paperclip, ArrowRight, AlertCircle, User as UserIcon,
+  Search, X, CheckCircle2, UserCheck, Filter,
+} from "lucide-react";
+import { useMemo, useState } from "react";
+import {
+  useTickets, useTicketCounts, useUpdateTicket,
+  type TicketStatus, type TicketPriority, type Ticket,
+} from "@/ordre/hooks/useTickets";
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/components/ui/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatRelative, initialsOf } from "@/ordre/lib/format";
 import { cn } from "@/lib/utils";
@@ -13,11 +22,7 @@ import { TicketQuickActions } from "./TicketQuickActions";
 type Tab = "open" | "new" | "mine" | "unassigned";
 
 const STATUS_LABEL: Record<TicketStatus, string> = {
-  new: "Ny",
-  in_progress: "Pågår",
-  resolved: "Løst",
-  closed: "Lukket",
-  spam: "Spam",
+  new: "Ny", in_progress: "Pågår", resolved: "Løst", closed: "Lukket", spam: "Spam",
 };
 
 const STATUS_TONE: Record<TicketStatus, string> = {
@@ -28,12 +33,24 @@ const STATUS_TONE: Record<TicketStatus, string> = {
   spam: "bg-destructive/10 text-destructive border-destructive/30",
 };
 
+const PRIO_LABEL: Record<TicketPriority, string> = {
+  low: "Lav", normal: "Normal", high: "Høy", urgent: "Haster",
+};
+
+const VISIBLE_LIMIT = 8;
+
 export function TicketsInbox() {
   const [tab, setTab] = useState<Tab>("open");
+  const [search, setSearch] = useState("");
+  const [priorities, setPriorities] = useState<TicketPriority[]>([]);
+  const [showAll, setShowAll] = useState(false);
   const { data: counts } = useTicketCounts();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const update = useUpdateTicket();
 
-  const filter =
+  const baseFilter =
     tab === "new"
       ? { status: ["new"] as TicketStatus[] }
       : tab === "mine"
@@ -42,8 +59,31 @@ export function TicketsInbox() {
           ? { assigned: "unassigned" as const, status: ["new", "in_progress"] as TicketStatus[] }
           : { status: ["new", "in_progress"] as TicketStatus[] };
 
-  const { data: tickets = [], isLoading } = useTickets(filter);
-  const visible = tickets.slice(0, 8);
+  const { data: tickets = [], isLoading } = useTickets({
+    ...baseFilter,
+    search: search.trim() || undefined,
+    priority: priorities.length ? priorities : undefined,
+  });
+
+  const visible = useMemo(
+    () => (showAll ? tickets : tickets.slice(0, VISIBLE_LIMIT)),
+    [tickets, showAll],
+  );
+
+  const togglePrio = (p: TicketPriority) =>
+    setPriorities((prev) => (prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]));
+
+  const clearFilters = () => { setSearch(""); setPriorities([]); };
+  const hasFilters = search.trim().length > 0 || priorities.length > 0;
+
+  const quickPatch = (t: Ticket, patch: Partial<Ticket>, msg: string) =>
+    update.mutate({ id: t.id, patch }, {
+      onSuccess: () => toast({ title: msg }),
+      onError: (e) => toast({
+        title: "Feilet", description: e instanceof Error ? e.message : String(e),
+        variant: "destructive",
+      }),
+    });
 
   const tabs: { key: Tab; label: string; count?: number }[] = [
     { key: "open", label: "Åpne", count: (counts?.newCount ?? 0) + (counts?.inProgressCount ?? 0) },
@@ -54,7 +94,7 @@ export function TicketsInbox() {
 
   return (
     <Card className="border-primary/30">
-      <CardHeader className="flex flex-row items-center justify-between gap-4 pb-3">
+      <CardHeader className="flex flex-col gap-3 pb-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <span className="flex h-9 w-9 items-center justify-center rounded-md bg-primary/12 text-primary">
             <Inbox className="h-4 w-4" />
@@ -66,12 +106,33 @@ export function TicketsInbox() {
             </p>
           </div>
         </div>
-        <Button asChild size="sm" variant="outline" className="gap-1.5">
-          <Link to="/ordre/ticket">
-            Vis alle
-            <ArrowRight className="h-3.5 w-3.5" />
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <div className="relative w-full sm:w-64">
+            <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Søk emne, avsender, innhold …"
+              className="h-8 pl-7 pr-7 text-caption"
+            />
+            {search && (
+              <button
+                type="button"
+                aria-label="Tøm søk"
+                onClick={() => setSearch("")}
+                className="absolute right-1 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </div>
+          <Button asChild size="sm" variant="outline" className="gap-1.5">
+            <Link to="/ordre/ticket">
+              Vis alle
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="space-y-3">
         {/* Tabs */}
@@ -103,6 +164,40 @@ export function TicketsInbox() {
           ))}
         </div>
 
+        {/* Filter-rad: prioritet + clear */}
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+            <Filter className="h-3 w-3" /> Prioritet
+          </span>
+          {(Object.keys(PRIO_LABEL) as TicketPriority[]).map((p) => {
+            const active = priorities.includes(p);
+            return (
+              <button
+                key={p}
+                type="button"
+                onClick={() => togglePrio(p)}
+                className={cn(
+                  "rounded-full border px-2 py-0.5 text-[10px] font-medium transition-colors",
+                  active
+                    ? "border-primary/50 bg-primary/12 text-primary"
+                    : "border-border bg-background text-muted-foreground hover:border-primary/30 hover:text-foreground",
+                )}
+              >
+                {PRIO_LABEL[p]}
+              </button>
+            );
+          })}
+          {hasFilters && (
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="ml-auto inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground"
+            >
+              <X className="h-3 w-3" /> Fjern filtre
+            </button>
+          )}
+        </div>
+
         {/* List */}
         {isLoading ? (
           <div className="space-y-2">
@@ -113,12 +208,20 @@ export function TicketsInbox() {
         ) : visible.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-2 rounded-md border border-dashed border-border py-10 text-center">
             <Inbox className="h-6 w-6 text-muted-foreground" />
-            <p className="text-body text-muted-foreground">Ingen tickets her</p>
+            <p className="text-body text-muted-foreground">
+              {hasFilters ? "Ingen tickets matcher filtrene." : "Ingen tickets her"}
+            </p>
+            {hasFilters && (
+              <Button size="sm" variant="ghost" onClick={clearFilters}>
+                Fjern filtre
+              </Button>
+            )}
           </div>
         ) : (
           <ul className="divide-y divide-border rounded-md border border-border bg-background">
             {visible.map((t) => {
               const isUrgent = t.priority === "urgent" || t.priority === "high";
+              const isMine = !!user?.id && t.assigned_to === user.id;
               return (
                 <li key={t.id}>
                   <div
@@ -158,7 +261,7 @@ export function TicketsInbox() {
                           {t.body_preview}
                         </p>
                       )}
-                      <div className="mt-1 flex items-center gap-1.5">
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5">
                         <Badge variant="outline" className={cn("text-[10px]", STATUS_TONE[t.status])}>
                           {STATUS_LABEL[t.status]}
                         </Badge>
@@ -171,7 +274,11 @@ export function TicketsInbox() {
                             {t.priority === "urgent" ? "Haster" : "Høy"}
                           </Badge>
                         )}
-                        {t.assigned_to ? (
+                        {isMine ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-primary/12 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                            <UserIcon className="h-2.5 w-2.5" /> Min
+                          </span>
+                        ) : t.assigned_to ? (
                           <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
                             <UserIcon className="h-2.5 w-2.5" /> Tildelt
                           </span>
@@ -183,7 +290,38 @@ export function TicketsInbox() {
                         )}
                       </div>
                     </div>
-                    <div className="ml-2 flex-shrink-0 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+                    <div
+                      className="ml-2 flex flex-shrink-0 items-center gap-1"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {!isMine && user?.id && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 px-2 text-[10px] text-muted-foreground hover:text-primary"
+                          title="Tildel meg"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            quickPatch(t, { assigned_to: user.id }, "Tildelt deg");
+                          }}
+                        >
+                          <UserCheck className="mr-1 h-3 w-3" /> Meg
+                        </Button>
+                      )}
+                      {t.status !== "resolved" && t.status !== "closed" && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 px-2 text-[10px] text-muted-foreground hover:text-[hsl(var(--alert-success))]"
+                          title="Marker som løst"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            quickPatch(t, { status: "resolved" }, "Markert som løst");
+                          }}
+                        >
+                          <CheckCircle2 className="mr-1 h-3 w-3" /> Løst
+                        </Button>
+                      )}
                       <TicketQuickActions ticket={t} />
                     </div>
                   </div>
@@ -193,15 +331,30 @@ export function TicketsInbox() {
           </ul>
         )}
 
-        {tickets.length > visible.length && (
+        {tickets.length > VISIBLE_LIMIT && !showAll && (
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-caption text-muted-foreground">
+              Viser {VISIBLE_LIMIT} av {tickets.length}
+            </span>
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="ghost" onClick={() => setShowAll(true)}>
+                Vis alle ({tickets.length})
+              </Button>
+              <Link
+                to="/ordre/ticket"
+                className="inline-flex items-center gap-1 text-caption text-primary hover:underline"
+              >
+                Åpne fullside
+                <ArrowRight className="h-3 w-3" />
+              </Link>
+            </div>
+          </div>
+        )}
+        {showAll && tickets.length > VISIBLE_LIMIT && (
           <div className="text-right">
-            <Link
-              to="/ordre/ticket"
-              className="inline-flex items-center gap-1 text-caption text-primary hover:underline"
-            >
-              +{tickets.length - visible.length} flere
-              <ArrowRight className="h-3 w-3" />
-            </Link>
+            <Button size="sm" variant="ghost" onClick={() => setShowAll(false)}>
+              Vis færre
+            </Button>
           </div>
         )}
       </CardContent>
