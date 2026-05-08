@@ -21,6 +21,7 @@ import { SendTestEmailDialog } from "@/ordre/components/shell/SendTestEmailDialo
 import { EmailReceiveCard } from "@/ordre/components/shell/EmailReceiveCard";
 import { supabase } from "@/integrations/supabase/client";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { RichTextEditor, type RichTextEditorHandle } from "@/ordre/components/shell/RichTextEditor";
 
 import { useToast } from "@/components/ui/use-toast";
 
@@ -213,7 +214,7 @@ function TemplateEditorCard() {
   const [textDraft, setTextDraft] = useState("");
   const [newDialogOpen, setNewDialogOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const bodyRef = useRef<HTMLTextAreaElement>(null);
+  const bodyEditorRef = useRef<RichTextEditorHandle>(null);
   const textRef = useRef<HTMLTextAreaElement>(null);
   const subjectRef = useRef<HTMLInputElement>(null);
   const lastFocusedRef = useRef<"subject" | "body" | "text">("body");
@@ -278,15 +279,7 @@ function TemplateEditorCard() {
         el?.setSelectionRange(start + token.length, start + token.length);
       });
     } else {
-      const el = bodyRef.current;
-      const start = el?.selectionStart ?? bodyDraft.length;
-      const end = el?.selectionEnd ?? bodyDraft.length;
-      const next = bodyDraft.slice(0, start) + token + bodyDraft.slice(end);
-      setBodyDraft(next);
-      requestAnimationFrame(() => {
-        el?.focus();
-        el?.setSelectionRange(start + token.length, start + token.length);
-      });
+      bodyEditorRef.current?.insertText(token);
     }
   };
 
@@ -422,21 +415,17 @@ function TemplateEditorCard() {
                     <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_240px]">
                       <div className="space-y-1.5">
                         <div className="flex items-center justify-between">
-                          <Label htmlFor="body" className="text-xs font-medium">
-                            HTML-innhold
-                          </Label>
+                          <Label className="text-xs font-medium">Innhold</Label>
                           <span className="text-[10px] text-muted-foreground">
-                            Støtter HTML — bruk &lt;p&gt;, &lt;strong&gt;, &lt;a&gt; osv.
+                            Bruk verktøylinjen — som i Word.
                           </span>
                         </div>
-                        <Textarea
-                          id="body"
-                          ref={bodyRef}
+                        <RichTextEditor
+                          ref={bodyEditorRef}
                           value={bodyDraft}
-                          onChange={(e) => setBodyDraft(e.target.value)}
+                          onChange={setBodyDraft}
                           onFocus={() => (lastFocusedRef.current = "body")}
-                          rows={14}
-                          className="font-mono text-xs leading-relaxed"
+                          placeholder="Skriv e-postinnholdet her…"
                         />
                       </div>
 
