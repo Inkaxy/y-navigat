@@ -240,6 +240,8 @@ export default function ProfileDetail() {
       send_to_pos_system: !!profile.send_to_pos_system,
       order_confirmation_mode: profile.order_confirmation_mode ?? "",
       order_confirmation_emails: profile.order_confirmation_emails ?? "",
+      packing_slip_delivery_mode: (profile as any).packing_slip_delivery_mode ?? "none",
+      packing_slip_emails: (profile as any).packing_slip_emails ?? "",
       expects_order_monday: !!profile.expects_order_monday,
       expects_order_tuesday: !!profile.expects_order_tuesday,
       expects_order_wednesday: !!profile.expects_order_wednesday,
