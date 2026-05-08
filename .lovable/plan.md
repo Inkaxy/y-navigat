@@ -1,103 +1,107 @@
-# Ordre — visuell redesign (kun utseende)
+# Plan: PDF-deklarasjon + bilder + egen AI-konfig
 
-Mål: Gi ordre-appen et varmt, håndverksbasert "Nøtterø Bakeri"-uttrykk inspirert av emballasje, etiketter og papirposer. **Ingen funksjonell endring** — alle knapper, felt, filtre, menyer, statuser, kolonner, handlinger og data­visning forblir identisk. Kun layout, kort, spacing, typografi, rammer, ikoner og overflater endres.
+## Oversikt
 
-## Designspråk (anvendelse av eksisterende brand-tokens)
+Tre sammenhengende deler:
+1. **Bildeopplasting pr vare** (utvider `products.image_url`)
+2. **PDF-tolking av deklarasjon/næring** med AI → forhåndsvisning → godkjenning → lagres som manuell overstyring på produktet (`product_recipe_links.manual_*`)
+3. **Egen AI-konfig** under Varer-innstillinger (provider + modell + secret), med Lovable AI som default
 
-Bruker tokens som allerede finnes i `index.css` / `tailwind.config.ts` — ingen nye farger:
+## Del 1 — Bilde pr vare
 
-- **Canvas**: `--surface-canvas` (papir-cream) med eksisterende subtil prikket papir-tekstur (allerede aktiv på `body`).
-- **Kort/paneler** = "papirlapper": `--surface-raised`, `rounded-[14px]`, tynn `--brand-bronze/20` border + indre `--brand-cream/40` ring (allerede definert i `Card`).
-- **Eyebrows / labels** = etikett-aktige: utility-klassen `.label-rule` (bronze, uppercase, 0.24em letter-spacing, tynne sidelinjer) og `.eyebrow` for mindre seksjonstitler.
-- **Overskrifter**: `font-display` (Fraunces) for sidetittel + dialog-titler; `Inter` 600 for tabell-headers og knapper (uendret).
-- **Stempel-frame**: `.stamp-frame` på status-badges og dato-tabs der det gir mening (subtil dobbel-ring som ligner et stempel-aftrykk).
-- **Diamond-mønster**: `.pattern-diamond-soft` som veldig svak bakgrunn på utvalgte tomme tilstander / sticky-headers.
-- **Skygger**: `shadow-card` / `shadow-elevated` (varme, organiske) i stedet for harde grå skygger.
-- **Eksisterende app-farger og status-farger beholdes 1:1** (gul = fastordre, lilla = retur, blå = pakkseddel, rød = destructive, grønn = success). Disse brukes som fyll/aksent som i dag.
+**Storage**
+- Ny public bucket `product-images` (RLS: alle kan lese, kun innloggede kan skrive til `<product_id>/...`)
 
-## Berørte filer (kun presentasjon)
+**UI**
+- Nytt kort "Bilde" i `VaredetaljerTab.tsx`:
+  - Drag-and-drop / fil-velger (jpg/png/webp, max 5 MB)
+  - Forhåndsvisning av nåværende `image_url`
+  - "Erstatt"-knapp / "Fjern bilde"
+- Ved opplasting: upload til `product-images/<product_id>/<timestamp>.<ext>` → `getPublicUrl` → `update products set image_url = ...`
 
-```text
-src/ordre/components/shell/PageHeader.tsx       — etikett-stil header
-src/ordre/components/shell/AppBanner.tsx        — wrapper, ingen API-endring
-src/ordre/components/shell/DateContextChips.tsx — chips som "tape-tabs"
-src/ordre/components/orders/StatusBadge.tsx     — stempel-look
-src/ordre/components/ui/status-pill.tsx         — papir-pill med tynn ring
-src/ordre/pages/Dashboard.tsx                   — kort som "etikettpaneler"
-src/ordre/pages/OrdersList.tsx                  — listrader som papir-strimler
-src/ordre/pages/OrderDetail.tsx                 — seksjoner som "pakkseddel-paneler"
-src/ordre/pages/Leveringskalender.tsx           — matrise: header som etikett-strip,
-                                                   kolonne-ikoner i tape-rad,
-                                                   sticky "Handling"-pille
-src/ordre/pages/NewOrder.tsx                    — handlekurv-panel + linjer
-src/ordre/pages/DeliveryNoteDashboard.tsx       — runde-kort som "stempel-kort"
-src/ordre/pages/DeliveryNoteDetail.tsx          — pakkseddel som faktisk seddel
-src/ordre/pages/RecurringOrders.tsx             — kort-grid med etikett-feel
-src/ordre/pages/Tours.tsx, DeliveryRules.tsx,
-  CustomerOrders.tsx, DeliveryNotesList.tsx,
-  DeliveryNoteCorrections.tsx,
-  DeliveryNoteSettings.tsx                      — samme språk konsistent
-src/ordre/components/orders/CustomerOrderModal.tsx,
-  MerknadDialog.tsx, ChangeTourDialog.tsx, m.fl. — dialog-shell-stil
-src/ordre/components/orders/matrix/*.tsx        — kolonne-ikoner, dialoger
-```
+## Del 2 — PDF-deklarasjon med AI
 
-Ingen DB-endringer. Ingen hooks-endringer. Ingen RPC-endringer. Ingen routing-endringer.
+**Storage**
+- Ny bucket `declaration-uploads` (privat, brukes kun midlertidig under tolkning)
 
-## Konkret per side
+**Edge function: `parse-declaration-pdf`**
+- Input: `{ product_id, file_path }` (storage-path til opplastet PDF)
+- Henter PDF fra Storage med service-role
+- Leser AI-konfig fra `platform_settings` (category=`varer_ai`, key=`provider_config`)
+- Velger endpoint:
+  - `lovable` → `https://ai.gateway.lovable.dev/v1/chat/completions` med `LOVABLE_API_KEY`
+  - `openai` → `https://api.openai.com/v1/chat/completions` med `CUSTOM_AI_API_KEY`
+  - `anthropic` → Anthropic-API
+  - `custom` → bruker `base_url` fra config
+- Sender PDF som base64 + tool-call schema for strukturert output:
+  ```
+  { ingredient_declaration: string,
+    nutrition_per_100g: { energy_kj, energy_kcal, fat_g, saturated_fat_g, carbs_g, sugars_g, fiber_g, protein_g, salt_g },
+    allergens_contains: string[],
+    allergens_may_contain: string[],
+    confidence: { ingredient: number, nutrition: number, allergens: number },
+    notes: string }
+  ```
+- Default modell: `google/gemini-2.5-pro` (best multimodal for tabeller)
+- Returnerer parsed JSON + confidence-scores
 
-**Leveringskalender (matrise) — hovedjobb**
-- Topbar (Kunde + Ordre fra dato + dager + turer + retur + Ny ordre + Handling) pakkes inn i et "papir-panel" med tynn bronze-border + indre cream-ring og soft skygge — samme felter, samme rekkefølge.
-- "Lagre / Avbryt" sentrert som i dag, men knappene får eksisterende `brand`/`outline`-varianter med en hårfin bronze-aksent under aktiv hover.
-- Kolonne-headers blir til "etikett-strips": dato + ukedag i `font-display`, bronze-divider over, dagens kolonne får en bronze underline i stedet for gul fyll (gul fyll beholdes som "har ordre"-indikator nederst i header).
-- Ikon-raden (Copy / Comment / Delete / Pakkseddel) får mer luft, hover-tint i bronze, og tooltips med ink-bg.
-- Tabellrader: alternerende `--surface-raised` / `--surface-canvas` med 1px `--border-subtle` — føles som papir-linjer, ikke admin-grid.
-- "Vis sammendrag" / "Vis hele varenavn" / "Skjul erstattede" (gear-meny) får dropdown med ink-bg + cream tekst som per memory.
-- Vær-ikoner beholdes uendret men temperaturen settes i `font-display`.
-- Sticky "Handling"-knapp og "Ny ordre" beholder fargene (grønn brand-CTA fra dagens stil bevares — disse er funksjonelle signaler), men får rounded-[10px], shadow-card og bronze focus-ring.
-- Dato-chips ("i dag / fra i morgen / denne uken / neste uke") får `.label-rule`-typografi.
+**UI — ny seksjon i `DeclarationTab.tsx`**
+- Knapp "Last opp PDF for AI-tolking" (over modus-velger)
+- Klikk → Dialog:
+  1. Drag-and-drop PDF
+  2. "Tolker …" spinner mens edge function kjører
+  3. Forhåndsvisning av AI-resultat (3 kolonner: Ingrediens / Næring / Allergener) med confidence-badges
+  4. Side-ved-side: "Nåværende verdi" vs "AI-forslag"
+  5. Brukeren kan redigere felter inline før godkjenning
+  6. Knapper: "Avbryt" / "Godkjenn og lagre"
+- Ved godkjenning:
+  - Set `declaration_mode = 'manual'` på `product_recipe_links`
+  - Skriv `manual_ingredient_declaration`, `manual_nutrition`, `manual_allergen_summary`
+  - Logg til `audit_log` (action: `ai_declaration_imported`, source-PDF-path som metadata)
+  - Slett midlertidig PDF fra `declaration-uploads`
+  - Toast + invalidate queries
 
-**NewOrder / OrderDetail**
-- Handlekurv-tittel "Ordre for {kunde} ({nr})" får `font-display` + lite bronze cart-emblem.
-- "Lørdag 09.05.2026 - tur 1 (ekstra)" formes som en stempel-rad: tynn dobbeltlinje (stamp-frame) + dato i `font-display`.
-- "Ny ordrelinje"-input får cream-bg, bronze focus-ring.
-- Pris-summering får etikett-look: `.eyebrow` over "Pris ordre", verdier i `font-display tabular-nums`.
-- "Slett / Lag pakkseddel / Kopiere ordren" beholder fargene (rød/gul/outline) — samme `Button`-varianter som i dag.
+## Del 3 — Egen AI-konfig under innstillinger
 
-**Dashboard / DeliveryNoteDashboard**
-- "FASTORDRE / DATERTE / RETUR / PAKKSEDLER"-kortene beholder farger 1:1 men får `stamp-frame`-ring, `font-display` tall og `.eyebrow` for label.
-- Info-bånd ("Hovedkjøring er kjørt for turer: 1, 2, 3", "Leveransepauser ...") blir cream-tape med bronze-ramme i stedet for blå/grønn rektangel — fargene beholdes som tynn venstre-bord (color-strip).
+**DB**
+- Bruker eksisterende `platform_settings`-tabell
+- Ny rad: `category='varer_ai'`, `key='provider_config'`, `value = { provider, model, base_url? }`
 
-**Pakkseddel-detalj**
-- Ligner en faktisk seddel: cream-papirlap med bronze stempel-ring rundt tittel, monospace-aktig tall-kolonne, tynne stiplede linjer mellom rader.
+**Secrets**
+- `CUSTOM_AI_API_KEY` (legges til via secrets-tool når bruker velger noe annet enn `lovable`)
 
-**Lister (OrdersList, RecurringOrders, CustomerOrders, DeliveryNotesList, Tours, DeliveryRules)**
-- Toolbar over listen samles i et papir-panel.
-- Rader får mer vertikal luft, kundenavn i `font-display`, sekundærdata i `text-muted-foreground tabular-nums`.
-- Status-badges via felles `StatusBadge`/`StatusPill` får stamp-look (tynn ring + uppercase 10px letter-spaced label) — fargene styres fortsatt av dagens token-mapping.
+**UI — ny side `/varer/innstillinger/ai`** (eller kort på eksisterende side)
+- Kort "AI for PDF-tolking":
+  - Select: provider (`Lovable AI (default)`, `OpenAI`, `Anthropic`, `Annet (kompatibel API)`)
+  - Input: modell (free text, med eksempler basert på provider)
+  - Input: base_url (kun synlig for `Annet`)
+  - Hvis ikke `Lovable`: knapp "Sett API-nøkkel" → trigger `add_secret` for `CUSTOM_AI_API_KEY`
+  - "Lagre"-knapp
+  - Status: viser om secret er konfigurert eller mangler
+- Default ved ny installasjon: `{ provider: 'lovable', model: 'google/gemini-2.5-pro' }`
 
-**Dialoger (Ordreinfo, Merknad, Pris-regulering, Endre tur, Slett, m.fl.)**
-- Dialog-header: `font-display` tittel, `.label-rule` evt. underrubrikk.
-- Tabellaktige innhold (Pris-regulering / Reguler fastordre): rader med papir-linjer, input-felt med cream-bg + bronze focus.
-- Bekreft-knapp = `brand` (bronze), avbryt = `outline`.
+## Tekniske detaljer
 
-## Teknisk
+**Migrations**
+1. Opprett buckets `product-images` (public) og `declaration-uploads` (private) + RLS-policies
+2. Ingen schema-endringer på `products` eller `product_recipe_links` — alt finnes allerede
 
-- Kun klasser, små JSX-wrappers og typografi-bytter. Ingen logikk-endringer, ingen prop-API-endringer, ingen nye avhengigheter.
-- All farge går via tokens (`bg-card`, `bg-background`, `text-foreground`, `border-border`, `text-primary`, `bg-warning`, osv.) — ingen hardkodede HEX/HSL.
-- Knapp-varianter beholdes (`default` = app-primary, `brand`, `destructive`, `outline`, `secondary`, `ghost`).
-- Status-tokens i `orderStatus.ts` og `deliveryNoteStatus.ts` røres ikke — bare `StatusPill`-rendringen pyntes.
-- Ingen endringer i `index.css` eller `tailwind.config.ts` utover evt. én ny utility (`paper-row` for alternerende stripe) hvis nødvendig.
+**Edge functions**
+- `parse-declaration-pdf` (ny, `verify_jwt = true`)
 
-## Out of scope
+**Filer som endres/opprettes**
+- ny: `supabase/functions/parse-declaration-pdf/index.ts`
+- ny: `src/varer/components/products/PdfDeclarationImportDialog.tsx`
+- ny: `src/varer/components/products/ProductImageUpload.tsx`
+- ny: `src/varer/pages/settings/SettingsAI.tsx` + route
+- endret: `src/varer/components/products/DeclarationTab.tsx` (legg til import-knapp)
+- endret: `src/varer/components/products/detail/tabs/VaredetaljerTab.tsx` (legg til bilde-kort)
+- endret: `src/varer/pages/settings/SettingsLayout.tsx` (ny menypunkt "AI")
+- endret: `src/App.tsx` eller varer-routes (ny route)
 
-- Mobil-redesign (kommer som egen fase).
-- Logikk, RPC, hooks, ruter, data, beregninger, tilstand — uendret.
-- Ingen endring av app-farger eller status-farger.
-- Ingen AI / nye features.
+## Avgrensninger (ikke i scope nå)
 
-## Verifikasjon
-
-- Visuell sjekk i preview på 1434×1097 av: Leveringskalender, NewOrder, OrderDetail, Dashboard, DeliveryNoteDashboard, OrdersList, RecurringOrders, en pakkseddel, en ordreinfo-dialog, og pris-regulerings-dialog.
-- Bekreftelse at alle eksisterende knapper/felt/menyer fortsatt finnes på samme sted med samme labels.
-- Spot-check at dark-mode fortsatt fungerer (UserMenu-toggle).
+- Galleri / flere bilder pr vare (kan utvides senere ved behov)
+- Bulk-import av flere PDF-er
+- Auto-OCR av skannede bilder (PDFs forutsettes maskingenererte; AI håndterer enkel OCR via multimodal)
+- Versjonering/historikk av tidligere AI-importer (kun audit_log-innslag)
