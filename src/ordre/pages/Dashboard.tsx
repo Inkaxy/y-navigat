@@ -32,7 +32,7 @@ export default function Dashboard() {
   const { data: ctxStats, isLoading: ctxLoading } = useDeliveryDayStats(contextDate);
   const { data: tomStats, isLoading: tomLoading } = useDeliveryDayStats(tom);
   const { data: queue, isLoading: queueLoading } = useActionQueueCounts();
-  const { data: tCounts } = useTicketCounts();
+  
 
   const countOf = (status: string) => counts?.find((c) => c.status === status)?.count ?? 0;
   const ctxCountOf = (status: string) =>
