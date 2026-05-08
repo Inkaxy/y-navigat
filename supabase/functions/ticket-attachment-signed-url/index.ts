@@ -17,8 +17,8 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_ANON_KEY")!,
       { global: { headers: { Authorization: authHeader } } },
     );
-    const { data: claims } = await userClient.auth.getClaims(authHeader.replace("Bearer ", ""));
-    if (!claims?.claims) return json({ error: "Unauthorized" }, 401);
+    const { data: { user } } = await userClient.auth.getUser();
+    if (!user) return json({ error: "Unauthorized" }, 401);
 
     const { attachment_id } = await req.json();
     if (!attachment_id) return json({ error: "attachment_id påkrevd" }, 400);
