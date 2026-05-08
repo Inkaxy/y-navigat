@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import * as Icons from "lucide-react";
 import { Check, ChevronDown, Search, Box } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -12,6 +12,7 @@ import {
   getCategoryLabel,
   type AccessibleApp,
 } from "@/hooks/useAccessibleApps";
+import { getAppInternalRoute } from "@/lib/appRoutes";
 
 // ----------------------------------------------------------------------------
 // PER-APP CONFIG — change ONLY this when copying to another app.
@@ -19,17 +20,6 @@ import {
 const CURRENT_APP_SLUG = "nbhub";
 const SHOW_ALL_APPS_LINK = true; // keep true only in NBHub
 const FALLBACK_COLOR = "#64748b";
-// Apps som bor i samme React-app (samme host) → naviger internt uansett deploy_url.
-const INTERNAL_ROUTES: Record<string, string> = {
-  nbhub: "/",
-  nbos: "/admin",
-  varer: "/varer",
-  kunder: "/kunder",
-  ravarer: "/ravarer/vareliste",
-  
-  ordre: "/ordre",
-  produksjon: "/produksjon",
-};
 // ----------------------------------------------------------------------------
 
 const iconMap = Icons as unknown as Record<string, React.ComponentType<{ className?: string }>>;
