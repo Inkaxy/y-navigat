@@ -116,10 +116,10 @@ export function CommandPalette({ open, onOpenChange }: Props) {
                   </PaletteItem>
                 );
               })}
-              {apps?.filter((a) => a.slug !== CURRENT_APP_SLUG).map((app) => (
+              {apps?.filter((a) => a.slug !== CURRENT_APP_SLUG && getAppInternalRoute(a.slug)).map((app) => (
                 <PaletteItem
                   key={app.id}
-                  onSelect={() => handleAppSwitch(app.deploy_url, app.start_path)}
+                  onSelect={() => handleAppSwitch(app.slug)}
                   value={`app ${app.display_name}`}
                 >
                   <ExternalLink className="h-4 w-4 opacity-70" />
