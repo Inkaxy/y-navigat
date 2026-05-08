@@ -684,12 +684,6 @@ export default function ProfileDetail() {
                       ]}
                     />
                   </Field>
-                  <Field label="Kopier faktura til e-post">
-                    <Input
-                      {...form.register("copy_invoice_to_email")}
-                      disabled={!canWrite}
-                    />
-                  </Field>
                   <CheckboxField
                     label="Hopp over leveringsnavn på regnskapskostnad"
                     checked={form.watch("skip_delivery_name_in_accounting_cost")}
