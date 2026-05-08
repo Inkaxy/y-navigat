@@ -9,6 +9,7 @@ import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { AppShell } from "@/components/layout/AppShell";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
+import AcceptInvite from "./pages/auth/AcceptInvite";
 import Hjem from "./pages/Hjem";
 
 import MinProfil from "./pages/MinProfil";
@@ -162,6 +163,7 @@ const App = () => (
           <AuthProvider>
             <Routes>
               <Route path="/login" element={<Login />} />
+              <Route path="/auth/accept-invite" element={<AcceptInvite />} />
               <Route path="/" element={<Index />} />
               <Route path="/hjem" element={<Navigate to="/" replace />} />
               <Route path="/mine-apper" element={<Navigate to="/" replace />} />
