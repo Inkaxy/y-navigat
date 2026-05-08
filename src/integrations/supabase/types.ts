@@ -7673,6 +7673,7 @@ export type Database = {
         Returns: Json
       }
       is_platform_admin: { Args: never; Returns: boolean }
+      is_platform_owner: { Args: { _user_id: string }; Returns: boolean }
       is_ravarer_owner: { Args: { _user_id: string }; Returns: boolean }
       list_active_cake_categories: {
         Args: { p_legal_entity_id: string }
