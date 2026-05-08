@@ -114,9 +114,65 @@ Deno.serve(async (req) => {
     const results: AnyRec[] = [];
 
     for (const line of allLines) {
-      // Skip lines already manually resolved
-      if (["manual", "not_applicable"].includes(line.match_confidence)) {
+      // Skip not_applicable lines fully
+      if (line.match_confidence === "not_applicable") {
         results.push({ id: line.id, skipped: true });
+        continue;
+      }
+
+      // For manually matched lines: keep the match, but recompute price/variance + normalized unit only
+      if (line.match_confidence === "manual" && line.raw_material_id) {
+        const manualUpdate: AnyRec = {};
+        const normalizedUnitM = normalizeUnit(line.unit);
+        if (normalizedUnitM && normalizedUnitM !== line.unit) manualUpdate.unit = normalizedUnitM;
+
+        const rm = rmById.get(line.raw_material_id);
+        const rmsRow = rmsList.find((r: AnyRec) => r.raw_material_id === line.raw_material_id && r.supplier_id === inv.supplier_id);
+        const expected = rmsRow?.agreed_price_per_base_unit != null ? Number(rmsRow.agreed_price_per_base_unit) : null;
+
+        let actual: number | null = null;
+        if (line.unit_price != null && rm?.base_unit) {
+          const conv = quantityToBase({
+            quantity: 1,
+            unit: line.unit,
+            description: line.description,
+            baseUnit: rm.base_unit,
+            rmsPackageSize: rmsRow?.package_size ?? null,
+            rmsPackageUnit: rmsRow?.package_unit ?? null,
+            linePackageSize: (line as any).package_size ?? null,
+            linePackageUnit: (line as any).package_unit ?? null,
+          });
+          if (conv && conv.factor !== 0) actual = Number(line.unit_price) / conv.factor;
+        }
+        manualUpdate.price_per_base_unit = actual;
+        manualUpdate.expected_price_per_base_unit = expected;
+
+        const reviewReasons = new Set<string>();
+        let requiresReview = false;
+        if (actual == null && isPackageUnit(normalizedUnitM) && rm?.base_unit) {
+          requiresReview = true;
+          reviewReasons.add("unknown_package_size");
+        }
+        if (expected != null && actual != null && expected !== 0) {
+          const variance = ((actual - expected) / expected) * 100;
+          manualUpdate.price_variance_pct = Number(variance.toFixed(3));
+          const tol = catTolMap.get(rm?.category ?? "") ?? tolDefault;
+          if (Math.abs(variance) <= tol) {
+            manualUpdate.variance_status = "within_tolerance";
+          } else {
+            manualUpdate.variance_status = "over_tolerance";
+            requiresReview = true;
+            reviewReasons.add("price_variance");
+          }
+        } else {
+          manualUpdate.variance_status = expected == null ? "no_baseline" : "no_baseline";
+          manualUpdate.price_variance_pct = null;
+        }
+        manualUpdate.requires_review = requiresReview;
+        manualUpdate.review_reason = reviewReasons.size ? Array.from(reviewReasons).join(",") : null;
+
+        await applyUpdate(svc, line.id, manualUpdate);
+        results.push({ id: line.id, status: "manual", recomputed: true });
         continue;
       }
 
