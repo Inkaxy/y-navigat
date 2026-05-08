@@ -14,7 +14,9 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useQueryClient } from "@tanstack/react-query";
+import { useIsPlatformOwner } from "@/hooks/useIsPlatformOwner";
+import { InviteUserDialog } from "./components/InviteUserDialog";
 
 type Row = {
   id: string;
