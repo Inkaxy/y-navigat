@@ -10,7 +10,6 @@ import {
   
 } from "lucide-react";
 import { TicketsInbox } from "@/ordre/components/shell/TicketsInbox";
-import { OrderActionInbox } from "@/ordre/components/orders/OrderActionInbox";
 import { AppBanner } from "@/ordre/components/shell/AppBanner";
 import { DateContextChips } from "@/ordre/components/shell/DateContextChips";
 import { Button } from "@/components/ui/button";
@@ -164,16 +163,6 @@ export default function Dashboard() {
           </Card>
         </section>
 
-        {/* Tiltakskø — innboks med AI-forslag */}
-        <section>
-          <h2 className="mb-3 flex items-center gap-2 text-caption font-semibold uppercase tracking-wide text-muted-foreground">
-            Tiltaksinnboks
-            <span className="rounded-full bg-app/10 px-2 py-0.5 text-[10px] font-medium text-app">
-              AI-assistert
-            </span>
-          </h2>
-          <OrderActionInbox />
-        </section>
 
         {/* Tiltakskø — kompakte tellere */}
         <section>
