@@ -74,8 +74,8 @@
     --foreground:            var(--text-primary);
     --card:                  var(--surface-raised);
     --card-foreground:       var(--text-primary);
-    --popover:               var(--brand-ink);
-    --popover-foreground:    var(--brand-cream);
+    --popover:               var(--surface-raised);
+    --popover-foreground:    var(--text-primary);
     --primary:               var(--app-color);
     --primary-foreground:    var(--text-on-accent);
     --secondary:             var(--surface-sunken);
