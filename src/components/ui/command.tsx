@@ -13,7 +13,7 @@ const Command = React.forwardRef<
   <CommandPrimitive
     ref={ref}
     className={cn(
-      "flex h-full w-full flex-col overflow-hidden rounded-[12px] bg-brand-ink/95 backdrop-blur-xl text-brand-cream",
+      "flex h-full w-full flex-col overflow-hidden rounded-[12px] bg-popover text-popover-foreground",
       className,
     )}
     {...props}
@@ -39,12 +39,12 @@ const CommandInput = React.forwardRef<
   React.ElementRef<typeof CommandPrimitive.Input>,
   React.ComponentPropsWithoutRef<typeof CommandPrimitive.Input>
 >(({ className, ...props }, ref) => (
-  <div className="flex items-center border-b border-brand-cream/10 px-3" cmdk-input-wrapper="">
-    <Search className="mr-2 h-4 w-4 shrink-0 text-brand-cream/50" />
+  <div className="flex items-center border-b border-border px-3" cmdk-input-wrapper="">
+    <Search className="mr-2 h-4 w-4 shrink-0 text-popover-foreground/50" />
     <CommandPrimitive.Input
       ref={ref}
       className={cn(
-        "flex h-11 w-full rounded-md bg-transparent py-3 text-sm text-brand-cream outline-none placeholder:text-brand-cream/40 disabled:cursor-not-allowed disabled:opacity-50",
+        "flex h-11 w-full rounded-md bg-transparent py-3 text-sm text-popover-foreground outline-none placeholder:text-popover-foreground/40 disabled:cursor-not-allowed disabled:opacity-50",
         className,
       )}
       {...props}
@@ -81,7 +81,7 @@ const CommandGroup = React.forwardRef<
   <CommandPrimitive.Group
     ref={ref}
     className={cn(
-      "overflow-hidden p-1 text-brand-cream [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-[10px] [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-[0.08em] [&_[cmdk-group-heading]]:text-brand-cream/50",
+      "overflow-hidden p-1 text-popover-foreground [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-[10px] [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-[0.08em] [&_[cmdk-group-heading]]:text-popover-foreground/50",
       className,
     )}
     {...props}
@@ -94,7 +94,7 @@ const CommandSeparator = React.forwardRef<
   React.ElementRef<typeof CommandPrimitive.Separator>,
   React.ComponentPropsWithoutRef<typeof CommandPrimitive.Separator>
 >(({ className, ...props }, ref) => (
-  <CommandPrimitive.Separator ref={ref} className={cn("-mx-1 h-px bg-brand-cream/10", className)} {...props} />
+  <CommandPrimitive.Separator ref={ref} className={cn("-mx-1 h-px bg-border", className)} {...props} />
 ));
 CommandSeparator.displayName = CommandPrimitive.Separator.displayName;
 
@@ -105,7 +105,7 @@ const CommandItem = React.forwardRef<
   <CommandPrimitive.Item
     ref={ref}
     className={cn(
-      "relative flex cursor-default select-none items-center rounded-[8px] px-2.5 py-2 text-sm text-brand-cream outline-none transition-colors data-[disabled=true]:pointer-events-none data-[selected='true']:bg-brand-bronze/[0.18] data-[selected=true]:text-brand-cream data-[selected=true]:shadow-[inset_3px_0_0_0_hsl(var(--brand-bronze))] data-[disabled=true]:opacity-50",
+      "relative flex cursor-default select-none items-center rounded-[8px] px-2.5 py-2 text-sm text-popover-foreground outline-none transition-colors data-[disabled=true]:pointer-events-none data-[selected='true']:bg-brand-bronze/[0.18] data-[selected=true]:text-popover-foreground data-[selected=true]:shadow-[inset_3px_0_0_0_hsl(var(--brand-bronze))] data-[disabled=true]:opacity-50",
       className,
     )}
     {...props}
@@ -115,7 +115,7 @@ const CommandItem = React.forwardRef<
 CommandItem.displayName = CommandPrimitive.Item.displayName;
 
 const CommandShortcut = ({ className, ...props }: React.HTMLAttributes<HTMLSpanElement>) => {
-  return <span className={cn("ml-auto text-xs tracking-widest text-brand-cream/50", className)} {...props} />;
+  return <span className={cn("ml-auto text-xs tracking-widest text-popover-foreground/50", className)} {...props} />;
 };
 CommandShortcut.displayName = "CommandShortcut";
 
