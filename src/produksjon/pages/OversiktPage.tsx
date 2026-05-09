@@ -1,29 +1,18 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useLegalEntities } from "@/produksjon/features/produksjonsavdelinger/hooks/useLegalEntities";
 import { useProductionDepartments } from "@/produksjon/features/produksjonsavdelinger/hooks/useProductionDepartments";
 import { DepartmentCard } from "@/produksjon/features/oversikt/components/DepartmentCard";
 import { useOversiktRealtime } from "@/produksjon/features/oversikt/hooks/useDepartmentLabelStats";
+import { useSelection } from "@/providers/SelectionProvider";
 
 export default function OversiktPage() {
-  const { data: entities, isLoading: entitiesLoading } = useLegalEntities();
-  const [legalEntityId, setLegalEntityId] = useState<string>("");
-
-  useEffect(() => {
-    if (!legalEntityId && entities && entities.length > 0) {
-      setLegalEntityId(entities[0].id);
-    }
-  }, [entities, legalEntityId]);
+  const { legalEntityId: selectedLegalEntityId } = useSelection();
+  const legalEntityId = selectedLegalEntityId ?? "";
+  const { data: entities } = useLegalEntities();
 
   const { data: departments, isLoading: depsLoading } = useProductionDepartments(
     legalEntityId || undefined,
