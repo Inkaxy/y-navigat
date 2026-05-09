@@ -241,29 +241,8 @@ export default function EtiketterPage() {
         </div>
       </div>
 
-      {/* Selskap + filtre */}
+      {/* Filtre */}
       <div className="flex flex-wrap items-end gap-4">
-        <div className="space-y-1">
-          <p className="text-xs uppercase tracking-wide text-muted-foreground font-medium">
-            Selskap
-          </p>
-          {entitiesLoading ? (
-            <Skeleton className="h-10 w-56" />
-          ) : (
-            <Select value={legalEntityId} onValueChange={setLegalEntityId}>
-              <SelectTrigger className="w-56">
-                <SelectValue placeholder="Velg selskap" />
-              </SelectTrigger>
-              <SelectContent>
-                {entities?.map((e) => (
-                  <SelectItem key={e.id} value={e.id}>
-                    {e.legal_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-        </div>
 
         <div className="space-y-1">
           <p className="text-xs uppercase tracking-wide text-muted-foreground font-medium">
