@@ -6258,6 +6258,7 @@ export type Database = {
         Row: {
           agreed_price: number | null
           base_unit: string
+          categories: string[]
           category: string | null
           components_reviewed_at: string | null
           created_at: string
@@ -6285,6 +6286,7 @@ export type Database = {
         Insert: {
           agreed_price?: number | null
           base_unit: string
+          categories?: string[]
           category?: string | null
           components_reviewed_at?: string | null
           created_at?: string
@@ -6312,6 +6314,7 @@ export type Database = {
         Update: {
           agreed_price?: number | null
           base_unit?: string
+          categories?: string[]
           category?: string | null
           components_reviewed_at?: string | null
           created_at?: string
@@ -8417,6 +8420,7 @@ export type Database = {
         Returns: {
           agreed_price: number | null
           base_unit: string
+          categories: string[]
           category: string | null
           components_reviewed_at: string | null
           created_at: string

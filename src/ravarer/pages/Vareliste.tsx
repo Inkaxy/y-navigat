@@ -30,9 +30,14 @@ export default function VarelistePage() {
 
   const supplierMap = useMemo(() => new Map(suppliers.map(s => [s.id, s.name])), [suppliers]);
 
+  const allCatsOf = (r: typeof rows[number]) => {
+    const list = (r.categories ?? []) as string[];
+    return list.length > 0 ? list : (r.category ? [r.category] : []);
+  };
+
   const categories = useMemo(() => {
     const set = new Set<string>();
-    rows.forEach(r => r.category && set.add(r.category));
+    rows.forEach(r => allCatsOf(r).forEach(c => set.add(c)));
     return Array.from(set).sort();
   }, [rows]);
 
@@ -41,7 +46,7 @@ export default function VarelistePage() {
     const arr = rows.filter(r => {
       if (active === "active" && !r.is_active) return false;
       if (active === "inactive" && r.is_active) return false;
-      if (cat !== "all" && r.category !== cat) return false;
+      if (cat !== "all" && !allCatsOf(r).includes(cat)) return false;
       if (needle && !`${r.name} ${r.sku}`.toLowerCase().includes(needle)) return false;
       return true;
     });
@@ -137,7 +142,14 @@ export default function VarelistePage() {
                   >
                     <td className="px-4 py-3 font-mono text-xs">{r.sku}</td>
                     <td className="px-4 py-3 font-medium">{r.name}</td>
-                    <td className="px-4 py-3 text-ink-secondary">{r.category ?? "—"}</td>
+                    <td className="px-4 py-3 text-ink-secondary">
+                      {(() => {
+                        const cs = allCatsOf(r);
+                        if (cs.length === 0) return "—";
+                        if (cs.length === 1) return cs[0];
+                        return <span title={cs.join(", ")}>{cs[0]} <span className="text-xs">+{cs.length - 1}</span></span>;
+                      })()}
+                    </td>
                     <td className="px-4 py-3 text-ink-secondary">{r.primary_supplier_id ? supplierMap.get(r.primary_supplier_id) ?? "—" : "—"}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{formatNok(r.current_cost_price)} <span className="text-xs text-ink-secondary">/ {r.base_unit}</span></td>
                     <td className="px-4 py-3 text-right tabular-nums">

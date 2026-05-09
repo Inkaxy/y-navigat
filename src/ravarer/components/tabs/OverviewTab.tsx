@@ -29,6 +29,7 @@ export function OverviewTab({ rm }: Props) {
       name: draft.name,
       description: draft.description,
       category: draft.category,
+      categories: draft.categories ?? [],
       base_unit: draft.base_unit,
       package_size: draft.package_size,
       package_unit: draft.package_unit,
@@ -42,6 +43,16 @@ export function OverviewTab({ rm }: Props) {
     });
   };
 
+  const cats = draft.categories ?? [];
+  const toggleCat = (c: string) =>
+    setDraft(d => {
+      const list = d.categories ?? [];
+      const next = list.includes(c) ? list.filter(x => x !== c) : [...list, c];
+      // Hold primær-kategori i synk: bruk første som primær hvis den ikke lenger er valgt
+      const primary = next.includes(d.category ?? "") ? d.category : (next[0] ?? null);
+      return { ...d, categories: next, category: primary };
+    });
+
   return (
     <div className="space-y-5">
       <Card className="p-5 space-y-4">
@@ -52,14 +63,48 @@ export function OverviewTab({ rm }: Props) {
             <Input value={draft.sku} onChange={e => setDraft(d => ({ ...d, sku: e.target.value }))} disabled={!canWrite} />
           </div>
           <div>
-            <Label>Kategori</Label>
-            <Select value={draft.category ?? ""} onValueChange={v => setDraft(d => ({ ...d, category: v || null }))} disabled={!canWrite}>
+            <Label>Primær kategori</Label>
+            <Select
+              value={draft.category ?? ""}
+              onValueChange={v => setDraft(d => {
+                const list = d.categories ?? [];
+                const nextList = v && !list.includes(v) ? [...list, v] : list;
+                return { ...d, category: v || null, categories: nextList };
+              })}
+              disabled={!canWrite}
+            >
               <SelectTrigger><SelectValue placeholder="Velg" /></SelectTrigger>
               <SelectContent>
                 {DEFAULT_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
+        </div>
+        <div>
+          <Label>Flere kategorier</Label>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {DEFAULT_CATEGORIES.map(c => {
+              const active = cats.includes(c);
+              const isPrimary = draft.category === c;
+              return (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => canWrite && toggleCat(c)}
+                  disabled={!canWrite}
+                  className={`rounded-full border px-3 py-1 text-xs transition ${
+                    active
+                      ? "border-app bg-app/10 text-app font-medium"
+                      : "border-border bg-background text-ink-secondary hover:bg-muted"
+                  } ${isPrimary ? "ring-1 ring-app" : ""} ${!canWrite ? "opacity-60 cursor-not-allowed" : ""}`}
+                  title={isPrimary ? "Primær kategori" : undefined}
+                >
+                  {c}{isPrimary ? " ★" : ""}
+                </button>
+              );
+            })}
+          </div>
+          <p className="mt-1 text-xs text-ink-secondary">Stjerne markerer primær kategori (brukes for prisetoleranser).</p>
         </div>
         <div>
           <Label>Navn *</Label>
