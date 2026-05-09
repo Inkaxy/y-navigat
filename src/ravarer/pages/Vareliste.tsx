@@ -30,9 +30,14 @@ export default function VarelistePage() {
 
   const supplierMap = useMemo(() => new Map(suppliers.map(s => [s.id, s.name])), [suppliers]);
 
+  const allCatsOf = (r: typeof rows[number]) => {
+    const list = (r.categories ?? []) as string[];
+    return list.length > 0 ? list : (r.category ? [r.category] : []);
+  };
+
   const categories = useMemo(() => {
     const set = new Set<string>();
-    rows.forEach(r => r.category && set.add(r.category));
+    rows.forEach(r => allCatsOf(r).forEach(c => set.add(c)));
     return Array.from(set).sort();
   }, [rows]);
 
@@ -41,7 +46,7 @@ export default function VarelistePage() {
     const arr = rows.filter(r => {
       if (active === "active" && !r.is_active) return false;
       if (active === "inactive" && r.is_active) return false;
-      if (cat !== "all" && r.category !== cat) return false;
+      if (cat !== "all" && !allCatsOf(r).includes(cat)) return false;
       if (needle && !`${r.name} ${r.sku}`.toLowerCase().includes(needle)) return false;
       return true;
     });
