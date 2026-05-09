@@ -30,35 +30,12 @@ export default function OversiktPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
-        <div className="space-y-1">
-          <h1 className="text-3xl font-bold tracking-tight">Produksjon</h1>
-          <p className="text-muted-foreground">
-            Oversikt over etikett-aktivitet per produksjonsavdeling.
-          </p>
-        </div>
-
-        <div className="space-y-1">
-          <p className="text-xs uppercase tracking-wide text-muted-foreground font-medium">
-            Selskap
-          </p>
-          {entitiesLoading ? (
-            <Skeleton className="h-10 w-56" />
-          ) : (
-            <Select value={legalEntityId} onValueChange={setLegalEntityId}>
-              <SelectTrigger className="w-56">
-                <SelectValue placeholder="Velg selskap" />
-              </SelectTrigger>
-              <SelectContent>
-                {entities?.map((e) => (
-                  <SelectItem key={e.id} value={e.id}>
-                    {e.legal_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-        </div>
+      <div className="space-y-1">
+        <h1 className="text-3xl font-bold tracking-tight">Produksjon</h1>
+        <p className="text-muted-foreground">
+          Oversikt over etikett-aktivitet per produksjonsavdeling
+          {selectedEntity ? ` — ${selectedEntity.legal_name}` : ""}.
+        </p>
       </div>
 
       {depsLoading && (
