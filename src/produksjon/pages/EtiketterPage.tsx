@@ -30,6 +30,7 @@ import {
 import { cn } from "@/lib/utils";
 
 import { useLegalEntities } from "@/produksjon/features/produksjonsavdelinger/hooks/useLegalEntities";
+import { useSelection } from "@/providers/SelectionProvider";
 
 import { DateNavigator } from "@/produksjon/features/etiketter/components/DateNavigator";
 import { KpiCard } from "@/produksjon/features/etiketter/components/KpiCard";
@@ -58,15 +59,10 @@ export default function EtiketterPage() {
   const today = useMemo(() => format(new Date(), "yyyy-MM-dd"), []);
   const [date, setDate] = useState<string>(today);
 
-  const { data: entities, isLoading: entitiesLoading } = useLegalEntities();
-  const [legalEntityId, setLegalEntityId] = useState<string>("");
+  const { legalEntityId: selectedLegalEntityId } = useSelection();
+  const legalEntityId = selectedLegalEntityId ?? "";
+  const { data: entities } = useLegalEntities();
 
-  // Default til første selskap når lastet
-  useEffect(() => {
-    if (!legalEntityId && entities && entities.length > 0) {
-      setLegalEntityId(entities[0].id);
-    }
-  }, [entities, legalEntityId]);
 
   const [tourId, setTourId] = useState<string>(ALL);
   const [departmentId, setDepartmentId] = useState<string>(ALL);
@@ -245,29 +241,8 @@ export default function EtiketterPage() {
         </div>
       </div>
 
-      {/* Selskap + filtre */}
+      {/* Filtre */}
       <div className="flex flex-wrap items-end gap-4">
-        <div className="space-y-1">
-          <p className="text-xs uppercase tracking-wide text-muted-foreground font-medium">
-            Selskap
-          </p>
-          {entitiesLoading ? (
-            <Skeleton className="h-10 w-56" />
-          ) : (
-            <Select value={legalEntityId} onValueChange={setLegalEntityId}>
-              <SelectTrigger className="w-56">
-                <SelectValue placeholder="Velg selskap" />
-              </SelectTrigger>
-              <SelectContent>
-                {entities?.map((e) => (
-                  <SelectItem key={e.id} value={e.id}>
-                    {e.legal_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-        </div>
 
         <div className="space-y-1">
           <p className="text-xs uppercase tracking-wide text-muted-foreground font-medium">

@@ -25,6 +25,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { useLegalEntities } from "@/produksjon/features/produksjonsavdelinger/hooks/useLegalEntities";
+import { useSelection } from "@/providers/SelectionProvider";
 import { useLabelPrintProfiles } from "@/produksjon/features/utskriftsprofiler/hooks/useLabelPrintProfiles";
 import {
   useArchiveLabelPrintProfile,
@@ -48,8 +49,8 @@ function formatDate(iso: string): string {
 }
 
 export default function UtskriftsprofilerPage() {
-  const { data: entities, isLoading: entitiesLoading } = useLegalEntities();
-  const [selectedEntityId, setSelectedEntityId] = useState<string | undefined>();
+  const { data: entities } = useLegalEntities();
+  const { legalEntityId: selectedLegalEntityId } = useSelection();
   const [archivedOpen, setArchivedOpen] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<LabelPrintProfile | null>(null);
@@ -57,8 +58,7 @@ export default function UtskriftsprofilerPage() {
     null,
   );
 
-  const effectiveEntityId =
-    selectedEntityId ?? entities?.[0]?.id ?? undefined;
+  const effectiveEntityId = selectedLegalEntityId ?? undefined;
   const selectedEntity =
     entities?.find((e) => e.id === effectiveEntityId) ?? null;
 
@@ -126,29 +126,11 @@ export default function UtskriftsprofilerPage() {
         </p>
       </header>
 
-      <div className="mb-6 flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-2">
-          <Label htmlFor="up-entity-select" className="text-sm">
-            Selskap:
-          </Label>
-          <Select
-            value={effectiveEntityId}
-            onValueChange={(v) => setSelectedEntityId(v)}
-            disabled={entitiesLoading || !entities?.length}
-          >
-            <SelectTrigger id="up-entity-select" className="w-[260px]">
-              <SelectValue placeholder="Velg selskap" />
-            </SelectTrigger>
-            <SelectContent>
-              {entities?.map((e) => (
-                <SelectItem key={e.id} value={e.id}>
-                  {e.legal_name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+      {selectedEntity && (
+        <div className="mb-6 text-sm text-muted-foreground">
+          Selskap: <span className="font-medium text-foreground">{selectedEntity.legal_name}</span>
         </div>
-      </div>
+      )}
 
       <section className="mb-8">
         <h2 className="mb-3 text-sm font-medium text-muted-foreground">

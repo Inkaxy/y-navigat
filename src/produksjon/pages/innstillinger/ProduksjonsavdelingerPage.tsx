@@ -27,21 +27,20 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useLegalEntities } from "@/produksjon/features/produksjonsavdelinger/hooks/useLegalEntities";
+import { useSelection } from "@/providers/SelectionProvider";
 import { useProductionDepartments } from "@/produksjon/features/produksjonsavdelinger/hooks/useProductionDepartments";
 import { useToggleProductionDepartmentStatus } from "@/produksjon/features/produksjonsavdelinger/hooks/useProductionDepartmentMutations";
 import { ProduksjonsavdelingDialog } from "@/produksjon/features/produksjonsavdelinger/components/ProduksjonsavdelingDialog";
 import type { ProductionDepartment } from "@/produksjon/features/produksjonsavdelinger/types";
 
 export default function ProduksjonsavdelingerPage() {
-  const { data: entities, isLoading: entitiesLoading } = useLegalEntities();
-  const [selectedEntityId, setSelectedEntityId] = useState<string | undefined>();
+  const { data: entities } = useLegalEntities();
+  const { legalEntityId: selectedLegalEntityId } = useSelection();
   const [showInactive, setShowInactive] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<ProductionDepartment | null>(null);
 
-  // Default-velg første selskap når listen lastes
-  const effectiveEntityId =
-    selectedEntityId ?? entities?.[0]?.id ?? undefined;
+  const effectiveEntityId = selectedLegalEntityId ?? undefined;
 
   const selectedEntity =
     entities?.find((e) => e.id === effectiveEntityId) ?? null;
@@ -109,27 +108,11 @@ export default function ProduksjonsavdelingerPage() {
 
       {/* Toolbar */}
       <div className="mb-4 flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-2">
-          <Label htmlFor="entity-select" className="text-sm">
-            Selskap:
-          </Label>
-          <Select
-            value={effectiveEntityId}
-            onValueChange={(v) => setSelectedEntityId(v)}
-            disabled={entitiesLoading || !entities?.length}
-          >
-            <SelectTrigger id="entity-select" className="w-[260px]">
-              <SelectValue placeholder="Velg selskap" />
-            </SelectTrigger>
-            <SelectContent>
-              {entities?.map((e) => (
-                <SelectItem key={e.id} value={e.id}>
-                  {e.legal_name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        {selectedEntity && (
+          <div className="text-sm text-muted-foreground">
+            Selskap: <span className="font-medium text-foreground">{selectedEntity.legal_name}</span>
+          </div>
+        )}
 
         <div className="flex items-center gap-2">
           <Switch

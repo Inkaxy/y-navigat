@@ -1,29 +1,18 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useLegalEntities } from "@/produksjon/features/produksjonsavdelinger/hooks/useLegalEntities";
 import { useProductionDepartments } from "@/produksjon/features/produksjonsavdelinger/hooks/useProductionDepartments";
 import { DepartmentCard } from "@/produksjon/features/oversikt/components/DepartmentCard";
 import { useOversiktRealtime } from "@/produksjon/features/oversikt/hooks/useDepartmentLabelStats";
+import { useSelection } from "@/providers/SelectionProvider";
 
 export default function OversiktPage() {
-  const { data: entities, isLoading: entitiesLoading } = useLegalEntities();
-  const [legalEntityId, setLegalEntityId] = useState<string>("");
-
-  useEffect(() => {
-    if (!legalEntityId && entities && entities.length > 0) {
-      setLegalEntityId(entities[0].id);
-    }
-  }, [entities, legalEntityId]);
+  const { legalEntityId: selectedLegalEntityId } = useSelection();
+  const legalEntityId = selectedLegalEntityId ?? "";
+  const { data: entities } = useLegalEntities();
 
   const { data: departments, isLoading: depsLoading } = useProductionDepartments(
     legalEntityId || undefined,
@@ -41,35 +30,12 @@ export default function OversiktPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
-        <div className="space-y-1">
-          <h1 className="text-3xl font-bold tracking-tight">Produksjon</h1>
-          <p className="text-muted-foreground">
-            Oversikt over etikett-aktivitet per produksjonsavdeling.
-          </p>
-        </div>
-
-        <div className="space-y-1">
-          <p className="text-xs uppercase tracking-wide text-muted-foreground font-medium">
-            Selskap
-          </p>
-          {entitiesLoading ? (
-            <Skeleton className="h-10 w-56" />
-          ) : (
-            <Select value={legalEntityId} onValueChange={setLegalEntityId}>
-              <SelectTrigger className="w-56">
-                <SelectValue placeholder="Velg selskap" />
-              </SelectTrigger>
-              <SelectContent>
-                {entities?.map((e) => (
-                  <SelectItem key={e.id} value={e.id}>
-                    {e.legal_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-        </div>
+      <div className="space-y-1">
+        <h1 className="text-3xl font-bold tracking-tight">Produksjon</h1>
+        <p className="text-muted-foreground">
+          Oversikt over etikett-aktivitet per produksjonsavdeling
+          {selectedEntity ? ` — ${selectedEntity.legal_name}` : ""}.
+        </p>
       </div>
 
       {depsLoading && (
