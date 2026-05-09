@@ -142,7 +142,14 @@ export default function VarelistePage() {
                   >
                     <td className="px-4 py-3 font-mono text-xs">{r.sku}</td>
                     <td className="px-4 py-3 font-medium">{r.name}</td>
-                    <td className="px-4 py-3 text-ink-secondary">{r.category ?? "—"}</td>
+                    <td className="px-4 py-3 text-ink-secondary">
+                      {(() => {
+                        const cs = allCatsOf(r);
+                        if (cs.length === 0) return "—";
+                        if (cs.length === 1) return cs[0];
+                        return <span title={cs.join(", ")}>{cs[0]} <span className="text-xs">+{cs.length - 1}</span></span>;
+                      })()}
+                    </td>
                     <td className="px-4 py-3 text-ink-secondary">{r.primary_supplier_id ? supplierMap.get(r.primary_supplier_id) ?? "—" : "—"}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{formatNok(r.current_cost_price)} <span className="text-xs text-ink-secondary">/ {r.base_unit}</span></td>
                     <td className="px-4 py-3 text-right tabular-nums">
