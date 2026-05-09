@@ -88,56 +88,11 @@ export default function Hjem() {
         </CardContent>
       </Card>
 
-      {/* Mine stillinger */}
-      <section className="space-y-3">
-        <div className="flex items-baseline justify-between">
-          <div>
-            <div className="text-[10px] font-medium uppercase tracking-[0.22em] text-muted-foreground">
-              Tilhørighet
-            </div>
-            <h2 className="mt-1 font-display text-xl font-semibold tracking-tight text-foreground">
-              Mine stillinger
-            </h2>
-          </div>
-          {positions && positions.length > 0 && (
-            <span className="text-xs text-muted-foreground">
-              {positions.length} {positions.length === 1 ? "stilling" : "stillinger"}
-            </span>
-          )}
-        </div>
-        {posLoading ? (
-          <div className="grid gap-3 md:grid-cols-2">
-            <Skeleton className="h-24" />
-            <Skeleton className="h-24" />
-          </div>
-        ) : positions && positions.length > 0 ? (
-          <div className="grid gap-3 md:grid-cols-2">
-            {positions.map((p: any) => (
-              <PositionCard key={p.id} position={p} />
-            ))}
-          </div>
-        ) : (
-          <EmptyState text="Du har ingen aktive stillinger registrert." />
-        )}
-      </section>
-
       {/* Mine apper */}
       <section className="space-y-3">
-        <div className="flex items-baseline justify-between">
-          <div>
-            <div className="text-[10px] font-medium uppercase tracking-[0.22em] text-muted-foreground">
-              Verktøy
-            </div>
-            <h2 className="mt-1 font-display text-xl font-semibold tracking-tight text-foreground">
-              Mine apper
-            </h2>
-          </div>
-          {accessibleApps.length > 0 && (
-            <span className="text-xs text-muted-foreground">
-              {accessibleApps.length} tilgjengelig
-            </span>
-          )}
-        </div>
+        <h2 className="font-display text-xl font-semibold tracking-tight text-foreground">
+          Mine apper
+        </h2>
         {appsLoading ? (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {Array.from({ length: 6 }).map((_, i) => (
