@@ -62,7 +62,7 @@ export function useUiPreference<T>(scope: string, fallback: T) {
         await supabase
           .from("user_ui_preferences")
           .upsert(
-            { user_id: userId, scope, value: next as unknown as object },
+            [{ user_id: userId, scope, value: next as never }],
             { onConflict: "user_id,scope" },
           );
       }, 300);
