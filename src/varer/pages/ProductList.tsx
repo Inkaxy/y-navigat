@@ -59,7 +59,7 @@ export default function ProductList() {
         )
         .eq("legal_entity_id", legalEntityId)
         .order("display_number", { ascending: true })
-        .limit(500);
+        .limit(2000);
       if (error) throw error;
       return (data ?? []) as ProductRow[];
     },
