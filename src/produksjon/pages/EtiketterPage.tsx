@@ -30,6 +30,7 @@ import {
 import { cn } from "@/lib/utils";
 
 import { useLegalEntities } from "@/produksjon/features/produksjonsavdelinger/hooks/useLegalEntities";
+import { useSelection } from "@/providers/SelectionProvider";
 
 import { DateNavigator } from "@/produksjon/features/etiketter/components/DateNavigator";
 import { KpiCard } from "@/produksjon/features/etiketter/components/KpiCard";
