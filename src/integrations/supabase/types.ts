@@ -8013,35 +8013,6 @@ export type Database = {
           status: string
         }[]
       }
-      get_raw_material_purchase_stats: {
-        Args: { p_raw_material_id: string }
-        Returns: {
-          avg_monthly_volume: number | null
-          avg_price_per_base_unit_12m: number | null
-          cost_12m: number | null
-          cost_24m: number | null
-          cost_30d: number | null
-          cost_90d: number | null
-          has_package_size_warning: boolean | null
-          invoice_count_12m: number | null
-          invoice_count_30d: number | null
-          invoice_count_90d: number | null
-          last_invoice_date: string | null
-          legal_entity_id: string | null
-          quantity_12m: number | null
-          quantity_24m: number | null
-          quantity_30d: number | null
-          quantity_90d: number | null
-          raw_material_id: string | null
-          supplier_count_12m: number | null
-        }
-        SetofOptions: {
-          from: "*"
-          to: "raw_material_purchase_stats"
-          isOneToOne: true
-          isSetofReturn: false
-        }
-      }
       get_recurring_items_for_delivery: {
         Args: { _delivery_date: string; _legal_entity_id: string }
         Returns: {
@@ -8145,35 +8116,6 @@ export type Database = {
           total_cost: number
           total_quantity: number
         }[]
-      }
-      list_raw_material_purchase_stats: {
-        Args: { p_legal_entity_id: string }
-        Returns: {
-          avg_monthly_volume: number | null
-          avg_price_per_base_unit_12m: number | null
-          cost_12m: number | null
-          cost_24m: number | null
-          cost_30d: number | null
-          cost_90d: number | null
-          has_package_size_warning: boolean | null
-          invoice_count_12m: number | null
-          invoice_count_30d: number | null
-          invoice_count_90d: number | null
-          last_invoice_date: string | null
-          legal_entity_id: string | null
-          quantity_12m: number | null
-          quantity_24m: number | null
-          quantity_30d: number | null
-          quantity_90d: number | null
-          raw_material_id: string | null
-          supplier_count_12m: number | null
-        }[]
-        SetofOptions: {
-          from: "*"
-          to: "raw_material_purchase_stats"
-          isOneToOne: false
-          isSetofReturn: true
-        }
       }
       list_supplier_purchase_stats: {
         Args: { p_supplier_id: string }
