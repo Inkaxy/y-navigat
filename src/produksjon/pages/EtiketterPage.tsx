@@ -58,15 +58,10 @@ export default function EtiketterPage() {
   const today = useMemo(() => format(new Date(), "yyyy-MM-dd"), []);
   const [date, setDate] = useState<string>(today);
 
-  const { data: entities, isLoading: entitiesLoading } = useLegalEntities();
-  const [legalEntityId, setLegalEntityId] = useState<string>("");
+  const { legalEntityId: selectedLegalEntityId } = useSelection();
+  const legalEntityId = selectedLegalEntityId ?? "";
+  const { data: entities } = useLegalEntities();
 
-  // Default til første selskap når lastet
-  useEffect(() => {
-    if (!legalEntityId && entities && entities.length > 0) {
-      setLegalEntityId(entities[0].id);
-    }
-  }, [entities, legalEntityId]);
 
   const [tourId, setTourId] = useState<string>(ALL);
   const [departmentId, setDepartmentId] = useState<string>(ALL);
