@@ -90,9 +90,6 @@ export default function Hjem() {
 
       {/* Mine apper */}
       <section className="space-y-3">
-        <h2 className="font-display text-xl font-semibold tracking-tight text-foreground">
-          Mine apper
-        </h2>
         {appsLoading ? (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {Array.from({ length: 6 }).map((_, i) => (
