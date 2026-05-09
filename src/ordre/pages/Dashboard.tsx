@@ -10,7 +10,6 @@ import {
   
 } from "lucide-react";
 import { TicketsInbox } from "@/ordre/components/shell/TicketsInbox";
-import { OrderActionInbox } from "@/ordre/components/orders/OrderActionInbox";
 import { AppBanner } from "@/ordre/components/shell/AppBanner";
 import { DateContextChips } from "@/ordre/components/shell/DateContextChips";
 import { Button } from "@/components/ui/button";
