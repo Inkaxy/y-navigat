@@ -609,7 +609,7 @@ function ProductPicker({
           <CommandList>
             <CommandEmpty>Ingen treff</CommandEmpty>
             <CommandGroup>
-              {products.slice(0, 80).map((p) => (
+              {products.map((p) => (
                 <CommandItem
                   key={p.id}
                   value={`${p.display_name} ${p.display_number} ${p.code}`}
