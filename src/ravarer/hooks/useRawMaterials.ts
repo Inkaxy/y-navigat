@@ -10,6 +10,7 @@ export interface RawMaterialRow {
   name: string;
   description: string | null;
   category: string | null;
+  categories: string[];
   is_packaging: boolean;
   base_unit: string;
   package_size: number | null;
