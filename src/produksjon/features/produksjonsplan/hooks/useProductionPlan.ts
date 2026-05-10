@@ -205,7 +205,7 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
           const pg = product.production_group_id ? prodGroupMap.get(product.production_group_id) : null;
           row = {
             product_id: product.id,
-            product_code: product.code,
+            product_code: product.display_number != null ? String(product.display_number) : null,
             product_name:
               criteria.aggregation === "per_production_group" && pg
                 ? pg.display_name
