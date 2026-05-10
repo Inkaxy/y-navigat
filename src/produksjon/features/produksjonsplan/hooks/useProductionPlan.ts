@@ -23,7 +23,7 @@ interface OrderLineRow {
 
 interface ProductRow {
   id: string;
-  code: string | null;
+  display_number: number | null;
   display_name: string;
   unit_of_sale: string | null;
   main_category_id: string | null;
