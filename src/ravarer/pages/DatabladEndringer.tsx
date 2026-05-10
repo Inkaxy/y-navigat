@@ -4,10 +4,21 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useChangelog, useAcknowledgeChange, type ChangelogRow } from "@/ravarer/hooks/useDatasheets";
 import { formatDate } from "@/ravarer/lib/constants";
 import { useNavigate } from "react-router-dom";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
+import { toast } from "sonner";
 
 export default function DatabladEndringer() {
   const navigate = useNavigate();
@@ -16,6 +27,27 @@ export default function DatabladEndringer() {
   const { data: rows = [], isLoading } = useChangelog({ onlyUnacked: filter === "unacked" });
   const ack = useAcknowledgeChange();
   const [selected, setSelected] = useState<ChangelogRow | null>(null);
+  const [confirmAllOpen, setConfirmAllOpen] = useState(false);
+  const [bulkPending, setBulkPending] = useState(false);
+
+  const unackedRows = rows.filter(r => !r.acknowledged);
+  const unackedCount = unackedRows.length;
+
+  const handleConfirmAll = async () => {
+    setBulkPending(true);
+    try {
+      const results = await Promise.allSettled(unackedRows.map(r => ack.mutateAsync(r.id)));
+      const failed = results.filter(r => r.status === "rejected").length;
+      if (failed === 0) {
+        toast.success(`${unackedCount} endringer bekreftet`);
+      } else {
+        toast.error(`${failed} av ${unackedCount} feilet`);
+      }
+    } finally {
+      setBulkPending(false);
+      setConfirmAllOpen(false);
+    }
+  };
 
   return (
     <div className="space-y-5">
@@ -33,7 +65,30 @@ export default function DatabladEndringer() {
           </SelectContent>
         </Select>
         <span className="text-sm text-ink-secondary">{rows.length} endringer</span>
+        <div className="flex-1" />
+        {canWrite && unackedCount > 0 && (
+          <Button variant="brand" size="sm" onClick={() => setConfirmAllOpen(true)} disabled={bulkPending}>
+            Bekreft alle ({unackedCount})
+          </Button>
+        )}
       </Card>
+
+      <AlertDialog open={confirmAllOpen} onOpenChange={setConfirmAllOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Bekreft alle endringer?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Dette markerer {unackedCount} endringer som gjennomgått. Handlingen kan ikke angres.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={bulkPending}>Avbryt</AlertDialogCancel>
+            <AlertDialogAction onClick={(e) => { e.preventDefault(); handleConfirmAll(); }} disabled={bulkPending}>
+              {bulkPending ? "Bekrefter…" : "Bekreft alle"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Card>
         {isLoading && <div className="p-12 text-center text-ink-secondary">Laster…</div>}
