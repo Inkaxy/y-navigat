@@ -62,6 +62,7 @@ import { useUserAccess as useKunderUserAccess } from "@/kunder/hooks/useUserAcce
 import { useAuth as useNbhubAuth } from "@/hooks/useAuth";
 import ProduksjonOversikt from "@/produksjon/pages/OversiktPage";
 import ProduksjonEtiketter from "@/produksjon/pages/EtiketterPage";
+import ProduksjonsplanPage from "@/produksjon/pages/ProduksjonsplanPage";
 import ProduksjonsavdelingerPage from "@/produksjon/pages/innstillinger/ProduksjonsavdelingerPage";
 import PakkeomraderPage from "@/produksjon/pages/innstillinger/PakkeomraderPage";
 import UtskriftsprofilerPage from "@/produksjon/pages/innstillinger/UtskriftsprofilerPage";
@@ -290,6 +291,7 @@ const App = () => (
               <Route path="/ordre/portal-test" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdrePortalTest /></AppAccessGuard></Shell>} />
               <Route path="/produksjon" element={<Shell><AppAccessGuard appCode="produksjon" appName="Produksjon"><Navigate to="/produksjon/oversikt" replace /></AppAccessGuard></Shell>} />
               <Route path="/produksjon/oversikt" element={<Shell><AppAccessGuard appCode="produksjon" appName="Produksjon"><ProduksjonOversikt /></AppAccessGuard></Shell>} />
+              <Route path="/produksjon/produksjonsplan" element={<Shell><AppAccessGuard appCode="produksjon" appName="Produksjon"><ProduksjonsplanPage /></AppAccessGuard></Shell>} />
               <Route path="/produksjon/etiketter" element={<Shell><AppAccessGuard appCode="produksjon" appName="Produksjon"><ProduksjonEtiketter /></AppAccessGuard></Shell>} />
               <Route path="/produksjon/innstillinger/produksjonsavdelinger" element={<Shell><AppAccessGuard appCode="produksjon" appName="Produksjon"><ProduksjonsavdelingerPage /></AppAccessGuard></Shell>} />
               <Route path="/produksjon/innstillinger/pakkeomrader" element={<Shell><AppAccessGuard appCode="produksjon" appName="Produksjon"><PakkeomraderPage /></AppAccessGuard></Shell>} />
