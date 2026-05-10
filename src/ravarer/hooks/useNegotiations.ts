@@ -247,7 +247,7 @@ export function useUpsertNegotiationRecipients() {
       const { data, error } = await supabase
         .from("negotiation_recipients" as any)
         .insert(rows as any)
-        .select();
+        .select("id, negotiation_id, supplier_id, contact_email, contact_name, status, expires_at, created_at");
       if (error) throw error;
       return data;
     },
