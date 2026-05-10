@@ -1,4 +1,5 @@
 import { useState } from "react";
+import DOMPurify from "dompurify";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -212,7 +213,7 @@ function DeclarationView({ link, productName, canWrite, qc }: { link: any; produ
                   <Label className="text-xs">Forhåndsvisning</Label>
                   <div
                     className="mt-1 rounded-md border border-border bg-muted/30 p-3 text-sm leading-relaxed"
-                    dangerouslySetInnerHTML={{ __html: computed.ingredient_declaration_html || "<em>Ingen ingredienser å vise.</em>" }}
+                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(computed.ingredient_declaration_html || "<em>Ingen ingredienser å vise.</em>", { USE_PROFILES: { html: true } }) }}
                   />
                   <p className="mt-1 text-xs text-muted-foreground">
                     Allergener i <strong>fet</strong>. QUID-prosenter beregnes på tvers av master + tillegg.
@@ -430,7 +431,7 @@ function PreviewDialog({ open, onClose, productName, computed }: { open: boolean
           <div className="font-semibold">{productName}</div>
           <div>
             <span className="font-medium">Ingredienser: </span>
-            <span dangerouslySetInnerHTML={{ __html: computed.ingredient_declaration_html || "—" }} />
+            <span dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(computed.ingredient_declaration_html || "—", { USE_PROFILES: { html: true } }) }} />
           </div>
           {computed.allergens_contains.length > 0 && (
             <div><span className="font-medium">Inneholder:</span> {computed.allergens_contains.join(", ")}.</div>
