@@ -61,6 +61,44 @@ export function PrintLabelDialog({
 
   const nextNumber = useNextLabelNumber();
   const insertJob = useInsertLabelPrintJob();
+  const { data: profiles } = useLabelPrintProfiles(legalEntityId || undefined);
+  const profile = profiles?.find((p) => p.id === profileId) ?? null;
+  const [downloading, setDownloading] = useState(false);
+
+  const handleDownloadPdf = async () => {
+    if (!row) return;
+    if (!profile) {
+      toast.error("Mangler etikett-profil for varen — sett profil først.");
+      return;
+    }
+    setDownloading(true);
+    try {
+      const { pdf } = await import("@react-pdf/renderer");
+      const data: LabelPdfData = {
+        profile,
+        row,
+        labelNumber,
+        quantity,
+        copies: quantity,
+      };
+      const blob = await pdf(<LabelPdfDocument data={data} />).toBlob();
+      const url = URL.createObjectURL(blob);
+      const fileName = `etikett_${row.display_number}_${slugifyLabel(row.display_name)}${labelNumber ? `_${labelNumber}` : ""}.pdf`;
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      toast.success(`Lastet ned ${fileName}`);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Kunne ikke generere PDF";
+      toast.error(msg);
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   useEffect(() => {
     if (open && row) {
