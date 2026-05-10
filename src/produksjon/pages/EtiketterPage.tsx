@@ -212,9 +212,67 @@ export default function EtiketterPage() {
     }
   };
 
-  return (
-    <div className="space-y-6">
-      {/* Header: dato + live + skriv ut */}
+  const [bulkPdfRunning, setBulkPdfRunning] = useState(false);
+  const handleBulkDownloadPdf = async () => {
+    if (!productProfiles || !profiles) return;
+    const missing = printableRows.filter((r) => !productProfiles[r.product_id]);
+    if (missing.length > 0) {
+      setMissingProfileNames(
+        missing.map((r) => `${r.display_number} — ${r.display_name}`),
+      );
+      setMissingProfileOpen(true);
+      return;
+    }
+    setBulkPdfRunning(true);
+    try {
+      const { pdf, Document } = await import("@react-pdf/renderer");
+      const pages: LabelPdfData[] = [];
+      for (const r of printableRows) {
+        const profileId = productProfiles[r.product_id];
+        const profile = profiles.find((p) => p.id === profileId);
+        if (!profile) continue;
+        pages.push({
+          profile,
+          row: r,
+          labelNumber: null,
+          quantity: r.total_labels || 1,
+          copies: r.total_labels || 1,
+        });
+      }
+      if (pages.length === 0) {
+        toast.warning("Ingen etiketter å generere.");
+        return;
+      }
+      // Bygg ett samlet dokument med alle sider
+      const Combined = (
+        <Document>
+          {pages.flatMap((d, i) =>
+            (LabelPdfDocument({ data: d }) as any).props.children.map(
+              (page: any, j: number) => ({ ...page, key: `${i}-${j}` }),
+            ),
+          )}
+        </Document>
+      );
+      const blob = await pdf(Combined).toBlob();
+      const url = URL.createObjectURL(blob);
+      const fileName = `etiketter_${date}_${slugifyLabel(
+        entities?.find((e) => e.id === legalEntityId)?.display_name ?? "selskap",
+      )}.pdf`;
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      toast.success(`Lastet ned ${fileName}`);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Kunne ikke generere PDF";
+      toast.error(msg);
+    } finally {
+      setBulkPdfRunning(false);
+    }
+  };
       <div className="flex flex-col lg:flex-row items-center justify-between gap-4">
         <div className="w-full lg:w-auto flex justify-center lg:justify-start">
           <DateNavigator date={date} onChange={setDate} />
