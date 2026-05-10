@@ -418,12 +418,20 @@ Deno.serve(async (req) => {
 
     // Bygg ingrediens-render: gå gjennom sortedAgg, men hopp over de som tilhører wrapParent (de skal vises inni parent)
     const renderedKeys = new Set<string>();
+    function escapeHtml(s: string): string {
+      return String(s ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
     function renderItem(a: Agg, includeQuid: boolean): string {
-      if (a.custom_text) return a.custom_text;
-      let display = a.name;
+      if (a.custom_text) return escapeHtml(a.custom_text);
+      let display = escapeHtml(a.name);
       for (const al of a.allergens) {
         const label = ALLERGEN_LABEL[al]; if (!label) continue;
-        const re = new RegExp(`(${label})`, "i");
+        const re = new RegExp(`(${label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "i");
         if (re.test(display)) { display = display.replace(re, "<strong>$1</strong>"); break; }
       }
       if (includeQuid && a.is_quid) {
