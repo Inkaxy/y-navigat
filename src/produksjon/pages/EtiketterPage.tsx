@@ -3,7 +3,7 @@ import { format } from "date-fns";
 import { Info, Printer, RotateCcw, Download } from "lucide-react";
 import { toast } from "sonner";
 import {
-  LabelPdfDocument,
+  CombinedLabelPdfDocument,
   slugifyLabel,
   type LabelPdfData,
 } from "@/produksjon/features/etiketter/lib/labelPdf";
