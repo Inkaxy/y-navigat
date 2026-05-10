@@ -225,13 +225,13 @@ export default function EtiketterPage() {
     }
     setBulkPdfRunning(true);
     try {
-      const { pdf, Document } = await import("@react-pdf/renderer");
-      const pages: LabelPdfData[] = [];
+      const { pdf } = await import("@react-pdf/renderer");
+      const items: LabelPdfData[] = [];
       for (const r of printableRows) {
         const profileId = productProfiles[r.product_id];
         const profile = profiles.find((p) => p.id === profileId);
         if (!profile) continue;
-        pages.push({
+        items.push({
           profile,
           row: r,
           labelNumber: null,
@@ -239,21 +239,13 @@ export default function EtiketterPage() {
           copies: r.total_labels || 1,
         });
       }
-      if (pages.length === 0) {
+      if (items.length === 0) {
         toast.warning("Ingen etiketter å generere.");
         return;
       }
-      // Bygg ett samlet dokument med alle sider
-      const Combined = (
-        <Document>
-          {pages.flatMap((d, i) =>
-            (LabelPdfDocument({ data: d }) as any).props.children.map(
-              (page: any, j: number) => ({ ...page, key: `${i}-${j}` }),
-            ),
-          )}
-        </Document>
-      );
-      const blob = await pdf(Combined).toBlob();
+      const blob = await pdf(
+        <CombinedLabelPdfDocument items={items} />,
+      ).toBlob();
       const url = URL.createObjectURL(blob);
       const fileName = `etiketter_${date}_${slugifyLabel(
         entities?.find((e) => e.id === legalEntityId)?.short_code ?? "selskap",
