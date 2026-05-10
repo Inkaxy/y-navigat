@@ -65,7 +65,30 @@ export default function DatabladEndringer() {
           </SelectContent>
         </Select>
         <span className="text-sm text-ink-secondary">{rows.length} endringer</span>
+        <div className="flex-1" />
+        {canWrite && unackedCount > 0 && (
+          <Button variant="brand" size="sm" onClick={() => setConfirmAllOpen(true)} disabled={bulkPending}>
+            Bekreft alle ({unackedCount})
+          </Button>
+        )}
       </Card>
+
+      <AlertDialog open={confirmAllOpen} onOpenChange={setConfirmAllOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Bekreft alle endringer?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Dette markerer {unackedCount} endringer som gjennomgått. Handlingen kan ikke angres.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={bulkPending}>Avbryt</AlertDialogCancel>
+            <AlertDialogAction onClick={(e) => { e.preventDefault(); handleConfirmAll(); }} disabled={bulkPending}>
+              {bulkPending ? "Bekrefter…" : "Bekreft alle"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Card>
         {isLoading && <div className="p-12 text-center text-ink-secondary">Laster…</div>}
