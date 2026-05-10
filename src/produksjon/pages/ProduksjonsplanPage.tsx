@@ -77,7 +77,7 @@ function relativeLabel(d: Date): string {
 
 export default function ProduksjonsplanPage() {
   const { legalEntityId } = useSelection();
-  const [prefs, setPrefs] = useUiPreference<UiPrefs>("produksjonsplan.prefs", DEFAULT_PREFS);
+  const { value: prefs, setValue: setPrefs } = useUiPreference<UiPrefs>("produksjonsplan.prefs", DEFAULT_PREFS);
 
   const [date, setDate] = useState<Date>(new Date());
   const dateStr = format(date, "yyyy-MM-dd");
