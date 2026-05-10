@@ -228,9 +228,32 @@ export function PrintLabelDialog({
           </div>
         </div>
 
-        <DialogFooter>
+        <div className="flex items-start gap-2 rounded-md border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
+          <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+          <span>
+            «Skriv ut» tildeler etikett-nummer og logger jobben i utskriftskøen
+            (ingen fysisk skriver er koblet til ennå). Bruk «Last ned PDF» for å
+            få etiketten som fil.
+          </span>
+        </div>
+
+        <DialogFooter className="gap-2 sm:gap-2">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Lukk
+          </Button>
+          <Button
+            variant="outline"
+            onClick={handleDownloadPdf}
+            disabled={downloading || !profile}
+            className="gap-2"
+            title={!profile ? "Sett etikett-profil for varen først" : undefined}
+          >
+            {downloading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
+            Last ned PDF
           </Button>
           <Button
             onClick={handlePrint}
