@@ -297,6 +297,22 @@ export default function EtiketterPage() {
               {bulkRunning ? "Skriver ut…" : "Skriv ut alle"}
             </Button>
           )}
+          <Button
+            variant="outline"
+            onClick={handleBulkDownloadPdf}
+            disabled={
+              bulkPdfRunning ||
+              !legalEntityId ||
+              printableRows.length === 0
+            }
+            className="gap-2"
+            title={
+              printableRows.length === 0 ? "Ingen varer å laste ned." : undefined
+            }
+          >
+            <Download className="h-4 w-4" />
+            {bulkPdfRunning ? "Genererer…" : "Last ned PDF (alle)"}
+          </Button>
         </div>
       </div>
 
