@@ -85,6 +85,6 @@ Deno.serve(async (req) => {
     });
   } catch (e: any) {
     console.error("submit-negotiation-response", e);
-    return new Response(JSON.stringify({ error: e?.message ?? String(e) }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ error: "internal_error" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 });
