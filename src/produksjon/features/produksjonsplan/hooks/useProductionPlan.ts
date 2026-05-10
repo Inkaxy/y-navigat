@@ -23,7 +23,7 @@ interface OrderLineRow {
 
 interface ProductRow {
   id: string;
-  code: string | null;
+  display_number: number | null;
   display_name: string;
   unit_of_sale: string | null;
   main_category_id: string | null;
@@ -127,7 +127,7 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
       // 3) Hent produkter
       const { data: products, error: prodErr } = await supabase
         .from("products")
-        .select("id, code, display_name, unit_of_sale, main_category_id, sub_category_id, production_group_id, dough_type, pieces_per_tray, pieces_per_liter")
+        .select("id, display_number, display_name, unit_of_sale, main_category_id, sub_category_id, production_group_id, dough_type, pieces_per_tray, pieces_per_liter")
         .in("id", productIds);
       if (prodErr) throw prodErr;
 
@@ -205,7 +205,7 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
           const pg = product.production_group_id ? prodGroupMap.get(product.production_group_id) : null;
           row = {
             product_id: product.id,
-            product_code: product.code,
+            product_code: product.display_number != null ? String(product.display_number) : null,
             product_name:
               criteria.aggregation === "per_production_group" && pg
                 ? pg.display_name
