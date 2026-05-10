@@ -127,7 +127,7 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
       // 3) Hent produkter
       const { data: products, error: prodErr } = await supabase
         .from("products")
-        .select("id, code, display_name, unit_of_sale, main_category_id, sub_category_id, production_group_id, dough_type, pieces_per_tray, pieces_per_liter")
+        .select("id, display_number, display_name, unit_of_sale, main_category_id, sub_category_id, production_group_id, dough_type, pieces_per_tray, pieces_per_liter")
         .in("id", productIds);
       if (prodErr) throw prodErr;
 
