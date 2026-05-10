@@ -179,7 +179,7 @@ export default function OrdreInnstillingerPage() {
           {sigDraft && (
             <div className="rounded-md border bg-muted/40 p-3">
               <div className="text-xs text-muted-foreground mb-2">Forhåndsvisning</div>
-              <div className="text-sm" dangerouslySetInnerHTML={{ __html: sigDraft }} />
+              <div className="text-sm" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(sigDraft, { USE_PROFILES: { html: true } }) }} />
             </div>
           )}
         </CardContent>

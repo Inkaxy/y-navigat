@@ -72,7 +72,7 @@ export interface NegotiationRecipientRow {
   supplier_id: string;
   contact_email: string | null;
   contact_name: string | null;
-  access_token: string;
+  access_token?: string;
   password_set_at: string | null;
   password_expires_at: string | null;
   failed_attempts: number;
@@ -143,7 +143,7 @@ export function useNegotiationRecipients(negotiationId: string | undefined) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("negotiation_recipients" as any)
-        .select("*")
+        .select("id, negotiation_id, supplier_id, contact_email, contact_name, password_set_at, password_expires_at, failed_attempts, locked_until, status, invited_at, first_viewed_at, last_viewed_at, responded_at, expires_at, created_at")
         .eq("negotiation_id", negotiationId!)
         .order("created_at");
       if (error) throw error;
@@ -247,7 +247,7 @@ export function useUpsertNegotiationRecipients() {
       const { data, error } = await supabase
         .from("negotiation_recipients" as any)
         .insert(rows as any)
-        .select();
+        .select("id, negotiation_id, supplier_id, contact_email, contact_name, status, expires_at, created_at");
       if (error) throw error;
       return data;
     },
