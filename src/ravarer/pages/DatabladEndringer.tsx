@@ -27,6 +27,27 @@ export default function DatabladEndringer() {
   const { data: rows = [], isLoading } = useChangelog({ onlyUnacked: filter === "unacked" });
   const ack = useAcknowledgeChange();
   const [selected, setSelected] = useState<ChangelogRow | null>(null);
+  const [confirmAllOpen, setConfirmAllOpen] = useState(false);
+  const [bulkPending, setBulkPending] = useState(false);
+
+  const unackedRows = rows.filter(r => !r.acknowledged);
+  const unackedCount = unackedRows.length;
+
+  const handleConfirmAll = async () => {
+    setBulkPending(true);
+    try {
+      const results = await Promise.allSettled(unackedRows.map(r => ack.mutateAsync(r.id)));
+      const failed = results.filter(r => r.status === "rejected").length;
+      if (failed === 0) {
+        toast.success(`${unackedCount} endringer bekreftet`);
+      } else {
+        toast.error(`${failed} av ${unackedCount} feilet`);
+      }
+    } finally {
+      setBulkPending(false);
+      setConfirmAllOpen(false);
+    }
+  };
 
   return (
     <div className="space-y-5">
