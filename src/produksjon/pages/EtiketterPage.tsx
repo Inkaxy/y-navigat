@@ -273,6 +273,10 @@ export default function EtiketterPage() {
       setBulkPdfRunning(false);
     }
   };
+
+  return (
+    <div className="space-y-6">
+      {/* Header: dato + live + skriv ut */}
       <div className="flex flex-col lg:flex-row items-center justify-between gap-4">
         <div className="w-full lg:w-auto flex justify-center lg:justify-start">
           <DateNavigator date={date} onChange={setDate} />
