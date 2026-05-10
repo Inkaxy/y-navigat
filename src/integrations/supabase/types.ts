@@ -5319,6 +5319,54 @@ export type Database = {
           },
         ]
       }
+      production_criteria_templates: {
+        Row: {
+          category_code: string | null
+          created_at: string
+          created_by: string | null
+          criteria: Json
+          id: string
+          legal_entity_id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          category_code?: string | null
+          created_at?: string
+          created_by?: string | null
+          criteria?: Json
+          id?: string
+          legal_entity_id: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          category_code?: string | null
+          created_at?: string
+          created_by?: string | null
+          criteria?: Json
+          id?: string
+          legal_entity_id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "production_criteria_templates_category_code_fkey"
+            columns: ["category_code"]
+            isOneToOne: false
+            referencedRelation: "production_template_categories"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "production_criteria_templates_legal_entity_id_fkey"
+            columns: ["legal_entity_id"]
+            isOneToOne: false
+            referencedRelation: "legal_entities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       production_departments: {
         Row: {
           code: string
@@ -5403,6 +5451,141 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      production_plan_snapshot_items: {
+        Row: {
+          id: string
+          product_id: string
+          quantity_from_stock: number
+          quantity_ordered: number
+          quantity_to_produce: number
+          snapshot_id: string
+          trays_full: number
+          trays_partial: number
+        }
+        Insert: {
+          id?: string
+          product_id: string
+          quantity_from_stock?: number
+          quantity_ordered?: number
+          quantity_to_produce?: number
+          snapshot_id: string
+          trays_full?: number
+          trays_partial?: number
+        }
+        Update: {
+          id?: string
+          product_id?: string
+          quantity_from_stock?: number
+          quantity_ordered?: number
+          quantity_to_produce?: number
+          snapshot_id?: string
+          trays_full?: number
+          trays_partial?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "production_plan_snapshot_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_plan_snapshot_items_snapshot_id_fkey"
+            columns: ["snapshot_id"]
+            isOneToOne: false
+            referencedRelation: "production_plan_snapshots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      production_plan_snapshots: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          criteria_copy: Json
+          id: string
+          legal_entity_id: string
+          list_type: string
+          note: string | null
+          production_date: string
+          template_id: string | null
+          template_name_copy: string | null
+          tours: number[]
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          criteria_copy?: Json
+          id?: string
+          legal_entity_id: string
+          list_type?: string
+          note?: string | null
+          production_date: string
+          template_id?: string | null
+          template_name_copy?: string | null
+          tours?: number[]
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          criteria_copy?: Json
+          id?: string
+          legal_entity_id?: string
+          list_type?: string
+          note?: string | null
+          production_date?: string
+          template_id?: string | null
+          template_name_copy?: string | null
+          tours?: number[]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "production_plan_snapshots_legal_entity_id_fkey"
+            columns: ["legal_entity_id"]
+            isOneToOne: false
+            referencedRelation: "legal_entities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_plan_snapshots_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "production_criteria_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      production_template_categories: {
+        Row: {
+          code: string
+          color_hex: string
+          created_at: string
+          id: string
+          label: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          color_hex?: string
+          created_at?: string
+          id?: string
+          label: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          color_hex?: string
+          created_at?: string
+          id?: string
+          label?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
       }
       products: {
         Row: {
