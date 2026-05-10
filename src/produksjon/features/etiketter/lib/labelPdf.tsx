@@ -115,7 +115,7 @@ function renderField(field: ProfileField, data: LabelPdfData, key: string) {
   );
 }
 
-export function LabelPdfDocument({ data }: { data: LabelPdfData }) {
+function LabelPages({ data }: { data: LabelPdfData }) {
   const { profile } = data;
   const landscape = profile.orientation === "landscape";
   const paperW = landscape ? profile.paper_width_mm : profile.paper_height_mm;
@@ -129,13 +129,9 @@ export function LabelPdfDocument({ data }: { data: LabelPdfData }) {
   const pages = Array.from({ length: copies });
 
   return (
-    <Document>
+    <>
       {pages.map((_, i) => (
-        <Page
-          key={i}
-          size={[mm(paperW), mm(paperH)]}
-          style={styles.page}
-        >
+        <Page key={i} size={[mm(paperW), mm(paperH)]} style={styles.page}>
           <View
             style={{
               position: "absolute",
@@ -149,9 +145,29 @@ export function LabelPdfDocument({ data }: { data: LabelPdfData }) {
               ),
             }}
           >
-            {fields.map((f, idx) => renderField(f, data, `${f.field_type}-${idx}`))}
+            {fields.map((f, idx) =>
+              renderField(f, data, `${f.field_type}-${idx}`),
+            )}
           </View>
         </Page>
+      ))}
+    </>
+  );
+}
+
+export function LabelPdfDocument({ data }: { data: LabelPdfData }) {
+  return (
+    <Document>
+      <LabelPages data={data} />
+    </Document>
+  );
+}
+
+export function CombinedLabelPdfDocument({ items }: { items: LabelPdfData[] }) {
+  return (
+    <Document>
+      {items.map((d, i) => (
+        <LabelPages key={i} data={d} />
       ))}
     </Document>
   );
