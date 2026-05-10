@@ -1,5 +1,11 @@
 import { useEffect, useState } from "react";
-import { Loader2, Printer, AlertCircle } from "lucide-react";
+import { Loader2, Printer, AlertCircle, Download, Info } from "lucide-react";
+import { useLabelPrintProfiles } from "@/produksjon/features/utskriftsprofiler/hooks/useLabelPrintProfiles";
+import {
+  LabelPdfDocument,
+  slugifyLabel,
+  type LabelPdfData,
+} from "../lib/labelPdf";
 import {
   Dialog,
   DialogContent,
@@ -55,6 +61,44 @@ export function PrintLabelDialog({
 
   const nextNumber = useNextLabelNumber();
   const insertJob = useInsertLabelPrintJob();
+  const { data: profiles } = useLabelPrintProfiles(legalEntityId || undefined);
+  const profile = profiles?.find((p) => p.id === profileId) ?? null;
+  const [downloading, setDownloading] = useState(false);
+
+  const handleDownloadPdf = async () => {
+    if (!row) return;
+    if (!profile) {
+      toast.error("Mangler etikett-profil for varen — sett profil først.");
+      return;
+    }
+    setDownloading(true);
+    try {
+      const { pdf } = await import("@react-pdf/renderer");
+      const data: LabelPdfData = {
+        profile,
+        row,
+        labelNumber,
+        quantity,
+        copies: quantity,
+      };
+      const blob = await pdf(<LabelPdfDocument data={data} />).toBlob();
+      const url = URL.createObjectURL(blob);
+      const fileName = `etikett_${row.display_number}_${slugifyLabel(row.display_name)}${labelNumber ? `_${labelNumber}` : ""}.pdf`;
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      toast.success(`Lastet ned ${fileName}`);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Kunne ikke generere PDF";
+      toast.error(msg);
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   useEffect(() => {
     if (open && row) {
@@ -184,9 +228,32 @@ export function PrintLabelDialog({
           </div>
         </div>
 
-        <DialogFooter>
+        <div className="flex items-start gap-2 rounded-md border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
+          <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+          <span>
+            «Skriv ut» tildeler etikett-nummer og logger jobben i utskriftskøen
+            (ingen fysisk skriver er koblet til ennå). Bruk «Last ned PDF» for å
+            få etiketten som fil.
+          </span>
+        </div>
+
+        <DialogFooter className="gap-2 sm:gap-2">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Lukk
+          </Button>
+          <Button
+            variant="outline"
+            onClick={handleDownloadPdf}
+            disabled={downloading || !profile}
+            className="gap-2"
+            title={!profile ? "Sett etikett-profil for varen først" : undefined}
+          >
+            {downloading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
+            Last ned PDF
           </Button>
           <Button
             onClick={handlePrint}

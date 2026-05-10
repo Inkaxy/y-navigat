@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
-import { Info, Printer, RotateCcw } from "lucide-react";
+import { Info, Printer, RotateCcw, Download } from "lucide-react";
 import { toast } from "sonner";
+import {
+  CombinedLabelPdfDocument,
+  slugifyLabel,
+  type LabelPdfData,
+} from "@/produksjon/features/etiketter/lib/labelPdf";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -207,6 +212,60 @@ export default function EtiketterPage() {
     }
   };
 
+  const [bulkPdfRunning, setBulkPdfRunning] = useState(false);
+  const handleBulkDownloadPdf = async () => {
+    if (!productProfiles || !profiles) return;
+    const missing = printableRows.filter((r) => !productProfiles[r.product_id]);
+    if (missing.length > 0) {
+      setMissingProfileNames(
+        missing.map((r) => `${r.display_number} — ${r.display_name}`),
+      );
+      setMissingProfileOpen(true);
+      return;
+    }
+    setBulkPdfRunning(true);
+    try {
+      const { pdf } = await import("@react-pdf/renderer");
+      const items: LabelPdfData[] = [];
+      for (const r of printableRows) {
+        const profileId = productProfiles[r.product_id];
+        const profile = profiles.find((p) => p.id === profileId);
+        if (!profile) continue;
+        items.push({
+          profile,
+          row: r,
+          labelNumber: null,
+          quantity: r.total_labels || 1,
+          copies: r.total_labels || 1,
+        });
+      }
+      if (items.length === 0) {
+        toast.warning("Ingen etiketter å generere.");
+        return;
+      }
+      const blob = await pdf(
+        <CombinedLabelPdfDocument items={items} />,
+      ).toBlob();
+      const url = URL.createObjectURL(blob);
+      const fileName = `etiketter_${date}_${slugifyLabel(
+        entities?.find((e) => e.id === legalEntityId)?.short_code ?? "selskap",
+      )}.pdf`;
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      toast.success(`Lastet ned ${fileName}`);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Kunne ikke generere PDF";
+      toast.error(msg);
+    } finally {
+      setBulkPdfRunning(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header: dato + live + skriv ut */}
@@ -238,6 +297,22 @@ export default function EtiketterPage() {
               {bulkRunning ? "Skriver ut…" : "Skriv ut alle"}
             </Button>
           )}
+          <Button
+            variant="outline"
+            onClick={handleBulkDownloadPdf}
+            disabled={
+              bulkPdfRunning ||
+              !legalEntityId ||
+              printableRows.length === 0
+            }
+            className="gap-2"
+            title={
+              printableRows.length === 0 ? "Ingen varer å laste ned." : undefined
+            }
+          >
+            <Download className="h-4 w-4" />
+            {bulkPdfRunning ? "Genererer…" : "Last ned PDF (alle)"}
+          </Button>
         </div>
       </div>
 
