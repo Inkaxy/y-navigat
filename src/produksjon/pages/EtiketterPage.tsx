@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
-import { Info, Printer, RotateCcw } from "lucide-react";
+import { Info, Printer, RotateCcw, Download } from "lucide-react";
 import { toast } from "sonner";
+import {
+  LabelPdfDocument,
+  slugifyLabel,
+  type LabelPdfData,
+} from "@/produksjon/features/etiketter/lib/labelPdf";
 
 import { Button } from "@/components/ui/button";
 import {
