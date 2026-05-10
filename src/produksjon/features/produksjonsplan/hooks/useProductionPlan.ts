@@ -86,11 +86,11 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
         const customerIds = Array.from(new Set(filteredOrders.map((o) => o.customer_id)));
         const { data: members } = await supabase
           .from("customer_group_members")
-          .select("customer_id, customer_group_id")
+          .select("customer_id, group_id")
           .in("customer_id", customerIds);
         for (const m of members ?? []) {
           const set = customerGroupMap.get(m.customer_id) ?? new Set<string>();
-          set.add(m.customer_group_id);
+          set.add(m.group_id);
           customerGroupMap.set(m.customer_id, set);
         }
       }
