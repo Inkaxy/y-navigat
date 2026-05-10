@@ -256,7 +256,7 @@ export default function EtiketterPage() {
       const blob = await pdf(Combined).toBlob();
       const url = URL.createObjectURL(blob);
       const fileName = `etiketter_${date}_${slugifyLabel(
-        entities?.find((e) => e.id === legalEntityId)?.display_name ?? "selskap",
+        entities?.find((e) => e.id === legalEntityId)?.short_code ?? "selskap",
       )}.pdf`;
       const a = document.createElement("a");
       a.href = url;
