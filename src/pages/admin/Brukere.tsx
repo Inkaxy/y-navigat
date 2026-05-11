@@ -33,6 +33,7 @@ export default function Brukere() {
   const [search, setSearch] = useState("");
   const [companyId, setCompanyId] = useState<string>("all");
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
   const qc = useQueryClient();
   const { data: isOwner = false } = useIsPlatformOwner();
 
