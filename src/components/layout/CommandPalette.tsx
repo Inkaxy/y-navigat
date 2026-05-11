@@ -38,6 +38,7 @@ export function CommandPalette({ open, onOpenChange }: Props) {
       const { data, error } = await supabase
         .from("legal_entities")
         .select("id, legal_name, short_code")
+        .eq("status", "active")
         .order("legal_name");
       if (error) throw error;
       return data ?? [];
