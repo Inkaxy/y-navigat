@@ -17,6 +17,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { useIsPlatformOwner } from "@/hooks/useIsPlatformOwner";
 import { InviteUserDialog } from "./components/InviteUserDialog";
+import { CreateUserDialog } from "./components/CreateUserDialog";
 
 type Row = {
   id: string;
