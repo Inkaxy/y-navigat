@@ -49,6 +49,7 @@ export function CompanyBlock({ className }: { className?: string }) {
         .from("legal_entities")
         .select("id, short_code, legal_name, status, founded_year")
         .in("id", entityIds)
+        .eq("status", "active")
         .order("legal_name", { ascending: true });
       if (error) throw error;
       return (data ?? []) as Entity[];
