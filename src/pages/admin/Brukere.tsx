@@ -96,9 +96,14 @@ export default function Brukere() {
         subtitle="Ansatte og deres stillinger."
         actions={
           isOwner ? (
-            <Button size="sm" onClick={() => setInviteOpen(true)}>
-              <UserPlus className="h-4 w-4" /> Inviter bruker
-            </Button>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={() => setCreateOpen(true)}>
+                <KeyRound className="h-4 w-4" /> Opprett med passord
+              </Button>
+              <Button size="sm" onClick={() => setInviteOpen(true)}>
+                <UserPlus className="h-4 w-4" /> Inviter bruker
+              </Button>
+            </div>
           ) : null
         }
       />
