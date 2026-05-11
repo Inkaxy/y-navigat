@@ -100,21 +100,20 @@ export default function Login() {
 
   return (
     <div
-      className="flex min-h-screen items-start justify-center px-4 pt-8 pb-8"
+      className="flex min-h-screen items-center justify-center px-4 py-4"
       style={{
         background:
           "radial-gradient(ellipse at top, hsl(var(--brand-ink)) 0%, hsl(24 24% 6%) 70%)",
       }}
     >
-      <div className="w-full max-w-3xl animate-fade-in">
-        <div className="flex flex-col items-center text-center">
+      <div className="w-full max-w-3xl space-y-2 animate-fade-in">
+        <div className="flex flex-col items-center text-center -mb-56 sm:-mb-72 md:-mb-96 lg:-mb-[28rem]">
           <Logo
             variant="horizontal"
             title="Nøtterø Bakeri"
-            className="h-[55vh] max-h-[40rem] w-auto text-brand-cream drop-shadow-[0_8px_30px_hsl(var(--brand-bronze)/0.25)]"
+            className="h-[48rem] w-auto sm:h-[56rem] md:h-[68rem] lg:h-[80rem] text-brand-cream drop-shadow-[0_8px_30px_hsl(var(--brand-bronze)/0.25)]"
           />
         </div>
-        <div className="mt-8"></div>
 
         <Card className="shadow-elevated">
           <CardHeader>
