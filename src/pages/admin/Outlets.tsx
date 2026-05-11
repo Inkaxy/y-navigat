@@ -199,6 +199,9 @@ export default function Outlets() {
                     <Button size="sm" variant="ghost" onClick={() => toggleStatus.mutate(r)}>
                       {r.status === "active" ? <Archive className="h-3.5 w-3.5" /> : <ArchiveRestore className="h-3.5 w-3.5" />}
                     </Button>
+                    <Button size="sm" variant="ghost" onClick={() => setDeleting(r)}>
+                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                    </Button>
                   </TableCell>
                 </TableRow>
               );
