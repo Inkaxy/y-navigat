@@ -126,6 +126,19 @@ export default function Outlets() {
     onError: (e: any) => toast.error(e.message),
   });
 
+  const remove = useMutation({
+    mutationFn: async (row: Outlet) => {
+      const { error } = await supabase.from("outlets").delete().eq("id", row.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-outlets"] });
+      toast.success("Outlet slettet");
+      setDeleting(null);
+    },
+    onError: (e: any) => toast.error(e.message ?? "Kunne ikke slette"),
+  });
+
   return (
     <AdminLayout title="Outlets">
       <AppHeaderBanner
