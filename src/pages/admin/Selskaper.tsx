@@ -290,6 +290,27 @@ export default function Selskaper() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!deleting} onOpenChange={(o) => !o && setDeleting(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Slette selskap?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Er du sikker på at du vil slette <strong>{deleting?.legal_name}</strong>? Dette kan feile dersom selskapet har tilknyttede outlets, kunder eller andre data. Handlingen kan ikke angres.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Avbryt</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={(e) => { e.preventDefault(); deleting && remove.mutate(deleting); }}
+              disabled={remove.isPending}
+            >
+              Slett
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AdminLayout>
   );
 }
