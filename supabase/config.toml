@@ -30,3 +30,6 @@ verify_jwt = false
 
 [functions.delete-user]
 verify_jwt = true
+
+[functions.create-user-with-password]
+verify_jwt = true

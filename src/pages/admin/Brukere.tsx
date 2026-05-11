@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import AdminLayout from "./AdminLayout";
 import { AppHeaderBanner } from "@/components/layout/AppHeaderBanner";
-import { Users, UserPlus } from "lucide-react";
+import { Users, UserPlus, KeyRound } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -17,6 +17,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { useIsPlatformOwner } from "@/hooks/useIsPlatformOwner";
 import { InviteUserDialog } from "./components/InviteUserDialog";
+import { CreateUserDialog } from "./components/CreateUserDialog";
 
 type Row = {
   id: string;
@@ -32,6 +33,7 @@ export default function Brukere() {
   const [search, setSearch] = useState("");
   const [companyId, setCompanyId] = useState<string>("all");
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
   const qc = useQueryClient();
   const { data: isOwner = false } = useIsPlatformOwner();
 
@@ -94,9 +96,14 @@ export default function Brukere() {
         subtitle="Ansatte og deres stillinger."
         actions={
           isOwner ? (
-            <Button size="sm" onClick={() => setInviteOpen(true)}>
-              <UserPlus className="h-4 w-4" /> Inviter bruker
-            </Button>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={() => setCreateOpen(true)}>
+                <KeyRound className="h-4 w-4" /> Opprett med passord
+              </Button>
+              <Button size="sm" onClick={() => setInviteOpen(true)}>
+                <UserPlus className="h-4 w-4" /> Inviter bruker
+              </Button>
+            </div>
           ) : null
         }
       />
@@ -149,6 +156,11 @@ export default function Brukere() {
         open={inviteOpen}
         onOpenChange={setInviteOpen}
         onInvited={() => qc.invalidateQueries({ queryKey: ["admin-users"] })}
+      />
+      <CreateUserDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        onCreated={() => qc.invalidateQueries({ queryKey: ["admin-users"] })}
       />
     </AdminLayout>
   );
