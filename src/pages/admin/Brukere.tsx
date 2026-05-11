@@ -157,6 +157,11 @@ export default function Brukere() {
         onOpenChange={setInviteOpen}
         onInvited={() => qc.invalidateQueries({ queryKey: ["admin-users"] })}
       />
+      <CreateUserDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        onCreated={() => qc.invalidateQueries({ queryKey: ["admin-users"] })}
+      />
     </AdminLayout>
   );
 }
