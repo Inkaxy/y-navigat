@@ -54,7 +54,7 @@ export default function Brukere() {
     queryFn: async (): Promise<Row[]> => {
       const today = new Date().toISOString().slice(0, 10);
       const [{ data: users, error: e1 }, { data: positions, error: e2 }] = await Promise.all([
-        supabase.from("users").select("id, display_name, email, status, last_login_at").order("display_name"),
+        supabase.from("users").select("id, display_name, email, status, last_login_at").neq("status", "deleted").order("display_name"),
         supabase.from("user_positions").select("user_id, legal_entity_id, valid_from, valid_to"),
       ]);
       if (e1) throw e1;
