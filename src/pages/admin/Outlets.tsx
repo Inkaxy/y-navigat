@@ -3,7 +3,11 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import AdminLayout from "./AdminLayout";
 import { AppHeaderBanner } from "@/components/layout/AppHeaderBanner";
-import { Store, Plus, Pencil, Archive, ArchiveRestore } from "lucide-react";
+import { Store, Plus, Pencil, Archive, ArchiveRestore, Trash2 } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
