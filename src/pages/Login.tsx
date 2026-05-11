@@ -107,7 +107,7 @@ export default function Login() {
       }}
     >
       <div className="w-full max-w-3xl space-y-2 sm:space-y-3 md:space-y-4 animate-fade-in">
-        <div className="flex flex-col items-center text-center -mb-10 sm:-mb-14 md:-mb-20">
+        <div className="flex flex-col items-center text-center -mb-40 sm:-mb-56 md:-mb-72 lg:-mb-80">
           <Logo
             variant="horizontal"
             title="Nøtterø Bakeri"
