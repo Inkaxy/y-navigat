@@ -132,6 +132,19 @@ export default function Selskaper() {
     onError: (e: any) => toast.error(e.message ?? "Feilet"),
   });
 
+  const remove = useMutation({
+    mutationFn: async (row: LE) => {
+      const { error } = await supabase.from("legal_entities").delete().eq("id", row.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-legal-entities"] });
+      toast.success("Selskap slettet");
+      setDeleting(null);
+    },
+    onError: (e: any) => toast.error(e.message ?? "Kunne ikke slette"),
+  });
+
   return (
     <AdminLayout title="Selskaper">
       <AppHeaderBanner
