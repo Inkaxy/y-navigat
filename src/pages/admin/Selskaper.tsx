@@ -3,7 +3,11 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import AdminLayout from "./AdminLayout";
 import { AppHeaderBanner } from "@/components/layout/AppHeaderBanner";
-import { Building2, Plus, Pencil, Archive, ArchiveRestore } from "lucide-react";
+import { Building2, Plus, Pencil, Archive, ArchiveRestore, Trash2 } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -70,6 +74,7 @@ export default function Selskaper() {
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [editing, setEditing] = useState<Partial<LE> | null>(null);
+  const [deleting, setDeleting] = useState<LE | null>(null);
 
   const { data = [], isLoading } = useQuery({
     queryKey: ["admin-legal-entities"],
@@ -125,6 +130,19 @@ export default function Selskaper() {
       toast.success("Status oppdatert");
     },
     onError: (e: any) => toast.error(e.message ?? "Feilet"),
+  });
+
+  const remove = useMutation({
+    mutationFn: async (row: LE) => {
+      const { error } = await supabase.from("legal_entities").delete().eq("id", row.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-legal-entities"] });
+      toast.success("Selskap slettet");
+      setDeleting(null);
+    },
+    onError: (e: any) => toast.error(e.message ?? "Kunne ikke slette"),
   });
 
   return (
@@ -189,6 +207,9 @@ export default function Selskaper() {
                   </Button>
                   <Button size="sm" variant="ghost" onClick={() => toggleStatus.mutate(r)}>
                     {r.status === "active" ? <Archive className="h-3.5 w-3.5" /> : <ArchiveRestore className="h-3.5 w-3.5" />}
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setDeleting(r)}>
+                    <Trash2 className="h-3.5 w-3.5 text-destructive" />
                   </Button>
                 </TableCell>
               </TableRow>
@@ -269,6 +290,27 @@ export default function Selskaper() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!deleting} onOpenChange={(o) => !o && setDeleting(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Slette selskap?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Er du sikker på at du vil slette <strong>{deleting?.legal_name}</strong>? Dette kan feile dersom selskapet har tilknyttede outlets, kunder eller andre data. Handlingen kan ikke angres.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Avbryt</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={(e) => { e.preventDefault(); deleting && remove.mutate(deleting); }}
+              disabled={remove.isPending}
+            >
+              Slett
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AdminLayout>
   );
 }

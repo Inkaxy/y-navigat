@@ -3,7 +3,11 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import AdminLayout from "./AdminLayout";
 import { AppHeaderBanner } from "@/components/layout/AppHeaderBanner";
-import { Store, Plus, Pencil, Archive, ArchiveRestore } from "lucide-react";
+import { Store, Plus, Pencil, Archive, ArchiveRestore, Trash2 } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -52,6 +56,7 @@ export default function Outlets() {
   const [search, setSearch] = useState("");
   const [companyId, setCompanyId] = useState("all");
   const [editing, setEditing] = useState<Partial<Outlet> | null>(null);
+  const [deleting, setDeleting] = useState<Outlet | null>(null);
 
   const { data: companies = [] } = useQuery({
     queryKey: ["admin-le-options"],
@@ -121,6 +126,19 @@ export default function Outlets() {
     onError: (e: any) => toast.error(e.message),
   });
 
+  const remove = useMutation({
+    mutationFn: async (row: Outlet) => {
+      const { error } = await supabase.from("outlets").delete().eq("id", row.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-outlets"] });
+      toast.success("Outlet slettet");
+      setDeleting(null);
+    },
+    onError: (e: any) => toast.error(e.message ?? "Kunne ikke slette"),
+  });
+
   return (
     <AdminLayout title="Outlets">
       <AppHeaderBanner
@@ -181,6 +199,9 @@ export default function Outlets() {
                     <Button size="sm" variant="ghost" onClick={() => toggleStatus.mutate(r)}>
                       {r.status === "active" ? <Archive className="h-3.5 w-3.5" /> : <ArchiveRestore className="h-3.5 w-3.5" />}
                     </Button>
+                    <Button size="sm" variant="ghost" onClick={() => setDeleting(r)}>
+                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                    </Button>
                   </TableCell>
                 </TableRow>
               );
@@ -237,6 +258,27 @@ export default function Outlets() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!deleting} onOpenChange={(o) => !o && setDeleting(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Slette outlet?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Er du sikker på at du vil slette <strong>{deleting?.short_name}</strong>? Denne handlingen kan ikke angres.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Avbryt</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={(e) => { e.preventDefault(); deleting && remove.mutate(deleting); }}
+              disabled={remove.isPending}
+            >
+              Slett
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AdminLayout>
   );
 }
