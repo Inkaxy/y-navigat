@@ -100,7 +100,7 @@ export default function Login() {
 
   return (
     <div
-      className="flex min-h-screen items-center justify-center px-4 py-4"
+      className="flex min-h-screen items-start justify-center px-4 pt-4 pb-4"
       style={{
         background:
           "radial-gradient(ellipse at top, hsl(var(--brand-ink)) 0%, hsl(24 24% 6%) 70%)",
