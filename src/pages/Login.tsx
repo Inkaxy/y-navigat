@@ -111,7 +111,7 @@ export default function Login() {
           <Logo
             variant="horizontal"
             title="Nøtterø Bakeri"
-            className="h-56 w-auto sm:h-64 md:h-72 lg:h-80 text-brand-cream drop-shadow-[0_8px_30px_hsl(var(--brand-bronze)/0.25)]"
+            className="h-96 w-auto sm:h-[28rem] md:h-[34rem] lg:h-[40rem] text-brand-cream drop-shadow-[0_8px_30px_hsl(var(--brand-bronze)/0.25)]"
           />
         </div>
 
