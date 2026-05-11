@@ -1,24 +1,35 @@
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import AdminLayout from "./AdminLayout";
 import { AppHeaderBanner } from "@/components/layout/AppHeaderBanner";
-import { User, X } from "lucide-react";
+import { User, X, Trash2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
 } from "@/components/ui/table";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { useState } from "react";
+import { useIsPlatformOwner } from "@/hooks/useIsPlatformOwner";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function BrukerDetalj() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const qc = useQueryClient();
   const today = new Date().toISOString().slice(0, 10);
+  const { data: isOwner = false } = useIsPlatformOwner();
+  const { user: authUser } = useAuth();
+  const [deleting, setDeleting] = useState(false);
 
   const { data: user } = useQuery({
     queryKey: ["admin-user", id],
@@ -67,12 +78,63 @@ export default function BrukerDetalj() {
     onError: (e: any) => toast.error(e.message),
   });
 
+  const canDelete = isOwner && id && id !== authUser?.id;
+
+  async function handleDelete() {
+    if (!id) return;
+    setDeleting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("delete-user", {
+        body: { user_id: id },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      toast.success("Bruker slettet");
+      qc.invalidateQueries({ queryKey: ["admin-users"] });
+      navigate("/admin/brukere");
+    } catch (e: any) {
+      toast.error(e?.message ?? "Kunne ikke slette bruker");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   return (
     <AdminLayout title={user?.display_name ?? "Bruker"}>
       <AppHeaderBanner
         icon={User}
         title={user?.display_name ?? "Bruker"}
         subtitle={user?.email}
+        actions={
+          canDelete ? (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button size="sm" variant="destructive" disabled={deleting}>
+                  <Trash2 className="h-4 w-4" /> Slett bruker
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Slett bruker?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Dette vil permanent slette {user?.display_name ?? "brukeren"} fra
+                    innloggingssystemet og avslutte alle aktive stillinger. Handlingen kan
+                    ikke angres.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Avbryt</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleDelete}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    Slett bruker
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          ) : null
+        }
       />
 
       <Card>
