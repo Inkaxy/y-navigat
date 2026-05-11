@@ -78,12 +78,63 @@ export default function BrukerDetalj() {
     onError: (e: any) => toast.error(e.message),
   });
 
+  const canDelete = isOwner && id && id !== authUser?.id;
+
+  async function handleDelete() {
+    if (!id) return;
+    setDeleting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("delete-user", {
+        body: { user_id: id },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      toast.success("Bruker slettet");
+      qc.invalidateQueries({ queryKey: ["admin-users"] });
+      navigate("/admin/brukere");
+    } catch (e: any) {
+      toast.error(e?.message ?? "Kunne ikke slette bruker");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   return (
     <AdminLayout title={user?.display_name ?? "Bruker"}>
       <AppHeaderBanner
         icon={User}
         title={user?.display_name ?? "Bruker"}
         subtitle={user?.email}
+        actions={
+          canDelete ? (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button size="sm" variant="destructive" disabled={deleting}>
+                  <Trash2 className="h-4 w-4" /> Slett bruker
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Slett bruker?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Dette vil permanent slette {user?.display_name ?? "brukeren"} fra
+                    innloggingssystemet og avslutte alle aktive stillinger. Handlingen kan
+                    ikke angres.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Avbryt</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleDelete}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    Slett bruker
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          ) : null
+        }
       />
 
       <Card>
