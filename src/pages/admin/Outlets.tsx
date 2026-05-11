@@ -56,6 +56,7 @@ export default function Outlets() {
   const [search, setSearch] = useState("");
   const [companyId, setCompanyId] = useState("all");
   const [editing, setEditing] = useState<Partial<Outlet> | null>(null);
+  const [deleting, setDeleting] = useState<Outlet | null>(null);
 
   const { data: companies = [] } = useQuery({
     queryKey: ["admin-le-options"],
