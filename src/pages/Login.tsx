@@ -100,18 +100,18 @@ export default function Login() {
 
   return (
     <div
-      className="flex min-h-screen items-start justify-center px-4 pt-2 sm:pt-4 md:pt-6 pb-8"
+      className="flex min-h-screen items-center justify-center px-4 py-4"
       style={{
         background:
           "radial-gradient(ellipse at top, hsl(var(--brand-ink)) 0%, hsl(24 24% 6%) 70%)",
       }}
     >
-      <div className="w-full max-w-3xl space-y-2 sm:space-y-3 md:space-y-4 animate-fade-in">
-        <div className="flex flex-col items-center text-center -mb-40 sm:-mb-56 md:-mb-72 lg:-mb-80">
+      <div className="w-full max-w-3xl space-y-2 animate-fade-in">
+        <div className="flex flex-col items-center text-center -mb-16 sm:-mb-20 md:-mb-24">
           <Logo
             variant="horizontal"
             title="Nøtterø Bakeri"
-            className="h-[40rem] w-auto md:h-[56rem] lg:h-[64rem] text-brand-cream drop-shadow-[0_8px_30px_hsl(var(--brand-bronze)/0.25)]"
+            className="h-56 w-auto sm:h-64 md:h-72 lg:h-80 text-brand-cream drop-shadow-[0_8px_30px_hsl(var(--brand-bronze)/0.25)]"
           />
         </div>
 
