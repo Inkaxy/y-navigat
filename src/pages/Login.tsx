@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { UserCircle2 } from "lucide-react";
-import { Logo } from "@/components/brand/Logo";
+import LoginLogo from "@/assets/brand/logo-login.svg?react";
 
 // Demo-panel er kun synlig i utvikling og bare hvis VITE_DEMO_PASSWORD er satt
 // som build-secret. Passordet bundles ikke i prod-byggene.
@@ -108,9 +108,9 @@ export default function Login() {
     >
       <div className="w-full max-w-3xl space-y-2 animate-fade-in">
         <div className="flex flex-col items-center text-center -mb-56 sm:-mb-72 md:-mb-96 lg:-mb-[28rem]">
-          <Logo
-            variant="horizontal"
-            title="Nøtterø Bakeri"
+          <LoginLogo
+            role="img"
+            aria-label="Nøtterø Bakeri"
             className="h-[48rem] w-auto sm:h-[56rem] md:h-[68rem] lg:h-[80rem] text-brand-cream drop-shadow-[0_8px_30px_hsl(var(--brand-bronze)/0.25)]"
           />
         </div>
