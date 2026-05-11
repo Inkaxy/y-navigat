@@ -74,6 +74,7 @@ export default function Selskaper() {
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [editing, setEditing] = useState<Partial<LE> | null>(null);
+  const [deleting, setDeleting] = useState<LE | null>(null);
 
   const { data = [], isLoading } = useQuery({
     queryKey: ["admin-legal-entities"],
