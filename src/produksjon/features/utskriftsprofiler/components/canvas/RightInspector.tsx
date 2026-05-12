@@ -222,7 +222,7 @@ export function RightInspector({ selected, innerW, innerH, onChange, onRemove }:
   );
 }
 
-void Icon;
+
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
