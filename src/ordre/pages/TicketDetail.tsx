@@ -51,7 +51,12 @@ export default function TicketDetail() {
   const { toast } = useToast();
   const { data, isLoading } = useTicket(id);
   const update = useUpdateTicket();
+  const { data: replies = [] } = useTicketReplies(id);
+  const { data: assignees = [] } = useOrdrekontorAssignees();
+  const sendReply = useSendTicketReply();
   const [notesDraft, setNotesDraft] = useState("");
+  const [replyDraft, setReplyDraft] = useState("");
+  const [confirmReplyOpen, setConfirmReplyOpen] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   useEffect(() => {
