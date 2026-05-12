@@ -1,27 +1,21 @@
-Jeg fant sannsynlig hovedfeil: koden henter «siste snapshot» før den lagrer nytt snapshot, men den henter uten å filtrere på samme utskriftskriterier. Det betyr at korreksjonslisten kan sammenligne mot en snapshot fra annen mal/tur/kriterier, og fordi snapshot-items bare lagres på `product_id`, blir grunnlaget feil for aggregerte produksjonsgrupper. I tillegg skjules print-DOM-en med `hidden print:block`, som kan være ustabilt sammen med global print-CSS og browserens print-capture.
+## Mål
+Vis ISO-ukenummer i alle kalendere i appen.
 
-Plan:
+## Endring
+Én sentral endring i `src/components/ui/calendar.tsx` (shadcn-wrapper rundt `react-day-picker`), som brukes av alle datovelgere (DateNavigator, WeekMonthQuickPicker, PeriodPicker, DateContextChips → kalender, m.fl.).
 
-1. Stramme inn snapshot-oppslag
-   - Endre `fetchLatestSnapshotItems` til å finne forrige snapshot for samme dato, selskap, liste-type og relevante kriterier.
-   - Matche på `criteria_copy`/turer slik at en utskrift ikke bruker snapshot fra en annen filtrering som sammenligningsgrunnlag.
+1. Sett `showWeekNumber` som default `true` på `<DayPicker>` (kan overstyres per bruk hvis nødvendig).
+2. Sett `weekStartsOn: 1` (mandag) som default — ISO-uke starter mandag, og det matcher allerede norsk locale (`nb`) brukt rundt om.
+3. Legg til styling i `classNames` slik at uke-kolonnen passer designsystemet:
+   - `head_head`: smal kolonne, `text-muted-foreground text-[0.7rem] font-normal uppercase tracking-wide`
+   - `weeknumber`: `text-muted-foreground text-[0.7rem] tabular-nums w-9 text-center`
+4. Lokalisér uke-header til "U" (eller "Uke") via `labels.labelWeekNumberHeader` så det ikke står engelsk "Wk".
 
-2. Gjøre snapshot-nøkkel lik tabellrad-nøkkel
-   - Slutte å lagre/sammenligne kun per `product_id` når produksjonsplanen kan være aggregert per produksjonsgruppe/hovedgruppe.
-   - Bruke en stabil `row_key` basert på valgt aggregering og tur/summering, slik at korreksjon sammenligner nøyaktig samme type rad som vises i utskriften.
-   - Dette krever en liten databaseendring: legge til `row_key` på `production_plan_snapshot_items` og indeks for `snapshot_id + row_key`.
+## Hva blir IKKE endret
+- Ingen logikk i de enkelte sidene/dialogene.
+- Ingen design-tokens i `index.css` / `tailwind.config.ts`.
+- Ingen endringer på print/produksjonsplan/snapshot-flyt.
 
-3. Gjøre utskrift av korreksjon deterministisk
-   - Lage print-jobben med eksplisitte sider: normale kopier + eventuell korreksjonsside.
-   - Sørge for at korreksjonssiden alltid er i DOM før `window.print()` åpnes, uten å stole på `hidden print:block` alene.
-   - Beholde dagens toast, men gjøre meldingen tydelig hvis forrige snapshot finnes, mangler eller ikke matcher kriteriene.
-
-4. Kontrollere med ekte data
-   - Verifisere at nylige snapshots faktisk lagres med varer.
-   - Teste logikken mot dagens lagrede snapshots: første utskrift gir bare produksjonsliste, andre utskrift med endring gir ekstra korreksjonsside med +/-.
-
-Teknisk berørte filer:
-- `src/produksjon/features/produksjonsplan/hooks/useProductionPlanSnapshots.ts`
-- `src/produksjon/pages/ProduksjonsplanPage.tsx`
-- `src/produksjon/features/produksjonsplan/components/CorrectionPlanTable.tsx`
-- Supabase-migration for `production_plan_snapshot_items.row_key`
+## Teknisk
+- `react-day-picker` v8 props brukt: `showWeekNumber`, `weekStartsOn`, `labels`.
+- Klassenavn (`head_head`, `weeknumber`) flettes inn via eksisterende `classNames`-objekt slik at brukstedene fortsatt kan overstyre via `cn`.
