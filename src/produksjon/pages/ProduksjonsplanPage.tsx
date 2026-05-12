@@ -279,16 +279,23 @@ export default function ProduksjonsplanPage() {
       )}
 
       {legalEntityId && (
-        <ProductionPlanTable
-          rows={rows}
-          showByMainGroup={prefs.showByMainGroup}
-          showTraysWithPlus={prefs.showTraysWithPlus}
-          loading={plan.isLoading}
-        />
+        <div className="print-area space-y-3">
+          <div className="hidden print:block mb-2">
+            <h1 className="text-lg font-semibold">Produksjonsplan — {format(date, "dd.MM.yyyy")}</h1>
+            {activeTemplate && <p className="text-xs">{activeTemplate.name}</p>}
+            <pre className="text-[10px] font-mono whitespace-pre-wrap">{summary}</pre>
+          </div>
+          <ProductionPlanTable
+            rows={rows}
+            showByMainGroup={prefs.showByMainGroup}
+            showTraysWithPlus={prefs.showTraysWithPlus}
+            loading={plan.isLoading}
+          />
+        </div>
       )}
 
       {/* Footer hint */}
-      <p className="text-xs text-muted-foreground">
+      <p className="text-xs text-muted-foreground print-hide">
         <Plus className="inline h-3 w-3 mr-1" />
         Snapshot- og korreksjons-funksjonen kommer i neste fase.
       </p>
