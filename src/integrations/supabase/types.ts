@@ -7317,6 +7317,56 @@ export type Database = {
           },
         ]
       }
+      ticket_replies: {
+        Row: {
+          body_rendered: string | null
+          body_text: string
+          created_at: string
+          error_message: string | null
+          id: string
+          microsoft_conversation_id: string | null
+          microsoft_message_id: string | null
+          send_status: string
+          sent_at: string | null
+          sent_by: string
+          ticket_id: string
+        }
+        Insert: {
+          body_rendered?: string | null
+          body_text: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          microsoft_conversation_id?: string | null
+          microsoft_message_id?: string | null
+          send_status?: string
+          sent_at?: string | null
+          sent_by: string
+          ticket_id: string
+        }
+        Update: {
+          body_rendered?: string | null
+          body_text?: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          microsoft_conversation_id?: string | null
+          microsoft_message_id?: string | null
+          send_status?: string
+          sent_at?: string | null
+          sent_by?: string
+          ticket_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_replies_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ticket_subscriptions: {
         Row: {
           client_state: string
