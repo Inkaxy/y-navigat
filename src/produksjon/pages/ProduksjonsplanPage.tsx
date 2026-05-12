@@ -288,9 +288,12 @@ export default function ProduksjonsplanPage() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <Button variant="outline" onClick={() => window.print()}>
+          <Button variant="outline" onClick={handlePrint}>
             <Printer className="h-4 w-4 mr-2" />
             Skriv ut
+            {(criteria.print_copies ?? 1) > 1 && (
+              <span className="ml-1 text-xs text-muted-foreground">×{criteria.print_copies}</span>
+            )}
           </Button>
 
           {/* Handling-meny */}
