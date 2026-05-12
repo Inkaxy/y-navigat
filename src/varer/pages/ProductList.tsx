@@ -291,6 +291,13 @@ export default function ProductList() {
         render: (p) => (p.mva_rate != null ? `${p.mva_rate}%` : "—"),
       },
       {
+        key: "pieces_per_tray",
+        label: "Antall pr brett",
+        headerClassName: "text-right",
+        cellClassName: "text-right tabular-nums text-muted-foreground",
+        render: (p) => (p.pieces_per_tray != null ? p.pieces_per_tray : "—"),
+      },
+      {
         key: "label_mode",
         label: "Etikett",
         cellClassName: "text-muted-foreground",
