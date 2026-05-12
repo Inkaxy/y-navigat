@@ -127,6 +127,7 @@ Deno.serve(async (req) => {
 
     return json(200, { success: true, user_id: newUserId });
   } catch (e) {
-    return json(500, { error: (e as Error).message });
+    console.error("invite-user", e);
+    return json(500, { error: "internal_error" });
   }
 });

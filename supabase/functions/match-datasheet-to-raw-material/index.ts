@@ -47,7 +47,8 @@ Deno.serve(async (req) => {
 
     return json({ candidates });
   } catch (e) {
-    return json({ error: (e as Error).message }, 500);
+    console.error("match-datasheet-to-raw-material", e);
+    return json({ error: "internal_error" }, 500);
   }
 });
 

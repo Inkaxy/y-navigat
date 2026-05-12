@@ -83,7 +83,8 @@ Deno.serve(async (req) => {
     return json({ raw_material_id: rm.id, sku: rm.sku, name: rm.name });
   } catch (e) {
     console.error(e);
-    return json({ error: (e as Error).message }, 500);
+    console.error("create-raw-material-from-datasheet", e);
+    return json({ error: "internal_error" }, 500);
   }
 });
 

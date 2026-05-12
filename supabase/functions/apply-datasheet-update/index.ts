@@ -187,7 +187,8 @@ Deno.serve(async (req) => {
     });
   } catch (e) {
     console.error(e);
-    return json({ error: (e as Error).message }, 500);
+    console.error("apply-datasheet-update", e);
+    return json({ error: "internal_error" }, 500);
   }
 });
 
