@@ -41,7 +41,7 @@ import {
   useMainCategories,
   useSubCategories,
 } from "../features/produksjonsplan/hooks/useReferenceData";
-import { ProductionPlanTable } from "../features/produksjonsplan/components/ProductionPlanTable";
+import { ProductionPlanTable, type ColumnVisibility } from "../features/produksjonsplan/components/ProductionPlanTable";
 import { SettKriteriaDialog } from "../features/produksjonsplan/components/SettKriteriaDialog";
 import { HentKriteriaDialog } from "../features/produksjonsplan/components/HentKriteriaDialog";
 import { SaveTemplateDialog } from "../features/produksjonsplan/components/SaveTemplateDialog";
@@ -55,6 +55,14 @@ interface UiPrefs {
   useLeadTimes: boolean;
   hideDoughTypes: boolean;
   expandPackages: boolean;
+  // Kolonne-valg
+  colMainGroup?: boolean;
+  colDoughType?: boolean;
+  colUnit?: boolean;
+  colOrdered?: boolean;
+  colFromStock?: boolean;
+  colLiters?: boolean;
+  colOnStock?: boolean;
 }
 
 const DEFAULT_PREFS: UiPrefs = {
@@ -66,6 +74,13 @@ const DEFAULT_PREFS: UiPrefs = {
   useLeadTimes: true,
   hideDoughTypes: false,
   expandPackages: false,
+  colMainGroup: true,
+  colDoughType: true,
+  colUnit: true,
+  colOrdered: true,
+  colFromStock: true,
+  colLiters: true,
+  colOnStock: true,
 };
 
 function relativeLabel(d: Date): string {
