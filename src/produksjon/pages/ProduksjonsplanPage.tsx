@@ -216,6 +216,15 @@ export default function ProduksjonsplanPage() {
               <DropdownMenuCheckboxItem checked={prefs.useLeadTimes} onCheckedChange={(v) => setPrefs({ ...prefs, useLeadTimes: !!v })}>Bruk ledetider</DropdownMenuCheckboxItem>
               <DropdownMenuCheckboxItem checked={prefs.hideDoughTypes} onCheckedChange={(v) => setPrefs({ ...prefs, hideDoughTypes: !!v })}>Skriv uten deigtyper</DropdownMenuCheckboxItem>
               <DropdownMenuCheckboxItem checked={prefs.expandPackages} onCheckedChange={(v) => setPrefs({ ...prefs, expandPackages: !!v })}>Ekspander pakker</DropdownMenuCheckboxItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel>Kolonner</DropdownMenuLabel>
+              <DropdownMenuCheckboxItem checked={prefs.colMainGroup ?? true} onCheckedChange={(v) => setPrefs({ ...prefs, colMainGroup: !!v })}>Hovedgruppe</DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem checked={prefs.colDoughType ?? true} onCheckedChange={(v) => setPrefs({ ...prefs, colDoughType: !!v })}>Deigtype</DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem checked={prefs.colOrdered ?? true} onCheckedChange={(v) => setPrefs({ ...prefs, colOrdered: !!v })}>I ordre</DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem checked={prefs.colFromStock ?? true} onCheckedChange={(v) => setPrefs({ ...prefs, colFromStock: !!v })}>Fra lager</DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem checked={prefs.colUnit ?? true} onCheckedChange={(v) => setPrefs({ ...prefs, colUnit: !!v })}>Enhet</DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem checked={prefs.colLiters ?? true} onCheckedChange={(v) => setPrefs({ ...prefs, colLiters: !!v })}>Liter</DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem checked={prefs.colOnStock ?? true} onCheckedChange={(v) => setPrefs({ ...prefs, colOnStock: !!v })}>På lager</DropdownMenuCheckboxItem>
             </DropdownMenuContent>
           </DropdownMenu>
 
