@@ -116,8 +116,9 @@ Deno.serve(async (req) => {
       return json(500, { error: `Stillinger kunne ikke tilordnes: ${posErr.message}` });
     }
 
-    return json(200, { success: true, user_id: newUserId, email, password: body.password });
+    return json(200, { success: true, user_id: newUserId, email });
   } catch (e) {
-    return json(500, { error: (e as Error).message });
+    console.error("create-user-with-password", e);
+    return json(500, { error: "internal_error" });
   }
 });
