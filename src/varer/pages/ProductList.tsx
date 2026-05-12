@@ -24,6 +24,8 @@ type ProductRow = {
   display_name: string;
   product_category: string;
   product_subcategory: string | null;
+  main_category: { code: string; display_name: string } | null;
+  sub_category: { code: string; display_name: string } | null;
   unit_of_sale: string;
   status: ProductStatus;
   variant_of_product_id: string | null;
