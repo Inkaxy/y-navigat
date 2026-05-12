@@ -196,7 +196,7 @@ export default function ProduksjonsplanPage() {
     let savedItemCount = 0;
     if (wantCorrection) {
       try {
-        prev = await fetchLatestSnapshotItems(legalEntityId, dateStr);
+        prev = await fetchLatestSnapshotItems(legalEntityId, dateStr, criteria);
       } catch (e) {
         console.error(e);
       }
@@ -466,6 +466,7 @@ export default function ProduksjonsplanPage() {
                       showTraysWithPlus={prefs.showTraysWithPlus}
                       columns={cols}
                       previousItems={printJob.prevItems}
+                      criteria={criteria}
                     />
                   ) : (
                     <ProductionPlanTable

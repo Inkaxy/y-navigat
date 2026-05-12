@@ -5459,6 +5459,7 @@ export type Database = {
           quantity_from_stock: number
           quantity_ordered: number
           quantity_to_produce: number
+          row_key: string
           snapshot_id: string
           trays_full: number
           trays_partial: number
@@ -5469,6 +5470,7 @@ export type Database = {
           quantity_from_stock?: number
           quantity_ordered?: number
           quantity_to_produce?: number
+          row_key?: string
           snapshot_id: string
           trays_full?: number
           trays_partial?: number
@@ -5479,6 +5481,7 @@ export type Database = {
           quantity_from_stock?: number
           quantity_ordered?: number
           quantity_to_produce?: number
+          row_key?: string
           snapshot_id?: string
           trays_full?: number
           trays_partial?: number

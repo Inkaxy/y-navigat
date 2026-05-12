@@ -1,5 +1,5 @@
 import { Fragment } from "react";
-import type { ProductionPlanRow } from "../types";
+import type { ProductionPlanRow, ProduksjonsplanCriteria } from "../types";
 import {
   Table,
   TableBody,
@@ -9,7 +9,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { ColumnVisibility } from "./ProductionPlanTable";
-import type { SnapshotItem } from "../hooks/useProductionPlanSnapshots";
+import { buildRowKey, type SnapshotItem } from "../hooks/useProductionPlanSnapshots";
 
 interface Props {
   rows: ProductionPlanRow[];
@@ -17,6 +17,7 @@ interface Props {
   showTraysWithPlus: boolean;
   columns: ColumnVisibility;
   previousItems: Map<string, SnapshotItem>;
+  criteria: ProduksjonsplanCriteria;
 }
 
 function fmtNum(n: number | null | undefined, digits = 0): string {
@@ -32,7 +33,7 @@ function fmtDiff(n: number, digits = 0): string {
   return s + (digits === 0 ? Math.round(v).toLocaleString("nb-NO") : v.toLocaleString("nb-NO", { maximumFractionDigits: digits }));
 }
 
-export function CorrectionPlanTable({ rows, showByMainGroup, showTraysWithPlus, columns, previousItems }: Props) {
+export function CorrectionPlanTable({ rows, showByMainGroup, showTraysWithPlus, columns, previousItems, criteria }: Props) {
   const printGroupStart = new Map<number, { code: string; name: string }>();
   if (showByMainGroup) {
     let prev = "__init__";
@@ -67,8 +68,8 @@ export function CorrectionPlanTable({ rows, showByMainGroup, showTraysWithPlus, 
     1; // Endring
 
   // Bygg liste over rader som finnes i forrige snapshot men ikke i nåværende → vises som "fjernet"
-  const currentIds = new Set(rows.map((r) => r.product_id));
-  const removedIds = Array.from(previousItems.keys()).filter((id) => !currentIds.has(id));
+  const currentKeys = new Set(rows.map((r) => buildRowKey(r, criteria)));
+  const removedKeys = Array.from(previousItems.keys()).filter((k) => !currentKeys.has(k));
 
   return (
     <Table density="compact">
@@ -90,7 +91,7 @@ export function CorrectionPlanTable({ rows, showByMainGroup, showTraysWithPlus, 
       <TableBody>
         {rows.map((r, idx) => {
           const sectionStart = printGroupStart.get(idx);
-          const prev = previousItems.get(r.product_id);
+          const prev = previousItems.get(buildRowKey(r, criteria));
           const qtyDiff = r.quantity_to_produce - (prev?.quantity_to_produce ?? 0);
           const traysFullDiff = r.trays_full - (prev?.trays_full ?? 0);
           const traysPartialDiff = r.trays_partial - (prev?.trays_partial ?? 0);
@@ -160,12 +161,12 @@ export function CorrectionPlanTable({ rows, showByMainGroup, showTraysWithPlus, 
             </Fragment>
           );
         })}
-        {removedIds.map((pid) => {
-          const prev = previousItems.get(pid)!;
+        {removedKeys.map((key) => {
+          const prev = previousItems.get(key)!;
           return (
-            <TableRow key={`removed-${pid}`} className="text-muted-foreground">
+            <TableRow key={`removed-${key}`} className="text-muted-foreground">
               {columns.doughType && <TableCell />}
-              <TableCell className="font-mono text-xs line-through">{pid.slice(0, 8)}</TableCell>
+              <TableCell className="font-mono text-xs line-through">{prev.product_id.slice(0, 8)}</TableCell>
               <TableCell className="line-through">(fjernet fra plan)</TableCell>
               {columns.ordered && <TableCell className="text-right tabular-nums">{fmtNum(prev.quantity_ordered)}</TableCell>}
               {columns.fromStock && <TableCell />}
