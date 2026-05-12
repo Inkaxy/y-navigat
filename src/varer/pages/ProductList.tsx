@@ -244,12 +244,6 @@ export default function ProductList() {
       },
       { key: "category", label: "Kategori", render: (p) => p.product_category },
       {
-        key: "subcategory",
-        label: "Underkategori",
-        cellClassName: "text-muted-foreground",
-        render: (p) => p.product_subcategory ?? "—",
-      },
-      {
         key: "main_category",
         label: "Hovedvaregruppe",
         render: (p) =>
