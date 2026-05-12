@@ -65,13 +65,12 @@ export function useDeliveryNoteCounts(date: string, tourId: string) {
       if (fastRes.error) throw fastRes.error;
       if (datertRes.error) throw datertRes.error;
       if (returRes.error) throw returRes.error;
-      if (notesRes.error) throw notesRes.error;
 
       return {
         fastordre: fastRes.count ?? 0,
         datert: datertRes.count ?? 0,
         retur: returRes.count ?? 0,
-        pakksedler: notesRes.count ?? 0,
+        pakksedler: pakksedlerCount,
       };
     },
     staleTime: 15_000,
