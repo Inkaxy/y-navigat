@@ -117,6 +117,34 @@ export default function TicketDetail() {
     });
   };
 
+  const setAssignee = (val: string) => {
+    const newId = val === UNASSIGNED ? null : val;
+    update.mutate({ id: ticket.id, patch: { assigned_to: newId } as never }, {
+      onSuccess: () => toast({ title: newId ? "Tildelt" : "Tildeling fjernet" }),
+    });
+  };
+
+  const doSendReply = () => {
+    sendReply.mutate(
+      { ticket_id: ticket.id, body_text: replyDraft },
+      {
+        onSuccess: () => {
+          toast({ title: "Svar sendt", description: `Til ${ticket.sender_email}` });
+          setReplyDraft("");
+          setConfirmReplyOpen(false);
+        },
+        onError: (e) => {
+          setConfirmReplyOpen(false);
+          toast({
+            title: "Kunne ikke sende svar",
+            description: e instanceof Error ? e.message : String(e),
+            variant: "destructive",
+          });
+        },
+      },
+    );
+  };
+
   return (
     <>
       <AppBanner
