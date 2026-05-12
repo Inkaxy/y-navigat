@@ -365,43 +365,100 @@ export default function ProduksjonsplanPage() {
         </Card>
       )}
 
-      {legalEntityId && (
-        <div className="print-area space-y-3">
-          <div className="hidden print:flex justify-between items-baseline mb-2">
-            <h1 className="text-base font-bold uppercase">
-              Produksjonsliste for: {format(date, "EEEE dd.MM.yy", { locale: nb })}
-              {criteria.sum_tours ? " sum alle turer" : ""}
-            </h1>
-            <span className="text-[9pt]">Skrevet ut: {format(new Date(), "dd.MM.yy HH:mm")}</span>
+      {legalEntityId && (() => {
+        const cols: ColumnVisibility = {
+          mainGroup: prefs.colMainGroup ?? true,
+          doughType: (prefs.colDoughType ?? true) && !prefs.hideDoughTypes,
+          unit: prefs.colUnit ?? true,
+          ordered: prefs.colOrdered ?? true,
+          fromStock: prefs.colFromStock ?? true,
+          liters: prefs.colLiters ?? true,
+          onStock: prefs.colOnStock ?? true,
+        };
+        const totalCopies = printJob?.copies ?? 1;
+        const correctionLast = !!printJob?.correction && !!printJob?.prevItems;
+        const baseDateLabel = `${format(date, "EEEE dd.MM.yy", { locale: nb })}${criteria.sum_tours ? " sum alle turer" : ""}`;
+        const printedAt = format(new Date(), "dd.MM.yy HH:mm");
+
+        // Bygg liste over "sider"
+        const pages: Array<{ kind: "normal" | "correction"; copyIdx: number }> = [];
+        for (let i = 0; i < totalCopies; i++) {
+          const isLast = i === totalCopies - 1;
+          pages.push({ kind: isLast && correctionLast ? "correction" : "normal", copyIdx: i });
+        }
+
+        return (
+          <div className="print-area space-y-3">
+            {/* Skjerm-visning: kun den vanlige tabellen én gang */}
+            <div className="print:hidden">
+              <ProductionPlanTable
+                rows={rows}
+                showByMainGroup={prefs.showByMainGroup}
+                showTraysWithPlus={prefs.showTraysWithPlus}
+                loading={plan.isLoading}
+                columns={cols}
+              />
+              {counts && (
+                <p className="text-xs text-muted-foreground mt-2">
+                  Fra {counts.datert} daterte ordre, {counts.fast} fastordre
+                  {counts.pakkseddel > 0 ? `, ${counts.pakkseddel} pakksedler` : ""}
+                </p>
+              )}
+            </div>
+
+            {/* Print-visning: N sider, evt. korreksjon på siste */}
+            <div className="hidden print:block">
+              {pages.map((p) => (
+                <div key={p.copyIdx} className="print-page">
+                  <div className="flex justify-between items-baseline mb-2">
+                    <h1 className="text-base font-bold uppercase">
+                      {p.kind === "correction" ? "Korreksjonsliste for: " : "Produksjonsliste for: "}
+                      {baseDateLabel}
+                      {p.kind === "correction" && printJob?.prevTakenAt && (
+                        <span className="ml-2 text-[9pt] font-normal normal-case">
+                          – endring siden {format(new Date(printJob.prevTakenAt), "HH:mm")}
+                        </span>
+                      )}
+                    </h1>
+                    <span className="text-[9pt]">
+                      Skrevet ut: {printedAt}
+                      {totalCopies > 1 && ` · kopi ${p.copyIdx + 1}/${totalCopies}`}
+                    </span>
+                  </div>
+                  {p.kind === "correction" && printJob?.prevItems ? (
+                    <CorrectionPlanTable
+                      rows={rows}
+                      showByMainGroup={prefs.showByMainGroup}
+                      showTraysWithPlus={prefs.showTraysWithPlus}
+                      columns={cols}
+                      previousItems={printJob.prevItems}
+                    />
+                  ) : (
+                    <ProductionPlanTable
+                      rows={rows}
+                      showByMainGroup={prefs.showByMainGroup}
+                      showTraysWithPlus={prefs.showTraysWithPlus}
+                      loading={false}
+                      columns={cols}
+                    />
+                  )}
+                  {counts && (
+                    <p className="text-[9pt] mt-2">
+                      Fra {counts.datert} daterte ordre, {counts.fast} fastordre
+                      {counts.pakkseddel > 0 ? `, ${counts.pakkseddel} pakksedler` : ""}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
-          <ProductionPlanTable
-            rows={rows}
-            showByMainGroup={prefs.showByMainGroup}
-            showTraysWithPlus={prefs.showTraysWithPlus}
-            loading={plan.isLoading}
-            columns={{
-              mainGroup: prefs.colMainGroup ?? true,
-              doughType: (prefs.colDoughType ?? true) && !prefs.hideDoughTypes,
-              unit: prefs.colUnit ?? true,
-              ordered: prefs.colOrdered ?? true,
-              fromStock: prefs.colFromStock ?? true,
-              liters: prefs.colLiters ?? true,
-              onStock: prefs.colOnStock ?? true,
-            } satisfies ColumnVisibility}
-          />
-          {counts && (
-            <p className="hidden print:block text-[9pt] mt-2">
-              Fra {counts.datert} daterte ordre, {counts.fast} fastordre
-              {counts.pakkseddel > 0 ? `, ${counts.pakkseddel} pakksedler` : ""}
-            </p>
-          )}
-        </div>
-      )}
+        );
+      })()}
 
       {/* Footer hint */}
       <p className="text-xs text-muted-foreground print-hide">
         <Plus className="inline h-3 w-3 mr-1" />
-        Snapshot- og korreksjons-funksjonen kommer i neste fase.
+        Snapshots lagres automatisk ved utskrift og slettes etter 2 dager.
       </p>
 
       <SettKriteriaDialog
