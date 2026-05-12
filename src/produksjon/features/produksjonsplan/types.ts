@@ -15,6 +15,10 @@ export interface ProduksjonsplanCriteria {
   sort_by: "default" | "product_number" | "product_name";
   /** Kundegruppe-koder; tom = alle */
   customer_group_ids: string[];
+  /** Antall kopier som skrives ut */
+  print_copies?: number;
+  /** Om siste kopi skal være korreksjonsliste mot siste snapshot samme dag */
+  print_correction_last?: boolean;
 }
 
 export const DEFAULT_CRITERIA: ProduksjonsplanCriteria = {
@@ -26,6 +30,8 @@ export const DEFAULT_CRITERIA: ProduksjonsplanCriteria = {
   aggregation: "per_main_and_production_group",
   sort_by: "product_number",
   customer_group_ids: [],
+  print_copies: 1,
+  print_correction_last: false,
 };
 
 export interface ProductionPlanRow {
