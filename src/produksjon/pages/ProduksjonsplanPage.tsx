@@ -229,11 +229,13 @@ export default function ProduksjonsplanPage() {
       return;
     }
 
-    setPrintJob({
-      copies,
-      correction: wantCorrection && !!prev,
-      prevItems: prev?.items ?? null,
-      prevTakenAt: prev?.takenAt ?? null,
+    flushSync(() => {
+      setPrintJob({
+        copies,
+        correction: wantCorrection && !!prev,
+        prevItems: prev?.items ?? null,
+        prevTakenAt: prev?.takenAt ?? null,
+      });
     });
 
     // Snapshot er lagret før print-dialogen åpnes, slik at avbrutt/ferdig utskrift gir samme grunnlag.
