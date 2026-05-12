@@ -157,7 +157,7 @@ export default function ProduksjonsplanPage() {
       product_name: "Sorteres etter varenavn",
     };
     lines.push(sortLabel[criteria.sort_by]);
-    lines.push(`Utskrift: ${criteria.print_copies ?? 1} kopi${(criteria.print_copies ?? 1) === 1 ? "" : "er"}${criteria.print_correction_last ? " + korreksjonsliste" : ""}`);
+    lines.push(`Utskrift: hovedliste${criteria.print_correction_last ? " + korreksjonsliste" : ""}`);
     return lines.join("\n");
   }, [criteria, mains.data, subs.data]);
 
@@ -171,7 +171,6 @@ export default function ProduksjonsplanPage() {
 
   // === Print: snapshot + korreksjon =====================================
   const [printJob, setPrintJob] = useState<{
-    copies: number;
     correction: boolean;
     prevItems: Map<string, SnapshotItem> | null;
     prevTakenAt: string | null;
@@ -189,8 +188,7 @@ export default function ProduksjonsplanPage() {
       });
       return;
     }
-    const copies = Math.max(1, Math.min(20, criteria.print_copies ?? 1));
-    const wantCorrection = !!criteria.print_correction_last && copies >= 1;
+    const wantCorrection = !!criteria.print_correction_last;
 
     let prev: { takenAt: string; items: Map<string, SnapshotItem> } | null = null;
     let savedItemCount = 0;
@@ -231,7 +229,6 @@ export default function ProduksjonsplanPage() {
 
     flushSync(() => {
       setPrintJob({
-        copies,
         correction: wantCorrection && !!prev,
         prevItems: prev?.items ?? null,
         prevTakenAt: prev?.takenAt ?? null,
@@ -323,9 +320,6 @@ export default function ProduksjonsplanPage() {
           <Button variant="outline" onClick={handlePrint}>
             <Printer className="h-4 w-4 mr-2" />
             Skriv ut
-            {(criteria.print_copies ?? 1) > 1 && (
-              <span className="ml-1 text-xs text-muted-foreground">×{criteria.print_copies}</span>
-            )}
           </Button>
 
           {/* Handling-meny */}
@@ -407,18 +401,16 @@ export default function ProduksjonsplanPage() {
           liters: prefs.colLiters ?? true,
           onStock: prefs.colOnStock ?? true,
         };
-        const totalCopies = printJob?.copies ?? 1;
         const correctionLast = !!printJob?.correction && !!printJob?.prevItems;
         const baseDateLabel = `${format(date, "EEEE dd.MM.yy", { locale: nb })}${criteria.sum_tours ? " sum alle turer" : ""}`;
         const printedAt = format(new Date(), "dd.MM.yy HH:mm");
 
-        // Bygg liste over "sider": N normale kopier + evt. én ekstra korreksjonsside
-        const pages: Array<{ kind: "normal" | "correction"; copyIdx: number }> = [];
-        for (let i = 0; i < totalCopies; i++) {
-          pages.push({ kind: "normal", copyIdx: i });
-        }
+        // Bygg liste over "sider": hovedliste + evt. én korreksjonsside
+        const pages: Array<{ kind: "normal" | "correction"; copyIdx: number }> = [
+          { kind: "normal", copyIdx: 0 },
+        ];
         if (correctionLast) {
-          pages.push({ kind: "correction", copyIdx: totalCopies });
+          pages.push({ kind: "correction", copyIdx: 1 });
         }
 
         return (
@@ -456,7 +448,6 @@ export default function ProduksjonsplanPage() {
                     </h1>
                     <span className="text-[9pt]">
                       Skrevet ut: {printedAt}
-                      {totalCopies > 1 && p.kind === "normal" && ` · kopi ${p.copyIdx + 1}/${totalCopies}`}
                     </span>
                   </div>
                   {p.kind === "correction" && printJob?.prevItems ? (
