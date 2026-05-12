@@ -265,6 +265,86 @@ export default function TicketDetail() {
           </Card>
         )}
 
+        {/* Tidligere svar (tråd) */}
+        {replies.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Reply className="h-4 w-4" /> Sendte svar ({replies.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {replies.map((r) => (
+                <div key={r.id} className="border-l-2 border-primary/40 pl-3 space-y-1">
+                  <div className="text-xs text-muted-foreground flex items-center gap-2 flex-wrap">
+                    <span className="font-medium text-foreground">{r.sent_by_name ?? "Bruker"}</span>
+                    <span>·</span>
+                    <span>{formatDistanceToNow(new Date(r.sent_at ?? r.created_at), { locale: nb, addSuffix: true })}</span>
+                    {r.send_status !== "sent" && (
+                      <Badge variant={r.send_status === "failed" ? "destructive" : "secondary"} className="text-[10px]">
+                        {r.send_status === "failed" ? "Feilet" : "Pending"}
+                      </Badge>
+                    )}
+                  </div>
+                  <pre className="whitespace-pre-wrap text-sm font-sans">{r.body_text}</pre>
+                  {r.error_message && (
+                    <div className="text-xs text-destructive flex items-start gap-1">
+                      <AlertCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                      <span>{r.error_message}</span>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Svar-felt */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Reply className="h-4 w-4" />
+              Svar til {ticket.sender_name ?? ticket.sender_email}{" "}
+              <span className="text-xs font-normal text-muted-foreground">&lt;{ticket.sender_email}&gt;</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <Textarea
+              value={replyDraft}
+              onChange={(e) => setReplyDraft(e.target.value)}
+              rows={8}
+              placeholder="Skriv svar …"
+              disabled={sendReply.isPending}
+            />
+            <AlertDialog open={confirmReplyOpen} onOpenChange={setConfirmReplyOpen}>
+              <AlertDialogTrigger asChild>
+                <Button size="sm" disabled={!replyDraft.trim() || sendReply.isPending}>
+                  {sendReply.isPending ? (
+                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sender …</>
+                  ) : (
+                    <><Send className="mr-2 h-4 w-4" /> Send svar</>
+                  )}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Send svar?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Svaret sendes til <strong>{ticket.sender_email}</strong> via {ticket.source_mailbox} og
+                    legges i samme e-post-tråd.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Avbryt</AlertDialogCancel>
+                  <AlertDialogAction onClick={(e) => { e.preventDefault(); doSendReply(); }}>
+                    Send
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </CardContent>
+        </Card>
+
         {/* Internt notat */}
         <Card>
           <CardHeader><CardTitle className="text-sm">Internt notat</CardTitle></CardHeader>
