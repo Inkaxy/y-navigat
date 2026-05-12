@@ -290,5 +290,8 @@
     font-size: 11pt !important;
   }
 
+  .print-area .print-page { break-after: page; page-break-after: always; }
+  .print-area .print-page:last-child { break-after: auto; page-break-after: auto; }
+
   @page { size: A4 portrait; margin: 10mm; }
 }
