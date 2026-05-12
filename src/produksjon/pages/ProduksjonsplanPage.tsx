@@ -424,7 +424,7 @@ export default function ProduksjonsplanPage() {
                     </h1>
                     <span className="text-[9pt]">
                       Skrevet ut: {printedAt}
-                      {totalCopies > 1 && ` · kopi ${p.copyIdx + 1}/${totalCopies}`}
+                      {totalCopies > 1 && p.kind === "normal" && ` · kopi ${p.copyIdx + 1}/${totalCopies}`}
                     </span>
                   </div>
                   {p.kind === "correction" && printJob?.prevItems ? (
