@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import DOMPurify from "dompurify";
 import { format, formatDistanceToNow } from "date-fns";
 import { nb } from "date-fns/locale";
-import { ArrowLeft, Download, Loader2, Mail, Paperclip, PlusCircle } from "lucide-react";
+import { ArrowLeft, Download, Loader2, Mail, Paperclip, PlusCircle, Send, Reply, AlertCircle } from "lucide-react";
 import { AppBanner } from "@/ordre/components/shell/AppBanner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,13 +13,22 @@ import { Label } from "@/components/ui/label";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/use-toast";
 import {
   useTicket, useUpdateTicket, getTicketAttachmentSignedUrl,
   type TicketStatus, type TicketPriority,
 } from "@/ordre/hooks/useTickets";
+import {
+  useTicketReplies, useSendTicketReply, useOrdrekontorAssignees,
+} from "@/ordre/hooks/useTicketReplies";
 import { TicketPresenceBanner } from "@/ordre/components/shell/TicketPresenceBanner";
+
+const UNASSIGNED = "__unassigned__";
 
 const STATUS_OPTS: { value: TicketStatus; label: string }[] = [
   { value: "new", label: "Ny" },
