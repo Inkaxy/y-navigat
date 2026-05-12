@@ -191,7 +191,7 @@ export default function ProduksjonsplanPage() {
     const wantCorrection = !!criteria.print_correction_last && copies >= 1;
 
     let prev: { takenAt: string; items: Map<string, SnapshotItem> } | null = null;
-    let saved: { id: string; itemCount: number } | null = null;
+    let savedItemCount = 0;
     if (wantCorrection) {
       try {
         prev = await fetchLatestSnapshotItems(legalEntityId, dateStr);
@@ -207,7 +207,7 @@ export default function ProduksjonsplanPage() {
     }
 
     try {
-      saved = await saveProductionPlanSnapshot(legalEntityId, dateStr, criteria, rows);
+      const saved = await saveProductionPlanSnapshot(legalEntityId, dateStr, criteria, rows);
       if (!saved) {
         toast({
           title: "Snapshot ble ikke lagret",
@@ -216,6 +216,7 @@ export default function ProduksjonsplanPage() {
         });
         return;
       }
+      savedItemCount = saved.itemCount;
     } catch (e) {
       console.error("Snapshot-lagring feilet", e);
       toast({
@@ -232,7 +233,6 @@ export default function ProduksjonsplanPage() {
       prevItems: prev?.items ?? null,
       prevTakenAt: prev?.takenAt ?? null,
     });
-    const savedItemCount = saved.itemCount;
 
     // Snapshot er lagret før print-dialogen åpnes, slik at avbrutt/ferdig utskrift gir samme grunnlag.
     setTimeout(() => {
