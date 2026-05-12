@@ -35,6 +35,7 @@ type ProductRow = {
   cake_role: CakeRole | null;
   image_url: string | null;
   mva_rate?: number | null;
+  pieces_per_tray: number | null;
 };
 
 const STATUS_BADGE: Record<ProductStatus, string> = {
@@ -75,7 +76,7 @@ export default function ProductList() {
       const { data, error } = await supabase
         .from("products")
         .select(
-          "id, display_number, code, display_name, product_category, product_subcategory, unit_of_sale, status, variant_of_product_id, variant_label, label_mode, is_cake_component, cake_role, image_url, mva_rate, main_category:product_main_categories(code, display_name), sub_category:product_sub_categories(code, display_name)",
+          "id, display_number, code, display_name, product_category, product_subcategory, unit_of_sale, status, variant_of_product_id, variant_label, label_mode, is_cake_component, cake_role, image_url, mva_rate, pieces_per_tray, main_category:product_main_categories(code, display_name), sub_category:product_sub_categories(code, display_name)",
         )
         .eq("legal_entity_id", legalEntityId)
         .order("display_number", { ascending: true })
@@ -288,6 +289,13 @@ export default function ProductList() {
         headerClassName: "text-right",
         cellClassName: "text-right tabular-nums text-muted-foreground",
         render: (p) => (p.mva_rate != null ? `${p.mva_rate}%` : "—"),
+      },
+      {
+        key: "pieces_per_tray",
+        label: "Antall pr brett",
+        headerClassName: "text-right",
+        cellClassName: "text-right tabular-nums text-muted-foreground",
+        render: (p) => (p.pieces_per_tray != null ? p.pieces_per_tray : "—"),
       },
       {
         key: "label_mode",
