@@ -1,6 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Minus, Plus, Maximize2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
   FIELD_LABELS,
@@ -28,10 +26,14 @@ interface Props {
   onAddFieldAt: (type: FieldType, x: number, y: number) => void;
   /** Optional inline toolbar to render anchored above selected field. */
   renderInlineToolbar?: (field: ProfileField) => React.ReactNode;
-  /** Read-only mode for thumbnails. */
+  /** Read-only mode for thumbnails / preview. */
   readOnly?: boolean;
   /** Override pixels-per-mm. Default: zoomable interactive canvas. */
   fixedPxPerMm?: number;
+  /** Controlled zoom (px per mm). */
+  zoom?: number;
+  /** Show rulers at top + left. */
+  showRulers?: boolean;
 }
 
 type DragMode =
