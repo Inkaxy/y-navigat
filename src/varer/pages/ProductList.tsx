@@ -321,7 +321,7 @@ export default function ProductList() {
     [],
   );
 
-  const DEFAULT_VISIBLE = ["variant_of", "category", "unit", "price"];
+  const DEFAULT_VISIBLE = ["variant_of", "main_category", "sub_category", "unit", "price"];
   const { value: pref, setValue: setPref } = useUiPreference<{ visible: string[] }>(
     COLUMN_PREF_SCOPE,
     { visible: DEFAULT_VISIBLE },
