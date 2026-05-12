@@ -466,6 +466,7 @@ export default function ProduksjonsplanPage() {
                       showTraysWithPlus={prefs.showTraysWithPlus}
                       columns={cols}
                       previousItems={printJob.prevItems}
+                      criteria={criteria}
                     />
                   ) : (
                     <ProductionPlanTable
