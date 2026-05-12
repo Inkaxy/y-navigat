@@ -22,7 +22,7 @@ function Calendar({
       showWeekNumber={showWeekNumber}
       weekStartsOn={weekStartsOn}
       labels={{
-        labelWeekNumberHeader: () => "Uke",
+        labelWeekNumber: (n: number) => `Uke ${n}`,
         ...labels,
       }}
       className={cn("p-3", className)}
