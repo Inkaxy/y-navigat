@@ -323,24 +323,6 @@ export function LabelCanvas(props: Props) {
         </div>
       </div>
 
-      {/* Coordinate bar */}
-      {!readOnly && (
-        <div className="border-t border-border bg-muted/30 px-3 py-1.5">
-          {selected ? (
-            <CoordinateBar
-              field={selected}
-              maxW={inner.w}
-              maxH={inner.h}
-              onChange={(patch) => onUpdateField(selected.field_type, patch)}
-            />
-          ) : (
-            <p className="text-xs text-muted-foreground">
-              Velg et felt for å se koordinater. Bruk piltaster for å flytte 1 mm,
-              Shift+pil = 5 mm.
-            </p>
-          )}
-        </div>
-      )}
     </div>
   );
 }
