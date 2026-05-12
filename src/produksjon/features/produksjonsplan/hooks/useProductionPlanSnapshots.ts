@@ -69,7 +69,7 @@ export async function fetchLatestSnapshotItems(
 
   const wantedSig = criteriaSignature(criteria);
   const match = snaps.find(
-    (s) => criteriaSignature((s.criteria_copy ?? {}) as ProduksjonsplanCriteria) === wantedSig,
+    (s) => criteriaSignature((s.criteria_copy ?? {}) as unknown as ProduksjonsplanCriteria) === wantedSig,
   );
   if (!match) return null;
 
