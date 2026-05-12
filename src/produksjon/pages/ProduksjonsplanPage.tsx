@@ -180,10 +180,18 @@ export default function ProduksjonsplanPage() {
       window.print();
       return;
     }
+    if (rows.length === 0) {
+      toast({
+        title: "Ingen rader å skrive ut",
+        description: "Snapshot lagres ikke før produksjonslisten har innhold.",
+      });
+      return;
+    }
     const copies = Math.max(1, Math.min(20, criteria.print_copies ?? 1));
     const wantCorrection = !!criteria.print_correction_last && copies >= 1;
 
     let prev: { takenAt: string; items: Map<string, SnapshotItem> } | null = null;
+    let saved: { id: string; itemCount: number } | null = null;
     if (wantCorrection) {
       try {
         prev = await fetchLatestSnapshotItems(legalEntityId, dateStr);
@@ -198,6 +206,26 @@ export default function ProduksjonsplanPage() {
       }
     }
 
+    try {
+      saved = await saveProductionPlanSnapshot(legalEntityId, dateStr, criteria, rows);
+      if (!saved) {
+        toast({
+          title: "Snapshot ble ikke lagret",
+          description: "Utskrift er avbrutt slik at neste korreksjonsliste ikke får feil grunnlag.",
+          variant: "destructive",
+        });
+        return;
+      }
+    } catch (e) {
+      console.error("Snapshot-lagring feilet", e);
+      toast({
+        title: "Snapshot ble ikke lagret",
+        description: "Utskrift er avbrutt slik at neste korreksjonsliste ikke får feil grunnlag.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setPrintJob({
       copies,
       correction: wantCorrection && !!prev,
@@ -205,19 +233,18 @@ export default function ProduksjonsplanPage() {
       prevTakenAt: prev?.takenAt ?? null,
     });
 
-    // Vent på render, skriv ut, lagre nytt snapshot, rydd printJob
+    // Snapshot er lagret før print-dialogen åpnes, slik at avbrutt/ferdig utskrift gir samme grunnlag.
     setTimeout(() => {
       window.print();
       setTimeout(() => {
         setPrintJob(null);
-        if (rows.length > 0) {
-          saveProductionPlanSnapshot(legalEntityId, dateStr, criteria, rows).catch((e) =>
-            console.error("Snapshot-lagring feilet", e),
-          );
-        }
+        toast({
+          title: "Snapshot lagret",
+          description: `Lagret ${saved.itemCount} varelinjer for ${format(date, "dd.MM.yyyy")}.`,
+        });
       }, 500);
     }, 100);
-  }, [legalEntityId, dateStr, criteria, rows]);
+  }, [legalEntityId, dateStr, date, criteria, rows]);
 
 
   return (
