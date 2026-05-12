@@ -197,45 +197,10 @@ export function LabelCanvas(props: Props) {
   return (
     <div className="flex h-full flex-col">
       {!readOnly && (
-        <div className="flex items-center justify-between border-b border-border bg-muted/30 px-3 py-1.5">
-          <div className="text-xs text-muted-foreground">
+        <div className="flex items-center justify-end border-b border-border bg-card/40 px-4 py-1.5 text-[11px] text-muted-foreground">
+          <span>
             Etikett: {paperW} × {paperH} mm · innhold {round1(inner.w)} × {round1(inner.h)} mm
-          </div>
-          <div className="flex items-center gap-1">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7"
-              onClick={() => setZoom((z) => Math.max(2, z - 1))}
-              aria-label="Zoom ut"
-            >
-              <Minus className="h-3.5 w-3.5" />
-            </Button>
-            <span className="w-12 text-center text-xs tabular-nums">
-              {Math.round((zoom / 4) * 100)}%
-            </span>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7"
-              onClick={() => setZoom((z) => Math.min(10, z + 1))}
-              aria-label="Zoom inn"
-            >
-              <Plus className="h-3.5 w-3.5" />
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7"
-              onClick={() => setZoom(4)}
-              aria-label="Tilbakestill zoom"
-            >
-              <Maximize2 className="h-3.5 w-3.5" />
-            </Button>
-          </div>
+          </span>
         </div>
       )}
 
