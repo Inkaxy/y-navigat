@@ -232,24 +232,12 @@ export function SettKriteriaDialog({ open, onOpenChange, legalEntityId, initial,
             {/* Utskrift */}
             <section className="space-y-2">
               <h3 className="text-sm font-semibold">Utskrift</h3>
-              <div className="flex items-center gap-3">
-                <Label htmlFor="print-copies" className="text-sm font-normal">Antall kopier</Label>
-                <Input
-                  id="print-copies"
-                  type="number"
-                  min={1}
-                  max={20}
-                  value={c.print_copies ?? 1}
-                  onChange={(e) => setC({ ...c, print_copies: Math.max(1, Math.min(20, parseInt(e.target.value || "1", 10))) })}
-                  className="w-24"
-                />
-              </div>
               <label className="flex items-center gap-2 text-sm">
                 <Checkbox
                   checked={!!c.print_correction_last}
                   onCheckedChange={(v) => setC({ ...c, print_correction_last: !!v })}
                 />
-                Siste kopi skal være korreksjonsliste (+/- mot forrige utskrift samme dag)
+                Skriv ut korreksjonsliste etter hovedlista (+/- mot forrige utskrift samme dag)
               </label>
             </section>
           </div>
