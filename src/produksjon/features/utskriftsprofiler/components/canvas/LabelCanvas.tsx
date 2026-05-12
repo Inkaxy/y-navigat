@@ -1,6 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Minus, Plus, Maximize2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
   FIELD_LABELS,
@@ -28,10 +26,14 @@ interface Props {
   onAddFieldAt: (type: FieldType, x: number, y: number) => void;
   /** Optional inline toolbar to render anchored above selected field. */
   renderInlineToolbar?: (field: ProfileField) => React.ReactNode;
-  /** Read-only mode for thumbnails. */
+  /** Read-only mode for thumbnails / preview. */
   readOnly?: boolean;
   /** Override pixels-per-mm. Default: zoomable interactive canvas. */
   fixedPxPerMm?: number;
+  /** Controlled zoom (px per mm). */
+  zoom?: number;
+  /** Show rulers at top + left. */
+  showRulers?: boolean;
 }
 
 type DragMode =
@@ -76,8 +78,8 @@ export function LabelCanvas(props: Props) {
   const paperW = landscape ? paperWidth : paperHeight;
   const paperH = landscape ? paperHeight : paperWidth;
 
-  const [zoom, setZoom] = useState(4); // px per mm
-  const pxPerMm = fixedPxPerMm ?? zoom;
+  const internalZoom = props.zoom ?? 4;
+  const pxPerMm = fixedPxPerMm ?? internalZoom;
 
   const innerRef = useRef<HTMLDivElement>(null);
   const [dragMode, setDragMode] = useState<DragMode | null>(null);
@@ -195,45 +197,10 @@ export function LabelCanvas(props: Props) {
   return (
     <div className="flex h-full flex-col">
       {!readOnly && (
-        <div className="flex items-center justify-between border-b border-border bg-muted/30 px-3 py-1.5">
-          <div className="text-xs text-muted-foreground">
+        <div className="flex items-center justify-end border-b border-border bg-card/40 px-4 py-1.5 text-[11px] text-muted-foreground">
+          <span>
             Etikett: {paperW} × {paperH} mm · innhold {round1(inner.w)} × {round1(inner.h)} mm
-          </div>
-          <div className="flex items-center gap-1">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7"
-              onClick={() => setZoom((z) => Math.max(2, z - 1))}
-              aria-label="Zoom ut"
-            >
-              <Minus className="h-3.5 w-3.5" />
-            </Button>
-            <span className="w-12 text-center text-xs tabular-nums">
-              {Math.round((zoom / 4) * 100)}%
-            </span>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7"
-              onClick={() => setZoom((z) => Math.min(10, z + 1))}
-              aria-label="Zoom inn"
-            >
-              <Plus className="h-3.5 w-3.5" />
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7"
-              onClick={() => setZoom(4)}
-              aria-label="Tilbakestill zoom"
-            >
-              <Maximize2 className="h-3.5 w-3.5" />
-            </Button>
-          </div>
+          </span>
         </div>
       )}
 
@@ -356,24 +323,6 @@ export function LabelCanvas(props: Props) {
         </div>
       </div>
 
-      {/* Coordinate bar */}
-      {!readOnly && (
-        <div className="border-t border-border bg-muted/30 px-3 py-1.5">
-          {selected ? (
-            <CoordinateBar
-              field={selected}
-              maxW={inner.w}
-              maxH={inner.h}
-              onChange={(patch) => onUpdateField(selected.field_type, patch)}
-            />
-          ) : (
-            <p className="text-xs text-muted-foreground">
-              Velg et felt for å se koordinater. Bruk piltaster for å flytte 1 mm,
-              Shift+pil = 5 mm.
-            </p>
-          )}
-        </div>
-      )}
     </div>
   );
 }

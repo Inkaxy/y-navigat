@@ -1,14 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import {
-  Dialog,
-  DialogContent,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Separator } from "@/components/ui/separator";
+import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import {
   defaultFieldSize,
@@ -23,12 +17,13 @@ import {
   useUpdateLabelPrintProfile,
 } from "../hooks/useLabelPrintProfileMutations";
 import type { LegalEntityOption } from "@/produksjon/features/produksjonsavdelinger/hooks/useLegalEntities";
-import { FieldPalette } from "./canvas/FieldPalette";
 import { LabelCanvas } from "./canvas/LabelCanvas";
-import { InlineToolbar } from "./canvas/InlineToolbar";
-import { PaperPresetSelect } from "./canvas/PaperPresetSelect";
-import { SettingsAccordion } from "./canvas/SettingsAccordion";
-import { getInnerArea, migrateLegacyFields, round1, clamp } from "../lib/canvasUtils";
+import { EditorTopbar } from "./canvas/EditorTopbar";
+import { LeftPanel } from "./canvas/LeftPanel";
+import { RightInspector } from "./canvas/RightInspector";
+import { StatusBar } from "./canvas/StatusBar";
+import { SettingsSheet } from "./canvas/SettingsSheet";
+import { getInnerArea, migrateLegacyFields, clamp } from "../lib/canvasUtils";
 
 interface Props {
   open: boolean;
@@ -40,6 +35,23 @@ interface Props {
 
 const LOGO_BUCKET = "label-logos";
 const MAX_LOGO_BYTES = 2 * 1024 * 1024;
+
+function formatRelative(iso: string): string {
+  try {
+    const d = new Date(iso);
+    const diff = Date.now() - d.getTime();
+    const min = Math.round(diff / 60000);
+    if (min < 1) return "nettopp";
+    if (min < 60) return `${min} min siden`;
+    const hr = Math.round(min / 60);
+    if (hr < 24) return `${hr} t siden`;
+    const days = Math.round(hr / 24);
+    if (days < 7) return `${days} d siden`;
+    return d.toLocaleDateString("nb-NO", { day: "2-digit", month: "2-digit" });
+  } catch {
+    return iso;
+  }
+}
 
 export function UtskriftsprofilDialog({
   open,
@@ -72,6 +84,9 @@ export function UtskriftsprofilDialog({
   const [notes, setNotes] = useState("");
   const [nameError, setNameError] = useState<string | null>(null);
   const [selectedFieldType, setSelectedFieldType] = useState<FieldType | null>(null);
+  const [editorMode, setEditorMode] = useState<"design" | "preview">("design");
+  const [zoom, setZoom] = useState(4);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const zCounterRef = useRef(0);
 
   const createMut = useCreateLabelPrintProfile();
@@ -139,6 +154,8 @@ export function UtskriftsprofilDialog({
     }
     setNameError(null);
     setSelectedFieldType(null);
+    setEditorMode("design");
+    setZoom(4);
     zCounterRef.current = 100;
   }, [open, mode, existing, legalEntity]);
 
@@ -161,6 +178,14 @@ export function UtskriftsprofilDialog({
     for (const f of fields) if (f.include) set.add(f.field_type);
     return set;
   }, [fields]);
+
+  const selected = useMemo(
+    () =>
+      selectedFieldType
+        ? fields.find((f) => f.field_type === selectedFieldType && f.include) ?? null
+        : null,
+    [fields, selectedFieldType],
+  );
 
   const updateField = (type: FieldType, patch: Partial<ProfileField>) => {
     setFields((prev) =>
@@ -192,18 +217,13 @@ export function UtskriftsprofilDialog({
   };
 
   const handleAddByClick = (type: FieldType) => {
-    // Place at next vertical slot
     const sz = defaultFieldSize(type);
     const placed = fields.filter((f) => f.include);
     const maxY = placed.reduce(
       (acc, f) => Math.max(acc, f.y_mm + f.height_mm),
       0,
     );
-    addFieldAt(
-      type,
-      0,
-      Math.min(maxY + 1, Math.max(0, inner.h - sz.h)),
-    );
+    addFieldAt(type, 0, Math.min(maxY + 1, Math.max(0, inner.h - sz.h)));
   };
 
   const handleLogoUpload = async (file: File) => {
@@ -245,10 +265,11 @@ export function UtskriftsprofilDialog({
     const trimmedName = name.trim();
     if (!trimmedName) {
       setNameError("Profilnavn er påkrevd.");
+      toast.error("Profilnavn er påkrevd.");
       return;
     }
     if (!companyName.trim()) {
-      toast.error("Firmanavn er påkrevd.");
+      toast.error("Firmanavn er påkrevd. Åpne innstillinger for å fylle inn.");
       return;
     }
     if (mode === "create" && !legalEntity) {
@@ -309,166 +330,161 @@ export function UtskriftsprofilDialog({
     }
   };
 
+  const subtitle =
+    mode === "edit" && existing
+      ? `${activeFieldTypes.size} av ${fields.length} felter · sist endret ${formatRelative(existing.updated_at)}`
+      : `${activeFieldTypes.size} felt på etiketten · ny profil`;
+
+  const isPreview = editorMode === "preview";
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="flex h-[92vh] max-h-[92vh] w-[95vw] max-w-[1400px] flex-col gap-0 overflow-hidden p-0"
+        className="flex h-[94vh] max-h-[94vh] w-[97vw] max-w-[1600px] flex-col gap-0 overflow-hidden p-0"
       >
         <form onSubmit={handleSubmit} className="flex h-full flex-col">
-          {/* HEADER */}
-          <div className="flex flex-wrap items-center gap-3 border-b border-border bg-muted/20 px-5 py-3">
-            <div className="min-w-[220px] flex-1">
-              <Label htmlFor="profile-name" className="sr-only">
-                Profilnavn
-              </Label>
-              <Input
-                id="profile-name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Navn på profil"
-                aria-invalid={!!nameError}
-                maxLength={80}
-                className="h-9 text-base font-medium"
-              />
-              {nameError && (
-                <p className="mt-1 text-xs text-destructive">{nameError}</p>
-              )}
-            </div>
-
-            <Separator orientation="vertical" className="h-8" />
-
-            <div className="flex items-center gap-2">
-              <Label className="text-xs text-muted-foreground">Papir</Label>
-              <PaperPresetSelect
-                width={paperWidth}
-                height={paperHeight}
-                onChange={(w, h) => {
-                  setPaperWidth(w);
-                  setPaperHeight(h);
-                }}
-              />
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Switch
-                id="landscape"
-                checked={landscape}
-                onCheckedChange={setLandscape}
-              />
-              <Label htmlFor="landscape" className="text-xs">
-                {landscape ? "Liggende" : "Stående"}
-              </Label>
-            </div>
+          {/* Hidden but accessible name field — surface via inline editor in topbar */}
+          <div className="sr-only">
+            <Label htmlFor="profile-name">Profilnavn</Label>
+            <Input
+              id="profile-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
           </div>
 
-          {/* MAIN: 3 columns */}
-          <div className="grid flex-1 min-h-0 grid-cols-[240px_1fr_320px]">
-            {/* LEFT: palette */}
-            <FieldPalette
-              activeFieldTypes={activeFieldTypes}
-              onDragStartField={() => {
-                /* noop — drop handled in canvas */
-              }}
-              onClickField={handleAddByClick}
-            />
+          <EditorTopbar
+            name={name}
+            subtitle={subtitle}
+            paperWidth={paperWidth}
+            paperHeight={paperHeight}
+            landscape={landscape}
+            mode={editorMode}
+            saved={mode === "edit" && existing ? `Lagret · ${new Date(existing.updated_at).toLocaleTimeString("nb-NO", { hour: "2-digit", minute: "2-digit" })}` : null}
+            isSubmitting={isSubmitting}
+            isCreate={mode === "create"}
+            onChangePaperWidth={setPaperWidth}
+            onChangePaperHeight={setPaperHeight}
+            onToggleLandscape={setLandscape}
+            onChangeMode={setEditorMode}
+            onOpenSettings={() => setSettingsOpen(true)}
+            onCancel={() => onOpenChange(false)}
+          />
 
-            {/* MIDDLE: canvas */}
-            <LabelCanvas
-              paperWidth={paperWidth}
-              paperHeight={paperHeight}
-              marginTop={marginTop}
-              marginRight={marginRight}
-              marginBottom={marginBottom}
-              marginLeft={marginLeft}
-              landscape={landscape}
+          {/* Profile name editable strip */}
+          <div className="flex items-center gap-3 border-b border-border bg-card px-4 py-2">
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Navn på profil"
+              maxLength={80}
+              aria-invalid={!!nameError}
+              className="h-8 max-w-[320px] border-0 bg-transparent px-0 text-sm font-semibold tracking-tight shadow-none focus-visible:ring-0"
+            />
+            {nameError && (
+              <span className="text-xs text-destructive">{nameError}</span>
+            )}
+          </div>
+
+          {/* Main: 3 columns */}
+          <div className="grid min-h-0 flex-1 grid-cols-[260px_1fr_320px]">
+            <LeftPanel
               fields={fields}
+              activeFieldTypes={activeFieldTypes}
               selectedFieldType={selectedFieldType}
-              companyName={companyName}
-              logoUrl={logoUrl}
-              includeFieldLabels={includeFieldLabels}
+              onClickField={handleAddByClick}
               onSelectField={setSelectedFieldType}
               onUpdateField={updateField}
-              onAddFieldAt={addFieldAt}
-              renderInlineToolbar={(field) => (
-                <InlineToolbar
-                  field={field}
-                  onChange={(patch) => updateField(field.field_type, patch)}
-                  onRemove={() => {
-                    updateField(field.field_type, { include: false });
-                    setSelectedFieldType(null);
-                  }}
-                />
-              )}
             />
 
-            {/* RIGHT: settings */}
-            <div className="overflow-y-auto border-l border-border bg-muted/10 p-4">
-              <SettingsAccordion
+            <div className="flex min-w-0 flex-col bg-muted/30">
+              <LabelCanvas
+                paperWidth={paperWidth}
+                paperHeight={paperHeight}
                 marginTop={marginTop}
                 marginRight={marginRight}
                 marginBottom={marginBottom}
                 marginLeft={marginLeft}
-                setMarginTop={setMarginTop}
-                setMarginRight={setMarginRight}
-                setMarginBottom={setMarginBottom}
-                setMarginLeft={setMarginLeft}
-                paperWidth={paperWidth}
-                paperHeight={paperHeight}
-                setPaperWidth={setPaperWidth}
-                setPaperHeight={setPaperHeight}
+                landscape={landscape}
+                fields={fields}
+                selectedFieldType={isPreview ? null : selectedFieldType}
                 companyName={companyName}
-                setCompanyName={setCompanyName}
-                companyNote={companyNote}
-                setCompanyNote={setCompanyNote}
                 logoUrl={logoUrl}
-                setLogoUrl={setLogoUrl}
-                logoHeight={logoHeight}
-                setLogoHeight={setLogoHeight}
-                logoUploading={logoUploading}
-                onLogoFileSelected={handleLogoUpload}
-                commentFt1={commentFt1}
-                commentFt2={commentFt2}
-                commentFt3={commentFt3}
-                setCommentFt1={setCommentFt1}
-                setCommentFt2={setCommentFt2}
-                setCommentFt3={setCommentFt3}
                 includeFieldLabels={includeFieldLabels}
-                setIncludeFieldLabels={setIncludeFieldLabels}
-                fieldLabelsBold={fieldLabelsBold}
-                setFieldLabelsBold={setFieldLabelsBold}
-                skipLeveresHentes={skipLeveresHentes}
-                setSkipLeveresHentes={setSkipLeveresHentes}
-                includeRouteName={includeRouteName}
-                setIncludeRouteName={setIncludeRouteName}
-                notes={notes}
-                setNotes={setNotes}
+                onSelectField={setSelectedFieldType}
+                onUpdateField={updateField}
+                onAddFieldAt={addFieldAt}
+                readOnly={isPreview}
+                zoom={zoom}
               />
             </div>
+
+            <RightInspector
+              selected={selected}
+              innerW={inner.w}
+              innerH={inner.h}
+              onChange={(patch) => selected && updateField(selected.field_type, patch)}
+              onRemove={() => {
+                if (!selected) return;
+                updateField(selected.field_type, { include: false });
+                setSelectedFieldType(null);
+              }}
+            />
           </div>
 
-          {/* FOOTER */}
-          <div className="flex items-center justify-end gap-2 border-t border-border bg-muted/20 px-5 py-3">
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => onOpenChange(false)}
-              disabled={isSubmitting}
-            >
-              Avbryt
-            </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting
-                ? "Lagrer …"
-                : mode === "create"
-                  ? "Opprett profil"
-                  : "Lagre endringer"}
-            </Button>
-          </div>
+          <StatusBar
+            placedCount={activeFieldTypes.size}
+            selected={selected}
+            zoomPct={Math.round((zoom / 4) * 100)}
+            onZoomIn={() => setZoom((z) => Math.min(10, z + 1))}
+            onZoomOut={() => setZoom((z) => Math.max(2, z - 1))}
+            onZoomReset={() => setZoom(4)}
+          />
+
+          <SettingsSheet
+            open={settingsOpen}
+            onOpenChange={setSettingsOpen}
+            marginTop={marginTop}
+            marginRight={marginRight}
+            marginBottom={marginBottom}
+            marginLeft={marginLeft}
+            setMarginTop={setMarginTop}
+            setMarginRight={setMarginRight}
+            setMarginBottom={setMarginBottom}
+            setMarginLeft={setMarginLeft}
+            paperWidth={paperWidth}
+            paperHeight={paperHeight}
+            setPaperWidth={setPaperWidth}
+            setPaperHeight={setPaperHeight}
+            companyName={companyName}
+            setCompanyName={setCompanyName}
+            companyNote={companyNote}
+            setCompanyNote={setCompanyNote}
+            logoUrl={logoUrl}
+            setLogoUrl={setLogoUrl}
+            logoHeight={logoHeight}
+            setLogoHeight={setLogoHeight}
+            logoUploading={logoUploading}
+            onLogoFileSelected={handleLogoUpload}
+            commentFt1={commentFt1}
+            commentFt2={commentFt2}
+            commentFt3={commentFt3}
+            setCommentFt1={setCommentFt1}
+            setCommentFt2={setCommentFt2}
+            setCommentFt3={setCommentFt3}
+            includeFieldLabels={includeFieldLabels}
+            setIncludeFieldLabels={setIncludeFieldLabels}
+            fieldLabelsBold={fieldLabelsBold}
+            setFieldLabelsBold={setFieldLabelsBold}
+            skipLeveresHentes={skipLeveresHentes}
+            setSkipLeveresHentes={setSkipLeveresHentes}
+            includeRouteName={includeRouteName}
+            setIncludeRouteName={setIncludeRouteName}
+            notes={notes}
+            setNotes={setNotes}
+          />
         </form>
       </DialogContent>
     </Dialog>
   );
 }
-
-// keep round1 import path stable
-void round1;
