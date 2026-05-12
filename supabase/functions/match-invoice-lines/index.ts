@@ -437,7 +437,8 @@ Deno.serve(async (req) => {
     return json({ ok: true, processed: results.length, results });
   } catch (e) {
     console.error("match-invoice-lines error", e);
-    return json({ error: (e as Error).message }, 500);
+    console.error("match-invoice-lines", e);
+    return json({ error: "internal_error" }, 500);
   }
 });
 

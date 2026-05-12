@@ -203,7 +203,8 @@ Deno.serve(async (req) => {
     return json({ datasheet_id: ds.id, extracted });
   } catch (e) {
     console.error(e);
-    return json({ error: (e as Error).message }, 500);
+    console.error("extract-datasheet", e);
+    return json({ error: "internal_error" }, 500);
   }
 });
 

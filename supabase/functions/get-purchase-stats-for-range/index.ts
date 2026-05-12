@@ -183,7 +183,8 @@ Deno.serve(async (req) => {
     return json({ primary_period: primary, comparison_period: comparison, delta });
   } catch (e) {
     console.error(e);
-    return json({ error: (e as Error).message }, 500);
+    console.error("get-purchase-stats-for-range", e);
+    return json({ error: "internal_error" }, 500);
   }
 });
 

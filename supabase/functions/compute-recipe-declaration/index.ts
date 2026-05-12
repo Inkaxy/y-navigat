@@ -32,6 +32,7 @@ Deno.serve(async (req) => {
     const text = await r.text();
     return new Response(text, { status: r.status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {
-    return new Response(JSON.stringify({ error: (e as Error).message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    console.error("compute-recipe-declaration", e);
+    return new Response(JSON.stringify({ error: "internal_error" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 });
