@@ -47,13 +47,13 @@ export async function saveProductionPlanSnapshot(
 ): Promise<void> {
   const { data: snap, error } = await supabase
     .from("production_plan_snapshots")
-    .insert({
+    .insert([{
       legal_entity_id: legalEntityId,
       production_date: productionDate,
       tours: criteria.tour_numbers,
-      criteria_copy: criteria as unknown as Record<string, unknown>,
+      criteria_copy: criteria as never,
       list_type: "produksjonsliste",
-    })
+    }])
     .select("id")
     .single();
 
