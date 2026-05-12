@@ -1,3 +1,4 @@
+import { flushSync } from "react-dom";
 import { useMemo, useState, useCallback } from "react";
 import { format, addDays, subDays, parseISO, isToday, isTomorrow, isYesterday } from "date-fns";
 import { nb } from "date-fns/locale";
@@ -156,6 +157,7 @@ export default function ProduksjonsplanPage() {
       product_name: "Sorteres etter varenavn",
     };
     lines.push(sortLabel[criteria.sort_by]);
+    lines.push(`Utskrift: ${criteria.print_copies ?? 1} kopi${(criteria.print_copies ?? 1) === 1 ? "" : "er"}${criteria.print_correction_last ? " + korreksjonsliste" : ""}`);
     return lines.join("\n");
   }, [criteria, mains.data, subs.data]);
 
