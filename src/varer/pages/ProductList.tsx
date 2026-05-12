@@ -24,6 +24,8 @@ type ProductRow = {
   display_name: string;
   product_category: string;
   product_subcategory: string | null;
+  main_category: { code: string; display_name: string } | null;
+  sub_category: { code: string; display_name: string } | null;
   unit_of_sale: string;
   status: ProductStatus;
   variant_of_product_id: string | null;
@@ -73,7 +75,7 @@ export default function ProductList() {
       const { data, error } = await supabase
         .from("products")
         .select(
-          "id, display_number, code, display_name, product_category, product_subcategory, unit_of_sale, status, variant_of_product_id, variant_label, label_mode, is_cake_component, cake_role, image_url, mva_rate",
+          "id, display_number, code, display_name, product_category, product_subcategory, unit_of_sale, status, variant_of_product_id, variant_label, label_mode, is_cake_component, cake_role, image_url, mva_rate, main_category:product_main_categories(code, display_name), sub_category:product_sub_categories(code, display_name)",
         )
         .eq("legal_entity_id", legalEntityId)
         .order("display_number", { ascending: true })
@@ -247,6 +249,36 @@ export default function ProductList() {
         cellClassName: "text-muted-foreground",
         render: (p) => p.product_subcategory ?? "—",
       },
+      {
+        key: "main_category",
+        label: "Hovedvaregruppe",
+        render: (p) =>
+          p.main_category ? (
+            <span>
+              <span className="font-mono text-xs text-muted-foreground mr-1.5">
+                {p.main_category.code}
+              </span>
+              {p.main_category.display_name}
+            </span>
+          ) : (
+            <span className="text-muted-foreground">—</span>
+          ),
+      },
+      {
+        key: "sub_category",
+        label: "Undervaregruppe",
+        render: (p) =>
+          p.sub_category ? (
+            <span>
+              <span className="font-mono text-xs text-muted-foreground mr-1.5">
+                {p.sub_category.code}
+              </span>
+              {p.sub_category.display_name}
+            </span>
+          ) : (
+            <span className="text-muted-foreground">—</span>
+          ),
+      },
       { key: "unit", label: "Salgsenhet", render: (p) => p.unit_of_sale },
       {
         key: "price",
@@ -289,7 +321,7 @@ export default function ProductList() {
     [],
   );
 
-  const DEFAULT_VISIBLE = ["variant_of", "category", "unit", "price"];
+  const DEFAULT_VISIBLE = ["variant_of", "main_category", "sub_category", "unit", "price"];
   const { value: pref, setValue: setPref } = useUiPreference<{ visible: string[] }>(
     COLUMN_PREF_SCOPE,
     { visible: DEFAULT_VISIBLE },
