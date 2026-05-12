@@ -167,6 +167,59 @@ export default function ProduksjonsplanPage() {
     setActiveTemplate(t);
   };
 
+  // === Print: snapshot + korreksjon =====================================
+  const [printJob, setPrintJob] = useState<{
+    copies: number;
+    correction: boolean;
+    prevItems: Map<string, SnapshotItem> | null;
+    prevTakenAt: string | null;
+  } | null>(null);
+
+  const handlePrint = useCallback(async () => {
+    if (!legalEntityId) {
+      window.print();
+      return;
+    }
+    const copies = Math.max(1, Math.min(20, criteria.print_copies ?? 1));
+    const wantCorrection = !!criteria.print_correction_last && copies >= 1;
+
+    let prev: { takenAt: string; items: Map<string, SnapshotItem> } | null = null;
+    if (wantCorrection) {
+      try {
+        prev = await fetchLatestSnapshotItems(legalEntityId, dateStr);
+      } catch (e) {
+        console.error(e);
+      }
+      if (!prev) {
+        toast({
+          title: "Ingen tidligere snapshot",
+          description: "Korreksjonsliste hoppes over – siste kopi blir vanlig liste.",
+        });
+      }
+    }
+
+    setPrintJob({
+      copies,
+      correction: wantCorrection && !!prev,
+      prevItems: prev?.items ?? null,
+      prevTakenAt: prev?.takenAt ?? null,
+    });
+
+    // Vent på render, skriv ut, lagre nytt snapshot, rydd printJob
+    setTimeout(() => {
+      window.print();
+      setTimeout(() => {
+        setPrintJob(null);
+        if (rows.length > 0) {
+          saveProductionPlanSnapshot(legalEntityId, dateStr, criteria, rows).catch((e) =>
+            console.error("Snapshot-lagring feilet", e),
+          );
+        }
+      }, 500);
+    }, 100);
+  }, [legalEntityId, dateStr, criteria, rows]);
+
+
   return (
     <div className="space-y-4">
       {/* Topp-bar */}
