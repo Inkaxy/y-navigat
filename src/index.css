@@ -255,11 +255,40 @@
   .shadow-floating { box-shadow: var(--shadow-lg); }
 }
 
-/* Print: kun .print-area skal vises ved utskrift */
+/* Print: kun .print-area skal vises ved utskrift, A4-kompakt */
 @media print {
   body * { visibility: hidden !important; }
   .print-area, .print-area * { visibility: visible !important; }
-  .print-area { position: absolute !important; inset: 0 !important; padding: 12mm !important; background: white !important; color: black !important; }
+  .print-area {
+    position: absolute !important;
+    inset: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+    color: black !important;
+    font-family: Inter, system-ui, sans-serif !important;
+    font-size: 10pt !important;
+    line-height: 1.15 !important;
+  }
   .print-hide { display: none !important; }
-  @page { size: A4; margin: 10mm; }
+
+  .print-area table { width: 100% !important; border-collapse: collapse !important; }
+  .print-area thead { display: table-header-group !important; }
+  .print-area tr { page-break-inside: avoid !important; }
+  .print-area th, .print-area td {
+    border: 0.5pt solid #000 !important;
+    padding: 2pt 4pt !important;
+    font-size: 9pt !important;
+    color: #000 !important;
+    background: transparent !important;
+  }
+  .print-area th { font-weight: 600 !important; text-align: left; }
+  .print-area .print-section-row td {
+    border: 0 !important;
+    border-top: 0.75pt solid #000 !important;
+    padding: 6pt 0 2pt !important;
+    font-weight: 700 !important;
+    font-size: 11pt !important;
+  }
+
+  @page { size: A4 portrait; margin: 10mm; }
 }
