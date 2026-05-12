@@ -49,7 +49,7 @@ export function SettKriteriaDialog({ open, onOpenChange, legalEntityId, initial,
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-2xl max-h-[95vh] h-[95vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>Sett kriteria for produksjonsplan</DialogTitle>
         </DialogHeader>
