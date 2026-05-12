@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import DOMPurify from "dompurify";
 import { format, formatDistanceToNow } from "date-fns";
 import { nb } from "date-fns/locale";
-import { ArrowLeft, Download, Loader2, Mail, Paperclip, PlusCircle } from "lucide-react";
+import { ArrowLeft, Download, Loader2, Mail, Paperclip, PlusCircle, Send, Reply, AlertCircle } from "lucide-react";
 import { AppBanner } from "@/ordre/components/shell/AppBanner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,13 +13,22 @@ import { Label } from "@/components/ui/label";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/use-toast";
 import {
   useTicket, useUpdateTicket, getTicketAttachmentSignedUrl,
   type TicketStatus, type TicketPriority,
 } from "@/ordre/hooks/useTickets";
+import {
+  useTicketReplies, useSendTicketReply, useOrdrekontorAssignees,
+} from "@/ordre/hooks/useTicketReplies";
 import { TicketPresenceBanner } from "@/ordre/components/shell/TicketPresenceBanner";
+
+const UNASSIGNED = "__unassigned__";
 
 const STATUS_OPTS: { value: TicketStatus; label: string }[] = [
   { value: "new", label: "Ny" },
@@ -42,7 +51,12 @@ export default function TicketDetail() {
   const { toast } = useToast();
   const { data, isLoading } = useTicket(id);
   const update = useUpdateTicket();
+  const { data: replies = [] } = useTicketReplies(id);
+  const { data: assignees = [] } = useOrdrekontorAssignees();
+  const sendReply = useSendTicketReply();
   const [notesDraft, setNotesDraft] = useState("");
+  const [replyDraft, setReplyDraft] = useState("");
+  const [confirmReplyOpen, setConfirmReplyOpen] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -103,6 +117,34 @@ export default function TicketDetail() {
     });
   };
 
+  const setAssignee = (val: string) => {
+    const newId = val === UNASSIGNED ? null : val;
+    update.mutate({ id: ticket.id, patch: { assigned_to: newId } as never }, {
+      onSuccess: () => toast({ title: newId ? "Tildelt" : "Tildeling fjernet" }),
+    });
+  };
+
+  const doSendReply = () => {
+    sendReply.mutate(
+      { ticket_id: ticket.id, body_text: replyDraft },
+      {
+        onSuccess: () => {
+          toast({ title: "Svar sendt", description: `Til ${ticket.sender_email}` });
+          setReplyDraft("");
+          setConfirmReplyOpen(false);
+        },
+        onError: (e) => {
+          setConfirmReplyOpen(false);
+          toast({
+            title: "Kunne ikke sende svar",
+            description: e instanceof Error ? e.message : String(e),
+            variant: "destructive",
+          });
+        },
+      },
+    );
+  };
+
   return (
     <>
       <AppBanner
@@ -134,6 +176,23 @@ export default function TicketDetail() {
                 <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
                 <SelectContent>{PRIO_OPTS.map((p) => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}</SelectContent>
               </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Tildelt</Label>
+              <Select value={ticket.assigned_to ?? UNASSIGNED} onValueChange={setAssignee}>
+                <SelectTrigger className="w-56"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={UNASSIGNED}>— Ikke tildelt —</SelectItem>
+                  {assignees.map((u) => (
+                    <SelectItem key={u.id} value={u.id}>{u.display_name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {assignees.length === 0 && (
+                <p className="text-[11px] text-muted-foreground max-w-[14rem]">
+                  Ingen brukere har ordrekontor-rollen ennå. Tildel i Admin → Brukere.
+                </p>
+              )}
             </div>
             <div className="ml-auto flex gap-2">
               {ticket.related_order_id ? (
@@ -205,6 +264,86 @@ export default function TicketDetail() {
             </CardContent>
           </Card>
         )}
+
+        {/* Tidligere svar (tråd) */}
+        {replies.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Reply className="h-4 w-4" /> Sendte svar ({replies.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {replies.map((r) => (
+                <div key={r.id} className="border-l-2 border-primary/40 pl-3 space-y-1">
+                  <div className="text-xs text-muted-foreground flex items-center gap-2 flex-wrap">
+                    <span className="font-medium text-foreground">{r.sent_by_name ?? "Bruker"}</span>
+                    <span>·</span>
+                    <span>{formatDistanceToNow(new Date(r.sent_at ?? r.created_at), { locale: nb, addSuffix: true })}</span>
+                    {r.send_status !== "sent" && (
+                      <Badge variant={r.send_status === "failed" ? "destructive" : "secondary"} className="text-[10px]">
+                        {r.send_status === "failed" ? "Feilet" : "Pending"}
+                      </Badge>
+                    )}
+                  </div>
+                  <pre className="whitespace-pre-wrap text-sm font-sans">{r.body_text}</pre>
+                  {r.error_message && (
+                    <div className="text-xs text-destructive flex items-start gap-1">
+                      <AlertCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                      <span>{r.error_message}</span>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Svar-felt */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Reply className="h-4 w-4" />
+              Svar til {ticket.sender_name ?? ticket.sender_email}{" "}
+              <span className="text-xs font-normal text-muted-foreground">&lt;{ticket.sender_email}&gt;</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <Textarea
+              value={replyDraft}
+              onChange={(e) => setReplyDraft(e.target.value)}
+              rows={8}
+              placeholder="Skriv svar …"
+              disabled={sendReply.isPending}
+            />
+            <AlertDialog open={confirmReplyOpen} onOpenChange={setConfirmReplyOpen}>
+              <AlertDialogTrigger asChild>
+                <Button size="sm" disabled={!replyDraft.trim() || sendReply.isPending}>
+                  {sendReply.isPending ? (
+                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sender …</>
+                  ) : (
+                    <><Send className="mr-2 h-4 w-4" /> Send svar</>
+                  )}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Send svar?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Svaret sendes til <strong>{ticket.sender_email}</strong> via {ticket.source_mailbox} og
+                    legges i samme e-post-tråd.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Avbryt</AlertDialogCancel>
+                  <AlertDialogAction onClick={(e) => { e.preventDefault(); doSendReply(); }}>
+                    Send
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </CardContent>
+        </Card>
 
         {/* Internt notat */}
         <Card>
