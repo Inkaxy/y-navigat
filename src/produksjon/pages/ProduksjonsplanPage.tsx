@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { format, addDays, subDays, parseISO, isToday, isTomorrow, isYesterday } from "date-fns";
 import { nb } from "date-fns/locale";
 import {
@@ -15,6 +15,13 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { toast } from "@/hooks/use-toast";
+import {
+  fetchLatestSnapshotItems,
+  saveProductionPlanSnapshot,
+  type SnapshotItem,
+} from "../features/produksjonsplan/hooks/useProductionPlanSnapshots";
+import { CorrectionPlanTable } from "../features/produksjonsplan/components/CorrectionPlanTable";
 import {
   Popover,
   PopoverContent,
