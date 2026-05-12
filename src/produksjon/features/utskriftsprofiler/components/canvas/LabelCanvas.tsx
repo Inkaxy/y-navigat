@@ -78,8 +78,8 @@ export function LabelCanvas(props: Props) {
   const paperW = landscape ? paperWidth : paperHeight;
   const paperH = landscape ? paperHeight : paperWidth;
 
-  const [zoom, setZoom] = useState(4); // px per mm
-  const pxPerMm = fixedPxPerMm ?? zoom;
+  const internalZoom = props.zoom ?? 4;
+  const pxPerMm = fixedPxPerMm ?? internalZoom;
 
   const innerRef = useRef<HTMLDivElement>(null);
   const [dragMode, setDragMode] = useState<DragMode | null>(null);
