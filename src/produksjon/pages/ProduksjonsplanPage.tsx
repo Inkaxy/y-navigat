@@ -304,17 +304,34 @@ export default function ProduksjonsplanPage() {
 
       {legalEntityId && (
         <div className="print-area space-y-3">
-          <div className="hidden print:block mb-2">
-            <h1 className="text-lg font-semibold">Produksjonsplan — {format(date, "dd.MM.yyyy")}</h1>
-            {activeTemplate && <p className="text-xs">{activeTemplate.name}</p>}
-            <pre className="text-[10px] font-mono whitespace-pre-wrap">{summary}</pre>
+          <div className="hidden print:flex justify-between items-baseline mb-2">
+            <h1 className="text-base font-bold uppercase">
+              Produksjonsliste for: {format(date, "EEEE dd.MM.yy", { locale: nb })}
+              {criteria.sum_tours ? " sum alle turer" : ""}
+            </h1>
+            <span className="text-[9pt]">Skrevet ut: {format(new Date(), "dd.MM.yy HH:mm")}</span>
           </div>
           <ProductionPlanTable
             rows={rows}
             showByMainGroup={prefs.showByMainGroup}
             showTraysWithPlus={prefs.showTraysWithPlus}
             loading={plan.isLoading}
+            columns={{
+              mainGroup: prefs.colMainGroup ?? true,
+              doughType: (prefs.colDoughType ?? true) && !prefs.hideDoughTypes,
+              unit: prefs.colUnit ?? true,
+              ordered: prefs.colOrdered ?? true,
+              fromStock: prefs.colFromStock ?? true,
+              liters: prefs.colLiters ?? true,
+              onStock: prefs.colOnStock ?? true,
+            } satisfies ColumnVisibility}
           />
+          {counts && (
+            <p className="hidden print:block text-[9pt] mt-2">
+              Fra {counts.datert} daterte ordre, {counts.fast} fastordre
+              {counts.pakkseddel > 0 ? `, ${counts.pakkseddel} pakksedler` : ""}
+            </p>
+          )}
         </div>
       )}
 
