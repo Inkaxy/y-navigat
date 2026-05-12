@@ -1,57 +1,94 @@
-## Mål
+# Snapshot- og korreksjons-utskrift
 
-1. Utskrift av produksjonsplanen skal ligne det vedlagte PDF-eksempelet og passe på ett A4-ark.
-2. Brukeren skal kunne skjule kolonner som er irrelevante for en gitt liste (Hovedgr., Deigtype, Enhet, I ordre, Fra lager, Liter, På lager).
+Legge til muligheten for å skrive ut N kopier av produksjonsplanen, hvor den **siste** kopien blir en korreksjonsliste som viser +/- mot siste snapshot fra samme dato.
 
-## Endringer
+---
 
-### 1. Print-layout (A4-kompakt, kun listen)
+## Brukerflyt
 
-I `src/index.css` `@media print`:
-- Sett kompakt typografi: `font-size: 10pt`, `line-height: 1.15`, sans-serif.
-- Tabell: `border-collapse`, tynne svarte linjer (`border: 0.5pt solid #000`), `td/th { padding: 2pt 4pt }`, `font-size: 9pt`.
-- `thead` repeteres på hver side (`display: table-header-group`).
-- Skjul globalt: topbar, submeny, status-/kriteria-card, footer-hint, mal-pille, alle knapper (`.print-hide` + skjul `header`, `nav`, `[role="dialog"]`).
-- `.print-area` får egen header med "PRODUKSJONSLISTE FOR: {ukedag dd.mm.åå} sum alle turer", liten dato/skrevet-ut-stempel oppe til høyre, og fotnote "Fra X daterte ordre, Y fastordre".
-- `@page { size: A4 portrait; margin: 10mm; }`.
+1. På **Sett kriteria for produksjonsplan**-dialogen kommer det et nytt felt: **«Skriv ut med korreksjon»** med to inputs:
+   - **Antall kopier** (number, default 1)
+   - **Korreksjonsliste på siste kopi** (toggle, default av)
+2. Disse lagres som del av kriteria-objektet (slik at maler husker det).
+3. Når brukeren klikker **Skriv ut**:
+   - Hent forrige snapshot for *(samme dato + samme legal_entity)*. Korreksjon kjøres **kun dag mot dag** — finnes ikke snapshot fra inneværende dag, hoppes diff over (siste kopi blir vanlig).
+   - Generer N "sider" i `print-area`. Hver side blir en separat A4 (vha. `break-after: page`).
+   - Side 1 til N-1 = identisk med dagens plan.
+   - Side N = korreksjonsliste (samme rader, men med ekstra kolonne **Endring** og en ekstra rad pr. produkt for **plater +/-**).
+   - Etter at print-dialogen er trigget, lagres et nytt snapshot av dagens plan i databasen.
+4. Snapshots auto-slettes etter **2 dager** (cron / scheduled function eller cleanup ved skriving).
 
-### 2. Hovedgruppe som seksjons-header (ikke kolonne) ved utskrift
+---
 
-I `ProductionPlanTable.tsx` (eller via en print-only variant):
-- Når `showByMainGroup=true` og man printer: render hver hovedgruppe som en H2-rad ("B1 Brød og Loff") og dropp "Hovedgr."-kolonnen.
-- På skjerm beholdes dagens layout (rowspan-kolonne) uendret.
+## Korreksjonsliste-layout
 
-### 3. Nye kolonne-valg
+Identisk med vanlig produksjonsliste, pluss:
 
-Utvid `UiPrefs` i `ProduksjonsplanPage.tsx`:
+- Ny kolonne **Endring** ytterst til høyre med `+5` / `-2` / blank.
+- Ny rad rett under hvert produkt med endring i platenanntall: viser `Plater: +0,5` eller `Plater: -1` (kun hvis ulikt).
+- Header endres til: `KORREKSJONSLISTE FOR: {ukedag dd.MM.åå} – endring siden {hh:mm}`.
+- Uendrede rader vises også (ifølge ditt valg).
+
+---
+
+## Database (ny tabell)
+
+```text
+production_plan_snapshots
+  id              uuid pk
+  legal_entity_id uuid
+  plan_date       date
+  taken_at        timestamptz default now()
+  taken_by        uuid (auth.uid)
+  criteria        jsonb            -- kriteriene som ble brukt
+  rows            jsonb            -- snapshot av rader (product_id, qty_to_produce, trays_full, trays_partial)
+  expires_at      timestamptz default now() + interval '2 days'
 ```
-hideMainGroupCol: boolean
-hideDoughTypeCol: boolean
-hideUnitCol: boolean
-hideOrderedCol: boolean
-hideFromStockCol: boolean
-hideLitersCol: boolean
-hideOnStockCol: boolean
-```
-Default: alle `false` (samme som i dag), bortsett fra at print uansett legger Hovedgr. som seksjons-header.
 
-I innstillinger-dropdownen legges en ny seksjon "Kolonner" med checkbox per kolonne. Eksisterende `hideDoughTypes` gjenbrukes som `hideDoughTypeCol` (rename + migrasjonsfri – gammel verdi leses som fallback).
+- RLS: bruker som tilhører `legal_entity_id` kan lese/skrive (samme mønster som andre produksjonsplan-tabeller).
+- Index på `(legal_entity_id, plan_date, taken_at desc)` for å hente nyeste raskt.
+- Cleanup: enten en scheduled edge function som sletter `expires_at < now()`, eller en `DELETE` som kjøres ved hver `INSERT` (enkleste løsning, ingen cron).
 
-`ProductionPlanTable` får tilsvarende props og skjuler header + celle (juster `colSpan` på tomme/loading-rader).
+---
 
-### 4. Header-tekst og tellinger ved utskrift
+## Kode-endringer
 
-I `ProduksjonsplanPage.tsx` `print:block`-blokken erstattes med:
-- `PRODUKSJONSLISTE FOR: onsdag 13.05.26 sum alle turer` (formattert nb-locale).
-- Liten "Skrevet ut: {dd.MM.åå HH:mm}" oppe til høyre.
-- Footer: `Fra {datert} daterte ordre, {fast} fastordre`.
+**`src/produksjon/features/produksjonsplan/types.ts`**
+- Legg til på `ProduksjonsplanCriteria`:
+  ```ts
+  print_copies?: number;          // default 1
+  print_correction_last?: boolean; // default false
+  ```
+- Oppdater `DEFAULT_CRITERIA`.
 
-## QA
+**`src/produksjon/features/produksjonsplan/components/SettKriteriaDialog.tsx`**
+- Ny seksjon «Utskrift» med number-input + checkbox.
 
-Etter endring: åpne print-preview i Chrome (Ctrl+P), bekreft 1 side A4, tabell-kolonner ikke kuttes, header repeteres ved sideskift hvis innholdet vokser, og at kolonne-toggles speiler valget både på skjerm og print.
+**Ny hook `useProductionPlanSnapshots.ts`**
+- `getLatestForToday(legalEntityId, date)` → siste snapshot for dagen.
+- `saveSnapshot(legalEntityId, date, criteria, rows)` → insert + slett utgåtte.
 
-## Filer som endres
+**Ny komponent `CorrectionPlanTable.tsx`**
+- Tar `rows` + `previousRowsByProductId` + `columns` props.
+- Samme markup som `ProductionPlanTable` men med ekstra **Endring**-kolonne og diff-rad for plater.
 
-- `src/index.css` (print-CSS)
-- `src/produksjon/pages/ProduksjonsplanPage.tsx` (prefs + UI-toggles + print-header)
-- `src/produksjon/features/produksjonsplan/components/ProductionPlanTable.tsx` (kolonne-toggles + seksjon-header ved print)
+**`src/produksjon/pages/ProduksjonsplanPage.tsx`**
+- Erstatt `window.print()`-knappen med ny `handlePrint()`-funksjon som:
+  1. Henter siste snapshot.
+  2. Bygger en `printJob`-state: `{ copies: N, includeCorrection: bool, prevRows: Map | null }`.
+  3. Trigger render av `<PrintLayout copies={N} ... />` i `print-area`.
+  4. Kaller `window.print()` (etter et kort `setTimeout` så DOM rekker å oppdatere).
+  5. Lagrer nytt snapshot.
+- Ny komponent `<PrintLayout>` rendrer N seksjoner, hver med `style={{ breakAfter: 'page' }}`, der siste evt. er `<CorrectionPlanTable>`.
+
+**`src/index.css`**
+- Legg til `.print-page { break-after: page; }` og `.print-page:last-child { break-after: auto; }`.
+
+---
+
+## Edge cases
+
+- Første utskrift på en ny dag: ingen snapshot finnes → siste kopi blir vanlig liste (med liten merknad i header: «Ingen tidligere snapshot å sammenligne mot»).
+- Korreksjon krysser ikke datoer (bevisst valg).
+- Snapshot inkluderer kun det minimum av data som trengs for diff (product_id, qty, trays).
+- Hvis et produkt finnes i ny liste men ikke gammel → `+full mengde`. Motsatt → vises som egen rad med `-full mengde` og strikethrough på navn.
