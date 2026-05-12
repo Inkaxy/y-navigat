@@ -249,6 +249,36 @@ export default function ProductList() {
         cellClassName: "text-muted-foreground",
         render: (p) => p.product_subcategory ?? "—",
       },
+      {
+        key: "main_category",
+        label: "Hovedvaregruppe",
+        render: (p) =>
+          p.main_category ? (
+            <span>
+              <span className="font-mono text-xs text-muted-foreground mr-1.5">
+                {p.main_category.code}
+              </span>
+              {p.main_category.display_name}
+            </span>
+          ) : (
+            <span className="text-muted-foreground">—</span>
+          ),
+      },
+      {
+        key: "sub_category",
+        label: "Undervaregruppe",
+        render: (p) =>
+          p.sub_category ? (
+            <span>
+              <span className="font-mono text-xs text-muted-foreground mr-1.5">
+                {p.sub_category.code}
+              </span>
+              {p.sub_category.display_name}
+            </span>
+          ) : (
+            <span className="text-muted-foreground">—</span>
+          ),
+      },
       { key: "unit", label: "Salgsenhet", render: (p) => p.unit_of_sale },
       {
         key: "price",
