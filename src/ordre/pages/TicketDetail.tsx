@@ -177,6 +177,23 @@ export default function TicketDetail() {
                 <SelectContent>{PRIO_OPTS.map((p) => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}</SelectContent>
               </Select>
             </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Tildelt</Label>
+              <Select value={ticket.assigned_to ?? UNASSIGNED} onValueChange={setAssignee}>
+                <SelectTrigger className="w-56"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={UNASSIGNED}>— Ikke tildelt —</SelectItem>
+                  {assignees.map((u) => (
+                    <SelectItem key={u.id} value={u.id}>{u.display_name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {assignees.length === 0 && (
+                <p className="text-[11px] text-muted-foreground max-w-[14rem]">
+                  Ingen brukere har ordrekontor-rollen ennå. Tildel i Admin → Brukere.
+                </p>
+              )}
+            </div>
             <div className="ml-auto flex gap-2">
               {ticket.related_order_id ? (
                 <Button asChild variant="outline">
