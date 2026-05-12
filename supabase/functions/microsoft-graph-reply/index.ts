@@ -35,13 +35,9 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    // Sjekk skrivetilgang
-    const { data: writeOk, error: accErr } = await admin.rpc("has_app_write_access", { _app_slug: "ordre" });
-    if (accErr || !writeOk) {
-      // Prøv uten arg-navn (fallback)
-      const { data: writeOk2 } = await admin.rpc("has_app_write_access" as never, { app_slug: "ordre" } as never);
-      if (!writeOk2) return json({ error: "Mangler skrivetilgang til Ordre" }, 403);
-    }
+    // Sjekk skrivetilgang via bruker-klient (slik at auth.uid() er satt)
+    const { data: writeOk } = await userClient.rpc("has_app_write_access", { p_app_code: "ordre" });
+    if (!writeOk) return json({ error: "Mangler skrivetilgang til Ordre" }, 403);
 
     // Hent ticket
     const { data: ticket, error: tErr } = await admin
