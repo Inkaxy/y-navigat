@@ -44,7 +44,7 @@ export async function saveProductionPlanSnapshot(
   productionDate: string,
   criteria: ProduksjonsplanCriteria,
   rows: ProductionPlanRow[],
-): Promise<void> {
+): Promise<{ id: string; itemCount: number } | null> {
   const { data: snap, error } = await supabase
     .from("production_plan_snapshots")
     .insert([{
@@ -59,7 +59,7 @@ export async function saveProductionPlanSnapshot(
 
   if (error || !snap) {
     console.error("Kunne ikke lagre snapshot", error);
-    return;
+    return null;
   }
 
   // Aggreger pr product_id (samme produkt kan dukke opp flere ganger ved per_product/turer)
@@ -89,6 +89,12 @@ export async function saveProductionPlanSnapshot(
     const { error: insErr } = await supabase
       .from("production_plan_snapshot_items")
       .insert(items);
-    if (insErr) console.error("Kunne ikke lagre snapshot items", insErr);
+    if (insErr) {
+      console.error("Kunne ikke lagre snapshot items", insErr);
+      await supabase.from("production_plan_snapshots").delete().eq("id", snap.id);
+      return null;
+    }
   }
+
+  return { id: snap.id, itemCount: items.length };
 }
