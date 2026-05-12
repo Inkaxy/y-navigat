@@ -232,6 +232,7 @@ export default function ProduksjonsplanPage() {
       prevItems: prev?.items ?? null,
       prevTakenAt: prev?.takenAt ?? null,
     });
+    const savedItemCount = saved.itemCount;
 
     // Snapshot er lagret før print-dialogen åpnes, slik at avbrutt/ferdig utskrift gir samme grunnlag.
     setTimeout(() => {
@@ -240,7 +241,7 @@ export default function ProduksjonsplanPage() {
         setPrintJob(null);
         toast({
           title: "Snapshot lagret",
-          description: `Lagret ${saved.itemCount} varelinjer for ${format(date, "dd.MM.yyyy")}.`,
+          description: `Lagret ${savedItemCount} varelinjer for ${format(date, "dd.MM.yyyy")}.`,
         });
       }, 500);
     }, 100);
