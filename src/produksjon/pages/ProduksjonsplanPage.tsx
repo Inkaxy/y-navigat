@@ -380,11 +380,13 @@ export default function ProduksjonsplanPage() {
         const baseDateLabel = `${format(date, "EEEE dd.MM.yy", { locale: nb })}${criteria.sum_tours ? " sum alle turer" : ""}`;
         const printedAt = format(new Date(), "dd.MM.yy HH:mm");
 
-        // Bygg liste over "sider"
+        // Bygg liste over "sider": N normale kopier + evt. én ekstra korreksjonsside
         const pages: Array<{ kind: "normal" | "correction"; copyIdx: number }> = [];
         for (let i = 0; i < totalCopies; i++) {
-          const isLast = i === totalCopies - 1;
-          pages.push({ kind: isLast && correctionLast ? "correction" : "normal", copyIdx: i });
+          pages.push({ kind: "normal", copyIdx: i });
+        }
+        if (correctionLast) {
+          pages.push({ kind: "correction", copyIdx: totalCopies });
         }
 
         return (
@@ -422,7 +424,7 @@ export default function ProduksjonsplanPage() {
                     </h1>
                     <span className="text-[9pt]">
                       Skrevet ut: {printedAt}
-                      {totalCopies > 1 && ` · kopi ${p.copyIdx + 1}/${totalCopies}`}
+                      {totalCopies > 1 && p.kind === "normal" && ` · kopi ${p.copyIdx + 1}/${totalCopies}`}
                     </span>
                   </div>
                   {p.kind === "correction" && printJob?.prevItems ? (
