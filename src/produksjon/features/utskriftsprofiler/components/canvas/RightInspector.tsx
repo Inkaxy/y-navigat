@@ -49,7 +49,6 @@ export function RightInspector({ selected, innerW, innerH, onChange, onRemove }:
     );
   }
 
-  const Icon = null;
   const group = FIELD_GROUPS[selected.field_type];
 
   return (
