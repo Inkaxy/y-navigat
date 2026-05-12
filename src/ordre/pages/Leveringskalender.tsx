@@ -1054,9 +1054,17 @@ export default function MatrixPage() {
               ) : (
                 <span className="text-xs text-muted-foreground">Alle aktive produkter er i matrisen.</span>
               )}
-              <span className="ml-auto text-[11px] text-muted-foreground/70">
-                Værvarsel fra Yr levert av Meteorologisk institutt og NRK
-              </span>
+              <div className="ml-auto flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
+                <span className="font-medium uppercase tracking-wide text-muted-foreground/70">Forklaring:</span>
+                <LegendSwatch className="bg-warning/10 border-warning/40" label="Ulagret endring" />
+                <LegendSwatch className="bg-sky-50 border-sky-300 dark:bg-sky-950/30 dark:border-sky-800" label="Leveringspause" />
+                <LegendSwatch className="bg-accent/30 border-border" label="Lagt til produkt" />
+                <LegendSwatch className="bg-muted/60 border-border" label="Helg" />
+                <LegendSwatch className="bg-muted border-border" label="Sum-rad/kolonne" />
+                <span className="text-muted-foreground/70">
+                  Værvarsel fra Yr levert av Meteorologisk institutt og NRK
+                </span>
+              </div>
             </div>
           </>
         )}
@@ -1560,5 +1568,14 @@ function MatrixGrid({
         </tfoot>
       </table>
     </div>
+  );
+}
+
+function LegendSwatch({ className, label }: { className: string; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span className={cn("inline-block h-3 w-3 rounded-sm border", className)} />
+      <span>{label}</span>
+    </span>
   );
 }
