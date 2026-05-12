@@ -35,6 +35,7 @@ type ProductRow = {
   cake_role: CakeRole | null;
   image_url: string | null;
   mva_rate?: number | null;
+  pieces_per_tray: number | null;
 };
 
 const STATUS_BADGE: Record<ProductStatus, string> = {
