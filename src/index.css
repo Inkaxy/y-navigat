@@ -254,3 +254,12 @@
   .shadow-elevated { box-shadow: var(--shadow-md); }
   .shadow-floating { box-shadow: var(--shadow-lg); }
 }
+
+/* Print: kun .print-area skal vises ved utskrift */
+@media print {
+  body * { visibility: hidden !important; }
+  .print-area, .print-area * { visibility: visible !important; }
+  .print-area { position: absolute !important; inset: 0 !important; padding: 12mm !important; background: white !important; color: black !important; }
+  .print-hide { display: none !important; }
+  @page { size: A4; margin: 10mm; }
+}
