@@ -869,11 +869,6 @@ export default function MatrixPage() {
 
   return (
     <div className="flex h-full flex-col bg-background">
-      <AppBanner
-        title="Leveringskalender"
-        subtitle="Ukentlig ordre-inntasting per kunde — produkter × (dato, tur)"
-        icon={Grid3x3}
-      />
 
       <div className="px-page py-4">
         <div className="rounded-[14px] border border-brand-bronze/20 bg-card p-3 shadow-card ring-1 ring-inset ring-brand-cream/40">
