@@ -348,6 +348,56 @@ export default function MatrixPage() {
 
   const dirtyCount = dirtyChanges.length;
 
+  // Effektive rader for "enkel tabell"-visning: lagrede celler + ulagrede endringer + nye rader.
+  const flatRows = useMemo(() => {
+    if (!matrix) return [] as import("@/ordre/components/orders/matrix/FlatLinesView").FlatLineRow[];
+    type Row = import("@/ordre/components/orders/matrix/FlatLinesView").FlatLineRow;
+    const productById = new Map(allProducts.map((p) => [p.id, p]));
+    const rowMap = new Map<string, Row>();
+
+    // 1) Lagrede celler
+    for (const c of matrix.existing_cells) {
+      if (!c.delivery_tour_id) continue;
+      const key = `${c.delivery_date}|${c.delivery_tour_id}|${c.product_id}`;
+      rowMap.set(key, {
+        key,
+        delivery_date: c.delivery_date,
+        delivery_tour_id: c.delivery_tour_id,
+        product_id: c.product_id,
+        quantity: Number(c.quantity),
+        unit_price: Number(c.unit_price),
+        line_total_incl_vat: Number(c.line_total_incl_vat),
+      });
+    }
+
+    // 2) Overlay redigeringer (inkl. nye linjer)
+    for (const [key, raw] of Object.entries(edits)) {
+      const [date, tour_id, product_id] = key.split("|");
+      const qty = Number(raw || 0);
+      const existing = rowMap.get(key);
+      if (qty <= 0) {
+        if (existing) rowMap.delete(key);
+        continue;
+      }
+      const p = productById.get(product_id);
+      const unitPrice = existing?.unit_price ?? Number(p?.unit_price ?? 0);
+      const mvaRate = Number(p?.mva_rate ?? 0);
+      rowMap.set(key, {
+        key,
+        delivery_date: date,
+        delivery_tour_id: tour_id,
+        product_id,
+        quantity: qty,
+        unit_price: unitPrice,
+        line_total_incl_vat: qty * unitPrice * (1 + mvaRate),
+        isDraft: true,
+      });
+    }
+
+    // Filtrer bort qty 0
+    return Array.from(rowMap.values()).filter((r) => r.quantity > 0);
+  }, [matrix, edits, allProducts]);
+
   const unsavedAddedCount = useMemo(() => {
     return addedProducts.filter((p) => {
       return !dirtyChanges.some((c) => c.product_id === p.id && c.quantity > 0);
