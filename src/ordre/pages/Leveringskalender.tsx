@@ -1797,7 +1797,8 @@ function MatrixGrid({
                         placeholder={ghost ? String(ghost) : ""}
                         className={cn(
                           "h-9 w-16 rounded-none border-0 bg-transparent px-1 text-center tabular-nums shadow-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-0",
-                          dirty && "font-semibold text-warning-foreground",
+                          value && "text-base font-semibold text-foreground",
+                          dirty && "font-bold text-warning-foreground",
                           pause && "cursor-not-allowed",
                           ghost && "placeholder:italic placeholder:text-muted-foreground/60",
                         )}
