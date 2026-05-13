@@ -142,6 +142,11 @@ export default function MatrixPage() {
 
   const { data: customers } = useNBCustomers(debouncedSearch);
   const { data: selectedCustomer } = useCustomerById(customerId);
+  const { data: customerSchedules = [] } = useRecurringSchedules(
+    customerId ? { customer_id: customerId, status: "active" } : { customer_id: "__none__" },
+  );
+  const existingSchedule: RecurringScheduleWithCustomer | null =
+    customerId && customerSchedules.length > 0 ? customerSchedules[0] : null;
   const { data: matrix, isLoading } = useMatrixData(customerId, dateFrom, dateTo);
   const { data: addableProducts } = useAddableProducts(customerId, !!customerId);
   const saveMatrix = useSaveMatrix();
