@@ -41,7 +41,7 @@ export function ProductInfoDialog({ productId, productName, open, onClose }: Pro
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")
-        .select("id, display_name, image_url, datasheet_url, description, description_rich, manual_ingredient_declaration, manual_allergens_contains, manual_allergens_may_contain, manual_nutrition_per_100g")
+        .select("id, display_name, image_url, datasheet_url, description, description_rich, manual_ingredient_declaration, manual_allergens_contains, manual_allergens_may_contain, manual_nutrition_per_100g, cert_nokkelhull, cert_norsk_100, breadscale_value")
         .eq("id", productId!)
         .maybeSingle();
       if (error) throw error;
