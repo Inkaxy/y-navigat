@@ -444,7 +444,11 @@ export default function MatrixPage() {
       let rowSum = 0;
       for (const c of columns) {
         const key = ckey(c.date, c.tour.id, p.id);
-        const qty = key in edits ? Number(edits[key] || 0) : existingQty[key] ?? 0;
+        const ghostQty = ghostMap?.get(`${c.date}|${c.tour.id}|${p.id}`) ?? 0;
+        const qty =
+          key in edits
+            ? Number(edits[key] || 0)
+            : existingQty[key] ?? ghostQty;
         if (!qty || !price) continue;
         const amount = qty * price;
         rowSum += amount;
