@@ -365,82 +365,96 @@ export function AppSwitcher() {
             const active = isAppActive(a, pathname);
             const myAppIdx = appIdx.indexOf(i);
 
+            const route = INTERNAL_ROUTES[a.slug];
             return (
-              <button
+              <div
                 key={`a-${a.slug}-${i}`}
-                ref={(el) => {
-                  if (el) rowsRef.current[myAppIdx] = el;
-                }}
-                role="menuitem"
-                tabIndex={focusIdx === myAppIdx ? 0 : -1}
-                onMouseEnter={() => setFocusIdx(myAppIdx)}
-                onClick={() => goTo(a)}
                 className={cn(
-                  "relative flex w-full items-center gap-3 px-4 py-2 text-left transition-colors",
-                  "focus:outline-none",
+                  "group/approw relative flex w-full items-stretch transition-colors",
                   active
                     ? "bg-brand-bronze/[0.14]"
-                    : "hover:bg-brand-cream/[0.08] focus-visible:bg-brand-cream/[0.08]",
+                    : "hover:bg-brand-cream/[0.08] focus-within:bg-brand-cream/[0.08]",
                 )}
-                style={{ height: "56px" }}
               >
-                {active && (
+                <button
+                  ref={(el) => {
+                    if (el) rowsRef.current[myAppIdx] = el;
+                  }}
+                  role="menuitem"
+                  tabIndex={focusIdx === myAppIdx ? 0 : -1}
+                  onMouseEnter={() => setFocusIdx(myAppIdx)}
+                  onClick={() => goTo(a)}
+                  className="relative flex flex-1 items-center gap-3 px-4 py-2 text-left focus:outline-none"
+                  style={{ height: "56px" }}
+                >
+                  {active && (
+                    <span
+                      aria-hidden
+                      className="absolute left-0 top-1/2 h-9 w-[3px] -translate-y-1/2 rounded-r-full bg-brand-bronze"
+                    />
+                  )}
+                  {/* Icon disc */}
                   <span
                     aria-hidden
-                    className="absolute left-0 top-1/2 h-9 w-[3px] -translate-y-1/2 rounded-r-full bg-brand-bronze"
-                  />
-                )}
-                {/* Icon disc */}
-                <span
-                  aria-hidden
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
-                  style={{
-                    backgroundColor: `${a.color_hex ?? "#a47236"}24`,
-                    color: a.color_hex ?? "#a47236",
-                  }}
-                >
-                  <Icon className="h-[18px] w-[18px]" />
-                </span>
-                {/* Use color via wrapper to avoid currentColor conflicts */}
-                <span className="sr-only">{a.display_name}</span>
-
-                {/* Tekst */}
-                <span className="flex min-w-0 flex-1 flex-col">
-                  <span
-                    className="truncate text-[15px] font-medium leading-tight text-brand-cream"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
+                    style={{
+                      backgroundColor: `${a.color_hex ?? "#a47236"}24`,
+                      color: a.color_hex ?? "#a47236",
+                    }}
                   >
-                    {a.display_name}
+                    <Icon className="h-[18px] w-[18px]" />
                   </span>
-                  <span className="truncate text-[12px] text-brand-cream/50">
-                    {CATEGORY_LABELS[a.category] ?? a.category}
-                    {a.access_level ? ` · ${a.access_level}` : ""}
-                  </span>
-                </span>
+                  <span className="sr-only">{a.display_name}</span>
 
-                {/* Badges */}
-                <span className="flex items-center gap-2">
-                  {a.status === "in_development" && (
-                    <span className="rounded-full border border-brand-bronze/40 bg-brand-bronze/15 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-brand-cream/85">
-                      Beta
+                  {/* Tekst */}
+                  <span className="flex min-w-0 flex-1 flex-col">
+                    <span className="truncate text-[15px] font-medium leading-tight text-brand-cream">
+                      {a.display_name}
                     </span>
-                  )}
-                  {isNew(a) && (
-                    <span className="rounded-full border border-brand-cream/20 bg-brand-cream/[0.08] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-brand-cream/85">
-                      Ny
+                    <span className="truncate text-[12px] text-brand-cream/50">
+                      {CATEGORY_LABELS[a.category] ?? a.category}
+                      {a.access_level ? ` · ${a.access_level}` : ""}
                     </span>
-                  )}
-                  {/* Reservert plass for ulest-tellinger (16px min) */}
-                  <span className="min-w-[16px]" aria-hidden />
-                  {active ? (
-                    <span className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-brand-bronze">
-                      <span className="inline-block h-1.5 w-1.5 rounded-full bg-brand-bronze" />
-                      Aktiv
-                    </span>
-                  ) : (
-                    <ChevronDown className="h-4 w-4 -rotate-90 text-brand-cream/30" />
-                  )}
-                </span>
-              </button>
+                  </span>
+
+                  {/* Badges */}
+                  <span className="flex items-center gap-2">
+                    {a.status === "in_development" && (
+                      <span className="rounded-full border border-brand-bronze/40 bg-brand-bronze/15 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-brand-cream/85">
+                        Beta
+                      </span>
+                    )}
+                    {isNew(a) && (
+                      <span className="rounded-full border border-brand-cream/20 bg-brand-cream/[0.08] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-brand-cream/85">
+                        Ny
+                      </span>
+                    )}
+                    <span className="min-w-[16px]" aria-hidden />
+                    {active ? (
+                      <span className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-brand-bronze">
+                        <span className="inline-block h-1.5 w-1.5 rounded-full bg-brand-bronze" />
+                        Aktiv
+                      </span>
+                    ) : (
+                      <ChevronDown className="h-4 w-4 -rotate-90 text-brand-cream/30" />
+                    )}
+                  </span>
+                </button>
+
+                {route && (
+                  <a
+                    href={route}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    title={`Åpne ${a.display_name} i ny fane`}
+                    aria-label={`Åpne ${a.display_name} i ny fane`}
+                    className="flex w-10 shrink-0 items-center justify-center text-brand-cream/40 opacity-0 transition-all hover:bg-brand-cream/[0.06] hover:text-brand-cream group-hover/approw:opacity-100 group-focus-within/approw:opacity-100 focus-visible:opacity-100"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                  </a>
+                )}
+              </div>
             );
           })}
         </div>
