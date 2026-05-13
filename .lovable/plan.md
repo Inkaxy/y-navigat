@@ -1,45 +1,45 @@
-## Mål
+## Hva som er galt
 
-Gjøre det mulig å opprette/redigere en **fastordre** (løpende ukentlig ordre) direkte fra Leveringskalender-matrisen, uten å forlate siden. Fastordren ligger som en mal på kunden — kunden kan selv endre den senere, og bakeriet får oversikt for forberedelse.
+### 1. "Ukjent produkt" i fastordre-dialogen
+`RecurringScheduleDialog` slår opp produktnavn via `useNBProducts()` (uten søk). Den hooken:
+- filtrerer `is_for_sale = true` og `status != 'discontinued'`
+- har `.limit(100)`
 
-## Endringer
+Hvis et produkt på malen er utgått, ikke selgbart, eller faller utenfor de 100 første alfabetisk, finnes det ikke i `productMap` → vises som **"Ukjent produkt"**. Søk i produktvelgeren treffer det heller ikke nødvendigvis siden samme filter brukes.
 
-### 1. Ny menyvalg i Handling-dropdown (Leveringskalender)
-I `src/ordre/pages/Leveringskalender.tsx`, i seksjonen "Opprette nytt" (rett under "Lag ny returordre"):
+### 2. Fastordren vises ikke i Leveringskalender-matrisen
+`useRecurringGhost` (`src/ordre/hooks/useRecurringGhost.ts`) hopper eksplisitt over alle linjer uten `tour_id`:
+```
+if (!item.tour_id) continue;
+```
+I skjermbildet ditt har begge produktradene **Tur = "—..."** (ingen tur valgt). Resultat: ingenting i ghost-mapen → ingen ghost-badge i matrisen.
 
-- Nytt valg: **"Fastordre (ukentlig mal)"** med ikon `Repeat` (lucide).
-- Disablet hvis ingen kunde valgt.
-- Åpner et modal-vindu (eksisterende `RecurringScheduleDialog`) med kunden forhåndsvalgt og låst.
+I tillegg krever matrisen at `tourActiveOnDate(tour, date)` er sann — så selv med tur må turen være aktiv på den ukedagen.
 
-### 2. Tilpass `RecurringScheduleDialog` for matrise-bruk
-I `src/ordre/components/orders/RecurringScheduleDialog.tsx`:
+## Forslag til fix
 
-- Nytt valgfritt prop `lockedCustomer?: { id: string; label: string }`.
-  - Når satt og det er en ny mal: skjul kunde-velgeren og vis kundenavn som read-only header.
-  - Eksisterende redigeringsflyt (klikker på en eksisterende mal) er uberørt.
-- Eksisterende ukematrise (Man–Søn × produkter med tur-velger) brukes som er.
+### A. Hent produkt-metadata for malen via ID-er
+I `RecurringScheduleDialog.tsx`:
+- Bruk `useProductsByIds` (finnes allerede i `src/ordre/hooks/useProductsByIds.ts`) på alle `product_id`-er i `detail.items`, og slå dem inn i `productMap` i tillegg til `useNBProducts`.
+- Da vises riktig navn/nummer/kode uavhengig av is_for_sale, discontinued eller 100-grensen.
 
-### 3. Vis eksisterende fastordre for valgt kunde
-For at brukeren skal se om kunden allerede har en mal:
+(Vurder også å øke/fjerne `.limit(100)` i `useNBProducts` når det brukes som "alle produkter" — men minimumsfiksen over er nok for "Ukjent produkt"-symptomet.)
 
-- Nytt enkelt hook-call i Leveringskalender: hent `recurring_order_schedules` for valgt `customer_id` (filtrert på `is_active = true`).
-- Hvis det finnes en aktiv mal: menyvalget endres til **"Rediger fastordre"** og åpner dialogen i edit-modus med den eksisterende malen.
-- Hvis ingen: **"Opprett fastordre"** åpner ny mal med kunden låst.
+### B. Vis fastordre uten tur i matrisen
+To alternativer — anbefaler **A2**:
 
-### 4. Liten badge ved siden av kundevelger
-Når valgt kunde har en aktiv fastordre: vis liten `Badge` "Fastordre aktiv" ved siden av kunde-Popover-knappen. Klikk åpner samme dialog. Ren visuell snarvei — ingen logikk-endringer.
+**A1.** Krev at brukeren velger tur i dialogen (valider ved lagring). Enkelt, men flytter byrden til brukeren og forklarer ikke dagens data.
 
-## Tekniske detaljer
+**A2.** Endre `useRecurringGhost` slik at items uten `tour_id` mappes til **alle aktive turer** den ukedagen kunden ellers leveres på — eller, enklere: endre nøkkelen til å droppe tur (`${date}|${productId}`) når item.tour_id er null, og la matrise-rendering vise badgen i første aktive tur-celle for den dagen. Det krever en liten omskriving av lookup i `Leveringskalender.tsx` (linje ~1814).
 
-- Tabeller `recurring_order_schedules` og `recurring_order_items` finnes allerede; ingen migrasjon nødvendig.
-- `useSaveRecurringSchedule` brukes som er — den håndterer både insert og update.
-- Mal er ikke koblet til kalenderukens viste data; den er en separat ukentlig mal som lever uavhengig av faktiske ordrelinjer i matrisen.
-- Etter lagring: invaliderer `recurring-schedules`-query slik at "Fastordre aktiv"-badgen oppdateres umiddelbart.
+Den minst inngripende varianten: behold tur-spesifikk nøkkel, men i `useRecurringGhost` ekspander tur-løse items til **alle aktive turer** for ukedagen via `delivery_tours`. Da dukker ghost opp på alle aktuelle turer som "foreslått grunnlag", og brukeren kan eventuelt velge spesifikk tur i malen senere.
 
 ## Filer som berøres
+- `src/ordre/components/orders/RecurringScheduleDialog.tsx` — slå opp manglende produkter via `useProductsByIds`.
+- `src/ordre/hooks/useRecurringGhost.ts` — håndter items uten `tour_id` (ekspander til aktive turer for ukedagen).
 
-- `src/ordre/pages/Leveringskalender.tsx` — meny-item, dialog-state, badge, kall til `useRecurringSchedules({ customer_id })`.
-- `src/ordre/components/orders/RecurringScheduleDialog.tsx` — `lockedCustomer`-prop og betinget rendering av kundevelger.
-- `src/ordre/hooks/useRecurringOrders.ts` — utvid `RecurringScheduleFilter` med `customer_id?: string` (liten tilføyelse).
+Ingen DB-endringer.
 
-Ingen DB-endringer, ingen edge functions.
+## Spørsmål før jeg implementerer
+1. For tur-løse mal-linjer: ekspandere ghost til **alle aktive turer** den dagen, eller heller kreve at bruker velger tur i dialogen?
+2. Skal jeg også øke/fjerne `.limit(100)` i `useNBProducts`, eller bare patche metadata-oppslaget?
