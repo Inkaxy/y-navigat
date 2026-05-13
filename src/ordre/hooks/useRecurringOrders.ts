@@ -37,6 +37,7 @@ export type RecurringItem = {
 export type RecurringScheduleFilter = {
   search?: string;
   status?: "active" | "inactive" | "all";
+  customer_id?: string;
 };
 
 /** Liste over fastordre-maler m/ kunde-info + linjeantall. */
