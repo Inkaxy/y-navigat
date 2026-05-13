@@ -17,6 +17,7 @@ import {
   PackageCheck,
   ChevronDown,
   Repeat,
+  Eye,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -181,6 +182,23 @@ export default function MatrixPage() {
   const [showAllProducts, setShowAllProducts] = useState(false);
   const [recurringDialogOpen, setRecurringDialogOpen] = useState(false);
 
+  // Toolbar visning
+  const [hiddenTourIds, setHiddenTourIds] = useState<Set<string>>(new Set());
+  const [showReturns, setShowReturns] = useState<boolean>(false);
+  const [customerCardOpen, setCustomerCardOpen] = useState(false);
+
+  const daysCount = useMemo(() => {
+    const a = new Date(dateFrom + "T12:00:00").getTime();
+    const b = new Date(dateTo + "T12:00:00").getTime();
+    return Math.max(1, Math.round((b - a) / 86400000) + 1);
+  }, [dateFrom, dateTo]);
+
+  function setDaysCount(n: number) {
+    const clamped = Math.max(1, Math.min(31, n));
+    setDateTo(addDays(dateFrom, clamped - 1));
+    setQuickFilter(null);
+  }
+
   // Merknad dialog state
   const [merknadCell, setMerknadCell] = useState<CellTarget | null>(null);
 
@@ -268,11 +286,12 @@ export default function MatrixPage() {
     if (!matrix) return cols;
     for (const date of days) {
       for (const tour of matrix.tours) {
+        if (hiddenTourIds.has(tour.id)) continue;
         if (tourActiveOnDate(tour, date)) cols.push({ date, tour });
       }
     }
     return cols;
-  }, [matrix, days]);
+  }, [matrix, days, hiddenTourIds]);
 
   const visibleDates = useMemo(() => new Set(columns.map((c) => c.date)), [columns]);
 
@@ -873,6 +892,73 @@ export default function MatrixPage() {
       <div className="px-6 py-5">
         <div className="rounded-[16px] border-2 border-brand-bronze/40 bg-gradient-to-br from-card to-brand-cream/20 p-5 shadow-lg ring-1 ring-inset ring-brand-bronze/10 px-[10px] py-[20px]">
         <div className="flex flex-wrap items-center gap-3">
+          <Popover open={customerCardOpen} onOpenChange={setCustomerCardOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                disabled={!selectedCustomer}
+                aria-label="Vis kundekort"
+                title="Vis kundekort"
+                className="border-2 border-brand-bronze/30 hover:border-brand-bronze/60"
+              >
+                <Eye className="h-4 w-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[360px] p-4" align="start">
+              {selectedCustomer ? (
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <div className="font-display text-base font-semibold">{selectedCustomer.display_name}</div>
+                    <span className="tabular-nums text-muted-foreground">{selectedCustomer.customer_number}</span>
+                  </div>
+                  {selectedCustomer.organization_number && (
+                    <div className="text-muted-foreground">Org.nr: <span className="tabular-nums text-foreground">{selectedCustomer.organization_number}</span></div>
+                  )}
+                  {selectedCustomer.primary_contact_name && (
+                    <div>{selectedCustomer.primary_contact_name}</div>
+                  )}
+                  {selectedCustomer.primary_contact_email && (
+                    <div className="truncate text-muted-foreground">{selectedCustomer.primary_contact_email}</div>
+                  )}
+                  {(selectedCustomer.delivery_address_line1 || selectedCustomer.delivery_postal_code) && (
+                    <div className="rounded-md border border-border bg-muted/40 p-2 text-xs">
+                      <div className="mb-1 font-medium uppercase tracking-wide text-muted-foreground">Leveringsadresse</div>
+                      {selectedCustomer.delivery_address_line1 && <div>{selectedCustomer.delivery_address_line1}</div>}
+                      {selectedCustomer.delivery_address_line2 && <div>{selectedCustomer.delivery_address_line2}</div>}
+                      <div>
+                        {[selectedCustomer.delivery_postal_code, selectedCustomer.delivery_city].filter(Boolean).join(" ")}
+                      </div>
+                    </div>
+                  )}
+                  {selectedCustomer.delivery_instructions && (
+                    <div className="rounded-md border border-brand-bronze/30 bg-brand-bronze/5 p-2 text-xs">
+                      <div className="mb-1 font-medium uppercase tracking-wide text-brand-bronze">Leveringsinstruks</div>
+                      {selectedCustomer.delivery_instructions}
+                    </div>
+                  )}
+                  {selectedCustomer.credit_hold && (
+                    <Badge variant="destructive">Kredittsperre{selectedCustomer.credit_hold_reason ? `: ${selectedCustomer.credit_hold_reason}` : ""}</Badge>
+                  )}
+                  <div className="pt-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setCustomerCardOpen(false);
+                        navigate(`/kunder/kundeliste/${selectedCustomer.id}`);
+                      }}
+                    >
+                      Åpne kundekort
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-sm text-muted-foreground">Velg en kunde først.</div>
+              )}
+            </PopoverContent>
+          </Popover>
+
           <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
             <PopoverTrigger asChild>
               <Button variant="outline" size="lg" className="min-w-[320px] justify-start text-base font-semibold border-2 border-brand-bronze/30 hover:border-brand-bronze/60 shadow-sm">
@@ -951,6 +1037,77 @@ export default function MatrixPage() {
               Hopp til i dag
             </Button>
           </div>
+
+          <div className="flex items-center gap-2 rounded-md border border-brand-bronze/30 bg-card/60 px-2 py-1 text-sm">
+            <span className="text-muted-foreground">vis</span>
+            <Input
+              type="number"
+              min={1}
+              max={31}
+              value={daysCount}
+              onChange={(e) => setDaysCount(parseInt(e.target.value || "1", 10))}
+              className="h-7 w-14 px-1 text-center tabular-nums"
+              disabled={!customerId}
+            />
+            <span className="text-muted-foreground">dager</span>
+          </div>
+
+          <div className="flex items-center gap-2 rounded-md border border-brand-bronze/30 bg-card/60 px-2 py-1 text-sm">
+            <span className="text-muted-foreground">vis turer</span>
+            <div className="flex items-center gap-1">
+              {(matrix?.tours ?? []).map((t) => {
+                const checked = !hiddenTourIds.has(t.id);
+                return (
+                  <Button
+                    key={t.id}
+                    type="button"
+                    size="sm"
+                    variant={checked ? "brand" : "outline"}
+                    className="h-7 px-2 text-xs tabular-nums"
+                    onClick={() => {
+                      setHiddenTourIds((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(t.id)) next.delete(t.id);
+                        else next.add(t.id);
+                        return next;
+                      });
+                    }}
+                    title={t.display_name}
+                  >
+                    {checked ? "☑" : "☐"} {t.tour_number}
+                  </Button>
+                );
+              })}
+              {(matrix?.tours ?? []).length === 0 && (
+                <span className="text-xs text-muted-foreground">—</span>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 rounded-md border border-brand-bronze/30 bg-card/60 px-2 py-1 text-sm">
+            <span className="text-muted-foreground">vis retur</span>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="h-7 px-2 text-xs">
+                  {showReturns ? "ja" : "nei"} <ChevronDown className="ml-1 h-3 w-3" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-28">
+                <DropdownMenuItem onSelect={() => setShowReturns(false)}>nei</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setShowReturns(true)}>ja</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
+          <Button
+            variant="brand"
+            size="sm"
+            disabled={!customerId}
+            onClick={() => navigate(`/ordre/ordrer/ny?customer_id=${customerId}`)}
+          >
+            <Plus className="h-4 w-4" />
+            Ny ordre
+          </Button>
 
           <div className="ml-auto flex items-center gap-2">
             {(dirtyCount > 0 || addedProducts.length > 0) && (
