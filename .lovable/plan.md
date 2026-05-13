@@ -1,21 +1,45 @@
 ## Mål
-Vis ISO-ukenummer i alle kalendere i appen.
 
-## Endring
-Én sentral endring i `src/components/ui/calendar.tsx` (shadcn-wrapper rundt `react-day-picker`), som brukes av alle datovelgere (DateNavigator, WeekMonthQuickPicker, PeriodPicker, DateContextChips → kalender, m.fl.).
+Gjøre det mulig å opprette/redigere en **fastordre** (løpende ukentlig ordre) direkte fra Leveringskalender-matrisen, uten å forlate siden. Fastordren ligger som en mal på kunden — kunden kan selv endre den senere, og bakeriet får oversikt for forberedelse.
 
-1. Sett `showWeekNumber` som default `true` på `<DayPicker>` (kan overstyres per bruk hvis nødvendig).
-2. Sett `weekStartsOn: 1` (mandag) som default — ISO-uke starter mandag, og det matcher allerede norsk locale (`nb`) brukt rundt om.
-3. Legg til styling i `classNames` slik at uke-kolonnen passer designsystemet:
-   - `head_head`: smal kolonne, `text-muted-foreground text-[0.7rem] font-normal uppercase tracking-wide`
-   - `weeknumber`: `text-muted-foreground text-[0.7rem] tabular-nums w-9 text-center`
-4. Lokalisér uke-header til "U" (eller "Uke") via `labels.labelWeekNumberHeader` så det ikke står engelsk "Wk".
+## Endringer
 
-## Hva blir IKKE endret
-- Ingen logikk i de enkelte sidene/dialogene.
-- Ingen design-tokens i `index.css` / `tailwind.config.ts`.
-- Ingen endringer på print/produksjonsplan/snapshot-flyt.
+### 1. Ny menyvalg i Handling-dropdown (Leveringskalender)
+I `src/ordre/pages/Leveringskalender.tsx`, i seksjonen "Opprette nytt" (rett under "Lag ny returordre"):
 
-## Teknisk
-- `react-day-picker` v8 props brukt: `showWeekNumber`, `weekStartsOn`, `labels`.
-- Klassenavn (`head_head`, `weeknumber`) flettes inn via eksisterende `classNames`-objekt slik at brukstedene fortsatt kan overstyre via `cn`.
+- Nytt valg: **"Fastordre (ukentlig mal)"** med ikon `Repeat` (lucide).
+- Disablet hvis ingen kunde valgt.
+- Åpner et modal-vindu (eksisterende `RecurringScheduleDialog`) med kunden forhåndsvalgt og låst.
+
+### 2. Tilpass `RecurringScheduleDialog` for matrise-bruk
+I `src/ordre/components/orders/RecurringScheduleDialog.tsx`:
+
+- Nytt valgfritt prop `lockedCustomer?: { id: string; label: string }`.
+  - Når satt og det er en ny mal: skjul kunde-velgeren og vis kundenavn som read-only header.
+  - Eksisterende redigeringsflyt (klikker på en eksisterende mal) er uberørt.
+- Eksisterende ukematrise (Man–Søn × produkter med tur-velger) brukes som er.
+
+### 3. Vis eksisterende fastordre for valgt kunde
+For at brukeren skal se om kunden allerede har en mal:
+
+- Nytt enkelt hook-call i Leveringskalender: hent `recurring_order_schedules` for valgt `customer_id` (filtrert på `is_active = true`).
+- Hvis det finnes en aktiv mal: menyvalget endres til **"Rediger fastordre"** og åpner dialogen i edit-modus med den eksisterende malen.
+- Hvis ingen: **"Opprett fastordre"** åpner ny mal med kunden låst.
+
+### 4. Liten badge ved siden av kundevelger
+Når valgt kunde har en aktiv fastordre: vis liten `Badge` "Fastordre aktiv" ved siden av kunde-Popover-knappen. Klikk åpner samme dialog. Ren visuell snarvei — ingen logikk-endringer.
+
+## Tekniske detaljer
+
+- Tabeller `recurring_order_schedules` og `recurring_order_items` finnes allerede; ingen migrasjon nødvendig.
+- `useSaveRecurringSchedule` brukes som er — den håndterer både insert og update.
+- Mal er ikke koblet til kalenderukens viste data; den er en separat ukentlig mal som lever uavhengig av faktiske ordrelinjer i matrisen.
+- Etter lagring: invaliderer `recurring-schedules`-query slik at "Fastordre aktiv"-badgen oppdateres umiddelbart.
+
+## Filer som berøres
+
+- `src/ordre/pages/Leveringskalender.tsx` — meny-item, dialog-state, badge, kall til `useRecurringSchedules({ customer_id })`.
+- `src/ordre/components/orders/RecurringScheduleDialog.tsx` — `lockedCustomer`-prop og betinget rendering av kundevelger.
+- `src/ordre/hooks/useRecurringOrders.ts` — utvid `RecurringScheduleFilter` med `customer_id?: string` (liten tilføyelse).
+
+Ingen DB-endringer, ingen edge functions.
