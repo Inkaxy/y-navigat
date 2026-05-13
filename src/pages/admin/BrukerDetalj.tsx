@@ -158,9 +158,12 @@ export default function BrukerDetalj() {
 
       <Card>
         <CardContent className="p-0">
-          <div className="border-b border-line p-4">
-            <h3 className="font-semibold">Stillinger</h3>
-            <p className="text-sm text-muted-foreground">Aktiv = i dag mellom Fra og Til.</p>
+          <div className="flex items-center justify-between border-b border-line p-4">
+            <div>
+              <h3 className="font-semibold">Stillinger</h3>
+              <p className="text-sm text-muted-foreground">Aktiv = i dag mellom Fra og Til.</p>
+            </div>
+            {id && <AddPositionDialog userId={id} assignedBy={authUser?.id ?? null} />}
           </div>
           <Table>
             <TableHeader>
