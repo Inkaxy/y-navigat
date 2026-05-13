@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { format, formatDistanceToNow } from "date-fns";
 import { nb } from "date-fns/locale";
-import { Inbox, Paperclip, Search, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Inbox, Paperclip, Search, X } from "lucide-react";
 import { AppBanner } from "@/ordre/components/shell/AppBanner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
