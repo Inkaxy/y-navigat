@@ -1843,7 +1843,7 @@ function MatrixGrid({
                         className={cn(
                           "h-9 w-16 rounded-none border-0 bg-transparent px-1 text-center tabular-nums shadow-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-0",
                           value && "text-base font-semibold text-foreground",
-                          dirty && "font-bold text-warning-foreground",
+                          dirty && "font-bold text-warning",
                           pause && "cursor-not-allowed",
                           ghost && "placeholder:italic placeholder:text-muted-foreground/60",
                         )}
