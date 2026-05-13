@@ -1,10 +1,11 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import DOMPurify from "dompurify";
 import ReactMarkdown from "react-markdown";
 import { Loader2, FileDown, Image as ImageIcon } from "lucide-react";
+import { toast } from "sonner";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 
 const NUTRITION_FIELDS: { key: string; label: string }[] = [
@@ -79,6 +80,7 @@ export function ProductInfoDialog({ productId, productName, open, onClose }: Pro
   const product = productQuery.data;
   const computed = declQuery.data;
   const loading = productQuery.isLoading || linkQuery.isLoading || declQuery.isLoading;
+  const [generating, setGenerating] = useState(false);
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -203,16 +205,82 @@ export function ProductInfoDialog({ productId, productName, open, onClose }: Pro
         </div>
 
         <DialogFooter className="gap-2 sm:gap-2">
-          {product?.datasheet_url ? (
+          <Button
+            variant="outline"
+            disabled={!product || loading || generating}
+            onClick={async () => {
+              if (!product) return;
+              setGenerating(true);
+              try {
+                const manualIng = product.manual_ingredient_declaration?.trim() || null;
+                const manualContains = (product.manual_allergens_contains ?? []) as string[];
+                const manualMay = (product.manual_allergens_may_contain ?? []) as string[];
+                const manualNut = (product.manual_nutrition_per_100g ?? null) as Record<string, number> | null;
+                const effIngredientHtml = computed?.ingredient_declaration_html || manualIng;
+                const ingredientsText = effIngredientHtml
+                  ? new DOMParser().parseFromString(
+                      DOMPurify.sanitize(effIngredientHtml, { USE_PROFILES: { html: true } }),
+                      "text/html",
+                    ).body.textContent?.trim() || null
+                  : null;
+                const rich = product.description_rich as { format?: string; text?: string } | null | undefined;
+                const description = (rich?.text ?? product.description ?? "").trim() || null;
+                const isManual = !computed && !!(manualIng || manualContains.length || manualMay.length || manualNut);
+
+                const [{ pdf }, { DatasheetPDFDocument }] = await Promise.all([
+                  import("@react-pdf/renderer"),
+                  import("./DatasheetPDFDocument"),
+                ]);
+                const blob = await pdf(
+                  <DatasheetPDFDocument
+                    data={{
+                      productName,
+                      imageUrl: product.image_url,
+                      description,
+                      ingredientsText,
+                      allergensContains: computed?.allergens_contains?.length ? computed.allergens_contains : manualContains,
+                      allergensMay: computed?.allergens_may_contain?.length ? computed.allergens_may_contain : manualMay,
+                      nutrition: computed?.nutrition_per_100g ?? manualNut,
+                      isManual,
+                    }}
+                  />,
+                ).toBlob();
+                const url = URL.createObjectURL(blob);
+                const safeName = productName
+                  .normalize("NFKD")
+                  .replace(/[\u0300-\u036f]/g, "")
+                  .replace(/æ/gi, "ae").replace(/ø/gi, "o").replace(/å/gi, "a")
+                  .replace(/[^a-zA-Z0-9]+/g, "_").replace(/^_+|_+$/g, "")
+                  .toLowerCase();
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `Datablad_${safeName}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                setTimeout(() => URL.revokeObjectURL(url), 1000);
+                toast.success("Datablad lastet ned");
+              } catch (err) {
+                console.error(err);
+                toast.error("Kunne ikke generere datablad");
+              } finally {
+                setGenerating(false);
+              }
+            }}
+          >
+            {generating ? (
+              <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+            ) : (
+              <FileDown className="mr-1.5 h-4 w-4" />
+            )}
+            Last ned datablad
+          </Button>
+          {product?.datasheet_url && (
             <Button asChild variant="outline">
               <a href={product.datasheet_url} target="_blank" rel="noreferrer">
-                <FileDown className="mr-1.5 h-4 w-4" /> Last ned datablad
+                <FileDown className="mr-1.5 h-4 w-4" /> Opplastet datablad
               </a>
             </Button>
-          ) : (
-            <Badge variant="outline" className="self-center text-xs text-muted-foreground">
-              Ingen datablad
-            </Badge>
           )}
           <Button onClick={onClose}>Lukk</Button>
         </DialogFooter>
