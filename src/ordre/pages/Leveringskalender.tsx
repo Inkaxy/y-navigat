@@ -182,6 +182,23 @@ export default function MatrixPage() {
   const [showAllProducts, setShowAllProducts] = useState(false);
   const [recurringDialogOpen, setRecurringDialogOpen] = useState(false);
 
+  // Toolbar visning
+  const [hiddenTourIds, setHiddenTourIds] = useState<Set<string>>(new Set());
+  const [showReturns, setShowReturns] = useState<boolean>(false);
+  const [customerCardOpen, setCustomerCardOpen] = useState(false);
+
+  const daysCount = useMemo(() => {
+    const a = new Date(dateFrom + "T12:00:00").getTime();
+    const b = new Date(dateTo + "T12:00:00").getTime();
+    return Math.max(1, Math.round((b - a) / 86400000) + 1);
+  }, [dateFrom, dateTo]);
+
+  function setDaysCount(n: number) {
+    const clamped = Math.max(1, Math.min(31, n));
+    setDateTo(addDays(dateFrom, clamped - 1));
+    setQuickFilter(null);
+  }
+
   // Merknad dialog state
   const [merknadCell, setMerknadCell] = useState<CellTarget | null>(null);
 
