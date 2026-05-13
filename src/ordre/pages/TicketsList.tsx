@@ -199,7 +199,7 @@ export default function TicketsList() {
                   </TableCell>
                 </TableRow>
               ) : (
-                tickets.map((t) => (
+                sortedTickets.map((t) => (
                   <TableRow
                     key={t.id}
                     className="cursor-pointer"
