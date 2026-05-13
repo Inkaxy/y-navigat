@@ -104,22 +104,32 @@ export default function PriceLists() {
     let ok = 0;
     let failed = 0;
     try {
+      // priceDate - 1 dag (for å lukke forrige periode)
+      const prevDate = (() => {
+        const d = new Date(priceDate + "T00:00:00Z");
+        d.setUTCDate(d.getUTCDate() - 1);
+        return d.toISOString().slice(0, 10);
+      })();
       for (const [key, newPrice] of pendingEdits.entries()) {
         const [productId, priceListId] = key.split("::");
         const productName = productNames[productId] ?? productId;
-        const { data: existing, error: selErr } = await supabase
+        // Finn aktiv rad på priceDate (kan ha valid_from < priceDate)
+        const { data: activeRows, error: selErr } = await supabase
           .from("price_list_items")
-          .select("id, price")
+          .select("id, price, valid_from, valid_to")
           .eq("price_list_id", priceListId)
           .eq("product_id", productId)
-          .eq("valid_from", priceDate)
-          .maybeSingle();
+          .lte("valid_from", priceDate)
+          .or(`valid_to.is.null,valid_to.gte.${priceDate}`)
+          .order("valid_from", { ascending: false })
+          .limit(1);
         if (selErr) {
           toast.error(`${productName}: ${selErr.message}`);
           failed++;
           continue;
         }
-        if (existing) {
+        const existing = activeRows?.[0] ?? null;
+        if (existing && existing.valid_from === priceDate) {
           const { error } = await supabase
             .from("price_list_items")
             .update({ price: newPrice })
