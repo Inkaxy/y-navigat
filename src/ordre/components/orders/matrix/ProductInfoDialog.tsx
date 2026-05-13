@@ -1,10 +1,11 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import DOMPurify from "dompurify";
 import ReactMarkdown from "react-markdown";
 import { Loader2, FileDown, Image as ImageIcon } from "lucide-react";
+import { toast } from "sonner";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 
 const NUTRITION_FIELDS: { key: string; label: string }[] = [
