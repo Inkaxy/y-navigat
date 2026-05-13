@@ -1557,6 +1557,7 @@ function MatrixGrid({
   colHasData: (date: string, tourId: string) => boolean;
   canEdit: boolean;
 }) {
+  const [infoProduct, setInfoProduct] = useState<{ id: string; name: string } | null>(null);
   const dateGroups = useMemo(() => {
     const groups: { date: string; count: number }[] = [];
     for (const c of columns) {
