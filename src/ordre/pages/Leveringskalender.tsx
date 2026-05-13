@@ -1038,6 +1038,77 @@ export default function MatrixPage() {
             </Button>
           </div>
 
+          <div className="flex items-center gap-2 rounded-md border border-brand-bronze/30 bg-card/60 px-2 py-1 text-sm">
+            <span className="text-muted-foreground">vis</span>
+            <Input
+              type="number"
+              min={1}
+              max={31}
+              value={daysCount}
+              onChange={(e) => setDaysCount(parseInt(e.target.value || "1", 10))}
+              className="h-7 w-14 px-1 text-center tabular-nums"
+              disabled={!customerId}
+            />
+            <span className="text-muted-foreground">dager</span>
+          </div>
+
+          <div className="flex items-center gap-2 rounded-md border border-brand-bronze/30 bg-card/60 px-2 py-1 text-sm">
+            <span className="text-muted-foreground">vis turer</span>
+            <div className="flex items-center gap-1">
+              {(matrix?.tours ?? []).map((t) => {
+                const checked = !hiddenTourIds.has(t.id);
+                return (
+                  <Button
+                    key={t.id}
+                    type="button"
+                    size="sm"
+                    variant={checked ? "brand" : "outline"}
+                    className="h-7 px-2 text-xs tabular-nums"
+                    onClick={() => {
+                      setHiddenTourIds((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(t.id)) next.delete(t.id);
+                        else next.add(t.id);
+                        return next;
+                      });
+                    }}
+                    title={t.display_name}
+                  >
+                    {checked ? "☑" : "☐"} {t.tour_number}
+                  </Button>
+                );
+              })}
+              {(matrix?.tours ?? []).length === 0 && (
+                <span className="text-xs text-muted-foreground">—</span>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 rounded-md border border-brand-bronze/30 bg-card/60 px-2 py-1 text-sm">
+            <span className="text-muted-foreground">vis retur</span>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="h-7 px-2 text-xs">
+                  {showReturns ? "ja" : "nei"} <ChevronDown className="ml-1 h-3 w-3" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-28">
+                <DropdownMenuItem onSelect={() => setShowReturns(false)}>nei</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setShowReturns(true)}>ja</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
+          <Button
+            variant="brand"
+            size="sm"
+            disabled={!customerId}
+            onClick={() => navigate(`/ordre/ordrer/ny?customer_id=${customerId}`)}
+          >
+            <Plus className="h-4 w-4" />
+            Ny ordre
+          </Button>
+
           <div className="ml-auto flex items-center gap-2">
             {(dirtyCount > 0 || addedProducts.length > 0) && (
               <>
