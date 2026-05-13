@@ -1055,7 +1055,7 @@ export default function MatrixPage() {
       <div className="flex-1 overflow-auto">
         {!customerId ? (
           <div className="grid h-full place-items-center p-10 text-center text-muted-foreground">
-            <div className="max-w-md">
+            <div className="max-w-2xl">
               <Grid3x3 className="mx-auto mb-3 h-10 w-10 opacity-40" />
               <p className="font-medium text-foreground">Velg en kunde for å åpne matrisen</p>
               <p className="mt-1 text-sm">
