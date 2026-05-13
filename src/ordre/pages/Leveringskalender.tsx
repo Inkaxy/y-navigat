@@ -19,7 +19,11 @@ import {
   Repeat,
   Eye,
   BookOpen,
+  CalendarIcon,
 } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import { format as fmtDate } from "date-fns";
+import { nb } from "date-fns/locale";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AppBanner } from "@/ordre/components/shell/AppBanner";
@@ -141,6 +145,7 @@ export default function MatrixPage() {
   const [quickFilter, setQuickFilter] = useState<QuickRange | null>("this_week");
 
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [fromDateOpen, setFromDateOpen] = useState(false);
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebouncedValue(search, 200);
 
@@ -1058,39 +1063,73 @@ export default function MatrixPage() {
             </Badge>
           )}
 
-          <ToggleGroup
-            type="single"
-            value={quickFilter ?? ""}
-            onValueChange={(v) => {
-              if (v === "today" || v === "this_week" || v === "next_week") applyQuickFilter(v);
-            }}
-            disabled={!customerId}
-          >
-            <ToggleGroupItem value="today" size="sm" variant="outline" aria-label="I morgen">
-              I morgen
-            </ToggleGroupItem>
-            <ToggleGroupItem value="this_week" size="sm" variant="outline" aria-label="Denne uken">
-              Denne uken
-            </ToggleGroupItem>
-            <ToggleGroupItem value="next_week" size="sm" variant="outline" aria-label="Neste uke">
-              Neste uke
-            </ToggleGroupItem>
-          </ToggleGroup>
-
-          <div className="flex items-center gap-1">
-            <Button variant="outline" size="icon" onClick={() => shiftWeek(-1)} aria-label="Forrige uke">
-              <ChevronLeft />
-            </Button>
-            <div className="px-2 text-sm font-medium tabular-nums">
-              {formatRangeLabel(dateFrom, dateTo)}
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center gap-1">
+              <Popover open={fromDateOpen} onOpenChange={setFromDateOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={!customerId}
+                    className="h-8 gap-1.5 text-xs font-medium"
+                    aria-label="Ordre fra dato"
+                  >
+                    <CalendarIcon className="h-3.5 w-3.5" />
+                    Ordre fra dato
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    locale={nb}
+                    selected={new Date(dateFrom + "T12:00:00")}
+                    onSelect={(d) => {
+                      if (!d) return;
+                      const iso = fmtDate(d, "yyyy-MM-dd");
+                      setDateFrom(iso);
+                      setDateTo(addDays(iso, Math.max(daysCount, 1) - 1));
+                      setQuickFilter(null);
+                      setFromDateOpen(false);
+                    }}
+                    initialFocus
+                    className={cn("p-3 pointer-events-auto")}
+                  />
+                </PopoverContent>
+              </Popover>
+              <Button variant="outline" size="icon" onClick={() => shiftWeek(-1)} aria-label="Forrige uke">
+                <ChevronLeft />
+              </Button>
+              <div className="px-2 text-sm font-medium tabular-nums">
+                {formatRangeLabel(dateFrom, dateTo)}
+              </div>
+              <Button variant="outline" size="icon" onClick={() => shiftWeek(1)} aria-label="Neste uke">
+                <ChevronRight />
+              </Button>
+              <Button variant="ghost" size="sm" onClick={jumpToday}>
+                Hopp til i dag
+              </Button>
             </div>
-            <Button variant="outline" size="icon" onClick={() => shiftWeek(1)} aria-label="Neste uke">
-              <ChevronRight />
-            </Button>
-            <Button variant="ghost" size="sm" onClick={jumpToday}>
-              Hopp til i dag
-            </Button>
+            <ToggleGroup
+              type="single"
+              value={quickFilter ?? ""}
+              onValueChange={(v) => {
+                if (v === "today" || v === "this_week" || v === "next_week") applyQuickFilter(v);
+              }}
+              disabled={!customerId}
+              className="justify-start"
+            >
+              <ToggleGroupItem value="today" size="sm" variant="outline" aria-label="I morgen">
+                I morgen
+              </ToggleGroupItem>
+              <ToggleGroupItem value="this_week" size="sm" variant="outline" aria-label="Denne uken">
+                Denne uken
+              </ToggleGroupItem>
+              <ToggleGroupItem value="next_week" size="sm" variant="outline" aria-label="Neste uke">
+                Neste uke
+              </ToggleGroupItem>
+            </ToggleGroup>
           </div>
+
 
           <div className="flex items-center gap-2 rounded-md border border-brand-bronze/30 bg-card/60 px-2 py-1 text-sm">
             <span className="text-muted-foreground">vis</span>
