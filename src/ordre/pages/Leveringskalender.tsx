@@ -16,6 +16,7 @@ import {
   Trash2,
   PackageCheck,
   ChevronDown,
+  Repeat,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -82,6 +83,8 @@ import { useUserAccess } from "@/ordre/hooks/useUserAccess";
 import { useWeatherForecast, type WeatherMap } from "@/ordre/hooks/useWeatherForecast";
 import { WeatherCell } from "@/ordre/components/orders/WeatherCell";
 import { useRecurringGhost, type RecurringGhostMap } from "@/ordre/hooks/useRecurringGhost";
+import { useRecurringSchedules, type RecurringScheduleWithCustomer } from "@/ordre/hooks/useRecurringOrders";
+import { RecurringScheduleDialog } from "@/ordre/components/orders/RecurringScheduleDialog";
 import {
   useDeliveryPausesForCustomer,
   isPaused,
@@ -139,6 +142,11 @@ export default function MatrixPage() {
 
   const { data: customers } = useNBCustomers(debouncedSearch);
   const { data: selectedCustomer } = useCustomerById(customerId);
+  const { data: customerSchedules = [] } = useRecurringSchedules(
+    customerId ? { customer_id: customerId, status: "active" } : { customer_id: "__none__" },
+  );
+  const existingSchedule: RecurringScheduleWithCustomer | null =
+    customerId && customerSchedules.length > 0 ? customerSchedules[0] : null;
   const { data: matrix, isLoading } = useMatrixData(customerId, dateFrom, dateTo);
   const { data: addableProducts } = useAddableProducts(customerId, !!customerId);
   const saveMatrix = useSaveMatrix();
@@ -171,6 +179,7 @@ export default function MatrixPage() {
   const [correctionsOpen, setCorrectionsOpen] = useState(false);
   const [flatView, setFlatView] = useState(false);
   const [showAllProducts, setShowAllProducts] = useState(false);
+  const [recurringDialogOpen, setRecurringDialogOpen] = useState(false);
 
   // Merknad dialog state
   const [merknadCell, setMerknadCell] = useState<CellTarget | null>(null);
@@ -852,6 +861,18 @@ export default function MatrixPage() {
             </PopoverContent>
           </Popover>
 
+          {existingSchedule && (
+            <Badge
+              variant="secondary"
+              className="cursor-pointer gap-1"
+              onClick={() => setRecurringDialogOpen(true)}
+              title="Klikk for å redigere fastordre"
+            >
+              <Repeat className="h-3 w-3" />
+              Fastordre aktiv
+            </Badge>
+          )}
+
           <ToggleGroup
             type="single"
             value={quickFilter ?? ""}
@@ -926,6 +947,13 @@ export default function MatrixPage() {
                 >
                   <RotateCcw className="h-4 w-4 mr-2" />
                   Lag ny returordre
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={!customerId}
+                  onSelect={() => setRecurringDialogOpen(true)}
+                >
+                  <Repeat className="h-4 w-4 mr-2" />
+                  {existingSchedule ? "Rediger fastordre" : "Opprett fastordre"}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuLabel>Batch-operasjoner</DropdownMenuLabel>
@@ -1223,6 +1251,22 @@ export default function MatrixPage() {
         customerId={customerId}
         dateFrom={dateFrom}
         dateTo={dateTo}
+      />
+      <RecurringScheduleDialog
+        open={recurringDialogOpen}
+        onOpenChange={setRecurringDialogOpen}
+        editing={existingSchedule}
+        lockedCustomer={
+          !existingSchedule && customerId && selectedCustomer
+            ? {
+                id: customerId,
+                label: `${selectedCustomer.customer_number} — ${selectedCustomer.display_name}`,
+              }
+            : null
+        }
+        onSaved={() => {
+          /* invalidert via hook */
+        }}
       />
     </div>
   );

@@ -74,13 +74,16 @@ export function RecurringScheduleDialog({
   onOpenChange,
   editing,
   onSaved,
+  lockedCustomer,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   editing: Editing;
   onSaved: () => void;
+  lockedCustomer?: { id: string; label: string } | null;
 }) {
   const isEdit = !!editing;
+  const isLocked = !isEdit && !!lockedCustomer;
   const { data: detail, isLoading: loadingDetail } = useRecurringScheduleDetail(
     editing?.id ?? null,
   );
@@ -130,8 +133,8 @@ export function RecurringScheduleDialog({
       setValidTo(editing.valid_to ?? "");
       setNotes(editing.notes ?? "");
     } else {
-      setCustomerId(null);
-      setCustomerLabel("");
+      setCustomerId(lockedCustomer?.id ?? null);
+      setCustomerLabel(lockedCustomer?.label ?? "");
       setName("Fastordre");
       setIsActive(true);
       setValidFrom("");
@@ -139,7 +142,7 @@ export function RecurringScheduleDialog({
       setNotes("");
       setRows([]);
     }
-  }, [open, isEdit, editing]);
+  }, [open, isEdit, editing, lockedCustomer]);
 
   // Last linjer fra detail og grupper til ukesrader
   useEffect(() => {
@@ -288,7 +291,7 @@ export function RecurringScheduleDialog({
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label>Kunde</Label>
-              {isEdit ? (
+              {isEdit || isLocked ? (
                 <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm">
                   {customerLabel}
                 </div>

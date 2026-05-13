@@ -37,6 +37,7 @@ export type RecurringItem = {
 export type RecurringScheduleFilter = {
   search?: string;
   status?: "active" | "inactive" | "all";
+  customer_id?: string;
 };
 
 /** Liste over fastordre-maler m/ kunde-info + linjeantall. */
@@ -56,6 +57,10 @@ export function useRecurringSchedules(filter: RecurringScheduleFilter = {}) {
         q = q.eq("is_active", true);
       } else if (filter.status === "inactive") {
         q = q.eq("is_active", false);
+      }
+
+      if (filter.customer_id) {
+        q = q.eq("customer_id", filter.customer_id);
       }
 
       const { data, error } = await q;
