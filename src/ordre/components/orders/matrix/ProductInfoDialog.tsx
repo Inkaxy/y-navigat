@@ -118,6 +118,32 @@ export function ProductInfoDialog({ productId, productName, open, onClose }: Pro
             );
           })()}
 
+          {(() => {
+            const items: { label: string; tone?: string }[] = [];
+            if (product?.cert_nokkelhull) items.push({ label: "Nøkkelhullet" });
+            if (product?.cert_norsk_100) items.push({ label: "100 % norsk" });
+            if (product?.breadscale_value) {
+              const names = ["", "Fint", "Halvgrovt", "Grovt", "Ekstra grovt"];
+              items.push({ label: `Brødskalaen: ${product.breadscale_value} – ${names[product.breadscale_value] ?? ""}` });
+            }
+            if (items.length === 0) return null;
+            return (
+              <section>
+                <h3 className="mb-1 font-semibold">Merkeordninger</h3>
+                <div className="flex flex-wrap gap-1.5">
+                  {items.map((it) => (
+                    <span
+                      key={it.label}
+                      className="inline-flex items-center rounded-full border border-app/40 bg-app/10 px-2.5 py-0.5 text-xs font-medium text-app-foreground"
+                    >
+                      {it.label}
+                    </span>
+                  ))}
+                </div>
+              </section>
+            );
+          })()}
+
           {loading && (
             <div className="flex items-center justify-center py-6 text-muted-foreground">
               <Loader2 className="h-5 w-5 animate-spin" />
