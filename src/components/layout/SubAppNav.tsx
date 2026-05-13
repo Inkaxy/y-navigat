@@ -281,13 +281,10 @@ function NavBar({ appSlug, items }: { appSlug: string; items: NavItem[] }) {
             const active = isLinkActive(item.to);
             return (
               <li key={item.to} className="shrink-0">
-                <div className="flex items-center">
-                  <NavLink to={item.to} className={baseClass(active)} style={baseStyle(active)}>
-                    {item.label}
-                    {item.badge != null && item.badge > 0 && <CountBadge value={item.badge} />}
-                  </NavLink>
-                  <OpenInNewTabButton to={item.to} label={item.label} />
-                </div>
+                <NavLink to={item.to} className={baseClass(active)} style={baseStyle(active)}>
+                  {item.label}
+                  {item.badge != null && item.badge > 0 && <CountBadge value={item.badge} />}
+                </NavLink>
               </li>
             );
           }
@@ -303,25 +300,9 @@ function NavBar({ appSlug, items }: { appSlug: string; items: NavItem[] }) {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" className="min-w-[220px]">
                   {item.links.map((l) => (
-                    <DropdownMenuItem
-                      key={l.to}
-                      onClick={() => navigate(l.to)}
-                      className="cursor-pointer"
-                    >
+                    <DropdownMenuItem key={l.to} onClick={() => navigate(l.to)} className="cursor-pointer">
                       <span className="flex-1">{l.label}</span>
                       {l.badge != null && l.badge > 0 && <CountBadge value={l.badge} />}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          window.open(l.to, "_blank", "noopener,noreferrer");
-                        }}
-                        className="ml-2 inline-flex h-6 w-6 items-center justify-center rounded hover:bg-muted"
-                        title={`Åpne ${l.label} i ny fane`}
-                        aria-label={`Åpne ${l.label} i ny fane`}
-                      >
-                        <ExternalLink className="h-3.5 w-3.5 opacity-70" />
-                      </button>
                     </DropdownMenuItem>
                   ))}
                 </DropdownMenuContent>
@@ -331,22 +312,6 @@ function NavBar({ appSlug, items }: { appSlug: string; items: NavItem[] }) {
         })}
       </ul>
     </nav>
-  );
-}
-
-function OpenInNewTabButton({ to, label }: { to: string; label: string }) {
-  return (
-    <a
-      href={to}
-      target="_blank"
-      rel="noopener noreferrer"
-      onClick={(e) => e.stopPropagation()}
-      className="ml-0.5 inline-flex h-6 w-6 items-center justify-center rounded text-brand-cream/50 transition-colors hover:bg-brand-cream/[0.08] hover:text-brand-cream/90"
-      title={`Åpne ${label} i ny fane`}
-      aria-label={`Åpne ${label} i ny fane`}
-    >
-      <ExternalLink className="h-3 w-3" />
-    </a>
   );
 }
 
