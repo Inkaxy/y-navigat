@@ -61,11 +61,7 @@ export function DeclarationTab({ productId, productName, canWrite }: Props) {
     return <div className="flex h-32 items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>;
   }
   if (!linkQuery.data) {
-    return (
-      <Card><CardContent className="py-12 text-center text-sm text-muted-foreground">
-        Ingen aktiv oppskrift koblet til dette produktet. Opprett eller koble til en oppskrift først.
-      </CardContent></Card>
-    );
+    return <ManualDeclarationEditor productId={productId} productName={productName} canWrite={canWrite} />;
   }
 
   return (
