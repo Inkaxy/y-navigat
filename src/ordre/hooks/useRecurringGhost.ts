@@ -5,12 +5,24 @@ import { isoDayOfWeek } from "@/ordre/hooks/useDeliveryTours";
 
 export type RecurringGhostMap = Map<string, number>; // key: `${date}|${tourId}|${productId}`
 
+const DAY_KEYS = [
+  "active_monday",
+  "active_tuesday",
+  "active_wednesday",
+  "active_thursday",
+  "active_friday",
+  "active_saturday",
+  "active_sunday",
+] as const;
+
 /**
  * Fastordre-forhåndsutfylling: henter alle recurring_order_items for kunden
  * (via aktive schedules), og mapper hver item til konkrete datoer i intervallet
  * basert på item.weekday (1=mandag … 7=søndag).
  *
- * Items uten tour_id ignoreres (ghost trenger eksplisitt tur).
+ * Items uten tour_id ekspanderes til ALLE aktive turer for ukedagen, slik at
+ * grunnlaget alltid vises i matrisen selv om brukeren ikke har valgt tur i
+ * fastordre-malen.
  */
 export function useRecurringGhost(
   customerId: string | null,
@@ -22,20 +34,40 @@ export function useRecurringGhost(
     enabled: !!customerId,
     staleTime: 60_000,
     queryFn: async (): Promise<RecurringGhostMap> => {
-      const { data, error } = await supabase
-        .from("recurring_order_schedules")
-        .select(
-          "id, valid_from, valid_to, is_active, recurring_order_items(product_id, weekday, tour_id, quantity)",
-        )
-        .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
-        .eq("customer_id", customerId!)
-        .eq("is_active", true);
-      if (error) throw error;
+      const [schedRes, toursRes] = await Promise.all([
+        supabase
+          .from("recurring_order_schedules")
+          .select(
+            "id, valid_from, valid_to, is_active, recurring_order_items(product_id, weekday, tour_id, quantity)",
+          )
+          .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
+          .eq("customer_id", customerId!)
+          .eq("is_active", true),
+        supabase
+          .from("delivery_tours")
+          .select(
+            "id, active_monday, active_tuesday, active_wednesday, active_thursday, active_friday, active_saturday, active_sunday, status",
+          )
+          .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
+          .eq("status", "active"),
+      ]);
+      if (schedRes.error) throw schedRes.error;
+      if (toursRes.error) throw toursRes.error;
+
+      // Map weekday (1-7) -> tour ids active that day
+      const toursByDow = new Map<number, string[]>();
+      for (let dow = 1; dow <= 7; dow++) {
+        const key = DAY_KEYS[dow - 1];
+        const ids = (toursRes.data ?? [])
+          .filter((t: any) => t[key])
+          .map((t: any) => t.id as string);
+        toursByDow.set(dow, ids);
+      }
 
       const out: RecurringGhostMap = new Map();
       const days = enumerateDates(dateFrom, dateTo);
 
-      for (const sched of (data ?? []) as Array<{
+      for (const sched of (schedRes.data ?? []) as Array<{
         valid_from: string | null;
         valid_to: string | null;
         recurring_order_items: Array<{
@@ -51,12 +83,14 @@ export function useRecurringGhost(
           const dow = isoDayOfWeek(date);
           for (const item of sched.recurring_order_items ?? []) {
             if (item.weekday !== dow) continue;
-            if (!item.tour_id) continue;
             if (!item.quantity || Number(item.quantity) <= 0) continue;
-            const key = `${date}|${item.tour_id}|${item.product_id}`;
-            // Hvis flere schedules treffer samme celle: summér (sjelden, men
-            // tryggere enn å tape data).
-            out.set(key, (out.get(key) ?? 0) + Number(item.quantity));
+            const targetTours = item.tour_id
+              ? [item.tour_id]
+              : toursByDow.get(dow) ?? [];
+            for (const tid of targetTours) {
+              const key = `${date}|${tid}|${item.product_id}`;
+              out.set(key, (out.get(key) ?? 0) + Number(item.quantity));
+            }
           }
         }
       }
