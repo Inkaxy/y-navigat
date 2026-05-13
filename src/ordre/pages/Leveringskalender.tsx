@@ -58,6 +58,7 @@ import {
 } from "@/ordre/components/orders/matrix/MatrixActionDialogs";
 import { CorrectionsDialog } from "@/ordre/components/orders/matrix/CorrectionsDialog";
 import { FlatLinesView } from "@/ordre/components/orders/matrix/FlatLinesView";
+import { ProductInfoDialog } from "@/ordre/components/orders/matrix/ProductInfoDialog";
 import {
   useColumnComments,
   useUpsertColumnComment,
