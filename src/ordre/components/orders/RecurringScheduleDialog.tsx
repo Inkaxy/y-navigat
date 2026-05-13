@@ -109,6 +109,11 @@ export function RecurringScheduleDialog({
   const { data: allProducts = [] } = useNBProducts();
   const { data: tours = [] } = useDeliveryTours({ activeOnly: true });
   const sortedTours = useMemo(() => sortToursByPriority(tours), [tours]);
+  const rowProductIds = useMemo(
+    () => Array.from(new Set(rows.map((r) => r.product_id))),
+    [rows],
+  );
+  const { data: rowProducts = [] } = useProductsByIds(rowProductIds);
   const productMap = useMemo(() => {
     const m = new Map<string, { name: string; number: number; code: string }>();
     allProducts.forEach((p) =>
@@ -117,8 +122,11 @@ export function RecurringScheduleDialog({
     searchedProducts.forEach((p) =>
       m.set(p.id, { name: p.display_name, number: p.display_number, code: p.code }),
     );
+    rowProducts.forEach((p) =>
+      m.set(p.id, { name: p.display_name, number: p.display_number, code: p.code }),
+    );
     return m;
-  }, [searchedProducts, allProducts]);
+  }, [searchedProducts, allProducts, rowProducts]);
 
   const save = useSaveRecurringSchedule();
 
