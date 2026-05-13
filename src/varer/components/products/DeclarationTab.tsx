@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import { logAudit } from "@/varer/lib/audit";
 import { PdfDeclarationImportDialog } from "@/varer/components/products/PdfDeclarationImportDialog";
 import { ManualDeclarationEditor } from "@/varer/components/products/ManualDeclarationEditor";
+import { CertificationsEditor } from "@/varer/components/products/CertificationsEditor";
 
 type Mode = "auto" | "manual" | "auto_with_overrides";
 
