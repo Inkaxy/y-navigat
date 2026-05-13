@@ -145,6 +145,7 @@ export default function MatrixPage() {
   const [quickFilter, setQuickFilter] = useState<QuickRange | null>("this_week");
 
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [fromDateOpen, setFromDateOpen] = useState(false);
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebouncedValue(search, 200);
 
