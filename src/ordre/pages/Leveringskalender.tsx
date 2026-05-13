@@ -19,7 +19,11 @@ import {
   Repeat,
   Eye,
   BookOpen,
+  CalendarIcon,
 } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import { format as fmtDate } from "date-fns";
+import { nb } from "date-fns/locale";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AppBanner } from "@/ordre/components/shell/AppBanner";
