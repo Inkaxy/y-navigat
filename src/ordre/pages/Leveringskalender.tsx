@@ -1894,3 +1894,14 @@ function LegendSwatch({ className, label }: { className: string; label: string }
     </span>
   );
 }
+
+function CardField({ label, value, mono }: { label: string; value?: string | null; mono?: boolean }) {
+  return (
+    <div className="space-y-1">
+      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className={cn("rounded-md border border-border bg-muted/20 px-3 py-2 text-sm", mono && "tabular-nums")}>
+        {value || <span className="text-muted-foreground">—</span>}
+      </div>
+    </div>
+  );
+}
