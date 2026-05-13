@@ -291,7 +291,7 @@ export function RecurringScheduleDialog({
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label>Kunde</Label>
-              {isEdit ? (
+              {isEdit || isLocked ? (
                 <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm">
                   {customerLabel}
                 </div>
