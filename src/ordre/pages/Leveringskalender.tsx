@@ -17,6 +17,7 @@ import {
   PackageCheck,
   ChevronDown,
   Repeat,
+  Eye,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
