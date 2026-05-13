@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { format, formatDistanceToNow } from "date-fns";
 import { nb } from "date-fns/locale";
-import { Inbox, Paperclip, Search, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Inbox, Paperclip, Search, X } from "lucide-react";
 import { AppBanner } from "@/ordre/components/shell/AppBanner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -38,6 +38,16 @@ const PRIORITY_LABELS: Record<TicketPriority, string> = {
   urgent: "Haster",
 };
 
+const PRIORITY_RANK: Record<TicketPriority, number> = {
+  urgent: 4,
+  high: 3,
+  normal: 2,
+  low: 1,
+};
+
+type SortKey = "received" | "priority";
+type SortDir = "asc" | "desc";
+
 export default function TicketsList() {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
@@ -46,12 +56,45 @@ export default function TicketsList() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<TicketStatus[]>(initialStatus);
   const [assignedFilter, setAssignedFilter] = useState<"all" | "mine" | "unassigned">(initialAssigned);
+  const [sortKey, setSortKey] = useState<SortKey>("received");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
+
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("desc");
+    }
+  };
+
+  const SortIcon = ({ k }: { k: SortKey }) => {
+    if (sortKey !== k) return <ArrowUpDown className="ml-1 inline h-3 w-3 text-muted-foreground/60" />;
+    return sortDir === "asc"
+      ? <ArrowUp className="ml-1 inline h-3 w-3" />
+      : <ArrowDown className="ml-1 inline h-3 w-3" />;
+  };
 
   const { data: tickets = [], isLoading } = useTickets({
     search: search || undefined,
     status: statusFilter.length ? statusFilter : undefined,
     assigned: assignedFilter,
   });
+
+  const sortedTickets = useMemo(() => {
+    const arr = [...tickets];
+    arr.sort((a, b) => {
+      let cmp = 0;
+      if (sortKey === "priority") {
+        cmp = (PRIORITY_RANK[a.priority] ?? 0) - (PRIORITY_RANK[b.priority] ?? 0);
+        if (cmp === 0) cmp = new Date(a.received_at).getTime() - new Date(b.received_at).getTime();
+      } else {
+        cmp = new Date(a.received_at).getTime() - new Date(b.received_at).getTime();
+      }
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+    return arr;
+  }, [tickets, sortKey, sortDir]);
 
   const toggleStatus = (s: TicketStatus) => {
     setStatusFilter((prev) => (prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]));
@@ -131,9 +174,13 @@ export default function TicketsList() {
               <TableRow>
                 <TableHead>Avsender</TableHead>
                 <TableHead>Emne</TableHead>
-                <TableHead>Mottatt</TableHead>
+                <TableHead onClick={() => toggleSort("received")} className="cursor-pointer select-none">
+                  Mottatt<SortIcon k="received" />
+                </TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Prioritet</TableHead>
+                <TableHead onClick={() => toggleSort("priority")} className="cursor-pointer select-none">
+                  Prioritet<SortIcon k="priority" />
+                </TableHead>
                 <TableHead className="w-10"></TableHead>
               </TableRow>
             </TableHeader>
@@ -144,7 +191,7 @@ export default function TicketsList() {
                     <TableCell colSpan={6}><Skeleton className="h-6 w-full" /></TableCell>
                   </TableRow>
                 ))
-              ) : tickets.length === 0 ? (
+              ) : sortedTickets.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center py-12">
                     <Inbox className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
@@ -152,7 +199,7 @@ export default function TicketsList() {
                   </TableCell>
                 </TableRow>
               ) : (
-                tickets.map((t) => (
+                sortedTickets.map((t) => (
                   <TableRow
                     key={t.id}
                     className="cursor-pointer"
