@@ -5629,6 +5629,12 @@ export type Database = {
           lead_time_days: number | null
           legal_entity_id: string
           main_category_id: string | null
+          manual_allergens_contains: string[]
+          manual_allergens_may_contain: string[]
+          manual_declaration_updated_at: string | null
+          manual_declaration_updated_by: string | null
+          manual_ingredient_declaration: string | null
+          manual_nutrition_per_100g: Json | null
           mva_always_included: boolean
           mva_rate: number
           packaging_cost_per_unit: number
@@ -5697,6 +5703,12 @@ export type Database = {
           lead_time_days?: number | null
           legal_entity_id: string
           main_category_id?: string | null
+          manual_allergens_contains?: string[]
+          manual_allergens_may_contain?: string[]
+          manual_declaration_updated_at?: string | null
+          manual_declaration_updated_by?: string | null
+          manual_ingredient_declaration?: string | null
+          manual_nutrition_per_100g?: Json | null
           mva_always_included?: boolean
           mva_rate?: number
           packaging_cost_per_unit?: number
@@ -5765,6 +5777,12 @@ export type Database = {
           lead_time_days?: number | null
           legal_entity_id?: string
           main_category_id?: string | null
+          manual_allergens_contains?: string[]
+          manual_allergens_may_contain?: string[]
+          manual_declaration_updated_at?: string | null
+          manual_declaration_updated_by?: string | null
+          manual_ingredient_declaration?: string | null
+          manual_nutrition_per_100g?: Json | null
           mva_always_included?: boolean
           mva_rate?: number
           packaging_cost_per_unit?: number
