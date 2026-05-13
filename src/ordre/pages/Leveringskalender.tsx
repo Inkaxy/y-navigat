@@ -861,6 +861,18 @@ export default function MatrixPage() {
             </PopoverContent>
           </Popover>
 
+          {existingSchedule && (
+            <Badge
+              variant="secondary"
+              className="cursor-pointer gap-1"
+              onClick={() => setRecurringDialogOpen(true)}
+              title="Klikk for å redigere fastordre"
+            >
+              <Repeat className="h-3 w-3" />
+              Fastordre aktiv
+            </Badge>
+          )}
+
           <ToggleGroup
             type="single"
             value={quickFilter ?? ""}
