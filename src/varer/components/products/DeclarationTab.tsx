@@ -62,7 +62,12 @@ export function DeclarationTab({ productId, productName, canWrite }: Props) {
     return <div className="flex h-32 items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>;
   }
   if (!linkQuery.data) {
-    return <ManualDeclarationEditor productId={productId} productName={productName} canWrite={canWrite} />;
+    return (
+      <div className="space-y-4">
+        <ManualDeclarationEditor productId={productId} productName={productName} canWrite={canWrite} />
+        <CertificationsEditor productId={productId} canWrite={canWrite} />
+      </div>
+    );
   }
 
   return (
