@@ -213,3 +213,124 @@ function ReadOnly({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
+
+function AddPositionDialog({ userId, assignedBy }: { userId: string; assignedBy: string | null }) {
+  const qc = useQueryClient();
+  const today = new Date().toISOString().slice(0, 10);
+  const [open, setOpen] = useState(false);
+  const [positionId, setPositionId] = useState<string>("");
+  const [legalEntityId, setLegalEntityId] = useState<string>("");
+  const [validFrom, setValidFrom] = useState<string>(today);
+  const [validTo, setValidTo] = useState<string>("");
+  const [isPrimary, setIsPrimary] = useState(false);
+
+  const { data: positions = [] } = useQuery({
+    queryKey: ["positions-list"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("positions")
+        .select("id, code, display_name")
+        .order("display_name");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const { data: entities = [] } = useQuery({
+    queryKey: ["legal-entities-list"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("legal_entities")
+        .select("id, short_code, legal_name")
+        .order("short_code");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const reset = () => {
+    setPositionId(""); setLegalEntityId(""); setValidFrom(today); setValidTo(""); setIsPrimary(false);
+  };
+
+  const create = useMutation({
+    mutationFn: async () => {
+      if (!positionId || !legalEntityId) throw new Error("Velg stilling og selskap");
+      const { error } = await supabase.from("user_positions").insert({
+        user_id: userId,
+        position_id: positionId,
+        legal_entity_id: legalEntityId,
+        valid_from: validFrom,
+        valid_to: validTo || null,
+        is_primary: isPrimary,
+        outlet_scope: "all",
+        outlet_ids: [],
+        assigned_by: assignedBy,
+      } as never);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-user-positions", userId] });
+      toast.success("Stilling lagt til");
+      reset();
+      setOpen(false);
+    },
+    onError: (e: any) => toast.error(e.message ?? "Kunne ikke legge til stilling"),
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) reset(); }}>
+      <DialogTrigger asChild>
+        <Button size="sm"><Plus className="h-4 w-4" /> Legg til stilling</Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Legg til stilling</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div>
+            <Label>Stilling</Label>
+            <Select value={positionId} onValueChange={setPositionId}>
+              <SelectTrigger><SelectValue placeholder="Velg stilling" /></SelectTrigger>
+              <SelectContent>
+                {positions.map((p: any) => (
+                  <SelectItem key={p.id} value={p.id}>{p.display_name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label>Selskap</Label>
+            <Select value={legalEntityId} onValueChange={setLegalEntityId}>
+              <SelectTrigger><SelectValue placeholder="Velg selskap" /></SelectTrigger>
+              <SelectContent>
+                {entities.map((e: any) => (
+                  <SelectItem key={e.id} value={e.id}>{e.short_code} – {e.legal_name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>Fra</Label>
+              <Input type="date" value={validFrom} onChange={(e) => setValidFrom(e.target.value)} />
+            </div>
+            <div>
+              <Label>Til (valgfri)</Label>
+              <Input type="date" value={validTo} onChange={(e) => setValidTo(e.target.value)} />
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Checkbox id="is-primary" checked={isPrimary} onCheckedChange={(v) => setIsPrimary(v === true)} />
+            <Label htmlFor="is-primary" className="cursor-pointer">Primær stilling</Label>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>Avbryt</Button>
+          <Button onClick={() => create.mutate()} disabled={create.isPending}>
+            {create.isPending ? "Lagrer …" : "Legg til"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
