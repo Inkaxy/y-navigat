@@ -1661,11 +1661,20 @@ function MatrixGrid({
                 >
                   <div className="flex items-baseline justify-between gap-2">
                     <div className="min-w-0">
-                      <div className="truncate font-medium">
-                        <span className="text-muted-foreground tabular-nums mr-2">{p.display_number}</span>
-                        {p.display_name}
+                      <div className="flex items-center gap-1.5 truncate font-medium">
+                        <button
+                          type="button"
+                          onClick={() => setInfoProduct({ id: p.id, name: p.display_name })}
+                          className="rounded p-0.5 text-brand-bronze/70 hover:bg-brand-bronze/10 hover:text-brand-bronze"
+                          title="Vis produktinfo"
+                          aria-label="Vis produktinfo"
+                        >
+                          <BookOpen className="h-3.5 w-3.5" />
+                        </button>
+                        <span className="text-muted-foreground tabular-nums">{p.display_number}</span>
+                        <span className="truncate">{p.display_name}</span>
                         {isAdded && (
-                          <Badge variant="outline" className="ml-2 text-[10px]">Ny</Badge>
+                          <Badge variant="outline" className="ml-1 text-[10px]">Ny</Badge>
                         )}
                       </div>
                       <div className="text-[11px] text-muted-foreground">
