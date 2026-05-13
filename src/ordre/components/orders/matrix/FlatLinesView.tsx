@@ -1,18 +1,29 @@
-import type { MatrixCell, MatrixProduct, MatrixTour } from "@/ordre/hooks/useMatrix";
+import type { MatrixProduct, MatrixTour } from "@/ordre/hooks/useMatrix";
 import { formatNOK } from "@/ordre/lib/format";
 
+export type FlatLineRow = {
+  key: string;
+  delivery_date: string;
+  delivery_tour_id: string | null;
+  product_id: string;
+  quantity: number;
+  unit_price: number;
+  line_total_incl_vat: number;
+  isDraft?: boolean;
+};
+
 export function FlatLinesView({
-  cells,
+  rows,
   products,
   tours,
 }: {
-  cells: MatrixCell[];
+  rows: FlatLineRow[];
   products: MatrixProduct[];
   tours: MatrixTour[];
 }) {
   const productById = new Map(products.map((p) => [p.id, p]));
   const tourById = new Map(tours.map((t) => [t.id, t]));
-  const sorted = [...cells].sort((a, b) => {
+  const sorted = [...rows].sort((a, b) => {
     if (a.delivery_date !== b.delivery_date) return a.delivery_date < b.delivery_date ? -1 : 1;
     const ta = tourById.get(a.delivery_tour_id ?? "")?.tour_number ?? 0;
     const tb = tourById.get(b.delivery_tour_id ?? "")?.tour_number ?? 0;
@@ -43,12 +54,17 @@ export function FlatLinesView({
             const p = productById.get(c.product_id);
             const t = tourById.get(c.delivery_tour_id ?? "");
             return (
-              <tr key={c.line_id} className="border-b hover:bg-muted/30">
+              <tr key={c.key} className="border-b hover:bg-muted/30">
                 <td className="px-3 py-1.5 tabular-nums">{c.delivery_date}</td>
                 <td className="px-3 py-1.5">{t ? `T${t.tour_number} ${t.display_name}` : "—"}</td>
                 <td className="px-3 py-1.5">
                   <span className="text-muted-foreground tabular-nums mr-2">{p?.display_number}</span>
                   {p?.display_name ?? c.product_id}
+                  {c.isDraft && (
+                    <span className="ml-2 rounded bg-warning/15 px-1.5 py-0.5 text-[10px] font-medium text-warning">
+                      Ulagret
+                    </span>
+                  )}
                 </td>
                 <td className="px-3 py-1.5 text-right tabular-nums">{c.quantity}</td>
                 <td className="px-3 py-1.5 text-right tabular-nums">{formatNOK(c.unit_price)}</td>
