@@ -870,12 +870,12 @@ export default function MatrixPage() {
   return (
     <div className="flex h-full flex-col bg-background">
 
-      <div className="px-page py-4">
-        <div className="rounded-[14px] border border-brand-bronze/20 bg-card p-3 shadow-card ring-1 ring-inset ring-brand-cream/40">
+      <div className="px-page py-5">
+        <div className="rounded-[16px] border-2 border-brand-bronze/40 bg-gradient-to-br from-card to-brand-cream/20 p-5 shadow-lg ring-1 ring-inset ring-brand-bronze/10">
         <div className="flex flex-wrap items-center gap-3">
           <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
             <PopoverTrigger asChild>
-              <Button variant="outline" className="min-w-[280px] justify-start">
+              <Button variant="outline" size="lg" className="min-w-[320px] justify-start text-base font-semibold border-2 border-brand-bronze/30 hover:border-brand-bronze/60 shadow-sm">
                 {selectedCustomer
                   ? `${selectedCustomer.customer_number} — ${selectedCustomer.display_name}`
                   : "Velg kunde …"}
