@@ -102,6 +102,15 @@ export function ProductInfoDialog({ productId, productName, open, onClose }: Pro
             )}
           </div>
 
+          {product?.description && product.description.trim() && (
+            <section>
+              <h3 className="mb-1 font-semibold">Beskrivelse</h3>
+              <div className="prose prose-sm max-w-none text-sm leading-relaxed text-foreground dark:prose-invert">
+                <ReactMarkdown>{product.description}</ReactMarkdown>
+              </div>
+            </section>
+          )}
+
           {loading && (
             <div className="flex items-center justify-center py-6 text-muted-foreground">
               <Loader2 className="h-5 w-5 animate-spin" />
