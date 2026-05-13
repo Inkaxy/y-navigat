@@ -1018,50 +1018,54 @@ export default function MatrixPage() {
           </Dialog>
 
 
-          <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="lg" className="min-w-[320px] justify-start text-base font-semibold border-2 border-brand-bronze/30 hover:border-brand-bronze/60 shadow-sm">
-                {selectedCustomer
-                  ? `${selectedCustomer.customer_number} — ${selectedCustomer.display_name}`
-                  : "Velg kunde …"}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-[420px] p-0" align="start">
-              <Command shouldFilter={false}>
-                <CommandInput placeholder="Søk kunde …" value={search} onValueChange={setSearch} />
-                <CommandList>
-                  <CommandEmpty>Ingen treff</CommandEmpty>
-                  <CommandGroup>
-                    {(customers ?? []).map((c) => (
-                      <CommandItem
-                        key={c.id}
-                        value={c.id}
-                        onSelect={() => {
-                          setCustomerId(c.id);
-                          setPickerOpen(false);
-                        }}
-                      >
-                        <span className="text-muted-foreground tabular-nums mr-2">{c.customer_number}</span>
-                        <span className="truncate">{c.display_name}</span>
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          </Popover>
+          <div className="flex flex-col items-start gap-1.5">
+            <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="lg" className="min-w-[320px] justify-start text-base font-semibold border-2 border-brand-bronze/30 hover:border-brand-bronze/60 shadow-sm">
+                  {selectedCustomer
+                    ? `${selectedCustomer.customer_number} — ${selectedCustomer.display_name}`
+                    : "Velg kunde …"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[420px] p-0" align="start">
+                <Command shouldFilter={false}>
+                  <CommandInput placeholder="Søk kunde …" value={search} onValueChange={setSearch} />
+                  <CommandList>
+                    <CommandEmpty>Ingen treff</CommandEmpty>
+                    <CommandGroup>
+                      {(customers ?? []).map((c) => (
+                        <CommandItem
+                          key={c.id}
+                          value={c.id}
+                          onSelect={() => {
+                            setCustomerId(c.id);
+                            setPickerOpen(false);
+                          }}
+                        >
+                          <span className="text-muted-foreground tabular-nums mr-2">{c.customer_number}</span>
+                          <span className="truncate">{c.display_name}</span>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
 
-          {existingSchedule && (
-            <Badge
-              variant="secondary"
-              className="cursor-pointer gap-1"
-              onClick={() => setRecurringDialogOpen(true)}
-              title="Klikk for å redigere fastordre"
-            >
-              <Repeat className="h-3 w-3" />
-              Fastordre aktiv
-            </Badge>
-          )}
+            {existingSchedule && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setRecurringDialogOpen(true)}
+                title="Klikk for å redigere fastordre"
+                className="h-8 gap-1.5 px-3 text-sm font-semibold"
+              >
+                <Repeat className="h-3.5 w-3.5" />
+                Fastordre aktiv
+              </Button>
+            )}
+          </div>
+
 
           <div className="relative flex flex-col gap-0.5 self-start">
             <div className="flex items-center gap-1 rounded-md border border-brand-bronze/30 bg-card/60 px-2 py-1 text-sm">
