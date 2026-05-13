@@ -81,6 +81,21 @@ export default function TicketsList() {
     assigned: assignedFilter,
   });
 
+  const sortedTickets = useMemo(() => {
+    const arr = [...tickets];
+    arr.sort((a, b) => {
+      let cmp = 0;
+      if (sortKey === "priority") {
+        cmp = (PRIORITY_RANK[a.priority] ?? 0) - (PRIORITY_RANK[b.priority] ?? 0);
+        if (cmp === 0) cmp = new Date(a.received_at).getTime() - new Date(b.received_at).getTime();
+      } else {
+        cmp = new Date(a.received_at).getTime() - new Date(b.received_at).getTime();
+      }
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+    return arr;
+  }, [tickets, sortKey, sortDir]);
+
   const toggleStatus = (s: TicketStatus) => {
     setStatusFilter((prev) => (prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]));
   };
