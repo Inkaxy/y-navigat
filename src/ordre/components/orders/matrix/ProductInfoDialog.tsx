@@ -80,6 +80,7 @@ export function ProductInfoDialog({ productId, productName, open, onClose }: Pro
   const product = productQuery.data;
   const computed = declQuery.data;
   const loading = productQuery.isLoading || linkQuery.isLoading || declQuery.isLoading;
+  const [generating, setGenerating] = useState(false);
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
