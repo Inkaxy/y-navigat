@@ -1768,11 +1768,11 @@ function MatrixGrid({
                         <button
                           type="button"
                           onClick={() => setInfoProduct({ id: p.id, name: p.display_name })}
-                          className="rounded p-0.5 text-brand-bronze/70 hover:bg-brand-bronze/10 hover:text-brand-bronze"
+                          className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-brand-bronze/40 bg-brand-bronze/10 text-brand-bronze shadow-sm transition-colors hover:border-brand-bronze hover:bg-brand-bronze hover:text-brand-ink"
                           title="Vis produktinfo"
                           aria-label="Vis produktinfo"
                         >
-                          <BookOpen className="h-3.5 w-3.5" />
+                          <BookOpen className="h-4 w-4" strokeWidth={2.25} />
                         </button>
                         <span className="text-muted-foreground tabular-nums">{p.display_number}</span>
                         <span className="truncate">{p.display_name}</span>
