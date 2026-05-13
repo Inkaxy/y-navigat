@@ -40,7 +40,7 @@ export function ProductInfoDialog({ productId, productName, open, onClose }: Pro
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")
-        .select("id, display_name, image_url, datasheet_url")
+        .select("id, display_name, image_url, datasheet_url, description")
         .eq("id", productId!)
         .maybeSingle();
       if (error) throw error;
