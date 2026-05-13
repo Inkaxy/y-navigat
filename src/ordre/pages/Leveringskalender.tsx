@@ -1807,7 +1807,9 @@ function MatrixGrid({
                   const hasM = hasMerknad(key);
                   const cellHasData = hasData(key);
                   const pause = isPaused(pauseMap, c.date, c.tour.id);
-                  const ghost = !value && !pause ? ghostMap?.get(key) : undefined;
+                  const ghost = pause ? undefined : ghostMap?.get(key);
+                  const effectiveQty = value ? Number(value.replace(",", ".") || 0) : 0;
+                  const ghostOverridden = !!ghost && !!value && effectiveQty !== ghost;
                   const fb = isFallback(key);
                   return (
                     <td
