@@ -147,6 +147,18 @@ export default function PriceLists() {
             changes: { price: newPrice, valid_from: priceDate },
           });
         } else {
+          // Lukk forrige periode hvis den finnes (valid_from < priceDate)
+          if (existing && existing.valid_from < priceDate) {
+            const { error: closeErr } = await supabase
+              .from("price_list_items")
+              .update({ valid_to: prevDate })
+              .eq("id", existing.id);
+            if (closeErr) {
+              toast.error(`${productName}: ${closeErr.message}`);
+              failed++;
+              continue;
+            }
+          }
           const { data, error } = await supabase
             .from("price_list_items")
             .insert({
