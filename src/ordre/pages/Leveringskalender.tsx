@@ -1854,12 +1854,23 @@ function MatrixGrid({
                           ghost && "placeholder:italic placeholder:text-muted-foreground/60",
                         )}
                       />
-                      {ghost && !value && (
+                      {ghost && (
                         <span
-                          className="pointer-events-none absolute inset-0 flex items-center justify-center"
-                          title="Fastordre-forslag — klikk for å bekrefte"
+                          className={cn(
+                            "pointer-events-none absolute left-0.5 top-0.5 rounded-sm px-1 text-[9px] font-semibold leading-tight tabular-nums",
+                            ghostOverridden
+                              ? "bg-warning/20 text-warning line-through decoration-warning/70"
+                              : "bg-primary/15 text-primary",
+                          )}
+                          title={
+                            ghostOverridden
+                              ? `Fastordre: ${ghost} stk — overstyrt til ${effectiveQty}`
+                              : `Fastordre: ${ghost} stk`
+                          }
                           aria-hidden
-                        />
+                        >
+                          {ghost}
+                        </span>
                       )}
                       {hasM && (
                         <span
