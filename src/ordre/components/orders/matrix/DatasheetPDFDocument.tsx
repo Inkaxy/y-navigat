@@ -51,7 +51,6 @@ export function DatasheetPDFDocument({ data }: { data: DatasheetData }) {
 
         {data.imageUrl ? (
           <View style={styles.imageWrap}>
-            {/* @ts-expect-error react-pdf Image accepts src string */}
             <Image style={styles.image} src={data.imageUrl} />
           </View>
         ) : null}
