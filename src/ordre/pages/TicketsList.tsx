@@ -38,6 +38,16 @@ const PRIORITY_LABELS: Record<TicketPriority, string> = {
   urgent: "Haster",
 };
 
+const PRIORITY_RANK: Record<TicketPriority, number> = {
+  urgent: 4,
+  high: 3,
+  normal: 2,
+  low: 1,
+};
+
+type SortKey = "received" | "priority";
+type SortDir = "asc" | "desc";
+
 export default function TicketsList() {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
@@ -46,6 +56,24 @@ export default function TicketsList() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<TicketStatus[]>(initialStatus);
   const [assignedFilter, setAssignedFilter] = useState<"all" | "mine" | "unassigned">(initialAssigned);
+  const [sortKey, setSortKey] = useState<SortKey>("received");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
+
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("desc");
+    }
+  };
+
+  const SortIcon = ({ k }: { k: SortKey }) => {
+    if (sortKey !== k) return <ArrowUpDown className="ml-1 inline h-3 w-3 text-muted-foreground/60" />;
+    return sortDir === "asc"
+      ? <ArrowUp className="ml-1 inline h-3 w-3" />
+      : <ArrowDown className="ml-1 inline h-3 w-3" />;
+  };
 
   const { data: tickets = [], isLoading } = useTickets({
     search: search || undefined,
