@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import DOMPurify from "dompurify";
+import ReactMarkdown from "react-markdown";
 import { Loader2, FileDown, Image as ImageIcon } from "lucide-react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -39,7 +40,7 @@ export function ProductInfoDialog({ productId, productName, open, onClose }: Pro
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")
-        .select("id, display_name, image_url, datasheet_url")
+        .select("id, display_name, image_url, datasheet_url, description")
         .eq("id", productId!)
         .maybeSingle();
       if (error) throw error;
@@ -100,6 +101,15 @@ export function ProductInfoDialog({ productId, productName, open, onClose }: Pro
               </div>
             )}
           </div>
+
+          {product?.description && product.description.trim() && (
+            <section>
+              <h3 className="mb-1 font-semibold">Beskrivelse</h3>
+              <div className="prose prose-sm max-w-none text-sm leading-relaxed text-foreground dark:prose-invert">
+                <ReactMarkdown>{product.description}</ReactMarkdown>
+              </div>
+            </section>
+          )}
 
           {loading && (
             <div className="flex items-center justify-center py-6 text-muted-foreground">
