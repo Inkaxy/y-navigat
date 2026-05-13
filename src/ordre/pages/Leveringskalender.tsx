@@ -174,6 +174,7 @@ export default function MatrixPage() {
   const [correctionsOpen, setCorrectionsOpen] = useState(false);
   const [flatView, setFlatView] = useState(false);
   const [showAllProducts, setShowAllProducts] = useState(false);
+  const [recurringDialogOpen, setRecurringDialogOpen] = useState(false);
 
   // Merknad dialog state
   const [merknadCell, setMerknadCell] = useState<CellTarget | null>(null);
