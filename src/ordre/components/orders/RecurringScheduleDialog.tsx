@@ -133,8 +133,8 @@ export function RecurringScheduleDialog({
       setValidTo(editing.valid_to ?? "");
       setNotes(editing.notes ?? "");
     } else {
-      setCustomerId(null);
-      setCustomerLabel("");
+      setCustomerId(lockedCustomer?.id ?? null);
+      setCustomerLabel(lockedCustomer?.label ?? "");
       setName("Fastordre");
       setIsActive(true);
       setValidFrom("");
@@ -142,7 +142,7 @@ export function RecurringScheduleDialog({
       setNotes("");
       setRows([]);
     }
-  }, [open, isEdit, editing]);
+  }, [open, isEdit, editing, lockedCustomer]);
 
   // Last linjer fra detail og grupper til ukesrader
   useEffect(() => {
