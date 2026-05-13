@@ -936,6 +936,13 @@ export default function MatrixPage() {
                   <RotateCcw className="h-4 w-4 mr-2" />
                   Lag ny returordre
                 </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={!customerId}
+                  onSelect={() => setRecurringDialogOpen(true)}
+                >
+                  <Repeat className="h-4 w-4 mr-2" />
+                  {existingSchedule ? "Rediger fastordre" : "Opprett fastordre"}
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuLabel>Batch-operasjoner</DropdownMenuLabel>
                 <DropdownMenuItem onSelect={() => setSetForAllOpen(true)} disabled={!canEdit || allProducts.length === 0}>
