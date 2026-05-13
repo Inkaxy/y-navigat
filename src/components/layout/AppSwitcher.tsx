@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
-import { ChevronDown, Search, Box, LayoutDashboard, X } from "lucide-react";
+import { ChevronDown, Search, Box, LayoutDashboard, X, ExternalLink } from "lucide-react";
 import * as Icons from "lucide-react";
 import {
   Popover,
