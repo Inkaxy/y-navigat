@@ -18,10 +18,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     // Set up listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, newSession) => {
       setSession(newSession);
       setUser(newSession?.user ?? null);
       setLoading(false);
+      if (event === "SIGNED_IN" && newSession?.user?.id) {
+        const uid = newSession.user.id;
+        setTimeout(() => {
+          supabase.from("users").update({ last_login_at: new Date().toISOString() } as never).eq("id", uid).then(
+            ({ error }) => { if (error) console.warn("last_login_at update failed", error.message); },
+          );
+        }, 0);
+      }
     });
 
     // THEN check existing session
