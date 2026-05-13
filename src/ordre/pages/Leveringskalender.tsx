@@ -1063,15 +1063,15 @@ export default function MatrixPage() {
             </Badge>
           )}
 
-          <div className="flex flex-col gap-1.5">
-            <div className="flex items-center gap-1">
+          <div className="relative flex flex-col gap-0.5 self-start">
+            <div className="flex items-center gap-1 rounded-md border border-brand-bronze/30 bg-card/60 px-2 py-1 text-sm">
               <Popover open={fromDateOpen} onOpenChange={setFromDateOpen}>
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
                     size="sm"
                     disabled={!customerId}
-                    className="h-8 gap-1.5 text-xs font-medium"
+                    className="h-7 gap-1.5 px-2 text-xs font-medium"
                     aria-label="Ordre fra dato"
                   >
                     <CalendarIcon className="h-3.5 w-3.5" />
@@ -1096,38 +1096,42 @@ export default function MatrixPage() {
                   />
                 </PopoverContent>
               </Popover>
-              <Button variant="outline" size="icon" onClick={() => shiftWeek(-1)} aria-label="Forrige uke">
+              <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => shiftWeek(-1)} aria-label="Forrige uke">
                 <ChevronLeft />
               </Button>
-              <div className="px-2 text-sm font-medium tabular-nums">
+              <div className="px-2 text-xs font-medium tabular-nums whitespace-nowrap">
                 {formatRangeLabel(dateFrom, dateTo)}
               </div>
-              <Button variant="outline" size="icon" onClick={() => shiftWeek(1)} aria-label="Neste uke">
+              <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => shiftWeek(1)} aria-label="Neste uke">
                 <ChevronRight />
               </Button>
-              <Button variant="ghost" size="sm" onClick={jumpToday}>
+              <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={jumpToday}>
                 Hopp til i dag
               </Button>
             </div>
-            <ToggleGroup
-              type="single"
-              value={quickFilter ?? ""}
-              onValueChange={(v) => {
-                if (v === "today" || v === "this_week" || v === "next_week") applyQuickFilter(v);
-              }}
-              disabled={!customerId}
-              className="justify-start"
-            >
-              <ToggleGroupItem value="today" size="sm" variant="outline" aria-label="I morgen">
-                I morgen
-              </ToggleGroupItem>
-              <ToggleGroupItem value="this_week" size="sm" variant="outline" aria-label="Denne uken">
-                Denne uken
-              </ToggleGroupItem>
-              <ToggleGroupItem value="next_week" size="sm" variant="outline" aria-label="Neste uke">
-                Neste uke
-              </ToggleGroupItem>
-            </ToggleGroup>
+            <div className="flex items-center gap-3 px-3 text-xs">
+              {([
+                ["today", "I morgen"],
+                ["this_week", "Denne uken"],
+                ["next_week", "Neste uke"],
+              ] as const).map(([val, label]) => {
+                const active = quickFilter === val;
+                return (
+                  <button
+                    key={val}
+                    type="button"
+                    disabled={!customerId}
+                    onClick={() => applyQuickFilter(val)}
+                    className={cn(
+                      "transition-colors hover:text-brand-bronze disabled:opacity-50 disabled:hover:text-current",
+                      active ? "font-semibold text-brand-bronze" : "text-muted-foreground",
+                    )}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
 
