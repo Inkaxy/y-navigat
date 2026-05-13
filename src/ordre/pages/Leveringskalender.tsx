@@ -1252,6 +1252,22 @@ export default function MatrixPage() {
         dateFrom={dateFrom}
         dateTo={dateTo}
       />
+      <RecurringScheduleDialog
+        open={recurringDialogOpen}
+        onOpenChange={setRecurringDialogOpen}
+        editing={existingSchedule}
+        lockedCustomer={
+          !existingSchedule && customerId && selectedCustomer
+            ? {
+                id: customerId,
+                label: `${selectedCustomer.customer_number} — ${selectedCustomer.display_name}`,
+              }
+            : null
+        }
+        onSaved={() => {
+          /* invalidert via hook */
+        }}
+      />
     </div>
   );
 }
