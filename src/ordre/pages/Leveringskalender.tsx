@@ -1762,18 +1762,18 @@ function MatrixGrid({
                     isAdded ? "bg-accent/30" : "bg-card",
                   )}
                 >
-                  <div className="flex items-baseline justify-between gap-2">
-                    <div className="min-w-0">
+                  <div className="flex items-stretch gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setInfoProduct({ id: p.id, name: p.display_name })}
+                      className="inline-flex w-9 shrink-0 items-center justify-center self-stretch rounded-md border border-brand-bronze/40 bg-brand-bronze/10 text-brand-bronze shadow-sm transition-colors hover:border-brand-bronze hover:bg-brand-bronze hover:text-brand-ink"
+                      title="Vis produktinfo"
+                      aria-label="Vis produktinfo"
+                    >
+                      <BookOpen className="h-5 w-5" strokeWidth={2.25} />
+                    </button>
+                    <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5 truncate font-medium">
-                        <button
-                          type="button"
-                          onClick={() => setInfoProduct({ id: p.id, name: p.display_name })}
-                          className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-brand-bronze/40 bg-brand-bronze/10 text-brand-bronze shadow-sm transition-colors hover:border-brand-bronze hover:bg-brand-bronze hover:text-brand-ink"
-                          title="Vis produktinfo"
-                          aria-label="Vis produktinfo"
-                        >
-                          <BookOpen className="h-4 w-4" strokeWidth={2.25} />
-                        </button>
                         <span className="text-muted-foreground tabular-nums">{p.display_number}</span>
                         <span className="truncate">{p.display_name}</span>
                         {isAdded && (
