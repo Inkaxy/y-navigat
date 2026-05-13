@@ -1043,7 +1043,7 @@ export default function MatrixPage() {
             </div>
           </div>
         ) : flatView && matrix ? (
-          <FlatLinesView cells={matrix.existing_cells} products={allProducts} tours={matrix.tours} />
+          <FlatLinesView rows={flatRows} products={allProducts} tours={matrix.tours} />
         ) : (
           <>
             <MatrixGrid
