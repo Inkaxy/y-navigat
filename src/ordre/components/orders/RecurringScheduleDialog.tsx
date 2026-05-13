@@ -74,13 +74,16 @@ export function RecurringScheduleDialog({
   onOpenChange,
   editing,
   onSaved,
+  lockedCustomer,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   editing: Editing;
   onSaved: () => void;
+  lockedCustomer?: { id: string; label: string } | null;
 }) {
   const isEdit = !!editing;
+  const isLocked = !isEdit && !!lockedCustomer;
   const { data: detail, isLoading: loadingDetail } = useRecurringScheduleDetail(
     editing?.id ?? null,
   );
