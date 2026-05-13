@@ -40,6 +40,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useNBCustomers } from "@/ordre/hooks/useNBCustomers";
 import { useNBProducts } from "@/ordre/hooks/useNBProducts";
+import { useProductsByIds } from "@/ordre/hooks/useProductsByIds";
 import { useDeliveryTours, sortToursByPriority } from "@/ordre/hooks/useDeliveryTours";
 import {
   WEEKDAY_SHORT,
