@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import AdminLayout from "./AdminLayout";
 import { AppHeaderBanner } from "@/components/layout/AppHeaderBanner";
-import { User, X, Trash2 } from "lucide-react";
+import { User, X, Trash2, Plus } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +15,11 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger,
+} from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
@@ -153,9 +158,12 @@ export default function BrukerDetalj() {
 
       <Card>
         <CardContent className="p-0">
-          <div className="border-b border-line p-4">
-            <h3 className="font-semibold">Stillinger</h3>
-            <p className="text-sm text-muted-foreground">Aktiv = i dag mellom Fra og Til.</p>
+          <div className="flex items-center justify-between border-b border-line p-4">
+            <div>
+              <h3 className="font-semibold">Stillinger</h3>
+              <p className="text-sm text-muted-foreground">Aktiv = i dag mellom Fra og Til.</p>
+            </div>
+            {id && <AddPositionDialog userId={id} assignedBy={authUser?.id ?? null} />}
           </div>
           <Table>
             <TableHeader>
@@ -203,5 +211,126 @@ function ReadOnly({ label, value }: { label: string; value: string }) {
       <Label className="text-xs">{label}</Label>
       <Input value={value} readOnly className="bg-muted/30" />
     </div>
+  );
+}
+
+function AddPositionDialog({ userId, assignedBy }: { userId: string; assignedBy: string | null }) {
+  const qc = useQueryClient();
+  const today = new Date().toISOString().slice(0, 10);
+  const [open, setOpen] = useState(false);
+  const [positionId, setPositionId] = useState<string>("");
+  const [legalEntityId, setLegalEntityId] = useState<string>("");
+  const [validFrom, setValidFrom] = useState<string>(today);
+  const [validTo, setValidTo] = useState<string>("");
+  const [isPrimary, setIsPrimary] = useState(false);
+
+  const { data: positions = [] } = useQuery({
+    queryKey: ["positions-list"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("positions")
+        .select("id, code, display_name")
+        .order("display_name");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const { data: entities = [] } = useQuery({
+    queryKey: ["legal-entities-list"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("legal_entities")
+        .select("id, short_code, legal_name")
+        .order("short_code");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const reset = () => {
+    setPositionId(""); setLegalEntityId(""); setValidFrom(today); setValidTo(""); setIsPrimary(false);
+  };
+
+  const create = useMutation({
+    mutationFn: async () => {
+      if (!positionId || !legalEntityId) throw new Error("Velg stilling og selskap");
+      const { error } = await supabase.from("user_positions").insert({
+        user_id: userId,
+        position_id: positionId,
+        legal_entity_id: legalEntityId,
+        valid_from: validFrom,
+        valid_to: validTo || null,
+        is_primary: isPrimary,
+        outlet_scope: "all",
+        outlet_ids: [],
+        assigned_by: assignedBy,
+      } as never);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-user-positions", userId] });
+      toast.success("Stilling lagt til");
+      reset();
+      setOpen(false);
+    },
+    onError: (e: any) => toast.error(e.message ?? "Kunne ikke legge til stilling"),
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) reset(); }}>
+      <DialogTrigger asChild>
+        <Button size="sm"><Plus className="h-4 w-4" /> Legg til stilling</Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Legg til stilling</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div>
+            <Label>Stilling</Label>
+            <Select value={positionId} onValueChange={setPositionId}>
+              <SelectTrigger><SelectValue placeholder="Velg stilling" /></SelectTrigger>
+              <SelectContent>
+                {positions.map((p: any) => (
+                  <SelectItem key={p.id} value={p.id}>{p.display_name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label>Selskap</Label>
+            <Select value={legalEntityId} onValueChange={setLegalEntityId}>
+              <SelectTrigger><SelectValue placeholder="Velg selskap" /></SelectTrigger>
+              <SelectContent>
+                {entities.map((e: any) => (
+                  <SelectItem key={e.id} value={e.id}>{e.short_code} – {e.legal_name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>Fra</Label>
+              <Input type="date" value={validFrom} onChange={(e) => setValidFrom(e.target.value)} />
+            </div>
+            <div>
+              <Label>Til (valgfri)</Label>
+              <Input type="date" value={validTo} onChange={(e) => setValidTo(e.target.value)} />
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Checkbox id="is-primary" checked={isPrimary} onCheckedChange={(v) => setIsPrimary(v === true)} />
+            <Label htmlFor="is-primary" className="cursor-pointer">Primær stilling</Label>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>Avbryt</Button>
+          <Button onClick={() => create.mutate()} disabled={create.isPending}>
+            {create.isPending ? "Lagrer …" : "Legg til"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
