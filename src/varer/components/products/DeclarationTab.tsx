@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { logAudit } from "@/varer/lib/audit";
 import { PdfDeclarationImportDialog } from "@/varer/components/products/PdfDeclarationImportDialog";
+import { ManualDeclarationEditor } from "@/varer/components/products/ManualDeclarationEditor";
 
 type Mode = "auto" | "manual" | "auto_with_overrides";
 
