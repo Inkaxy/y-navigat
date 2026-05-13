@@ -25,6 +25,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { AppBanner } from "@/ordre/components/shell/AppBanner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -1093,15 +1094,20 @@ export default function MatrixPage() {
 
           <div className="flex items-center gap-2 rounded-md border border-brand-bronze/30 bg-card/60 px-2 py-1 text-sm">
             <span className="text-muted-foreground">vis</span>
-            <Input
-              type="number"
-              min={1}
-              max={31}
-              value={daysCount}
-              onChange={(e) => setDaysCount(parseInt(e.target.value || "1", 10))}
-              className="h-7 w-14 px-1 text-center tabular-nums"
+            <Select
+              value={String(daysCount)}
+              onValueChange={(v) => setDaysCount(parseInt(v, 10))}
               disabled={!customerId}
-            />
+            >
+              <SelectTrigger className="h-7 w-16 px-2 text-center tabular-nums">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Array.from({ length: 31 }, (_, i) => i + 1).map((n) => (
+                  <SelectItem key={n} value={String(n)}>{n}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <span className="text-muted-foreground">dager</span>
           </div>
 
