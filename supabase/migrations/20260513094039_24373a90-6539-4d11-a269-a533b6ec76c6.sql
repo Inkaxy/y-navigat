@@ -1,0 +1,67 @@
+DO $$
+DECLARE
+  v_pl_id uuid := '0bed143b-3de0-4ef1-b4b9-65253ef13895';
+  v_le_id uuid := '751709bc-04b3-4449-867d-b97faa9ab373';
+  v_today date := CURRENT_DATE;
+  v_prev date := CURRENT_DATE - 1;
+  rec record;
+  v_existing record;
+  v_unmatched int := 0;
+  v_updated int := 0;
+  v_inserted int := 0;
+  v_closed int := 0;
+  v_skipped int := 0;
+BEGIN
+  CREATE TEMP TABLE _new_prices(display_number int PRIMARY KEY, new_price numeric) ON COMMIT DROP;
+  INSERT INTO _new_prices(display_number, new_price)
+  SELECT * FROM unnest(
+    ARRAY[10069,10098,10099,10139,20000,20001,20002,20003,20004,20005,20006,20007,20008,20009,20010,20011,20012,20013,20015,20016,20017,20018,20019,20020,20021,20022,20023,20024,20025,20026,20027,20028,20029,20030,20031,20032,20033,20034,20035,20036,20037,20038,20039,20040,20041,21008,21009,21010,21012,21013,21016,21018,21019,21020,21022,21023,21026,21027,21028,21030,21031,21035,21036,21037,21038,21039,21040,21041,22000,22001,22002,22003,22004,22009,22010,22014,22019,22020,22021,22022,22023,22500,22501,22502,22503,22504,22505,22506,22507,22508,22510,22511,22512,22513,22514,22515,22516,22517,22518,22519,22520,22521,22522,22523,22524,22525,22526,22527,22528,22529,22530,22531,22532,22533,22535,22536,22537,22538,22541,22542,22543,22544,22545,22546,22547,22548,22549,22550,22551,22552,22553,22554,22555,22556,22557,22558,22559,22560,22561,22562,22563,22564,22565,22566,22568,22569,22573,30000,30001,30002,30003,30004,30005,30006,30007,30008,30009,30010,30011,30012,30013,30014,30015,30016,30017,30018,30019,30020,30021,30022,30023,30024,30025,30026,30027,30028,30029,30030,30031,30032,30033,30034,30035,30036,30037,30038,30039,30040,30041,30042,30045,30046,30047,30048,30049,30050,30051,30052,30053,30054,30055,30056,30057,30058,30059,30060,30061,30062,30063,30064,30065,30066,30067,30068,30069,30070,30071,30072,30073,30074,30075,30076,30077,30078,30079,30080,30081,30082,30083,30084,30085,30086,30087,30088,30089,30090,30091,30092,30093,30094,30095,30096]::int[],
+    ARRAY[33.542,17.217,16.744,4.954,16.125,16.125,16.125,1.075,16.125,21.5,16.125,16.125,16.125,16.125,16.125,21.5,16.125,16.125,16.125,21.5,16.125,16.125,16.125,21.5,21.5,1.075,1.075,16.125,16.125,16.125,12.9,10.75,10.729,271.975,19.35,19.716,16.609,68.53,10.75,10.75,16.544,271.975,21.5,21.5,21.5,61.727,97.61,7.762,7.869,14.351,16.813,42.326,10.793,23.629,10.019,25.596,80.421,25.37,86.591,97.373,80.646,21.5,53.019,88.365,32.25,8.6,32.25,21.5,21.5,21.5,26.875,37.625,43,26.875,26.875,16.125,16.125,26.875,26.875,5.375,43,25.187,17.007,19.35,17.2,21.78,25.736,47.612,22.167,22.167,25.316,10.761,33.217,19.78,32.25,12.943,40.13,15.039,35.475,7.88,5.192,17.921,1.075,16.125,39.227,19.436,10.062,221.213,401.986,541.112,927.585,1082.149,1448.971,12.9,10.965,15.039,17.781,15.147,26.488,26.875,3.225,10.879,20.425,2.15,1.075,11.943,35.83,15.792,17.974,16.125,70.577,46.73,12.264,22.457,8.847,3.225,26.38,79.142,21.5,10.75,10.75,21.5,21.5,55.362,410.553,410.553,232.35,8.6,15.05,20.425,12.9,15.05,15.05,7.525,3.225,3.225,19.35,13.91,15.383,15.545,15.276,13.405,13.405,20.221,17.394,19.554,21.597,19.586,19.522,19.586,21.048,18.576,19.973,9.428,15.05,20.221,15.276,26.757,27.584,19.586,21.145,14.555,17.2,21.188,21.919,18.759,7.418,16.125,18.275,21.5,16.577,17.598,21.145,20.511,21.472,20.221,107.5,21.5,21.5,50.536,45.903,29.982,36.346,35.937,27.026,32.293,22.22,27.724,28.326,20.21,36.636,39.012,25.95,17.383,32.314,30.1,34.4,19.855,31.175,28.38,80.786,30.552,41.097,25.166,31.325,24.703,38.915,20.038,21.5,27.918,5.869,46.547,38.378,40.484,35.228,64.78,51.718,376.25,53.309,22.994,21.5,18.232]::numeric[]
+  ) AS t(display_number, new_price)
+  ON CONFLICT (display_number) DO UPDATE SET new_price = EXCLUDED.new_price;
+
+  FOR rec IN
+    SELECT np.display_number, np.new_price, p.id AS product_id
+    FROM _new_prices np
+    LEFT JOIN public.products p ON p.display_number = np.display_number AND p.legal_entity_id = v_le_id
+  LOOP
+    IF rec.product_id IS NULL THEN
+      v_unmatched := v_unmatched + 1;
+      CONTINUE;
+    END IF;
+
+    SELECT * INTO v_existing
+    FROM public.price_list_items pli
+    WHERE pli.price_list_id = v_pl_id
+      AND pli.product_id = rec.product_id
+      AND pli.valid_from <= v_today
+      AND (pli.valid_to IS NULL OR pli.valid_to >= v_today)
+    ORDER BY pli.valid_from DESC
+    LIMIT 1;
+
+    IF v_existing.id IS NULL THEN
+      INSERT INTO public.price_list_items(price_list_id, product_id, price, valid_from, valid_to)
+      VALUES (v_pl_id, rec.product_id, rec.new_price, v_today, NULL);
+      v_inserted := v_inserted + 1;
+    ELSIF v_existing.valid_from = v_today THEN
+      IF v_existing.price IS DISTINCT FROM rec.new_price THEN
+        UPDATE public.price_list_items SET price = rec.new_price WHERE id = v_existing.id;
+        v_updated := v_updated + 1;
+      ELSE
+        v_skipped := v_skipped + 1;
+      END IF;
+    ELSE
+      IF v_existing.price IS DISTINCT FROM rec.new_price THEN
+        UPDATE public.price_list_items SET valid_to = v_prev WHERE id = v_existing.id;
+        INSERT INTO public.price_list_items(price_list_id, product_id, price, valid_from, valid_to)
+        VALUES (v_pl_id, rec.product_id, rec.new_price, v_today, NULL);
+        v_closed := v_closed + 1;
+        v_inserted := v_inserted + 1;
+      ELSE
+        v_skipped := v_skipped + 1;
+      END IF;
+    END IF;
+  END LOOP;
+
+  RAISE NOTICE '3 NB Butikker import 39-3 missing tail: inserted %, updated %, closed %, skipped %, unmatched %', v_inserted, v_updated, v_closed, v_skipped, v_unmatched;
+END $$;
