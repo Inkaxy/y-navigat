@@ -191,7 +191,7 @@ export default function TicketsList() {
                     <TableCell colSpan={6}><Skeleton className="h-6 w-full" /></TableCell>
                   </TableRow>
                 ))
-              ) : tickets.length === 0 ? (
+              ) : sortedTickets.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center py-12">
                     <Inbox className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
