@@ -60,7 +60,8 @@ Deno.serve(async (req) => {
     const signatureHtml = (sigRow?.value as { html?: string } | null)?.html ?? "";
     const finalHtml = body.body_html + (signatureHtml ? `<br/><br/>${signatureHtml}` : "");
 
-    const url = `${GATEWAY_URL}/me/messages/${encodeURIComponent(ticket.microsoft_message_id)}/reply`;
+    const mailbox = ticket.source_mailbox || "ordre@nottero-bakeri.no";
+    const url = `${GATEWAY_URL}/users/${encodeURIComponent(mailbox)}/messages/${encodeURIComponent(ticket.microsoft_message_id)}/reply`;
     const graphRes = await fetch(url, {
       method: "POST",
       headers: {
