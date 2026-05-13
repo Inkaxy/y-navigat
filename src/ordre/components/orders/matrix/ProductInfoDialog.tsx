@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import DOMPurify from "dompurify";
+import ReactMarkdown from "react-markdown";
 import { Loader2, FileDown, Image as ImageIcon } from "lucide-react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
