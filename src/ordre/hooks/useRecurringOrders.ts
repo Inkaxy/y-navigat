@@ -59,6 +59,10 @@ export function useRecurringSchedules(filter: RecurringScheduleFilter = {}) {
         q = q.eq("is_active", false);
       }
 
+      if (filter.customer_id) {
+        q = q.eq("customer_id", filter.customer_id);
+      }
+
       const { data, error } = await q;
       if (error) throw error;
 
