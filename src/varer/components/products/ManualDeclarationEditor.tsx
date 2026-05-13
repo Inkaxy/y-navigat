@@ -5,8 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Loader2, Save, FileText } from "lucide-react";
+import { RichTextEditor } from "@/ordre/components/shell/RichTextEditor";
 import { toast } from "sonner";
 import { logAudit } from "@/varer/lib/audit";
 
@@ -138,16 +138,18 @@ export function ManualDeclarationEditor({
         <CardHeader>
           <CardTitle className="text-base">Ingrediensdeklarasjon</CardTitle>
         </CardHeader>
-        <CardContent>
-          <Textarea
-            rows={5}
+        <CardContent className="space-y-2">
+          <RichTextEditor
             value={ingredient}
-            disabled={!canWrite}
-            onChange={(e) => setIngredient(e.target.value)}
+            onChange={(html) => {
+              if (!canWrite) return;
+              // Behandle helt tom editor som tom streng
+              setIngredient(html === "<p></p>" ? "" : html);
+            }}
             placeholder="Hvetemel, vann, salt, gjær, …"
           />
-          <p className="mt-1.5 text-xs text-muted-foreground">
-            Merk allergener manuelt med <code>&lt;strong&gt;hvete&lt;/strong&gt;</code> for fet skrift.
+          <p className="text-xs text-muted-foreground">
+            Marker allergener og bruk verktøylinjen for fet skrift, kursiv, lister m.m. — ingen HTML-koder nødvendig.
           </p>
         </CardContent>
       </Card>
