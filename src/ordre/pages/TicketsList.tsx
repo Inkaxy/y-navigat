@@ -174,9 +174,13 @@ export default function TicketsList() {
               <TableRow>
                 <TableHead>Avsender</TableHead>
                 <TableHead>Emne</TableHead>
-                <TableHead>Mottatt</TableHead>
+                <TableHead onClick={() => toggleSort("received")} className="cursor-pointer select-none">
+                  Mottatt<SortIcon k="received" />
+                </TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Prioritet</TableHead>
+                <TableHead onClick={() => toggleSort("priority")} className="cursor-pointer select-none">
+                  Prioritet<SortIcon k="priority" />
+                </TableHead>
                 <TableHead className="w-10"></TableHead>
               </TableRow>
             </TableHeader>
