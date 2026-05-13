@@ -342,13 +342,24 @@ export default function PriceLists() {
     queryKey: ["price-list-items-agg", legalEntityId],
     enabled: view === "simple",
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("price_list_items")
-        .select("price_list_id, product_id, updated_at");
-      if (error) throw error;
+      const PAGE = 1000;
+      let from = 0;
+      const all: { price_list_id: string; product_id: string; updated_at: string }[] = [];
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const { data, error } = await supabase
+          .from("price_list_items")
+          .select("price_list_id, product_id, updated_at")
+          .range(from, from + PAGE - 1);
+        if (error) throw error;
+        const batch = (data ?? []) as typeof all;
+        all.push(...batch);
+        if (batch.length < PAGE) break;
+        from += PAGE;
+      }
       const counts = new Map<string, Set<string>>();
       const updated = new Map<string, string>();
-      for (const it of data ?? []) {
+      for (const it of all) {
         if (!counts.has(it.price_list_id)) counts.set(it.price_list_id, new Set());
         counts.get(it.price_list_id)!.add(it.product_id);
         const cur = updated.get(it.price_list_id);
