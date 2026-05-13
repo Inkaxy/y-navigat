@@ -80,6 +80,7 @@ export function DeclarationTab({ productId, productName, canWrite }: Props) {
         </div>
       )}
       <DeclarationView link={linkQuery.data} productName={productName} canWrite={canWrite} qc={qc} />
+      <CertificationsEditor productId={productId} canWrite={canWrite} />
       <PdfDeclarationImportDialog
         open={importOpen}
         onOpenChange={setImportOpen}
