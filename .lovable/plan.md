@@ -1,33 +1,43 @@
-## Hvorfor er prisen 0,00 kr på Teie?
+## Problem
 
-Teie har prisliste **«3 NB Butikker»**, og varene har faktisk priser der — men alle med `valid_from = 2026-05-13` (i dag). Matrisen viser uke 11.5–17.5, og RPC-en `get_customer_matrix_data` slår opp **én pris per vare for hele uka** ved å bruke `p_date_from` (mandag 11.5) som dato. Siden prisene først er gyldige fra 13.5, finner `get_effective_price` ingenting for 11.5 → `unit_price = null` → "0,00 kr" i sum-kolonnen for hele uka.
+Pris-matrisen for Teie (og enhver kunde uten leverte ordrer) viser ingen rader fordi `get_customer_matrix_data` kun tar med produkter som finnes i `order_lines` for kunden. Teie har 0 ordrer, men 284 linjer i `recurring_order_items` — disse blir ikke synlige, og dermed vises heller ingen priser.
 
-Dette gjelder ikke bare Teie: enhver kunde der priser nettopp er satt vil få 0 kr i matrisen denne uka, helt frem til mandag i neste uke.
+Pris-oppslaget i seg selv fungerer (verifisert mot `3 NB Butikker`).
 
-## Foreslått fix
+## Løsning
 
-Endre `get_customer_matrix_data` slik at pris-oppslaget bruker `GREATEST(p_date_from, CURRENT_DATE)` i stedet for `p_date_from`. 
+Utvid produktfilteret i `get_customer_matrix_data` til også å inkludere produkter fra kundens aktive fastordre.
 
-- For **fremtidige uker**: bruker mandag i den uka (uendret oppførsel).
-- For **inneværende eller tidligere uker**: bruker dagens dato, som plukker opp priser som ble gyldige denne uka.
+### SQL-endring (migrasjon)
 
-Dette matcher hvordan ordreregistrering allerede oppfører seg (priser settes ved ordreopprettelse mot dagens kontekst), og løser problemet uten å rekonstruere prishistorikk per celle.
+I produkter-CTE-en, bytt ut `EXISTS`-blokken med en `OR`:
 
-### Teknisk
-
-I `get_customer_matrix_data`:
 ```sql
-'unit_price', (SELECT ep.price
-               FROM public.get_effective_price(
-                 p.id, p_customer_id, v_default_price_list_id,
-                 GREATEST(p_date_from, CURRENT_DATE)
-               ) ep),
-'price_source', COALESCE((SELECT ep.source FROM public.get_effective_price(
-                 p.id, p_customer_id, v_default_price_list_id,
-                 GREATEST(p_date_from, CURRENT_DATE)
-               ) ep), 'none')
+AND (
+  EXISTS (
+    SELECT 1 FROM order_lines ol
+    JOIN orders o ON o.id = ol.order_id
+    WHERE ol.product_id = p.id
+      AND o.customer_id = p_customer_id
+      AND o.status <> 'cancelled'
+  )
+  OR EXISTS (
+    SELECT 1 FROM recurring_order_items roi
+    JOIN recurring_order_schedules ros ON ros.id = roi.schedule_id
+    WHERE roi.product_id = p.id
+      AND ros.customer_id = p_customer_id
+  )
+)
 ```
 
-Migrasjon: `CREATE OR REPLACE FUNCTION public.get_customer_matrix_data(...)` med samme body, kun pris-datoen byttet ut.
+Resten av funksjonen (pris-oppslag via `GREATEST(p_date_from, CURRENT_DATE)`, turer, eksisterende celler) er uendret.
 
-Ingen frontend-endringer nødvendig.
+## Effekt
+
+- Teie får umiddelbart sine 284 fastordre-produkter i matrisen, med priser fra `3 NB Butikker`.
+- Kunder med både ordrer og fastordre får union av begge (ingen duplikater pga `EXISTS`).
+- Ingen frontend-endringer nødvendig.
+
+## Ingen kodeendringer
+
+Kun én database-migrasjon (`CREATE OR REPLACE FUNCTION public.get_customer_matrix_data ...`).
