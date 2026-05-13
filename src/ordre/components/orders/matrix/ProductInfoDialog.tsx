@@ -102,14 +102,19 @@ export function ProductInfoDialog({ productId, productName, open, onClose }: Pro
             )}
           </div>
 
-          {product?.description && product.description.trim() && (
-            <section>
-              <h3 className="mb-1 font-semibold">Beskrivelse</h3>
-              <div className="prose prose-sm max-w-none text-sm leading-relaxed text-foreground dark:prose-invert">
-                <ReactMarkdown>{product.description}</ReactMarkdown>
-              </div>
-            </section>
-          )}
+          {(() => {
+            const rich = product?.description_rich as { format?: string; text?: string } | null | undefined;
+            const md = (rich?.text ?? product?.description ?? "").trim();
+            if (!md) return null;
+            return (
+              <section>
+                <h3 className="mb-1 font-semibold">Beskrivelse</h3>
+                <div className="prose prose-sm max-w-none text-sm leading-relaxed text-foreground dark:prose-invert">
+                  <ReactMarkdown>{md}</ReactMarkdown>
+                </div>
+              </section>
+            );
+          })()}
 
           {loading && (
             <div className="flex items-center justify-center py-6 text-muted-foreground">
