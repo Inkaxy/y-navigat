@@ -286,11 +286,12 @@ export default function MatrixPage() {
     if (!matrix) return cols;
     for (const date of days) {
       for (const tour of matrix.tours) {
+        if (hiddenTourIds.has(tour.id)) continue;
         if (tourActiveOnDate(tour, date)) cols.push({ date, tour });
       }
     }
     return cols;
-  }, [matrix, days]);
+  }, [matrix, days, hiddenTourIds]);
 
   const visibleDates = useMemo(() => new Set(columns.map((c) => c.date)), [columns]);
 
