@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import { logAudit } from "@/varer/lib/audit";
 import { PdfDeclarationImportDialog } from "@/varer/components/products/PdfDeclarationImportDialog";
 import { ManualDeclarationEditor } from "@/varer/components/products/ManualDeclarationEditor";
+import { CertificationsEditor } from "@/varer/components/products/CertificationsEditor";
 
 type Mode = "auto" | "manual" | "auto_with_overrides";
 
@@ -61,7 +62,12 @@ export function DeclarationTab({ productId, productName, canWrite }: Props) {
     return <div className="flex h-32 items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>;
   }
   if (!linkQuery.data) {
-    return <ManualDeclarationEditor productId={productId} productName={productName} canWrite={canWrite} />;
+    return (
+      <div className="space-y-4">
+        <ManualDeclarationEditor productId={productId} productName={productName} canWrite={canWrite} />
+        <CertificationsEditor productId={productId} canWrite={canWrite} />
+      </div>
+    );
   }
 
   return (
@@ -74,6 +80,7 @@ export function DeclarationTab({ productId, productName, canWrite }: Props) {
         </div>
       )}
       <DeclarationView link={linkQuery.data} productName={productName} canWrite={canWrite} qc={qc} />
+      <CertificationsEditor productId={productId} canWrite={canWrite} />
       <PdfDeclarationImportDialog
         open={importOpen}
         onOpenChange={setImportOpen}

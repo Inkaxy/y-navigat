@@ -5594,7 +5594,10 @@ export type Database = {
         Row: {
           account_reference: string | null
           allows_return: boolean
+          breadscale_value: number | null
           cake_role: string | null
+          cert_nokkelhull: boolean
+          cert_norsk_100: boolean
           code: string
           created_at: string
           created_by: string | null
@@ -5668,7 +5671,10 @@ export type Database = {
         Insert: {
           account_reference?: string | null
           allows_return?: boolean
+          breadscale_value?: number | null
           cake_role?: string | null
+          cert_nokkelhull?: boolean
+          cert_norsk_100?: boolean
           code: string
           created_at?: string
           created_by?: string | null
@@ -5742,7 +5748,10 @@ export type Database = {
         Update: {
           account_reference?: string | null
           allows_return?: boolean
+          breadscale_value?: number | null
           cake_role?: string | null
+          cert_nokkelhull?: boolean
+          cert_norsk_100?: boolean
           code?: string
           created_at?: string
           created_by?: string | null

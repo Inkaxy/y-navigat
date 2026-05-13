@@ -41,7 +41,7 @@ export function ProductInfoDialog({ productId, productName, open, onClose }: Pro
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")
-        .select("id, display_name, image_url, datasheet_url, description, description_rich, manual_ingredient_declaration, manual_allergens_contains, manual_allergens_may_contain, manual_nutrition_per_100g")
+        .select("id, display_name, image_url, datasheet_url, description, description_rich, manual_ingredient_declaration, manual_allergens_contains, manual_allergens_may_contain, manual_nutrition_per_100g, cert_nokkelhull, cert_norsk_100, breadscale_value")
         .eq("id", productId!)
         .maybeSingle();
       if (error) throw error;
@@ -113,6 +113,32 @@ export function ProductInfoDialog({ productId, productName, open, onClose }: Pro
                 <h3 className="mb-1 font-semibold">Beskrivelse</h3>
                 <div className="prose prose-sm max-w-none text-sm leading-relaxed text-foreground dark:prose-invert">
                   <ReactMarkdown>{md}</ReactMarkdown>
+                </div>
+              </section>
+            );
+          })()}
+
+          {(() => {
+            const items: { label: string; tone?: string }[] = [];
+            if (product?.cert_nokkelhull) items.push({ label: "Nøkkelhullet" });
+            if (product?.cert_norsk_100) items.push({ label: "100 % norsk" });
+            if (product?.breadscale_value) {
+              const names = ["", "Fint", "Halvgrovt", "Grovt", "Ekstra grovt"];
+              items.push({ label: `Brødskalaen: ${product.breadscale_value} – ${names[product.breadscale_value] ?? ""}` });
+            }
+            if (items.length === 0) return null;
+            return (
+              <section>
+                <h3 className="mb-1 font-semibold">Merkeordninger</h3>
+                <div className="flex flex-wrap gap-1.5">
+                  {items.map((it) => (
+                    <span
+                      key={it.label}
+                      className="inline-flex items-center rounded-full border border-app/40 bg-app/10 px-2.5 py-0.5 text-xs font-medium text-app-foreground"
+                    >
+                      {it.label}
+                    </span>
+                  ))}
                 </div>
               </section>
             );
