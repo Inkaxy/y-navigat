@@ -1824,6 +1824,12 @@ function MatrixGrid({
           </tr>
         </tfoot>
       </table>
+      <ProductInfoDialog
+        productId={infoProduct?.id ?? null}
+        productName={infoProduct?.name ?? ""}
+        open={!!infoProduct}
+        onClose={() => setInfoProduct(null)}
+      />
     </div>
   );
 }
