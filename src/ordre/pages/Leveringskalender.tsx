@@ -894,72 +894,121 @@ export default function MatrixPage() {
       <div className="px-6 py-5">
         <div className="rounded-[16px] border-2 border-brand-bronze/40 bg-gradient-to-br from-card to-brand-cream/20 p-5 shadow-lg ring-1 ring-inset ring-brand-bronze/10 px-[10px] py-[20px]">
         <div className="flex flex-wrap items-center gap-3">
-          <Popover open={customerCardOpen} onOpenChange={setCustomerCardOpen}>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                size="icon"
-                disabled={!selectedCustomer}
-                aria-label="Vis kundekort"
-                title="Vis kundekort"
-                className="border-2 border-brand-bronze/30 hover:border-brand-bronze/60"
-              >
-                <Eye className="h-4 w-4" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-[360px] p-4" align="start">
+          <Button
+            variant="outline"
+            size="icon"
+            disabled={!selectedCustomer}
+            aria-label="Vis kundekort"
+            title="Vis kundekort"
+            className="border-2 border-brand-bronze/30 hover:border-brand-bronze/60"
+            onClick={() => setCustomerCardOpen(true)}
+          >
+            <Eye className="h-4 w-4" />
+          </Button>
+          <Dialog open={customerCardOpen} onOpenChange={setCustomerCardOpen}>
+            <DialogContent className="max-w-3xl">
+              <DialogHeader>
+                <DialogTitle className="font-display text-xl">
+                  {selectedCustomer
+                    ? `Kunde: ${selectedCustomer.customer_number} ${selectedCustomer.display_name}`
+                    : "Kundekort"}
+                </DialogTitle>
+              </DialogHeader>
               {selectedCustomer ? (
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-baseline justify-between gap-2">
-                    <div className="font-display text-base font-semibold">{selectedCustomer.display_name}</div>
-                    <span className="tabular-nums text-muted-foreground">{selectedCustomer.customer_number}</span>
-                  </div>
-                  {selectedCustomer.organization_number && (
-                    <div className="text-muted-foreground">Org.nr: <span className="tabular-nums text-foreground">{selectedCustomer.organization_number}</span></div>
-                  )}
-                  {selectedCustomer.primary_contact_name && (
-                    <div>{selectedCustomer.primary_contact_name}</div>
-                  )}
-                  {selectedCustomer.primary_contact_email && (
-                    <div className="truncate text-muted-foreground">{selectedCustomer.primary_contact_email}</div>
-                  )}
-                  {(selectedCustomer.delivery_address_line1 || selectedCustomer.delivery_postal_code) && (
-                    <div className="rounded-md border border-border bg-muted/40 p-2 text-xs">
-                      <div className="mb-1 font-medium uppercase tracking-wide text-muted-foreground">Leveringsadresse</div>
+                <Tabs defaultValue="info" className="w-full">
+                  <TabsList className="flex w-full flex-wrap justify-start">
+                    <TabsTrigger value="info">Navn, nummer og kontaktinfo</TabsTrigger>
+                    <TabsTrigger value="addresses">Adresser</TabsTrigger>
+                    <TabsTrigger value="invoice">Faktura- og betalingsinfo</TabsTrigger>
+                    <TabsTrigger value="notes">Notater</TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="info" className="mt-4 grid gap-4 sm:grid-cols-2">
+                    <CardField label="Kundenummer" value={selectedCustomer.customer_number} mono />
+                    <CardField label="Navn" value={selectedCustomer.display_name} />
+                    <CardField label="Organisasjonsnummer" value={selectedCustomer.organization_number} mono />
+                    <CardField label="Kontaktperson" value={selectedCustomer.primary_contact_name} />
+                    <CardField label="E-post" value={selectedCustomer.primary_contact_email} />
+                    <CardField label="Referanse" value={selectedCustomer.custom_reference} />
+                    <CardField label="Status" value={selectedCustomer.status} />
+                    {selectedCustomer.credit_hold && (
+                      <div className="sm:col-span-2">
+                        <Badge variant="destructive">
+                          Kredittsperre{selectedCustomer.credit_hold_reason ? `: ${selectedCustomer.credit_hold_reason}` : ""}
+                        </Badge>
+                      </div>
+                    )}
+                  </TabsContent>
+
+                  <TabsContent value="addresses" className="mt-4 space-y-4">
+                    <div className="rounded-md border border-border bg-muted/30 p-3 text-sm">
+                      <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Leveringsadresse
+                      </div>
                       {selectedCustomer.delivery_address_line1 && <div>{selectedCustomer.delivery_address_line1}</div>}
                       {selectedCustomer.delivery_address_line2 && <div>{selectedCustomer.delivery_address_line2}</div>}
                       <div>
-                        {[selectedCustomer.delivery_postal_code, selectedCustomer.delivery_city].filter(Boolean).join(" ")}
+                        {[selectedCustomer.delivery_postal_code, selectedCustomer.delivery_city]
+                          .filter(Boolean)
+                          .join(" ") || <span className="text-muted-foreground">—</span>}
                       </div>
+                      {selectedCustomer.delivery_country && (
+                        <div className="text-muted-foreground">{selectedCustomer.delivery_country}</div>
+                      )}
                     </div>
-                  )}
-                  {selectedCustomer.delivery_instructions && (
-                    <div className="rounded-md border border-brand-bronze/30 bg-brand-bronze/5 p-2 text-xs">
-                      <div className="mb-1 font-medium uppercase tracking-wide text-brand-bronze">Leveringsinstruks</div>
-                      {selectedCustomer.delivery_instructions}
-                    </div>
-                  )}
-                  {selectedCustomer.credit_hold && (
-                    <Badge variant="destructive">Kredittsperre{selectedCustomer.credit_hold_reason ? `: ${selectedCustomer.credit_hold_reason}` : ""}</Badge>
-                  )}
-                  <div className="pt-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        setCustomerCardOpen(false);
-                        navigate(`/kunder/kundeliste/${selectedCustomer.id}`);
-                      }}
-                    >
-                      Åpne kundekort
-                    </Button>
-                  </div>
-                </div>
+                    {selectedCustomer.delivery_instructions && (
+                      <div className="rounded-md border border-brand-bronze/30 bg-brand-bronze/5 p-3 text-sm">
+                        <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-brand-bronze">
+                          Leveringsinstruks
+                        </div>
+                        {selectedCustomer.delivery_instructions}
+                      </div>
+                    )}
+                  </TabsContent>
+
+                  <TabsContent value="invoice" className="mt-4 grid gap-4 sm:grid-cols-2">
+                    <CardField
+                      label="Fakturamottaker (kunde-ID)"
+                      value={selectedCustomer.invoice_recipient_customer_id}
+                      mono
+                    />
+                    <CardField
+                      label="Standard prisliste"
+                      value={selectedCustomer.default_price_list_id}
+                      mono
+                    />
+                    <CardField
+                      label="Påkrevd referanse på faktura"
+                      value={selectedCustomer.enforce_custom_reference ? "Ja" : "Nei"}
+                    />
+                  </TabsContent>
+
+                  <TabsContent value="notes" className="mt-4">
+                    <p className="text-sm text-muted-foreground">
+                      Notater redigeres på det fulle kundekortet.
+                    </p>
+                  </TabsContent>
+                </Tabs>
               ) : (
                 <div className="text-sm text-muted-foreground">Velg en kunde først.</div>
               )}
-            </PopoverContent>
-          </Popover>
+              <DialogFooter>
+                {selectedCustomer && (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setCustomerCardOpen(false);
+                      navigate(`/kunder/kundeliste/${selectedCustomer.id}`);
+                    }}
+                  >
+                    Åpne full side
+                  </Button>
+                )}
+                <Button onClick={() => setCustomerCardOpen(false)}>Lukk</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
 
           <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
             <PopoverTrigger asChild>
