@@ -117,64 +117,84 @@ export function ProductInfoDialog({ productId, productName, open, onClose }: Pro
             </div>
           )}
 
-          {!loading && !linkQuery.data && (
-            <p className="text-sm text-muted-foreground">
-              Ingen oppskrift koblet til dette produktet — deklarasjon ikke tilgjengelig.
-            </p>
-          )}
+          {(() => {
+            if (loading) return null;
 
-          {!loading && computed && (
-            <>
-              <section>
-                <h3 className="mb-1 font-semibold">Ingredienser</h3>
-                <div
-                  className="text-sm leading-relaxed text-foreground"
-                  dangerouslySetInnerHTML={{
-                    __html: DOMPurify.sanitize(
-                      computed.ingredient_declaration_html || "<em>Ingen ingredienser å vise.</em>",
-                      { USE_PROFILES: { html: true } },
-                    ),
-                  }}
-                />
-              </section>
+            // Bygg "effektiv" deklarasjon: prefer computed (oppskrift), fall back til manuelle felter på produktet.
+            const manualIng = product?.manual_ingredient_declaration?.trim() || null;
+            const manualContains = (product?.manual_allergens_contains ?? []) as string[];
+            const manualMay = (product?.manual_allergens_may_contain ?? []) as string[];
+            const manualNut = (product?.manual_nutrition_per_100g ?? null) as Record<string, number> | null;
 
-              {(computed.allergens_contains?.length ?? 0) > 0 && (
-                <section>
-                  <h3 className="mb-1 font-semibold">Allergener</h3>
-                  <p className="text-sm">{computed.allergens_contains!.join(", ")}</p>
-                </section>
-              )}
+            const effIngredient = computed?.ingredient_declaration_html || manualIng;
+            const effContains = computed?.allergens_contains?.length ? computed.allergens_contains : manualContains;
+            const effMay = computed?.allergens_may_contain?.length ? computed.allergens_may_contain : manualMay;
+            const effNutrition = computed?.nutrition_per_100g ?? manualNut;
+            const isManual = !computed && (manualIng || manualContains.length || manualMay.length || manualNut);
 
-              {(computed.allergens_may_contain?.length ?? 0) > 0 && (
-                <section>
-                  <h3 className="mb-1 font-semibold">Kan inneholde spor av</h3>
-                  <p className="text-sm">{computed.allergens_may_contain!.join(", ")}</p>
-                </section>
-              )}
+            if (!computed && !isManual) {
+              return (
+                <p className="text-sm text-muted-foreground">
+                  Ingen oppskrift eller manuell deklarasjon registrert for dette produktet.
+                </p>
+              );
+            }
 
-              <section>
-                <h3 className="mb-1 font-semibold">Næringsinnhold pr 100 g</h3>
-                {computed.nutrition_per_100g ? (
-                  <table className="w-full text-sm">
-                    <tbody>
-                      {NUTRITION_FIELDS.map((f) => {
-                        const v = computed.nutrition_per_100g?.[f.key];
-                        if (v == null) return null;
-                        return (
-                          <tr key={f.key} className="border-b border-border/50 last:border-0">
-                            <td className="py-1">{f.label}</td>
-                            <td className="py-1 text-right tabular-nums">{v}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                ) : (
-                  <p className="text-sm text-muted-foreground">Ingen næringsdata.</p>
+            return (
+              <>
+                {effIngredient && (
+                  <section>
+                    <h3 className="mb-1 font-semibold">Ingredienser</h3>
+                    <div
+                      className="text-sm leading-relaxed text-foreground"
+                      dangerouslySetInnerHTML={{
+                        __html: DOMPurify.sanitize(effIngredient, { USE_PROFILES: { html: true } }),
+                      }}
+                    />
+                    {isManual && (
+                      <p className="mt-1 text-[11px] text-muted-foreground">Lagt inn manuelt</p>
+                    )}
+                  </section>
                 )}
-              </section>
-            </>
-          )}
+
+                {effContains.length > 0 && (
+                  <section>
+                    <h3 className="mb-1 font-semibold">Allergener</h3>
+                    <p className="text-sm">{effContains.join(", ")}</p>
+                  </section>
+                )}
+
+                {effMay.length > 0 && (
+                  <section>
+                    <h3 className="mb-1 font-semibold">Kan inneholde spor av</h3>
+                    <p className="text-sm">{effMay.join(", ")}</p>
+                  </section>
+                )}
+
+                <section>
+                  <h3 className="mb-1 font-semibold">Næringsinnhold pr 100 g</h3>
+                  {effNutrition ? (
+                    <table className="w-full text-sm">
+                      <tbody>
+                        {NUTRITION_FIELDS.map((f) => {
+                          const v = effNutrition?.[f.key];
+                          if (v == null) return null;
+                          return (
+                            <tr key={f.key} className="border-b border-border/50 last:border-0">
+                              <td className="py-1">{f.label}</td>
+                              <td className="py-1 text-right tabular-nums">{v}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Ingen næringsdata.</p>
+                  )}
+                </section>
+              </>
+            );
+          })()}
         </div>
 
         <DialogFooter className="gap-2 sm:gap-2">
