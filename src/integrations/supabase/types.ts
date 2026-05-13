@@ -8300,6 +8300,13 @@ export type Database = {
           status: string
         }[]
       }
+      get_ordrekontor_assignees: {
+        Args: never
+        Returns: {
+          display_name: string
+          id: string
+        }[]
+      }
       get_raw_material_purchase_stats: {
         Args: { p_raw_material_id: string }
         Returns: {
