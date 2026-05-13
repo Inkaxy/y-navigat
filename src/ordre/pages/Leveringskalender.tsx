@@ -83,6 +83,8 @@ import { useUserAccess } from "@/ordre/hooks/useUserAccess";
 import { useWeatherForecast, type WeatherMap } from "@/ordre/hooks/useWeatherForecast";
 import { WeatherCell } from "@/ordre/components/orders/WeatherCell";
 import { useRecurringGhost, type RecurringGhostMap } from "@/ordre/hooks/useRecurringGhost";
+import { useRecurringSchedules, type RecurringScheduleWithCustomer } from "@/ordre/hooks/useRecurringOrders";
+import { RecurringScheduleDialog } from "@/ordre/components/orders/RecurringScheduleDialog";
 import {
   useDeliveryPausesForCustomer,
   isPaused,
