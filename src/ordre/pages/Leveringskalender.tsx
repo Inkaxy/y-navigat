@@ -469,7 +469,7 @@ export default function MatrixPage() {
       );
     }
     return { rowTotals, colTotals, grand };
-  }, [allProducts, columns, edits, existingQty]);
+  }, [allProducts, columns, edits, existingQty, ghostMap]);
 
   async function handleSave() {
     if (!customerId || dirtyCount === 0) return;
