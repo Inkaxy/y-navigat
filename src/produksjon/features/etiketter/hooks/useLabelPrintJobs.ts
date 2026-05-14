@@ -21,13 +21,17 @@ export interface LabelPrintJob {
 export const recentLabelJobsKey = (deptId: string | undefined) =>
   ["label_print_jobs", "recent", deptId ?? "none"] as const;
 
-export function useRecentLabelJobs(deptId: string | undefined, limit = 20) {
+export function useRecentLabelJobs(
+  deptId: string | undefined,
+  legalEntityId: string | undefined,
+  limit = 20,
+) {
   const qc = useQueryClient();
 
   useEffect(() => {
-    if (!deptId) return;
+    if (!deptId || !legalEntityId) return;
     const channel = supabase
-      .channel(`label-jobs-${deptId}`)
+      .channel(`${legalEntityId}:label-jobs:${deptId}`)
       .on(
         "postgres_changes",
         {
@@ -44,7 +48,7 @@ export function useRecentLabelJobs(deptId: string | undefined, limit = 20) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [deptId, qc]);
+  }, [deptId, legalEntityId, qc]);
 
   return useQuery({
     queryKey: recentLabelJobsKey(deptId),
