@@ -23,25 +23,19 @@ export function useTicketPresence(ticketId: string | undefined) {
     let channel: ReturnType<typeof supabase.channel> | null = null;
 
     (async () => {
-      // Hent display_name (best-effort) + ticketens legal_entity_id (kreves av RLS-policy)
-      const [{ data: profile }, { data: ticket }] = await Promise.all([
-        supabase
-          .from("users_public")
-          .select("display_name, first_name")
-          .eq("id", user.id)
-          .maybeSingle(),
-        supabase
-          .from("tickets")
-          .select("legal_entity_id")
-          .eq("id", ticketId)
-          .maybeSingle(),
-      ]);
+      // Hent display_name (best-effort). Tickets er foreløpig kun NB (single-LE).
+      const NB_LEGAL_ENTITY_ID = "751709bc-04b3-4449-867d-b97faa9ab373";
+      const { data: profile } = await supabase
+        .from("users_public")
+        .select("display_name, first_name")
+        .eq("id", user.id)
+        .maybeSingle();
       const displayName =
         profile?.display_name ??
         profile?.first_name ??
         user.email ??
         "Ukjent bruker";
-      const legalEntityId = (ticket?.legal_entity_id as string | undefined) ?? null;
+      const legalEntityId = NB_LEGAL_ENTITY_ID;
 
       if (cancelled || !legalEntityId) return;
 
