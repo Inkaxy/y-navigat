@@ -22,6 +22,7 @@ import { EmailReceiveCard } from "@/ordre/components/shell/EmailReceiveCard";
 import { supabase } from "@/integrations/supabase/client";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { RichTextEditor, type RichTextEditorHandle } from "@/ordre/components/shell/RichTextEditor";
+import { AiSettingsCard } from "@/ordre/components/shell/AiSettingsCard";
 
 import { useToast } from "@/components/ui/use-toast";
 
