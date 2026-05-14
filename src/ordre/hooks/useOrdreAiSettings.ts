@@ -87,7 +87,7 @@ export function useOrdreAiSettings() {
       for (const row of rows) {
         const { error: e } = await supabase
           .from("platform_settings")
-          .upsert([row as any], { onConflict: "category,key" });
+          .upsert([row as any], { onConflict: "key" });
         if (e) throw e;
       }
       setSettings(merged);
