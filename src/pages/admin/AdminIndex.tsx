@@ -23,9 +23,9 @@ const AREAS: Area[] = [
   { to: "/admin/outlets",      title: "Outlets",      desc: "Butikker, bakerier og produksjonssteder.",    icon: Store, active: true },
   { to: "/admin/stillinger",   title: "Stillinger",   desc: "Stillingsmaler og kategorier.",               icon: Briefcase, active: true },
   { to: "/admin/apper",        title: "Apper",        desc: "Registrerte NBOS-apper og status.",           icon: AppWindow, active: true },
-  { to: "/admin/integrasjoner",title: "Integrasjoner",desc: "Eksterne systemer og API-koblinger.",         icon: Plug, active: false },
-  { to: "/admin/helsesenter",  title: "Helsesenter",  desc: "Systemstatus og diagnostikk.",                icon: HeartPulse, active: false },
-  { to: "/admin/audit",        title: "Audit",        desc: "Endringslogg og sikkerhetshendelser.",        icon: ScrollText, active: false },
+  { to: "/admin/integrasjoner",title: "Integrasjoner",desc: "Eksterne systemer og API-koblinger.",         icon: Plug, active: true },
+  { to: "/admin/helsesenter",  title: "Helsesenter",  desc: "Systemstatus og diagnostikk.",                icon: HeartPulse, active: true },
+  { to: "/admin/audit",        title: "Audit",        desc: "Endringslogg og sikkerhetshendelser.",        icon: ScrollText, active: true },
 ];
 
 export default function AdminIndex() {
