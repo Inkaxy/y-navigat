@@ -20,6 +20,11 @@ import AppPlaceholder from "./pages/apps/AppPlaceholder";
 import { AppAccessGuard } from "./components/auth/AppAccessGuard";
 import AdminIndex from "./pages/admin/AdminIndex";
 import AdminPlaceholder from "./pages/admin/AdminPlaceholder";
+import Integrasjoner from "./pages/admin/Integrasjoner";
+import IntegrasjonDetalj from "./pages/admin/IntegrasjonDetalj";
+import TripletexIntegrasjon from "./pages/admin/TripletexIntegrasjon";
+import Helsesenter from "./pages/admin/Helsesenter";
+import Audit from "./pages/admin/Audit";
 import Selskaper from "./pages/admin/Selskaper";
 import Brukere from "./pages/admin/Brukere";
 import BrukerDetalj from "./pages/admin/BrukerDetalj";
@@ -185,9 +190,11 @@ const App = () => (
               <Route path="/admin/stillinger" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><Stillinger /></AppAccessGuard></Shell>} />
               <Route path="/admin/stillinger/:id" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><StillingDetalj /></AppAccessGuard></Shell>} />
               <Route path="/admin/apper" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><Apper /></AppAccessGuard></Shell>} />
-              <Route path="/admin/integrasjoner" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><AdminPlaceholder title="Integrasjoner" phase="1C" /></AppAccessGuard></Shell>} />
-              <Route path="/admin/helsesenter" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><AdminPlaceholder title="Helsesenter" phase="1C" /></AppAccessGuard></Shell>} />
-              <Route path="/admin/audit" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><AdminPlaceholder title="Audit" phase="1C" /></AppAccessGuard></Shell>} />
+              <Route path="/admin/integrasjoner" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><Integrasjoner /></AppAccessGuard></Shell>} />
+              <Route path="/admin/integrasjoner/tripletex" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><TripletexIntegrasjon /></AppAccessGuard></Shell>} />
+              <Route path="/admin/integrasjoner/:integrationType" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><IntegrasjonDetalj /></AppAccessGuard></Shell>} />
+              <Route path="/admin/helsesenter" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><Helsesenter /></AppAccessGuard></Shell>} />
+              <Route path="/admin/audit" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><Audit /></AppAccessGuard></Shell>} />
               {/* Varer embed routes — frosset kontrakt, INGEN AppShell */}
               <Route path="/embed/v1/kakebygger/:categoryId" element={<VarerAppProvider><VarerCakeBuilderEmbed /></VarerAppProvider>} />
               <Route path="/embed/kakebygger/:categoryId" element={<VarerAppProvider><VarerCakeBuilderEmbed /></VarerAppProvider>} />
