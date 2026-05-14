@@ -122,7 +122,7 @@ export default function EtiketterPage() {
     () => filteredRows?.map((r) => r.product_id) ?? [],
     [filteredRows],
   );
-  const { data: productProfiles } = useProductLabelProfiles(productIds);
+  const { data: productProfiles } = useProductLabelProfiles(productIds, legalEntityId || undefined);
   const activeProfilesCount = useMemo(
     () => (profiles ?? []).filter((p) => p.status === "active").length,
     [profiles],
@@ -406,7 +406,7 @@ export default function EtiketterPage() {
         }}
       />
 
-      <RecentLabelJobs deptId={recentDeptId} department={recentDept} />
+      <RecentLabelJobs deptId={recentDeptId} department={recentDept} legalEntityId={legalEntityId || undefined} />
 
       <PrintLabelDialog
         open={printOpen}

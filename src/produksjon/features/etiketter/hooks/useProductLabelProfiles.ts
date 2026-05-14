@@ -6,7 +6,10 @@ import { supabase } from "@/integrations/supabase/client";
  * Henter label_profile_id for et sett av produkter.
  * Returnerer Map<product_id, label_profile_id | null>.
  */
-export function useProductLabelProfiles(productIds: string[] | undefined) {
+export function useProductLabelProfiles(
+  productIds: string[] | undefined,
+  legalEntityId: string | undefined,
+) {
   const qc = useQueryClient();
   const ids = (productIds ?? []).slice().sort();
   const key = ["product_label_profiles", ids.join(",")] as const;
@@ -32,9 +35,9 @@ export function useProductLabelProfiles(productIds: string[] | undefined) {
 
   // Realtime: invalidate hvis label_profile_id endres for et av produktene
   useEffect(() => {
-    if (ids.length === 0) return;
+    if (ids.length === 0 || !legalEntityId) return;
     const channel = supabase
-      .channel(`product-label-profiles:${ids.length}`)
+      .channel(`${legalEntityId}:product-label-profiles:${ids.length}`)
       .on(
         "postgres_changes",
         {
@@ -54,7 +57,7 @@ export function useProductLabelProfiles(productIds: string[] | undefined) {
       supabase.removeChannel(channel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ids.join(",")]);
+  }, [ids.join(","), legalEntityId]);
 
   return query;
 }

@@ -8841,6 +8841,7 @@ export type Database = {
         Returns: string
       }
       user_has_invoice_access: { Args: never; Returns: boolean }
+      user_has_legal_entity_access: { Args: { _le: string }; Returns: boolean }
       validate_order_delivery_rules: {
         Args: {
           p_customer_id: string

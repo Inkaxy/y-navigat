@@ -154,15 +154,29 @@ export function useOrderRealtime(orderId: string | undefined) {
   const qc = useQueryClient();
   const [remoteUpdated, setRemoteUpdated] = useState<{ at: string; by: string | null } | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [legalEntityId, setLegalEntityId] = useState<string | null>(null);
 
   useEffect(() => {
     void supabase.auth.getUser().then(({ data }) => setCurrentUserId(data.user?.id ?? null));
   }, []);
 
   useEffect(() => {
-    if (!orderId) return;
+    if (!orderId) {
+      setLegalEntityId(null);
+      return;
+    }
+    void supabase
+      .from("orders")
+      .select("legal_entity_id")
+      .eq("id", orderId)
+      .maybeSingle()
+      .then(({ data }) => setLegalEntityId((data?.legal_entity_id as string | undefined) ?? null));
+  }, [orderId]);
+
+  useEffect(() => {
+    if (!orderId || !legalEntityId) return;
     const channel = supabase
-      .channel(`order:${orderId}`)
+      .channel(`${legalEntityId}:order:${orderId}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "orders", filter: `id=eq.${orderId}` },
@@ -196,7 +210,7 @@ export function useOrderRealtime(orderId: string | undefined) {
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [orderId, qc, currentUserId]);
+  }, [orderId, qc, currentUserId, legalEntityId]);
 
   function acknowledge() {
     setRemoteUpdated(null);

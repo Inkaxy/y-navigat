@@ -23,7 +23,8 @@ export function useTicketPresence(ticketId: string | undefined) {
     let channel: ReturnType<typeof supabase.channel> | null = null;
 
     (async () => {
-      // Hent display_name (best-effort)
+      // Hent display_name (best-effort). Tickets er foreløpig kun NB (single-LE).
+      const NB_LEGAL_ENTITY_ID = "751709bc-04b3-4449-867d-b97faa9ab373";
       const { data: profile } = await supabase
         .from("users_public")
         .select("display_name, first_name")
@@ -34,10 +35,11 @@ export function useTicketPresence(ticketId: string | undefined) {
         profile?.first_name ??
         user.email ??
         "Ukjent bruker";
+      const legalEntityId = NB_LEGAL_ENTITY_ID;
 
-      if (cancelled) return;
+      if (cancelled || !legalEntityId) return;
 
-      channel = supabase.channel(`ticket-presence:${ticketId}`, {
+      channel = supabase.channel(`${legalEntityId}:ticket-presence:${ticketId}`, {
         config: { presence: { key: user.id } },
       });
 

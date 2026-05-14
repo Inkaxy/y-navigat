@@ -62,10 +62,12 @@ export function useWizardConfig(args: {
     }, 500);
   };
 
+  const legalEntityId = query.data?.category?.legal_entity_id ?? null;
+
   useEffect(() => {
-    if (!categoryId || !priceListId) return;
+    if (!categoryId || !priceListId || !legalEntityId) return;
     const channel = supabase
-      .channel(`cake-builder-${categoryId}-${priceListId}`)
+      .channel(`${legalEntityId}:cake-builder:${categoryId}:${priceListId}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "cake_categories", filter: `id=eq.${categoryId}` },
@@ -123,7 +125,7 @@ export function useWizardConfig(args: {
       supabase.removeChannel(channel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [categoryId, priceListId]);
+  }, [categoryId, priceListId, legalEntityId]);
 
   return query;
 }

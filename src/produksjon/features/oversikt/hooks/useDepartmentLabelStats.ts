@@ -113,7 +113,7 @@ export function useOversiktRealtime(
   useEffect(() => {
     if (!legalEntityId || departmentIds.length === 0) return;
     const channel = supabase
-      .channel(`oversikt-${legalEntityId}`)
+      .channel(`${legalEntityId}:oversikt`)
       .on(
         "postgres_changes",
         {
