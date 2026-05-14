@@ -30,7 +30,7 @@ export function usePackingAreas(legalEntityId: string | undefined) {
   useEffect(() => {
     if (!legalEntityId) return;
     const channel = supabase
-      .channel(`packing_areas:${legalEntityId}`)
+      .channel(`${legalEntityId}:packing-areas`)
       .on(
         "postgres_changes",
         {
