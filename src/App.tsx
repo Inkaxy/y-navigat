@@ -88,6 +88,7 @@ import M365Callback from "@/ordre/pages/M365Callback";
 import OrdrePortalTest from "@/ordre/pages/PortalTest";
 import OrdreTicketsList from "@/ordre/pages/TicketsList";
 import OrdreTicketDetail from "@/ordre/pages/TicketDetail";
+import OrdreAiForslag from "@/ordre/pages/AiForslag";
 
 import { RavarerProvider } from "@/ravarer/context/RavarerContext";
 import RavarerVareliste from "@/ravarer/pages/Vareliste";
