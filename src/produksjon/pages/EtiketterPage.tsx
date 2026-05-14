@@ -406,7 +406,7 @@ export default function EtiketterPage() {
         }}
       />
 
-      <RecentLabelJobs deptId={recentDeptId} department={recentDept} />
+      <RecentLabelJobs deptId={recentDeptId} department={recentDept} legalEntityId={legalEntityId || undefined} />
 
       <PrintLabelDialog
         open={printOpen}
