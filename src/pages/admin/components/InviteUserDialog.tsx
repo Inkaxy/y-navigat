@@ -110,7 +110,21 @@ export function InviteUserDialog({ open, onOpenChange, onInvited }: Props) {
       });
       return;
     }
-    toast.success(`Invitasjon sendt til ${email}`);
+    const d = data as { email_sent?: boolean; email_error?: string | null; sent_from?: string | null; invite_url?: string | null };
+    if (d.email_sent) {
+      toast.success(`Invitasjon sendt til ${email}`, {
+        description: d.sent_from ? `Fra ${d.sent_from}` : undefined,
+      });
+    } else {
+      toast.warning("Bruker opprettet, men e-post ble ikke sendt", {
+        description: d.email_error ?? "Kopier lenken under og send manuelt.",
+        duration: 20000,
+      });
+      if (d.invite_url) {
+        try { await navigator.clipboard.writeText(d.invite_url); } catch { /* ignore */ }
+        toast.info("Invitasjons-lenke kopiert til utklippstavlen", { duration: 10000 });
+      }
+    }
     onOpenChange(false);
     onInvited?.();
   };
