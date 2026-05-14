@@ -115,8 +115,8 @@ export default function TripletexIntegrasjon() {
               )}
 
               <div className="space-y-2">
-                <SecretRow label="Consumer token" present={!!c.consumer_token_encrypted} />
-                <SecretRow label="Employee token" present={!!c.employee_token_encrypted} />
+                <SecretRow label="Consumer token" present={!!c.has_consumer_token} />
+                <SecretRow label="Employee token" present={!!c.has_employee_token} />
               </div>
             </CardContent>
           </Card>
