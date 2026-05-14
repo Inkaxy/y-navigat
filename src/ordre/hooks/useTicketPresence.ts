@@ -23,21 +23,29 @@ export function useTicketPresence(ticketId: string | undefined) {
     let channel: ReturnType<typeof supabase.channel> | null = null;
 
     (async () => {
-      // Hent display_name (best-effort)
-      const { data: profile } = await supabase
-        .from("users_public")
-        .select("display_name, first_name")
-        .eq("id", user.id)
-        .maybeSingle();
+      // Hent display_name (best-effort) + ticketens legal_entity_id (kreves av RLS-policy)
+      const [{ data: profile }, { data: ticket }] = await Promise.all([
+        supabase
+          .from("users_public")
+          .select("display_name, first_name")
+          .eq("id", user.id)
+          .maybeSingle(),
+        supabase
+          .from("tickets")
+          .select("legal_entity_id")
+          .eq("id", ticketId)
+          .maybeSingle(),
+      ]);
       const displayName =
         profile?.display_name ??
         profile?.first_name ??
         user.email ??
         "Ukjent bruker";
+      const legalEntityId = (ticket?.legal_entity_id as string | undefined) ?? null;
 
-      if (cancelled) return;
+      if (cancelled || !legalEntityId) return;
 
-      channel = supabase.channel(`ticket-presence:${ticketId}`, {
+      channel = supabase.channel(`${legalEntityId}:ticket-presence:${ticketId}`, {
         config: { presence: { key: user.id } },
       });
 
