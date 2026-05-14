@@ -188,7 +188,10 @@ export default function OrdreInnstillingerPage() {
       {/* Kort 3: E-post-mottak */}
       <EmailReceiveCard accountConnected={!!account?.is_connected} />
 
-      {/* Kort 4: Mal-editor */}
+      {/* Kort 4: AI-analyse */}
+      <AiSettingsCard />
+
+      {/* Kort 5: Mal-editor */}
       <TemplateEditorCard />
 
       <SendTestEmailDialog
