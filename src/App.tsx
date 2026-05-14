@@ -88,6 +88,7 @@ import M365Callback from "@/ordre/pages/M365Callback";
 import OrdrePortalTest from "@/ordre/pages/PortalTest";
 import OrdreTicketsList from "@/ordre/pages/TicketsList";
 import OrdreTicketDetail from "@/ordre/pages/TicketDetail";
+import OrdreAiForslag from "@/ordre/pages/AiForslag";
 
 import { RavarerProvider } from "@/ravarer/context/RavarerContext";
 import RavarerVareliste from "@/ravarer/pages/Vareliste";
@@ -284,7 +285,7 @@ const App = () => (
               <Route path="/ordre/leveringskalender" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreLeveringskalender /></AppAccessGuard></Shell>} />
               <Route path="/ordre/ticket" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreTicketsList /></AppAccessGuard></Shell>} />
               <Route path="/ordre/ticket/:id" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreTicketDetail /></AppAccessGuard></Shell>} />
-              <Route path="/ordre/ai-forslag" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdrePlaceholder title="AI-forslag" subtitle="Kommer i en senere fase" /></AppAccessGuard></Shell>} />
+              <Route path="/ordre/ai-forslag" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreAiForslag /></AppAccessGuard></Shell>} />
               <Route path="/ordre/avvik" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdrePlaceholder title="Avvik" subtitle="Kommer i en senere fase" /></AppAccessGuard></Shell>} />
               <Route path="/ordre/innstillinger" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreInnstillinger /></AppAccessGuard></Shell>} />
               <Route path="/ordre/innstillinger/m365-callback" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><M365Callback /></AppAccessGuard></Shell>} />

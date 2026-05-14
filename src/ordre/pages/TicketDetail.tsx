@@ -27,6 +27,7 @@ import {
   useTicketReplies, useSendTicketReply, useOrdrekontorAssignees,
 } from "@/ordre/hooks/useTicketReplies";
 import { TicketPresenceBanner } from "@/ordre/components/shell/TicketPresenceBanner";
+import { AiSuggestionCard } from "@/ordre/components/orders/AiSuggestionCard";
 
 const UNASSIGNED = "__unassigned__";
 
@@ -207,6 +208,20 @@ export default function TicketDetail() {
             </div>
           </CardContent>
         </Card>
+
+        {/* AI-analyse */}
+        <AiSuggestionCard
+          ticketId={ticket.id}
+          ticketStatus={ticket.status}
+          hasOrder={!!ticket.related_order_id}
+          analyzedAt={(ticket as any).ai_analyzed_at ?? null}
+          suggestion={(ticket as any).ai_suggestion ?? null}
+          provider={(ticket as any).ai_provider ?? null}
+          model={(ticket as any).ai_model ?? null}
+          costUsd={(ticket as any).ai_cost_usd ?? null}
+          error={(ticket as any).ai_error ?? null}
+          confidence={(ticket as any).ai_confidence_score ?? null}
+        />
 
         {/* E-post-tråd */}
         <Card>
