@@ -21,17 +21,23 @@ export function useTripletexCredentials(legalEntityId: string | null | undefined
       const { data, error } = await supabase
         .from("tripletex_credentials")
         .select(
-          "legal_entity_id, mode, consumer_token_encrypted, employee_token_encrypted, sync_enabled, sync_frequency_minutes, last_synced_at, last_sync_status, last_sync_error",
+          "legal_entity_id, mode, sync_enabled, sync_frequency_minutes, last_synced_at, last_sync_status, last_sync_error",
         )
         .eq("legal_entity_id", legalEntityId!)
         .maybeSingle();
       if (error) throw error;
       if (!data) return null;
+      // Token-flagg hentes via SECURITY DEFINER funksjon — selve token-feltene
+      // er REVOKED for authenticated for å hindre eksponering.
+      const { data: tokenStatus } = await (supabase.rpc as any)("tripletex_token_status", {
+        _legal_entity_id: legalEntityId,
+      });
+      const status = Array.isArray(tokenStatus) ? tokenStatus[0] : tokenStatus;
       return {
         legal_entity_id: data.legal_entity_id,
         mode: (data.mode as "standard" | "private") ?? "standard",
-        has_consumer_token: !!data.consumer_token_encrypted,
-        has_employee_token: !!data.employee_token_encrypted,
+        has_consumer_token: !!status?.has_consumer_token,
+        has_employee_token: !!status?.has_employee_token,
         sync_enabled: data.sync_enabled,
         sync_frequency_minutes: data.sync_frequency_minutes,
         last_synced_at: data.last_synced_at,

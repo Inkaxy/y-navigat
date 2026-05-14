@@ -7,10 +7,12 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { FakturaerHeaderBanner } from "@/fakturaer/components/FakturaerHeaderBanner";
 import { useFakturaer } from "@/fakturaer/context/FakturaerContext";
+import { useSelection } from "@/providers/SelectionProvider";
 
 export default function ImportEhfPage({ embedded = false }: { embedded?: boolean } = {}) {
   const navigate = useNavigate();
   const { canWrite } = useFakturaer();
+  const { legalEntityId } = useSelection();
   const [busy, setBusy] = useState(false);
   const [dragOver, setDragOver] = useState(false);
 
@@ -19,12 +21,16 @@ export default function ImportEhfPage({ embedded = false }: { embedded?: boolean
       toast.error("Filen må være en .xml-fil");
       return;
     }
+    if (!legalEntityId) {
+      toast.error("Velg et selskap først");
+      return;
+    }
     setBusy(true);
     try {
       const xmlText = await file.text();
 
-      // Last opp rå XML til storage for sporbarhet
-      const path = `${Date.now()}_${file.name}`;
+      // Last opp rå XML til storage for sporbarhet — entity-scoped path
+      const path = `${legalEntityId}/${Date.now()}_${file.name}`;
       const { error: upErr } = await supabase.storage.from("invoice-ehf-xml").upload(path, file);
       if (upErr) throw upErr;
 

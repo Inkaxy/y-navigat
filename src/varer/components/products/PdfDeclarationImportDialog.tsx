@@ -80,7 +80,16 @@ export function PdfDeclarationImportDialog({ open, onOpenChange, productId, prod
     setBusy(true);
     setStage("parsing");
     try {
-      const path = `${productId}/${Date.now()}.pdf`;
+      // Hent produktets legal_entity_id for entity-scoped storage path
+      const { data: prod, error: prodErr } = await supabase
+        .from("products")
+        .select("legal_entity_id")
+        .eq("id", productId)
+        .maybeSingle();
+      if (prodErr) throw prodErr;
+      if (!prod?.legal_entity_id) throw new Error("Produktet mangler selskap");
+
+      const path = `${prod.legal_entity_id}/${productId}/${Date.now()}.pdf`;
       const { error: upErr } = await supabase.storage
         .from("declaration-uploads")
         .upload(path, file, { contentType: "application/pdf" });
