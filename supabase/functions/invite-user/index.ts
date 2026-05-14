@@ -193,6 +193,8 @@ Deno.serve(async (req) => {
       is_primary: idx === 0,
       valid_from: today,
       assigned_by: callerId,
+      outlet_scope: "all",
+      outlet_ids: [],
     }));
     const { error: posErr } = await admin.from("user_positions").insert(rows);
     if (posErr && !posErr.message.includes("duplicate")) {
