@@ -8830,6 +8830,13 @@ export type Database = {
       set_rfq_password: { Args: { p_recipient_id: string }; Returns: string }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
+      tripletex_token_status: {
+        Args: { _legal_entity_id: string }
+        Returns: {
+          has_consumer_token: boolean
+          has_employee_token: boolean
+        }[]
+      }
       unaccent: { Args: { "": string }; Returns: string }
       upsert_matrix_column_comment: {
         Args: {

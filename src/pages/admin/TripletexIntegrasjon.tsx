@@ -19,12 +19,26 @@ export default function TripletexIntegrasjon() {
         .from("tripletex_credentials")
         .select(`
           legal_entity_id, mode, sync_enabled, sync_frequency_minutes,
-          consumer_token_encrypted, employee_token_encrypted,
           last_synced_at, last_sync_status, last_sync_error,
           legal_entities(legal_name, short_code)
         `);
       if (error) throw error;
-      return data ?? [];
+      const rows = data ?? [];
+      // Token-flagg hentes via SECURITY DEFINER funksjon (REVOKED kolonner).
+      const enriched = await Promise.all(
+        rows.map(async (r: any) => {
+          const { data: status } = await (supabase.rpc as any)("tripletex_token_status", {
+            _legal_entity_id: r.legal_entity_id,
+          });
+          const s = Array.isArray(status) ? status[0] : status;
+          return {
+            ...r,
+            has_consumer_token: !!s?.has_consumer_token,
+            has_employee_token: !!s?.has_employee_token,
+          };
+        }),
+      );
+      return enriched;
     },
   });
 
@@ -101,8 +115,8 @@ export default function TripletexIntegrasjon() {
               )}
 
               <div className="space-y-2">
-                <SecretRow label="Consumer token" present={!!c.consumer_token_encrypted} />
-                <SecretRow label="Employee token" present={!!c.employee_token_encrypted} />
+                <SecretRow label="Consumer token" present={!!c.has_consumer_token} />
+                <SecretRow label="Employee token" present={!!c.has_employee_token} />
               </div>
             </CardContent>
           </Card>
