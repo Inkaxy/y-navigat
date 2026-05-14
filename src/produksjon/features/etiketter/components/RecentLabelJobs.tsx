@@ -25,6 +25,7 @@ import type { ProductionDepartment } from "@/produksjon/features/produksjonsavde
 interface Props {
   deptId: string | undefined;
   department: ProductionDepartment | undefined;
+  legalEntityId: string | undefined;
 }
 
 const STATUS_META: Record<
@@ -36,8 +37,8 @@ const STATUS_META: Record<
   failed: { label: "Feilet", variant: "destructive" },
 };
 
-export function RecentLabelJobs({ deptId, department }: Props) {
-  const { data, isLoading } = useRecentLabelJobs(deptId);
+export function RecentLabelJobs({ deptId, department, legalEntityId }: Props) {
+  const { data, isLoading } = useRecentLabelJobs(deptId, legalEntityId);
   const nextNumber = useNextLabelNumber();
   const insertJob = useInsertLabelPrintJob();
 
