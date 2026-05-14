@@ -77,7 +77,7 @@ Deno.serve(async (req) => {
     const { data: hasAccess } = await userClient.rpc("has_ordre_settings_access");
     if (!hasAccess) {
       // Også tillat ordre-write
-      const { data: hasWrite } = await userClient.rpc("has_app_write_access", { _app_code: "ordre" });
+      const { data: hasWrite } = await userClient.rpc("has_app_write_access", { p_app_code: "ordre" });
       if (!hasWrite) return jsonErr("Forbidden", 403);
     }
 
