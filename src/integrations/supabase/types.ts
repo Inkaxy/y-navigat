@@ -14,6 +14,68 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_call_log: {
+        Row: {
+          completion_tokens: number | null
+          confidence_score: number | null
+          cost_usd: number | null
+          created_at: string
+          duration_ms: number | null
+          error: string | null
+          id: string
+          model: string
+          prompt_tokens: number | null
+          provider: string
+          request_payload: Json | null
+          response_payload: Json | null
+          status: string
+          ticket_id: string | null
+          triggered_by: string | null
+        }
+        Insert: {
+          completion_tokens?: number | null
+          confidence_score?: number | null
+          cost_usd?: number | null
+          created_at?: string
+          duration_ms?: number | null
+          error?: string | null
+          id?: string
+          model: string
+          prompt_tokens?: number | null
+          provider: string
+          request_payload?: Json | null
+          response_payload?: Json | null
+          status: string
+          ticket_id?: string | null
+          triggered_by?: string | null
+        }
+        Update: {
+          completion_tokens?: number | null
+          confidence_score?: number | null
+          cost_usd?: number | null
+          created_at?: string
+          duration_ms?: number | null
+          error?: string | null
+          id?: string
+          model?: string
+          prompt_tokens?: number | null
+          provider?: string
+          request_payload?: Json | null
+          response_payload?: Json | null
+          status?: string
+          ticket_id?: string | null
+          triggered_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_call_log_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_provider_config: {
         Row: {
           azure_deployment: string | null
@@ -7430,7 +7492,9 @@ export type Database = {
       tickets: {
         Row: {
           ai_analyzed_at: string | null
+          ai_confidence_score: number | null
           ai_cost_usd: number | null
+          ai_error: string | null
           ai_model: string | null
           ai_provider: string | null
           ai_status: string | null
@@ -7461,7 +7525,9 @@ export type Database = {
         }
         Insert: {
           ai_analyzed_at?: string | null
+          ai_confidence_score?: number | null
           ai_cost_usd?: number | null
+          ai_error?: string | null
           ai_model?: string | null
           ai_provider?: string | null
           ai_status?: string | null
@@ -7492,7 +7558,9 @@ export type Database = {
         }
         Update: {
           ai_analyzed_at?: string | null
+          ai_confidence_score?: number | null
           ai_cost_usd?: number | null
+          ai_error?: string | null
           ai_model?: string | null
           ai_provider?: string | null
           ai_status?: string | null
