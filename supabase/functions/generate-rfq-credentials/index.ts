@@ -23,6 +23,13 @@ Deno.serve(async (req) => {
       { global: { headers: { Authorization: authHeader } } },
     );
 
+    // Service-role client used only to read credential columns
+    // (access_token / password_hash) which are revoked from authenticated/anon.
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    );
+
     const { data: userData, error: userErr } = await supabase.auth.getUser();
     if (userErr || !userData?.user) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -75,8 +82,8 @@ Deno.serve(async (req) => {
       });
       if (pwErr) throw pwErr;
 
-      // Read token back
-      const { data: tok } = await supabase
+      // Read token back via service role (column is revoked from authenticated)
+      const { data: tok } = await supabaseAdmin
         .from("negotiation_recipients")
         .select("access_token")
         .eq("id", r.id)
