@@ -47,7 +47,7 @@ export function useLabelRealtime(filter: LabelScreenFilter | null): {
     };
 
     const channel = supabase
-      .channel(`labels-${filter.legalEntityId}-${filter.date}`)
+      .channel(`${filter.legalEntityId}:labels:${filter.date}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "order_lines" },
