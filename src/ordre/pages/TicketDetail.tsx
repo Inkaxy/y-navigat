@@ -27,6 +27,7 @@ import {
   useTicketReplies, useSendTicketReply, useOrdrekontorAssignees,
 } from "@/ordre/hooks/useTicketReplies";
 import { TicketPresenceBanner } from "@/ordre/components/shell/TicketPresenceBanner";
+import { AiSuggestionCard } from "@/ordre/components/orders/AiSuggestionCard";
 
 const UNASSIGNED = "__unassigned__";
 
