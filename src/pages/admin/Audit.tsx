@@ -27,7 +27,7 @@ export default function Audit() {
     enabled: !!user?.id,
     staleTime: 5 * 60_000,
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("is_platform_admin", { _user_id: user!.id });
+      const { data, error } = await (supabase.rpc as any)("is_platform_admin");
       if (error) throw error;
       return Boolean(data);
     },
