@@ -185,7 +185,14 @@ delivery_date: leter etter dato i e-posten, ellers null.`;
       outputTokens = result.outputTokens;
     } catch (e) {
       callError = (e as Error).message;
-      callStatus = /rate.?limit|429/i.test(callError) ? "rate_limited" : "error";
+      if (/credit balance|insufficient.?credit|quota|billing/i.test(callError)) {
+        callError = `${provider} har ikke nok kreditt på kontoen. Fyll på kreditt hos provider, eller bytt provider i Innstillinger → AI.`;
+        callStatus = "error";
+      } else if (/rate.?limit|429/i.test(callError)) {
+        callStatus = "rate_limited";
+      } else {
+        callStatus = "error";
+      }
     }
 
     const durationMs = Date.now() - startTs;
