@@ -177,7 +177,6 @@ export function ProductionPlanTable({ rows, showByMainGroup, showTraysWithPlus, 
                 }
                 className={cn(
                   !color && isZebra && "bg-muted/50",
-                  color && isZebra && "brightness-95",
                   hasDetails && "cursor-pointer print:cursor-auto hover:brightness-95",
                   isExpanded && !color && "bg-accent/30",
                 )}
