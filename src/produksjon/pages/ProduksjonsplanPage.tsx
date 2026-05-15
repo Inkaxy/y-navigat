@@ -197,9 +197,10 @@ export default function ProduksjonsplanPage() {
     correction: boolean;
     prevItems: Map<string, SnapshotItem> | null;
     prevTakenAt: string | null;
+    alternateRowGray: boolean;
   } | null>(null);
 
-  const handlePrint = useCallback(async () => {
+  const handlePrint = useCallback(async (options: PrintProduksjonslisteOptions = printProdDefaults) => {
     if (!legalEntityId) {
       window.print();
       return;
@@ -255,6 +256,7 @@ export default function ProduksjonsplanPage() {
         correction: wantCorrection && !!prev,
         prevItems: prev?.items ?? null,
         prevTakenAt: prev?.takenAt ?? null,
+        alternateRowGray: options.alternateRowGray,
       });
     });
 
@@ -269,7 +271,7 @@ export default function ProduksjonsplanPage() {
         });
       }, 500);
     }, 100);
-  }, [legalEntityId, dateStr, date, criteria, rows]);
+  }, [legalEntityId, dateStr, date, criteria, rows, printProdDefaults]);
 
 
   return (
@@ -437,7 +439,7 @@ export default function ProduksjonsplanPage() {
         }
 
         return (
-          <div className="print-area space-y-3">
+          <div className={cn("print-area space-y-3", (printJob?.alternateRowGray ?? true) && "print-zebra-rows")}>
             {/* Skjerm-visning: kun den vanlige tabellen én gang */}
             <div className="print:hidden">
               <ProductionPlanTable
@@ -557,7 +559,7 @@ export default function ProduksjonsplanPage() {
           }
           setPrintProdDialog(false);
           // Vent én tick slik at criteria oppdateres før vi printer
-          setTimeout(() => handlePrint(), 50);
+          setTimeout(() => handlePrint(o), 50);
         }}
       />
 
