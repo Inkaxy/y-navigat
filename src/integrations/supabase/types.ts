@@ -5478,6 +5478,7 @@ export type Database = {
           display_name: string
           id: string
           legal_entity_id: string
+          main_product_id: string | null
           sort_order: number
           status: string
           updated_at: string
@@ -5489,6 +5490,7 @@ export type Database = {
           display_name: string
           id?: string
           legal_entity_id: string
+          main_product_id?: string | null
           sort_order?: number
           status?: string
           updated_at?: string
@@ -5500,6 +5502,7 @@ export type Database = {
           display_name?: string
           id?: string
           legal_entity_id?: string
+          main_product_id?: string | null
           sort_order?: number
           status?: string
           updated_at?: string
@@ -5510,6 +5513,13 @@ export type Database = {
             columns: ["legal_entity_id"]
             isOneToOne: false
             referencedRelation: "legal_entities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_groups_main_product_id_fkey"
+            columns: ["main_product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
             referencedColumns: ["id"]
           },
         ]
