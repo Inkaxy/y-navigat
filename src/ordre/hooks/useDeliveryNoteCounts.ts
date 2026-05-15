@@ -1,6 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
+import { NULL_TOUR_KEY } from "@/ordre/hooks/useTourRunStatus";
+import { useDeliveryTours } from "@/ordre/hooks/useDeliveryTours";
+import { fetchPendingRecurringOrderCounts } from "@/ordre/hooks/usePendingRecurringOrders";
 
 export type DeliveryNoteCounts = {
   fastordre: number;
@@ -14,8 +17,11 @@ export type DeliveryNoteCounts = {
  * tourId === "all" → ingen tur-filter.
  */
 export function useDeliveryNoteCounts(date: string, tourId: string) {
+  const toursQ = useDeliveryTours({ activeOnly: true });
+
   return useQuery({
-    queryKey: ["delivery-note-counts", date, tourId],
+    queryKey: ["delivery-note-counts", date, tourId, toursQ.data],
+    enabled: !toursQ.isLoading,
     queryFn: async (): Promise<DeliveryNoteCounts> => {
       // Hent ordre-IDer som allerede har en aktiv pakkseddel for valgt dato/tur,
       // slik at "kø"-tellerne (FASTORDRE/DATERTE/RETUR) viser gjenstående arbeid.
@@ -25,7 +31,8 @@ export function useDeliveryNoteCounts(date: string, tourId: string) {
         .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
         .eq("delivery_date", date)
         .neq("status", "cancelled");
-      if (tourId !== "all") notesQ = notesQ.eq("delivery_tour_id", tourId);
+      if (tourId === NULL_TOUR_KEY) notesQ = notesQ.is("delivery_tour_id", null);
+      else if (tourId !== "all") notesQ = notesQ.eq("delivery_tour_id", tourId);
       const { data: notesWithLines, error: notesLinesErr } = await notesQ;
       if (notesLinesErr) throw notesLinesErr;
 
@@ -45,7 +52,8 @@ export function useDeliveryNoteCounts(date: string, tourId: string) {
           .select("id", { count: "exact", head: true })
           .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
           .eq("delivery_date", date);
-        if (tourId !== "all") q = q.eq("delivery_tour_id", tourId);
+        if (tourId === NULL_TOUR_KEY) q = q.is("delivery_tour_id", null);
+        else if (tourId !== "all") q = q.eq("delivery_tour_id", tourId);
         if (packedOrderIds.size > 0) {
           q = q.not(
             "id",
@@ -56,18 +64,26 @@ export function useDeliveryNoteCounts(date: string, tourId: string) {
         return q;
       };
 
-      const [fastRes, datertRes, returRes] = await Promise.all([
+      const [fastRes, datertRes, returRes, pendingRecurring] = await Promise.all([
         buildOrdersBase().eq("is_customer_order", false).eq("is_return", false),
         buildOrdersBase().eq("is_customer_order", true).eq("is_return", false),
         buildOrdersBase().eq("is_return", true),
+        fetchPendingRecurringOrderCounts(date, toursQ.data ?? []),
       ]);
 
       if (fastRes.error) throw fastRes.error;
       if (datertRes.error) throw datertRes.error;
       if (returRes.error) throw returRes.error;
 
+      const pendingFastordre =
+        tourId === "all"
+          ? pendingRecurring.total
+          : tourId === NULL_TOUR_KEY
+            ? pendingRecurring.nullTourCount
+            : pendingRecurring.byTour[tourId] ?? 0;
+
       return {
-        fastordre: fastRes.count ?? 0,
+        fastordre: (fastRes.count ?? 0) + pendingFastordre,
         datert: datertRes.count ?? 0,
         retur: returRes.count ?? 0,
         pakksedler: pakksedlerCount,
