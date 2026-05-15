@@ -294,7 +294,7 @@
     padding: 2pt 4pt !important;
     font-size: 9pt !important;
     color: #000 !important;
-    background: transparent !important;
+    background: #ffffff !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
@@ -305,11 +305,15 @@
     padding: 6pt 0 2pt !important;
     font-weight: 700 !important;
     font-size: 11pt !important;
-    background: transparent !important;
+    background: #ffffff !important;
   }
-  /* Sebrastriper — annenhver rad lysegrå, resten hvit */
+  /* Sebrastriper — annenhver rad lysegrå, resten hvit. Plassert ETTER td-regelen
+     over for å vinne på spesifisitet. */
+  .print-area tr[data-zebra="0"] > td {
+    background: #ffffff !important;
+  }
   .print-area tr[data-zebra="1"] > td {
-    background: #f3f4f6 !important;
+    background: #e5e7eb !important;
   }
 
   .print-area .print-page { break-after: page; page-break-after: always; }
