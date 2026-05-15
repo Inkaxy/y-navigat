@@ -340,7 +340,7 @@ export default function ProduksjonsplanPage() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <Button variant="outline" onClick={handlePrint}>
+          <Button variant="outline" onClick={() => setPrintProdDialog(true)}>
             <Printer className="h-4 w-4 mr-2" />
             Skriv ut
           </Button>
