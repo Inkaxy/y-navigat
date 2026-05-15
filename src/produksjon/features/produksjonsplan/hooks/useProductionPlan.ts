@@ -215,13 +215,22 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
 
       // 2) Hent ordrelinjer
       const orderIds = finalOrders.map((o) => o.id);
-      const { data: lines, error: linesErr } = await supabase
-        .from("order_lines")
-        .select("order_id, product_id, quantity")
-        .in("order_id", orderIds);
-      if (linesErr) throw linesErr;
+      let lines: OrderLineRow[] = [];
+      if (orderIds.length > 0) {
+        const { data, error: linesErr } = await supabase
+          .from("order_lines")
+          .select("order_id, product_id, quantity")
+          .in("order_id", orderIds);
+        if (linesErr) throw linesErr;
+        lines = (data ?? []) as OrderLineRow[];
+      }
 
-      const productIds = Array.from(new Set((lines ?? []).map((l) => l.product_id).filter(Boolean) as string[]));
+      const productIds = Array.from(
+        new Set([
+          ...lines.map((l) => l.product_id).filter(Boolean) as string[],
+          ...tourFilteredRecurring.map((r) => r.product_id).filter(Boolean) as string[],
+        ]),
+      );
       if (productIds.length === 0) return { rows: [], orderCounts };
 
       // 3) Hent produkter
@@ -266,25 +275,34 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
 
       // Filtrer linjer: criteria på main/sub category
       const includedLines: { tour: number | null; product: ProductRow; quantity: number }[] = [];
-      for (const l of (lines ?? []) as OrderLineRow[]) {
-        const product = productMap.get(l.product_id);
-        if (!product) continue;
-
-        // main_category filter
+      const passesCategoryFilter = (product: ProductRow): boolean => {
         if (criteria.main_category_ids.length > 0) {
-          if (!product.main_category_id || !criteria.main_category_ids.includes(product.main_category_id)) continue;
+          if (!product.main_category_id || !criteria.main_category_ids.includes(product.main_category_id)) return false;
         }
-        // sub_category filter
         if (criteria.sub_category_ids.length > 0) {
           if (product.sub_category_id) {
-            if (!criteria.sub_category_ids.includes(product.sub_category_id)) continue;
+            if (!criteria.sub_category_ids.includes(product.sub_category_id)) return false;
           } else {
-            if (!criteria.include_products_without_subcategory) continue;
+            if (!criteria.include_products_without_subcategory) return false;
           }
         }
+        return true;
+      };
 
+      for (const l of lines) {
+        const product = productMap.get(l.product_id);
+        if (!product) continue;
+        if (!passesCategoryFilter(product)) continue;
         const tour = orderTourMap.get(l.order_id) ?? null;
         includedLines.push({ tour, product, quantity: Number(l.quantity) });
+      }
+
+      // Fastordre-linjer
+      for (const r of tourFilteredRecurring) {
+        const product = productMap.get(r.product_id);
+        if (!product) continue;
+        if (!passesCategoryFilter(product)) continue;
+        includedLines.push({ tour: r.tour_number, product, quantity: r.quantity });
       }
 
       // Aggregeringsnøkkel
