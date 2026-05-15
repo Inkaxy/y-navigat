@@ -15,6 +15,8 @@ export type GenerateDeliveryNotesResult = {
   orders_skipped: number;
   /** Kun for run_type='correction' — antall annullerte forrige pakksedler. */
   notes_cancelled?: number;
+  /** Kun for run_type='main' — antall ordre opprettet fra fastordre. */
+  recurring_orders_created?: number;
 };
 
 export type GenerateDeliveryNotesArgs = {

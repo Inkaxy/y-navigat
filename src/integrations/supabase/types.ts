@@ -3473,6 +3473,7 @@ export type Database = {
           picked_up_at: string | null
           picked_up_by: string | null
           previous_status_before_hold: string | null
+          recurring_schedule_id: string | null
           send_email_confirm: boolean
           send_sms_confirm: boolean
           source: string
@@ -3527,6 +3528,7 @@ export type Database = {
           picked_up_at?: string | null
           picked_up_by?: string | null
           previous_status_before_hold?: string | null
+          recurring_schedule_id?: string | null
           send_email_confirm?: boolean
           send_sms_confirm?: boolean
           source: string
@@ -3581,6 +3583,7 @@ export type Database = {
           picked_up_at?: string | null
           picked_up_by?: string | null
           previous_status_before_hold?: string | null
+          recurring_schedule_id?: string | null
           send_email_confirm?: boolean
           send_sms_confirm?: boolean
           source?: string
@@ -3665,6 +3668,13 @@ export type Database = {
             columns: ["legal_entity_id"]
             isOneToOne: false
             referencedRelation: "legal_entities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_recurring_schedule_id_fkey"
+            columns: ["recurring_schedule_id"]
+            isOneToOne: false
+            referencedRelation: "recurring_order_schedules"
             referencedColumns: ["id"]
           },
           {
@@ -8566,6 +8576,15 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      materialize_recurring_orders: {
+        Args: {
+          p_created_by?: string
+          p_delivery_date: string
+          p_legal_entity_id: string
+          p_tour_filter?: string[]
+        }
+        Returns: number
       }
       negotiation_recipient_by_token: {
         Args: { p_password: string; p_token: string }
