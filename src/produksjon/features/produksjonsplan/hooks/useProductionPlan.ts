@@ -68,18 +68,21 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
         .neq("status", "cancelled");
       if (ordersErr) throw ordersErr;
 
-      // Tur-filter
-      let tourMap = new Map<string, number | null>(); // tour_id -> tour_number
-      if (orders && orders.length > 0) {
-        const tourIds = Array.from(new Set(orders.map((o) => o.delivery_tour_id).filter(Boolean) as string[]));
-        if (tourIds.length > 0) {
-          const { data: tours } = await supabase
-            .from("delivery_tours")
-            .select("id, tour_number")
-            .in("id", tourIds);
-          tourMap = new Map((tours ?? []).map((t) => [t.id, t.tour_number]));
-        }
-      }
+      // Hent alle aktive turer for selskapet (trenger info for ekspandering av fastordre uten tur).
+      const { data: allTours } = await supabase
+        .from("delivery_tours")
+        .select(
+          "id, tour_number, status, active_monday, active_tuesday, active_wednesday, active_thursday, active_friday, active_saturday, active_sunday",
+        )
+        .eq("legal_entity_id", legalEntityId);
+      const tourMap = new Map<string, number | null>(
+        (allTours ?? []).map((t: any) => [t.id, t.tour_number as number | null]),
+      );
+      const dow = isoDayOfWeek(date);
+      const dayKey = DAY_KEYS[dow - 1];
+      const activeTourIdsForDow = (allTours ?? [])
+        .filter((t: any) => t.status === "active" && t[dayKey])
+        .map((t: any) => t.id as string);
 
       const filteredOrders: (OrderRow & { tour_number: number | null })[] = (orders ?? [])
         .map((o) => ({
@@ -114,15 +117,101 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
             return criteria.customer_group_ids.some((g) => groups.has(g));
           });
 
-      // Tellinger til status-tekst
+      // Sett av kunder som allerede har faktisk ordre på denne datoen — for å unngå
+      // dobbeltelling når fastordre-malen også gjelder.
+      const customersWithOrder = new Set(finalOrders.map((o) => o.customer_id));
+
+      // === Fastordre (recurring) — virtuelle linjer ===========================
+      // Maler genererer ikke faktiske ordre, men skal vises på produksjonslista.
+      type RecurringLine = {
+        customer_id: string;
+        tour_id: string | null;
+        tour_number: number | null;
+        product_id: string;
+        quantity: number;
+      };
+      const recurringLines: RecurringLine[] = [];
+      {
+        const { data: schedules } = await supabase
+          .from("recurring_order_schedules")
+          .select(
+            "id, customer_id, valid_from, valid_to, is_active, recurring_order_items(product_id, weekday, tour_id, quantity)",
+          )
+          .eq("legal_entity_id", legalEntityId)
+          .eq("is_active", true);
+
+        for (const sched of (schedules ?? []) as Array<{
+          customer_id: string;
+          valid_from: string | null;
+          valid_to: string | null;
+          recurring_order_items: Array<{
+            product_id: string;
+            weekday: number;
+            tour_id: string | null;
+            quantity: number;
+          }> | null;
+        }>) {
+          if (sched.valid_from && date < sched.valid_from) continue;
+          if (sched.valid_to && date > sched.valid_to) continue;
+          if (customersWithOrder.has(sched.customer_id)) continue;
+          for (const item of sched.recurring_order_items ?? []) {
+            if (item.weekday !== dow) continue;
+            if (!item.quantity || Number(item.quantity) <= 0) continue;
+            const targetTours = item.tour_id ? [item.tour_id] : activeTourIdsForDow;
+            for (const tid of targetTours) {
+              const tn = tourMap.get(tid) ?? null;
+              recurringLines.push({
+                customer_id: sched.customer_id,
+                tour_id: tid,
+                tour_number: tn,
+                product_id: item.product_id,
+                quantity: Number(item.quantity),
+              });
+            }
+          }
+        }
+      }
+
+      // Kundegruppe-filter på fastordre
+      let finalRecurring = recurringLines;
+      if (criteria.customer_group_ids.length > 0 && recurringLines.length > 0) {
+        const recCustomerIds = Array.from(new Set(recurringLines.map((r) => r.customer_id)));
+        const { data: members } = await supabase
+          .from("customer_group_members")
+          .select("customer_id, group_id")
+          .in("customer_id", recCustomerIds);
+        const map = new Map<string, Set<string>>();
+        for (const m of members ?? []) {
+          const set = map.get(m.customer_id) ?? new Set<string>();
+          set.add(m.group_id);
+          map.set(m.customer_id, set);
+        }
+        finalRecurring = recurringLines.filter((r) => {
+          const groups = map.get(r.customer_id);
+          if (!groups) return false;
+          return criteria.customer_group_ids.some((g) => groups.has(g));
+        });
+      }
+
+      // Tur-filter på fastordre
+      const tourFilteredRecurring = criteria.tour_numbers.length === 0
+        ? finalRecurring
+        : finalRecurring.filter(
+            (r) => r.tour_number !== null && criteria.tour_numbers.includes(r.tour_number),
+          );
+
+      // Tellinger til status-tekst (fastordre teller én pr unik kunde)
       const orderCounts = { fast: 0, datert: 0, pakkseddel: 0 };
       for (const o of finalOrders) {
         if ((o as { source?: string }).source === "recurring") orderCounts.fast++;
         else if ((o as { source?: string }).source === "delivery_note") orderCounts.pakkseddel++;
         else orderCounts.datert++;
       }
+      orderCounts.fast += new Set(tourFilteredRecurring.map((r) => r.customer_id)).size;
 
-      if (finalOrders.length === 0) return { rows: [], orderCounts };
+      if (finalOrders.length === 0 && tourFilteredRecurring.length === 0) {
+        return { rows: [], orderCounts };
+      }
 
       // 2) Hent ordrelinjer
       const orderIds = finalOrders.map((o) => o.id);
