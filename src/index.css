@@ -292,8 +292,12 @@
     font-size: 11pt !important;
     background: transparent !important;
   }
-  /* Sebrastriper for produksjonsplan — bedre lesbarhet på utskrift */
-  .print-area tr[data-zebra="1"] > td {
+  /* Kategorifarge på linjer — overstyrer sebrabakgrunn for klarere visuell gruppering */
+  .print-area tr[data-cat-color="1"] > td {
+    background: var(--print-bg, #ececec) !important;
+  }
+  /* Sebrastriper når raden ikke har kategorifarge */
+  .print-area tr[data-zebra="1"]:not([data-cat-color="1"]) > td {
     background: #ececec !important;
   }
 
