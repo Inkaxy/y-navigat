@@ -221,10 +221,18 @@ export function StamdataPage({
     queryKey: ["stamdata-picker-products", tableName, editing?.id, extraProductPicker?.productFilterColumn, legalEntityId],
     enabled: !!extraProductPicker && !!editing?.id,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("products")
+      const { data, error } = await (supabase
+        .from("products") as unknown as {
+          select: (s: string) => {
+            eq: (col: string, val: string) => {
+              eq: (col: string, val: string) => {
+                order: (col: string) => Promise<{ data: Array<{ id: string; display_number: number | null; display_name: string; status: string }> | null; error: { message: string } | null }>;
+              };
+            };
+          };
+        })
         .select("id, display_number, display_name, status")
-        .eq("legal_entity_id", legalEntityId)
+        .eq("legal_entity_id", legalEntityId as string)
         .eq(extraProductPicker!.productFilterColumn, editing!.id)
         .order("display_number");
       if (error) throw error;
