@@ -338,7 +338,7 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
         if (!product) continue;
         if (!passesCategoryFilter(product)) continue;
         const tour = orderTourMap.get(l.order_id) ?? null;
-        includedLines.push({ tour, product, quantity: Number(l.quantity) });
+        includedLines.push({ tour, product: effectiveProductFor(product), quantity: Number(l.quantity) });
       }
 
       // Fastordre-linjer
@@ -346,7 +346,7 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
         const product = productMap.get(r.product_id);
         if (!product) continue;
         if (!passesCategoryFilter(product)) continue;
-        includedLines.push({ tour: r.tour_number, product, quantity: r.quantity });
+        includedLines.push({ tour: r.tour_number, product: effectiveProductFor(product), quantity: r.quantity });
       }
 
       // Aggregeringsnøkkel
