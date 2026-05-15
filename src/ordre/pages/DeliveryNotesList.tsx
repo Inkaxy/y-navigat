@@ -140,20 +140,40 @@ export default function DeliveryNotesList() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading && (
+            {(isLoading || pendingLoading) && (
               <TableRow>
                 <TableCell colSpan={7} className="text-center text-muted-foreground">
                   Laster…
                 </TableCell>
               </TableRow>
             )}
-            {!isLoading && rows.length === 0 && (
+            {!isLoading && !pendingLoading && rows.length === 0 && pendingRows.length === 0 && (
               <TableRow>
                 <TableCell colSpan={7} className="text-center text-muted-foreground">
                   Ingen pakksedler for valgt dato/tur.
                 </TableCell>
               </TableRow>
             )}
+            {pendingRows.map((p) => (
+              <TableRow key={`pending-${p.schedule_id}`} className="bg-muted/40">
+                <TableCell />
+                <TableCell className="text-muted-foreground italic">—</TableCell>
+                <TableCell>
+                  {p.customer_display_name}
+                  {p.customer_number ? (
+                    <span className="ml-1 text-xs text-muted-foreground">#{p.customer_number}</span>
+                  ) : null}
+                </TableCell>
+                <TableCell>{p.tour_label ?? "—"}</TableCell>
+                <TableCell className="text-right text-muted-foreground">—</TableCell>
+                <TableCell className="text-right text-muted-foreground">—</TableCell>
+                <TableCell>
+                  <Badge variant="outline" className="font-normal bg-yellow-100 text-yellow-900">
+                    Fastordre — ikke generert
+                  </Badge>
+                </TableCell>
+              </TableRow>
+            ))}
             {rows.map((r) => {
               const sv = statusVariant(r.status);
               const customerName =
