@@ -150,7 +150,8 @@ export function ProductionPlanTable({ rows, showByMainGroup, showTraysWithPlus, 
           const isExpanded = expanded.has(rowKey);
           const hasDetails = (r.details?.length ?? 0) > 0;
           const detailColSpan = printColCount; // strekker over alle "data"-kolonner (uten Hovedgr.)
-          const color = categoryColor(r.main_category_code);
+          // Kun farge på annenhver linje — veksler mellom hvit og lys kategorifarge
+          const color = isZebra ? categoryColor(r.main_category_code) : null;
           return (
             <Fragment key={rowKey}>
               {sectionStart && (
