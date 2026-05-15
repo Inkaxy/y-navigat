@@ -1,5 +1,6 @@
 import { Fragment } from "react";
 import type { ProductionPlanRow, ProduksjonsplanCriteria } from "../types";
+import { categoryColor } from "../lib/categoryColor";
 import {
   Table,
   TableBody,
