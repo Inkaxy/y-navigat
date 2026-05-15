@@ -1,7 +1,8 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useSelection } from "@/providers/SelectionProvider";
 
-const STORAGE_KEY = "kunder_selected_legal_entity";
+const LEGACY_STORAGE_KEY = "kunder_selected_legal_entity";
 export const ALL_ENTITIES = "__ALL__";
 
 type Ctx = {
@@ -21,33 +22,40 @@ export function SelectedEntityProvider({
   defaultEntityId: string | null;
 }) {
   const queryClient = useQueryClient();
-  const [selected, setSelectedState] = useState<string | null>(() => {
-    return typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null;
-  });
+  const { legalEntityId, setLegalEntityId } = useSelection();
 
-  // Initialiser fra default hvis ingen verdi i localStorage
+  // Engangs-migrering fra gammel localStorage-nøkkel + initialisering fra default
   useEffect(() => {
-    if (!selected && defaultEntityId) {
-      setSelectedState(defaultEntityId);
-      localStorage.setItem(STORAGE_KEY, defaultEntityId);
+    if (legalEntityId) return;
+    if (typeof window === "undefined") return;
+    const legacy = window.localStorage.getItem(LEGACY_STORAGE_KEY);
+    if (legacy) {
+      setLegalEntityId(legacy);
+      window.localStorage.removeItem(LEGACY_STORAGE_KEY);
+      return;
     }
-  }, [defaultEntityId, selected]);
+    if (defaultEntityId) {
+      setLegalEntityId(defaultEntityId);
+    }
+  }, [legalEntityId, defaultEntityId, setLegalEntityId]);
 
   const setSelected = useCallback(
     (id: string) => {
-      setSelectedState(id);
-      localStorage.setItem(STORAGE_KEY, id);
-      // Invalider all kunde-data ved selskap-bytte
+      setLegalEntityId(id);
       queryClient.invalidateQueries({ queryKey: ["customers"] });
       queryClient.invalidateQueries({ queryKey: ["customer"] });
       queryClient.invalidateQueries({ queryKey: ["price-lists"] });
     },
-    [queryClient],
+    [queryClient, setLegalEntityId],
   );
 
   const value = useMemo<Ctx>(
-    () => ({ selected, setSelected, isAll: selected === ALL_ENTITIES }),
-    [selected, setSelected],
+    () => ({
+      selected: legalEntityId,
+      setSelected,
+      isAll: legalEntityId === ALL_ENTITIES,
+    }),
+    [legalEntityId, setSelected],
   );
 
   return <SelectedEntityContext.Provider value={value}>{children}</SelectedEntityContext.Provider>;
