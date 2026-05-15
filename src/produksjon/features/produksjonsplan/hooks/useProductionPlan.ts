@@ -437,7 +437,7 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
       };
 
       const agg = new Map<string, ProductionPlanRow>();
-      for (const { tour, product, quantity } of includedLines) {
+      for (const { tour, product, originalProduct, quantity, customerId } of includedLines) {
         const tourKey = criteria.sum_tours ? "ALL" : `t${tour ?? "x"}`;
         const k = `${tourKey}::${keyOf(product)}`;
         let row = agg.get(k);
@@ -469,10 +469,40 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
             liters: null,
             on_stock: null,
             tour_number: criteria.sum_tours ? null : tour,
+            details: [],
           };
           agg.set(k, row);
         }
         row.quantity_ordered += quantity;
+        if (customerId) {
+          const c = customerMap.get(customerId);
+          const detail: ProductionPlanRowDetail = {
+            customer_id: customerId,
+            customer_number: c?.number ?? null,
+            customer_name: c?.name ?? "Ukjent kunde",
+            address: c?.address ?? null,
+            tour_number: tour,
+            tour_name: tour != null ? tourNameMap.get(tour) ?? null : null,
+            product_id: originalProduct.id,
+            product_code:
+              originalProduct.display_number != null ? String(originalProduct.display_number) : null,
+            quantity,
+            unit_of_sale: originalProduct.unit_of_sale,
+          };
+          row.details.push(detail);
+        }
+      }
+
+      // Sorter detaljer per rad: tur, så kundenummer
+      for (const row of agg.values()) {
+        row.details.sort((a, b) => {
+          const ta = a.tour_number ?? 999;
+          const tb = b.tour_number ?? 999;
+          if (ta !== tb) return ta - tb;
+          const ca = a.customer_number ?? "";
+          const cb = b.customer_number ?? "";
+          return ca.localeCompare(cb, "nb", { numeric: true });
+        });
       }
 
       // Beregn produksjon, plater, liter
