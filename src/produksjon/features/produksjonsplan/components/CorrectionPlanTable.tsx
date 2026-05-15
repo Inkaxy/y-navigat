@@ -97,6 +97,11 @@ export function CorrectionPlanTable({ rows, showByMainGroup, showTraysWithPlus, 
           const traysPartialDiff = r.trays_partial - (prev?.trays_partial ?? 0);
           const showTrayDiffRow = traysFullDiff !== 0 || traysPartialDiff !== 0;
           const isNew = !prev;
+          let zebraIdx = idx;
+          for (let k = idx; k >= 0; k--) {
+            if (printGroupStart.has(k)) { zebraIdx = idx - k; break; }
+          }
+          const isZebra = zebraIdx % 2 === 1;
 
           return (
             <Fragment key={`${r.product_id}-${idx}`}>
@@ -107,7 +112,7 @@ export function CorrectionPlanTable({ rows, showByMainGroup, showTraysWithPlus, 
                   </TableCell>
                 </TableRow>
               )}
-              <TableRow>
+              <TableRow data-zebra={isZebra ? "1" : "0"} className={isZebra ? "bg-muted/50" : undefined}>
                 {columns.doughType && (
                   <TableCell className="text-xs text-muted-foreground">{r.dough_type ?? ""}</TableCell>
                 )}

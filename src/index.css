@@ -280,6 +280,8 @@
     font-size: 9pt !important;
     color: #000 !important;
     background: transparent !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
   .print-area th { font-weight: 600 !important; text-align: left; }
   .print-area .print-section-row td {
@@ -288,6 +290,11 @@
     padding: 6pt 0 2pt !important;
     font-weight: 700 !important;
     font-size: 11pt !important;
+    background: transparent !important;
+  }
+  /* Sebrastriper for produksjonsplan — bedre lesbarhet på utskrift */
+  .print-area tr[data-zebra="1"] > td {
+    background: #ececec !important;
   }
 
   .print-area .print-page { break-after: page; page-break-after: always; }
