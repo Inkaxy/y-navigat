@@ -1,55 +1,60 @@
+
 ## Mål
 
-Pakksedler skal samles per kunde, dekke alle ordre (inkl. fastordre), oppdateres automatisk hvis nye ordre kommer etter hovedkjøring, og kun skrives ut for valgt dato.
+Pakksedler-modulen skal følge denne modellen:
 
-## Dagens situasjon (kort)
-
-- `generate_delivery_notes` lager **én pakkseddel per ordre** (én `delivery_notes`-rad per `orders`-rad).
-- Fastordre materialiseres til ordre i starten av "main"-kjøring (allerede på plass).
-- "Tilleggkjøring" finnes som manuell handling — ikke automatisk.
-- Bulk-utskrift er allerede dato-bundet (`scope.date`).
+- **Fastordre-feltet** (gul boks) teller alle fastordre for valgt dato — både materialiserte (i `orders`) og ikke-materialiserte (aktive `recurring_order_schedules`) som ikke er pauset.
+- **Daterte ordre-feltet** teller daterte/kundeordre uten pakkseddel for valgt dato.
+- **Returordre-feltet** teller returordre uten pakkseddel.
+- **Pakksedler-feltet** (blå) teller og viser kun faktiske pakksedler for valgt dato.
+- En fastordre som redigeres flyttes automatisk til «daterte ordre» (`is_customer_order = true`).
+- Legges en ny ordre inn etter at hovedkjøring er kjørt → tilleggkjøring/ny pakkseddel.
 
 ## Endringer
 
-### 1. Én pakkseddel per kunde (per dato + tur)
+### 1. Pakksedler-listen (`DeliveryNotesList.tsx`) leser `type`-param
 
-Endre `generate_delivery_notes`:
+I dag ignoreres `type=fast|datert|retur` fra URL — alle widgets havner i samme visning, og fastordre-virtualrader vises overalt. Endre slik at listen får fire moduser:
 
-- Loop **per (customer_id, delivery_tour_id)** i stedet for per ordre.
-- For hver kunde: opprett **én** `delivery_notes`-rad, og legg alle linjer fra alle ordre for kunden inn som `delivery_note_lines` med `order_id` på linje-nivå (slik at sporbarhet til opprinnelig ordre beholdes).
-- `customer_snapshot` / `delivery_address_snapshot` hentes én gang per kunde.
-- Sum (`subtotal_excl_vat`, `total_vat`, `total_incl_vat`) summeres på tvers av alle ordrene.
-- Ordre med ulik `delivery_tour_id` for samme kunde havner på separate pakksedler (én per tur).
+```text
+type=fast    → "Fastordre for {dato}" — viser pending recurring + materialiserte fastordre
+               uten pakkseddel. Knapp: "Generer pakksedler" (kjører hoved-/tilleggkjøring).
+type=datert  → "Daterte ordre for {dato}" — viser orders.is_customer_order=true uten pakkseddel.
+type=retur   → "Returordre for {dato}" — viser orders.is_return=true uten pakkseddel.
+(default)    → "Pakksedler for {dato}" — viser kun rader fra delivery_notes. Ingen virtualrader.
+```
 
-Skip-regel for ordre som allerede er pakket beholdes (ordre med eksisterende ikke-cancelled `delivery_note_line` hoppes over) — dette gjør at "additional"-run kun plukker nye/uplukkede ordre, og slår de sammen med ev. ny pakkseddel for kunden.
+Fjern «Fastordre — ikke generert»-badgen og «Generer X fastordre»-knappen fra default-visningen — de hører hjemme kun i `type=fast`.
 
-### 2. Automatisk pakkseddel ved nye ordre etter hovedkjøring
+### 2. Ny hook for daterte/retur-køer
 
-Ny DB-trigger `trg_orders_auto_pakkseddel` på `orders` (AFTER INSERT OR UPDATE OF status, delivery_date, delivery_tour_id):
+Lag `useUnpackedOrders(date, tourId, kind)` som returnerer ordre-rader (`orders` joinet med `customers`/`delivery_tours`) som ennå ikke er dekket av en aktiv pakkseddel for valgt dato. Brukes av `type=datert` og `type=retur`. Logikken finnes allerede delvis i `useDeliveryNoteCounts` (sett av `packedOrderIds`).
 
-- Sjekker om det allerede finnes en fullført "main"-kjøring i `delivery_note_runs` for `(legal_entity_id, delivery_date)`.
-- Hvis ja, og ordren ikke allerede har en aktiv pakkseddel-linje, kjører den `generate_delivery_notes(..., p_run_type='additional')` for den datoen og turen.
-- Tilleggkjøringen vil da plukke opp den nye ordren og:
-  - opprette ny pakkseddel for kunden hvis kunden ikke har én fra før, eller
-  - (alternativ B nedenfor) slå den sammen med eksisterende pakkseddel.
+### 3. Fastordre-listen viser begge typer i én tabell
 
-**Sammenslåing eller ny pakkseddel?** To alternativer:
-- **A (foreslått): Ny separat pakkseddel** for tilleggsordren. Eksisterende pakksedler er allerede skrevet ut/sendt — å endre dem etter print er forvirrende. Brukeren ser klart "tilleggspakkseddel".
-- **B: Append til eksisterende pakkseddel** for kunden. Krever at vi aldri printer før alle ordre er inne — bryter "skriv ut og glem"-flyten.
+Slå sammen:
+- Pending recurring (fra `usePendingRecurringOrderRows`) — vises som «Mal»-rad uten ordre-nr.
+- Materialiserte fastordre (orders med `is_customer_order=false`, `is_return=false`, ikke-pakket) — vises med ordre-nr.
 
-### 3. Utskrift kun for valgt dato
+Felles knapp «Generer pakksedler ({n})» kjører hovedkjøring for valgt tur/dato (samme RPC som i dag).
 
-Allerede oppfylt: `useBulkPakksedlerPDF` og `BulkPakkseddelPDFButton` bruker `scope.date` = valgt dato. Per-rad-utskrift i `DeliveryNotesList` bruker også valgt dato. Ingen endring nødvendig — kun verifisering.
+### 4. Redigering av fastordre → datert
+
+Når en bruker åpner en materialisert fastordre og endrer linjer/antall, sett `orders.is_customer_order = true` i samme mutation. Dette gjør at ordren forsvinner fra fastordre-feltet og dukker opp under «Daterte ordre». (Krever liten endring i ordre-edit-flow — identifiser stedet og legg til feltet ved første endring.)
+
+### 5. Tilleggkjøring etter ny ordre
+
+I dag finnes «Tilleggkjøring» som dropdown-handling. Bekreft at den fanger nye ordre lagt inn etter hovedkjøring (sjekk RPC `generate_delivery_notes` i runType=`additional`). Vis en liten «N nye ordre siden hovedkjøring — kjør tilleggkjøring»-banner i dashboardet når antallet > 0.
 
 ## Tekniske detaljer
 
-- **Migrasjon 1**: Erstatt `generate_delivery_notes` med per-kunde-versjon. Beholder samme signatur og returverdi (`jsonb` med `notes_generated`, `lines_generated`, `orders_processed`, …).
-- **Migrasjon 2**: Trigger-funksjon `auto_additional_run_for_new_order()` + trigger på `orders`. Trigger må kjøres som `SECURITY DEFINER` med `auth.uid()` → bruker `created_by` på ordren som triggered_by hvis `auth.uid()` mangler.
-- Idempotens: skip-regelen i `generate_delivery_notes` (ordre allerede på aktiv pakkseddel) sikrer at trigger ikke dobbeltgenererer.
-- `useDeliveryNoteCounts` og dashbordet trenger ingen endringer — tellerne fungerer fortsatt (PAKKSEDLER teller `delivery_notes`, FASTORDRE/DATERTE/RETUR teller ordre uten pakkseddel-linje).
+- Filer som endres: `src/ordre/pages/DeliveryNotesList.tsx`, ny `src/ordre/hooks/useUnpackedOrders.ts`, små justeringer i `usePendingRecurringOrders.ts` (eksporter «materialized fastordre»-rader også, eller slå sammen i listen).
+- Ingen DB-migrasjon nødvendig.
+- `type`-param leses via `useSearchParams`. Tittel og knapper byttes basert på modus.
+- Dashboard-tellerne (`useDeliveryNoteCounts`) er allerede korrekte — ingen endring der.
 
-## Åpne spørsmål
+## Det vi IKKE gjør
 
-1. **Sammenslåing vs ny pakkseddel** for sen-ankomne ordre — A eller B over?
-2. **Skal triggeren kjøre umiddelbart** (synkront i samme transaksjon, kan gjøre order-insert tregere) **eller asynkront** (via `pg_notify` + edge function / scheduled job)? Synkron er enklest og raskest å implementere.
-3. **Hva med ordre som *endrer* `delivery_date`** etter hovedkjøring — skal gammel pakkseddel-linje annulleres og ny genereres? Sannsynligvis ja, men bekreft.
+- Ingen automatisk materialisering av fastordre ved sidelast (du var tydelig på at det krever manuell kjøring).
+- Ingen endring på pause-håndtering (utelates fortsatt helt).
+- Ingen endring på pakksedler-feltet/listen ut over å fjerne virtualradene.
