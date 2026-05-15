@@ -127,6 +127,15 @@ export function ProductionPlanTable({ rows, showByMainGroup, showTraysWithPlus, 
           const sectionStart = printGroupStart.get(idx);
           // Print colCount uten Hovedgr.-kolonne
           const printColCount = colCount - (showByMainGroup && columns.mainGroup ? 1 : 0);
+          // Alternerende sebrastriper — restartes på hver hovedgruppe
+          let zebraIdx = idx;
+          if (showByMainGroup) {
+            // finn forrige sectionStart
+            for (let k = idx; k >= 0; k--) {
+              if (printGroupStart.has(k)) { zebraIdx = idx - k; break; }
+            }
+          }
+          const isZebra = zebraIdx % 2 === 1;
           return (
             <Fragment key={`${r.product_id}-${idx}`}>
               {sectionStart && (
@@ -136,7 +145,10 @@ export function ProductionPlanTable({ rows, showByMainGroup, showTraysWithPlus, 
                   </TableCell>
                 </TableRow>
               )}
-              <TableRow>
+              <TableRow
+                data-zebra={isZebra ? "1" : "0"}
+                className={cn(isZebra && "bg-muted/50")}
+              >
                 {showByMainGroup && columns.mainGroup && span > 0 && (
                   <TableCell
                     rowSpan={span}
