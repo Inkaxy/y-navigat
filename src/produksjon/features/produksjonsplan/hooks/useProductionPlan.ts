@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { isoDayOfWeek } from "@/ordre/hooks/useDeliveryTours";
-import type { ProductionPlanRow, ProduksjonsplanCriteria } from "../types";
+import type { ProductionPlanRow, ProductionPlanRowDetail, ProduksjonsplanCriteria } from "../types";
 
 const DAY_KEYS = [
   "active_monday",
