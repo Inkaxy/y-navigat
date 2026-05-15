@@ -53,6 +53,16 @@ import { ProductionPlanTable, type ColumnVisibility } from "../features/produksj
 import { SettKriteriaDialog } from "../features/produksjonsplan/components/SettKriteriaDialog";
 import { HentKriteriaDialog } from "../features/produksjonsplan/components/HentKriteriaDialog";
 import { SaveTemplateDialog } from "../features/produksjonsplan/components/SaveTemplateDialog";
+import {
+  PrintProduksjonslisteDialog,
+  DEFAULT_PRINT_PRODUKSJON_OPTIONS,
+  type PrintProduksjonslisteOptions,
+} from "../features/produksjonsplan/components/PrintProduksjonslisteDialog";
+import {
+  PrintPakkelisteDialog,
+  DEFAULT_PRINT_PAKKELISTE_OPTIONS,
+  type PrintPakkelisteOptions,
+} from "../features/produksjonsplan/components/PrintPakkelisteDialog";
 
 interface UiPrefs {
   showCustomers: boolean;
