@@ -216,6 +216,23 @@ export function StamdataPage({
     },
   });
 
+  /* ----- Produkt-picker (f.eks. hovedvare) ----- */
+  const pickerProductsQuery = useQuery<Array<{ id: string; display_number: number | null; display_name: string; status: string }>>({
+    queryKey: ["stamdata-picker-products", tableName, editing?.id, extraProductPicker?.productFilterColumn, legalEntityId],
+    enabled: !!extraProductPicker && !!editing?.id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("products")
+        .select("id, display_number, display_name, status")
+        .eq("legal_entity_id", legalEntityId)
+        .eq(extraProductPicker!.productFilterColumn, editing!.id)
+        .order("display_number");
+      if (error) throw error;
+      const rows = (data ?? []) as Array<{ id: string; display_number: number | null; display_name: string; status: string }>;
+      return extraProductPicker!.activeOnly === false ? rows : rows.filter((p) => p.status === "active");
+    },
+  });
+
   /* ----- Filtrert liste ----- */
   const filtered = useMemo(() => {
     const rows = listQuery.data ?? [];
