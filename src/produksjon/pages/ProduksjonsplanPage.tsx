@@ -538,6 +538,48 @@ export default function ProduksjonsplanPage() {
         editing={editingTpl ?? activeTemplate}
         onSaved={() => { /* refetched by hook */ }}
       />
+
+      <PrintProduksjonslisteDialog
+        open={printProdDialog}
+        onOpenChange={setPrintProdDialog}
+        summary={summary}
+        templateName={activeTemplate?.name ?? null}
+        initial={printProdDefaults}
+        onSaveDefaults={(o) => {
+          setPrintProdDefaults(o);
+          toast({ title: "Standardvalg lagret" });
+        }}
+        onPrint={(o) => {
+          setPrintProdDefaults(o);
+          // Synk snapshot/diff-valg inn i criteria slik at handlePrint bruker samme grunnlag
+          if (o.showSnapshotDiff !== !!criteria.print_correction_last) {
+            setCriteria({ ...criteria, print_correction_last: o.showSnapshotDiff });
+          }
+          setPrintProdDialog(false);
+          // Vent én tick slik at criteria oppdateres før vi printer
+          setTimeout(() => handlePrint(), 50);
+        }}
+      />
+
+      <PrintPakkelisteDialog
+        open={printPackDialog}
+        onOpenChange={setPrintPackDialog}
+        summary={summary}
+        templateName={activeTemplate?.name ?? null}
+        initial={printPackDefaults}
+        onSaveDefaults={(o) => {
+          setPrintPackDefaults(o);
+          toast({ title: "Standardvalg lagret" });
+        }}
+        onPrint={(o) => {
+          setPrintPackDefaults(o);
+          setPrintPackDialog(false);
+          toast({
+            title: "Pakkeliste",
+            description: "Utskrift av pakkeliste er ikke implementert ennå.",
+          });
+        }}
+      />
     </div>
   );
 }
