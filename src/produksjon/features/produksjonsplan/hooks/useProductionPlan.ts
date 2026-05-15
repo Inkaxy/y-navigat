@@ -1,6 +1,17 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { isoDayOfWeek } from "@/ordre/hooks/useDeliveryTours";
 import type { ProductionPlanRow, ProduksjonsplanCriteria } from "../types";
+
+const DAY_KEYS = [
+  "active_monday",
+  "active_tuesday",
+  "active_wednesday",
+  "active_thursday",
+  "active_friday",
+  "active_saturday",
+  "active_sunday",
+] as const;
 
 interface Args {
   legalEntityId: string | null;
