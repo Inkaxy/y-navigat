@@ -1,4 +1,5 @@
-import { Fragment } from "react";
+import { Fragment, useState } from "react";
+import { ChevronRight } from "lucide-react";
 import type { ProductionPlanRow } from "../types";
 import {
   Table,
