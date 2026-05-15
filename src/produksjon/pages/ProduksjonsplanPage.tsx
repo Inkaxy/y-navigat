@@ -353,8 +353,8 @@ export default function ProduksjonsplanPage() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-64">
-              <DropdownMenuItem disabled>Produksjonsliste (aktiv)</DropdownMenuItem>
-              <DropdownMenuItem disabled>Pakkeliste</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setPrintProdDialog(true)}>Produksjonsliste</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setPrintPackDialog(true)}>Pakkeliste</DropdownMenuItem>
               <DropdownMenuItem disabled>Spesifisert pakkeliste</DropdownMenuItem>
               <DropdownMenuItem disabled>Veieliste</DropdownMenuItem>
               <DropdownMenuItem disabled>Kvitteringsliste</DropdownMenuItem>
