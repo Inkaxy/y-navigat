@@ -271,18 +271,48 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
         mainCatMap = new Map((cats ?? []).map((c) => [c.id, c as MainCategoryRow]));
       }
 
-      // 5) Hent produksjonsgrupper
+      // 5) Hent produksjonsgrupper (inkl. hovedvare)
       const prodGroupIds = Array.from(
         new Set((products ?? []).map((p) => p.production_group_id).filter(Boolean) as string[]),
       );
-      let prodGroupMap = new Map<string, { id: string; display_name: string }>();
+      let prodGroupMap = new Map<string, { id: string; display_name: string; main_product_id: string | null }>();
       if (prodGroupIds.length > 0) {
         const { data: pgs } = await supabase
           .from("production_groups")
-          .select("id, display_name")
+          .select("id, display_name, main_product_id")
           .in("id", prodGroupIds);
-        prodGroupMap = new Map((pgs ?? []).map((g) => [g.id, g as { id: string; display_name: string }]));
+        prodGroupMap = new Map(
+          (pgs ?? []).map((g: { id: string; display_name: string; main_product_id: string | null }) => [g.id, g]),
+        );
       }
+
+      // 5b) Hent hovedvare-produkter (for sammenslåing)
+      const mergeOn = !!criteria.merge_by_main_product && criteria.aggregation === "per_product";
+      const mainProductIds = mergeOn
+        ? Array.from(
+            new Set(
+              Array.from(prodGroupMap.values())
+                .map((g) => g.main_product_id)
+                .filter(Boolean) as string[],
+            ),
+          ).filter((id) => !productMap.has(id))
+        : [];
+      if (mainProductIds.length > 0) {
+        const { data: extra } = await supabase
+          .from("products")
+          .select("id, display_number, display_name, unit_of_sale, main_category_id, sub_category_id, production_group_id, dough_type, pieces_per_tray, pieces_per_liter")
+          .in("id", mainProductIds);
+        for (const p of extra ?? []) productMap.set(p.id, p as ProductRow);
+      }
+
+      const effectiveProductFor = (p: ProductRow): ProductRow => {
+        if (!mergeOn) return p;
+        if (!p.production_group_id) return p;
+        const g = prodGroupMap.get(p.production_group_id);
+        if (!g?.main_product_id) return p;
+        return productMap.get(g.main_product_id) ?? p;
+      };
+
 
       // 6) Bygg per-(tur×product) eller (sum×product) aggregat
       const orderTourMap = new Map(finalOrders.map((o) => [o.id, o.tour_number]));
