@@ -22,6 +22,11 @@ export type RecurringScheduleWithCustomer = RecurringSchedule & {
   item_count: number;
 };
 
+type RecurringScheduleQueryRow = RecurringSchedule & {
+  customers?: { display_name: string | null; customer_number: string | null } | null;
+  recurring_order_items?: Array<{ id: string }> | null;
+};
+
 export type RecurringItem = {
   id: string;
   schedule_id: string;
@@ -66,7 +71,7 @@ export function useRecurringSchedules(filter: RecurringScheduleFilter = {}) {
       const { data, error } = await q;
       if (error) throw error;
 
-      let rows = (data ?? []).map((row: any) => ({
+      let rows = ((data ?? []) as RecurringScheduleQueryRow[]).map((row) => ({
         id: row.id,
         customer_id: row.customer_id,
         legal_entity_id: row.legal_entity_id,
