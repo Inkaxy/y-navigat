@@ -118,3 +118,100 @@ export async function fetchPendingRecurringOrderCounts(
 
   return { total, byTour, nullTourCount };
 }
+export type PendingRecurringOrderRow = {
+  schedule_id: string;
+  customer_id: string;
+  customer_display_name: string;
+  customer_number: string | null;
+  tour_id: string | null;
+  tour_label: string | null;
+};
+
+export async function fetchPendingRecurringOrderRows(
+  date: string,
+  tours: DeliveryTourLike[],
+  tourFilter: string,
+): Promise<PendingRecurringOrderRow[]> {
+  const weekday = isoDayOfWeek(date);
+  const fallbackTourId = resolveFallbackTourId(tours, weekday);
+
+  const [{ data: schedules, error: schedulesError }, { data: existingOrders, error: ordersError }, { data: pauses, error: pausesError }] =
+    await Promise.all([
+      supabase
+        .from("recurring_order_schedules")
+        .select("id, customer_id, recurring_order_items!inner(tour_id, quantity), customer:customers(display_name, customer_number)")
+        .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
+        .eq("is_active", true)
+        .or(`valid_from.is.null,valid_from.lte.${date}`)
+        .or(`valid_to.is.null,valid_to.gte.${date}`)
+        .eq("recurring_order_items.weekday", weekday)
+        .gt("recurring_order_items.quantity", 0),
+      supabase
+        .from("orders")
+        .select("recurring_schedule_id")
+        .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
+        .eq("delivery_date", date)
+        .not("recurring_schedule_id", "is", null),
+      supabase
+        .from("delivery_pauses")
+        .select("customer_id")
+        .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
+        .lte("pause_from", date)
+        .or(`pause_to.is.null,pause_to.gte.${date}`),
+    ]);
+
+  if (schedulesError) throw schedulesError;
+  if (ordersError) throw ordersError;
+  if (pausesError) throw pausesError;
+
+  const materialized = new Set(
+    (existingOrders ?? []).map((r) => r.recurring_schedule_id).filter((id): id is string => Boolean(id)),
+  );
+  const paused = new Set((pauses ?? []).map((r) => r.customer_id));
+  const tourById = new Map(tours.map((t) => [t.id, t] as const));
+
+  type Row = {
+    id: string;
+    customer_id: string;
+    recurring_order_items?: Array<{ tour_id: string | null; quantity: number | string | null }>;
+    customer?: { display_name: string | null; customer_number: string | null } | null;
+  };
+
+  const rows: PendingRecurringOrderRow[] = [];
+  for (const s of (schedules ?? []) as Row[]) {
+    if (materialized.has(s.id) || paused.has(s.customer_id)) continue;
+    const tourIds = new Set(
+      (s.recurring_order_items ?? [])
+        .filter((it) => Number(it.quantity ?? 0) > 0)
+        .map((it) => it.tour_id ?? fallbackTourId),
+    );
+    const resolvedTourId = Array.from(tourIds).filter(Boolean).sort()[0] ?? null;
+
+    if (tourFilter === NULL_TOUR_KEY) {
+      if (resolvedTourId !== null) continue;
+    } else if (tourFilter !== "all") {
+      if (resolvedTourId !== tourFilter) continue;
+    }
+
+    const tour = resolvedTourId ? tourById.get(resolvedTourId) : null;
+    rows.push({
+      schedule_id: s.id,
+      customer_id: s.customer_id,
+      customer_display_name: s.customer?.display_name ?? "—",
+      customer_number: s.customer?.customer_number ?? null,
+      tour_id: resolvedTourId,
+      tour_label: tour ? `Tur ${(tour as DeliveryTourLike).tour_number}` : null,
+    });
+  }
+  return rows.sort((a, b) => a.customer_display_name.localeCompare(b.customer_display_name, "nb"));
+}
+
+export function usePendingRecurringOrderRows(date: string, tourId: string) {
+  const toursQ = useDeliveryTours({ activeOnly: true });
+  return useQuery({
+    queryKey: ["pending-recurring-rows", date, tourId, toursQ.data?.length ?? 0],
+    enabled: !toursQ.isLoading,
+    queryFn: () => fetchPendingRecurringOrderRows(date, toursQ.data ?? [], tourId),
+    staleTime: 15_000,
+  });
+}
