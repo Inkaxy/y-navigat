@@ -72,7 +72,7 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
       const { data: allTours } = await supabase
         .from("delivery_tours")
         .select(
-          "id, tour_number, status, active_monday, active_tuesday, active_wednesday, active_thursday, active_friday, active_saturday, active_sunday",
+          "id, tour_number, display_name, status, active_monday, active_tuesday, active_wednesday, active_thursday, active_friday, active_saturday, active_sunday",
         )
         .eq("legal_entity_id", legalEntityId);
       const tourMap = new Map<string, number | null>(
