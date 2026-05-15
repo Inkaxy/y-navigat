@@ -84,6 +84,28 @@ export default function DeliveryNotesList() {
           Pakksedler — {formatDate(date)} — {tourLabel}
         </h1>
         <div className="ml-auto flex items-center gap-2">
+          {pendingRows.length > 0 && (
+            <Button
+              variant="brand"
+              size="sm"
+              className="gap-2"
+              disabled={generate.isPending}
+              onClick={async () => {
+                try {
+                  const tourFilter = tourParam === "all" || tourParam === NULL_TOUR_KEY ? null : [tourParam];
+                  const result = await generate.mutateAsync({ date, tourFilter, runType: "main" });
+                  toast.success(
+                    `Hovedkjøring: ${result.notes_generated} pakksedler · ${result.recurring_orders_created ?? 0} fastordre opprettet`,
+                  );
+                } catch (e) {
+                  toast.error(e instanceof Error ? e.message : "Uventet feil");
+                }
+              }}
+            >
+              <Play className="h-4 w-4" />
+              Generer {pendingRows.length} fastordre
+            </Button>
+          )}
           <BulkPakkseddelPDFButton
             scope={{ kind: "date_tour", date, tourId: tourParam }}
             label="Skriv ut alle i listen"
