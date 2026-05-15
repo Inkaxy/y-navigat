@@ -133,8 +133,10 @@ export default function DeliveryNoteDashboard() {
       tourId === "all" || tourId === NULL_TOUR_KEY ? null : [tourId];
     try {
       const result = await generate.mutateAsync({ date, tourFilter });
+      const recurring = result.recurring_orders_created ?? 0;
+      const recurringPart = recurring > 0 ? ` · ${recurring} fastordre opprettet` : "";
       toast.success(
-        `${result.notes_generated} pakksedler generert (${result.lines_generated} linjer)`,
+        `${result.notes_generated} pakksedler generert (${result.lines_generated} linjer)${recurringPart}`,
       );
     } catch (e: any) {
       toast.error(e?.message ?? "Uventet feil ved hovedkjøring");
