@@ -153,6 +153,16 @@ export function SettKriteriaDialog({ open, onOpenChange, legalEntityId, initial,
                   <Label htmlFor="agg-3" className="text-sm font-normal">Pr produksjonsgruppe</Label>
                 </div>
               </RadioGroup>
+              <label className="flex items-center gap-2 text-sm pt-1">
+                <Checkbox
+                  checked={!!c.merge_by_main_product}
+                  disabled={c.aggregation !== "per_product"}
+                  onCheckedChange={(v) => setC({ ...c, merge_by_main_product: !!v })}
+                />
+                <span className={c.aggregation !== "per_product" ? "text-muted-foreground" : ""}>
+                  Slå sammen varer i samme produksjonsgruppe (vis som hovedvare)
+                </span>
+              </label>
             </section>
 
             {/* Sortering */}
