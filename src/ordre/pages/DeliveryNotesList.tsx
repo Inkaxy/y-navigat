@@ -1,12 +1,15 @@
 import { useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Play } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useDeliveryNotesList } from "@/ordre/hooks/useDeliveryNotesList";
 import { useDeliveryTours } from "@/ordre/hooks/useDeliveryTours";
+import { usePendingRecurringOrderRows } from "@/ordre/hooks/usePendingRecurringOrders";
+import { useGenerateDeliveryNotes } from "@/ordre/hooks/useGenerateDeliveryNotes";
 import { formatDate, formatNOK, todayISO } from "@/ordre/lib/format";
 import { cn } from "@/lib/utils";
 import { BulkPakkseddelPDFButton } from "@/ordre/components/pakksedler/BulkPakkseddelPDFButton";
@@ -41,6 +44,8 @@ export default function DeliveryNotesList() {
 
   const { data: tours = [] } = useDeliveryTours({ activeOnly: true });
   const { data: rows = [], isLoading } = useDeliveryNotesList(date, tourParam);
+  const { data: pendingRows = [], isLoading: pendingLoading } = usePendingRecurringOrderRows(date, tourParam);
+  const generate = useGenerateDeliveryNotes();
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
@@ -79,6 +84,28 @@ export default function DeliveryNotesList() {
           Pakksedler — {formatDate(date)} — {tourLabel}
         </h1>
         <div className="ml-auto flex items-center gap-2">
+          {pendingRows.length > 0 && (
+            <Button
+              variant="brand"
+              size="sm"
+              className="gap-2"
+              disabled={generate.isPending}
+              onClick={async () => {
+                try {
+                  const tourFilter = tourParam === "all" || tourParam === NULL_TOUR_KEY ? null : [tourParam];
+                  const result = await generate.mutateAsync({ date, tourFilter, runType: "main" });
+                  toast.success(
+                    `Hovedkjøring: ${result.notes_generated} pakksedler · ${result.recurring_orders_created ?? 0} fastordre opprettet`,
+                  );
+                } catch (e) {
+                  toast.error(e instanceof Error ? e.message : "Uventet feil");
+                }
+              }}
+            >
+              <Play className="h-4 w-4" />
+              Generer {pendingRows.length} fastordre
+            </Button>
+          )}
           <BulkPakkseddelPDFButton
             scope={{ kind: "date_tour", date, tourId: tourParam }}
             label="Skriv ut alle i listen"
@@ -113,20 +140,40 @@ export default function DeliveryNotesList() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading && (
+            {(isLoading || pendingLoading) && (
               <TableRow>
                 <TableCell colSpan={7} className="text-center text-muted-foreground">
                   Laster…
                 </TableCell>
               </TableRow>
             )}
-            {!isLoading && rows.length === 0 && (
+            {!isLoading && !pendingLoading && rows.length === 0 && pendingRows.length === 0 && (
               <TableRow>
                 <TableCell colSpan={7} className="text-center text-muted-foreground">
                   Ingen pakksedler for valgt dato/tur.
                 </TableCell>
               </TableRow>
             )}
+            {pendingRows.map((p) => (
+              <TableRow key={`pending-${p.schedule_id}`} className="bg-muted/40">
+                <TableCell />
+                <TableCell className="text-muted-foreground italic">—</TableCell>
+                <TableCell>
+                  {p.customer_display_name}
+                  {p.customer_number ? (
+                    <span className="ml-1 text-xs text-muted-foreground">#{p.customer_number}</span>
+                  ) : null}
+                </TableCell>
+                <TableCell>{p.tour_label ?? "—"}</TableCell>
+                <TableCell className="text-right text-muted-foreground">—</TableCell>
+                <TableCell className="text-right text-muted-foreground">—</TableCell>
+                <TableCell>
+                  <Badge variant="outline" className="font-normal bg-yellow-100 text-yellow-900">
+                    Fastordre — ikke generert
+                  </Badge>
+                </TableCell>
+              </TableRow>
+            ))}
             {rows.map((r) => {
               const sv = statusVariant(r.status);
               const customerName =
