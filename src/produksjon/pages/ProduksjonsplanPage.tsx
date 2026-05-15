@@ -123,6 +123,19 @@ export default function ProduksjonsplanPage() {
   const [saveDialog, setSaveDialog] = useState(false);
   const [editingTpl, setEditingTpl] = useState<CriteriaTemplate | null>(null);
 
+  const [printProdDialog, setPrintProdDialog] = useState(false);
+  const [printPackDialog, setPrintPackDialog] = useState(false);
+  const { value: printProdDefaults, setValue: setPrintProdDefaults } =
+    useUiPreference<PrintProduksjonslisteOptions>(
+      "produksjonsplan.print.produksjon",
+      DEFAULT_PRINT_PRODUKSJON_OPTIONS,
+    );
+  const { value: printPackDefaults, setValue: setPrintPackDefaults } =
+    useUiPreference<PrintPakkelisteOptions>(
+      "produksjonsplan.print.pakkeliste",
+      DEFAULT_PRINT_PAKKELISTE_OPTIONS,
+    );
+
   const plan = useProductionPlan({ legalEntityId, date: dateStr, criteria });
   const cats = useTemplateCategories();
   const mains = useMainCategories(legalEntityId);
