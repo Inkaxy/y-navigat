@@ -150,8 +150,6 @@ export function ProductionPlanTable({ rows, showByMainGroup, showTraysWithPlus, 
           const isExpanded = expanded.has(rowKey);
           const hasDetails = (r.details?.length ?? 0) > 0;
           const detailColSpan = printColCount; // strekker over alle "data"-kolonner (uten Hovedgr.)
-          // Kun farge på annenhver linje — veksler mellom hvit og lys kategorifarge
-          const color = isZebra ? categoryColor(r.main_category_code) : null;
           return (
             <Fragment key={rowKey}>
               {sectionStart && (
@@ -163,22 +161,10 @@ export function ProductionPlanTable({ rows, showByMainGroup, showTraysWithPlus, 
               )}
               <TableRow
                 data-zebra={isZebra ? "1" : "0"}
-                data-cat-color={color ? "1" : "0"}
-                style={
-                  color
-                    ? ({
-                        // Skjerm: alltid kategorifarge; sebra blir litt mørkere variant
-                        backgroundColor: color.bg,
-                        // Print: hex-versjon (sikrere for print-color-adjust)
-                        // CSS custom prop brukt av .print-area regel i index.css
-                        ["--print-bg" as string]: color.print,
-                      } as React.CSSProperties)
-                    : undefined
-                }
                 className={cn(
-                  !color && isZebra && "bg-muted/50",
-                  hasDetails && "cursor-pointer print:cursor-auto hover:brightness-95",
-                  isExpanded && !color && "bg-accent/30",
+                  isZebra && "bg-muted/40",
+                  hasDetails && "cursor-pointer print:cursor-auto hover:bg-muted/60",
+                  isExpanded && "bg-accent/30",
                 )}
                 onClick={() => hasDetails && toggle(rowKey)}
               >
