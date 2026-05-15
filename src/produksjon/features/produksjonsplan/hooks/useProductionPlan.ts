@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { isoDayOfWeek } from "@/ordre/hooks/useDeliveryTours";
-import type { ProductionPlanRow, ProduksjonsplanCriteria } from "../types";
+import type { ProductionPlanRow, ProductionPlanRowDetail, ProduksjonsplanCriteria } from "../types";
 
 const DAY_KEYS = [
   "active_monday",
@@ -72,7 +72,7 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
       const { data: allTours } = await supabase
         .from("delivery_tours")
         .select(
-          "id, tour_number, status, active_monday, active_tuesday, active_wednesday, active_thursday, active_friday, active_saturday, active_sunday",
+          "id, tour_number, display_name, status, active_monday, active_tuesday, active_wednesday, active_thursday, active_friday, active_saturday, active_sunday",
         )
         .eq("legal_entity_id", legalEntityId);
       const tourMap = new Map<string, number | null>(
@@ -342,9 +342,49 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
 
       // 6) Bygg per-(tur×product) eller (sum×product) aggregat
       const orderTourMap = new Map(finalOrders.map((o) => [o.id, o.tour_number]));
+      const orderCustomerMap = new Map(finalOrders.map((o) => [o.id, o.customer_id]));
+
+      // Hent kundedata + tur-navn for "trykk på rad og se hvem som har bestilt"
+      const allCustomerIds = Array.from(
+        new Set([
+          ...finalOrders.map((o) => o.customer_id),
+          ...tourFilteredRecurring.map((r) => r.customer_id),
+        ]),
+      );
+      const customerMap = new Map<
+        string,
+        { number: string | null; name: string; address: string | null }
+      >();
+      if (allCustomerIds.length > 0) {
+        const { data: cs } = await supabase
+          .from("customers")
+          .select("id, customer_number, display_name, delivery_address_line1, delivery_postal_code, delivery_city")
+          .in("id", allCustomerIds);
+        for (const c of cs ?? []) {
+          const addrParts = [
+            c.delivery_address_line1,
+            [c.delivery_postal_code, c.delivery_city].filter(Boolean).join(" "),
+          ].filter(Boolean) as string[];
+          customerMap.set(c.id, {
+            number: c.customer_number ?? null,
+            name: c.display_name,
+            address: addrParts.length ? addrParts.join(", ") : null,
+          });
+        }
+      }
+      const tourNameMap = new Map<number, string>();
+      for (const t of allTours ?? []) {
+        if (t.tour_number != null) tourNameMap.set(t.tour_number, t.display_name);
+      }
 
       // Filtrer linjer: criteria på main/sub category
-      const includedLines: { tour: number | null; product: ProductRow; quantity: number }[] = [];
+      const includedLines: {
+        tour: number | null;
+        product: ProductRow;
+        originalProduct: ProductRow;
+        quantity: number;
+        customerId: string | null;
+      }[] = [];
       const passesCategoryFilter = (product: ProductRow): boolean => {
         if (criteria.main_category_ids.length > 0) {
           if (!product.main_category_id || !criteria.main_category_ids.includes(product.main_category_id)) return false;
@@ -364,7 +404,14 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
         if (!product) continue;
         if (!passesCategoryFilter(product)) continue;
         const tour = orderTourMap.get(l.order_id) ?? null;
-        includedLines.push({ tour, product: effectiveProductFor(product), quantity: Number(l.quantity) });
+        const cid = orderCustomerMap.get(l.order_id) ?? null;
+        includedLines.push({
+          tour,
+          product: effectiveProductFor(product),
+          originalProduct: product,
+          quantity: Number(l.quantity),
+          customerId: cid,
+        });
       }
 
       // Fastordre-linjer
@@ -372,7 +419,13 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
         const product = productMap.get(r.product_id);
         if (!product) continue;
         if (!passesCategoryFilter(product)) continue;
-        includedLines.push({ tour: r.tour_number, product: effectiveProductFor(product), quantity: r.quantity });
+        includedLines.push({
+          tour: r.tour_number,
+          product: effectiveProductFor(product),
+          originalProduct: product,
+          quantity: r.quantity,
+          customerId: r.customer_id,
+        });
       }
 
       // Aggregeringsnøkkel
@@ -384,7 +437,7 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
       };
 
       const agg = new Map<string, ProductionPlanRow>();
-      for (const { tour, product, quantity } of includedLines) {
+      for (const { tour, product, originalProduct, quantity, customerId } of includedLines) {
         const tourKey = criteria.sum_tours ? "ALL" : `t${tour ?? "x"}`;
         const k = `${tourKey}::${keyOf(product)}`;
         let row = agg.get(k);
@@ -416,10 +469,40 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
             liters: null,
             on_stock: null,
             tour_number: criteria.sum_tours ? null : tour,
+            details: [],
           };
           agg.set(k, row);
         }
         row.quantity_ordered += quantity;
+        if (customerId) {
+          const c = customerMap.get(customerId);
+          const detail: ProductionPlanRowDetail = {
+            customer_id: customerId,
+            customer_number: c?.number ?? null,
+            customer_name: c?.name ?? "Ukjent kunde",
+            address: c?.address ?? null,
+            tour_number: tour,
+            tour_name: tour != null ? tourNameMap.get(tour) ?? null : null,
+            product_id: originalProduct.id,
+            product_code:
+              originalProduct.display_number != null ? String(originalProduct.display_number) : null,
+            quantity,
+            unit_of_sale: originalProduct.unit_of_sale,
+          };
+          row.details.push(detail);
+        }
+      }
+
+      // Sorter detaljer per rad: tur, så kundenummer
+      for (const row of agg.values()) {
+        row.details.sort((a, b) => {
+          const ta = a.tour_number ?? 999;
+          const tb = b.tour_number ?? 999;
+          if (ta !== tb) return ta - tb;
+          const ca = a.customer_number ?? "";
+          const cb = b.customer_number ?? "";
+          return ca.localeCompare(cb, "nb", { numeric: true });
+        });
       }
 
       // Beregn produksjon, plater, liter
