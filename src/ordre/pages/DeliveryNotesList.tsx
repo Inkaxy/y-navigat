@@ -44,6 +44,8 @@ export default function DeliveryNotesList() {
 
   const { data: tours = [] } = useDeliveryTours({ activeOnly: true });
   const { data: rows = [], isLoading } = useDeliveryNotesList(date, tourParam);
+  const { data: pendingRows = [], isLoading: pendingLoading } = usePendingRecurringOrderRows(date, tourParam);
+  const generate = useGenerateDeliveryNotes();
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
