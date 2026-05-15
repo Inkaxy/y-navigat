@@ -429,7 +429,11 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
       }
 
       // Aggregeringsnøkkel
+      // Sammenslåing av varer i samme produksjonsgruppe skjer KUN når
+      // `merge_by_main_product` er aktivert (mergeOn). Aggregeringsmodusene
+      // styrer bare sortering/visning, ikke om varer skal slås sammen.
       const keyOf = (p: ProductRow): string => {
+        if (!mergeOn) return `p:${p.id}`;
         if (criteria.aggregation === "per_product") return `p:${p.id}`;
         if (criteria.aggregation === "per_production_group") return `pg:${p.production_group_id ?? `_${p.id}`}`;
         // per_main_and_production_group
