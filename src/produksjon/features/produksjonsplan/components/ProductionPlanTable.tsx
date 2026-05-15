@@ -36,6 +36,14 @@ function fmtNum(n: number | null | undefined, digits = 0): string {
 }
 
 export function ProductionPlanTable({ rows, showByMainGroup, showTraysWithPlus, loading, columns }: Props) {
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const toggle = (k: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(k)) next.delete(k);
+      else next.add(k);
+      return next;
+    });
   // Skjerm: rowspans for hovedgruppe-kolonnen
   const groupSpans = new Map<number, number>();
   if (showByMainGroup && columns.mainGroup) {
