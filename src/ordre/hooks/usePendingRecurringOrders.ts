@@ -139,7 +139,7 @@ export async function fetchPendingRecurringOrderRows(
     await Promise.all([
       supabase
         .from("recurring_order_schedules")
-        .select("id, customer_id, recurring_order_items!inner(tour_id, quantity), customer:customers(display_name, customer_number)")
+        .select("id, customer_id, recurring_order_items!inner(tour_id, quantity)")
         .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
         .eq("is_active", true)
         .or(`valid_from.is.null,valid_from.lte.${date}`)
