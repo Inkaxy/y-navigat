@@ -174,10 +174,9 @@ export async function fetchPendingRecurringOrderRows(
     id: string;
     customer_id: string;
     recurring_order_items?: Array<{ tour_id: string | null; quantity: number | string | null }>;
-    customer?: { display_name: string | null; customer_number: string | null } | null;
   };
 
-  const rows: PendingRecurringOrderRow[] = [];
+  const filtered: Array<{ row: Row; resolvedTourId: string | null }> = [];
   for (const s of (schedules ?? []) as Row[]) {
     if (materialized.has(s.id) || paused.has(s.customer_id)) continue;
     const tourIds = new Set(
@@ -192,17 +191,35 @@ export async function fetchPendingRecurringOrderRows(
     } else if (tourFilter !== "all") {
       if (resolvedTourId !== tourFilter) continue;
     }
+    filtered.push({ row: s, resolvedTourId });
+  }
 
+  // Hent kunde-info i én spørring (ingen FK-relasjon å hente via PostgREST).
+  const customerIds = Array.from(new Set(filtered.map((f) => f.row.customer_id)));
+  const customerById = new Map<string, { display_name: string | null; customer_number: string | null }>();
+  if (customerIds.length > 0) {
+    const { data: customers, error: custErr } = await supabase
+      .from("customers")
+      .select("id, display_name, customer_number")
+      .in("id", customerIds);
+    if (custErr) throw custErr;
+    for (const c of customers ?? []) {
+      customerById.set(c.id as string, { display_name: c.display_name as string | null, customer_number: c.customer_number as string | null });
+    }
+  }
+
+  const rows: PendingRecurringOrderRow[] = filtered.map(({ row, resolvedTourId }) => {
     const tour = resolvedTourId ? tourById.get(resolvedTourId) : null;
-    rows.push({
-      schedule_id: s.id,
-      customer_id: s.customer_id,
-      customer_display_name: s.customer?.display_name ?? "—",
-      customer_number: s.customer?.customer_number ?? null,
+    const cust = customerById.get(row.customer_id);
+    return {
+      schedule_id: row.id,
+      customer_id: row.customer_id,
+      customer_display_name: cust?.display_name ?? "—",
+      customer_number: cust?.customer_number ?? null,
       tour_id: resolvedTourId,
       tour_label: tour ? `Tur ${(tour as DeliveryTourLike).tour_number}` : null,
-    });
-  }
+    };
+  });
   return rows.sort((a, b) => a.customer_display_name.localeCompare(b.customer_display_name, "nb"));
 }
 
