@@ -243,6 +243,8 @@ export function useSaveRecurringSchedule() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["recurring-schedules"] });
       void qc.invalidateQueries({ queryKey: ["recurring-schedule-detail"] });
+      void qc.invalidateQueries({ queryKey: ["delivery-note-counts"] });
+      void qc.invalidateQueries({ queryKey: ["tour-order-counts"] });
     },
   });
 }
