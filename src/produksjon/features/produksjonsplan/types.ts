@@ -31,6 +31,7 @@ export const DEFAULT_CRITERIA: ProduksjonsplanCriteria = {
   sort_by: "product_number",
   customer_group_ids: [],
   print_correction_last: true,
+  merge_by_main_product: false,
 };
 
 export interface ProductionPlanRow {
