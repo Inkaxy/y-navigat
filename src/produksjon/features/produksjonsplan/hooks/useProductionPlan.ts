@@ -117,9 +117,22 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
             return criteria.customer_group_ids.some((g) => groups.has(g));
           });
 
-      // Sett av kunder som allerede har faktisk ordre på denne datoen — for å unngå
-      // dobbeltelling når fastordre-malen også gjelder.
-      const customersWithOrder = new Set(finalOrders.map((o) => o.customer_id));
+      // Fastordre = grunnlaget. Faktisk kundeordre overstyrer fastordre PER PRODUKT
+      // (kunden kan justere opp/ned). Andre produkter i fastordren beholdes.
+      // Vi henter ordrelinjer tidlig her for å bygge (customer_id, product_id)-sett
+      // som skal ekskluderes fra fastordre-ekspansjonen.
+      const customerProductOverride = new Set<string>(); // `${customer_id}|${product_id}`
+      const orderIdToCustomer = new Map(finalOrders.map((o) => [o.id, o.customer_id]));
+      if (finalOrders.length > 0) {
+        const { data: preLines } = await supabase
+          .from("order_lines")
+          .select("order_id, product_id")
+          .in("order_id", finalOrders.map((o) => o.id));
+        for (const l of preLines ?? []) {
+          const cid = orderIdToCustomer.get(l.order_id);
+          if (cid && l.product_id) customerProductOverride.add(`${cid}|${l.product_id}`);
+        }
+      }
 
       // === Fastordre (recurring) — virtuelle linjer ===========================
       // Maler genererer ikke faktiske ordre, men skal vises på produksjonslista.
@@ -153,10 +166,11 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
         }>) {
           if (sched.valid_from && date < sched.valid_from) continue;
           if (sched.valid_to && date > sched.valid_to) continue;
-          if (customersWithOrder.has(sched.customer_id)) continue;
           for (const item of sched.recurring_order_items ?? []) {
             if (item.weekday !== dow) continue;
             if (!item.quantity || Number(item.quantity) <= 0) continue;
+            // Per-produkt overstyring: hopp over hvis kunden har dette produktet i en faktisk ordre
+            if (customerProductOverride.has(`${sched.customer_id}|${item.product_id}`)) continue;
             const targetTours = item.tour_id ? [item.tour_id] : activeTourIdsForDow;
             for (const tid of targetTours) {
               const tn = tourMap.get(tid) ?? null;
