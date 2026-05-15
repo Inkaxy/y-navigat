@@ -115,9 +115,9 @@ export function CorrectionPlanTable({ rows, showByMainGroup, showTraysWithPlus, 
               )}
               <TableRow
                 data-zebra={isZebra ? "1" : "0"}
-                data-cat-color={categoryColor(r.main_category_code) ? "1" : "0"}
+                data-cat-color={isZebra && categoryColor(r.main_category_code) ? "1" : "0"}
                 style={(() => {
-                  const c = categoryColor(r.main_category_code);
+                  const c = isZebra ? categoryColor(r.main_category_code) : null;
                   return c
                     ? ({
                         backgroundColor: c.bg,
@@ -126,9 +126,9 @@ export function CorrectionPlanTable({ rows, showByMainGroup, showTraysWithPlus, 
                     : undefined;
                 })()}
                 className={
-                  categoryColor(r.main_category_code)
-                    ? (isZebra ? "brightness-95" : undefined)
-                    : (isZebra ? "bg-muted/50" : undefined)
+                  !isZebra
+                    ? undefined
+                    : (categoryColor(r.main_category_code) ? undefined : "bg-muted/50")
                 }
               >
                 {columns.doughType && (
