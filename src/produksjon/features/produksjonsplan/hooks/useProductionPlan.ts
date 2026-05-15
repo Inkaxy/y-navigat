@@ -166,10 +166,11 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
         }>) {
           if (sched.valid_from && date < sched.valid_from) continue;
           if (sched.valid_to && date > sched.valid_to) continue;
-          if (customersWithOrder.has(sched.customer_id)) continue;
           for (const item of sched.recurring_order_items ?? []) {
             if (item.weekday !== dow) continue;
             if (!item.quantity || Number(item.quantity) <= 0) continue;
+            // Per-produkt overstyring: hopp over hvis kunden har dette produktet i en faktisk ordre
+            if (customerProductOverride.has(`${sched.customer_id}|${item.product_id}`)) continue;
             const targetTours = item.tour_id ? [item.tour_id] : activeTourIdsForDow;
             for (const tid of targetTours) {
               const tn = tourMap.get(tid) ?? null;
