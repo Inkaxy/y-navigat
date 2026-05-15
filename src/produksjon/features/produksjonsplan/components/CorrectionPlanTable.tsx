@@ -1,5 +1,6 @@
 import { Fragment } from "react";
 import type { ProductionPlanRow, ProduksjonsplanCriteria } from "../types";
+import { categoryColor } from "../lib/categoryColor";
 import {
   Table,
   TableBody,
@@ -112,7 +113,24 @@ export function CorrectionPlanTable({ rows, showByMainGroup, showTraysWithPlus, 
                   </TableCell>
                 </TableRow>
               )}
-              <TableRow data-zebra={isZebra ? "1" : "0"} className={isZebra ? "bg-muted/50" : undefined}>
+              <TableRow
+                data-zebra={isZebra ? "1" : "0"}
+                data-cat-color={categoryColor(r.main_category_code) ? "1" : "0"}
+                style={(() => {
+                  const c = categoryColor(r.main_category_code);
+                  return c
+                    ? ({
+                        backgroundColor: c.bg,
+                        ["--print-bg" as string]: c.print,
+                      } as React.CSSProperties)
+                    : undefined;
+                })()}
+                className={
+                  categoryColor(r.main_category_code)
+                    ? (isZebra ? "brightness-95" : undefined)
+                    : (isZebra ? "bg-muted/50" : undefined)
+                }
+              >
                 {columns.doughType && (
                   <TableCell className="text-xs text-muted-foreground">{r.dough_type ?? ""}</TableCell>
                 )}

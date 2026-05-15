@@ -1,6 +1,7 @@
 import { Fragment, useState } from "react";
 import { ChevronRight } from "lucide-react";
 import type { ProductionPlanRow } from "../types";
+import { categoryColor } from "../lib/categoryColor";
 import {
   Table,
   TableBody,
@@ -149,6 +150,7 @@ export function ProductionPlanTable({ rows, showByMainGroup, showTraysWithPlus, 
           const isExpanded = expanded.has(rowKey);
           const hasDetails = (r.details?.length ?? 0) > 0;
           const detailColSpan = printColCount; // strekker over alle "data"-kolonner (uten Hovedgr.)
+          const color = categoryColor(r.main_category_code);
           return (
             <Fragment key={rowKey}>
               {sectionStart && (
@@ -160,10 +162,23 @@ export function ProductionPlanTable({ rows, showByMainGroup, showTraysWithPlus, 
               )}
               <TableRow
                 data-zebra={isZebra ? "1" : "0"}
+                data-cat-color={color ? "1" : "0"}
+                style={
+                  color
+                    ? ({
+                        // Skjerm: alltid kategorifarge; sebra blir litt mørkere variant
+                        backgroundColor: color.bg,
+                        // Print: hex-versjon (sikrere for print-color-adjust)
+                        // CSS custom prop brukt av .print-area regel i index.css
+                        ["--print-bg" as string]: color.print,
+                      } as React.CSSProperties)
+                    : undefined
+                }
                 className={cn(
-                  isZebra && "bg-muted/50",
-                  hasDetails && "cursor-pointer print:cursor-auto hover:bg-accent/40",
-                  isExpanded && "bg-accent/30",
+                  !color && isZebra && "bg-muted/50",
+                  color && isZebra && "brightness-95",
+                  hasDetails && "cursor-pointer print:cursor-auto hover:brightness-95",
+                  isExpanded && !color && "bg-accent/30",
                 )}
                 onClick={() => hasDetails && toggle(rowKey)}
               >
