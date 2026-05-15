@@ -57,6 +57,21 @@ export interface ProductionPlanRow {
   on_stock: number | null;
   /** Sortering: tur-nummer rad er knyttet til (når sum_tours=false) */
   tour_number: number | null;
+  /** Per-kunde linjer som inngår i denne aggregerte raden (for «trykk for å se hvem som har bestilt») */
+  details: ProductionPlanRowDetail[];
+}
+
+export interface ProductionPlanRowDetail {
+  customer_id: string;
+  customer_number: string | null;
+  customer_name: string;
+  address: string | null;
+  tour_number: number | null;
+  tour_name: string | null;
+  product_id: string;
+  product_code: string | null;
+  quantity: number;
+  unit_of_sale: string | null;
 }
 
 export interface CriteriaTemplate {
