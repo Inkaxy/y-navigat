@@ -156,11 +156,18 @@ export function SettKriteriaDialog({ open, onOpenChange, legalEntityId, initial,
               <label className="flex items-center gap-2 text-sm pt-1">
                 <Checkbox
                   checked={!!c.merge_by_main_product}
-                  disabled={c.aggregation !== "per_product"}
-                  onCheckedChange={(v) => setC({ ...c, merge_by_main_product: !!v })}
+                  onCheckedChange={(v) =>
+                    setC({
+                      ...c,
+                      merge_by_main_product: !!v,
+                      // Sammenslåing fungerer kun pr varenr — bytt automatisk
+                      aggregation: v ? "per_product" : c.aggregation,
+                    })
+                  }
                 />
-                <span className={c.aggregation !== "per_product" ? "text-muted-foreground" : ""}>
+                <span>
                   Slå sammen varer i samme produksjonsgruppe (vis som hovedvare)
+                  <span className="text-muted-foreground"> — setter aggregering til «Pr varenr»</span>
                 </span>
               </label>
             </section>
