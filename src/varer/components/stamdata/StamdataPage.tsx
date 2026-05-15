@@ -132,6 +132,7 @@ export function StamdataPage({
   usageChecks,
   extraFields = [],
   extraColumns = [],
+  extraProductPicker,
 }: StamdataPageProps) {
   const qc = useQueryClient();
   const { canWrite, legalEntityId } = useAppContext();
@@ -141,6 +142,7 @@ export function StamdataPage({
   const [deleting, setDeleting] = useState<StamdataRow | null>(null);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [form, setForm] = useState(() => emptyForm(extraFields));
+  const [pickerValue, setPickerValue] = useState<string>("");
   const [saving, setSaving] = useState(false);
 
   /* ----- Hovedliste ----- */
