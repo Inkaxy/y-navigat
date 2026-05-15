@@ -45,8 +45,38 @@ import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
 
 export default function DeliveryNoteDashboard() {
   const navigate = useNavigate();
-  const [date, setDate] = useState<string>(todayISO());
-  const [tourId, setTourId] = useState<string>("all");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const date = searchParams.get("date") || todayISO();
+  const tourId = searchParams.get("tour") || "all";
+  const setDate = useCallback(
+    (next: string | ((prev: string) => string)) => {
+      setSearchParams(
+        (prev) => {
+          const cur = prev.get("date") || todayISO();
+          const value = typeof next === "function" ? (next as (p: string) => string)(cur) : next;
+          const np = new URLSearchParams(prev);
+          np.set("date", value);
+          return np;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
+  const setTourId = useCallback(
+    (next: string) => {
+      setSearchParams(
+        (prev) => {
+          const np = new URLSearchParams(prev);
+          if (next && next !== "all") np.set("tour", next);
+          else np.delete("tour");
+          return np;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
   const [pickerOpen, setPickerOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmCorrectionOpen, setConfirmCorrectionOpen] = useState(false);
