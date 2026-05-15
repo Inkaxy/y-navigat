@@ -1,5 +1,8 @@
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
+import { useDeliveryTours } from "@/ordre/hooks/useDeliveryTours";
+import { NULL_TOUR_KEY } from "@/ordre/hooks/useTourRunStatus";
 
 type DeliveryTourLike = {
   id: string;
