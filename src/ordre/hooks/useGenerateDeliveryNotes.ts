@@ -43,6 +43,7 @@ export function useGenerateDeliveryNotes() {
       qc.invalidateQueries({ queryKey: ["delivery-note-counts"] });
       qc.invalidateQueries({ queryKey: ["delivery-notes-list"] });
       qc.invalidateQueries({ queryKey: ["delivery-note-runs"] });
+      qc.invalidateQueries({ queryKey: ["tour-order-counts"] });
       qc.invalidateQueries({ queryKey: ["active-pauses"] });
     },
   });

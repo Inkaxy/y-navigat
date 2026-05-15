@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
+import { NULL_TOUR_KEY } from "@/ordre/hooks/useTourRunStatus";
 
 export type DeliveryNoteRow = {
   id: string;
@@ -12,6 +13,11 @@ export type DeliveryNoteRow = {
   status: string;
   total_incl_vat: number;
   line_count: number;
+};
+
+type DeliveryNoteListQueryRow = Omit<DeliveryNoteRow, "line_count" | "total_incl_vat"> & {
+  total_incl_vat: number | string | null;
+  delivery_note_lines: Array<{ id: string }> | null;
 };
 
 export function useDeliveryNotesList(date: string, tourId: string) {
@@ -28,12 +34,13 @@ export function useDeliveryNotesList(date: string, tourId: string) {
         .neq("status", "cancelled")
         .order("display_number", { ascending: true });
 
-      if (tourId !== "all") q = q.eq("delivery_tour_id", tourId);
+      if (tourId === NULL_TOUR_KEY) q = q.is("delivery_tour_id", null);
+      else if (tourId !== "all") q = q.eq("delivery_tour_id", tourId);
 
       const { data, error } = await q;
       if (error) throw error;
 
-      return (data ?? []).map((row: any) => ({
+      return ((data ?? []) as DeliveryNoteListQueryRow[]).map((row) => ({
         id: row.id,
         display_number: row.display_number,
         customer_id: row.customer_id,

@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
+import { fetchPendingRecurringOrderCounts } from "@/ordre/hooks/usePendingRecurringOrders";
 
 export type DeliveryTour = {
   id: string;
@@ -112,19 +113,25 @@ export type TourOrderCounts = {
 
 /** Antall ordrer per tur for en gitt dato. Inkluderer "Uten tur"-bøtte. */
 export function useTourOrderCounts(isoDate: string) {
+  const toursQ = useDeliveryTours({ activeOnly: true });
+
   return useQuery({
-    queryKey: ["tour-order-counts", isoDate],
+    queryKey: ["tour-order-counts", isoDate, toursQ.data],
+    enabled: !toursQ.isLoading,
     queryFn: async (): Promise<TourOrderCounts> => {
-      const { data, error } = await supabase
-        .from("orders")
-        .select("delivery_tour_id")
-        .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
-        .eq("delivery_date", isoDate)
-        .eq("is_return", false)
-        .in("status", TOUR_COUNT_STATUS_WHITELIST as unknown as string[]);
+      const [{ data, error }, pendingRecurring] = await Promise.all([
+        supabase
+          .from("orders")
+          .select("delivery_tour_id")
+          .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
+          .eq("delivery_date", isoDate)
+          .eq("is_return", false)
+          .in("status", TOUR_COUNT_STATUS_WHITELIST as unknown as string[]),
+        fetchPendingRecurringOrderCounts(isoDate, toursQ.data ?? []),
+      ]);
       if (error) throw error;
-      const byTour: Record<string, number> = {};
-      let nullTourCount = 0;
+      const byTour: Record<string, number> = { ...pendingRecurring.byTour };
+      let nullTourCount = pendingRecurring.nullTourCount;
       for (const r of data ?? []) {
         const id = (r as { delivery_tour_id: string | null }).delivery_tour_id;
         if (id) byTour[id] = (byTour[id] ?? 0) + 1;
