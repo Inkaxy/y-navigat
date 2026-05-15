@@ -1,0 +1,1 @@
+ALTER TABLE public.production_groups ADD COLUMN IF NOT EXISTS main_product_id uuid REFERENCES public.products(id) ON DELETE SET NULL;

@@ -1,33 +1,39 @@
-## Hva som er feil
+# Hovedvare per produksjonsgruppe + valgfri sammenslåing
 
-Kunder-appen har sin egen, isolerte selskapsvelger (`SelectedEntityProvider` i `src/kunder/state/SelectedEntityContext.tsx`) som lagrer valg i localStorage-nøkkelen `kunder_selected_legal_entity`. Det finnes **ingen UI** for å bytte selskap inne i Kunder-appen — banneret har bare en "Ny kunde"-knapp. Topbar/CompanySelector skriver kun til den globale `SelectionProvider` (`nbhub.selection`), så bytter der påvirker ikke Kunder.
+## Mål
+Når flere varer er pakket ulikt, men er samme bakevare (f.eks. nr. 1 Kneipp og nr. 701 Kneipp), skal de **kunne** slås sammen til én linje på produksjonsplanen — vist som hovedvarens nummer/navn med summert antall. Sammenslåingen må kunne skrus av/på per utskrift.
 
-Resultat for deg nå:
-- `selected` i Kunder leses fra localStorage og treffer enten et selskap uten kunder (NB AS) eller `__ALL__`. Verifisert i DB: de 2 kundene (Teie, Meny Eiktoppen) ligger i NBE (`751709bc-...`), ikke i selskapet velgeren peker på.
-- "Ny kunde" er disabled fordi `canCreateInScope = !isAll && !!selected && hasKunderWrite` — enten `isAll = true` (`__ALL__`) eller selected peker på et entity hvor du faktisk har skrive-tilgang men ikke ser kundene som ligger i NBE.
+Eksempel (sammenslåing PÅ):
+- Bestilt: nr. 1 Kneipp × 20, nr. 701 Kneipp × 25
+- Vises som: **Varenummer 1 Kneipp = 45**
 
-Du har skrive-tilgang (daglig_leder/plattform_ansvarlig → admin på `kunder`-appen), så tilgang er ikke problemet — det er bare at appen viser feil selskap og ikke gir deg mulighet til å bytte.
+Sammenslåing AV: vises som to linjer (nr. 1 = 20, nr. 701 = 25), som i dag.
 
-## Fiks
+## Endringer
 
-Fjern den isolerte Kunder-konteksten og bruk global `SelectionProvider` (samme som Ordre/Råvarer bruker). Da følger Kunder-appen selskapsvelgeren i topbar.
+### 1. Database
+Legg til `main_product_id uuid` (FK → products.id, nullable, ON DELETE SET NULL) på `production_groups`. Hvis ikke satt og sammenslåing er PÅ, faller aggregeringen tilbake på gruppens display_name.
 
-### Endringer
+### 2. Innstillinger – Produksjonsgrupper
+Utvid `StamdataPage` med ny prop `extraProductPicker` for valg av hovedvare (filtrert til produkter i samme produksjonsgruppe i samme selskap). Vises som ekstra kolonne ("Hovedvare") og felt i ny/rediger-dialog.
 
-1. **`src/kunder/state/SelectedEntityContext.tsx`** — beholdes som tynn adapter:
-   - `useSelectedEntity()` returnerer nå `{ selected, setSelected, isAll }` basert på `useSelection()` fra `@/providers/SelectionProvider`. `selected = legalEntityId` (eller `ALL_ENTITIES` hvis det er satt eksplisitt). `setSelected` kaller `setLegalEntityId` og invaliderer `customers`/`customer`/`price-lists` queries.
-   - `SelectedEntityProvider` blir en passthrough som ved første mount sjekker: hvis global `legalEntityId` er null og `defaultEntityId` finnes (brukerens primær-entity), kall `setLegalEntityId(defaultEntityId)`. Migrer eventuell verdi fra `kunder_selected_legal_entity` én gang og slett nøkkelen.
+### 3. Kriteria – ny toggle
+- I `ProduksjonsplanCriteria`: ny `merge_by_main_product: boolean` (default `false`).
+- I `SettKriteriaDialog` (under "Slå sammen til produksjonsvarer"): ny checkbox **"Slå sammen varer i samme produksjonsgruppe (vis som hovedvare)"**. Aktiv kun når `aggregation === "per_product"` (de andre modusene aggregerer allerede).
 
-2. **`src/App.tsx`** — `KunderEntityProvider` beholdes som er (sender fortsatt `defaultEntityId={access?.primaryEntityId}`).
+### 4. Produksjonsplan-aggregering (`useProductionPlan.ts`)
+Når `merge_by_main_product = true` og `aggregation = per_product`:
+- Hent `main_product_id` for hver produksjonsgruppe brukt i resultatet.
+- Erstatt aggregeringsnøkkelen for produkter med produksjonsgruppe: bruk `mainProductId` i stedet for produktets egen id.
+- Bruk hovedvarens `display_number`, `display_name`, `unit_of_sale`, `pieces_per_tray`, `pieces_per_liter` på den slåtte raden.
+- Produkter uten produksjonsgruppe eller uten satt hovedvare beholder sin egen rad.
 
-3. **Ingen endringer i `CustomerList.tsx` / `useCustomers.ts`** — de leser fortsatt via `useSelectedEntity()`.
+For `per_production_group` / `per_main_and_production_group`: bruk hovedvarens info når satt (fallback gruppens navn).
 
-### Migrering av eksisterende localStorage
-
-I provider-mount: hvis `localStorage.kunder_selected_legal_entity` finnes og global `legalEntityId` er null, sett global til den verdien, så fjern nøkkelen.
-
-### Verifisering etter implementering
-
-- Last `/kunder/kundeliste` — selskapet i topbar skal styre listen.
-- Bytt selskap i topbar til NBE → 2 kunder vises (Teie, Meny Eiktoppen — Meny er inactive, så filter "Aktive" viser kun Teie).
-- "Ny kunde"-knapp aktiv når et spesifikt selskap er valgt.
+## Filer
+- `supabase/migrations/...` — `main_product_id` på `production_groups`
+- `src/varer/components/stamdata/StamdataPage.tsx` — støtte for hovedvare-velger
+- `src/varer/pages/settings/SettingsProductionGroups.tsx` — ny prop
+- `src/produksjon/features/produksjonsplan/types.ts` — `merge_by_main_product`
+- `src/produksjon/features/produksjonsplan/components/SettKriteriaDialog.tsx` — ny checkbox
+- `src/produksjon/features/produksjonsplan/hooks/useProductionPlan.ts` — bruk hovedvare i aggregering

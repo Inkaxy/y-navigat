@@ -76,6 +76,16 @@ export type StamdataUsageCheck = {
   column: string;
 };
 
+export type ExtraProductPicker = {
+  /** Felt-navn på stamdata-tabellen, f.eks. "main_product_id". */
+  key: string;
+  label: string;
+  /** Kolonne på products som må matche stamdata-radens id, f.eks. "production_group_id". */
+  productFilterColumn: string;
+  /** Kun aktive produkter (status='active'). Default true. */
+  activeOnly?: boolean;
+};
+
 export type StamdataPageProps = {
   title: string;
   description: string;
@@ -90,6 +100,8 @@ export type StamdataPageProps = {
   extraFields?: ExtraSelectField[];
   /** Ekstra kolonner i tabellen (f.eks. visning av main_category_navn). */
   extraColumns?: ExtraColumn[];
+  /** Valgfri picker for å koble til et produkt (f.eks. hovedvare). Kun synlig ved redigering. */
+  extraProductPicker?: ExtraProductPicker;
 };
 
 /* ---------- Hjelpere ---------- */
@@ -120,6 +132,7 @@ export function StamdataPage({
   usageChecks,
   extraFields = [],
   extraColumns = [],
+  extraProductPicker,
 }: StamdataPageProps) {
   const qc = useQueryClient();
   const { canWrite, legalEntityId } = useAppContext();
@@ -129,6 +142,7 @@ export function StamdataPage({
   const [deleting, setDeleting] = useState<StamdataRow | null>(null);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [form, setForm] = useState(() => emptyForm(extraFields));
+  const [pickerValue, setPickerValue] = useState<string>("");
   const [saving, setSaving] = useState(false);
 
   /* ----- Hovedliste ----- */
@@ -202,6 +216,31 @@ export function StamdataPage({
     },
   });
 
+  /* ----- Produkt-picker (f.eks. hovedvare) ----- */
+  const pickerProductsQuery = useQuery<Array<{ id: string; display_number: number | null; display_name: string; status: string }>>({
+    queryKey: ["stamdata-picker-products", tableName, editing?.id, extraProductPicker?.productFilterColumn, legalEntityId],
+    enabled: !!extraProductPicker && !!editing?.id,
+    queryFn: async () => {
+      const { data, error } = await (supabase
+        .from("products") as unknown as {
+          select: (s: string) => {
+            eq: (col: string, val: string) => {
+              eq: (col: string, val: string) => {
+                order: (col: string) => Promise<{ data: Array<{ id: string; display_number: number | null; display_name: string; status: string }> | null; error: { message: string } | null }>;
+              };
+            };
+          };
+        })
+        .select("id, display_number, display_name, status")
+        .eq("legal_entity_id", legalEntityId as string)
+        .eq(extraProductPicker!.productFilterColumn, editing!.id)
+        .order("display_number");
+      if (error) throw error;
+      const rows = (data ?? []) as Array<{ id: string; display_number: number | null; display_name: string; status: string }>;
+      return extraProductPicker!.activeOnly === false ? rows : rows.filter((p) => p.status === "active");
+    },
+  });
+
   /* ----- Filtrert liste ----- */
   const filtered = useMemo(() => {
     const rows = listQuery.data ?? [];
@@ -217,6 +256,7 @@ export function StamdataPage({
   /* ----- Åpne ny ----- */
   function openNew() {
     setForm(emptyForm(extraFields));
+    setPickerValue("");
     setEditing(null);
     setCreating(true);
   }
@@ -236,6 +276,10 @@ export function StamdataPage({
       status: row.status ?? "active",
       ...extras,
     });
+    if (extraProductPicker) {
+      const v = row[extraProductPicker.key];
+      setPickerValue(v == null ? "" : String(v));
+    }
     setEditing(row);
     setCreating(false);
   }
@@ -284,6 +328,9 @@ export function StamdataPage({
     };
     for (const f of extraFields) {
       payload[f.key] = form[f.key as keyof typeof form] || null;
+    }
+    if (extraProductPicker && editing) {
+      payload[extraProductPicker.key] = pickerValue || null;
     }
 
     setSaving(true);
@@ -559,6 +606,36 @@ export function StamdataPage({
                 </div>
               );
             })}
+
+            {extraProductPicker && editing && (
+              <div>
+                <Label>{extraProductPicker.label}</Label>
+                <Select
+                  value={pickerValue || "__none__"}
+                  onValueChange={(v) => setPickerValue(v === "__none__" ? "" : v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Velg hovedvare…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">— Ingen —</SelectItem>
+                    {(pickerProductsQuery.data ?? []).map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.display_number != null && (
+                          <span className="font-mono text-xs mr-1">#{p.display_number}</span>
+                        )}
+                        {p.display_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {(pickerProductsQuery.data ?? []).length === 0 && !pickerProductsQuery.isLoading && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Ingen produkter er knyttet til denne gruppen ennå.
+                  </p>
+                )}
+              </div>
+            )}
 
             <div>
               <Label htmlFor="sd-desc">Beskrivelse</Label>
