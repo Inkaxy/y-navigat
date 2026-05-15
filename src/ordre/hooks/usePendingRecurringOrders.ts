@@ -1,6 +1,18 @@
 import { supabase } from "@/integrations/supabase/client";
 import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
-import { isoDayOfWeek, type DeliveryTour } from "@/ordre/hooks/useDeliveryTours";
+
+type DeliveryTourLike = {
+  id: string;
+  tour_number: number;
+  status: string;
+  active_monday: boolean;
+  active_tuesday: boolean;
+  active_wednesday: boolean;
+  active_thursday: boolean;
+  active_friday: boolean;
+  active_saturday: boolean;
+  active_sunday: boolean;
+};
 
 export type PendingRecurringOrderCounts = {
   total: number;
@@ -14,7 +26,13 @@ type RecurringScheduleRow = {
   recurring_order_items?: Array<{ tour_id: string | null; quantity: number | string | null }>;
 };
 
-function activeTourForDate(tour: DeliveryTour, isoDow: number) {
+function isoDayOfWeek(isoDate: string): number {
+  const d = new Date(`${isoDate}T12:00:00`);
+  const js = d.getDay();
+  return js === 0 ? 7 : js;
+}
+
+function activeTourForDate(tour: DeliveryTourLike, isoDow: number) {
   const keys = [
     "active_monday",
     "active_tuesday",
@@ -27,7 +45,7 @@ function activeTourForDate(tour: DeliveryTour, isoDow: number) {
   return tour.status === "active" && tour[keys[isoDow - 1]];
 }
 
-function resolveFallbackTourId(tours: DeliveryTour[], isoDow: number) {
+function resolveFallbackTourId(tours: DeliveryTourLike[], isoDow: number) {
   return tours
     .filter((tour) => activeTourForDate(tour, isoDow))
     .slice()
@@ -36,7 +54,7 @@ function resolveFallbackTourId(tours: DeliveryTour[], isoDow: number) {
 
 export async function fetchPendingRecurringOrderCounts(
   date: string,
-  tours: DeliveryTour[],
+  tours: DeliveryTourLike[],
 ): Promise<PendingRecurringOrderCounts> {
   const weekday = isoDayOfWeek(date);
   const fallbackTourId = resolveFallbackTourId(tours, weekday);
