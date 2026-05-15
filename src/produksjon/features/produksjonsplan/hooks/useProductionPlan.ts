@@ -305,12 +305,38 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
         for (const p of extra ?? []) productMap.set(p.id, p as ProductRow);
       }
 
+      // 5c) Fallback: hvis sammenslåing er på og en gruppe IKKE har hovedvare satt,
+      // velg automatisk det laveste varenummeret i gruppen som representant.
+      const fallbackMainByGroup = new Map<string, string>(); // group_id -> product_id
+      if (mergeOn) {
+        const byGroup = new Map<string, ProductRow[]>();
+        for (const p of productMap.values()) {
+          if (!p.production_group_id) continue;
+          const g = prodGroupMap.get(p.production_group_id);
+          if (!g || g.main_product_id) continue;
+          const arr = byGroup.get(p.production_group_id) ?? [];
+          arr.push(p);
+          byGroup.set(p.production_group_id, arr);
+        }
+        for (const [gid, arr] of byGroup) {
+          if (arr.length < 2) continue;
+          arr.sort((a, b) => {
+            const an = a.display_number ?? Number.POSITIVE_INFINITY;
+            const bn = b.display_number ?? Number.POSITIVE_INFINITY;
+            if (an !== bn) return an - bn;
+            return a.display_name.localeCompare(b.display_name, "nb");
+          });
+          fallbackMainByGroup.set(gid, arr[0].id);
+        }
+      }
+
       const effectiveProductFor = (p: ProductRow): ProductRow => {
         if (!mergeOn) return p;
         if (!p.production_group_id) return p;
         const g = prodGroupMap.get(p.production_group_id);
-        if (!g?.main_product_id) return p;
-        return productMap.get(g.main_product_id) ?? p;
+        const mainId = g?.main_product_id ?? fallbackMainByGroup.get(p.production_group_id) ?? null;
+        if (!mainId) return p;
+        return productMap.get(mainId) ?? p;
       };
 
 
