@@ -84,6 +84,9 @@
     --muted-foreground:      var(--text-secondary);
     --accent:                var(--surface-sunken);
     --accent-foreground:     var(--text-primary);
+    --production-row:        0 0% 100%;
+    --production-row-zebra:  220 14% 93%;
+    --production-row-hover:  220 14% 90%;
     --destructive:           var(--state-danger);
     --destructive-foreground: var(--text-on-accent);
     --danger:                var(--state-danger);
@@ -247,6 +250,18 @@
       0 0 0 1px hsl(var(--brand-bronze) / 0.25),
       0 0 0 3px hsl(var(--surface-canvas)),
       0 0 0 4px hsl(var(--brand-bronze) / 0.18);
+  }
+
+  .production-zebra-table tbody tr[data-zebra="0"] > td {
+    background: hsl(var(--production-row));
+  }
+
+  .production-zebra-table tbody tr[data-zebra="1"] > td {
+    background: hsl(var(--production-row-zebra));
+  }
+
+  .production-zebra-table tbody tr[data-zebra]:hover > td {
+    background: hsl(var(--production-row-hover));
   }
 
   .shadow-xs { box-shadow: var(--shadow-xs); }

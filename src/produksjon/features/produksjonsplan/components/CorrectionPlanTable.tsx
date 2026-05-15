@@ -73,7 +73,7 @@ export function CorrectionPlanTable({ rows, showByMainGroup, showTraysWithPlus, 
   const removedKeys = Array.from(previousItems.keys()).filter((k) => !currentKeys.has(k));
 
   return (
-    <Table density="compact">
+    <Table density="compact" className="production-zebra-table">
       <TableHeader>
         <TableRow>
           {columns.doughType && <TableHead className="w-24">Deigtype</TableHead>}
@@ -115,7 +115,6 @@ export function CorrectionPlanTable({ rows, showByMainGroup, showTraysWithPlus, 
               )}
               <TableRow
                 data-zebra={isZebra ? "1" : "0"}
-                className={isZebra ? "bg-muted/40" : undefined}
               >
                 {columns.doughType && (
                   <TableCell className="text-xs text-muted-foreground">{r.dough_type ?? ""}</TableCell>

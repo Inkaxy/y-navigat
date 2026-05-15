@@ -99,7 +99,7 @@ export function ProductionPlanTable({ rows, showByMainGroup, showTraysWithPlus, 
     (columns.onStock ? 1 : 0);
 
   return (
-    <Table density="compact">
+    <Table density="compact" className="production-zebra-table">
       <TableHeader sticky>
         <TableRow>
           {showByMainGroup && columns.mainGroup && (
@@ -162,7 +162,6 @@ export function ProductionPlanTable({ rows, showByMainGroup, showTraysWithPlus, 
               <TableRow
                 data-zebra={isZebra ? "1" : "0"}
                 className={cn(
-                  isZebra && "bg-muted/40",
                   hasDetails && "cursor-pointer print:cursor-auto hover:bg-muted/60",
                   isExpanded && "bg-accent/30",
                 )}
