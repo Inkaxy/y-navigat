@@ -1,26 +1,47 @@
-## Mål
-Linjene i produksjonsplan, korreksjonsliste og utskrift skal kun veksle mellom **hvit** (oddetalls-rader) og **lysegrå** (partalls-rader). Ingen pastell-toner fra kategoripaletten.
+## Funn
 
-## Endringer
+Jeg fant tre sannsynlige årsaker til at du ikke ser forskjell:
 
-### 1. `ProductionPlanTable.tsx`
-- Fjern import og bruk av `categoryColor`.
-- Fjern `data-cat-color`-attributt og `style`-objektet som setter `backgroundColor` / `--print-bg`.
-- Forenkle `className` til:
-  - `isZebra && "bg-muted/40"` (lysegrå annenhver rad)
-  - behold `hasDetails && "cursor-pointer hover:bg-muted/60"`
-  - behold `isExpanded && "bg-accent/30"`
+1. **Stripene starter på nytt for hver hovedvaregruppe**
+   - I både `ProductionPlanTable` og `CorrectionPlanTable` beregnes zebra slik:
+     - finn siste hovedgruppe-start
+     - sett rad 1 i hver gruppe til hvit
+     - sett rad 2 i samme gruppe til grå
+   - Hvis mange hovedgrupper har én linje, eller gruppene ofte starter på nytt, blir nesten alle linjer hvite.
+   - Dette forklarer hvorfor det ikke synes i displayet.
 
-### 2. `CorrectionPlanTable.tsx`
-- Samme opprydding: fjern `categoryColor`-import, `data-cat-color`, inline-style og brightness-klasser.
-- Bare `isZebra ? "bg-muted/40" : undefined`.
+2. **Utskrift bruker samme `data-zebra`-verdi**
+   - Print-CSS farger bare rader med `data-zebra="1"`.
+   - Når mange/alle produktlinjer får `data-zebra="0"`, blir også utskriften hvit.
 
-### 3. `src/index.css` — print-regler
-- Fjern (eller forenkle) `.print-area`-regler som leser `--print-bg`.
-- Erstatt med klassisk zebra: oddetalls-print-rader får `background: #f3f4f6` (lysegrå), partalls-rader hvit. Behold `print-color-adjust: exact` så grå faktisk skrives ut.
+3. **Print-valget “Grå bakgrunn på annenhver linje” er ikke koblet til selve utskriften**
+   - Valget finnes i dialogen (`alternateRowGray`), men det sendes ikke videre til tabellen/CSS.
+   - Det betyr at innstillingen ikke faktisk styrer om radstriping brukes.
 
-### 4. `categoryColor.ts`
-- Filen brukes ikke lenger andre steder — kan slettes, eller beholdes som ubrukt. Forslag: slett for å holde koden ryddig.
+## Plan
+
+1. **Endre zebra-beregningen**
+   - Bruk produktlinjens faktiske indeks direkte: `idx % 2`.
+   - Ikke restart stripingen per hovedvaregruppe.
+   - Gruppeoverskrifter i print skal ikke telles som produktlinjer.
+
+2. **Gjør skjermvisningen tydelig**
+   - Behold cellenivå-farging på `td`, siden det overstyrer tabellens `bg-card`.
+   - Sett radene eksplisitt til:
+     - hvit for `data-zebra="0"`
+     - tydelig lysegrå for `data-zebra="1"`
+
+3. **Gjør utskrift tydelig**
+   - Overstyr print-regelen som setter alle celler til transparent.
+   - Legg inn begge print-regler etter standard print-cellene:
+     - `data-zebra="0"` = hvit
+     - `data-zebra="1"` = lysegrå
+   - Bruk `print-color-adjust: exact` videre.
+
+4. **Koble utskriftsvalget riktig**
+   - La “Grå bakgrunn på annenhver linje” faktisk styre om striping skal være aktiv i print.
+   - Skjermvisningen kan fortsatt alltid vise zebra-striping, siden det er ønsket i displayet.
 
 ## Resultat
-Skjerm og utskrift viser kun hvit + lysegrå annenhver-rad, helt uten farge per varegruppe — i tråd med ønsket utseende.
+
+Etter implementering vil annenhver produktlinje være konsekvent hvit/lysegrå på tvers av hele produksjonslisten, både i display og utskrift — uavhengig av hovedvaregruppe.
