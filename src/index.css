@@ -85,8 +85,8 @@
     --accent:                var(--surface-sunken);
     --accent-foreground:     var(--text-primary);
     --production-row:        0 0% 100%;
-    --production-row-zebra:  220 14% 93%;
-    --production-row-hover:  220 14% 90%;
+    --production-row-zebra:  220 14% 89%;
+    --production-row-hover:  220 14% 84%;
     --destructive:           var(--state-danger);
     --destructive-foreground: var(--text-on-accent);
     --danger:                var(--state-danger);
