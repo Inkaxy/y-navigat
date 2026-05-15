@@ -292,13 +292,9 @@
     font-size: 11pt !important;
     background: transparent !important;
   }
-  /* Kategorifarge på linjer — overstyrer sebrabakgrunn for klarere visuell gruppering */
-  .print-area tr[data-cat-color="1"] > td {
-    background: var(--print-bg, #ececec) !important;
-  }
-  /* Sebrastriper når raden ikke har kategorifarge */
-  .print-area tr[data-zebra="1"]:not([data-cat-color="1"]) > td {
-    background: #ececec !important;
+  /* Sebrastriper — annenhver rad lysegrå, resten hvit */
+  .print-area tr[data-zebra="1"] > td {
+    background: #f3f4f6 !important;
   }
 
   .print-area .print-page { break-after: page; page-break-after: always; }
