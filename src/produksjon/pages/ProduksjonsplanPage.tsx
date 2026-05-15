@@ -384,7 +384,7 @@ export default function ProduksjonsplanPage() {
             style={{ backgroundColor: activeColor ?? undefined }}
           >
             <span className="font-medium">{activeTemplate.name}</span>
-            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handlePrint} title="Skriv ut">
+            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setPrintProdDialog(true)} title="Skriv ut">
               <Printer className="h-3.5 w-3.5" />
             </Button>
             <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setSaveDialog(true)} title="Lagre">
