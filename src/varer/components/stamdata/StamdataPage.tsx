@@ -304,6 +304,9 @@ export function StamdataPage({
     for (const f of extraFields) {
       payload[f.key] = form[f.key as keyof typeof form] || null;
     }
+    if (extraProductPicker && editing) {
+      payload[extraProductPicker.key] = pickerValue || null;
+    }
 
     setSaving(true);
     try {
