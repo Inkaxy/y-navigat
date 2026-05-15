@@ -15,6 +15,11 @@ export type DeliveryNoteRow = {
   line_count: number;
 };
 
+type DeliveryNoteListQueryRow = Omit<DeliveryNoteRow, "line_count" | "total_incl_vat"> & {
+  total_incl_vat: number | string | null;
+  delivery_note_lines: Array<{ id: string }> | null;
+};
+
 export function useDeliveryNotesList(date: string, tourId: string) {
   return useQuery({
     queryKey: ["delivery-notes-list", date, tourId],
@@ -35,7 +40,7 @@ export function useDeliveryNotesList(date: string, tourId: string) {
       const { data, error } = await q;
       if (error) throw error;
 
-      return (data ?? []).map((row: any) => ({
+      return ((data ?? []) as DeliveryNoteListQueryRow[]).map((row) => ({
         id: row.id,
         display_number: row.display_number,
         customer_id: row.customer_id,
