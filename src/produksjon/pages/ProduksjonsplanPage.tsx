@@ -53,6 +53,16 @@ import { ProductionPlanTable, type ColumnVisibility } from "../features/produksj
 import { SettKriteriaDialog } from "../features/produksjonsplan/components/SettKriteriaDialog";
 import { HentKriteriaDialog } from "../features/produksjonsplan/components/HentKriteriaDialog";
 import { SaveTemplateDialog } from "../features/produksjonsplan/components/SaveTemplateDialog";
+import {
+  PrintProduksjonslisteDialog,
+  DEFAULT_PRINT_PRODUKSJON_OPTIONS,
+  type PrintProduksjonslisteOptions,
+} from "../features/produksjonsplan/components/PrintProduksjonslisteDialog";
+import {
+  PrintPakkelisteDialog,
+  DEFAULT_PRINT_PAKKELISTE_OPTIONS,
+  type PrintPakkelisteOptions,
+} from "../features/produksjonsplan/components/PrintPakkelisteDialog";
 
 interface UiPrefs {
   showCustomers: boolean;
@@ -112,6 +122,19 @@ export default function ProduksjonsplanPage() {
   const [hentDialog, setHentDialog] = useState(false);
   const [saveDialog, setSaveDialog] = useState(false);
   const [editingTpl, setEditingTpl] = useState<CriteriaTemplate | null>(null);
+
+  const [printProdDialog, setPrintProdDialog] = useState(false);
+  const [printPackDialog, setPrintPackDialog] = useState(false);
+  const { value: printProdDefaults, setValue: setPrintProdDefaults } =
+    useUiPreference<PrintProduksjonslisteOptions>(
+      "produksjonsplan.print.produksjon",
+      DEFAULT_PRINT_PRODUKSJON_OPTIONS,
+    );
+  const { value: printPackDefaults, setValue: setPrintPackDefaults } =
+    useUiPreference<PrintPakkelisteOptions>(
+      "produksjonsplan.print.pakkeliste",
+      DEFAULT_PRINT_PAKKELISTE_OPTIONS,
+    );
 
   const plan = useProductionPlan({ legalEntityId, date: dateStr, criteria });
   const cats = useTemplateCategories();
@@ -317,7 +340,7 @@ export default function ProduksjonsplanPage() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <Button variant="outline" onClick={handlePrint}>
+          <Button variant="outline" onClick={() => setPrintProdDialog(true)}>
             <Printer className="h-4 w-4 mr-2" />
             Skriv ut
           </Button>
@@ -330,8 +353,8 @@ export default function ProduksjonsplanPage() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-64">
-              <DropdownMenuItem disabled>Produksjonsliste (aktiv)</DropdownMenuItem>
-              <DropdownMenuItem disabled>Pakkeliste</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setPrintProdDialog(true)}>Produksjonsliste</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setPrintPackDialog(true)}>Pakkeliste</DropdownMenuItem>
               <DropdownMenuItem disabled>Spesifisert pakkeliste</DropdownMenuItem>
               <DropdownMenuItem disabled>Veieliste</DropdownMenuItem>
               <DropdownMenuItem disabled>Kvitteringsliste</DropdownMenuItem>
@@ -361,7 +384,7 @@ export default function ProduksjonsplanPage() {
             style={{ backgroundColor: activeColor ?? undefined }}
           >
             <span className="font-medium">{activeTemplate.name}</span>
-            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handlePrint} title="Skriv ut">
+            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setPrintProdDialog(true)} title="Skriv ut">
               <Printer className="h-3.5 w-3.5" />
             </Button>
             <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setSaveDialog(true)} title="Lagre">
@@ -514,6 +537,48 @@ export default function ProduksjonsplanPage() {
         criteria={criteria}
         editing={editingTpl ?? activeTemplate}
         onSaved={() => { /* refetched by hook */ }}
+      />
+
+      <PrintProduksjonslisteDialog
+        open={printProdDialog}
+        onOpenChange={setPrintProdDialog}
+        summary={summary}
+        templateName={activeTemplate?.name ?? null}
+        initial={printProdDefaults}
+        onSaveDefaults={(o) => {
+          setPrintProdDefaults(o);
+          toast({ title: "Standardvalg lagret" });
+        }}
+        onPrint={(o) => {
+          setPrintProdDefaults(o);
+          // Synk snapshot/diff-valg inn i criteria slik at handlePrint bruker samme grunnlag
+          if (o.showSnapshotDiff !== !!criteria.print_correction_last) {
+            setCriteria({ ...criteria, print_correction_last: o.showSnapshotDiff });
+          }
+          setPrintProdDialog(false);
+          // Vent én tick slik at criteria oppdateres før vi printer
+          setTimeout(() => handlePrint(), 50);
+        }}
+      />
+
+      <PrintPakkelisteDialog
+        open={printPackDialog}
+        onOpenChange={setPrintPackDialog}
+        summary={summary}
+        templateName={activeTemplate?.name ?? null}
+        initial={printPackDefaults}
+        onSaveDefaults={(o) => {
+          setPrintPackDefaults(o);
+          toast({ title: "Standardvalg lagret" });
+        }}
+        onPrint={(o) => {
+          setPrintPackDefaults(o);
+          setPrintPackDialog(false);
+          toast({
+            title: "Pakkeliste",
+            description: "Utskrift av pakkeliste er ikke implementert ennå.",
+          });
+        }}
       />
     </div>
   );
