@@ -145,8 +145,12 @@ export function ProductionPlanTable({ rows, showByMainGroup, showTraysWithPlus, 
             }
           }
           const isZebra = zebraIdx % 2 === 1;
+          const rowKey = `${r.product_id}-${idx}`;
+          const isExpanded = expanded.has(rowKey);
+          const hasDetails = (r.details?.length ?? 0) > 0;
+          const detailColSpan = printColCount; // strekker over alle "data"-kolonner (uten Hovedgr.)
           return (
-            <Fragment key={`${r.product_id}-${idx}`}>
+            <Fragment key={rowKey}>
               {sectionStart && (
                 <TableRow className="hidden print:table-row print-section-row">
                   <TableCell colSpan={printColCount}>
@@ -156,7 +160,12 @@ export function ProductionPlanTable({ rows, showByMainGroup, showTraysWithPlus, 
               )}
               <TableRow
                 data-zebra={isZebra ? "1" : "0"}
-                className={cn(isZebra && "bg-muted/50")}
+                className={cn(
+                  isZebra && "bg-muted/50",
+                  hasDetails && "cursor-pointer print:cursor-auto hover:bg-accent/40",
+                  isExpanded && "bg-accent/30",
+                )}
+                onClick={() => hasDetails && toggle(rowKey)}
               >
                 {showByMainGroup && columns.mainGroup && span > 0 && (
                   <TableCell
@@ -171,7 +180,19 @@ export function ProductionPlanTable({ rows, showByMainGroup, showTraysWithPlus, 
                 {columns.doughType && (
                   <TableCell className="text-xs text-muted-foreground">{r.dough_type ?? ""}</TableCell>
                 )}
-                <TableCell className="font-mono text-xs">{r.product_code ?? ""}</TableCell>
+                <TableCell className="font-mono text-xs">
+                  <span className="inline-flex items-center gap-1">
+                    {hasDetails && (
+                      <ChevronRight
+                        className={cn(
+                          "h-3 w-3 text-muted-foreground transition-transform print:hidden",
+                          isExpanded && "rotate-90",
+                        )}
+                      />
+                    )}
+                    {r.product_code ?? ""}
+                  </span>
+                </TableCell>
                 <TableCell>{r.product_name}</TableCell>
                 {columns.ordered && (
                   <TableCell className="text-right tabular-nums">{fmtNum(r.quantity_ordered)}</TableCell>
@@ -200,6 +221,47 @@ export function ProductionPlanTable({ rows, showByMainGroup, showTraysWithPlus, 
                   </TableCell>
                 )}
               </TableRow>
+              {isExpanded && hasDetails && (
+                <TableRow className="print:hidden bg-muted/30 hover:bg-muted/30">
+                  {showByMainGroup && columns.mainGroup && span > 0 && (
+                    <TableCell rowSpan={0} className="hidden" />
+                  )}
+                  <TableCell colSpan={detailColSpan} className="p-0">
+                    <div className="px-4 py-2">
+                      <table className="w-full text-xs">
+                        <thead className="text-muted-foreground">
+                          <tr className="border-b border-line-subtle">
+                            <th className="text-left font-medium py-1 pr-3">Kundenr</th>
+                            <th className="text-left font-medium py-1 pr-3">Kunde</th>
+                            <th className="text-left font-medium py-1 pr-3">Tur</th>
+                            <th className="text-left font-medium py-1 pr-3">Varenr</th>
+                            <th className="text-right font-medium py-1 pr-3">Antall</th>
+                            <th className="text-left font-medium py-1 pr-3">Enhet</th>
+                            <th className="text-left font-medium py-1 pr-3">Rute</th>
+                            <th className="text-left font-medium py-1">Adresse</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {r.details.map((d, di) => (
+                            <tr key={`${d.customer_id}-${d.product_id}-${di}`} className="border-b border-line-subtle/50 last:border-0">
+                              <td className="font-mono py-1 pr-3">{d.customer_number ?? ""}</td>
+                              <td className="py-1 pr-3">{d.customer_name}</td>
+                              <td className="py-1 pr-3 text-muted-foreground">
+                                {d.tour_number != null ? `tur ${d.tour_number}` : ""}
+                              </td>
+                              <td className="font-mono py-1 pr-3">{d.product_code ?? ""}</td>
+                              <td className="text-right tabular-nums py-1 pr-3">{fmtNum(d.quantity)}</td>
+                              <td className="py-1 pr-3 text-muted-foreground">{d.unit_of_sale ?? ""}</td>
+                              <td className="py-1 pr-3 text-muted-foreground">{d.tour_name ?? ""}</td>
+                              <td className="py-1 text-muted-foreground">{d.address ?? ""}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              )}
             </Fragment>
           );
         })}
