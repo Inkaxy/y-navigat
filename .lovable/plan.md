@@ -1,47 +1,50 @@
-## Funn
+## Mål
 
-Jeg fant tre sannsynlige årsaker til at du ikke ser forskjell:
+Fastordre (`recurring_order_schedules` + `recurring_order_items`) skal automatisk bli til ekte rader i `orders` + `order_lines` for valgt leveringsdato, slik at de plukkes opp av eksisterende `generate_delivery_notes`-flyt og kommer med på pakksedler, faktura, ordreliste osv.
 
-1. **Stripene starter på nytt for hver hovedvaregruppe**
-   - I både `ProductionPlanTable` og `CorrectionPlanTable` beregnes zebra slik:
-     - finn siste hovedgruppe-start
-     - sett rad 1 i hver gruppe til hvit
-     - sett rad 2 i samme gruppe til grå
-   - Hvis mange hovedgrupper har én linje, eller gruppene ofte starter på nytt, blir nesten alle linjer hvite.
-   - Dette forklarer hvorfor det ikke synes i displayet.
+## Designvalg
 
-2. **Utskrift bruker samme `data-zebra`-verdi**
-   - Print-CSS farger bare rader med `data-zebra="1"`.
-   - Når mange/alle produktlinjer får `data-zebra="0"`, blir også utskriften hvit.
+- **Materialisering skjer som første steg inne i `generate_delivery_notes`** (samme RPC-kall). Dermed trenger vi ikke endre frontend-flyten — knappen "Generer pakksedler" gjør alt i én transaksjon.
+- **Idempotent**: hver `(customer_id, delivery_date, recurring_schedule_id)` materialiseres maks én gang. Re-kjøring lager ikke duplikater.
+- **Bare for `run_type='main'`**: `additional`/`correction` materialiserer ikke fastordre på nytt (de plukker opp evt. nye manuelle ordre / lager korreksjon av eksisterende).
+- **Respekter pause**: kunder med aktiv `delivery_pauses` for datoen hoppes over (samme regel som ordre-iterasjonen).
+- **Respekter ukedag og gyldighet**: `recurring_order_items.weekday` må matche datoens ISO-ukedag, og `valid_from`/`valid_to` på schedule.
+- **Tur-tilordning**: hvis `recurring_order_items.tour_id` er satt → bruk den. Hvis NULL → fall tilbake til kundens default-tur for ukedagen (samme regel som `useRecurringGhost`'s ekspansjon, men forenklet til én tur per linje for å unngå dobling). Trenger avklaring — se "Åpne spørsmål".
+- **Pris**: hentes via samme prisfunksjon som "Ny ordre" bruker (kundespesifikk → prisliste → standard). Vi gjenbruker eksisterende SQL-funksjon hvis den finnes; ellers ny intern helper.
+- **Kilde-sporing**: nye ordre får `source = 'recurring'` og `source_reference = recurring_schedule_id::text` så de er filtrerbare i ordrelista.
 
-3. **Print-valget “Grå bakgrunn på annenhver linje” er ikke koblet til selve utskriften**
-   - Valget finnes i dialogen (`alternateRowGray`), men det sendes ikke videre til tabellen/CSS.
-   - Det betyr at innstillingen ikke faktisk styrer om radstriping brukes.
+## Endringer
 
-## Plan
+### 1. Database (migration)
 
-1. **Endre zebra-beregningen**
-   - Bruk produktlinjens faktiske indeks direkte: `idx % 2`.
-   - Ikke restart stripingen per hovedvaregruppe.
-   - Gruppeoverskrifter i print skal ikke telles som produktlinjer.
+- **Ny kolonne** på `orders`:
+  - `recurring_schedule_id uuid NULL REFERENCES recurring_order_schedules(id) ON DELETE SET NULL`
+  - Unik partial index: `UNIQUE (legal_entity_id, customer_id, delivery_date, recurring_schedule_id) WHERE recurring_schedule_id IS NOT NULL` — sikrer idempotens.
 
-2. **Gjør skjermvisningen tydelig**
-   - Behold cellenivå-farging på `td`, siden det overstyrer tabellens `bg-card`.
-   - Sett radene eksplisitt til:
-     - hvit for `data-zebra="0"`
-     - tydelig lysegrå for `data-zebra="1"`
+- **Ny SQL-funksjon** `materialize_recurring_orders(p_legal_entity_id uuid, p_delivery_date date, p_tour_filter uuid[]) RETURNS int` (antall nye ordre):
+  - Loop: alle aktive schedules der `valid_from`/`valid_to` dekker datoen og kunde ikke er på pause.
+  - For hver `recurring_order_items` der `weekday = isodow(p_delivery_date)`:
+    - Bestem tur (item.tour_id eller fallback til kundens default-tur for ukedagen).
+    - Hvis `p_tour_filter` er satt og turen ikke er med, hopp over.
+    - Hopp over hvis ordre med samme `(legal_entity, customer, dato, schedule_id)` finnes.
+    - Insert i `orders` (`status='confirmed'`, `source='recurring'`, snapshot kunde + adresse).
+    - Insert linjer i `order_lines` med pris og snapshot fra produkt.
+    - Beregn totaler.
 
-3. **Gjør utskrift tydelig**
-   - Overstyr print-regelen som setter alle celler til transparent.
-   - Legg inn begge print-regler etter standard print-cellene:
-     - `data-zebra="0"` = hvit
-     - `data-zebra="1"` = lysegrå
-   - Bruk `print-color-adjust: exact` videre.
+- **Endre `generate_delivery_notes`**: helt øverst, hvis `p_run_type = 'main'`, kall `materialize_recurring_orders(...)` og inkluder antallet i `details`-jsonb.
 
-4. **Koble utskriftsvalget riktig**
-   - La “Grå bakgrunn på annenhver linje” faktisk styre om striping skal være aktiv i print.
-   - Skjermvisningen kan fortsatt alltid vise zebra-striping, siden det er ønsket i displayet.
+### 2. Frontend
 
-## Resultat
+- **`useGenerateDeliveryNotes`**: legg til `recurring_orders_created?: number` i resultat-typen og vis i toast ("X fastordre opprettet, Y pakksedler generert").
+- **OrdersList**: legg til filter/badge for `source = 'recurring'` så brukeren ser hvilke ordre som kom fra fastordre.
 
-Etter implementering vil annenhver produktlinje være konsekvent hvit/lysegrå på tvers av hele produksjonslisten, både i display og utskrift — uavhengig av hovedvaregruppe.
+## Åpne spørsmål
+
+1. **Tur-fallback når `recurring_order_items.tour_id` er NULL**: hva er kundens "default-tur for ukedag"? Skal vi
+   - (a) bruke den ene aktive turen for ukedagen hvis det kun finnes én, ellers feile/varsle, eller
+   - (b) lese et nytt felt på kunde (`default_tour_id`), eller
+   - (c) tvinge brukeren til alltid å sette `tour_id` på items (validering i fastordre-dialog)?
+2. **Pris-kilde**: Finnes det allerede en SQL-funksjon for prisoppslag, eller skal vi gjenskape logikken? (Sjekkes ved implementering.)
+3. **Ordre-status ved opprettelse**: `confirmed` (klar for produksjon) eller `awaiting_confirmation` (krever manuell godkjenning)? Anbefaling: `confirmed` siden fastordre per definisjon er forhåndsgodkjent.
+
+Si fra om svarene på (1) og (3), så kjører jeg migrasjonen.
