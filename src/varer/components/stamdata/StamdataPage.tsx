@@ -76,6 +76,16 @@ export type StamdataUsageCheck = {
   column: string;
 };
 
+export type ExtraProductPicker = {
+  /** Felt-navn på stamdata-tabellen, f.eks. "main_product_id". */
+  key: string;
+  label: string;
+  /** Kolonne på products som må matche stamdata-radens id, f.eks. "production_group_id". */
+  productFilterColumn: string;
+  /** Kun aktive produkter (status='active'). Default true. */
+  activeOnly?: boolean;
+};
+
 export type StamdataPageProps = {
   title: string;
   description: string;
@@ -90,6 +100,8 @@ export type StamdataPageProps = {
   extraFields?: ExtraSelectField[];
   /** Ekstra kolonner i tabellen (f.eks. visning av main_category_navn). */
   extraColumns?: ExtraColumn[];
+  /** Valgfri picker for å koble til et produkt (f.eks. hovedvare). Kun synlig ved redigering. */
+  extraProductPicker?: ExtraProductPicker;
 };
 
 /* ---------- Hjelpere ---------- */
