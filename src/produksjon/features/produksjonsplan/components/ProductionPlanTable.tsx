@@ -137,15 +137,8 @@ export function ProductionPlanTable({ rows, showByMainGroup, showTraysWithPlus, 
           const sectionStart = printGroupStart.get(idx);
           // Print colCount uten Hovedgr.-kolonne
           const printColCount = colCount - (showByMainGroup && columns.mainGroup ? 1 : 0);
-          // Alternerende sebrastriper — restartes på hver hovedgruppe
-          let zebraIdx = idx;
-          if (showByMainGroup) {
-            // finn forrige sectionStart
-            for (let k = idx; k >= 0; k--) {
-              if (printGroupStart.has(k)) { zebraIdx = idx - k; break; }
-            }
-          }
-          const isZebra = zebraIdx % 2 === 1;
+          // Alternerende sebrastriper — basert på faktisk produktlinje-indeks
+          const isZebra = idx % 2 === 1;
           const rowKey = `${r.product_id}-${idx}`;
           const isExpanded = expanded.has(rowKey);
           const hasDetails = (r.details?.length ?? 0) > 0;
