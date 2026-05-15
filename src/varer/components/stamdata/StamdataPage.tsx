@@ -607,6 +607,36 @@ export function StamdataPage({
               );
             })}
 
+            {extraProductPicker && editing && (
+              <div>
+                <Label>{extraProductPicker.label}</Label>
+                <Select
+                  value={pickerValue || "__none__"}
+                  onValueChange={(v) => setPickerValue(v === "__none__" ? "" : v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Velg hovedvare…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">— Ingen —</SelectItem>
+                    {(pickerProductsQuery.data ?? []).map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.display_number != null && (
+                          <span className="font-mono text-xs mr-1">#{p.display_number}</span>
+                        )}
+                        {p.display_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {(pickerProductsQuery.data ?? []).length === 0 && !pickerProductsQuery.isLoading && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Ingen produkter er knyttet til denne gruppen ennå.
+                  </p>
+                )}
+              </div>
+            )}
+
             <div>
               <Label htmlFor="sd-desc">Beskrivelse</Label>
               <Textarea
