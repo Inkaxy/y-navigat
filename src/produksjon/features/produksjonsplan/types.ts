@@ -17,6 +17,8 @@ export interface ProduksjonsplanCriteria {
   customer_group_ids: string[];
   /** Om en korreksjonsliste skal skrives ut etter hovedlista (mot siste snapshot samme dag) */
   print_correction_last?: boolean;
+  /** Slå sammen varer i samme produksjonsgruppe til hovedvare-linje (kun ved per_product) */
+  merge_by_main_product?: boolean;
 }
 
 export const DEFAULT_CRITERIA: ProduksjonsplanCriteria = {
