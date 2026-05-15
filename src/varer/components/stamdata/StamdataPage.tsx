@@ -231,6 +231,7 @@ export function StamdataPage({
   /* ----- Åpne ny ----- */
   function openNew() {
     setForm(emptyForm(extraFields));
+    setPickerValue("");
     setEditing(null);
     setCreating(true);
   }
@@ -250,6 +251,10 @@ export function StamdataPage({
       status: row.status ?? "active",
       ...extras,
     });
+    if (extraProductPicker) {
+      const v = row[extraProductPicker.key];
+      setPickerValue(v == null ? "" : String(v));
+    }
     setEditing(row);
     setCreating(false);
   }
