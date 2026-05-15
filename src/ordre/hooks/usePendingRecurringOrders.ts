@@ -1,0 +1,99 @@
+import { supabase } from "@/integrations/supabase/client";
+import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
+import { isoDayOfWeek, type DeliveryTour } from "@/ordre/hooks/useDeliveryTours";
+
+export type PendingRecurringOrderCounts = {
+  total: number;
+  byTour: Record<string, number>;
+  nullTourCount: number;
+};
+
+type RecurringScheduleRow = {
+  id: string;
+  customer_id: string;
+  recurring_order_items?: Array<{ tour_id: string | null; quantity: number | string | null }>;
+};
+
+function activeTourForDate(tour: DeliveryTour, isoDow: number) {
+  const keys = [
+    "active_monday",
+    "active_tuesday",
+    "active_wednesday",
+    "active_thursday",
+    "active_friday",
+    "active_saturday",
+    "active_sunday",
+  ] as const;
+  return tour.status === "active" && tour[keys[isoDow - 1]];
+}
+
+function resolveFallbackTourId(tours: DeliveryTour[], isoDow: number) {
+  return tours
+    .filter((tour) => activeTourForDate(tour, isoDow))
+    .slice()
+    .sort((a, b) => a.tour_number - b.tour_number)[0]?.id ?? null;
+}
+
+export async function fetchPendingRecurringOrderCounts(
+  date: string,
+  tours: DeliveryTour[],
+): Promise<PendingRecurringOrderCounts> {
+  const weekday = isoDayOfWeek(date);
+  const fallbackTourId = resolveFallbackTourId(tours, weekday);
+
+  const [{ data: schedules, error: schedulesError }, { data: existingOrders, error: ordersError }, { data: pauses, error: pausesError }] =
+    await Promise.all([
+      supabase
+        .from("recurring_order_schedules")
+        .select("id, customer_id, recurring_order_items!inner(tour_id, quantity)")
+        .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
+        .eq("is_active", true)
+        .or(`valid_from.is.null,valid_from.lte.${date}`)
+        .or(`valid_to.is.null,valid_to.gte.${date}`)
+        .eq("recurring_order_items.weekday", weekday)
+        .gt("recurring_order_items.quantity", 0),
+      supabase
+        .from("orders")
+        .select("recurring_schedule_id")
+        .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
+        .eq("delivery_date", date)
+        .not("recurring_schedule_id", "is", null),
+      supabase
+        .from("delivery_pauses")
+        .select("customer_id")
+        .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
+        .lte("pause_from", date)
+        .or(`pause_to.is.null,pause_to.gte.${date}`),
+    ]);
+
+  if (schedulesError) throw schedulesError;
+  if (ordersError) throw ordersError;
+  if (pausesError) throw pausesError;
+
+  const materializedScheduleIds = new Set(
+    (existingOrders ?? [])
+      .map((row) => row.recurring_schedule_id)
+      .filter((id): id is string => Boolean(id)),
+  );
+  const pausedCustomerIds = new Set((pauses ?? []).map((row) => row.customer_id));
+  const byTour: Record<string, number> = {};
+  let nullTourCount = 0;
+  let total = 0;
+
+  for (const schedule of (schedules ?? []) as RecurringScheduleRow[]) {
+    if (materializedScheduleIds.has(schedule.id) || pausedCustomerIds.has(schedule.customer_id)) continue;
+
+    const tourIds = new Set(
+      (schedule.recurring_order_items ?? [])
+        .filter((item) => Number(item.quantity ?? 0) > 0)
+        .map((item) => item.tour_id ?? fallbackTourId),
+    );
+    const resolvedTourId = Array.from(tourIds).filter(Boolean).sort()[0] ?? null;
+
+    if (resolvedTourId) byTour[resolvedTourId] = (byTour[resolvedTourId] ?? 0) + 1;
+    else nullTourCount += 1;
+    total += 1;
+  }
+
+  return { total, byTour, nullTourCount };
+}
