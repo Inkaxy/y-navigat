@@ -163,7 +163,7 @@ export function useSaveDeliveryNote() {
               delivery_note_id: deliveryNoteId,
               line_number,
               product_id: l.product_id,
-              product_snapshot: l.product_snapshot,
+              product_snapshot: l.product_snapshot as any,
               quantity: l.quantity,
               sales_unit: l.sales_unit,
               unit_price: l.unit_price,
@@ -175,7 +175,7 @@ export function useSaveDeliveryNote() {
               notes: l.notes,
               order_line_id,
               order_id,
-            });
+            } as any);
           if (iErr) throw iErr;
         }
       }
