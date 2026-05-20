@@ -99,7 +99,7 @@ export function useSaveDeliveryNote() {
               line_vat: c.vat,
               line_total_incl_vat: c.total,
               notes: l.notes,
-              product_snapshot: l.product_snapshot,
+              product_snapshot: l.product_snapshot as any,
               sales_unit: l.sales_unit,
             })
             .eq("id", order_line_id);
