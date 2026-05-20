@@ -310,12 +310,13 @@ export default function DeliveryNoteDetail() {
                   <TableCell className="text-right">
                     <Input
                       type="number"
+                      inputMode="decimal"
                       min={0}
                       step="1"
                       value={l.quantity}
                       onChange={(e) => updateLine(idx, { quantity: Number(e.target.value) || 0 })}
                       disabled={locked}
-                      className="h-8 text-right tabular-nums"
+                      className="h-8 px-2 text-right tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                     />
                   </TableCell>
                   <TableCell className="text-muted-foreground">{l.sales_unit}</TableCell>
@@ -323,12 +324,13 @@ export default function DeliveryNoteDetail() {
                     <TableCell className="text-right">
                       <Input
                         type="number"
+                        inputMode="decimal"
                         min={0}
                         step="0.01"
                         value={l.unit_price}
                         onChange={(e) => updateLine(idx, { unit_price: Number(e.target.value) || 0 })}
                         disabled={locked}
-                        className="h-8 text-right tabular-nums"
+                        className="h-8 px-2 text-right tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                       />
                     </TableCell>
                   )}
@@ -336,6 +338,7 @@ export default function DeliveryNoteDetail() {
                     <TableCell className="text-right">
                       <Input
                         type="number"
+                        inputMode="numeric"
                         min={0}
                         max={100}
                         step="1"
@@ -344,7 +347,7 @@ export default function DeliveryNoteDetail() {
                           updateLine(idx, { discount_percent: Number(e.target.value) || 0 })
                         }
                         disabled={locked}
-                        className="h-8 text-right tabular-nums"
+                        className="h-8 px-2 text-right tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                       />
                     </TableCell>
                   )}
