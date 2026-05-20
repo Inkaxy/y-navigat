@@ -9,9 +9,14 @@ export type DeliveryNoteLine = {
   quantity: number;
   sales_unit: string;
   unit_price: number;
+  discount_percent: number;
+  vat_rate: number;
   line_subtotal_excl_vat: number;
   line_vat: number;
   line_total_incl_vat: number;
+  notes: string | null;
+  order_line_id: string | null;
+  order_id: string | null;
 };
 
 export type DeliveryNoteLegalEntity = {
