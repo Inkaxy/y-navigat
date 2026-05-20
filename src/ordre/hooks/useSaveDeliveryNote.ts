@@ -120,7 +120,7 @@ export function useSaveDeliveryNote() {
               order_id,
               line_number: nextLineNo,
               product_id: l.product_id,
-              product_snapshot: l.product_snapshot,
+              product_snapshot: l.product_snapshot as any,
               quantity: l.quantity,
               sales_unit: l.sales_unit,
               unit_price: l.unit_price,
@@ -130,7 +130,7 @@ export function useSaveDeliveryNote() {
               line_vat: c.vat,
               line_total_incl_vat: c.total,
               notes: l.notes,
-            })
+            } as any)
             .select("id")
             .single();
           if (oiErr) throw oiErr;
