@@ -1,0 +1,1 @@
+ALTER TABLE public.delivery_note_runs ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ;
