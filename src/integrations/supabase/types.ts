@@ -1424,6 +1424,7 @@ export type Database = {
       }
       delivery_note_runs: {
         Row: {
+          completed_at: string | null
           created_at: string
           delivery_date: string
           details: Json | null
@@ -1442,6 +1443,7 @@ export type Database = {
           triggered_by: string | null
         }
         Insert: {
+          completed_at?: string | null
           created_at?: string
           delivery_date: string
           details?: Json | null
@@ -1460,6 +1462,7 @@ export type Database = {
           triggered_by?: string | null
         }
         Update: {
+          completed_at?: string | null
           created_at?: string
           delivery_date?: string
           details?: Json | null
