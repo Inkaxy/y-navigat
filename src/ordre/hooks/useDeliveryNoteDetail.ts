@@ -89,9 +89,14 @@ export function useDeliveryNoteDetail(id: string | undefined) {
           quantity: Number(l.quantity ?? 0),
           sales_unit: l.sales_unit ?? "",
           unit_price: Number(l.unit_price ?? 0),
+          discount_percent: Number(l.discount_percent ?? 0),
+          vat_rate: Number(l.vat_rate ?? 0),
           line_subtotal_excl_vat: Number(l.line_subtotal_excl_vat ?? 0),
           line_vat: Number(l.line_vat ?? 0),
           line_total_incl_vat: Number(l.line_total_incl_vat ?? 0),
+          notes: l.notes ?? null,
+          order_line_id: l.order_line_id ?? null,
+          order_id: l.order_id ?? null,
         }))
         .sort((a, b) => a.line_number - b.line_number);
 
@@ -102,6 +107,7 @@ export function useDeliveryNoteDetail(id: string | undefined) {
         delivery_tour_id: (data as any).delivery_tour_id,
         route_label: (data as any).route_label,
         status: (data as any).status,
+        customer_id: (data as any).customer_id,
         customer_snapshot: (data as any).customer_snapshot,
         delivery_address_snapshot: (data as any).delivery_address_snapshot,
         subtotal_excl_vat: Number((data as any).subtotal_excl_vat ?? 0),
