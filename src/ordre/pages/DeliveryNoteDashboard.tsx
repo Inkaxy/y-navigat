@@ -245,9 +245,9 @@ export default function DeliveryNoteDashboard() {
       key: "pakk",
       label: "PAKKSEDLER",
       value: counts?.pakksedler ?? 0,
-      // Dypere blå (status-confirmed-token), hvit tekst, dominant
+      // Brand-ink (navy) med cream tekst — dominant, fungerer i begge tema
       classes:
-        "bg-[hsl(var(--status-confirmed))] text-white hover:brightness-110 ring-1 ring-[hsl(var(--status-confirmed))]/40",
+        "bg-brand-ink text-brand-cream hover:bg-brand-ink-deep ring-1 ring-brand-ink/40",
       span: 2,
       onClick: () => navigate(`/ordre/pakksedler/liste?date=${date}&tour=${tourId}`),
     },
