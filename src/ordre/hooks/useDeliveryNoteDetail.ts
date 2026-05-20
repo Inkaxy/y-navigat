@@ -9,9 +9,14 @@ export type DeliveryNoteLine = {
   quantity: number;
   sales_unit: string;
   unit_price: number;
+  discount_percent: number;
+  vat_rate: number;
   line_subtotal_excl_vat: number;
   line_vat: number;
   line_total_incl_vat: number;
+  notes: string | null;
+  order_line_id: string | null;
+  order_id: string | null;
 };
 
 export type DeliveryNoteLegalEntity = {
@@ -29,6 +34,7 @@ export type DeliveryNoteDetail = {
   delivery_tour_id: string | null;
   route_label: string | null;
   status: string;
+  customer_id: string;
   customer_snapshot: Record<string, unknown> | null;
   delivery_address_snapshot: Record<string, unknown> | null;
   subtotal_excl_vat: number;
@@ -48,7 +54,7 @@ export function useDeliveryNoteDetail(id: string | undefined) {
       const { data, error } = await supabase
         .from("delivery_notes")
         .select(
-          "id, display_number, delivery_date, delivery_tour_id, route_label, status, legal_entity_id, customer_snapshot, delivery_address_snapshot, subtotal_excl_vat, total_vat, total_incl_vat, notes, delivery_note_lines(id, line_number, product_id, product_snapshot, quantity, sales_unit, unit_price, line_subtotal_excl_vat, line_vat, line_total_incl_vat)"
+          "id, display_number, delivery_date, delivery_tour_id, route_label, status, legal_entity_id, customer_id, customer_snapshot, delivery_address_snapshot, subtotal_excl_vat, total_vat, total_incl_vat, notes, delivery_note_lines(id, line_number, product_id, product_snapshot, quantity, sales_unit, unit_price, discount_percent, vat_rate, line_subtotal_excl_vat, line_vat, line_total_incl_vat, notes, order_line_id, order_id)"
         )
         .eq("id", id)
         .maybeSingle();
@@ -83,9 +89,14 @@ export function useDeliveryNoteDetail(id: string | undefined) {
           quantity: Number(l.quantity ?? 0),
           sales_unit: l.sales_unit ?? "",
           unit_price: Number(l.unit_price ?? 0),
+          discount_percent: Number(l.discount_percent ?? 0),
+          vat_rate: Number(l.vat_rate ?? 0),
           line_subtotal_excl_vat: Number(l.line_subtotal_excl_vat ?? 0),
           line_vat: Number(l.line_vat ?? 0),
           line_total_incl_vat: Number(l.line_total_incl_vat ?? 0),
+          notes: l.notes ?? null,
+          order_line_id: l.order_line_id ?? null,
+          order_id: l.order_id ?? null,
         }))
         .sort((a, b) => a.line_number - b.line_number);
 
@@ -96,6 +107,7 @@ export function useDeliveryNoteDetail(id: string | undefined) {
         delivery_tour_id: (data as any).delivery_tour_id,
         route_label: (data as any).route_label,
         status: (data as any).status,
+        customer_id: (data as any).customer_id,
         customer_snapshot: (data as any).customer_snapshot,
         delivery_address_snapshot: (data as any).delivery_address_snapshot,
         subtotal_excl_vat: Number((data as any).subtotal_excl_vat ?? 0),
