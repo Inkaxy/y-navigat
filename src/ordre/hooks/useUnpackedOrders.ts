@@ -25,7 +25,7 @@ export type UnpackedOrderRow = {
 
 type OrderQueryRow = {
   id: string;
-  display_number: string | null;
+  order_number: string | null;
   customer_id: string;
   delivery_tour_id: string | null;
   total_incl_vat: number | string | null;
@@ -62,7 +62,7 @@ export async function fetchUnpackedOrders(
   let ordersQ = supabase
     .from("orders")
     .select(
-      "id, display_number, customer_id, delivery_tour_id, total_incl_vat, recurring_schedule_id, order_lines(id)",
+      "id, order_number, customer_id, delivery_tour_id, total_incl_vat, recurring_schedule_id, order_lines(id)",
     )
     .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
     .eq("delivery_date", date);
@@ -103,7 +103,7 @@ export async function fetchUnpackedOrders(
       const tour = o.delivery_tour_id ? tourById.get(o.delivery_tour_id) : null;
       return {
         order_id: o.id,
-        display_number: o.display_number ?? null,
+        display_number: o.order_number ?? null,
         customer_id: o.customer_id,
         customer_display_name: cust?.display_name ?? "—",
         customer_number: cust?.customer_number ?? null,
