@@ -265,10 +265,10 @@ export default function DeliveryNoteDetail() {
             <TableRow>
               <TableHead className="w-16">Nr</TableHead>
               <TableHead>Varenavn</TableHead>
-              <TableHead className="w-28 text-right">Antall</TableHead>
-              <TableHead className="w-20">Enhet</TableHead>
-              {showPrices && <TableHead className="w-28 text-right">Pris</TableHead>}
-              {showPrices && <TableHead className="w-20 text-right">% rab</TableHead>}
+              <TableHead className="w-24 text-right">Antall</TableHead>
+              <TableHead className="w-16">Enhet</TableHead>
+              {showPrices && <TableHead className="w-32 text-right">Pris</TableHead>}
+              {showPrices && <TableHead className="w-24 text-right">% rab</TableHead>}
               {showPrices && <TableHead className="w-28 text-right">Sum</TableHead>}
               <TableHead className="w-12" />
             </TableRow>
