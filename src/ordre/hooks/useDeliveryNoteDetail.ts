@@ -34,6 +34,7 @@ export type DeliveryNoteDetail = {
   delivery_tour_id: string | null;
   route_label: string | null;
   status: string;
+  customer_id: string;
   customer_snapshot: Record<string, unknown> | null;
   delivery_address_snapshot: Record<string, unknown> | null;
   subtotal_excl_vat: number;
@@ -53,7 +54,7 @@ export function useDeliveryNoteDetail(id: string | undefined) {
       const { data, error } = await supabase
         .from("delivery_notes")
         .select(
-          "id, display_number, delivery_date, delivery_tour_id, route_label, status, legal_entity_id, customer_snapshot, delivery_address_snapshot, subtotal_excl_vat, total_vat, total_incl_vat, notes, delivery_note_lines(id, line_number, product_id, product_snapshot, quantity, sales_unit, unit_price, line_subtotal_excl_vat, line_vat, line_total_incl_vat)"
+          "id, display_number, delivery_date, delivery_tour_id, route_label, status, legal_entity_id, customer_id, customer_snapshot, delivery_address_snapshot, subtotal_excl_vat, total_vat, total_incl_vat, notes, delivery_note_lines(id, line_number, product_id, product_snapshot, quantity, sales_unit, unit_price, discount_percent, vat_rate, line_subtotal_excl_vat, line_vat, line_total_incl_vat, notes, order_line_id, order_id)"
         )
         .eq("id", id)
         .maybeSingle();
