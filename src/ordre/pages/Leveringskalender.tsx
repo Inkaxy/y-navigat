@@ -384,10 +384,9 @@ export default function MatrixPage() {
     const productById = new Map(allProducts.map((p) => [p.id, p]));
     const rowMap = new Map<string, Row>();
 
-    // 1) Lagrede celler
+    // 1) Lagrede celler (ta med ALLE bestilte linjer, også uten tur)
     for (const c of matrix.existing_cells) {
-      if (!c.delivery_tour_id) continue;
-      const key = `${c.delivery_date}|${c.delivery_tour_id}|${c.product_id}`;
+      const key = `${c.delivery_date}|${c.delivery_tour_id ?? ""}|${c.product_id}`;
       rowMap.set(key, {
         key,
         delivery_date: c.delivery_date,
