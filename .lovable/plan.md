@@ -1,44 +1,45 @@
-# Ny etikett-modus: «Per kundeordre»
+# Forbedre Ordrelinjer i Ny ordre
 
 ## Mål
-Legg til et fjerde valg i nedtrekkslisten **Skrive etikett** på vare-detalj → Produksjon. Når en kunde bestiller flere av samme vare i samme ordre, skal alt komme på én felles etikett — uavhengig av antall.
 
-Eksempel: Kunde bestiller 5 kneipp → 1 etikett (ikke 5).
-
-## Sammenligning med eksisterende modi
-
-| Verdi | Etikett |
-|---|---|
-| `none` | Ingen |
-| `per_unit` | 1 per stk (5 kneipp = 5) |
-| `per_order_or_note` | 1 per ordre + 1 ekstra per merknad |
-| `per_note` | Kun hvis merknad |
-| **`per_order` (ny)** | **Nøyaktig 1 per kundeordre — ignorerer antall og merknad** |
+1. **Mengde må være hele tall** (1, 2, 3 …) for varer som ikke er delbare. For delbare varer (f.eks. kg/liter, eller `is_divisible = true`) tillates desimaler.
+2. **Layout-løft** av Ordrelinjer-seksjonen i `src/ordre/pages/NewOrder.tsx` slik at pris, rabatt og mengde blir tydeligere og mer behagelige å bruke (jf. de vedlagte skjermbildene).
 
 ## Endringer
 
-### Database (migrasjon)
-Oppdater `public.get_label_products_for_date` slik at `CASE`-uttrykket som beregner `total_labels` får en ny gren:
-```
-WHEN 'per_order' THEN COUNT(DISTINCT el.order_id)::INTEGER
-```
-Ingen schema-endring nødvendig — `label_mode` er allerede `text` uten CHECK-constraint.
+### A. Mengde — hele tall som standard
+- Utvid `ProductOption` (i `src/ordre/hooks/useNBProducts.ts`) til også å hente `is_divisible`.
+- Mengde-feltet i ordrelinjen:
+  - `step={isDivisible ? "0.001" : "1"}`, `min="1"`
+  - `inputMode={isDivisible ? "decimal" : "numeric"}`
+  - `onChange`: hvis ikke-delbar → strip alt unntatt siffer, tom verdi tillates mens man skriver.
+  - `onBlur`: rund opp/ned til nærmeste hele tall (min 1) hvis ikke-delbar.
+- Default-verdi forblir `"1"`.
+- Validering før lagring: blokker desimal-mengde på ikke-delbar vare med tydelig toast.
 
-### Frontend
-- `src/varer/lib/productSchema.ts`: legg `"per_order"` i `LABEL_MODES`-enum.
-- `src/varer/lib/constants.ts`: legg til
-  - option `{ value: "per_order", label: "Per kundeordre" }`
-  - beskrivelse: «Én etikett per ordre, uansett antall stk eller merknad.»
-- `src/produksjon/features/etiketter/types.ts`: utvid `LabelMode`-union med `"per_order"`.
-- `src/produksjon/features/etiketter/components/LabelProductsTable.tsx`: legg `per_order`-badge i `MODE_LABELS`.
+### B. UI-løft av linje-raden
+Behold dagens kolonner men polér visningen:
 
-### Etikett-utskrift
-Eksisterende per-stk-løkke i utskrift må sjekkes — for `per_order` skal det produseres nøyaktig 1 etikett per ordre (sum av antall vises som tekst på etiketten, men er ett fysisk merke). Jeg sjekker `useLabelPrintJobs`/skriverflyten ved implementering og legger inn samme behandling som `per_note` (én etikett uavhengig av kvantum).
+- **Spinner-pilene skjules** på alle `type="number"`-felt (samme triks som på pakkseddel): `appearance-none` + `[&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none`.
+- **Bredere kolonner** så hele tallet vises:
+  - Mengde: 96 px
+  - Enhet: 64 px (vist som chip/badge, ikke bare grå tekst)
+  - Pris/enhet: 128 px, høyrejustert, suffiks "kr"
+  - Rabatt %: 88 px, suffiks "%"
+  - Sum: 112 px, semibold
+- **Tydeligere produktcelle**: produktnavn på topp, varenr som muted, "Bytt"-knapp som liten ghost.
+- **Notat & badges på egen rad** (som i dag) men med litt mer luft og venstre-innrykk slik at det visuelt henger sammen med linja.
+- **Hover-state** på hele rad (`hover:bg-muted/30`) og `rounded-md` rundt hver linje for å skille dem.
+- **Tom-tilstand**: behold dashed boks, men gjør CTA-en til en stor "Legg til første linje"-knapp inni boksen.
+- **Totaler-blokk** høyrejusteres med litt mer luft og en svak topp-bord.
 
-## Berørte filer
-- ny migrasjon (oppdaterer DB-funksjon)
-- `src/varer/lib/productSchema.ts`
-- `src/varer/lib/constants.ts`
-- `src/produksjon/features/etiketter/types.ts`
-- `src/produksjon/features/etiketter/components/LabelProductsTable.tsx`
-- evt. utskrifts-hook hvis den itererer per stk
+### C. Sammenheng med pakkseddel
+Samme mengde-regel (hele tall hvis ikke delbar) skal også gjelde i `DeliveryNoteDetail.tsx` sitt mengde-felt — vi gjenbruker `is_divisible` fra `product_snapshot` der det finnes, ellers tillater vi desimaler (bakoverkompatibelt).
+
+## Filer som endres
+
+- `src/ordre/hooks/useNBProducts.ts` — legge til `is_divisible` på `ProductOption` og i select.
+- `src/ordre/pages/NewOrder.tsx` — hele Ordrelinjer-seksjonen (linjer ~834–950) og `LineDraft`/hjelpere.
+- `src/ordre/pages/DeliveryNoteDetail.tsx` — samme mengde-regel på linje-input.
+
+Ingen DB-migrasjoner. Ingen endring i lagre-flyten.
