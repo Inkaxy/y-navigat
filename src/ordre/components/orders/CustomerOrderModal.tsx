@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Plus, Search, Trash2, AlertTriangle } from "lucide-react";
+import { Loader2, Search, Trash2, AlertTriangle } from "lucide-react";
 import { z } from "zod";
 import { toast } from "sonner";
 import {
@@ -215,36 +215,32 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
 
   const today = new Date().toISOString().slice(0, 10);
 
-  function addLine() {
-    setLines((prev) => [...prev, newLine()]);
-  }
   function removeLine(uid: string) {
-    setLines((prev) => (prev.length === 1 ? prev : prev.filter((l) => l.uid !== uid)));
+    setLines((prev) => prev.filter((l) => l.uid !== uid));
   }
 
-  async function pickProduct(uid: string, p: ProductOption) {
+  async function appendProductLine(p: ProductOption) {
     const ep = await fetchEffectivePrice({
       productId: p.id,
       customerId: customer.id,
       date: deliveryDate,
       caller: isEdit ? "customer_order_update" : "customer_order_create",
     }).catch(() => null);
-    setLines((prev) =>
-      prev.map((l) =>
-        l.uid === uid
-          ? {
-              ...l,
-              product: p,
-              product_display_name: p.display_name,
-              product_display_number: p.display_number,
-              product_unit_of_sale: p.unit_of_sale,
-              product_mva_rate: p.mva_rate,
-              unit_price: ep ? String(ep.price) : "0",
-              is_fallback: !ep || ep.is_fallback,
-            }
-          : l,
-      ),
-    );
+    const draft: LineDraft = {
+      uid: crypto.randomUUID(),
+      product: p,
+      product_display_name: p.display_name,
+      product_display_number: p.display_number,
+      product_unit_of_sale: p.unit_of_sale,
+      product_mva_rate: p.mva_rate,
+      quantity: "1",
+      unit_price: ep ? String(ep.price) : "0",
+      is_fallback: !ep || ep.is_fallback,
+    };
+    setLines((prev) => {
+      const cleaned = prev.filter((l) => l.product);
+      return [...cleaned, draft];
+    });
   }
 
   function setLineQty(uid: string, value: string) {
@@ -252,6 +248,28 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
     if (cleaned !== "" && !/^\d*\.?\d*$/.test(cleaned)) return;
     setLines((prev) => prev.map((l) => (l.uid === uid ? { ...l, quantity: cleaned } : l)));
   }
+
+  function setLinePrice(uid: string, value: string) {
+    const cleaned = value.replace(",", ".");
+    if (cleaned !== "" && !/^\d*\.?\d*$/.test(cleaned)) return;
+    setLines((prev) => prev.map((l) => (l.uid === uid ? { ...l, unit_price: cleaned } : l)));
+  }
+
+  const totals = useMemo(() => {
+    let qty = 0;
+    let sum = 0;
+    for (const l of lines) {
+      if (!l.product) continue;
+      const q = Number(l.quantity) || 0;
+      const p = Number(l.unit_price) || 0;
+      qty += q;
+      sum += q * p;
+    }
+    return { qty, sum, count: lines.filter((l) => l.product).length };
+  }, [lines]);
+
+  const fmtKr = (n: number) =>
+    n.toLocaleString("nb-NO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   function buildInput(): CustomerOrderInput | null {
     const nameRes = NameSchema.safeParse(name);
@@ -407,7 +425,7 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
           else onOpenChange(true);
         }}
       >
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[92vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {isEdit ? `Rediger kundeordre ${existing?.order_number ?? ""}` : "Ny kundeordre"}
@@ -544,72 +562,121 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
 
               {/* Ordrelinjer */}
               <fieldset className="space-y-3">
-                <legend className="text-sm font-semibold">Ordrelinjer</legend>
-                <div className="space-y-2">
-                  {lines.map((l) => (
-                    <div
-                      key={l.uid}
-                      className={`flex items-end gap-2 rounded-md border bg-card p-2 ${
-                        l.is_fallback ? "border-destructive ring-1 ring-destructive/40" : "border-border"
-                      }`}
-                      title={l.is_fallback ? "Pris ikke funnet — mangler prisliste-rad eller spesialpris" : undefined}
-                    >
-                      <div className="flex-1">
-                        <Label className="text-xs">Produkt</Label>
-                        {l.product ? (
-                          <div className="flex items-center justify-between rounded-md border border-border bg-background px-2 py-1.5 text-sm">
-                            <div>
-                              <div className="font-medium">{l.product.display_name}</div>
-                              <div className="text-xs text-muted-foreground">
-                                {l.product.code || "—"} · {l.product.unit_of_sale}
-                              </div>
-                            </div>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() =>
-                                setLines((prev) =>
-                                  prev.map((x) =>
-                                    x.uid === l.uid ? { ...x, product: null, unit_price: "0" } : x,
-                                  ),
-                                )
-                              }
-                            >
-                              Bytt
-                            </Button>
-                          </div>
-                        ) : (
-                          <ProductCombobox onSelect={(p) => pickProduct(l.uid, p)} />
-                        )}
-                      </div>
-                      <div className="w-24">
-                        <Label className="text-xs">Antall</Label>
-                        <Input
-                          type="text"
-                          inputMode="decimal"
-                          value={l.quantity}
-                          onChange={(e) => setLineQty(l.uid, e.target.value)}
-                          className="text-right"
-                        />
-                      </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removeLine(l.uid)}
-                        disabled={lines.length === 1}
-                        aria-label="Fjern linje"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
-                  <Button type="button" variant="outline" size="sm" onClick={addLine}>
-                    <Plus className="h-4 w-4" />
-                    Legg til linje
-                  </Button>
+                <div className="flex items-center justify-between">
+                  <legend className="text-sm font-semibold">Ordrelinjer</legend>
+                  <span className="text-xs text-muted-foreground">
+                    {totals.count} {totals.count === 1 ? "linje" : "linjer"}
+                  </span>
                 </div>
+
+                {/* Add via search — always available */}
+                <div className="rounded-md border border-dashed border-border bg-muted/30 p-2">
+                  <Label className="mb-1.5 block text-xs font-medium">
+                    Ny ordrelinje — søk produkt
+                  </Label>
+                  <ProductCombobox onSelect={appendProductLine} />
+                </div>
+
+                {/* Column header */}
+                {lines.some((l) => l.product) && (
+                  <div className="grid grid-cols-[1fr_88px_120px_120px_36px] gap-2 px-2 text-[11px] uppercase tracking-wide text-muted-foreground">
+                    <span>Produkt</span>
+                    <span className="text-right">Antall</span>
+                    <span className="text-right">Pris (kr)</span>
+                    <span className="text-right">Sum</span>
+                    <span />
+                  </div>
+                )}
+
+                <div className="space-y-1.5">
+                  {lines
+                    .filter((l) => l.product)
+                    .map((l) => {
+                      const q = Number(l.quantity) || 0;
+                      const p = Number(l.unit_price) || 0;
+                      const lineSum = q * p;
+                      return (
+                        <div
+                          key={l.uid}
+                          className={`grid grid-cols-[1fr_88px_120px_120px_36px] items-center gap-2 rounded-md border bg-card px-2 py-1.5 transition-colors hover:bg-muted/40 ${
+                            l.is_fallback
+                              ? "border-destructive ring-1 ring-destructive/40"
+                              : "border-border"
+                          }`}
+                          title={
+                            l.is_fallback
+                              ? "Pris ikke funnet — mangler prisliste-rad eller spesialpris"
+                              : undefined
+                          }
+                        >
+                          <div className="min-w-0">
+                            <div className="truncate text-sm font-medium">
+                              {l.product!.display_name}
+                            </div>
+                            <div className="truncate text-xs text-muted-foreground">
+                              {l.product!.code || `#${l.product!.display_number ?? "—"}`} ·{" "}
+                              {l.product!.unit_of_sale}
+                              {l.is_fallback && (
+                                <span className="ml-2 font-medium text-destructive">
+                                  · pris mangler
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <Input
+                            type="text"
+                            inputMode="decimal"
+                            value={l.quantity}
+                            onChange={(e) => setLineQty(l.uid, e.target.value)}
+                            className="h-9 text-right tabular-nums"
+                          />
+                          <Input
+                            type="text"
+                            inputMode="decimal"
+                            value={l.unit_price}
+                            onChange={(e) => setLinePrice(l.uid, e.target.value)}
+                            className="h-9 text-right tabular-nums"
+                          />
+                          <div className="text-right text-sm font-medium tabular-nums">
+                            {fmtKr(lineSum)}
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => removeLine(l.uid)}
+                            aria-label="Fjern linje"
+                            className="h-8 w-8"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      );
+                    })}
+
+                  {totals.count === 0 && (
+                    <div className="rounded-md border border-dashed border-border bg-background py-6 text-center text-sm text-muted-foreground">
+                      Ingen linjer ennå — søk opp et produkt over for å legge til.
+                    </div>
+                  )}
+                </div>
+
+                {/* Totals */}
+                {totals.count > 0 && (
+                  <div className="grid grid-cols-[1fr_88px_120px_120px_36px] items-center gap-2 border-t border-border px-2 pt-2 text-sm">
+                    <span className="text-right font-medium text-muted-foreground">
+                      Totalt
+                    </span>
+                    <span className="text-right tabular-nums text-muted-foreground">
+                      {totals.qty.toLocaleString("nb-NO")}
+                    </span>
+                    <span />
+                    <span className="text-right font-semibold tabular-nums">
+                      {fmtKr(totals.sum)} kr
+                    </span>
+                    <span />
+                  </div>
+                )}
               </fieldset>
 
               {/* Opphav */}
