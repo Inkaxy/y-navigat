@@ -819,34 +819,37 @@ function NameField({
       <Label htmlFor="cf-name">
         Navn <span className="text-destructive">*</span>
       </Label>
-      <Popover open={open && hasResults} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <Input
-            id="cf-name"
-            value={value}
-            onChange={(e) => {
-              onChange(e.target.value);
-              setOpen(true);
-            }}
-            onFocus={() => setOpen(true)}
-            placeholder="Sluttkundens navn"
-            autoComplete="off"
-            required
-          />
-        </PopoverTrigger>
-        <PopoverContent
-          align="start"
-          className="w-[var(--radix-popover-trigger-width)] p-0"
-          onOpenAutoFocus={(e) => e.preventDefault()}
-        >
-          <div className="max-h-64 overflow-y-auto" role="listbox" aria-live="polite">
+      <div className="relative">
+        <Input
+          id="cf-name"
+          value={value}
+          onChange={(e) => {
+            onChange(e.target.value);
+            setOpen(true);
+          }}
+          onFocus={() => setOpen(true)}
+          onBlur={() => {
+            // delay to allow click on suggestion
+            window.setTimeout(() => setOpen(false), 150);
+          }}
+          placeholder="Sluttkundens navn"
+          autoComplete="off"
+          required
+        />
+        {open && hasResults && (
+          <div
+            className="absolute left-0 right-0 top-full z-50 mt-1 max-h-64 overflow-y-auto rounded-md border border-border bg-popover text-popover-foreground shadow-md"
+            role="listbox"
+            aria-live="polite"
+          >
             {(suggestions ?? []).map((s) => (
               <button
                 key={s.name}
                 type="button"
                 role="option"
                 aria-selected={false}
-                className="flex w-full flex-col items-start border-b border-border px-3 py-2 text-left text-sm hover:bg-accent"
+                className="flex w-full flex-col items-start border-b border-border px-3 py-2 text-left text-sm last:border-b-0 hover:bg-accent"
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={() => {
                   onPickSuggestion(s);
                   setOpen(false);
@@ -861,8 +864,8 @@ function NameField({
               </button>
             ))}
           </div>
-        </PopoverContent>
-      </Popover>
+        )}
+      </div>
     </div>
   );
 }
