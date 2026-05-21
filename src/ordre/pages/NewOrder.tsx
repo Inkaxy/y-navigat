@@ -545,6 +545,11 @@ export default function NewOrder() {
       toast.error("Du må legge til minst én ordrelinje for å opprette ordren");
       return;
     }
+    const badQty = validLines.find((l) => !l.product?.is_divisible && !Number.isInteger(Number(l.quantity)));
+    if (badQty) {
+      toast.error(`Mengde for "${badQty.product?.display_name}" må være et helt tall`);
+      return;
+    }
 
     setSubmitting(true);
     try {
