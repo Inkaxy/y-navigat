@@ -11,6 +11,7 @@ export type ProductOption = {
   mva_rate: number;
   status: string;
   is_for_sale: boolean;
+  is_divisible: boolean;
 };
 
 /** Henter aktive selgbare produkter for NB AS */
@@ -20,7 +21,7 @@ export function useNBProducts(search?: string) {
     queryFn: async (): Promise<ProductOption[]> => {
       let q = supabase
         .from("products")
-        .select("id, display_number, code, display_name, unit_of_sale, mva_rate, status, is_for_sale")
+        .select("id, display_number, code, display_name, unit_of_sale, mva_rate, status, is_for_sale, is_divisible")
         .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
         .eq("is_for_sale", true)
         .neq("status", "discontinued")
