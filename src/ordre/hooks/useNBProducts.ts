@@ -23,16 +23,27 @@ export function useNBProducts(search?: string, priceListId?: string | null) {
   return useQuery({
     queryKey: ["nb-products", search ?? "", priceListId ?? null],
     queryFn: async (): Promise<ProductOption[]> => {
-      let allowedIds: string[] | null = null;
-      if (priceListId) {
-        const { data: items, error: itemsErr } = await supabase
-          .from("price_list_items")
-          .select("product_id")
-          .eq("price_list_id", priceListId);
-        if (itemsErr) throw itemsErr;
-        allowedIds = Array.from(new Set((items ?? []).map((r: any) => r.product_id).filter(Boolean)));
-        if (allowedIds.length === 0) return [];
-      }
+      // Krav: kun produkter som har en gyldig pris i kundens prisliste.
+      // Hvis kunden ikke har prisliste → ingen produkter (unngå å vise alt).
+      if (!priceListId) return [];
+
+      const today = new Date().toISOString().slice(0, 10);
+      const { data: items, error: itemsErr } = await supabase
+        .from("price_list_items")
+        .select("product_id, price, valid_from, valid_to")
+        .eq("price_list_id", priceListId)
+        .gt("price", 0)
+        .lte("valid_from", today);
+      if (itemsErr) throw itemsErr;
+      const allowedIds = Array.from(
+        new Set(
+          (items ?? [])
+            .filter((r: any) => !r.valid_to || r.valid_to >= today)
+            .map((r: any) => r.product_id)
+            .filter(Boolean),
+        ),
+      );
+      if (allowedIds.length === 0) return [];
 
       let q = supabase
         .from("products")
@@ -40,16 +51,13 @@ export function useNBProducts(search?: string, priceListId?: string | null) {
         .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
         .eq("is_for_sale", true)
         .neq("status", "discontinued")
+        .in("id", allowedIds)
         .order("display_number", { ascending: false })
-        .limit(200);
-
-      if (allowedIds) q = q.in("id", allowedIds);
+        .limit(500);
 
       if (search && search.trim().length > 0) {
         const s = search.trim().replace(/[%,]/g, " ");
-        q = q.or(
-          [`display_name.ilike.%${s}%`, `code.ilike.%${s}%`].join(","),
-        );
+        q = q.or([`display_name.ilike.%${s}%`, `code.ilike.%${s}%`].join(","));
       }
       const { data, error } = await q;
       if (error) throw error;
