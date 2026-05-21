@@ -842,15 +842,18 @@ export default function NewOrder() {
           </CardHeader>
           <CardContent>
             {lines.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-                Legg til første ordrelinje for å komme i gang.
+              <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-border p-10 text-center">
+                <p className="text-sm text-muted-foreground">Ingen linjer enda.</p>
+                <Button size="sm" variant="outline" onClick={() => setLines((p) => [...p, newLine()])} className="gap-1">
+                  <Plus className="h-3.5 w-3.5" /> Legg til første linje
+                </Button>
               </div>
             ) : (
-              <div className="space-y-2">
-                <div className="grid grid-cols-[1fr_80px_80px_120px_70px_100px_40px] gap-2 border-b border-border pb-2 text-xs font-medium text-muted-foreground">
+              <div className="space-y-1">
+                <div className="grid grid-cols-[minmax(0,1fr)_96px_64px_140px_96px_120px_36px] items-center gap-3 border-b border-border pb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   <div>Produkt</div>
                   <div className="text-right">Mengde</div>
-                  <div className="text-right">Enhet</div>
+                  <div className="text-center">Enhet</div>
                   <div className="text-right">Pris/enhet</div>
                   <div className="text-right">Rabatt %</div>
                   <div className="text-right">Sum</div>
@@ -859,17 +862,25 @@ export default function NewOrder() {
                 {lines.map((l) => {
                   const t = calcLineTotals(l);
                   const overridden = l.unit_price_source === "manual_override";
+                  const isDivisible = !!l.product?.is_divisible;
                   return (
-                    <div key={l.uid} className="space-y-1.5">
-                      <div className="grid grid-cols-[1fr_80px_80px_120px_70px_100px_40px] items-center gap-2">
-                        <div>
+                    <div key={l.uid} className="rounded-md py-2 transition-colors hover:bg-muted/40">
+                      <div className="grid grid-cols-[minmax(0,1fr)_96px_64px_140px_96px_120px_36px] items-center gap-3">
+                        <div className="min-w-0">
                           {l.product ? (
                             <div className="flex items-center gap-2">
-                              <div className="flex-1 truncate text-sm">
-                                <span className="font-medium">{l.product.display_name}</span>
-                                <span className="ml-2 text-xs text-muted-foreground">{l.product.code}</span>
+                              <div className="min-w-0 flex-1">
+                                <div className="truncate text-sm font-medium">{l.product.display_name}</div>
+                                <div className="truncate text-xs text-muted-foreground">{l.product.code}</div>
                               </div>
-                              <Button size="sm" variant="ghost" onClick={() => updateLine(l.uid, { product: null, unit_price: "0", effective_price: null, unit_price_source: null })} className="h-6 px-1 text-xs">Bytt</Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => updateLine(l.uid, { product: null, unit_price: "0", effective_price: null, unit_price_source: null })}
+                                className="h-7 px-2 text-xs"
+                              >
+                                Bytt
+                              </Button>
                             </div>
                           ) : (
                             <ProductCombobox onSelect={(p) => selectProductForLine(l.uid, p)} />
@@ -877,50 +888,99 @@ export default function NewOrder() {
                         </div>
                         <Input
                           type="number"
-                          step="0.001"
+                          inputMode={isDivisible ? "decimal" : "numeric"}
+                          min="1"
+                          step={isDivisible ? "0.001" : "1"}
                           value={l.quantity}
-                          onChange={(e) => updateLine(l.uid, { quantity: e.target.value })}
-                          className="h-8 text-right text-sm"
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            if (!isDivisible) {
+                              // tillat tom mens man skriver, ellers kun siffer
+                              updateLine(l.uid, { quantity: v.replace(/[^\d]/g, "") });
+                            } else {
+                              updateLine(l.uid, { quantity: v });
+                            }
+                          }}
+                          onBlur={(e) => {
+                            const n = Number(e.target.value);
+                            if (!Number.isFinite(n) || n <= 0) {
+                              updateLine(l.uid, { quantity: "1" });
+                              return;
+                            }
+                            if (!isDivisible) {
+                              const rounded = Math.max(1, Math.round(n));
+                              if (String(rounded) !== l.quantity) updateLine(l.uid, { quantity: String(rounded) });
+                            }
+                          }}
+                          className="h-9 px-2 text-right text-sm tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                         />
-                        <div className="text-right text-xs text-muted-foreground">{l.product?.unit_of_sale ?? "—"}</div>
-                        <Input
-                          type="number"
-                          step="0.0001"
-                          value={l.unit_price}
-                          onChange={(e) => setManualPrice(l.uid, e.target.value)}
-                          disabled={!l.product}
-                          className="h-8 text-right text-sm"
-                        />
-                        <Input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          max="100"
-                          value={l.discount_percent}
-                          onChange={(e) => updateLine(l.uid, { discount_percent: e.target.value })}
-                          disabled={!l.product}
-                          className="h-8 text-right text-sm"
-                        />
-                        <div className="text-right text-sm font-medium">{formatNOK(t.total)}</div>
-                        <Button size="sm" variant="ghost" onClick={() => removeLine(l.uid)} className="h-7 w-7 p-0 text-destructive hover:bg-destructive/10">
+                        <div className="text-center">
+                          {l.product ? (
+                            <span className="inline-flex h-6 items-center rounded-md bg-muted px-2 text-xs font-medium text-muted-foreground">
+                              {l.product.unit_of_sale}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </div>
+                        <div className="relative">
+                          <Input
+                            type="number"
+                            inputMode="decimal"
+                            step="0.0001"
+                            value={l.unit_price}
+                            onChange={(e) => setManualPrice(l.uid, e.target.value)}
+                            disabled={!l.product}
+                            className="h-9 pr-8 text-right text-sm tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                          />
+                          <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                            kr
+                          </span>
+                        </div>
+                        <div className="relative">
+                          <Input
+                            type="number"
+                            inputMode="decimal"
+                            step="0.01"
+                            min="0"
+                            max="100"
+                            value={l.discount_percent}
+                            onChange={(e) => updateLine(l.uid, { discount_percent: e.target.value })}
+                            disabled={!l.product}
+                            className="h-9 pr-7 text-right text-sm tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                          />
+                          <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                            %
+                          </span>
+                        </div>
+                        <div className="text-right text-sm font-semibold tabular-nums">{formatNOK(t.total)}</div>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => removeLine(l.uid)}
+                          className="h-8 w-8 p-0 text-destructive hover:bg-destructive/10"
+                          aria-label="Fjern linje"
+                        >
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </div>
                       {l.product && (
-                        <div className="flex items-center gap-2 pl-1 text-xs">
+                        <div className="mt-1.5 flex flex-wrap items-center gap-2 pl-1 text-xs">
                           <PriceSourceBadge source={l.unit_price_source} />
+                          <span className="rounded-md bg-muted px-1.5 py-0.5 text-muted-foreground">
+                            MVA {l.vat_rate}%
+                          </span>
                           {overridden && l.effective_price !== null && (
-                            <span className="text-warning">
-                              <AlertTriangle className="mr-0.5 inline h-3 w-3" />
+                            <span className="inline-flex items-center gap-1 rounded-md bg-warning/10 px-1.5 py-0.5 text-warning">
+                              <AlertTriangle className="h-3 w-3" />
                               Overstyrt fra {formatNOK(l.effective_price)}
                             </span>
                           )}
-                          <span className="text-muted-foreground">MVA {l.vat_rate}%</span>
                           <Input
                             value={l.notes}
                             onChange={(e) => updateLine(l.uid, { notes: e.target.value })}
-                            placeholder="Notat på linje..."
-                            className="h-6 max-w-[280px] text-xs"
+                            placeholder="Notat på linje…"
+                            className="h-7 max-w-[320px] flex-1 text-xs"
                           />
                         </div>
                       )}
@@ -931,26 +991,27 @@ export default function NewOrder() {
             )}
 
             {/* Totaler */}
-            <div className="mt-4 ml-auto max-w-xs space-y-1 text-sm">
+            <div className="mt-6 ml-auto max-w-xs space-y-1.5 border-t border-border pt-3 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Sum eks. mva</span>
-                <span>{formatNOK(totals.subtotal)}</span>
+                <span className="tabular-nums">{formatNOK(totals.subtotal)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Rabatt</span>
-                <span>{formatNOK(totals.discount)}</span>
+                <span className="tabular-nums">{formatNOK(totals.discount)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">MVA</span>
-                <span>{formatNOK(totals.vat)}</span>
+                <span className="tabular-nums">{formatNOK(totals.vat)}</span>
               </div>
-              <div className="flex justify-between border-t border-border pt-1.5 text-base font-semibold">
+              <div className="flex justify-between border-t border-border pt-2 text-base font-semibold">
                 <span>Sum inkl. mva</span>
-                <span>{formatNOK(totals.total)}</span>
+                <span className="tabular-nums">{formatNOK(totals.total)}</span>
               </div>
             </div>
           </CardContent>
         </Card>
+
 
         {/* Seksjon 4: Notater */}
         <Card>
