@@ -222,6 +222,31 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
     setLines((prev) => (prev.length === 1 ? prev : prev.filter((l) => l.uid !== uid)));
   }
 
+  async function appendProductLine(p: ProductOption) {
+    const ep = await fetchEffectivePrice({
+      productId: p.id,
+      customerId: customer.id,
+      date: deliveryDate,
+      caller: isEdit ? "customer_order_update" : "customer_order_create",
+    }).catch(() => null);
+    const draft: LineDraft = {
+      uid: crypto.randomUUID(),
+      product: p,
+      product_display_name: p.display_name,
+      product_display_number: p.display_number,
+      product_unit_of_sale: p.unit_of_sale,
+      product_mva_rate: p.mva_rate,
+      quantity: "1",
+      unit_price: ep ? String(ep.price) : "0",
+      is_fallback: !ep || ep.is_fallback,
+    };
+    setLines((prev) => {
+      // Drop initial empty line(s) (no product) so the search-driven flow stays clean
+      const cleaned = prev.filter((l) => l.product);
+      return [...cleaned, draft];
+    });
+  }
+
   async function pickProduct(uid: string, p: ProductOption) {
     const ep = await fetchEffectivePrice({
       productId: p.id,
@@ -252,6 +277,28 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
     if (cleaned !== "" && !/^\d*\.?\d*$/.test(cleaned)) return;
     setLines((prev) => prev.map((l) => (l.uid === uid ? { ...l, quantity: cleaned } : l)));
   }
+
+  function setLinePrice(uid: string, value: string) {
+    const cleaned = value.replace(",", ".");
+    if (cleaned !== "" && !/^\d*\.?\d*$/.test(cleaned)) return;
+    setLines((prev) => prev.map((l) => (l.uid === uid ? { ...l, unit_price: cleaned } : l)));
+  }
+
+  const totals = useMemo(() => {
+    let qty = 0;
+    let sum = 0;
+    for (const l of lines) {
+      if (!l.product) continue;
+      const q = Number(l.quantity) || 0;
+      const p = Number(l.unit_price) || 0;
+      qty += q;
+      sum += q * p;
+    }
+    return { qty, sum, count: lines.filter((l) => l.product).length };
+  }, [lines]);
+
+  const fmtKr = (n: number) =>
+    n.toLocaleString("nb-NO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   function buildInput(): CustomerOrderInput | null {
     const nameRes = NameSchema.safeParse(name);
