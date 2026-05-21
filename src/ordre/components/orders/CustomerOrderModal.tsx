@@ -867,11 +867,17 @@ function NameField({
   );
 }
 
-function ProductCombobox({ onSelect }: { onSelect: (p: ProductOption) => void }) {
+function ProductCombobox({
+  onSelect,
+  priceListId,
+}: {
+  onSelect: (p: ProductOption) => void;
+  priceListId?: string | null;
+}) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const debounced = useDebouncedValue(q, 200);
-  const { data: products, isLoading } = useNBProducts(debounced);
+  const { data: products, isLoading } = useNBProducts(debounced, priceListId);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
