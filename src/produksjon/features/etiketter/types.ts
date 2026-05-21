@@ -1,4 +1,4 @@
-export type LabelMode = "none" | "per_unit" | "per_order_or_note" | "per_note";
+export type LabelMode = "none" | "per_unit" | "per_order" | "per_order_or_note" | "per_note";
 export type LabelPrintModel = "standard" | "orig_plus_copy";
 
 export interface LabelProductRow {
