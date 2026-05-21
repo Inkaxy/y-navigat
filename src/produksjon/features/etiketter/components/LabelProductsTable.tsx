@@ -41,6 +41,11 @@ const MODE_META: Record<LabelMode, { label: string; tooltip: string; icon: typeo
     tooltip: "Én etikett per solgt enhet",
     icon: Tag,
   },
+  per_order: {
+    label: "per kundeordre",
+    tooltip: "Én etikett per kundeordre (uavhengig av antall)",
+    icon: Package,
+  },
   per_order_or_note: {
     label: "per ordre/merknad",
     tooltip: "Én etikett per ordre (flere per merknad)",
