@@ -292,6 +292,7 @@ export default function DeliveryNoteDetail() {
               const gross = l.quantity * l.unit_price;
               const sub = gross * (1 - (l.discount_percent || 0) / 100);
               const lineTotal = sub * (1 + l.vat_rate / 100);
+              const isDivisible = !!(ps["is_divisible"] as boolean | undefined);
               return (
                 <TableRow key={l.id ?? `new-${idx}`}>
                   <TableCell className="tabular-nums text-muted-foreground">
@@ -310,11 +311,17 @@ export default function DeliveryNoteDetail() {
                   <TableCell className="text-right">
                     <Input
                       type="number"
-                      inputMode="decimal"
+                      inputMode={isDivisible ? "decimal" : "numeric"}
                       min={0}
-                      step="1"
+                      step={isDivisible ? "0.001" : "1"}
                       value={l.quantity}
                       onChange={(e) => updateLine(idx, { quantity: Number(e.target.value) || 0 })}
+                      onBlur={(e) => {
+                        if (!isDivisible) {
+                          const n = Math.max(0, Math.round(Number(e.target.value) || 0));
+                          if (n !== l.quantity) updateLine(idx, { quantity: n });
+                        }
+                      }}
                       disabled={locked}
                       className="h-8 px-2 text-right tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                     />
