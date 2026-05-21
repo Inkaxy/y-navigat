@@ -30,6 +30,7 @@ export const MVA_RATES = [
 export const LABEL_MODE_OPTIONS = [
   { value: "none", label: "Ingen etikett" },
   { value: "per_unit", label: "Per stk" },
+  { value: "per_order", label: "Per kundeordre" },
   { value: "per_order_or_note", label: "Per ordre eller merknad" },
   { value: "per_note", label: "Per merknad" },
 ] as const;
@@ -38,6 +39,7 @@ export type LabelMode = (typeof LABEL_MODE_OPTIONS)[number]["value"];
 export const LABEL_MODE_HELP: Record<LabelMode, string> = {
   none: "Ingen etikett skrives ut for denne varen.",
   per_unit: "Én etikett per bestilte stk (kvantum rundes opp).",
+  per_order: "Én etikett per kundeordre, uansett antall stk eller merknad.",
   per_order_or_note: "Én etikett per ordre + én ekstra per ordre med merknad.",
   per_note: "Kun én etikett per ordre som har en merknad.",
 };
