@@ -574,7 +574,10 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
                   <Label className="mb-1.5 block text-xs font-medium">
                     Ny ordrelinje — søk produkt
                   </Label>
-                  <ProductCombobox onSelect={appendProductLine} />
+                  <ProductCombobox
+                    onSelect={appendProductLine}
+                    priceListId={customer.default_price_list_id}
+                  />
                 </div>
 
                 {/* Column header */}
