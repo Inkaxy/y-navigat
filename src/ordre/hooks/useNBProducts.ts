@@ -14,19 +14,36 @@ export type ProductOption = {
   is_divisible: boolean;
 };
 
-/** Henter aktive selgbare produkter for NB AS */
-export function useNBProducts(search?: string) {
+/**
+ * Henter aktive selgbare produkter for NB AS.
+ * Hvis `priceListId` er satt: returnerer kun produkter som har en pris i den prislisten,
+ * sortert etter `display_number` synkende.
+ */
+export function useNBProducts(search?: string, priceListId?: string | null) {
   return useQuery({
-    queryKey: ["nb-products", search ?? ""],
+    queryKey: ["nb-products", search ?? "", priceListId ?? null],
     queryFn: async (): Promise<ProductOption[]> => {
+      let allowedIds: string[] | null = null;
+      if (priceListId) {
+        const { data: items, error: itemsErr } = await supabase
+          .from("price_list_items")
+          .select("product_id")
+          .eq("price_list_id", priceListId);
+        if (itemsErr) throw itemsErr;
+        allowedIds = Array.from(new Set((items ?? []).map((r: any) => r.product_id).filter(Boolean)));
+        if (allowedIds.length === 0) return [];
+      }
+
       let q = supabase
         .from("products")
         .select("id, display_number, code, display_name, unit_of_sale, mva_rate, status, is_for_sale, is_divisible")
         .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
         .eq("is_for_sale", true)
         .neq("status", "discontinued")
-        .order("display_name")
-        .limit(100);
+        .order("display_number", { ascending: false })
+        .limit(200);
+
+      if (allowedIds) q = q.in("id", allowedIds);
 
       if (search && search.trim().length > 0) {
         const s = search.trim().replace(/[%,]/g, " ");
