@@ -436,7 +436,7 @@ export default function NewOrder() {
     const productIds = Array.from(new Set(copied.map((l) => l.product_id)));
     const { data: products, error } = await supabase
       .from("products")
-      .select("id, code, display_name, display_number, unit_of_sale, mva_rate, status, is_for_sale")
+      .select("id, code, display_name, display_number, unit_of_sale, mva_rate, status, is_for_sale, is_divisible")
       .in("id", productIds);
     if (error) {
       toast.error(error.message);
@@ -456,6 +456,7 @@ export default function NewOrder() {
             mva_rate: Number(p.mva_rate),
             status: p.status,
             is_for_sale: p.is_for_sale,
+            is_divisible: !!(p as any).is_divisible,
           }
         : null;
       return {
