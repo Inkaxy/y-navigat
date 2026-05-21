@@ -215,11 +215,8 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
 
   const today = new Date().toISOString().slice(0, 10);
 
-  function addLine() {
-    setLines((prev) => [...prev, newLine()]);
-  }
   function removeLine(uid: string) {
-    setLines((prev) => (prev.length === 1 ? prev : prev.filter((l) => l.uid !== uid)));
+    setLines((prev) => prev.filter((l) => l.uid !== uid));
   }
 
   async function appendProductLine(p: ProductOption) {
@@ -241,35 +238,9 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
       is_fallback: !ep || ep.is_fallback,
     };
     setLines((prev) => {
-      // Drop initial empty line(s) (no product) so the search-driven flow stays clean
       const cleaned = prev.filter((l) => l.product);
       return [...cleaned, draft];
     });
-  }
-
-  async function pickProduct(uid: string, p: ProductOption) {
-    const ep = await fetchEffectivePrice({
-      productId: p.id,
-      customerId: customer.id,
-      date: deliveryDate,
-      caller: isEdit ? "customer_order_update" : "customer_order_create",
-    }).catch(() => null);
-    setLines((prev) =>
-      prev.map((l) =>
-        l.uid === uid
-          ? {
-              ...l,
-              product: p,
-              product_display_name: p.display_name,
-              product_display_number: p.display_number,
-              product_unit_of_sale: p.unit_of_sale,
-              product_mva_rate: p.mva_rate,
-              unit_price: ep ? String(ep.price) : "0",
-              is_fallback: !ep || ep.is_fallback,
-            }
-          : l,
-      ),
-    );
   }
 
   function setLineQty(uid: string, value: string) {
