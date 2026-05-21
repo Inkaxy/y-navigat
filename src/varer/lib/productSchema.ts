@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { UNITS_OF_SALE } from "./constants";
 
-const LABEL_MODES = ["none", "per_unit", "per_order_or_note", "per_note"] as const;
+const LABEL_MODES = ["none", "per_unit", "per_order", "per_order_or_note", "per_note"] as const;
 const LABEL_PRINT_MODELS = ["standard", "orig_plus_copy"] as const;
 const RETURN_PRICE_TYPES = ["percent", "amount"] as const;
 const CAKE_ROLES = ["base", "topping", "filling", "customization", "info"] as const;
