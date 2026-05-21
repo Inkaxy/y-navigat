@@ -165,6 +165,7 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
                   mva_rate: 15,
                   status: "active",
                   is_for_sale: true,
+                  is_divisible: false,
                 } satisfies ProductOption,
               } as { product: ProductOption }),
             }))
