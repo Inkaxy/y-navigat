@@ -909,8 +909,12 @@ function ProductCombobox({
             <div className="p-4 text-center text-sm text-muted-foreground">
               <Loader2 className="mx-auto h-4 w-4 animate-spin" />
             </div>
+          ) : !priceListId ? (
+            <div className="p-4 text-center text-sm text-muted-foreground">
+              Kunden har ingen prisliste — sett standard prisliste på kunden for å kunne velge varer.
+            </div>
           ) : !products || products.length === 0 ? (
-            <div className="p-4 text-center text-sm text-muted-foreground">Ingen treff</div>
+            <div className="p-4 text-center text-sm text-muted-foreground">Ingen varer med pris i kundens prisliste</div>
           ) : (
             products.map((p) => (
               <button
