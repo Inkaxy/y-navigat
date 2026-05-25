@@ -172,8 +172,8 @@ export default function CustomerList() {
         </div>
 
         {/* Tabell */}
-        <div className="overflow-hidden rounded-lg border bg-card">
-          <Table>
+        <div className="overflow-x-auto rounded-lg border bg-card">
+          <Table className="min-w-[720px]">
             <TableHeader>
               <TableRow>
                 <TableHead className="w-[100px]">Kundenr</TableHead>

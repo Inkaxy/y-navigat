@@ -425,7 +425,7 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
           else onOpenChange(true);
         }}
       >
-        <DialogContent className="max-w-4xl max-h-[92vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[92vh] overflow-y-auto max-sm:!left-0 max-sm:!top-0 max-sm:!h-[100dvh] max-sm:!max-h-[100dvh] max-sm:!w-screen max-sm:!max-w-none max-sm:!translate-x-0 max-sm:!translate-y-0 max-sm:!rounded-none max-sm:!border-0 max-sm:p-4">
           <DialogHeader>
             <DialogTitle>
               {isEdit ? `Rediger kundeordre ${existing?.order_number ?? ""}` : "Ny kundeordre"}
@@ -895,7 +895,7 @@ function ProductCombobox({
           <span className="text-muted-foreground">Velg produkt...</span>
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-[420px] p-0">
+      <PopoverContent align="start" className="w-[min(420px,calc(100vw-2rem))] p-0">
         <div className="border-b border-border p-2">
           <Input
             value={q}

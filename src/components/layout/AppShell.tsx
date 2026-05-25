@@ -14,8 +14,8 @@ export function AppShell({ children }: { children: ReactNode }) {
           <SubAppNav />
           <main className="flex-1">
             <div
-              className="page-canvas mx-auto w-full animate-fade-in"
-              style={{ maxWidth: "1280px", padding: "32px 32px 48px" }}
+              className="page-canvas mx-auto w-full animate-fade-in px-4 pb-10 pt-5 sm:px-6 sm:pt-6 md:px-8 md:pb-12 md:pt-8"
+              style={{ maxWidth: "1280px" }}
             >
               {children}
             </div>
