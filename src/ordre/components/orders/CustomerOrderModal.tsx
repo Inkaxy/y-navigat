@@ -895,7 +895,7 @@ function ProductCombobox({
           <span className="text-muted-foreground">Velg produkt...</span>
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-[420px] p-0">
+      <PopoverContent align="start" className="w-[min(420px,calc(100vw-2rem))] p-0">
         <div className="border-b border-border p-2">
           <Input
             value={q}
