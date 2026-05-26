@@ -479,6 +479,11 @@ export default function TicketDetail() {
                       targetOrderNumber={targetOrderNumber}
                     />
                   )}
+                  <TimelineCard
+                    ticketId={ticket.id}
+                    orderId={ticket.related_order_id ?? null}
+                    title="Tidslinje"
+                  />
                 </>
               );
             })()}
