@@ -286,6 +286,7 @@ export default function OrderDetail() {
                 ↩ Fra ticket
               </Link>
             )}
+          </div>
 
           <div className="ml-auto flex flex-wrap items-center gap-2">
             {releaseAction && (
