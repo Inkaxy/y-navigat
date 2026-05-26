@@ -30,6 +30,7 @@ import {
   hasRedRisk, hasMissingInfo, type AiSuggestion, type RequestType,
 } from "@/ordre/lib/aiSuggestion";
 import { cn } from "@/lib/utils";
+import { UnreadMentionsBanner } from "@/ordre/components/orders/UnreadMentionsBanner";
 
 const STATUS_LABELS: Record<TicketStatus, string> = {
   new: "Ny", in_progress: "Pågår", resolved: "Løst", closed: "Lukket", spam: "Spam",
