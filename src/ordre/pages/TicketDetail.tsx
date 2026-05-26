@@ -65,7 +65,6 @@ export default function TicketDetail() {
   const [notesDraft, setNotesDraft] = useState("");
   const [replyDraft, setReplyDraft] = useState("");
   const [confirmReplyOpen, setConfirmReplyOpen] = useState(false);
-  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (data?.ticket) setNotesDraft(data.ticket.internal_notes ?? "");
@@ -96,17 +95,7 @@ export default function TicketDetail() {
     ? DOMPurify.sanitize(ticket.body_html, { USE_PROFILES: { html: true } })
     : null;
 
-  const onDownload = async (attId: string) => {
-    setDownloadingId(attId);
-    try {
-      const url = await getTicketAttachmentSignedUrl(attId);
-      window.open(url, "_blank");
-    } catch (e) {
-      toast({ title: "Kunne ikke laste ned vedlegg", description: String(e), variant: "destructive" });
-    } finally {
-      setDownloadingId(null);
-    }
-  };
+
 
   const setStatus = (status: TicketStatus) => {
     const prev = ticket.status;
