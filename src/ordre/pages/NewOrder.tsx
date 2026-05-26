@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Loader2, Plus, Trash2, AlertTriangle, Check, Search, Copy } from "lucide-react";
@@ -26,6 +26,9 @@ import { useDuplicateOrderCheck } from "@/ordre/hooks/useDuplicateOrderCheck";
 import { OrderDeadlineWarning } from "@/ordre/components/orders/OrderDeadlineWarning";
 import { useOrderDeadlineCheck } from "@/ordre/hooks/useOrderDeadlineCheck";
 import type { CopyableOrderLine } from "@/ordre/hooks/useRecentOrdersForCustomer";
+import { QaChecklistCard } from "@/ordre/components/orders/QaChecklistCard";
+import { evaluateOrderDraftChecks, summarizeQa } from "@/ordre/lib/qaChecks";
+import { normalizeAiSuggestion, type AiSuggestion } from "@/ordre/lib/aiSuggestion";
 
 type LineDraft = {
   uid: string;
