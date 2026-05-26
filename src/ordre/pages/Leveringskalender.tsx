@@ -398,7 +398,31 @@ export default function MatrixPage() {
       });
     }
 
-    // 2) Overlay redigeringer (inkl. nye linjer)
+    // 2) Fastordre-ghosts (forhåndsutfylte forslag — vises som ulagret)
+    if (ghostMap) {
+      for (const [gkey, qty] of ghostMap.entries()) {
+        if (!qty || qty <= 0) continue;
+        const [date, tour_id, product_id] = gkey.split("|");
+        if (!visibleDates.has(date)) continue;
+        const key = `${date}|${tour_id}|${product_id}`;
+        if (rowMap.has(key)) continue;
+        const p = productById.get(product_id);
+        const unitPrice = Number(p?.unit_price ?? 0);
+        const mvaRate = Number(p?.mva_rate ?? 0);
+        rowMap.set(key, {
+          key,
+          delivery_date: date,
+          delivery_tour_id: tour_id,
+          product_id,
+          quantity: Number(qty),
+          unit_price: unitPrice,
+          line_total_incl_vat: Number(qty) * unitPrice * (1 + mvaRate),
+          isDraft: true,
+        });
+      }
+    }
+
+    // 3) Overlay redigeringer (inkl. nye linjer)
     for (const [key, raw] of Object.entries(edits)) {
       const [date, tour_id, product_id] = key.split("|");
       const qty = Number(raw || 0);
@@ -424,7 +448,7 @@ export default function MatrixPage() {
 
     // Filtrer bort qty 0
     return Array.from(rowMap.values()).filter((r) => r.quantity > 0);
-  }, [matrix, edits, allProducts]);
+  }, [matrix, edits, allProducts, ghostMap, visibleDates]);
 
   const unsavedAddedCount = useMemo(() => {
     return addedProducts.filter((p) => {
