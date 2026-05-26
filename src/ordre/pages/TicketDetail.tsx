@@ -269,37 +269,11 @@ export default function TicketDetail() {
             </Card>
 
             {/* Vedlegg */}
-            {attachments.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-sm flex items-center gap-2"><Paperclip className="h-4 w-4" /> Vedlegg ({attachments.length})</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ul className="space-y-2">
-                    {attachments.map((a) => (
-                      <li key={a.id} className="flex items-center justify-between gap-3 text-sm border rounded-md p-2">
-                        <div className="min-w-0">
-                          <div className="truncate font-medium">{a.file_name}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {a.content_type ?? "ukjent type"}
-                            {a.size_bytes ? ` · ${(a.size_bytes / 1024).toFixed(0)} kB` : ""}
-                            {!a.storage_path && " · for stor (ikke lagret)"}
-                          </div>
-                        </div>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={!a.storage_path || downloadingId === a.id}
-                          onClick={() => onDownload(a.id)}
-                        >
-                          {downloadingId === a.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
-                        </Button>
-                      </li>
-                    ))}
-                  </ul>
-                </CardContent>
-              </Card>
-            )}
+            <AttachmentsCard
+              attachments={attachments}
+              relatedOrderId={ticket.related_order_id ?? null}
+            />
+
 
             {/* Tidligere svar */}
             {replies.length > 0 && (
