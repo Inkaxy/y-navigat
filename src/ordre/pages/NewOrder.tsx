@@ -235,6 +235,9 @@ export default function NewOrder() {
   const [customer, setCustomer] = useState<CustomerOption | null>(null);
   const [isReturn] = useState<boolean>(isReturnFromUrl);
   const [ticketBanner, setTicketBanner] = useState<string | null>(null);
+  const [ticketAi, setTicketAi] = useState<AiSuggestion | null>(null);
+  const [ticketBodyText, setTicketBodyText] = useState<string | null>(null);
+  const [qaOverride, setQaOverride] = useState(false);
 
   // Pre-velg kunde fra URL-param ved første render
   useEffect(() => {
