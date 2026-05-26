@@ -7633,6 +7633,70 @@ export type Database = {
           },
         ]
       }
+      ticket_internal_comment_reads: {
+        Row: {
+          comment_id: string
+          read_at: string
+          user_id: string
+        }
+        Insert: {
+          comment_id: string
+          read_at?: string
+          user_id: string
+        }
+        Update: {
+          comment_id?: string
+          read_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_internal_comment_reads_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "ticket_internal_comments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ticket_internal_comments: {
+        Row: {
+          author_id: string | null
+          author_name: string | null
+          body: string
+          created_at: string
+          id: string
+          mentioned_teams: Database["public"]["Enums"]["ticket_team"][]
+          ticket_id: string
+        }
+        Insert: {
+          author_id?: string | null
+          author_name?: string | null
+          body: string
+          created_at?: string
+          id?: string
+          mentioned_teams?: Database["public"]["Enums"]["ticket_team"][]
+          ticket_id: string
+        }
+        Update: {
+          author_id?: string | null
+          author_name?: string | null
+          body?: string
+          created_at?: string
+          id?: string
+          mentioned_teams?: Database["public"]["Enums"]["ticket_team"][]
+          ticket_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_internal_comments_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ticket_replies: {
         Row: {
           body_rendered: string | null
@@ -7726,7 +7790,9 @@ export type Database = {
           ai_provider: string | null
           ai_status: string | null
           ai_suggestion: Json | null
+          assigned_team: Database["public"]["Enums"]["ticket_team"] | null
           assigned_to: string | null
+          awaiting_internal: boolean
           body_html: string | null
           body_preview: string | null
           body_text: string | null
@@ -7759,7 +7825,9 @@ export type Database = {
           ai_provider?: string | null
           ai_status?: string | null
           ai_suggestion?: Json | null
+          assigned_team?: Database["public"]["Enums"]["ticket_team"] | null
           assigned_to?: string | null
+          awaiting_internal?: boolean
           body_html?: string | null
           body_preview?: string | null
           body_text?: string | null
@@ -7792,7 +7860,9 @@ export type Database = {
           ai_provider?: string | null
           ai_status?: string | null
           ai_suggestion?: Json | null
+          assigned_team?: Database["public"]["Enums"]["ticket_team"] | null
           assigned_to?: string | null
+          awaiting_internal?: boolean
           body_html?: string | null
           body_preview?: string | null
           body_text?: string | null
@@ -8025,6 +8095,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_team_memberships: {
+        Row: {
+          created_at: string
+          id: string
+          team: Database["public"]["Enums"]["ticket_team"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          team: Database["public"]["Enums"]["ticket_team"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          team?: Database["public"]["Enums"]["ticket_team"]
+          user_id?: string
+        }
+        Relationships: []
       }
       user_ui_preferences: {
         Row: {
@@ -9145,6 +9236,12 @@ export type Database = {
         | "concluded"
         | "cancelled"
         | "awaiting_confirmation"
+      ticket_team:
+        | "kundeservice"
+        | "produksjon"
+        | "butikk"
+        | "konditor"
+        | "admin"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -9320,6 +9417,13 @@ export const Constants = {
         "concluded",
         "cancelled",
         "awaiting_confirmation",
+      ],
+      ticket_team: [
+        "kundeservice",
+        "produksjon",
+        "butikk",
+        "konditor",
+        "admin",
       ],
     },
   },
