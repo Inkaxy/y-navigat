@@ -30,6 +30,7 @@ import { TicketPresenceBanner } from "@/ordre/components/shell/TicketPresenceBan
 import { AiSuggestionCard } from "@/ordre/components/orders/AiSuggestionCard";
 import { RelatedOrdersCard } from "@/ordre/components/orders/RelatedOrdersCard";
 import { ChangeProposalCard } from "@/ordre/components/orders/ChangeProposalCard";
+import { AiReplyDraftCard } from "@/ordre/components/orders/AiReplyDraftCard";
 import { normalizeAiSuggestion } from "@/ordre/lib/aiSuggestion";
 
 const UNASSIGNED = "__unassigned__";
