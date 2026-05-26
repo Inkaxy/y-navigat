@@ -189,7 +189,7 @@ Deno.serve(async (req) => {
 
     const [{ data: customers }, { data: products }, { data: pickups }] = await Promise.all([
       admin.from("customers")
-        .select("id,display_name,customer_number,primary_contact_email")
+        .select("id,display_name,customer_number,primary_contact_email,primary_contact_phone,mobile_phone")
         .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
         .eq("status", "active")
         .limit(200),
@@ -205,6 +205,58 @@ Deno.serve(async (req) => {
         .eq("status", "active")
         .limit(50),
     ]);
+
+    // --- Runde 2: hent kandidat-ordre ---
+    // Strategi: (1) match sender_email mot kundens primary_contact_email,
+    // (2) regex etter ordrenr i bodyen (f.eks. 2025-1234 eller #1234),
+    // (3) hent aktive/fremtidige ordrer for de matchede kundene + eventuelle eksplisitte ordrenr.
+    const senderEmail = (ticket.sender_email ?? "").toLowerCase().trim();
+    const matchedCustomerIds = new Set<string>();
+    for (const c of customers ?? []) {
+      const e1 = (c.primary_contact_email ?? "").toLowerCase().trim();
+      if (senderEmail && e1 && e1 === senderEmail) matchedCustomerIds.add(c.id);
+    }
+    const rawBody = (ticket.body_text ?? ticket.body_preview ?? "").slice(0, 8000);
+    const orderNumberMatches = Array.from(
+      rawBody.matchAll(/(?:ordre\w*\s*(?:nr|nummer)?\s*[:#]?\s*|#)\s*(\d{2,4}[-\s]?\d{3,6})/gi),
+    ).map((m) => m[1].replace(/\s/g, "").replace(/^(\d{2,4})(\d{3,6})$/, "$1-$2"));
+    const today = new Date(); today.setHours(0,0,0,0);
+    const cutoff = new Date(today); cutoff.setDate(cutoff.getDate() - 60);
+    const cutoffISO = cutoff.toISOString().slice(0,10);
+    const activeStatuses = ["draft","awaiting_confirmation","confirmed","in_production","packed","on_hold"];
+    let candidateOrdersRaw: any[] = [];
+    if (matchedCustomerIds.size > 0 || orderNumberMatches.length > 0) {
+      let q = admin.from("orders")
+        .select("id,order_number,status,delivery_date,delivery_time,customer_id,customer_snapshot,delivery_address_line1,delivery_postal_code,delivery_city,customer_notes,internal_notes")
+        .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
+        .gte("delivery_date", cutoffISO)
+        .in("status", activeStatuses)
+        .order("delivery_date", { ascending: true })
+        .limit(20);
+      const orFilters: string[] = [];
+      if (matchedCustomerIds.size > 0) {
+        orFilters.push(`customer_id.in.(${Array.from(matchedCustomerIds).join(",")})`);
+      }
+      for (const onr of orderNumberMatches) {
+        orFilters.push(`order_number.eq.${onr}`);
+      }
+      if (orFilters.length > 0) q = q.or(orFilters.join(","));
+      const { data: cand } = await q;
+      candidateOrdersRaw = cand ?? [];
+    }
+    // Hent linjer for kandidatene for snapshot
+    const candIds = candidateOrdersRaw.map((o: any) => o.id);
+    let linesByOrder: Record<string, any[]> = {};
+    if (candIds.length > 0) {
+      const { data: lines } = await admin.from("order_lines")
+        .select("order_id,line_number,quantity,product_snapshot,notes")
+        .in("order_id", candIds)
+        .order("line_number", { ascending: true });
+      for (const l of lines ?? []) {
+        (linesByOrder[l.order_id] = linesByOrder[l.order_id] || []).push(l);
+      }
+    }
+
 
     const bodyText = trimEmailBody(ticket.body_text ?? ticket.body_preview ?? "");
     const todayISO = new Date().toISOString().slice(0, 10);
