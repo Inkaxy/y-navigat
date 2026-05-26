@@ -25,6 +25,9 @@ export interface Ticket {
   assigned_to: string | null;
   related_order_id: string | null;
   internal_notes: string | null;
+  ai_status: string | null;
+  ai_suggestion: unknown;
+  ai_confidence_score: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -43,7 +46,7 @@ export interface TicketsFilter {
   search?: string;
   status?: TicketStatus[];
   priority?: TicketPriority[];
-  assigned?: "all" | "mine" | "unassigned";
+  assigned?: "all" | "mine" | "unassigned" | string; // string = specific user_id
   fromDate?: string;
   toDate?: string;
 }
@@ -55,7 +58,7 @@ export function useTickets(filter: TicketsFilter = {}) {
       let q = supabase.from("tickets").select("*").order("received_at", { ascending: false }).limit(500);
       if (filter.search) {
         const s = `%${filter.search}%`;
-        q = q.or(`subject.ilike.${s},sender_email.ilike.${s},body_text.ilike.${s}`);
+        q = q.or(`subject.ilike.${s},sender_email.ilike.${s},sender_name.ilike.${s},body_text.ilike.${s},body_preview.ilike.${s}`);
       }
       if (filter.status?.length) q = q.in("status", filter.status);
       if (filter.priority?.length) q = q.in("priority", filter.priority);
@@ -66,11 +69,38 @@ export function useTickets(filter: TicketsFilter = {}) {
         if (u.user) q = q.eq("assigned_to", u.user.id);
       } else if (filter.assigned === "unassigned") {
         q = q.is("assigned_to", null);
+      } else if (filter.assigned && filter.assigned !== "all") {
+        q = q.eq("assigned_to", filter.assigned);
       }
       const { data, error } = await q;
       if (error) throw error;
       return (data ?? []) as Ticket[];
     },
+  });
+}
+
+// Hent siste utgående svar per ticket — brukes til å avgjøre "venter på kunde".
+export function useLatestReplyByTicket(ticketIds: string[]) {
+  const ids = [...ticketIds].sort();
+  return useQuery({
+    enabled: ids.length > 0,
+    queryKey: ["tickets-latest-reply", ids],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("ticket_replies")
+        .select("ticket_id, sent_at, send_status")
+        .in("ticket_id", ids)
+        .eq("send_status", "sent")
+        .order("sent_at", { ascending: false });
+      if (error) throw error;
+      const map = new Map<string, string>();
+      for (const r of (data ?? []) as Array<{ ticket_id: string; sent_at: string | null }>) {
+        if (!r.sent_at) continue;
+        if (!map.has(r.ticket_id)) map.set(r.ticket_id, r.sent_at);
+      }
+      return map;
+    },
+    staleTime: 30_000,
   });
 }
 
