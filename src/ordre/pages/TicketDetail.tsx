@@ -34,8 +34,11 @@ import { AiReplyDraftCard } from "@/ordre/components/orders/AiReplyDraftCard";
 import { AttachmentsCard } from "@/ordre/components/orders/AttachmentsCard";
 import { RuleWarningsCard } from "@/ordre/components/orders/RuleWarningsCard";
 import { TimelineCard } from "@/ordre/components/orders/TimelineCard";
+import { InternalCommentsCard } from "@/ordre/components/orders/InternalCommentsCard";
 import { logTicketEvent } from "@/ordre/lib/ticketEvents";
 import { normalizeAiSuggestion } from "@/ordre/lib/aiSuggestion";
+import { TEAMS, TEAM_LABEL, type TicketTeam } from "@/ordre/lib/teams";
+import { Switch } from "@/components/ui/switch";
 
 const UNASSIGNED = "__unassigned__";
 
