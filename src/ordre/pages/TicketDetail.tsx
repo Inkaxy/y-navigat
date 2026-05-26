@@ -108,8 +108,20 @@ export default function TicketDetail() {
   };
 
   const setStatus = (status: TicketStatus) => {
+    const prev = ticket.status;
     update.mutate({ id: ticket.id, patch: { status } as never }, {
-      onSuccess: () => toast({ title: "Status oppdatert" }),
+      onSuccess: () => {
+        toast({ title: "Status oppdatert" });
+        const isResolve = (status === "resolved" || status === "closed") && prev !== status;
+        const isReopen = (prev === "resolved" || prev === "closed") && (status === "new" || status === "in_progress");
+        void logTicketEvent({
+          ticket_id: ticket.id,
+          order_id: ticket.related_order_id ?? null,
+          event_type: isResolve ? "ticket.resolved" : isReopen ? "ticket.reopened" : "ticket.status_changed",
+          summary: `${prev} → ${status}`,
+          payload: { from: prev, to: status },
+        });
+      },
     });
   };
   const setPriority = (priority: TicketPriority) => {
@@ -120,14 +132,31 @@ export default function TicketDetail() {
 
   const saveNotes = () => {
     update.mutate({ id: ticket.id, patch: { internal_notes: notesDraft } as never }, {
-      onSuccess: () => toast({ title: "Notat lagret" }),
+      onSuccess: () => {
+        toast({ title: "Notat lagret" });
+        void logTicketEvent({
+          ticket_id: ticket.id,
+          order_id: ticket.related_order_id ?? null,
+          event_type: "note.added",
+          summary: notesDraft.slice(0, 160),
+        });
+      },
     });
   };
 
   const setAssignee = (val: string) => {
     const newId = val === UNASSIGNED ? null : val;
+    const assigneeLabel = newId ? assignees.find((a) => a.id === newId)?.display_name ?? newId : null;
     update.mutate({ id: ticket.id, patch: { assigned_to: newId } as never }, {
-      onSuccess: () => toast({ title: newId ? "Tildelt" : "Tildeling fjernet" }),
+      onSuccess: () => {
+        toast({ title: newId ? "Tildelt" : "Tildeling fjernet" });
+        void logTicketEvent({
+          ticket_id: ticket.id,
+          order_id: ticket.related_order_id ?? null,
+          event_type: newId ? "ticket.assigned" : "ticket.unassigned",
+          summary: assigneeLabel ?? null,
+        });
+      },
     });
   };
 
