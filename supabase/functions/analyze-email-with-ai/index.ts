@@ -87,6 +87,36 @@ const SuggestionSchema = z.object({
     tour_id: z.string().uuid().nullable(),
     tour_name: z.string().nullable(),
   }).nullable().optional(),
+  // Runde 2: kandidat-ordre + endringer
+  candidate_orders: z.array(z.object({
+    order_id: z.string().uuid(),
+    order_number: z.string().nullable(),
+    match_confidence: z.number().min(0).max(1),
+    why_match: z.string(),
+    snapshot: z.object({
+      delivery_date: z.string().nullable().optional(),
+      delivery_time: z.string().nullable().optional(),
+      status: z.string().nullable().optional(),
+      customer_name: z.string().nullable().optional(),
+      line_summary: z.string().nullable().optional(),
+    }).nullable().optional(),
+  })).default([]),
+  referenced_order: z.object({
+    order_id: z.string().uuid(),
+    order_number: z.string().nullable(),
+    match_confidence: z.number().min(0).max(1),
+  }).nullable().optional(),
+  change_intent: z.object({
+    target_order_id: z.string().uuid().nullable(),
+    changes: z.array(z.object({
+      field: z.string(),
+      current_value: z.string().nullable(),
+      proposed_value: z.string().nullable(),
+      reasoning: z.string(),
+      confidence: z.number().min(0).max(1),
+    })).default([]),
+    cancellation_reason: z.string().nullable().optional(),
+  }).nullable().optional(),
   delivery_date: z.string().nullable().optional(), // bakoverkomp
   confidence_score: z.number().min(0).max(1),
   reasoning: z.string(),
