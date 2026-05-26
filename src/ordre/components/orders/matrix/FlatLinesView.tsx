@@ -12,6 +12,16 @@ export type FlatLineRow = {
   isDraft?: boolean;
 };
 
+const WEEKDAYS = ["Søndag", "Mandag", "Tirsdag", "Onsdag", "Torsdag", "Fredag", "Lørdag"];
+
+function formatHeaderDate(iso: string): { weekday: string; date: string } {
+  const d = new Date(iso + "T12:00:00");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  return { weekday: WEEKDAYS[d.getDay()], date: `${dd}.${mm}.${yyyy}` };
+}
+
 export function FlatLinesView({
   rows,
   products,
@@ -23,6 +33,7 @@ export function FlatLinesView({
 }) {
   const productById = new Map(products.map((p) => [p.id, p]));
   const tourById = new Map(tours.map((t) => [t.id, t]));
+
   const sorted = [...rows].sort((a, b) => {
     if (a.delivery_date !== b.delivery_date) return a.delivery_date < b.delivery_date ? -1 : 1;
     const ta = tourById.get(a.delivery_tour_id ?? "")?.tour_number ?? 0;
@@ -33,47 +44,99 @@ export function FlatLinesView({
     return pa - pb;
   });
 
+  // Grupper etter dato + tur
+  const groups = new Map<string, { date: string; tourId: string | null; rows: FlatLineRow[] }>();
+  for (const r of sorted) {
+    const k = `${r.delivery_date}|${r.delivery_tour_id ?? ""}`;
+    if (!groups.has(k)) groups.set(k, { date: r.delivery_date, tourId: r.delivery_tour_id, rows: [] });
+    groups.get(k)!.rows.push(r);
+  }
+
+  if (sorted.length === 0) {
+    return (
+      <div className="p-12 text-center text-muted-foreground text-sm">
+        Ingen ordrelinjer i synlig periode.
+      </div>
+    );
+  }
+
   return (
-    <div className="overflow-auto">
-      <table className="min-w-full text-sm">
-        <thead className="sticky top-0 bg-card border-b">
-          <tr className="text-left">
-            <th className="px-3 py-2">Dato</th>
-            <th className="px-3 py-2">Tur</th>
-            <th className="px-3 py-2">Vare</th>
-            <th className="px-3 py-2 text-right">Mengde</th>
-            <th className="px-3 py-2 text-right">Pris</th>
-            <th className="px-3 py-2 text-right">Sum inkl. mva</th>
-          </tr>
-        </thead>
-        <tbody>
-          {sorted.length === 0 && (
-            <tr><td colSpan={6} className="p-6 text-center text-muted-foreground">Ingen ordrelinjer i synlig periode.</td></tr>
-          )}
-          {sorted.map((c) => {
-            const p = productById.get(c.product_id);
-            const t = tourById.get(c.delivery_tour_id ?? "");
-            return (
-              <tr key={c.key} className="border-b hover:bg-muted/30">
-                <td className="px-3 py-1.5 tabular-nums">{c.delivery_date}</td>
-                <td className="px-3 py-1.5">{t ? `T${t.tour_number} ${t.display_name}` : "—"}</td>
-                <td className="px-3 py-1.5">
-                  <span className="text-muted-foreground tabular-nums mr-2">{p?.display_number}</span>
-                  {p?.display_name ?? c.product_id}
-                  {c.isDraft && (
-                    <span className="ml-2 rounded bg-warning/15 px-1.5 py-0.5 text-[10px] font-medium text-warning">
-                      Ulagret
-                    </span>
-                  )}
-                </td>
-                <td className="px-3 py-1.5 text-right tabular-nums">{c.quantity}</td>
-                <td className="px-3 py-1.5 text-right tabular-nums">{formatNOK(c.unit_price)}</td>
-                <td className="px-3 py-1.5 text-right tabular-nums">{formatNOK(c.line_total_incl_vat)}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+    <div className="space-y-8">
+      {Array.from(groups.values()).map((g) => {
+        const t = tourById.get(g.tourId ?? "");
+        const { weekday, date } = formatHeaderDate(g.date);
+        const groupTotal = g.rows.reduce((s, r) => s + r.line_total_incl_vat, 0);
+        return (
+          <section key={`${g.date}|${g.tourId ?? ""}`} className="space-y-2">
+            <header className="px-1">
+              <h3 className="text-xl font-semibold tracking-tight">
+                <span className="font-bold">{weekday}</span>{" "}
+                <span className="text-foreground/80">{date}</span>
+                {t && (
+                  <>
+                    {" "}
+                    <span className="text-foreground/60">- tur</span>{" "}
+                    <span className="font-bold">{t.tour_number}</span>
+                  </>
+                )}
+              </h3>
+              {t?.display_name && (
+                <p className="mt-0.5 text-xs text-muted-foreground">{t.display_name}</p>
+              )}
+            </header>
+
+            <div className="overflow-hidden rounded-lg border">
+              <table className="w-full text-sm">
+                <tbody>
+                  {g.rows.map((c, idx) => {
+                    const p = productById.get(c.product_id);
+                    const unit = p?.sales_unit ?? "";
+                    return (
+                      <tr
+                        key={c.key}
+                        className={
+                          (idx % 2 === 0 ? "bg-muted/40" : "bg-card") +
+                          " border-b last:border-b-0 border-line-subtle"
+                        }
+                      >
+                        <td className="w-[64px] px-3 py-2 text-right tabular-nums text-muted-foreground">
+                          {p?.display_number ?? ""}
+                        </td>
+                        <td className="px-3 py-2">
+                          {p?.display_name ?? c.product_id}
+                          {c.isDraft && (
+                            <span className="ml-2 rounded bg-warning/15 px-1.5 py-0.5 text-[10px] font-medium text-warning">
+                              Ulagret
+                            </span>
+                          )}
+                        </td>
+                        <td className="w-[80px] px-3 py-2 text-right text-base font-bold tabular-nums">
+                          {c.quantity}
+                        </td>
+                        <td className="w-[60px] px-2 py-2 text-muted-foreground">{unit}</td>
+                        <td className="w-[120px] px-3 py-2 text-right tabular-nums text-muted-foreground">
+                          à {formatNOK(c.unit_price)} =
+                        </td>
+                        <td className="w-[120px] px-3 py-2 text-right tabular-nums">
+                          {formatNOK(c.line_total_incl_vat)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  <tr className="bg-card">
+                    <td colSpan={5} className="px-3 py-2 text-right text-xs uppercase tracking-wider text-muted-foreground">
+                      Sum
+                    </td>
+                    <td className="px-3 py-2 text-right tabular-nums font-semibold">
+                      {formatNOK(groupTotal)}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+        );
+      })}
     </div>
   );
 }
