@@ -3,7 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import DOMPurify from "dompurify";
 import { format, formatDistanceToNow } from "date-fns";
 import { nb } from "date-fns/locale";
-import { ArrowLeft, Download, Loader2, Mail, Paperclip, Send, Reply, AlertCircle } from "lucide-react";
+import { ArrowLeft, Loader2, Mail, Send, Reply, AlertCircle } from "lucide-react";
 import { AppBanner } from "@/ordre/components/shell/AppBanner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,7 +20,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/use-toast";
 import {
-  useTicket, useUpdateTicket, getTicketAttachmentSignedUrl,
+  useTicket, useUpdateTicket,
   type TicketStatus, type TicketPriority,
 } from "@/ordre/hooks/useTickets";
 import {
@@ -31,6 +31,7 @@ import { AiSuggestionCard } from "@/ordre/components/orders/AiSuggestionCard";
 import { RelatedOrdersCard } from "@/ordre/components/orders/RelatedOrdersCard";
 import { ChangeProposalCard } from "@/ordre/components/orders/ChangeProposalCard";
 import { AiReplyDraftCard } from "@/ordre/components/orders/AiReplyDraftCard";
+import { AttachmentsCard } from "@/ordre/components/orders/AttachmentsCard";
 import { TimelineCard } from "@/ordre/components/orders/TimelineCard";
 import { logTicketEvent } from "@/ordre/lib/ticketEvents";
 import { normalizeAiSuggestion } from "@/ordre/lib/aiSuggestion";
@@ -64,7 +65,6 @@ export default function TicketDetail() {
   const [notesDraft, setNotesDraft] = useState("");
   const [replyDraft, setReplyDraft] = useState("");
   const [confirmReplyOpen, setConfirmReplyOpen] = useState(false);
-  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (data?.ticket) setNotesDraft(data.ticket.internal_notes ?? "");
@@ -95,17 +95,7 @@ export default function TicketDetail() {
     ? DOMPurify.sanitize(ticket.body_html, { USE_PROFILES: { html: true } })
     : null;
 
-  const onDownload = async (attId: string) => {
-    setDownloadingId(attId);
-    try {
-      const url = await getTicketAttachmentSignedUrl(attId);
-      window.open(url, "_blank");
-    } catch (e) {
-      toast({ title: "Kunne ikke laste ned vedlegg", description: String(e), variant: "destructive" });
-    } finally {
-      setDownloadingId(null);
-    }
-  };
+
 
   const setStatus = (status: TicketStatus) => {
     const prev = ticket.status;
@@ -269,37 +259,11 @@ export default function TicketDetail() {
             </Card>
 
             {/* Vedlegg */}
-            {attachments.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-sm flex items-center gap-2"><Paperclip className="h-4 w-4" /> Vedlegg ({attachments.length})</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ul className="space-y-2">
-                    {attachments.map((a) => (
-                      <li key={a.id} className="flex items-center justify-between gap-3 text-sm border rounded-md p-2">
-                        <div className="min-w-0">
-                          <div className="truncate font-medium">{a.file_name}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {a.content_type ?? "ukjent type"}
-                            {a.size_bytes ? ` · ${(a.size_bytes / 1024).toFixed(0)} kB` : ""}
-                            {!a.storage_path && " · for stor (ikke lagret)"}
-                          </div>
-                        </div>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={!a.storage_path || downloadingId === a.id}
-                          onClick={() => onDownload(a.id)}
-                        >
-                          {downloadingId === a.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
-                        </Button>
-                      </li>
-                    ))}
-                  </ul>
-                </CardContent>
-              </Card>
-            )}
+            <AttachmentsCard
+              attachments={attachments}
+              relatedOrderId={ticket.related_order_id ?? null}
+            />
+
 
             {/* Tidligere svar */}
             {replies.length > 0 && (
