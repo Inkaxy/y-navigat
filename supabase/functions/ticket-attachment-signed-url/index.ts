@@ -20,7 +20,7 @@ Deno.serve(async (req) => {
     const { data: { user } } = await userClient.auth.getUser();
     if (!user) return json({ error: "Unauthorized" }, 401);
 
-    const { attachment_id } = await req.json();
+    const { attachment_id, inline } = await req.json();
     if (!attachment_id) return json({ error: "attachment_id påkrevd" }, 400);
 
     // Use user client so RLS verifies access
@@ -33,9 +33,10 @@ Deno.serve(async (req) => {
     if (!att?.storage_path) return json({ error: "Vedlegg ikke tilgjengelig" }, 404);
 
     const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const signOpts = inline ? undefined : { download: att.file_name };
     const { data: signed, error: sErr } = await admin.storage
       .from("ticket-attachments")
-      .createSignedUrl(att.storage_path, 60 * 5, { download: att.file_name });
+      .createSignedUrl(att.storage_path, 60 * 5, signOpts);
     if (sErr) return json({ error: sErr.message }, 500);
 
     return json({ signed_url: signed.signedUrl });
