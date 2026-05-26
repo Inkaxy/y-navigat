@@ -3548,6 +3548,7 @@ export type Database = {
           picked_up_at: string | null
           picked_up_by: string | null
           previous_status_before_hold: string | null
+          production_notes: string | null
           recurring_schedule_id: string | null
           send_email_confirm: boolean
           send_sms_confirm: boolean
@@ -3557,6 +3558,7 @@ export type Database = {
           status: string
           status_changed_at: string
           status_changed_by: string | null
+          store_notes: string | null
           subtotal_excl_vat: number
           total_discount: number
           total_incl_vat: number
@@ -3603,6 +3605,7 @@ export type Database = {
           picked_up_at?: string | null
           picked_up_by?: string | null
           previous_status_before_hold?: string | null
+          production_notes?: string | null
           recurring_schedule_id?: string | null
           send_email_confirm?: boolean
           send_sms_confirm?: boolean
@@ -3612,6 +3615,7 @@ export type Database = {
           status?: string
           status_changed_at?: string
           status_changed_by?: string | null
+          store_notes?: string | null
           subtotal_excl_vat?: number
           total_discount?: number
           total_incl_vat?: number
@@ -3658,6 +3662,7 @@ export type Database = {
           picked_up_at?: string | null
           picked_up_by?: string | null
           previous_status_before_hold?: string | null
+          production_notes?: string | null
           recurring_schedule_id?: string | null
           send_email_confirm?: boolean
           send_sms_confirm?: boolean
@@ -3667,6 +3672,7 @@ export type Database = {
           status?: string
           status_changed_at?: string
           status_changed_by?: string | null
+          store_notes?: string | null
           subtotal_excl_vat?: number
           total_discount?: number
           total_incl_vat?: number

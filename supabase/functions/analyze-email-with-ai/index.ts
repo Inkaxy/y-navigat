@@ -55,6 +55,7 @@ const SuggestionSchema = z.object({
     customer_notes: z.string().nullable().optional(),
     internal_notes: z.string().nullable().optional(),
     production_notes: z.string().nullable().optional(),
+    store_notes: z.string().nullable().optional(),
     cake_text: z.string().nullable().optional(),
     allergies: z.string().nullable().optional(),
     special_requests: z.string().nullable().optional(),
@@ -271,7 +272,17 @@ Returner KUN gyldig JSON som matcher dette schemaet (ingen markdown, ingen tekst
   "summary": string (1-3 setninger på norsk),
   "suggested_action": string (kort handlingsforslag på norsk),
   "customer_match": { "customer_id": uuid|null, "customer_name": string|null, "match_confidence": 0..1 } | null,
-  "order_fields": { ... samme som før ... },
+  "order_fields": {
+    "delivery_date": "YYYY-MM-DD"|null, "delivery_time": "HH:MM"|null,
+    "pickup_location_hint": string|null,
+    "delivery_address_line1": string|null, "delivery_address_line2": string|null,
+    "delivery_postal_code": string|null, "delivery_city": string|null,
+    "customer_notes": string|null, "internal_notes": string|null,
+    "production_notes": string|null,  // se PRODUCTION_NOTES under
+    "store_notes": string|null,       // se STORE_NOTES under
+    "cake_text": string|null, "allergies": string|null, "special_requests": string|null,
+    "contact_phone": string|null, "contact_email": string|null
+  },
   "products": [{ ... samme som før ... }],
   "missing_info": [{ "code": string, "label": string }],
   "risks": [{ "severity": "red"|"yellow"|"green", "code": string, "message": string }],
@@ -310,7 +321,13 @@ Regler:
 - proposed_value: hva kunden ønsker å endre til. Bruk samme format som lagret (YYYY-MM-DD for dato, HH:MM for tid).
 - customer_match / products / missing_info / risks: som tidligere.
 - Norsk datoformat er DD-MM-YYYY. delivery_date i utdata må være ISO YYYY-MM-DD.
-- Hold sammendrag og reasoning korte og praktiske.`;
+- Hold sammendrag og reasoning korte og praktiske.
+
+PRODUCTION_NOTES (order_fields.production_notes) — tekst til BAKERIET. Skal være kort, strukturert, og inneholde KUN det produksjon trenger. Bruk én linje per punkt med "Felt: verdi"-format. Inkluder alle relevante: Produkt, Antall, Størrelse/personer, Kaketekst, Pynt, Fyll, Smak, Allergier, Spesialønsker, Vedlegg fra kunde (hvis nevnt), "Obs:" for ting produksjon må være ekstra oppmerksom på (kort frist, uvanlig størrelse osv.). Sett null hvis intet relevant.
+
+STORE_NOTES (order_fields.store_notes) — tekst til UTLEVERINGSSTEDET/BUTIKKEN. Kort og strukturert, én linje per punkt. Inkluder: Hentetid, Kundenavn, Telefon, Betalingsstatus (hvis nevnt eller utledet), "Kontakt kunde:" hvis noe må avklares før henting, Hentebeskjeder (samme dag, ringer ved ankomst, parkering osv.), "Endret:" hvis ordren er endret etter bekreftelse. Sett null hvis intet relevant.
+
+Begge notatene skal være på norsk, vennlige men telegrafiske. IKKE gjenta hele e-postteksten.`;
 
     const userText = [
       `=== TICKET ===`,

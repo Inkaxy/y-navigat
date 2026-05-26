@@ -48,6 +48,7 @@ export type AiOrderFields = {
   customer_notes?: string | null;
   internal_notes?: string | null;
   production_notes?: string | null;
+  store_notes?: string | null;
   cake_text?: string | null;
   allergies?: string | null;
   special_requests?: string | null;

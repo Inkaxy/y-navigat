@@ -256,14 +256,23 @@ export default function NewOrder() {
     (async () => {
       const { data: t } = await supabase
         .from("tickets")
-        .select("subject, sender_email, ai_suggestion")
+        .select("subject, sender_email, sender_name, ai_suggestion")
         .eq("id", ticketId).maybeSingle();
       if (cancelled || !t) return;
       const ai = (t as any).ai_suggestion as null | {
-        customer_match?: { customer_id: string | null } | null;
+        customer_match?: { customer_id: string | null; customer_name?: string | null } | null;
         order_fields?: Record<string, string | null | undefined>;
-        products?: Array<{ product_id: string | null; product_name: string; quantity: number }>;
+        products?: Array<{
+          product_id: string | null;
+          product_name: string;
+          quantity: number;
+          size_or_servings?: string | null;
+          flavor?: string | null;
+          filling?: string | null;
+          decoration?: string | null;
+        }>;
       };
+      const senderName = (t as any).sender_name as string | null | undefined;
 
       // Velg kunde: 1) AI-match, 2) sender_email-ilike
       let pickedCustomer: CustomerOption | null = null;
@@ -311,11 +320,7 @@ export default function NewOrder() {
 
       // Bygg internt notat med AI-detaljer
       const noteParts: string[] = [`Opprettet fra ticket: ${t.subject ?? "(uten emne)"}`];
-      if (of.cake_text) noteParts.push(`Kaketekst: ${of.cake_text}`);
-      if (of.allergies) noteParts.push(`Allergier: ${of.allergies}`);
-      if (of.special_requests) noteParts.push(`Spesialønsker: ${of.special_requests}`);
       if (of.contact_phone) noteParts.push(`Telefon: ${of.contact_phone}`);
-      if (of.production_notes) noteParts.push(`Produksjon: ${of.production_notes}`);
       if (of.internal_notes) noteParts.push(of.internal_notes);
       // Produktforslag uten match — som hint i notatet
       const unmatched = (ai?.products ?? []).filter((p) => !p.product_id);
@@ -323,6 +328,41 @@ export default function NewOrder() {
         noteParts.push(`AI foreslo (uten match): ${unmatched.map((p) => `${p.quantity}× ${p.product_name}`).join(", ")}`);
       }
       setInternalNotes((prev) => prev || noteParts.join("\n"));
+
+      // Produksjonsnotat — bruk AI-felt direkte, fall back til strukturert oppsummering
+      const prodFromAi = (of.production_notes ?? "").trim();
+      let productionFallback = "";
+      if (!prodFromAi) {
+        const lines: string[] = [];
+        const aiProducts = ai?.products ?? [];
+        for (const p of aiProducts) {
+          const parts = [`${p.quantity}× ${p.product_name}`];
+          if (p.size_or_servings) parts.push(p.size_or_servings);
+          if (p.flavor) parts.push(`smak: ${p.flavor}`);
+          if (p.filling) parts.push(`fyll: ${p.filling}`);
+          if (p.decoration) parts.push(`pynt: ${p.decoration}`);
+          lines.push(`Produkt: ${parts.join(" · ")}`);
+        }
+        if (of.cake_text) lines.push(`Kaketekst: ${of.cake_text}`);
+        if (of.allergies) lines.push(`Allergier: ${of.allergies}`);
+        if (of.special_requests) lines.push(`Spesialønsker: ${of.special_requests}`);
+        productionFallback = lines.join("\n");
+      }
+      setProductionNotes((prev) => prev || prodFromAi || productionFallback);
+
+      // Butikknotat — bruk AI-felt direkte, fall back til strukturert oppsummering
+      const storeFromAi = (of.store_notes ?? "").trim();
+      let storeFallback = "";
+      if (!storeFromAi) {
+        const lines: string[] = [];
+        if (of.delivery_time) lines.push(`Hentetid: ${of.delivery_time}`);
+        const customerName = ai?.customer_match?.customer_name ?? senderName ?? null;
+        if (customerName) lines.push(`Kunde: ${customerName}`);
+        if (of.contact_phone) lines.push(`Telefon: ${of.contact_phone}`);
+        if (of.pickup_location_hint) lines.push(`Hentested: ${of.pickup_location_hint}`);
+        storeFallback = lines.join("\n");
+      }
+      setStoreNotes((prev) => prev || storeFromAi || storeFallback);
 
       // Forhåndsutfyll produktlinjer fra AI-treff (kun med product_id)
       const matched = (ai?.products ?? []).filter((p) => p.product_id);
@@ -375,6 +415,8 @@ export default function NewOrder() {
   const [deliveryInstructions, setDeliveryInstructions] = useState("");
   const [internalNotes, setInternalNotes] = useState("");
   const [customerNotes, setCustomerNotes] = useState("");
+  const [productionNotes, setProductionNotes] = useState("");
+  const [storeNotes, setStoreNotes] = useState("");
   const [customerReference, setCustomerReference] = useState("");
   const enforceRef = !!customer?.enforce_custom_reference;
   const enforcedRefValue = customer?.custom_reference?.trim() ?? "";
@@ -711,6 +753,8 @@ export default function NewOrder() {
             const parts = [internalNotes?.trim(), breach].filter(Boolean);
             return parts.length > 0 ? parts.join("\n\n") : null;
           })(),
+          production_notes: productionNotes.trim() || null,
+          store_notes: storeNotes.trim() || null,
           customer_notes: customerNotes || null,
           customer_reference: (customer.enforce_custom_reference
             ? (customer.custom_reference?.trim() || null)
@@ -1174,6 +1218,38 @@ export default function NewOrder() {
             <div>
               <Label htmlFor="internal">Internt notat (ikke synlig for kunde)</Label>
               <Textarea id="internal" rows={2} value={internalNotes} onChange={(e) => setInternalNotes(e.target.value)} />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <Label htmlFor="production-notes">
+                  Produksjonsnotat <span className="text-xs text-muted-foreground">(til bakeriet)</span>
+                </Label>
+                <Textarea
+                  id="production-notes"
+                  rows={6}
+                  value={productionNotes}
+                  onChange={(e) => setProductionNotes(e.target.value)}
+                  placeholder={`Produkt: 1× Bløtkake · 8 personer · smak: jordbær\nKaketekst: «Gratulerer med dagen, Eva!»\nPynt: blomster i lilla\nAllergier: nøtter\nObs: …`}
+                />
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  Strukturert, telegrafisk. Kaketekst, pynt, fyll, allergier, ting produksjon må være obs på.
+                </p>
+              </div>
+              <div>
+                <Label htmlFor="store-notes">
+                  Butikknotat <span className="text-xs text-muted-foreground">(til hentestedet)</span>
+                </Label>
+                <Textarea
+                  id="store-notes"
+                  rows={6}
+                  value={storeNotes}
+                  onChange={(e) => setStoreNotes(e.target.value)}
+                  placeholder={`Hentetid: 14:00\nKunde: Eva Hansen\nTelefon: 90000000\nBetaling: betalt på forhånd\nKontakt kunde: bekreft hentetid\nEndret: utvidet med 4 personer 25.05`}
+                />
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  Hentetid, kontaktinfo, betalingsstatus, spesielle hentebeskjeder.
+                </p>
+              </div>
             </div>
             <div>
               <Label htmlFor="customer-notes">Notat fra kunde</Label>
