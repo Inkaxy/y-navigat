@@ -7465,39 +7465,64 @@ export type Database = {
       }
       ticket_attachments: {
         Row: {
+          ai_summarized_at: string | null
+          ai_summary: string | null
+          attached_at: string | null
+          attached_by: string | null
+          attached_to_order_id: string | null
           content_type: string | null
           created_at: string
           file_name: string
           id: string
           is_inline: boolean
+          kind: string
           microsoft_attachment_id: string | null
           size_bytes: number | null
           storage_path: string | null
           ticket_id: string
         }
         Insert: {
+          ai_summarized_at?: string | null
+          ai_summary?: string | null
+          attached_at?: string | null
+          attached_by?: string | null
+          attached_to_order_id?: string | null
           content_type?: string | null
           created_at?: string
           file_name: string
           id?: string
           is_inline?: boolean
+          kind?: string
           microsoft_attachment_id?: string | null
           size_bytes?: number | null
           storage_path?: string | null
           ticket_id: string
         }
         Update: {
+          ai_summarized_at?: string | null
+          ai_summary?: string | null
+          attached_at?: string | null
+          attached_by?: string | null
+          attached_to_order_id?: string | null
           content_type?: string | null
           created_at?: string
           file_name?: string
           id?: string
           is_inline?: boolean
+          kind?: string
           microsoft_attachment_id?: string | null
           size_bytes?: number | null
           storage_path?: string | null
           ticket_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "ticket_attachments_attached_to_order_id_fkey"
+            columns: ["attached_to_order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "ticket_attachments_ticket_id_fkey"
             columns: ["ticket_id"]
