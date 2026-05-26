@@ -398,7 +398,7 @@ export default function MatrixPage() {
       });
     }
 
-    // 2) Fastordre-ghosts (forhåndsutfylte forslag — vises som ulagret)
+    // 2) Fastordre (faktiske faste bestillinger fra recurring schedules)
     if (ghostMap) {
       for (const [gkey, qty] of ghostMap.entries()) {
         if (!qty || qty <= 0) continue;
@@ -417,7 +417,6 @@ export default function MatrixPage() {
           quantity: Number(qty),
           unit_price: unitPrice,
           line_total_incl_vat: Number(qty) * unitPrice * (1 + mvaRate),
-          isDraft: true,
         });
       }
     }
