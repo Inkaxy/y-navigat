@@ -107,6 +107,25 @@ export function OrderConfirmationDialog({ open, onOpenChange, orderId, ticketId,
       setSending(false);
     }
   };
+  const qaChecks = useMemo(() => {
+    if (!draft) return [];
+    const v = (draft.variables ?? {}) as Record<string, any>;
+    const order = {
+      delivery_date: v.delivery_date ?? v.order?.delivery_date ?? null,
+      delivery_time: v.delivery_time ?? v.order?.delivery_time ?? null,
+      total_amount: v.total_amount ?? v.order?.total_amount ?? null,
+      line_count: Array.isArray(v.lines) ? v.lines.length : (v.line_count ?? v.order?.line_count ?? 1),
+      pickup_location_hint: v.pickup_location_hint ?? v.order?.pickup_location_hint ?? null,
+    };
+    return evaluateConfirmationChecks({
+      order,
+      ai: normalizeAiSuggestion(v.ai_suggestion ?? null),
+      body_text: `${subject}\n\n${bodyText}\n\n${bodyHtml}`,
+      include_price: !!(order.total_amount && order.total_amount > 0),
+    });
+  }, [draft, subject, bodyText, bodyHtml]);
+  const qaSummary = summarizeQa(qaChecks);
+
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
