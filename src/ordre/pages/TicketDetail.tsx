@@ -154,6 +154,22 @@ export default function TicketDetail() {
     });
   };
 
+  const setTeam = (val: string) => {
+    const team = val === UNASSIGNED ? null : (val as TicketTeam);
+    update.mutate({ id: ticket.id, patch: { assigned_team: team } as never }, {
+      onSuccess: () => toast({ title: team ? `Team: ${TEAM_LABEL[team]}` : "Team fjernet" }),
+    });
+  };
+
+  const setAwaiting = (next: boolean) => {
+    update.mutate({ id: ticket.id, patch: { awaiting_internal: next } as never }, {
+      onSuccess: () =>
+        toast({
+          title: next ? "Venter på intern avklaring" : "Intern avklaring avsluttet",
+        }),
+    });
+  };
+
   const doSendReply = () => {
     sendReply.mutate(
       { ticket_id: ticket.id, body_text: replyDraft },
