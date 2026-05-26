@@ -272,7 +272,17 @@ Returner KUN gyldig JSON som matcher dette schemaet (ingen markdown, ingen tekst
   "summary": string (1-3 setninger på norsk),
   "suggested_action": string (kort handlingsforslag på norsk),
   "customer_match": { "customer_id": uuid|null, "customer_name": string|null, "match_confidence": 0..1 } | null,
-  "order_fields": { ... samme som før ... },
+  "order_fields": {
+    "delivery_date": "YYYY-MM-DD"|null, "delivery_time": "HH:MM"|null,
+    "pickup_location_hint": string|null,
+    "delivery_address_line1": string|null, "delivery_address_line2": string|null,
+    "delivery_postal_code": string|null, "delivery_city": string|null,
+    "customer_notes": string|null, "internal_notes": string|null,
+    "production_notes": string|null,  // se PRODUCTION_NOTES under
+    "store_notes": string|null,       // se STORE_NOTES under
+    "cake_text": string|null, "allergies": string|null, "special_requests": string|null,
+    "contact_phone": string|null, "contact_email": string|null
+  },
   "products": [{ ... samme som før ... }],
   "missing_info": [{ "code": string, "label": string }],
   "risks": [{ "severity": "red"|"yellow"|"green", "code": string, "message": string }],
