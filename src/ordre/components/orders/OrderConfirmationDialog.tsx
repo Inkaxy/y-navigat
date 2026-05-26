@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Loader2, Mail, Send, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -11,6 +11,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/use-toast";
+import { QaChecklistCard } from "@/ordre/components/orders/QaChecklistCard";
+import { evaluateConfirmationChecks, summarizeQa } from "@/ordre/lib/qaChecks";
+import { normalizeAiSuggestion } from "@/ordre/lib/aiSuggestion";
 
 type Draft = {
   subject: string;
