@@ -3300,6 +3300,78 @@ export type Database = {
         }
         Relationships: []
       }
+      order_confirmations_sent: {
+        Row: {
+          body_html: string
+          body_text: string | null
+          created_at: string
+          edited_by_user: boolean
+          error_message: string | null
+          id: string
+          language: string
+          microsoft_message_id: string | null
+          order_id: string
+          recipient_email: string
+          send_status: string
+          sent_by: string | null
+          sent_from: string | null
+          subject: string
+          ticket_id: string | null
+          variables_snapshot: Json | null
+        }
+        Insert: {
+          body_html: string
+          body_text?: string | null
+          created_at?: string
+          edited_by_user?: boolean
+          error_message?: string | null
+          id?: string
+          language?: string
+          microsoft_message_id?: string | null
+          order_id: string
+          recipient_email: string
+          send_status?: string
+          sent_by?: string | null
+          sent_from?: string | null
+          subject: string
+          ticket_id?: string | null
+          variables_snapshot?: Json | null
+        }
+        Update: {
+          body_html?: string
+          body_text?: string | null
+          created_at?: string
+          edited_by_user?: boolean
+          error_message?: string | null
+          id?: string
+          language?: string
+          microsoft_message_id?: string | null
+          order_id?: string
+          recipient_email?: string
+          send_status?: string
+          sent_by?: string | null
+          sent_from?: string | null
+          subject?: string
+          ticket_id?: string | null
+          variables_snapshot?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_confirmations_sent_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_confirmations_sent_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_lines: {
         Row: {
           cake_config: Json | null
