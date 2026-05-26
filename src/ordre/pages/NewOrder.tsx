@@ -769,6 +769,13 @@ export default function NewOrder() {
         await supabase.from("tickets")
           .update({ related_order_id: orderRow.id, status: "in_progress" })
           .eq("id", ticketId);
+        await logTicketEvent({
+          ticket_id: ticketId,
+          order_id: orderRow.id,
+          event_type: "order.created_from_ticket",
+          summary: `${numRow.order_number} · ${customer.display_name}`,
+          payload: { order_number: numRow.order_number, line_count: validLines.length },
+        });
       }
 
       toast.success(`Ordre ${numRow.order_number} opprettet`);
