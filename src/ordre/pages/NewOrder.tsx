@@ -248,29 +248,115 @@ export default function NewOrder() {
     return () => { cancelled = true; };
   }, [prefilledCustomerId, customer]);
 
-  // Pre-fyll fra ticket (hvis ticket_id i URL)
+  // Pre-fyll fra ticket (hvis ticket_id i URL) — bruker AI-forslag når tilgjengelig
   useEffect(() => {
     if (!ticketId) return;
     let cancelled = false;
     (async () => {
-      const { data: t } = await supabase.from("tickets").select("subject, sender_email").eq("id", ticketId).maybeSingle();
+      const { data: t } = await supabase
+        .from("tickets")
+        .select("subject, sender_email, ai_suggestion")
+        .eq("id", ticketId).maybeSingle();
       if (cancelled || !t) return;
-      // Forsøk match på sender-email
+      const ai = (t as any).ai_suggestion as null | {
+        customer_match?: { customer_id: string | null } | null;
+        order_fields?: Record<string, string | null | undefined>;
+        products?: Array<{ product_id: string | null; product_name: string; quantity: number }>;
+      };
+
+      // Velg kunde: 1) AI-match, 2) sender_email-ilike
+      let pickedCustomer: CustomerOption | null = null;
       if (!customer && !prefilledCustomerId) {
-        const { data: c } = await supabase
-          .from("customers")
-          .select("id, customer_number, display_name, organization_number, primary_contact_name, primary_contact_email, invoice_recipient_customer_id, delivery_address_line1, delivery_address_line2, delivery_postal_code, delivery_city, delivery_country, delivery_instructions, custom_reference, enforce_custom_reference, default_price_list_id")
-          .ilike("primary_contact_email", t.sender_email)
-          .maybeSingle();
+        const aiCustomerId = ai?.customer_match?.customer_id ?? null;
+        if (aiCustomerId) {
+          const { data: c } = await supabase
+            .from("customers")
+            .select("id, customer_number, display_name, organization_number, primary_contact_name, primary_contact_email, invoice_recipient_customer_id, delivery_address_line1, delivery_address_line2, delivery_postal_code, delivery_city, delivery_country, delivery_instructions, custom_reference, enforce_custom_reference, default_price_list_id")
+            .eq("id", aiCustomerId).maybeSingle();
+          if (c) pickedCustomer = c as unknown as CustomerOption;
+        }
+        if (!pickedCustomer && t.sender_email) {
+          const { data: c } = await supabase
+            .from("customers")
+            .select("id, customer_number, display_name, organization_number, primary_contact_name, primary_contact_email, invoice_recipient_customer_id, delivery_address_line1, delivery_address_line2, delivery_postal_code, delivery_city, delivery_country, delivery_instructions, custom_reference, enforce_custom_reference, default_price_list_id")
+            .ilike("primary_contact_email", t.sender_email)
+            .maybeSingle();
+          if (c) pickedCustomer = c as unknown as CustomerOption;
+        }
         if (cancelled) return;
-        if (c) {
-          setCustomer(c as unknown as CustomerOption);
-          setTicketBanner(`Pre-utfylt fra ticket: ${t.subject ?? "(uten emne)"}`);
+        if (pickedCustomer) {
+          setCustomer(pickedCustomer);
+          setTicketBanner(`Pre-utfylt fra ticket: ${t.subject ?? "(uten emne)"}${ai ? " · AI-forslag brukt" : ""}`);
         } else {
           setTicketBanner(`Avsender (${t.sender_email}) ikke matchet — velg kunde manuelt.`);
         }
       }
-      setInternalNotes((prev) => prev || `Opprettet fra ticket: ${t.subject ?? "(uten emne)"}`);
+
+      // Bruk AI-forslag til ordrefelt og notater (kun hvis ikke allerede satt)
+      const of = ai?.order_fields ?? {};
+      if (of.delivery_date) setDeliveryDate((prev) => (prev === tomorrow() ? String(of.delivery_date) : prev));
+      if (of.delivery_time) setDeliveryTime((prev) => prev || String(of.delivery_time));
+      if (of.delivery_address_line1 || of.delivery_city || of.delivery_postal_code) {
+        setUseCustomerAddress(false);
+        setDelAddr((prev) => ({
+          line1: prev.line1 || (of.delivery_address_line1 ?? ""),
+          line2: prev.line2 || (of.delivery_address_line2 ?? ""),
+          postal: prev.postal || (of.delivery_postal_code ?? ""),
+          city: prev.city || (of.delivery_city ?? ""),
+          country: prev.country || "NO",
+        }));
+      }
+      if (of.customer_notes) setCustomerNotes((prev) => prev || String(of.customer_notes));
+
+      // Bygg internt notat med AI-detaljer
+      const noteParts: string[] = [`Opprettet fra ticket: ${t.subject ?? "(uten emne)"}`];
+      if (of.cake_text) noteParts.push(`Kaketekst: ${of.cake_text}`);
+      if (of.allergies) noteParts.push(`Allergier: ${of.allergies}`);
+      if (of.special_requests) noteParts.push(`Spesialønsker: ${of.special_requests}`);
+      if (of.contact_phone) noteParts.push(`Telefon: ${of.contact_phone}`);
+      if (of.production_notes) noteParts.push(`Produksjon: ${of.production_notes}`);
+      if (of.internal_notes) noteParts.push(of.internal_notes);
+      // Produktforslag uten match — som hint i notatet
+      const unmatched = (ai?.products ?? []).filter((p) => !p.product_id);
+      if (unmatched.length > 0) {
+        noteParts.push(`AI foreslo (uten match): ${unmatched.map((p) => `${p.quantity}× ${p.product_name}`).join(", ")}`);
+      }
+      setInternalNotes((prev) => prev || noteParts.join("\n"));
+
+      // Forhåndsutfyll produktlinjer fra AI-treff (kun med product_id)
+      const matched = (ai?.products ?? []).filter((p) => p.product_id);
+      if (matched.length > 0) {
+        try {
+          const ids = matched.map((p) => p.product_id!) as string[];
+          const { data: prods } = await supabase
+            .from("products")
+            .select("id, display_number, code, display_name, unit_of_sale, mva_rate, status, is_for_sale, is_divisible, legal_entity_id")
+            .in("id", ids);
+          if (cancelled || !prods) return;
+          const byId = new Map(prods.map((p: any) => [p.id, p]));
+          const newLines: LineDraft[] = matched
+            .map((m) => {
+              const p = byId.get(m.product_id!) as ProductOption | undefined;
+              if (!p) return null;
+              return {
+                ...newLine(),
+                product: p,
+                quantity: String(m.quantity || 1),
+                vat_rate: Number(p.mva_rate ?? 15),
+              };
+            })
+            .filter((x): x is LineDraft => x !== null);
+          if (newLines.length > 0) {
+            setLines((prev) => {
+              // Bytt ut bare hvis bruker ikke har lagt til noe ennå
+              const onlyEmpty = prev.length === 1 && !prev[0].product;
+              return onlyEmpty ? newLines : prev;
+            });
+          }
+        } catch (err) {
+          console.warn("Kunne ikke forhåndsutfylle produkter fra AI:", err);
+        }
+      }
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -601,7 +687,8 @@ export default function NewOrder() {
           order_number: numRow.order_number,
           order_year: numRow.order_year,
           order_sequence: numRow.order_sequence,
-          source: "manual",
+          source: ticketId ? "ticket" : "manual",
+          source_reference: ticketId ?? null,
           customer_id: customer.id,
           customer_snapshot: customerSnapshot,
           invoice_recipient_customer_id: customer.invoice_recipient_customer_id,

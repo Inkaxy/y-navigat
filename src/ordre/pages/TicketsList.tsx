@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTickets, type TicketStatus, type TicketPriority } from "@/ordre/hooks/useTickets";
+import { normalizeAiSuggestion, REQUEST_TYPE_LABEL, REQUEST_TYPE_BADGE, hasRedRisk, hasMissingInfo } from "@/ordre/lib/aiSuggestion";
 import { cn } from "@/lib/utils";
 
 const STATUS_LABELS: Record<TicketStatus, string> = {
@@ -211,9 +212,42 @@ export default function TicketsList() {
                     </TableCell>
                     <TableCell className="max-w-md">
                       <div className="truncate font-medium text-sm">{t.subject ?? "(uten emne)"}</div>
-                      {t.body_preview && (
-                        <div className="truncate text-xs text-muted-foreground">{t.body_preview}</div>
-                      )}
+                      {(() => {
+                        const ai = normalizeAiSuggestion((t as any).ai_suggestion);
+                        const aiStatus = (t as any).ai_status as string | null;
+                        return (
+                          <div className="mt-1 flex flex-wrap items-center gap-1">
+                            {ai && (
+                              <Badge variant="outline" className={cn("text-[10px]", REQUEST_TYPE_BADGE[ai.request_type])}>
+                                {REQUEST_TYPE_LABEL[ai.request_type]}
+                              </Badge>
+                            )}
+                            {hasMissingInfo(ai) && (
+                              <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30">
+                                Mangler info
+                              </Badge>
+                            )}
+                            {hasRedRisk(ai) && (
+                              <Badge variant="outline" className="text-[10px] bg-destructive/10 text-destructive border-destructive/30">
+                                Risiko
+                              </Badge>
+                            )}
+                            {t.related_order_id && (
+                              <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30">
+                                Koblet til ordre
+                              </Badge>
+                            )}
+                            {!t.related_order_id && aiStatus === "success" && (
+                              <Badge variant="outline" className="text-[10px] bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/30">
+                                AI-forslag klart
+                              </Badge>
+                            )}
+                            {t.body_preview && (
+                              <span className="truncate text-xs text-muted-foreground">· {t.body_preview}</span>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </TableCell>
                     <TableCell className="text-sm whitespace-nowrap" title={format(new Date(t.received_at), "d. MMM yyyy HH:mm", { locale: nb })}>
                       {formatDistanceToNow(new Date(t.received_at), { locale: nb, addSuffix: true })}

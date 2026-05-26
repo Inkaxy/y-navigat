@@ -1,4 +1,4 @@
-// Analyserer en ticket-epost med valgt AI-provider, returnerer strukturert ordre-forslag.
+// Analyserer en ticket-epost med valgt AI-provider, returnerer strukturert ordre-forslag (v2).
 // Lagrer på tickets.ai_suggestion + ai_call_log.
 
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -24,23 +24,70 @@ const InputSchema = z.object({
   force: z.boolean().optional(),
 });
 
+const REQUEST_TYPES = [
+  "new_order",
+  "change",
+  "cancellation",
+  "question",
+  "complaint",
+  "internal",
+  "unclear",
+  "spam",
+] as const;
+
 const SuggestionSchema = z.object({
+  request_type: z.enum(REQUEST_TYPES),
+  summary: z.string(),
+  suggested_action: z.string(),
   customer_match: z.object({
     customer_id: z.string().uuid().nullable(),
     customer_name: z.string().nullable(),
     match_confidence: z.number().min(0).max(1),
   }).nullable(),
+  order_fields: z.object({
+    delivery_date: z.string().nullable().optional(),
+    delivery_time: z.string().nullable().optional(),
+    pickup_location_hint: z.string().nullable().optional(),
+    delivery_address_line1: z.string().nullable().optional(),
+    delivery_address_line2: z.string().nullable().optional(),
+    delivery_postal_code: z.string().nullable().optional(),
+    delivery_city: z.string().nullable().optional(),
+    customer_notes: z.string().nullable().optional(),
+    internal_notes: z.string().nullable().optional(),
+    production_notes: z.string().nullable().optional(),
+    cake_text: z.string().nullable().optional(),
+    allergies: z.string().nullable().optional(),
+    special_requests: z.string().nullable().optional(),
+    contact_phone: z.string().nullable().optional(),
+    contact_email: z.string().nullable().optional(),
+  }).default({}),
   products: z.array(z.object({
     product_id: z.string().uuid().nullable(),
     product_name: z.string(),
     quantity: z.number(),
+    size_or_servings: z.string().nullable().optional(),
+    flavor: z.string().nullable().optional(),
+    filling: z.string().nullable().optional(),
+    decoration: z.string().nullable().optional(),
     match_confidence: z.number().min(0).max(1),
   })),
-  delivery_date: z.string().nullable(),
+  missing_info: z.array(z.object({
+    code: z.string(),
+    label: z.string(),
+  })).default([]),
+  risks: z.array(z.object({
+    severity: z.enum(["red", "yellow", "green"]),
+    code: z.string(),
+    message: z.string(),
+  })).default([]),
+  field_confidence: z.record(z.number().min(0).max(1)).default({}),
+  reasoning_per_field: z.record(z.string()).default({}),
+  // tour beholdes for bakoverkomp
   tour: z.object({
     tour_id: z.string().uuid().nullable(),
     tour_name: z.string().nullable(),
-  }).nullable(),
+  }).nullable().optional(),
+  delivery_date: z.string().nullable().optional(), // bakoverkomp
   confidence_score: z.number().min(0).max(1),
   reasoning: z.string(),
 });
@@ -76,7 +123,6 @@ Deno.serve(async (req) => {
 
     const { data: hasAccess } = await userClient.rpc("has_ordre_settings_access");
     if (!hasAccess) {
-      // Også tillat ordre-write
       const { data: hasWrite } = await userClient.rpc("has_app_write_access", { p_app_code: "ordre" });
       if (!hasWrite) return jsonErr("Forbidden", 403);
     }
@@ -85,7 +131,6 @@ Deno.serve(async (req) => {
     if (!parsed.success) return jsonErr("Ugyldig input", 400, { details: parsed.error.flatten() });
     const { ticket_id, force } = parsed.data;
 
-    // Last ticket
     const { data: ticket, error: tErr } = await admin
       .from("tickets").select("*").eq("id", ticket_id).maybeSingle();
     if (tErr) throw tErr;
@@ -97,7 +142,6 @@ Deno.serve(async (req) => {
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Last AI-settings
     const { data: settingsRows } = await admin
       .from("platform_settings")
       .select("key,value")
@@ -113,39 +157,83 @@ Deno.serve(async (req) => {
       return jsonErr(`Provider ${provider} er ikke konfigurert (mangler API-nøkkel-secret)`, 503);
     }
 
-    // Last kontekst (kun NB inntil videre)
-    const { data: customers } = await admin
-      .from("customers")
-      .select("id,display_name,customer_number,primary_contact_email")
-      .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
-      .eq("status", "active")
-      .limit(200);
-    const { data: products } = await admin
-      .from("products")
-      .select("id,display_name,display_number,unit_of_sale")
-      .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
-      .eq("status", "active")
-      .eq("is_for_sale", true)
-      .limit(200);
+    const [{ data: customers }, { data: products }, { data: pickups }] = await Promise.all([
+      admin.from("customers")
+        .select("id,display_name,customer_number,primary_contact_email")
+        .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
+        .eq("status", "active")
+        .limit(200),
+      admin.from("products")
+        .select("id,display_name,display_number,unit_of_sale")
+        .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
+        .eq("status", "active")
+        .eq("is_for_sale", true)
+        .limit(200),
+      admin.from("pickup_locations")
+        .select("id,display_name,city")
+        .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
+        .eq("status", "active")
+        .limit(50),
+    ]);
 
     const bodyText = trimEmailBody(ticket.body_text ?? ticket.body_preview ?? "");
+    const todayISO = new Date().toISOString().slice(0, 10);
 
-    const systemPrompt = `Du er en assistent som leser e-post sendt til Nøtterø Bakeri sitt ordrekontor og foreslår en strukturert ordre.
+    const systemPrompt = `Du er en assistent som leser e-post sendt til Nøtterø Bakeri sitt ordrekontor og lager en strukturert analyse for en saksbehandler.
 
-Du skal returnere KUN gyldig JSON som matcher dette schemaet (ingen markdown, ingen forklaring rundt):
+Dagens dato: ${todayISO}.
+
+Returner KUN gyldig JSON som matcher dette schemaet (ingen markdown, ingen tekst rundt):
 {
+  "request_type": "new_order"|"change"|"cancellation"|"question"|"complaint"|"internal"|"unclear"|"spam",
+  "summary": string (1-3 setninger på norsk),
+  "suggested_action": string (kort handlingsforslag på norsk),
   "customer_match": { "customer_id": uuid|null, "customer_name": string|null, "match_confidence": 0..1 } | null,
-  "products": [ { "product_id": uuid|null, "product_name": string, "quantity": number, "match_confidence": 0..1 } ],
-  "delivery_date": "YYYY-MM-DD"|null,
-  "tour": null,
+  "order_fields": {
+    "delivery_date": "YYYY-MM-DD"|null,
+    "delivery_time": "HH:MM"|null,
+    "pickup_location_hint": string|null,
+    "delivery_address_line1": string|null,
+    "delivery_address_line2": string|null,
+    "delivery_postal_code": string|null,
+    "delivery_city": string|null,
+    "customer_notes": string|null,
+    "internal_notes": string|null,
+    "production_notes": string|null,
+    "cake_text": string|null,
+    "allergies": string|null,
+    "special_requests": string|null,
+    "contact_phone": string|null,
+    "contact_email": string|null
+  },
+  "products": [{
+    "product_id": uuid|null,
+    "product_name": string,
+    "quantity": number,
+    "size_or_servings": string|null,
+    "flavor": string|null,
+    "filling": string|null,
+    "decoration": string|null,
+    "match_confidence": 0..1
+  }],
+  "missing_info": [{ "code": string, "label": string }],
+  "risks": [{ "severity": "red"|"yellow"|"green", "code": string, "message": string }],
+  "field_confidence": { "delivery_date": 0..1, "customer_id": 0..1, "pickup": 0..1, ... },
+  "reasoning_per_field": { "delivery_date": "kunden skrev 'lørdag'", ... },
   "confidence_score": 0..1,
-  "reasoning": string (kort, norsk)
+  "reasoning": string (kort overordnet begrunnelse på norsk)
 }
 
-Match kunde basert på sender-epost mot primary_contact_email, deretter på navn nevnt i e-posten. Hvis usikker, sett customer_id=null og lav match_confidence.
-Match produkter på navn — ikke gjett UUID hvis du ikke er sikker (sett product_id=null).
-Sett tour alltid til null (turer håndteres ikke i v1).
-delivery_date: leter etter dato i e-posten, ellers null.`;
+Regler:
+- request_type: klassifiser ut fra om kunden bestiller noe nytt, ber om endring, vil avbestille, stiller spørsmål, klager, eller om eposten er intern/uklar/spam.
+- customer_match: prøv først match på sender-epost mot primary_contact_email, deretter navn i e-posten. Sett customer_id=null hvis usikker.
+- products: match på navn. Ikke gjett UUID — sett product_id=null hvis usikker.
+- missing_info: list opp felt som mangler for at en ordre skal kunne opprettes (telefonnummer, hentetid, hentested, fyll, kaketekst, antall, …). Bruk korte koder ('phone','pickup_time','pickup','filling','cake_text','quantity','customer','product') og norske labels.
+- risks: flagg ting saksbehandleren må sjekke. severity 'red' = må løses før ordre, 'yellow' = bør kontrolleres, 'green' = OK. Eksempler: relativ dato ('neste fredag'), uklar hentested, mulig duplikat, allergi nevnt, for kort frist, ukjent produkt.
+- delivery_date må være ISO YYYY-MM-DD (regn ut fra dagens dato hvis kunden skrev relativt).
+- pickup_location_hint = fritekst kunden brukte (f.eks. "Majorstua"). IKKE gjett UUID.
+- order_fields.cake_text/allergies/special_requests skal fylles ut hvis nevnt — ikke pakk inn i prosa.
+- Hold sammendrag og reasoning korte og praktiske.`;
 
     const userText = [
       `=== TICKET ===`,
@@ -156,11 +244,14 @@ delivery_date: leter etter dato i e-posten, ellers null.`;
       `--- E-post-tekst ---`,
       bodyText,
       ``,
-      `=== KUNDER (id, nummer, navn, epost) ===`,
+      `=== KUNDER (id | kundenr | navn | epost) ===`,
       (customers ?? []).map((c: any) => `${c.id} | ${c.customer_number ?? ""} | ${c.display_name} | ${c.primary_contact_email ?? ""}`).join("\n"),
       ``,
-      `=== PRODUKTER (id, nummer, navn, enhet) ===`,
+      `=== PRODUKTER (id | nr | navn | enhet) ===`,
       (products ?? []).map((p: any) => `${p.id} | ${p.display_number ?? ""} | ${p.display_name} | ${p.unit_of_sale ?? ""}`).join("\n"),
+      ``,
+      `=== HENTESTEDER (navn | by) ===`,
+      (pickups ?? []).map((p: any) => `${p.display_name} | ${p.city ?? ""}`).join("\n"),
     ].join("\n");
 
     const startTs = Date.now();
@@ -175,7 +266,7 @@ delivery_date: leter etter dato i e-posten, ellers null.`;
         provider,
         apiKey,
         model,
-        maxTokens: 2048,
+        maxTokens: 3072,
         temperature: 0.1,
         systemPrompt,
         userText,
@@ -197,13 +288,22 @@ delivery_date: leter etter dato i e-posten, ellers null.`;
 
     const durationMs = Date.now() - startTs;
 
-    // Parse + valider
     let suggestion: z.infer<typeof SuggestionSchema> | null = null;
     if (callStatus === "success") {
       try {
-        // Tåle ```json fences
         const cleaned = rawText.replace(/```(?:json)?\s*/g, "").replace(/```\s*$/, "").trim();
         const json = JSON.parse(cleaned);
+        // Bakoverkomp: hvis modellen returnerte gammelt format uten request_type, oppgrader minimalt
+        if (json && typeof json === "object" && !json.request_type) {
+          json.request_type = "unclear";
+          json.summary = json.summary ?? "";
+          json.suggested_action = json.suggested_action ?? "";
+          json.order_fields = json.order_fields ?? {};
+          json.missing_info = json.missing_info ?? [];
+          json.risks = json.risks ?? [];
+          json.field_confidence = json.field_confidence ?? {};
+          json.reasoning_per_field = json.reasoning_per_field ?? {};
+        }
         const result = SuggestionSchema.safeParse(json);
         if (!result.success) {
           callStatus = "error";
@@ -217,7 +317,6 @@ delivery_date: leter etter dato i e-posten, ellers null.`;
       }
     }
 
-    // Pricing fra settings, fallback til shared estimateCostUsd
     let costUsd: number | null = null;
     const priceCfg = pricing?.[provider]?.[model];
     if (priceCfg && inputTokens != null && outputTokens != null) {
@@ -226,7 +325,6 @@ delivery_date: leter etter dato i e-posten, ellers null.`;
       costUsd = estimateCostUsd(model, inputTokens, outputTokens);
     }
 
-    // Oppdater ticket
     const updateData: Record<string, unknown> = {
       ai_status: callStatus === "success" ? "success" : callStatus,
       ai_provider: provider,
@@ -239,7 +337,6 @@ delivery_date: leter etter dato i e-posten, ellers null.`;
     };
     await admin.from("tickets").update(updateData).eq("id", ticket_id);
 
-    // Log call
     await admin.from("ai_call_log").insert({
       ticket_id,
       triggered_by: userId,
@@ -258,10 +355,14 @@ delivery_date: leter etter dato i e-posten, ellers null.`;
         body_length: bodyText.length,
         customers_count: customers?.length ?? 0,
         products_count: products?.length ?? 0,
+        pickups_count: pickups?.length ?? 0,
       },
       response_payload: suggestion ? {
+        request_type: suggestion.request_type,
         customer_matched: !!suggestion.customer_match?.customer_id,
         products_count: suggestion.products.length,
+        missing_count: suggestion.missing_info.length,
+        risks_count: suggestion.risks.length,
         confidence: suggestion.confidence_score,
       } : null,
     });

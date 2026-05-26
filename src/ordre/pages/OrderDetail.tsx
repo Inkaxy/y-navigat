@@ -281,7 +281,11 @@ export default function OrderDetail() {
             <span className="text-caption text-muted-foreground">
               {formatNOK(order.total_incl_vat)} · {lines.length} linjer
             </span>
-          </div>
+            {order.source === "ticket" && order.source_reference && (
+              <Link to={`/ordre/ticket/${order.source_reference}`} className="text-caption text-primary underline-offset-2 hover:underline">
+                ↩ Fra ticket
+              </Link>
+            )}
 
           <div className="ml-auto flex flex-wrap items-center gap-2">
             {releaseAction && (
