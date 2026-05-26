@@ -256,14 +256,23 @@ export default function NewOrder() {
     (async () => {
       const { data: t } = await supabase
         .from("tickets")
-        .select("subject, sender_email, ai_suggestion")
+        .select("subject, sender_email, sender_name, ai_suggestion")
         .eq("id", ticketId).maybeSingle();
       if (cancelled || !t) return;
       const ai = (t as any).ai_suggestion as null | {
-        customer_match?: { customer_id: string | null } | null;
+        customer_match?: { customer_id: string | null; customer_name?: string | null } | null;
         order_fields?: Record<string, string | null | undefined>;
-        products?: Array<{ product_id: string | null; product_name: string; quantity: number }>;
+        products?: Array<{
+          product_id: string | null;
+          product_name: string;
+          quantity: number;
+          size_or_servings?: string | null;
+          flavor?: string | null;
+          filling?: string | null;
+          decoration?: string | null;
+        }>;
       };
+      const senderName = (t as any).sender_name as string | null | undefined;
 
       // Velg kunde: 1) AI-match, 2) sender_email-ilike
       let pickedCustomer: CustomerOption | null = null;
