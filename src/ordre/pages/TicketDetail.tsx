@@ -418,6 +418,7 @@ export default function TicketDetail() {
                     error={(ticket as any).ai_error ?? null}
                     confidence={(ticket as any).ai_confidence_score ?? null}
                   />
+                  <RuleWarningsCard aiSuggestion={(ticket as any).ai_suggestion ?? null} />
                   <AiReplyDraftCard
                     ticketId={ticket.id}
                     hasOrder={!!ticket.related_order_id}
