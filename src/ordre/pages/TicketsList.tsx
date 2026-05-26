@@ -55,7 +55,8 @@ type QuickFilter =
   | "new" | "ai_ready" | "missing_info" | "risk"
   | "not_linked" | "linked" | "awaiting_customer" | "ready_for_order"
   | "changes" | "cancellations" | "complaints"
-  | "pickup_today" | "pickup_tomorrow";
+  | "pickup_today" | "pickup_tomorrow"
+  | "awaiting_internal";
 
 const QUICK_FILTERS: { key: QuickFilter; label: string; icon?: React.ReactNode }[] = [
   { key: "new", label: "Nye" },
@@ -65,6 +66,7 @@ const QUICK_FILTERS: { key: QuickFilter; label: string; icon?: React.ReactNode }
   { key: "not_linked", label: "Ikke koblet" },
   { key: "linked", label: "Koblet til ordre", icon: <Link2 className="mr-1 h-3 w-3" /> },
   { key: "awaiting_customer", label: "Venter på kunde" },
+  { key: "awaiting_internal", label: "Venter intern avklaring" },
   { key: "ready_for_order", label: "Klar til ordre" },
   { key: "changes", label: "Endringer" },
   { key: "cancellations", label: "Kanselleringer" },
