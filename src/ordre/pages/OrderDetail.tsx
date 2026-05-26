@@ -440,6 +440,9 @@ export default function OrderDetail() {
         {/* Hovedinnhold — uten tabs */}
         <OrderDetailsTab order={order} lines={lines} />
 
+        {/* Vedlegg knyttet til ordren (bilder, logoer, dokumenter) */}
+        <OrderAttachmentsCard orderId={order.id} />
+
         {/* Ticket-sporbarhet: original epost + tidslinje av kommunikasjon/AI/koblinger */}
         <div className="grid gap-4 lg:grid-cols-2">
           <OriginalEmailCard orderId={order.id} />
