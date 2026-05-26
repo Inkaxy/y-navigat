@@ -262,9 +262,11 @@ export default function NewOrder() {
     (async () => {
       const { data: t } = await supabase
         .from("tickets")
-        .select("subject, sender_email, sender_name, ai_suggestion")
+        .select("subject, sender_email, sender_name, body_text, body_preview, ai_suggestion")
         .eq("id", ticketId).maybeSingle();
       if (cancelled || !t) return;
+      setTicketAi(normalizeAiSuggestion((t as any).ai_suggestion));
+      setTicketBodyText(((t as any).body_text ?? (t as any).body_preview ?? null) as string | null);
       const ai = (t as any).ai_suggestion as null | {
         customer_match?: { customer_id: string | null; customer_name?: string | null } | null;
         order_fields?: Record<string, string | null | undefined>;
