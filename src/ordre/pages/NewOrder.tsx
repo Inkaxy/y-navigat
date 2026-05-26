@@ -728,6 +728,12 @@ export default function NewOrder() {
       toast.error(`Mengde for "${badQty.product?.display_name}" må være et helt tall`);
       return;
     }
+    // QA: blokkér på røde sjekker med mindre brukeren har bekreftet override
+    if (qaSummary.severity === "red" && !qaOverride) {
+      toast.error("Kvalitetssikring: røde punkter må løses (eller bekreft override)");
+      return;
+    }
+
 
     setSubmitting(true);
     try {
