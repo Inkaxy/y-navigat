@@ -311,7 +311,13 @@ Regler:
 - proposed_value: hva kunden ønsker å endre til. Bruk samme format som lagret (YYYY-MM-DD for dato, HH:MM for tid).
 - customer_match / products / missing_info / risks: som tidligere.
 - Norsk datoformat er DD-MM-YYYY. delivery_date i utdata må være ISO YYYY-MM-DD.
-- Hold sammendrag og reasoning korte og praktiske.`;
+- Hold sammendrag og reasoning korte og praktiske.
+
+PRODUCTION_NOTES (order_fields.production_notes) — tekst til BAKERIET. Skal være kort, strukturert, og inneholde KUN det produksjon trenger. Bruk én linje per punkt med "Felt: verdi"-format. Inkluder alle relevante: Produkt, Antall, Størrelse/personer, Kaketekst, Pynt, Fyll, Smak, Allergier, Spesialønsker, Vedlegg fra kunde (hvis nevnt), "Obs:" for ting produksjon må være ekstra oppmerksom på (kort frist, uvanlig størrelse osv.). Sett null hvis intet relevant.
+
+STORE_NOTES (order_fields.store_notes) — tekst til UTLEVERINGSSTEDET/BUTIKKEN. Kort og strukturert, én linje per punkt. Inkluder: Hentetid, Kundenavn, Telefon, Betalingsstatus (hvis nevnt eller utledet), "Kontakt kunde:" hvis noe må avklares før henting, Hentebeskjeder (samme dag, ringer ved ankomst, parkering osv.), "Endret:" hvis ordren er endret etter bekreftelse. Sett null hvis intet relevant.
+
+Begge notatene skal være på norsk, vennlige men telegrafiske. IKKE gjenta hele e-postteksten.`;
 
     const userText = [
       `=== TICKET ===`,
