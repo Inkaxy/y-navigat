@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Loader2, Plus, Trash2, AlertTriangle, Check, Search, Copy } from "lucide-react";
 import { AppBanner } from "@/ordre/components/shell/AppBanner";
@@ -301,6 +302,20 @@ export default function NewOrder() {
 
   // 6.2 Dublett-sjekk
   const { data: duplicates = [] } = useDuplicateOrderCheck(customer?.id ?? null, deliveryDate);
+
+  // Hent effektiv prisliste for kunden (default eller via gruppe/profil)
+  const { data: effectivePriceListId = null } = useQuery({
+    queryKey: ["customer-effective-price-list", customer?.id ?? null],
+    enabled: !!customer?.id,
+    queryFn: async (): Promise<string | null> => {
+      const { data, error } = await supabase.rpc("customer_effective_price_list", {
+        _customer_id: customer!.id,
+      });
+      if (error) throw error;
+      return (data as string | null) ?? customer?.default_price_list_id ?? null;
+    },
+  });
+  const productPriceListId = effectivePriceListId ?? customer?.default_price_list_id ?? null;
 
   // A.5.5.6.2 — Ordrefrist-sjekk
   const productIdsForCheck = lines
@@ -894,7 +909,7 @@ export default function NewOrder() {
                               </Button>
                             </div>
                           ) : (
-                            <ProductCombobox onSelect={(p) => selectProductForLine(l.uid, p)} />
+                            <ProductCombobox onSelect={(p) => selectProductForLine(l.uid, p)} priceListId={productPriceListId} />
                           )}
                         </div>
                         <Input
