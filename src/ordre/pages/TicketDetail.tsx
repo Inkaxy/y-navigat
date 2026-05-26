@@ -413,12 +413,29 @@ export default function TicketDetail() {
                 candidates.find((c) => c.order_id === targetOrderId)?.order_number ?? referenced?.order_number ?? null;
               const handleLink = (orderId: string) => {
                 update.mutate({ id: ticket.id, patch: { related_order_id: orderId } as never }, {
-                  onSuccess: () => toast({ title: "Ticket koblet til ordre" }),
+                  onSuccess: () => {
+                    toast({ title: "Ticket koblet til ordre" });
+                    const cand = candidates.find((c) => c.order_id === orderId);
+                    void logTicketEvent({
+                      ticket_id: ticket.id,
+                      order_id: orderId,
+                      event_type: "ticket.linked_to_order",
+                      summary: cand?.order_number ?? null,
+                    });
+                  },
                 });
               };
               const handleUnlink = () => {
+                const prevOrderId = ticket.related_order_id;
                 update.mutate({ id: ticket.id, patch: { related_order_id: null } as never }, {
-                  onSuccess: () => toast({ title: "Kobling fjernet" }),
+                  onSuccess: () => {
+                    toast({ title: "Kobling fjernet" });
+                    void logTicketEvent({
+                      ticket_id: ticket.id,
+                      order_id: prevOrderId,
+                      event_type: "ticket.unlinked_from_order",
+                    });
+                  },
                 });
               };
               return (
