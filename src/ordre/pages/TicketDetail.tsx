@@ -405,6 +405,12 @@ export default function TicketDetail() {
                     error={(ticket as any).ai_error ?? null}
                     confidence={(ticket as any).ai_confidence_score ?? null}
                   />
+                  <AiReplyDraftCard
+                    ticketId={ticket.id}
+                    hasOrder={!!ticket.related_order_id}
+                    requestType={sugg?.request_type ?? null}
+                    onDraft={(text) => setReplyDraft(text)}
+                  />
                   {(candidates.length > 0 || ticket.related_order_id) && (
                     <RelatedOrdersCard
                       candidates={candidates}
