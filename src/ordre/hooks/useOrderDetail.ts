@@ -34,6 +34,8 @@ export type OrderDetail = {
   total_incl_vat: number;
   internal_notes: string | null;
   customer_notes: string | null;
+  production_notes: string | null;
+  store_notes: string | null;
   previous_status_before_hold: string | null;
   cancelled_at: string | null;
   cancelled_by: string | null;
