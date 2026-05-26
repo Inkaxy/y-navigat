@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import DOMPurify from "dompurify";
 import { format, formatDistanceToNow } from "date-fns";
 import { nb } from "date-fns/locale";
@@ -48,7 +48,7 @@ const PRIO_OPTS: { value: TicketPriority; label: string }[] = [
 
 export default function TicketDetail() {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
+  
   const { toast } = useToast();
   const { data, isLoading } = useTicket(id);
   const update = useUpdateTicket();
