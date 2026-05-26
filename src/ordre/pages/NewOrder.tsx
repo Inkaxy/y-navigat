@@ -239,7 +239,7 @@ export default function NewOrder() {
     (async () => {
       const { data } = await supabase
         .from("customers")
-        .select("id, customer_number, display_name, organization_number, primary_contact_name, primary_contact_email, invoice_recipient_customer_id, delivery_address_line1, delivery_address_line2, delivery_postal_code, delivery_city, delivery_country, delivery_instructions, custom_reference, enforce_custom_reference")
+        .select("id, customer_number, display_name, organization_number, primary_contact_name, primary_contact_email, invoice_recipient_customer_id, delivery_address_line1, delivery_address_line2, delivery_postal_code, delivery_city, delivery_country, delivery_instructions, custom_reference, enforce_custom_reference, default_price_list_id")
         .eq("id", prefilledCustomerId)
         .maybeSingle();
       if (cancelled || !data) return;
@@ -259,7 +259,7 @@ export default function NewOrder() {
       if (!customer && !prefilledCustomerId) {
         const { data: c } = await supabase
           .from("customers")
-          .select("id, customer_number, display_name, organization_number, primary_contact_name, primary_contact_email, invoice_recipient_customer_id, delivery_address_line1, delivery_address_line2, delivery_postal_code, delivery_city, delivery_country, delivery_instructions, custom_reference, enforce_custom_reference")
+          .select("id, customer_number, display_name, organization_number, primary_contact_name, primary_contact_email, invoice_recipient_customer_id, delivery_address_line1, delivery_address_line2, delivery_postal_code, delivery_city, delivery_country, delivery_instructions, custom_reference, enforce_custom_reference, default_price_list_id")
           .ilike("primary_contact_email", t.sender_email)
           .maybeSingle();
         if (cancelled) return;
