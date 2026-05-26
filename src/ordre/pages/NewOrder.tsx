@@ -311,11 +311,7 @@ export default function NewOrder() {
 
       // Bygg internt notat med AI-detaljer
       const noteParts: string[] = [`Opprettet fra ticket: ${t.subject ?? "(uten emne)"}`];
-      if (of.cake_text) noteParts.push(`Kaketekst: ${of.cake_text}`);
-      if (of.allergies) noteParts.push(`Allergier: ${of.allergies}`);
-      if (of.special_requests) noteParts.push(`Spesialønsker: ${of.special_requests}`);
       if (of.contact_phone) noteParts.push(`Telefon: ${of.contact_phone}`);
-      if (of.production_notes) noteParts.push(`Produksjon: ${of.production_notes}`);
       if (of.internal_notes) noteParts.push(of.internal_notes);
       // Produktforslag uten match — som hint i notatet
       const unmatched = (ai?.products ?? []).filter((p) => !p.product_id);
@@ -323,6 +319,41 @@ export default function NewOrder() {
         noteParts.push(`AI foreslo (uten match): ${unmatched.map((p) => `${p.quantity}× ${p.product_name}`).join(", ")}`);
       }
       setInternalNotes((prev) => prev || noteParts.join("\n"));
+
+      // Produksjonsnotat — bruk AI-felt direkte, fall back til strukturert oppsummering
+      const prodFromAi = (of.production_notes ?? "").trim();
+      let productionFallback = "";
+      if (!prodFromAi) {
+        const lines: string[] = [];
+        const aiProducts = ai?.products ?? [];
+        for (const p of aiProducts) {
+          const parts = [`${p.quantity}× ${p.product_name}`];
+          if (p.size_or_servings) parts.push(p.size_or_servings);
+          if (p.flavor) parts.push(`smak: ${p.flavor}`);
+          if (p.filling) parts.push(`fyll: ${p.filling}`);
+          if (p.decoration) parts.push(`pynt: ${p.decoration}`);
+          lines.push(`Produkt: ${parts.join(" · ")}`);
+        }
+        if (of.cake_text) lines.push(`Kaketekst: ${of.cake_text}`);
+        if (of.allergies) lines.push(`Allergier: ${of.allergies}`);
+        if (of.special_requests) lines.push(`Spesialønsker: ${of.special_requests}`);
+        productionFallback = lines.join("\n");
+      }
+      setProductionNotes((prev) => prev || prodFromAi || productionFallback);
+
+      // Butikknotat — bruk AI-felt direkte, fall back til strukturert oppsummering
+      const storeFromAi = (of.store_notes ?? "").trim();
+      let storeFallback = "";
+      if (!storeFromAi) {
+        const lines: string[] = [];
+        if (of.delivery_time) lines.push(`Hentetid: ${of.delivery_time}`);
+        const customerName = ai?.customer_match?.customer_name ?? t.sender_name ?? null;
+        if (customerName) lines.push(`Kunde: ${customerName}`);
+        if (of.contact_phone) lines.push(`Telefon: ${of.contact_phone}`);
+        if (of.pickup_location_hint) lines.push(`Hentested: ${of.pickup_location_hint}`);
+        storeFallback = lines.join("\n");
+      }
+      setStoreNotes((prev) => prev || storeFromAi || storeFallback);
 
       // Forhåndsutfyll produktlinjer fra AI-treff (kun med product_id)
       const matched = (ai?.products ?? []).filter((p) => p.product_id);
