@@ -28,6 +28,9 @@ import {
 } from "@/ordre/hooks/useTicketReplies";
 import { TicketPresenceBanner } from "@/ordre/components/shell/TicketPresenceBanner";
 import { AiSuggestionCard } from "@/ordre/components/orders/AiSuggestionCard";
+import { RelatedOrdersCard } from "@/ordre/components/orders/RelatedOrdersCard";
+import { ChangeProposalCard } from "@/ordre/components/orders/ChangeProposalCard";
+import { normalizeAiSuggestion } from "@/ordre/lib/aiSuggestion";
 
 const UNASSIGNED = "__unassigned__";
 
