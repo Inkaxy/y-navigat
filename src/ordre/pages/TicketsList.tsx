@@ -290,6 +290,7 @@ export default function TicketsList() {
     <>
       <AppBanner title="Ticket" subtitle="Innkommende e-poster og forespørsler" />
       <div className="container mx-auto px-4 py-6 space-y-4 max-w-[1400px]">
+        <UnreadMentionsBanner />
         {/* Søk + presise selects */}
         <Card>
           <CardContent className="pt-4 space-y-3">
