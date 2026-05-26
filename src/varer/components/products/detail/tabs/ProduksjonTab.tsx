@@ -253,6 +253,41 @@ export function ProduksjonTab({
             </div>
 
             <div className="md:col-span-2">
+              <Label>Utskriftsprofil</Label>
+              <Controller
+                control={control}
+                name="label_profile_id"
+                render={({ field }) => (
+                  <Select
+                    value={field.value ?? "__none__"}
+                    onValueChange={(v) => field.onChange(v === "__none__" ? null : v)}
+                    disabled={!canWrite || labelMode === "none"}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={
+                        labelMode === "none"
+                          ? "Sett etikett-modus først…"
+                          : activeProfiles.length === 0
+                          ? "Ingen profiler tilgjengelig"
+                          : "Velg utskriftsprofil…"
+                      } />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">Ingen valgt</SelectItem>
+                      {activeProfiles.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Bestemmer hvilken utskriftsprofil som brukes til å generere etiketten.
+                Profiler opprettes i Produksjon → Innstillinger → Utskriftsprofiler.
+              </p>
+            </div>
+
+            <div className="md:col-span-2">
               <Label>Avdeling(er)</Label>
               {productionDepartments.length === 0 ? (
                 <p className="text-xs text-muted-foreground mt-1">

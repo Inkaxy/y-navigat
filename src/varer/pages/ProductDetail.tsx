@@ -440,6 +440,7 @@ export default function ProductDetail() {
           <ProduksjonTab
             productId={product.id}
             canWrite={canWrite}
+            legalEntityId={legalEntityId}
             productionGroups={lookups.productionGroups}
             productionDepartments={lookups.productionDepartments}
             selectedDepartmentIds={labelDepartmentIds}
