@@ -240,6 +240,27 @@ export default function TicketDetail() {
                 </p>
               )}
             </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Team</Label>
+              <Select value={ticket.assigned_team ?? UNASSIGNED} onValueChange={setTeam}>
+                <SelectTrigger className="w-44"><SelectValue placeholder="Velg team" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={UNASSIGNED}>— Ingen —</SelectItem>
+                  {TEAMS.map((t) => (
+                    <SelectItem key={t} value={t}>{TEAM_LABEL[t]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Intern avklaring</Label>
+              <div className="flex h-9 items-center gap-2 rounded-md border bg-background px-3">
+                <Switch checked={ticket.awaiting_internal} onCheckedChange={setAwaiting} />
+                <span className="text-xs text-muted-foreground">
+                  {ticket.awaiting_internal ? "Venter på intern" : "Av"}
+                </span>
+              </div>
+            </div>
             {ticket.related_order_id && (
               <div className="ml-auto">
                 <Button asChild variant="outline" size="sm">
