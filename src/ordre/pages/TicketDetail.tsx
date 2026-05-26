@@ -386,22 +386,25 @@ export default function TicketDetail() {
               </CardContent>
             </Card>
 
-            {/* Internt notat */}
+            {/* Intern diskusjon med team-tagging */}
+            <InternalCommentsCard ticketId={ticket.id} />
+
+            {/* Internt sammendrag (kort notat) */}
             <Card>
-              <CardHeader><CardTitle className="text-sm">Internt notat</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="text-sm">Internt sammendrag</CardTitle></CardHeader>
               <CardContent className="space-y-2">
                 <Textarea
                   value={notesDraft}
                   onChange={(e) => setNotesDraft(e.target.value)}
-                  rows={4}
-                  placeholder="Notater for ordrekontoret …"
+                  rows={3}
+                  placeholder="Kort sammendrag for ordrekontoret …"
                 />
                 <Button
                   size="sm"
                   onClick={saveNotes}
                   disabled={update.isPending || notesDraft === (ticket.internal_notes ?? "")}
                 >
-                  Lagre notat
+                  Lagre sammendrag
                 </Button>
               </CardContent>
             </Card>
