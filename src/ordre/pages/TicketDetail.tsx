@@ -28,6 +28,9 @@ import {
 } from "@/ordre/hooks/useTicketReplies";
 import { TicketPresenceBanner } from "@/ordre/components/shell/TicketPresenceBanner";
 import { AiSuggestionCard } from "@/ordre/components/orders/AiSuggestionCard";
+import { RelatedOrdersCard } from "@/ordre/components/orders/RelatedOrdersCard";
+import { ChangeProposalCard } from "@/ordre/components/orders/ChangeProposalCard";
+import { normalizeAiSuggestion } from "@/ordre/lib/aiSuggestion";
 
 const UNASSIGNED = "__unassigned__";
 
@@ -368,20 +371,62 @@ export default function TicketDetail() {
           </div>
 
           {/* Høyre: AI-panel */}
-          <div className="min-w-0">
-            <AiSuggestionCard
-              ticketId={ticket.id}
-              ticketStatus={ticket.status}
-              hasOrder={!!ticket.related_order_id}
-              relatedOrderId={ticket.related_order_id}
-              analyzedAt={(ticket as any).ai_analyzed_at ?? null}
-              suggestion={(ticket as any).ai_suggestion ?? null}
-              provider={(ticket as any).ai_provider ?? null}
-              model={(ticket as any).ai_model ?? null}
-              costUsd={(ticket as any).ai_cost_usd ?? null}
-              error={(ticket as any).ai_error ?? null}
-              confidence={(ticket as any).ai_confidence_score ?? null}
-            />
+          <div className="min-w-0 space-y-4">
+            {(() => {
+              const sugg = normalizeAiSuggestion((ticket as any).ai_suggestion);
+              const candidates = sugg?.candidate_orders ?? [];
+              const referenced = sugg?.referenced_order ?? null;
+              const targetOrderId = ticket.related_order_id ?? sugg?.change_intent?.target_order_id ?? referenced?.order_id ?? null;
+              const targetOrderNumber =
+                candidates.find((c) => c.order_id === targetOrderId)?.order_number ?? referenced?.order_number ?? null;
+              const handleLink = (orderId: string) => {
+                update.mutate({ id: ticket.id, patch: { related_order_id: orderId } as never }, {
+                  onSuccess: () => toast({ title: "Ticket koblet til ordre" }),
+                });
+              };
+              const handleUnlink = () => {
+                update.mutate({ id: ticket.id, patch: { related_order_id: null } as never }, {
+                  onSuccess: () => toast({ title: "Kobling fjernet" }),
+                });
+              };
+              return (
+                <>
+                  <AiSuggestionCard
+                    ticketId={ticket.id}
+                    ticketStatus={ticket.status}
+                    hasOrder={!!ticket.related_order_id}
+                    relatedOrderId={ticket.related_order_id}
+                    analyzedAt={(ticket as any).ai_analyzed_at ?? null}
+                    suggestion={(ticket as any).ai_suggestion ?? null}
+                    provider={(ticket as any).ai_provider ?? null}
+                    model={(ticket as any).ai_model ?? null}
+                    costUsd={(ticket as any).ai_cost_usd ?? null}
+                    error={(ticket as any).ai_error ?? null}
+                    confidence={(ticket as any).ai_confidence_score ?? null}
+                  />
+                  {(candidates.length > 0 || ticket.related_order_id) && (
+                    <RelatedOrdersCard
+                      candidates={candidates}
+                      referencedOrderId={referenced?.order_id ?? null}
+                      linkedOrderId={ticket.related_order_id}
+                      onLink={handleLink}
+                      onUnlink={handleUnlink}
+                      busy={update.isPending}
+                    />
+                  )}
+                  {sugg && (sugg.request_type === "change" || sugg.request_type === "cancellation") && (
+                    <ChangeProposalCard
+                      ticketId={ticket.id}
+                      ticketStatus={ticket.status}
+                      requestType={sugg.request_type}
+                      changeIntent={sugg.change_intent ?? null}
+                      targetOrderId={targetOrderId}
+                      targetOrderNumber={targetOrderNumber}
+                    />
+                  )}
+                </>
+              );
+            })()}
           </div>
         </div>
       </div>

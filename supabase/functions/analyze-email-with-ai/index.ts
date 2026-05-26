@@ -87,6 +87,36 @@ const SuggestionSchema = z.object({
     tour_id: z.string().uuid().nullable(),
     tour_name: z.string().nullable(),
   }).nullable().optional(),
+  // Runde 2: kandidat-ordre + endringer
+  candidate_orders: z.array(z.object({
+    order_id: z.string().uuid(),
+    order_number: z.string().nullable(),
+    match_confidence: z.number().min(0).max(1),
+    why_match: z.string(),
+    snapshot: z.object({
+      delivery_date: z.string().nullable().optional(),
+      delivery_time: z.string().nullable().optional(),
+      status: z.string().nullable().optional(),
+      customer_name: z.string().nullable().optional(),
+      line_summary: z.string().nullable().optional(),
+    }).nullable().optional(),
+  })).default([]),
+  referenced_order: z.object({
+    order_id: z.string().uuid(),
+    order_number: z.string().nullable(),
+    match_confidence: z.number().min(0).max(1),
+  }).nullable().optional(),
+  change_intent: z.object({
+    target_order_id: z.string().uuid().nullable(),
+    changes: z.array(z.object({
+      field: z.string(),
+      current_value: z.string().nullable(),
+      proposed_value: z.string().nullable(),
+      reasoning: z.string(),
+      confidence: z.number().min(0).max(1),
+    })).default([]),
+    cancellation_reason: z.string().nullable().optional(),
+  }).nullable().optional(),
   delivery_date: z.string().nullable().optional(), // bakoverkomp
   confidence_score: z.number().min(0).max(1),
   reasoning: z.string(),
@@ -159,7 +189,7 @@ Deno.serve(async (req) => {
 
     const [{ data: customers }, { data: products }, { data: pickups }] = await Promise.all([
       admin.from("customers")
-        .select("id,display_name,customer_number,primary_contact_email")
+        .select("id,display_name,customer_number,primary_contact_email,primary_contact_phone,mobile_phone")
         .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
         .eq("status", "active")
         .limit(200),
@@ -176,6 +206,58 @@ Deno.serve(async (req) => {
         .limit(50),
     ]);
 
+    // --- Runde 2: hent kandidat-ordre ---
+    // Strategi: (1) match sender_email mot kundens primary_contact_email,
+    // (2) regex etter ordrenr i bodyen (f.eks. 2025-1234 eller #1234),
+    // (3) hent aktive/fremtidige ordrer for de matchede kundene + eventuelle eksplisitte ordrenr.
+    const senderEmail = (ticket.sender_email ?? "").toLowerCase().trim();
+    const matchedCustomerIds = new Set<string>();
+    for (const c of customers ?? []) {
+      const e1 = (c.primary_contact_email ?? "").toLowerCase().trim();
+      if (senderEmail && e1 && e1 === senderEmail) matchedCustomerIds.add(c.id);
+    }
+    const rawBody = (ticket.body_text ?? ticket.body_preview ?? "").slice(0, 8000);
+    const orderNumberMatches = Array.from(
+      rawBody.matchAll(/(?:ordre\w*\s*(?:nr|nummer)?\s*[:#]?\s*|#)\s*(\d{2,4}[-\s]?\d{3,6})/gi),
+    ).map((m) => m[1].replace(/\s/g, "").replace(/^(\d{2,4})(\d{3,6})$/, "$1-$2"));
+    const today = new Date(); today.setHours(0,0,0,0);
+    const cutoff = new Date(today); cutoff.setDate(cutoff.getDate() - 60);
+    const cutoffISO = cutoff.toISOString().slice(0,10);
+    const activeStatuses = ["draft","awaiting_confirmation","confirmed","in_production","packed","on_hold"];
+    let candidateOrdersRaw: any[] = [];
+    if (matchedCustomerIds.size > 0 || orderNumberMatches.length > 0) {
+      let q = admin.from("orders")
+        .select("id,order_number,status,delivery_date,delivery_time,customer_id,customer_snapshot,delivery_address_line1,delivery_postal_code,delivery_city,customer_notes,internal_notes")
+        .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
+        .gte("delivery_date", cutoffISO)
+        .in("status", activeStatuses)
+        .order("delivery_date", { ascending: true })
+        .limit(20);
+      const orFilters: string[] = [];
+      if (matchedCustomerIds.size > 0) {
+        orFilters.push(`customer_id.in.(${Array.from(matchedCustomerIds).join(",")})`);
+      }
+      for (const onr of orderNumberMatches) {
+        orFilters.push(`order_number.eq.${onr}`);
+      }
+      if (orFilters.length > 0) q = q.or(orFilters.join(","));
+      const { data: cand } = await q;
+      candidateOrdersRaw = cand ?? [];
+    }
+    // Hent linjer for kandidatene for snapshot
+    const candIds = candidateOrdersRaw.map((o: any) => o.id);
+    let linesByOrder: Record<string, any[]> = {};
+    if (candIds.length > 0) {
+      const { data: lines } = await admin.from("order_lines")
+        .select("order_id,line_number,quantity,product_snapshot,notes")
+        .in("order_id", candIds)
+        .order("line_number", { ascending: true });
+      for (const l of lines ?? []) {
+        (linesByOrder[l.order_id] = linesByOrder[l.order_id] || []).push(l);
+      }
+    }
+
+
     const bodyText = trimEmailBody(ticket.body_text ?? ticket.body_preview ?? "");
     const todayISO = new Date().toISOString().slice(0, 10);
 
@@ -189,50 +271,45 @@ Returner KUN gyldig JSON som matcher dette schemaet (ingen markdown, ingen tekst
   "summary": string (1-3 setninger på norsk),
   "suggested_action": string (kort handlingsforslag på norsk),
   "customer_match": { "customer_id": uuid|null, "customer_name": string|null, "match_confidence": 0..1 } | null,
-  "order_fields": {
-    "delivery_date": "YYYY-MM-DD"|null,
-    "delivery_time": "HH:MM"|null,
-    "pickup_location_hint": string|null,
-    "delivery_address_line1": string|null,
-    "delivery_address_line2": string|null,
-    "delivery_postal_code": string|null,
-    "delivery_city": string|null,
-    "customer_notes": string|null,
-    "internal_notes": string|null,
-    "production_notes": string|null,
-    "cake_text": string|null,
-    "allergies": string|null,
-    "special_requests": string|null,
-    "contact_phone": string|null,
-    "contact_email": string|null
-  },
-  "products": [{
-    "product_id": uuid|null,
-    "product_name": string,
-    "quantity": number,
-    "size_or_servings": string|null,
-    "flavor": string|null,
-    "filling": string|null,
-    "decoration": string|null,
-    "match_confidence": 0..1
-  }],
+  "order_fields": { ... samme som før ... },
+  "products": [{ ... samme som før ... }],
   "missing_info": [{ "code": string, "label": string }],
   "risks": [{ "severity": "red"|"yellow"|"green", "code": string, "message": string }],
-  "field_confidence": { "delivery_date": 0..1, "customer_id": 0..1, "pickup": 0..1, ... },
-  "reasoning_per_field": { "delivery_date": "kunden skrev 'lørdag'", ... },
+  "field_confidence": { ... },
+  "reasoning_per_field": { ... },
+  "candidate_orders": [{
+    "order_id": uuid,            // MÅ være en av order_id-ene i KANDIDAT-ORDRE-lista nedenfor
+    "order_number": string|null,
+    "match_confidence": 0..1,
+    "why_match": string (kort norsk forklaring),
+    "snapshot": { "delivery_date": "YYYY-MM-DD"|null, "delivery_time": string|null, "status": string|null, "customer_name": string|null, "line_summary": string|null }
+  }],
+  "referenced_order": { "order_id": uuid, "order_number": string|null, "match_confidence": 0..1 } | null,
+  "change_intent": {
+    "target_order_id": uuid|null,
+    "changes": [{
+      "field": "delivery_date"|"delivery_time"|"customer_notes"|"internal_notes"|"delivery_address_line1"|"delivery_address_line2"|"delivery_postal_code"|"delivery_city",
+      "current_value": string|null,
+      "proposed_value": string|null,
+      "reasoning": string,
+      "confidence": 0..1
+    }],
+    "cancellation_reason": string|null
+  } | null,
   "confidence_score": 0..1,
-  "reasoning": string (kort overordnet begrunnelse på norsk)
+  "reasoning": string
 }
 
 Regler:
 - request_type: klassifiser ut fra om kunden bestiller noe nytt, ber om endring, vil avbestille, stiller spørsmål, klager, eller om eposten er intern/uklar/spam.
-- customer_match: prøv først match på sender-epost mot primary_contact_email, deretter navn i e-posten. Sett customer_id=null hvis usikker.
-- products: match på navn. Ikke gjett UUID — sett product_id=null hvis usikker.
-- missing_info: list opp felt som mangler for at en ordre skal kunne opprettes (telefonnummer, hentetid, hentested, fyll, kaketekst, antall, …). Bruk korte koder ('phone','pickup_time','pickup','filling','cake_text','quantity','customer','product') og norske labels.
-- risks: flagg ting saksbehandleren må sjekke. severity 'red' = må løses før ordre, 'yellow' = bør kontrolleres, 'green' = OK. Eksempler: relativ dato ('neste fredag'), uklar hentested, mulig duplikat, allergi nevnt, for kort frist, ukjent produkt.
-- delivery_date må være ISO YYYY-MM-DD (regn ut fra dagens dato hvis kunden skrev relativt).
-- pickup_location_hint = fritekst kunden brukte (f.eks. "Majorstua"). IKKE gjett UUID.
-- order_fields.cake_text/allergies/special_requests skal fylles ut hvis nevnt — ikke pakk inn i prosa.
+- candidate_orders: velg 0-3 fra KANDIDAT-ORDRE-lista som ser ut til å være relevante for denne eposten. Bruk EKSAKTE order_id fra lista. La være tom hvis ingen passer.
+- referenced_order: hvis eposten tydelig handler om EN spesifikk eksisterende ordre (endring/kansellering/spørsmål), sett denne til den mest sannsynlige. Ellers null.
+- change_intent: SETT KUN når request_type = "change" eller "cancellation". target_order_id skal være eksisterende order_id fra kandidatlista (eller referenced_order). Kun feltene i whitelisten over kan endres — for andre endringer (kaketekst, antall, fyll osv.) skal du beskrive dem i "summary" og "suggested_action", men IKKE i changes.
+- cancellation_reason: kort grunn på norsk hvis kunden vil kansellere.
+- current_value: hva som står i ordren nå (slå opp i kandidat-snapshotet). Hvis ukjent, sett null.
+- proposed_value: hva kunden ønsker å endre til. Bruk samme format som lagret (YYYY-MM-DD for dato, HH:MM for tid).
+- customer_match / products / missing_info / risks: som tidligere.
+- Norsk datoformat er DD-MM-YYYY. delivery_date i utdata må være ISO YYYY-MM-DD.
 - Hold sammendrag og reasoning korte og praktiske.`;
 
     const userText = [
@@ -244,15 +321,29 @@ Regler:
       `--- E-post-tekst ---`,
       bodyText,
       ``,
-      `=== KUNDER (id | kundenr | navn | epost) ===`,
-      (customers ?? []).map((c: any) => `${c.id} | ${c.customer_number ?? ""} | ${c.display_name} | ${c.primary_contact_email ?? ""}`).join("\n"),
+      `=== KUNDER (id | kundenr | navn | epost | telefon) ===`,
+      (customers ?? []).map((c: any) => `${c.id} | ${c.customer_number ?? ""} | ${c.display_name} | ${c.primary_contact_email ?? ""} | ${c.primary_contact_phone ?? c.mobile_phone ?? ""}`).join("\n"),
       ``,
       `=== PRODUKTER (id | nr | navn | enhet) ===`,
       (products ?? []).map((p: any) => `${p.id} | ${p.display_number ?? ""} | ${p.display_name} | ${p.unit_of_sale ?? ""}`).join("\n"),
       ``,
       `=== HENTESTEDER (navn | by) ===`,
       (pickups ?? []).map((p: any) => `${p.display_name} | ${p.city ?? ""}`).join("\n"),
+      ``,
+      `=== KANDIDAT-ORDRE (order_id | ordrenr | status | hentedato | hentetid | kunde | linjer | kundenotat | adresse) ===`,
+      candidateOrdersRaw.length === 0
+        ? "(ingen aktive/fremtidige ordre funnet for denne kunden eller refererte ordrenr)"
+        : candidateOrdersRaw.map((o: any) => {
+            const cn = o.customer_snapshot?.display_name ?? o.customer_snapshot?.name ?? "";
+            const ls = (linesByOrder[o.id] ?? []).slice(0, 5).map((l: any) => {
+              const name = l.product_snapshot?.display_name ?? l.product_snapshot?.name ?? "?";
+              return `${l.quantity}x ${name}`;
+            }).join(", ");
+            const addr = [o.delivery_address_line1, o.delivery_postal_code, o.delivery_city].filter(Boolean).join(" ");
+            return `${o.id} | ${o.order_number ?? ""} | ${o.status} | ${o.delivery_date ?? ""} | ${o.delivery_time ?? ""} | ${cn} | ${ls} | ${o.customer_notes ?? ""} | ${addr}`;
+          }).join("\n"),
     ].join("\n");
+
 
     const startTs = Date.now();
     let rawText = "";

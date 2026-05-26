@@ -66,6 +66,64 @@ export type AiProductLine = {
   match_confidence: number;
 };
 
+// --- Runde 2: kandidat-ordre + endringer ---
+
+export type CandidateOrder = {
+  order_id: string;
+  order_number: string | null;
+  match_confidence: number;
+  why_match: string;
+  snapshot?: {
+    delivery_date?: string | null;
+    delivery_time?: string | null;
+    status?: string | null;
+    customer_name?: string | null;
+    line_summary?: string | null;
+  } | null;
+};
+
+export type ReferencedOrder = {
+  order_id: string;
+  order_number: string | null;
+  match_confidence: number;
+};
+
+// Felt AI har lov til å foreslå endring på (whitelist matcher edge-function `apply-ticket-change`).
+export type ChangeField =
+  | "delivery_date"
+  | "delivery_time"
+  | "customer_notes"
+  | "internal_notes"
+  | "delivery_address_line1"
+  | "delivery_address_line2"
+  | "delivery_postal_code"
+  | "delivery_city";
+
+export const CHANGE_FIELD_LABEL: Record<ChangeField, string> = {
+  delivery_date: "Hentedato",
+  delivery_time: "Hentetid",
+  customer_notes: "Kundenotat",
+  internal_notes: "Internt notat",
+  delivery_address_line1: "Adresse",
+  delivery_address_line2: "Adresse 2",
+  delivery_postal_code: "Postnr",
+  delivery_city: "By",
+};
+
+export type ProposedChange = {
+  field: ChangeField | string; // string = info-only, ikke applicable
+  current_value: string | null;
+  proposed_value: string | null;
+  reasoning: string;
+  confidence: number;
+};
+
+export type ChangeIntent = {
+  target_order_id: string | null;
+  changes: ProposedChange[];
+  cancellation_reason?: string | null;
+};
+
 export type AiSuggestion = {
   request_type: RequestType;
   summary: string;
@@ -82,6 +140,9 @@ export type AiSuggestion = {
   field_confidence: Record<string, number>;
   reasoning_per_field: Record<string, string>;
   tour?: { tour_id: string | null; tour_name: string | null } | null;
+  candidate_orders?: CandidateOrder[];
+  referenced_order?: ReferencedOrder | null;
+  change_intent?: ChangeIntent | null;
   delivery_date?: string | null; // bakoverkomp
   confidence_score: number;
   reasoning: string;
@@ -101,30 +162,41 @@ export function hasMissingInfo(s: AiSuggestion | null | undefined): boolean {
   return !!s?.missing_info?.length;
 }
 
+export const APPLIABLE_CHANGE_FIELDS = new Set<string>(Object.keys(CHANGE_FIELD_LABEL));
+
+export function isAppliableChange(field: string): field is ChangeField {
+  return APPLIABLE_CHANGE_FIELDS.has(field);
+}
+
 // Normalisér jsonb fra DB til AiSuggestion (best-effort; tolererer gammelt format).
 export function normalizeAiSuggestion(raw: unknown): AiSuggestion | null {
   if (!raw || typeof raw !== "object") return null;
   const r = raw as Record<string, unknown>;
-  // Hvis vi har et minimum av nye felt, returner direkte
   if (typeof r.request_type === "string" && Array.isArray(r.products)) {
-    return raw as AiSuggestion;
+    const s = raw as AiSuggestion;
+    return {
+      ...s,
+      candidate_orders: Array.isArray(s.candidate_orders) ? s.candidate_orders : [],
+      referenced_order: s.referenced_order ?? null,
+      change_intent: s.change_intent ?? null,
+    };
   }
-  // Gammelt format → wrap til nytt minimum
   if (Array.isArray((r as any).products)) {
     return {
       request_type: "unclear",
       summary: "",
       suggested_action: "",
       customer_match: (r as any).customer_match ?? null,
-      order_fields: {
-        delivery_date: (r as any).delivery_date ?? null,
-      },
+      order_fields: { delivery_date: (r as any).delivery_date ?? null },
       products: (r as any).products ?? [],
       missing_info: [],
       risks: [],
       field_confidence: {},
       reasoning_per_field: {},
       tour: (r as any).tour ?? null,
+      candidate_orders: [],
+      referenced_order: null,
+      change_intent: null,
       delivery_date: (r as any).delivery_date ?? null,
       confidence_score: (r as any).confidence_score ?? 0,
       reasoning: (r as any).reasoning ?? "",
