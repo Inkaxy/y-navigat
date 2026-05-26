@@ -189,6 +189,7 @@ export default function MatrixPage() {
   const [pauseOpen, setPauseOpen] = useState(false);
   const [correctionsOpen, setCorrectionsOpen] = useState(false);
   const [flatView, setFlatView] = useState(false);
+  const [flatDayFilter, setFlatDayFilter] = useState<string | null>(null);
   const [showAllProducts, setShowAllProducts] = useState(false);
   const [recurringDialogOpen, setRecurringDialogOpen] = useState(false);
 
@@ -1377,14 +1378,51 @@ export default function MatrixPage() {
             </div>
           </div>
         ) : flatView && matrix ? (
-          <FlatLinesView
-            rows={flatRows}
-            products={allProducts}
-            tours={matrix.tours}
-            onQuantityChange={(date, tour_id, product_id, value) =>
-              setCellValue(`${date}|${tour_id ?? ""}|${product_id}` as CellKey, value)
-            }
-          />
+          <div className="space-y-4 p-1">
+            <div className="flex flex-wrap items-center gap-1.5 rounded-lg border bg-card p-1.5">
+              <button
+                type="button"
+                onClick={() => setFlatDayFilter(null)}
+                className={
+                  "rounded-md px-3 py-1.5 text-sm font-medium transition-colors " +
+                  (flatDayFilter === null
+                    ? "bg-primary text-primary-foreground"
+                    : "text-foreground hover:bg-muted")
+                }
+              >
+                Hele uken
+              </button>
+              {days.map((d) => {
+                const dt = new Date(d + "T12:00:00");
+                const wd = ["Søn", "Man", "Tir", "Ons", "Tor", "Fre", "Lør"][dt.getDay()];
+                const label = `${wd} ${String(dt.getDate()).padStart(2, "0")}.${String(dt.getMonth() + 1).padStart(2, "0")}`;
+                const active = flatDayFilter === d;
+                return (
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => setFlatDayFilter(d)}
+                    className={
+                      "rounded-md px-3 py-1.5 text-sm font-medium transition-colors tabular-nums " +
+                      (active
+                        ? "bg-primary text-primary-foreground"
+                        : "text-foreground hover:bg-muted")
+                    }
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+            <FlatLinesView
+              rows={flatDayFilter ? flatRows.filter((r) => r.delivery_date === flatDayFilter) : flatRows}
+              products={allProducts}
+              tours={matrix.tours}
+              onQuantityChange={(date, tour_id, product_id, value) =>
+                setCellValue(`${date}|${tour_id ?? ""}|${product_id}` as CellKey, value)
+              }
+            />
+          </div>
         ) : (
           <>
             <MatrixGrid
