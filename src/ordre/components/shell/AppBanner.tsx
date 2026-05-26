@@ -24,7 +24,7 @@ export function AppBanner({
 }) {
   const { data: app } = useOrdreApp();
   const finalTitle = title ?? app?.display_name ?? "Ordre";
-  const finalSubtitle = subtitle ?? `Ordremottak og ordrestyring for ${NB_LEGAL_NAME}`;
+  const finalSubtitle = subtitle ?? "​";
 
   return (
     <PageHeader
