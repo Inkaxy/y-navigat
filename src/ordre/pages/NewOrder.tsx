@@ -1217,6 +1217,38 @@ export default function NewOrder() {
               <Label htmlFor="internal">Internt notat (ikke synlig for kunde)</Label>
               <Textarea id="internal" rows={2} value={internalNotes} onChange={(e) => setInternalNotes(e.target.value)} />
             </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <Label htmlFor="production-notes">
+                  Produksjonsnotat <span className="text-xs text-muted-foreground">(til bakeriet)</span>
+                </Label>
+                <Textarea
+                  id="production-notes"
+                  rows={6}
+                  value={productionNotes}
+                  onChange={(e) => setProductionNotes(e.target.value)}
+                  placeholder={`Produkt: 1× Bløtkake · 8 personer · smak: jordbær\nKaketekst: «Gratulerer med dagen, Eva!»\nPynt: blomster i lilla\nAllergier: nøtter\nObs: …`}
+                />
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  Strukturert, telegrafisk. Kaketekst, pynt, fyll, allergier, ting produksjon må være obs på.
+                </p>
+              </div>
+              <div>
+                <Label htmlFor="store-notes">
+                  Butikknotat <span className="text-xs text-muted-foreground">(til hentestedet)</span>
+                </Label>
+                <Textarea
+                  id="store-notes"
+                  rows={6}
+                  value={storeNotes}
+                  onChange={(e) => setStoreNotes(e.target.value)}
+                  placeholder={`Hentetid: 14:00\nKunde: Eva Hansen\nTelefon: 90000000\nBetaling: betalt på forhånd\nKontakt kunde: bekreft hentetid\nEndret: utvidet med 4 personer 25.05`}
+                />
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  Hentetid, kontaktinfo, betalingsstatus, spesielle hentebeskjeder.
+                </p>
+              </div>
+            </div>
             <div>
               <Label htmlFor="customer-notes">Notat fra kunde</Label>
               <Textarea id="customer-notes" rows={2} value={customerNotes} onChange={(e) => setCustomerNotes(e.target.value)} />
