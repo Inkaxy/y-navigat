@@ -28,6 +28,8 @@ export interface Ticket {
   ai_status: string | null;
   ai_suggestion: unknown;
   ai_confidence_score: number | null;
+  assigned_team: import("@/ordre/lib/teams").TicketTeam | null;
+  awaiting_internal: boolean;
   created_at: string;
   updated_at: string;
 }

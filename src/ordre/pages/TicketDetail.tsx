@@ -34,8 +34,11 @@ import { AiReplyDraftCard } from "@/ordre/components/orders/AiReplyDraftCard";
 import { AttachmentsCard } from "@/ordre/components/orders/AttachmentsCard";
 import { RuleWarningsCard } from "@/ordre/components/orders/RuleWarningsCard";
 import { TimelineCard } from "@/ordre/components/orders/TimelineCard";
+import { InternalCommentsCard } from "@/ordre/components/orders/InternalCommentsCard";
 import { logTicketEvent } from "@/ordre/lib/ticketEvents";
 import { normalizeAiSuggestion } from "@/ordre/lib/aiSuggestion";
+import { TEAMS, TEAM_LABEL, type TicketTeam } from "@/ordre/lib/teams";
+import { Switch } from "@/components/ui/switch";
 
 const UNASSIGNED = "__unassigned__";
 
@@ -151,6 +154,22 @@ export default function TicketDetail() {
     });
   };
 
+  const setTeam = (val: string) => {
+    const team = val === UNASSIGNED ? null : (val as TicketTeam);
+    update.mutate({ id: ticket.id, patch: { assigned_team: team } as never }, {
+      onSuccess: () => toast({ title: team ? `Team: ${TEAM_LABEL[team]}` : "Team fjernet" }),
+    });
+  };
+
+  const setAwaiting = (next: boolean) => {
+    update.mutate({ id: ticket.id, patch: { awaiting_internal: next } as never }, {
+      onSuccess: () =>
+        toast({
+          title: next ? "Venter på intern avklaring" : "Intern avklaring avsluttet",
+        }),
+    });
+  };
+
   const doSendReply = () => {
     sendReply.mutate(
       { ticket_id: ticket.id, body_text: replyDraft },
@@ -220,6 +239,27 @@ export default function TicketDetail() {
                   Ingen brukere har ordrekontor-rollen ennå. Tildel i Admin → Brukere.
                 </p>
               )}
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Team</Label>
+              <Select value={ticket.assigned_team ?? UNASSIGNED} onValueChange={setTeam}>
+                <SelectTrigger className="w-44"><SelectValue placeholder="Velg team" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={UNASSIGNED}>— Ingen —</SelectItem>
+                  {TEAMS.map((t) => (
+                    <SelectItem key={t} value={t}>{TEAM_LABEL[t]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Intern avklaring</Label>
+              <div className="flex h-9 items-center gap-2 rounded-md border bg-background px-3">
+                <Switch checked={ticket.awaiting_internal} onCheckedChange={setAwaiting} />
+                <span className="text-xs text-muted-foreground">
+                  {ticket.awaiting_internal ? "Venter på intern" : "Av"}
+                </span>
+              </div>
             </div>
             {ticket.related_order_id && (
               <div className="ml-auto">
@@ -346,22 +386,25 @@ export default function TicketDetail() {
               </CardContent>
             </Card>
 
-            {/* Internt notat */}
+            {/* Intern diskusjon med team-tagging */}
+            <InternalCommentsCard ticketId={ticket.id} />
+
+            {/* Internt sammendrag (kort notat) */}
             <Card>
-              <CardHeader><CardTitle className="text-sm">Internt notat</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="text-sm">Internt sammendrag</CardTitle></CardHeader>
               <CardContent className="space-y-2">
                 <Textarea
                   value={notesDraft}
                   onChange={(e) => setNotesDraft(e.target.value)}
-                  rows={4}
-                  placeholder="Notater for ordrekontoret …"
+                  rows={3}
+                  placeholder="Kort sammendrag for ordrekontoret …"
                 />
                 <Button
                   size="sm"
                   onClick={saveNotes}
                   disabled={update.isPending || notesDraft === (ticket.internal_notes ?? "")}
                 >
-                  Lagre notat
+                  Lagre sammendrag
                 </Button>
               </CardContent>
             </Card>

@@ -30,6 +30,7 @@ import {
   hasRedRisk, hasMissingInfo, type AiSuggestion, type RequestType,
 } from "@/ordre/lib/aiSuggestion";
 import { cn } from "@/lib/utils";
+import { UnreadMentionsBanner } from "@/ordre/components/orders/UnreadMentionsBanner";
 
 const STATUS_LABELS: Record<TicketStatus, string> = {
   new: "Ny", in_progress: "Pågår", resolved: "Løst", closed: "Lukket", spam: "Spam",
@@ -55,7 +56,8 @@ type QuickFilter =
   | "new" | "ai_ready" | "missing_info" | "risk"
   | "not_linked" | "linked" | "awaiting_customer" | "ready_for_order"
   | "changes" | "cancellations" | "complaints"
-  | "pickup_today" | "pickup_tomorrow";
+  | "pickup_today" | "pickup_tomorrow"
+  | "awaiting_internal";
 
 const QUICK_FILTERS: { key: QuickFilter; label: string; icon?: React.ReactNode }[] = [
   { key: "new", label: "Nye" },
@@ -65,6 +67,7 @@ const QUICK_FILTERS: { key: QuickFilter; label: string; icon?: React.ReactNode }
   { key: "not_linked", label: "Ikke koblet" },
   { key: "linked", label: "Koblet til ordre", icon: <Link2 className="mr-1 h-3 w-3" /> },
   { key: "awaiting_customer", label: "Venter på kunde" },
+  { key: "awaiting_internal", label: "Venter intern avklaring" },
   { key: "ready_for_order", label: "Klar til ordre" },
   { key: "changes", label: "Endringer" },
   { key: "cancellations", label: "Kanselleringer" },
@@ -226,6 +229,7 @@ export default function TicketsList() {
           case "complaints": if (requestType !== "complaint") return false; break;
           case "pickup_today": if (pickupDate !== today) return false; break;
           case "pickup_tomorrow": if (pickupDate !== tomorrow) return false; break;
+          case "awaiting_internal": if (!t.awaiting_internal) return false; break;
         }
       }
       if (outletFilter !== "all") {
@@ -287,6 +291,7 @@ export default function TicketsList() {
     <>
       <AppBanner title="Ticket" subtitle="Innkommende e-poster og forespørsler" />
       <div className="container mx-auto px-4 py-6 space-y-4 max-w-[1400px]">
+        <UnreadMentionsBanner />
         {/* Søk + presise selects */}
         <Card>
           <CardContent className="pt-4 space-y-3">
