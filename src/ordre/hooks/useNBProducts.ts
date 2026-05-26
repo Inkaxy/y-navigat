@@ -28,40 +28,50 @@ export function useNBProducts(search?: string, priceListId?: string | null) {
       if (!priceListId) return [];
 
       const today = new Date().toISOString().slice(0, 10);
-      const { data: items, error: itemsErr } = await supabase
+      // Join via embedded relation slik at vi slipper å sende hundrevis av IDs i URL-en (→ 414/400).
+      let q = supabase
         .from("price_list_items")
-        .select("product_id, price, valid_from, valid_to")
+        .select(
+          "product_id, products!inner(id, display_number, code, display_name, unit_of_sale, mva_rate, status, is_for_sale, is_divisible, legal_entity_id)",
+        )
         .eq("price_list_id", priceListId)
         .gt("price", 0)
-        .lte("valid_from", today);
-      if (itemsErr) throw itemsErr;
-      const allowedIds = Array.from(
-        new Set(
-          (items ?? [])
-            .filter((r: any) => !r.valid_to || r.valid_to >= today)
-            .map((r: any) => r.product_id)
-            .filter(Boolean),
-        ),
-      );
-      if (allowedIds.length === 0) return [];
-
-      let q = supabase
-        .from("products")
-        .select("id, display_number, code, display_name, unit_of_sale, mva_rate, status, is_for_sale, is_divisible")
-        .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
-        .eq("is_for_sale", true)
-        .neq("status", "discontinued")
-        .in("id", allowedIds)
-        .order("display_number", { ascending: false })
-        .limit(500);
+        .lte("valid_from", today)
+        .or(`valid_to.is.null,valid_to.gte.${today}`)
+        .eq("products.legal_entity_id", NB_LEGAL_ENTITY_ID)
+        .eq("products.is_for_sale", true)
+        .neq("products.status", "discontinued")
+        .limit(2000);
 
       if (search && search.trim().length > 0) {
         const s = search.trim().replace(/[%,]/g, " ");
-        q = q.or([`display_name.ilike.%${s}%`, `code.ilike.%${s}%`].join(","));
+        q = q.or(`display_name.ilike.%${s}%,code.ilike.%${s}%`, {
+          foreignTable: "products",
+        });
       }
+
       const { data, error } = await q;
       if (error) throw error;
-      return (data ?? []) as ProductOption[];
+      const seen = new Set<string>();
+      const out: ProductOption[] = [];
+      for (const row of (data ?? []) as any[]) {
+        const p = row.products;
+        if (!p || seen.has(p.id)) continue;
+        seen.add(p.id);
+        out.push({
+          id: p.id,
+          display_number: Number(p.display_number),
+          code: p.code,
+          display_name: p.display_name,
+          unit_of_sale: p.unit_of_sale,
+          mva_rate: Number(p.mva_rate ?? 0),
+          status: p.status,
+          is_for_sale: p.is_for_sale,
+          is_divisible: p.is_divisible,
+        });
+      }
+      out.sort((a, b) => b.display_number - a.display_number);
+      return out.slice(0, 500);
     },
     staleTime: 30_000,
   });
