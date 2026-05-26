@@ -356,7 +356,7 @@ export default function NewOrder() {
       if (!storeFromAi) {
         const lines: string[] = [];
         if (of.delivery_time) lines.push(`Hentetid: ${of.delivery_time}`);
-        const customerName = ai?.customer_match?.customer_name ?? t.sender_name ?? null;
+        const customerName = ai?.customer_match?.customer_name ?? senderName ?? null;
         if (customerName) lines.push(`Kunde: ${customerName}`);
         if (of.contact_phone) lines.push(`Telefon: ${of.contact_phone}`);
         if (of.pickup_location_hint) lines.push(`Hentested: ${of.pickup_location_hint}`);
