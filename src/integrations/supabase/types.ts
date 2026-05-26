@@ -7501,6 +7501,63 @@ export type Database = {
           },
         ]
       }
+      ticket_events: {
+        Row: {
+          actor_label: string | null
+          actor_type: string
+          actor_user_id: string | null
+          created_at: string
+          event_type: string
+          id: string
+          occurred_at: string
+          order_id: string | null
+          payload: Json
+          summary: string | null
+          ticket_id: string | null
+        }
+        Insert: {
+          actor_label?: string | null
+          actor_type?: string
+          actor_user_id?: string | null
+          created_at?: string
+          event_type: string
+          id?: string
+          occurred_at?: string
+          order_id?: string | null
+          payload?: Json
+          summary?: string | null
+          ticket_id?: string | null
+        }
+        Update: {
+          actor_label?: string | null
+          actor_type?: string
+          actor_user_id?: string | null
+          created_at?: string
+          event_type?: string
+          id?: string
+          occurred_at?: string
+          order_id?: string | null
+          payload?: Json
+          summary?: string | null
+          ticket_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_events_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ticket_events_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ticket_replies: {
         Row: {
           body_rendered: string | null
