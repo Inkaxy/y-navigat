@@ -129,14 +129,16 @@ function CustomerCombobox({
 function ProductCombobox({
   onSelect,
   autoFocus,
+  priceListId,
 }: {
   onSelect: (p: ProductOption) => void;
   autoFocus?: boolean;
+  priceListId: string | null;
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const debouncedQ = useDebouncedValue(q, 250);
-  const { data: products, isLoading } = useNBProducts(debouncedQ);
+  const { data: products, isLoading } = useNBProducts(debouncedQ, priceListId);
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     // Shortcut 6.4: Enter i produktsøk velger første treff
@@ -170,8 +172,12 @@ function ProductCombobox({
             <div className="p-4 text-center text-sm text-muted-foreground">
               <Loader2 className="mx-auto h-4 w-4 animate-spin" />
             </div>
+          ) : !priceListId ? (
+            <div className="p-4 text-center text-sm text-muted-foreground">
+              Kunden har ingen prisliste. Sett standard prisliste på kunden for å kunne velge varer.
+            </div>
           ) : !products || products.length === 0 ? (
-            <div className="p-4 text-center text-sm text-muted-foreground">Ingen treff</div>
+            <div className="p-4 text-center text-sm text-muted-foreground">Ingen varer i kundens prisliste{q ? " matcher søket" : ""}.</div>
           ) : (
             products.map((p, idx) => (
               <button
