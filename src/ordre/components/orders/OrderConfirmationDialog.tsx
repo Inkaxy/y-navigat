@@ -199,12 +199,23 @@ export function OrderConfirmationDialog({ open, onOpenChange, orderId, ticketId,
           </div>
         </div>
 
+        {draft && (
+          <div className="pt-2">
+            <QaChecklistCard
+              title="Kvalitetssikring før sending"
+              description="Grønn: OK. Gul: bør sjekkes. Rød: må løses før sending."
+              checks={qaChecks}
+              compact
+            />
+          </div>
+        )}
+
         <DialogFooter className="border-t pt-3">
           <p className="text-xs text-muted-foreground mr-auto">
             Strukturerte ordredata er hentet rett fra ordren. AI brukes kun til innledning/språk.
           </p>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={sending}>Avbryt</Button>
-          <Button onClick={send} disabled={sending || loading || !recipient || !subject || !bodyHtml}>
+          <Button onClick={send} disabled={sending || loading || !recipient || !subject || !bodyHtml || qaSummary.severity === "red"}>
             {sending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Send className="h-4 w-4 mr-1.5" />}
             Send bekreftelse
           </Button>
