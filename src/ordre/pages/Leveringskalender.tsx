@@ -189,6 +189,7 @@ export default function MatrixPage() {
   const [pauseOpen, setPauseOpen] = useState(false);
   const [correctionsOpen, setCorrectionsOpen] = useState(false);
   const [flatView, setFlatView] = useState(false);
+  const [flatDayFilter, setFlatDayFilter] = useState<string | null>(null);
   const [showAllProducts, setShowAllProducts] = useState(false);
   const [recurringDialogOpen, setRecurringDialogOpen] = useState(false);
 
