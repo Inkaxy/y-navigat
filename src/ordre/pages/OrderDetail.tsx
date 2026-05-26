@@ -439,6 +439,12 @@ export default function OrderDetail() {
         {/* Hovedinnhold — uten tabs */}
         <OrderDetailsTab order={order} lines={lines} />
 
+        {/* Ticket-sporbarhet: original epost + tidslinje av kommunikasjon/AI/koblinger */}
+        <div className="grid gap-4 lg:grid-cols-2">
+          <OriginalEmailCard orderId={order.id} />
+          <TimelineCard orderId={order.id} title="Ticket-historikk" />
+        </div>
+
         {actions.length === 0 && !releaseAction && (
           <Card className="p-3 text-center text-caption italic text-muted-foreground">
             Ingen videre statushandlinger fra «{getStatusMeta(status).label}».
