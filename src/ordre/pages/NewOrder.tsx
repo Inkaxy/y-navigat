@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Loader2, Plus, Trash2, AlertTriangle, Check, Search, Copy } from "lucide-react";
 import { AppBanner } from "@/ordre/components/shell/AppBanner";
@@ -129,14 +130,16 @@ function CustomerCombobox({
 function ProductCombobox({
   onSelect,
   autoFocus,
+  priceListId,
 }: {
   onSelect: (p: ProductOption) => void;
   autoFocus?: boolean;
+  priceListId: string | null;
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const debouncedQ = useDebouncedValue(q, 250);
-  const { data: products, isLoading } = useNBProducts(debouncedQ);
+  const { data: products, isLoading } = useNBProducts(debouncedQ, priceListId);
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     // Shortcut 6.4: Enter i produktsøk velger første treff
@@ -170,8 +173,12 @@ function ProductCombobox({
             <div className="p-4 text-center text-sm text-muted-foreground">
               <Loader2 className="mx-auto h-4 w-4 animate-spin" />
             </div>
+          ) : !priceListId ? (
+            <div className="p-4 text-center text-sm text-muted-foreground">
+              Kunden har ingen prisliste. Sett standard prisliste på kunden for å kunne velge varer.
+            </div>
           ) : !products || products.length === 0 ? (
-            <div className="p-4 text-center text-sm text-muted-foreground">Ingen treff</div>
+            <div className="p-4 text-center text-sm text-muted-foreground">Ingen varer i kundens prisliste{q ? " matcher søket" : ""}.</div>
           ) : (
             products.map((p, idx) => (
               <button
@@ -232,7 +239,7 @@ export default function NewOrder() {
     (async () => {
       const { data } = await supabase
         .from("customers")
-        .select("id, customer_number, display_name, organization_number, primary_contact_name, primary_contact_email, invoice_recipient_customer_id, delivery_address_line1, delivery_address_line2, delivery_postal_code, delivery_city, delivery_country, delivery_instructions, custom_reference, enforce_custom_reference")
+        .select("id, customer_number, display_name, organization_number, primary_contact_name, primary_contact_email, invoice_recipient_customer_id, delivery_address_line1, delivery_address_line2, delivery_postal_code, delivery_city, delivery_country, delivery_instructions, custom_reference, enforce_custom_reference, default_price_list_id")
         .eq("id", prefilledCustomerId)
         .maybeSingle();
       if (cancelled || !data) return;
@@ -252,7 +259,7 @@ export default function NewOrder() {
       if (!customer && !prefilledCustomerId) {
         const { data: c } = await supabase
           .from("customers")
-          .select("id, customer_number, display_name, organization_number, primary_contact_name, primary_contact_email, invoice_recipient_customer_id, delivery_address_line1, delivery_address_line2, delivery_postal_code, delivery_city, delivery_country, delivery_instructions, custom_reference, enforce_custom_reference")
+          .select("id, customer_number, display_name, organization_number, primary_contact_name, primary_contact_email, invoice_recipient_customer_id, delivery_address_line1, delivery_address_line2, delivery_postal_code, delivery_city, delivery_country, delivery_instructions, custom_reference, enforce_custom_reference, default_price_list_id")
           .ilike("primary_contact_email", t.sender_email)
           .maybeSingle();
         if (cancelled) return;
@@ -295,6 +302,20 @@ export default function NewOrder() {
 
   // 6.2 Dublett-sjekk
   const { data: duplicates = [] } = useDuplicateOrderCheck(customer?.id ?? null, deliveryDate);
+
+  // Hent effektiv prisliste for kunden (default eller via gruppe/profil)
+  const { data: effectivePriceListId = null } = useQuery({
+    queryKey: ["customer-effective-price-list", customer?.id ?? null],
+    enabled: !!customer?.id,
+    queryFn: async (): Promise<string | null> => {
+      const { data, error } = await supabase.rpc("customer_effective_price_list", {
+        _customer_id: customer!.id,
+      });
+      if (error) throw error;
+      return (data as string | null) ?? customer?.default_price_list_id ?? null;
+    },
+  });
+  const productPriceListId = effectivePriceListId ?? customer?.default_price_list_id ?? null;
 
   // A.5.5.6.2 — Ordrefrist-sjekk
   const productIdsForCheck = lines
@@ -888,7 +909,7 @@ export default function NewOrder() {
                               </Button>
                             </div>
                           ) : (
-                            <ProductCombobox onSelect={(p) => selectProductForLine(l.uid, p)} />
+                            <ProductCombobox onSelect={(p) => selectProductForLine(l.uid, p)} priceListId={productPriceListId} />
                           )}
                         </div>
                         <Input
