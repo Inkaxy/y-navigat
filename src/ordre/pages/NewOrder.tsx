@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Loader2, Plus, Trash2, AlertTriangle, Check, Search, Copy } from "lucide-react";
@@ -26,6 +26,9 @@ import { useDuplicateOrderCheck } from "@/ordre/hooks/useDuplicateOrderCheck";
 import { OrderDeadlineWarning } from "@/ordre/components/orders/OrderDeadlineWarning";
 import { useOrderDeadlineCheck } from "@/ordre/hooks/useOrderDeadlineCheck";
 import type { CopyableOrderLine } from "@/ordre/hooks/useRecentOrdersForCustomer";
+import { QaChecklistCard } from "@/ordre/components/orders/QaChecklistCard";
+import { evaluateOrderDraftChecks, summarizeQa } from "@/ordre/lib/qaChecks";
+import { normalizeAiSuggestion, type AiSuggestion } from "@/ordre/lib/aiSuggestion";
 
 type LineDraft = {
   uid: string;
@@ -232,6 +235,9 @@ export default function NewOrder() {
   const [customer, setCustomer] = useState<CustomerOption | null>(null);
   const [isReturn] = useState<boolean>(isReturnFromUrl);
   const [ticketBanner, setTicketBanner] = useState<string | null>(null);
+  const [ticketAi, setTicketAi] = useState<AiSuggestion | null>(null);
+  const [ticketBodyText, setTicketBodyText] = useState<string | null>(null);
+  const [qaOverride, setQaOverride] = useState(false);
 
   // Pre-velg kunde fra URL-param ved første render
   useEffect(() => {
@@ -256,9 +262,11 @@ export default function NewOrder() {
     (async () => {
       const { data: t } = await supabase
         .from("tickets")
-        .select("subject, sender_email, sender_name, ai_suggestion")
+        .select("subject, sender_email, sender_name, body_text, body_preview, ai_suggestion")
         .eq("id", ticketId).maybeSingle();
       if (cancelled || !t) return;
+      setTicketAi(normalizeAiSuggestion((t as any).ai_suggestion));
+      setTicketBodyText(((t as any).body_text ?? (t as any).body_preview ?? null) as string | null);
       const ai = (t as any).ai_suggestion as null | {
         customer_match?: { customer_id: string | null; customer_name?: string | null } | null;
         order_fields?: Record<string, string | null | undefined>;
@@ -681,6 +689,26 @@ export default function NewOrder() {
     { subtotal: 0, vat: 0, total: 0, discount: 0 },
   );
 
+  // QA-sjekkliste før ordre lagres
+  const qaChecks = useMemo(() => {
+    return evaluateOrderDraftChecks({
+      delivery_date: deliveryDate || null,
+      delivery_time: deliveryTime || null,
+      has_pickup_concept: !!ticketAi?.order_fields?.pickup_location_hint,
+      pickup_location_hint: ticketAi?.order_fields?.pickup_location_hint ?? null,
+      pickup_location_known: true,
+      lines: lines.map((l) => ({
+        product_id: l.product?.id ?? null,
+        product_name: l.product?.display_name ?? null,
+        quantity: Number(l.quantity) || 0,
+      })),
+      customer_id: customer?.id ?? null,
+      ai: ticketAi,
+      source_text: ticketBodyText,
+    });
+  }, [deliveryDate, deliveryTime, lines, customer?.id, ticketAi, ticketBodyText]);
+  const qaSummary = summarizeQa(qaChecks);
+
   async function save() {
     if (!customer) {
       toast.error("Velg en kunde");
@@ -700,6 +728,12 @@ export default function NewOrder() {
       toast.error(`Mengde for "${badQty.product?.display_name}" må være et helt tall`);
       return;
     }
+    // QA: blokkér på røde sjekker med mindre brukeren har bekreftet override
+    if (qaSummary.severity === "red" && !qaOverride) {
+      toast.error("Kvalitetssikring: røde punkter må løses (eller bekreft override)");
+      return;
+    }
+
 
     setSubmitting(true);
     try {
@@ -1258,17 +1292,35 @@ export default function NewOrder() {
           </CardContent>
         </Card>
 
+        {/* QA-sjekkliste før ordre lagres */}
+        <QaChecklistCard
+          title="Kvalitetssikring før lagring"
+          description="Grønn: OK. Gul: bør sjekkes. Rød: må løses før ordre lagres."
+          checks={qaChecks}
+        />
+
         {/* Knapper */}
         <div className="sticky bottom-0 -mx-4 flex flex-wrap items-center justify-end gap-2 border-t border-border bg-background/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6">
           <div className="mr-auto text-sm text-muted-foreground">
             {lines.filter((l) => l.product).length} linjer · {formatNOK(totals.total)}
           </div>
+          {qaSummary.severity === "red" && (
+            <label className="flex items-center gap-2 text-xs text-destructive">
+              <input
+                type="checkbox"
+                checked={qaOverride}
+                onChange={(e) => setQaOverride(e.target.checked)}
+                className="h-3.5 w-3.5"
+              />
+              Lagre likevel (overstyr røde varsler)
+            </label>
+          )}
           <Button variant="ghost" asChild>
             <Link to="/ordre/ordrer">Avbryt</Link>
           </Button>
           <Button
             onClick={() => save()}
-            disabled={submitting || !customer}
+            disabled={submitting || !customer || (qaSummary.severity === "red" && !qaOverride)}
             title="⌘Enter / Ctrl+Enter"
           >
             {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
