@@ -68,6 +68,7 @@ export const productSchema = z.object({
   shelf_life_frozen_days: intOrNull,
   label_mode: z.enum(LABEL_MODES),
   label_print_model: z.enum(LABEL_PRINT_MODELS),
+  label_profile_id: textOrNull,
 
   // Tab: Varedetaljer
   description_rich_md: textOrNull, // markdown-tekst, lagres som JSONB { format, text }
@@ -149,6 +150,7 @@ export function productToFormValues(p: any): ProductFormValues {
     shelf_life_frozen_days: p.shelf_life_frozen_days ?? null,
     label_mode: (p.label_mode ?? "none") as ProductFormValues["label_mode"],
     label_print_model: (p.label_print_model ?? "standard") as ProductFormValues["label_print_model"],
+    label_profile_id: p.label_profile_id ?? null,
 
     description_rich_md: mdText,
     image_url: p.image_url ?? null,
@@ -221,6 +223,7 @@ export const FIELD_TO_TAB: Record<keyof ProductFormValues, string> = {
   shelf_life_frozen_days: "produksjon",
   label_mode: "produksjon",
   label_print_model: "produksjon",
+  label_profile_id: "produksjon",
 
   description_rich_md: "varedetaljer",
   image_url: "varedetaljer",

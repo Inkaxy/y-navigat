@@ -28,6 +28,7 @@ import {
   LABEL_PRINT_MODEL_OPTIONS,
   LABEL_PRINT_MODEL_HELP,
 } from "@/varer/lib/constants";
+import { useLabelPrintProfiles } from "@/produksjon/features/utskriftsprofiler/hooks/useLabelPrintProfiles";
 import type { ProductFormValues } from "@/varer/lib/productSchema";
 import { CakeBuilderSection, type CakeStepLink } from "@/varer/components/products/detail/CakeBuilderSection";
 
@@ -45,6 +46,7 @@ interface DepartmentRow {
 interface Props {
   productId: string;
   canWrite: boolean;
+  legalEntityId: string | undefined;
   productionGroups: LookupRow[];
   productionDepartments: DepartmentRow[];
   selectedDepartmentIds: string[];
@@ -57,6 +59,7 @@ interface Props {
 export function ProduksjonTab({
   productId,
   canWrite,
+  legalEntityId,
   productionGroups,
   productionDepartments,
   selectedDepartmentIds,
@@ -68,6 +71,8 @@ export function ProduksjonTab({
   const { control, register, watch, setValue } = useFormContext<ProductFormValues>();
   const [confirmTurnOff, setConfirmTurnOff] = useState<{ pending: string } | null>(null);
   const labelMode = watch("label_mode");
+  const { data: printProfiles = [] } = useLabelPrintProfiles(legalEntityId);
+  const activeProfiles = printProfiles.filter((p) => (p as { status?: string }).status === "active");
 
   const departmentOptions = productionDepartments.map((d) => ({
     id: d.id,
@@ -244,6 +249,41 @@ export function ProduksjonTab({
               />
               <p className="text-xs text-muted-foreground mt-1">
                 {LABEL_PRINT_MODEL_HELP[watch("label_print_model")]}
+              </p>
+            </div>
+
+            <div className="md:col-span-2">
+              <Label>Utskriftsprofil</Label>
+              <Controller
+                control={control}
+                name="label_profile_id"
+                render={({ field }) => (
+                  <Select
+                    value={field.value ?? "__none__"}
+                    onValueChange={(v) => field.onChange(v === "__none__" ? null : v)}
+                    disabled={!canWrite || labelMode === "none"}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={
+                        labelMode === "none"
+                          ? "Sett etikett-modus først…"
+                          : activeProfiles.length === 0
+                          ? "Ingen profiler tilgjengelig"
+                          : "Velg utskriftsprofil…"
+                      } />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">Ingen valgt</SelectItem>
+                      {activeProfiles.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Bestemmer hvilken utskriftsprofil som brukes til å generere etiketten.
+                Profiler opprettes i Produksjon → Innstillinger → Utskriftsprofiler.
               </p>
             </div>
 
