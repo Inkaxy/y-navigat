@@ -753,6 +753,8 @@ export default function NewOrder() {
             const parts = [internalNotes?.trim(), breach].filter(Boolean);
             return parts.length > 0 ? parts.join("\n\n") : null;
           })(),
+          production_notes: productionNotes.trim() || null,
+          store_notes: storeNotes.trim() || null,
           customer_notes: customerNotes || null,
           customer_reference: (customer.enforce_custom_reference
             ? (customer.custom_reference?.trim() || null)
