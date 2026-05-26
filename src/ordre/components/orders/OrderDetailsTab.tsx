@@ -284,6 +284,31 @@ export function OrderDetailsTab({ order, lines }: { order: OrderDetail; lines: O
             </div>
           </div>
 
+          {(order.production_notes || order.store_notes) && (
+            <div className="grid gap-3 border-t border-border pt-3 sm:grid-cols-2">
+              {order.production_notes && (
+                <div>
+                  <div className="mb-1 text-xs font-medium uppercase tracking-wide text-amber-700 dark:text-amber-300">
+                    Produksjonsnotat
+                  </div>
+                  <div className="whitespace-pre-wrap rounded-md border border-amber-500/30 bg-amber-500/5 p-2 text-sm">
+                    {order.production_notes}
+                  </div>
+                </div>
+              )}
+              {order.store_notes && (
+                <div>
+                  <div className="mb-1 text-xs font-medium uppercase tracking-wide text-sky-700 dark:text-sky-300">
+                    Butikknotat
+                  </div>
+                  <div className="whitespace-pre-wrap rounded-md border border-sky-500/30 bg-sky-500/5 p-2 text-sm">
+                    {order.store_notes}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {(order.internal_notes || order.customer_notes) && (
             <div className="grid gap-3 border-t border-border pt-3 sm:grid-cols-2">
               {order.internal_notes && (
