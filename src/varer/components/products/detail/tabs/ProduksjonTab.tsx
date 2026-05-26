@@ -28,6 +28,7 @@ import {
   LABEL_PRINT_MODEL_OPTIONS,
   LABEL_PRINT_MODEL_HELP,
 } from "@/varer/lib/constants";
+import { useLabelPrintProfiles } from "@/produksjon/features/utskriftsprofiler/hooks/useLabelPrintProfiles";
 import type { ProductFormValues } from "@/varer/lib/productSchema";
 import { CakeBuilderSection, type CakeStepLink } from "@/varer/components/products/detail/CakeBuilderSection";
 
@@ -45,6 +46,7 @@ interface DepartmentRow {
 interface Props {
   productId: string;
   canWrite: boolean;
+  legalEntityId: string | undefined;
   productionGroups: LookupRow[];
   productionDepartments: DepartmentRow[];
   selectedDepartmentIds: string[];
@@ -57,6 +59,7 @@ interface Props {
 export function ProduksjonTab({
   productId,
   canWrite,
+  legalEntityId,
   productionGroups,
   productionDepartments,
   selectedDepartmentIds,
@@ -68,6 +71,8 @@ export function ProduksjonTab({
   const { control, register, watch, setValue } = useFormContext<ProductFormValues>();
   const [confirmTurnOff, setConfirmTurnOff] = useState<{ pending: string } | null>(null);
   const labelMode = watch("label_mode");
+  const { data: printProfiles = [] } = useLabelPrintProfiles(legalEntityId);
+  const activeProfiles = printProfiles.filter((p) => (p as { status?: string }).status === "active");
 
   const departmentOptions = productionDepartments.map((d) => ({
     id: d.id,
