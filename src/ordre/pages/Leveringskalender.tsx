@@ -1377,7 +1377,14 @@ export default function MatrixPage() {
             </div>
           </div>
         ) : flatView && matrix ? (
-          <FlatLinesView rows={flatRows} products={allProducts} tours={matrix.tours} />
+          <FlatLinesView
+            rows={flatRows}
+            products={allProducts}
+            tours={matrix.tours}
+            onQuantityChange={(date, tour_id, product_id, value) =>
+              setCellValue(`${date}|${tour_id ?? ""}|${product_id}` as CellKey, value)
+            }
+          />
         ) : (
           <>
             <MatrixGrid

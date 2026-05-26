@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import type { MatrixProduct, MatrixTour } from "@/ordre/hooks/useMatrix";
 import { formatNOK } from "@/ordre/lib/format";
 
@@ -22,14 +23,51 @@ function formatHeaderDate(iso: string): { weekday: string; date: string } {
   return { weekday: WEEKDAYS[d.getDay()], date: `${dd}.${mm}.${yyyy}` };
 }
 
+function QtyInput({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange: (v: string) => void;
+}) {
+  const [local, setLocal] = useState<string>(String(value));
+  useEffect(() => {
+    setLocal((prev) => (Number(prev.replace(",", ".")) === value ? prev : String(value)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      value={local}
+      onChange={(e) => {
+        const raw = e.target.value;
+        const cleaned = raw.replace(",", ".");
+        if (cleaned !== "" && !/^\d*\.?\d*$/.test(cleaned)) return;
+        setLocal(raw);
+        onChange(cleaned);
+      }}
+      onFocus={(e) => e.currentTarget.select()}
+      className="w-16 rounded border border-input bg-background px-2 py-1 text-right text-base font-bold tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    />
+  );
+}
+
 export function FlatLinesView({
   rows,
   products,
   tours,
+  onQuantityChange,
 }: {
   rows: FlatLineRow[];
   products: MatrixProduct[];
   tours: MatrixTour[];
+  onQuantityChange?: (
+    delivery_date: string,
+    delivery_tour_id: string | null,
+    product_id: string,
+    value: string,
+  ) => void;
 }) {
   const productById = new Map(products.map((p) => [p.id, p]));
   const tourById = new Map(tours.map((t) => [t.id, t]));
@@ -44,7 +82,6 @@ export function FlatLinesView({
     return pa - pb;
   });
 
-  // Grupper etter dato + tur
   const groups = new Map<string, { date: string; tourId: string | null; rows: FlatLineRow[] }>();
   for (const r of sorted) {
     const k = `${r.delivery_date}|${r.delivery_tour_id ?? ""}`;
@@ -110,8 +147,22 @@ export function FlatLinesView({
                             </span>
                           )}
                         </td>
-                        <td className="w-[80px] px-3 py-2 text-right text-base font-bold tabular-nums">
-                          {c.quantity}
+                        <td className="w-[96px] px-3 py-2 text-right">
+                          {onQuantityChange ? (
+                            <QtyInput
+                              value={c.quantity}
+                              onChange={(v) =>
+                                onQuantityChange(
+                                  c.delivery_date,
+                                  c.delivery_tour_id,
+                                  c.product_id,
+                                  v,
+                                )
+                              }
+                            />
+                          ) : (
+                            <span className="text-base font-bold tabular-nums">{c.quantity}</span>
+                          )}
                         </td>
                         <td className="w-[60px] px-2 py-2 text-muted-foreground">{unit}</td>
                         <td className="w-[120px] px-3 py-2 text-right tabular-nums text-muted-foreground">
