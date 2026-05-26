@@ -1292,17 +1292,35 @@ export default function NewOrder() {
           </CardContent>
         </Card>
 
+        {/* QA-sjekkliste før ordre lagres */}
+        <QaChecklistCard
+          title="Kvalitetssikring før lagring"
+          description="Grønn: OK. Gul: bør sjekkes. Rød: må løses før ordre lagres."
+          checks={qaChecks}
+        />
+
         {/* Knapper */}
         <div className="sticky bottom-0 -mx-4 flex flex-wrap items-center justify-end gap-2 border-t border-border bg-background/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6">
           <div className="mr-auto text-sm text-muted-foreground">
             {lines.filter((l) => l.product).length} linjer · {formatNOK(totals.total)}
           </div>
+          {qaSummary.severity === "red" && (
+            <label className="flex items-center gap-2 text-xs text-destructive">
+              <input
+                type="checkbox"
+                checked={qaOverride}
+                onChange={(e) => setQaOverride(e.target.checked)}
+                className="h-3.5 w-3.5"
+              />
+              Lagre likevel (overstyr røde varsler)
+            </label>
+          )}
           <Button variant="ghost" asChild>
             <Link to="/ordre/ordrer">Avbryt</Link>
           </Button>
           <Button
             onClick={() => save()}
-            disabled={submitting || !customer}
+            disabled={submitting || !customer || (qaSummary.severity === "red" && !qaOverride)}
             title="⌘Enter / Ctrl+Enter"
           >
             {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
