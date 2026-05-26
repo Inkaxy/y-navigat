@@ -55,6 +55,7 @@ const SuggestionSchema = z.object({
     customer_notes: z.string().nullable().optional(),
     internal_notes: z.string().nullable().optional(),
     production_notes: z.string().nullable().optional(),
+    store_notes: z.string().nullable().optional(),
     cake_text: z.string().nullable().optional(),
     allergies: z.string().nullable().optional(),
     special_requests: z.string().nullable().optional(),
