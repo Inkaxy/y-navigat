@@ -3,7 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import DOMPurify from "dompurify";
 import { format, formatDistanceToNow } from "date-fns";
 import { nb } from "date-fns/locale";
-import { ArrowLeft, Download, Loader2, Mail, Paperclip, Send, Reply, AlertCircle } from "lucide-react";
+import { ArrowLeft, Loader2, Mail, Send, Reply, AlertCircle } from "lucide-react";
 import { AppBanner } from "@/ordre/components/shell/AppBanner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
