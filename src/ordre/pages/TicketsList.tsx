@@ -228,6 +228,7 @@ export default function TicketsList() {
           case "complaints": if (requestType !== "complaint") return false; break;
           case "pickup_today": if (pickupDate !== today) return false; break;
           case "pickup_tomorrow": if (pickupDate !== tomorrow) return false; break;
+          case "awaiting_internal": if (!t.awaiting_internal) return false; break;
         }
       }
       if (outletFilter !== "all") {
