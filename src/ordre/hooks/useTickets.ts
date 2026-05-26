@@ -32,6 +32,8 @@ export interface Ticket {
   updated_at: string;
 }
 
+export type AttachmentKind = "inspiration" | "logo" | "document" | "other" | "unclassified";
+
 export interface TicketAttachment {
   id: string;
   ticket_id: string;
@@ -40,6 +42,12 @@ export interface TicketAttachment {
   size_bytes: number | null;
   storage_path: string | null;
   is_inline: boolean;
+  kind: AttachmentKind;
+  attached_to_order_id: string | null;
+  ai_summary: string | null;
+  ai_summarized_at: string | null;
+  attached_by: string | null;
+  attached_at: string | null;
 }
 
 export interface TicketsFilter {
