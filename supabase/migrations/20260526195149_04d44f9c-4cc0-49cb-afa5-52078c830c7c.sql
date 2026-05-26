@@ -1,0 +1,2 @@
+ALTER TABLE public.products DROP CONSTRAINT IF EXISTS products_label_mode_check;
+ALTER TABLE public.products ADD CONSTRAINT products_label_mode_check CHECK (label_mode = ANY (ARRAY['none'::text, 'per_unit'::text, 'per_order'::text, 'per_order_or_note'::text, 'per_note'::text]));
