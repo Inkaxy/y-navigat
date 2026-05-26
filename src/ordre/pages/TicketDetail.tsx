@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import DOMPurify from "dompurify";
 import { format, formatDistanceToNow } from "date-fns";
 import { nb } from "date-fns/locale";
-import { ArrowLeft, Download, Loader2, Mail, Paperclip, PlusCircle, Send, Reply, AlertCircle } from "lucide-react";
+import { ArrowLeft, Download, Loader2, Mail, Paperclip, Send, Reply, AlertCircle } from "lucide-react";
 import { AppBanner } from "@/ordre/components/shell/AppBanner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -157,11 +157,11 @@ export default function TicketDetail() {
           </Button>
         }
       />
-      <div className="container mx-auto max-w-5xl p-4 space-y-4">
-        {/* Sanntids-presence: hvem andre er inne nå */}
+      <div className="container mx-auto max-w-7xl p-4 space-y-4">
+        {/* Sanntids-presence */}
         <TicketPresenceBanner ticketId={ticket.id} />
 
-        {/* Handlings-rad */}
+        {/* Handlings-rad: status / prioritet / tildelt */}
         <Card>
           <CardContent className="pt-4 flex flex-wrap items-end gap-3">
             <div className="space-y-1">
@@ -195,190 +195,195 @@ export default function TicketDetail() {
                 </p>
               )}
             </div>
-            <div className="ml-auto flex gap-2">
-              {ticket.related_order_id ? (
-                <Button asChild variant="outline">
+            {ticket.related_order_id && (
+              <div className="ml-auto">
+                <Button asChild variant="outline" size="sm">
                   <Link to={`/ordre/ordrer/${ticket.related_order_id}`}>Vis tilknyttet ordre</Link>
                 </Button>
-              ) : (
-                <Button onClick={() => navigate(`/ordre/ordrer/ny?ticket_id=${ticket.id}`)}>
-                  <PlusCircle className="mr-2 h-4 w-4" /> Opprett ordre fra ticket
-                </Button>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* AI-analyse */}
-        <AiSuggestionCard
-          ticketId={ticket.id}
-          ticketStatus={ticket.status}
-          hasOrder={!!ticket.related_order_id}
-          analyzedAt={(ticket as any).ai_analyzed_at ?? null}
-          suggestion={(ticket as any).ai_suggestion ?? null}
-          provider={(ticket as any).ai_provider ?? null}
-          model={(ticket as any).ai_model ?? null}
-          costUsd={(ticket as any).ai_cost_usd ?? null}
-          error={(ticket as any).ai_error ?? null}
-          confidence={(ticket as any).ai_confidence_score ?? null}
-        />
-
-        {/* E-post-tråd */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Mail className="h-4 w-4" />
-              {ticket.subject ?? "(uten emne)"}
-            </CardTitle>
-            <div className="text-xs text-muted-foreground space-y-0.5">
-              <div><strong>Fra:</strong> {ticket.sender_name ? `${ticket.sender_name} <${ticket.sender_email}>` : ticket.sender_email}</div>
-              <div><strong>Mottatt:</strong> {format(new Date(ticket.received_at), "d. MMM yyyy HH:mm", { locale: nb })} ({formatDistanceToNow(new Date(ticket.received_at), { locale: nb, addSuffix: true })})</div>
-              {Array.isArray(ticket.to_recipients) && ticket.to_recipients.length > 0 && (
-                <div><strong>Til:</strong> {(ticket.to_recipients as Array<{ emailAddress?: { address?: string } }>).map((r) => r?.emailAddress?.address).filter(Boolean).join(", ")}</div>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent>
-            {sanitizedHtml ? (
-              <div className="prose prose-sm max-w-none dark:prose-invert" dangerouslySetInnerHTML={{ __html: sanitizedHtml }} />
-            ) : (
-              <pre className="whitespace-pre-wrap text-sm font-sans">{ticket.body_text ?? ticket.body_preview ?? "(tom)"}</pre>
+              </div>
             )}
           </CardContent>
         </Card>
 
-        {/* Vedlegg */}
-        {attachments.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm flex items-center gap-2"><Paperclip className="h-4 w-4" /> Vedlegg ({attachments.length})</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ul className="space-y-2">
-                {attachments.map((a) => (
-                  <li key={a.id} className="flex items-center justify-between gap-3 text-sm border rounded-md p-2">
-                    <div className="min-w-0">
-                      <div className="truncate font-medium">{a.file_name}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {a.content_type ?? "ukjent type"}
-                        {a.size_bytes ? ` · ${(a.size_bytes / 1024).toFixed(0)} kB` : ""}
-                        {!a.storage_path && " · for stor (ikke lagret)"}
-                      </div>
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={!a.storage_path || downloadingId === a.id}
-                      onClick={() => onDownload(a.id)}
-                    >
-                      {downloadingId === a.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
-                    </Button>
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Tidligere svar (tråd) */}
-        {replies.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm flex items-center gap-2">
-                <Reply className="h-4 w-4" /> Sendte svar ({replies.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {replies.map((r) => (
-                <div key={r.id} className="border-l-2 border-primary/40 pl-3 space-y-1">
-                  <div className="text-xs text-muted-foreground flex items-center gap-2 flex-wrap">
-                    <span className="font-medium text-foreground">{r.sent_by_name ?? "Bruker"}</span>
-                    <span>·</span>
-                    <span>{formatDistanceToNow(new Date(r.sent_at ?? r.created_at), { locale: nb, addSuffix: true })}</span>
-                    {r.send_status !== "sent" && (
-                      <Badge variant={r.send_status === "failed" ? "destructive" : "secondary"} className="text-[10px]">
-                        {r.send_status === "failed" ? "Feilet" : "Pending"}
-                      </Badge>
-                    )}
-                  </div>
-                  <pre className="whitespace-pre-wrap text-sm font-sans">{r.body_text}</pre>
-                  {r.error_message && (
-                    <div className="text-xs text-destructive flex items-start gap-1">
-                      <AlertCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
-                      <span>{r.error_message}</span>
-                    </div>
+        {/* Split-view: kommunikasjon ⟷ AI-panel */}
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,28rem)] gap-4 items-start">
+          {/* Venstre: kundekommunikasjon */}
+          <div className="space-y-4 min-w-0">
+            {/* E-post-tråd */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Mail className="h-4 w-4" />
+                  {ticket.subject ?? "(uten emne)"}
+                </CardTitle>
+                <div className="text-xs text-muted-foreground space-y-0.5">
+                  <div><strong>Fra:</strong> {ticket.sender_name ? `${ticket.sender_name} <${ticket.sender_email}>` : ticket.sender_email}</div>
+                  <div><strong>Mottatt:</strong> {format(new Date(ticket.received_at), "d. MMM yyyy HH:mm", { locale: nb })} ({formatDistanceToNow(new Date(ticket.received_at), { locale: nb, addSuffix: true })})</div>
+                  {Array.isArray(ticket.to_recipients) && ticket.to_recipients.length > 0 && (
+                    <div><strong>Til:</strong> {(ticket.to_recipients as Array<{ emailAddress?: { address?: string } }>).map((r) => r?.emailAddress?.address).filter(Boolean).join(", ")}</div>
                   )}
                 </div>
-              ))}
-            </CardContent>
-          </Card>
-        )}
+              </CardHeader>
+              <CardContent>
+                {sanitizedHtml ? (
+                  <div className="prose prose-sm max-w-none dark:prose-invert" dangerouslySetInnerHTML={{ __html: sanitizedHtml }} />
+                ) : (
+                  <pre className="whitespace-pre-wrap text-sm font-sans">{ticket.body_text ?? ticket.body_preview ?? "(tom)"}</pre>
+                )}
+              </CardContent>
+            </Card>
 
-        {/* Svar-felt */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm flex items-center gap-2">
-              <Reply className="h-4 w-4" />
-              Svar til {ticket.sender_name ?? ticket.sender_email}{" "}
-              <span className="text-xs font-normal text-muted-foreground">&lt;{ticket.sender_email}&gt;</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <Textarea
-              value={replyDraft}
-              onChange={(e) => setReplyDraft(e.target.value)}
-              rows={8}
-              placeholder="Skriv svar …"
-              disabled={sendReply.isPending}
-            />
-            <AlertDialog open={confirmReplyOpen} onOpenChange={setConfirmReplyOpen}>
-              <AlertDialogTrigger asChild>
-                <Button size="sm" disabled={!replyDraft.trim() || sendReply.isPending}>
-                  {sendReply.isPending ? (
-                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sender …</>
-                  ) : (
-                    <><Send className="mr-2 h-4 w-4" /> Send svar</>
-                  )}
+            {/* Vedlegg */}
+            {attachments.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm flex items-center gap-2"><Paperclip className="h-4 w-4" /> Vedlegg ({attachments.length})</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-2">
+                    {attachments.map((a) => (
+                      <li key={a.id} className="flex items-center justify-between gap-3 text-sm border rounded-md p-2">
+                        <div className="min-w-0">
+                          <div className="truncate font-medium">{a.file_name}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {a.content_type ?? "ukjent type"}
+                            {a.size_bytes ? ` · ${(a.size_bytes / 1024).toFixed(0)} kB` : ""}
+                            {!a.storage_path && " · for stor (ikke lagret)"}
+                          </div>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={!a.storage_path || downloadingId === a.id}
+                          onClick={() => onDownload(a.id)}
+                        >
+                          {downloadingId === a.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Tidligere svar */}
+            {replies.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <Reply className="h-4 w-4" /> Sendte svar ({replies.length})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {replies.map((r) => (
+                    <div key={r.id} className="border-l-2 border-primary/40 pl-3 space-y-1">
+                      <div className="text-xs text-muted-foreground flex items-center gap-2 flex-wrap">
+                        <span className="font-medium text-foreground">{r.sent_by_name ?? "Bruker"}</span>
+                        <span>·</span>
+                        <span>{formatDistanceToNow(new Date(r.sent_at ?? r.created_at), { locale: nb, addSuffix: true })}</span>
+                        {r.send_status !== "sent" && (
+                          <Badge variant={r.send_status === "failed" ? "destructive" : "secondary"} className="text-[10px]">
+                            {r.send_status === "failed" ? "Feilet" : "Pending"}
+                          </Badge>
+                        )}
+                      </div>
+                      <pre className="whitespace-pre-wrap text-sm font-sans">{r.body_text}</pre>
+                      {r.error_message && (
+                        <div className="text-xs text-destructive flex items-start gap-1">
+                          <AlertCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                          <span>{r.error_message}</span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Svar-felt */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Reply className="h-4 w-4" />
+                  Svar til {ticket.sender_name ?? ticket.sender_email}{" "}
+                  <span className="text-xs font-normal text-muted-foreground">&lt;{ticket.sender_email}&gt;</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <Textarea
+                  value={replyDraft}
+                  onChange={(e) => setReplyDraft(e.target.value)}
+                  rows={8}
+                  placeholder="Skriv svar …"
+                  disabled={sendReply.isPending}
+                />
+                <AlertDialog open={confirmReplyOpen} onOpenChange={setConfirmReplyOpen}>
+                  <AlertDialogTrigger asChild>
+                    <Button size="sm" disabled={!replyDraft.trim() || sendReply.isPending}>
+                      {sendReply.isPending ? (
+                        <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sender …</>
+                      ) : (
+                        <><Send className="mr-2 h-4 w-4" /> Send svar</>
+                      )}
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Send svar?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Svaret sendes til <strong>{ticket.sender_email}</strong> via {ticket.source_mailbox} og
+                        legges i samme e-post-tråd.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Avbryt</AlertDialogCancel>
+                      <AlertDialogAction onClick={(e) => { e.preventDefault(); doSendReply(); }}>
+                        Send
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </CardContent>
+            </Card>
+
+            {/* Internt notat */}
+            <Card>
+              <CardHeader><CardTitle className="text-sm">Internt notat</CardTitle></CardHeader>
+              <CardContent className="space-y-2">
+                <Textarea
+                  value={notesDraft}
+                  onChange={(e) => setNotesDraft(e.target.value)}
+                  rows={4}
+                  placeholder="Notater for ordrekontoret …"
+                />
+                <Button
+                  size="sm"
+                  onClick={saveNotes}
+                  disabled={update.isPending || notesDraft === (ticket.internal_notes ?? "")}
+                >
+                  Lagre notat
                 </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Send svar?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Svaret sendes til <strong>{ticket.sender_email}</strong> via {ticket.source_mailbox} og
-                    legges i samme e-post-tråd.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Avbryt</AlertDialogCancel>
-                  <AlertDialogAction onClick={(e) => { e.preventDefault(); doSendReply(); }}>
-                    Send
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
+          </div>
 
-        {/* Internt notat */}
-        <Card>
-          <CardHeader><CardTitle className="text-sm">Internt notat</CardTitle></CardHeader>
-          <CardContent className="space-y-2">
-            <Textarea
-              value={notesDraft}
-              onChange={(e) => setNotesDraft(e.target.value)}
-              rows={4}
-              placeholder="Notater for ordrekontoret …"
+          {/* Høyre: AI-panel */}
+          <div className="min-w-0">
+            <AiSuggestionCard
+              ticketId={ticket.id}
+              ticketStatus={ticket.status}
+              hasOrder={!!ticket.related_order_id}
+              relatedOrderId={ticket.related_order_id}
+              analyzedAt={(ticket as any).ai_analyzed_at ?? null}
+              suggestion={(ticket as any).ai_suggestion ?? null}
+              provider={(ticket as any).ai_provider ?? null}
+              model={(ticket as any).ai_model ?? null}
+              costUsd={(ticket as any).ai_cost_usd ?? null}
+              error={(ticket as any).ai_error ?? null}
+              confidence={(ticket as any).ai_confidence_score ?? null}
             />
-            <Button
-              size="sm"
-              onClick={saveNotes}
-              disabled={update.isPending || notesDraft === (ticket.internal_notes ?? "")}
-            >
-              Lagre notat
-            </Button>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
     </>
   );
