@@ -689,6 +689,26 @@ export default function NewOrder() {
     { subtotal: 0, vat: 0, total: 0, discount: 0 },
   );
 
+  // QA-sjekkliste før ordre lagres
+  const qaChecks = useMemo(() => {
+    return evaluateOrderDraftChecks({
+      delivery_date: deliveryDate || null,
+      delivery_time: deliveryTime || null,
+      has_pickup_concept: !!ticketAi?.order_fields?.pickup_location_hint,
+      pickup_location_hint: ticketAi?.order_fields?.pickup_location_hint ?? null,
+      pickup_location_known: true,
+      lines: lines.map((l) => ({
+        product_id: l.product?.id ?? null,
+        product_name: l.product?.display_name ?? null,
+        quantity: Number(l.quantity) || 0,
+      })),
+      customer_id: customer?.id ?? null,
+      ai: ticketAi,
+      source_text: ticketBodyText,
+    });
+  }, [deliveryDate, deliveryTime, lines, customer?.id, ticketAi, ticketBodyText]);
+  const qaSummary = summarizeQa(qaChecks);
+
   async function save() {
     if (!customer) {
       toast.error("Velg en kunde");
