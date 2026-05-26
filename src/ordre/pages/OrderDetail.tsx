@@ -47,6 +47,8 @@ import {
 import { DeleteOrderDialog } from "@/ordre/components/orders/DeleteOrderDialog";
 import { OrderTimeline } from "@/ordre/components/orders/OrderTimeline";
 import { OrderDetailsTab } from "@/ordre/components/orders/OrderDetailsTab";
+import { OriginalEmailCard } from "@/ordre/components/orders/OriginalEmailCard";
+import { TimelineCard } from "@/ordre/components/orders/TimelineCard";
 import {
   canCancel,
   canDelete,
@@ -436,6 +438,12 @@ export default function OrderDetail() {
 
         {/* Hovedinnhold — uten tabs */}
         <OrderDetailsTab order={order} lines={lines} />
+
+        {/* Ticket-sporbarhet: original epost + tidslinje av kommunikasjon/AI/koblinger */}
+        <div className="grid gap-4 lg:grid-cols-2">
+          <OriginalEmailCard orderId={order.id} />
+          <TimelineCard orderId={order.id} title="Ticket-historikk" />
+        </div>
 
         {actions.length === 0 && !releaseAction && (
           <Card className="p-3 text-center text-caption italic text-muted-foreground">

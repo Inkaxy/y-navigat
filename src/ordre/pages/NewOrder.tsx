@@ -18,6 +18,7 @@ import { useNBCustomers, type CustomerOption } from "@/ordre/hooks/useNBCustomer
 import { useNBProducts, fetchEffectivePrice, categorizePriceSource, type ProductOption } from "@/ordre/hooks/useNBProducts";
 import { useDebouncedValue } from "@/ordre/hooks/useDebouncedValue";
 import { logAudit } from "@/ordre/lib/audit";
+import { logTicketEvent } from "@/ordre/lib/ticketEvents";
 import { TourPicker } from "@/ordre/components/orders/TourPicker";
 import { CopyFromPreviousOrderDialog } from "@/ordre/components/orders/CopyFromPreviousOrderDialog";
 import { DuplicateOrderWarning } from "@/ordre/components/orders/DuplicateOrderWarning";
@@ -768,6 +769,13 @@ export default function NewOrder() {
         await supabase.from("tickets")
           .update({ related_order_id: orderRow.id, status: "in_progress" })
           .eq("id", ticketId);
+        await logTicketEvent({
+          ticket_id: ticketId,
+          order_id: orderRow.id,
+          event_type: "order.created_from_ticket",
+          summary: `${numRow.order_number} · ${customer.display_name}`,
+          payload: { order_number: numRow.order_number, line_count: validLines.length },
+        });
       }
 
       toast.success(`Ordre ${numRow.order_number} opprettet`);

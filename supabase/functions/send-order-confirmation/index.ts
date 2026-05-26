@@ -138,6 +138,24 @@ Deno.serve(async (req) => {
       }).then(() => {}, () => {});
     }
 
+    // Tidslinje-hendelse
+    await admin.from("ticket_events").insert({
+      ticket_id: body.ticket_id ?? null,
+      order_id: body.order_id ?? null,
+      event_type: "confirmation.sent",
+      actor_type: "staff",
+      actor_user_id: userId,
+      actor_label: userRes?.user?.email ?? null,
+      summary: sendError
+        ? `Feilet til ${body.recipient_email}: ${sendError}`
+        : `${body.subject} → ${body.recipient_email}`,
+      payload: {
+        send_status: sendError ? "failed" : "sent",
+        confirmation_id: logRow?.id ?? null,
+        mailbox,
+      },
+    }).then(() => {}, () => {});
+
     if (sendError) return json({ error: sendError, confirmation_id: logRow?.id }, 502);
     return json({ success: true, confirmation_id: logRow?.id, sent_to: body.recipient_email, sent_from: mailbox });
   } catch (e) {

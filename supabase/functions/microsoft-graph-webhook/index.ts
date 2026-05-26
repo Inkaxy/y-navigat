@@ -142,6 +142,33 @@ async function processMessage(
     return;
   }
 
+  // Tidslinje-hendelse: ticket mottatt (eller kunde svarte hvis del av eksisterende tråd)
+  let isReply = false;
+  let parentTicketId: string | null = null;
+  if (msg.conversationId) {
+    const { data: prior } = await admin
+      .from("tickets")
+      .select("id, related_order_id")
+      .eq("conversation_id", msg.conversationId)
+      .neq("id", ticketRow.id)
+      .order("received_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    if (prior) { isReply = true; parentTicketId = prior.id; }
+  }
+  await admin.from("ticket_events").insert({
+    ticket_id: ticketRow.id,
+    order_id: null,
+    event_type: isReply ? "customer.replied" : "ticket.received",
+    actor_type: "customer",
+    actor_label: senderEmail,
+    summary: msg.subject ?? null,
+    payload: {
+      conversation_id: msg.conversationId ?? null,
+      parent_ticket_id: parentTicketId,
+    },
+  }).then(() => {}, () => {});
+
   // Process attachments
   if (msg.hasAttachments) {
     const attRes = await fetch(

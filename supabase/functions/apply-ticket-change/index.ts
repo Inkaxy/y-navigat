@@ -136,6 +136,43 @@ Deno.serve(async (req) => {
       source_app: "ordre",
     });
 
+    // Tidslinje-hendelser
+    const tEvents: Record<string, unknown>[] = [];
+    if (!ticket.related_order_id) {
+      tEvents.push({
+        ticket_id, order_id,
+        event_type: "ticket.linked_to_order",
+        actor_type: "staff",
+        actor_user_id: userId,
+        actor_label: userRes.user.email ?? null,
+        summary: order.order_number ?? null,
+        payload: {},
+      });
+    }
+    tEvents.push({
+      ticket_id, order_id,
+      event_type: action === "cancel_order" ? "order.cancelled" : "order.fields_changed",
+      actor_type: "staff",
+      actor_user_id: userId,
+      actor_label: userRes.user.email ?? null,
+      summary: action === "cancel_order"
+        ? (cancellation_reason ?? `Ordre ${order.order_number ?? ""} kansellert`)
+        : `Endret felt: ${Object.keys(after).join(", ")}`,
+      payload: { before, after, cancellation_reason: cancellation_reason ?? null },
+    });
+    if (mark_resolved) {
+      tEvents.push({
+        ticket_id, order_id,
+        event_type: "ticket.resolved",
+        actor_type: "staff",
+        actor_user_id: userId,
+        actor_label: userRes.user.email ?? null,
+        summary: "Lukket etter anvendt endring",
+        payload: {},
+      });
+    }
+    await admin.from("ticket_events").insert(tEvents);
+
     return new Response(JSON.stringify({ ok: true, order_id, applied: Object.keys(after) }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

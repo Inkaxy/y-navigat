@@ -458,6 +458,25 @@ Regler:
       } : null,
     });
 
+    // Tidslinje-hendelse
+    await admin.from("ticket_events").insert({
+      ticket_id,
+      order_id: ticket.related_order_id ?? null,
+      event_type: callStatus === "success" ? "ai.analysis_completed" : "ai.analysis_failed",
+      actor_type: "ai",
+      actor_user_id: userId ?? null,
+      actor_label: `${provider}/${model}`,
+      summary: callStatus === "success"
+        ? `${suggestion?.request_type ?? "?"} · konfidens ${Math.round((suggestion?.confidence_score ?? 0) * 100)}%`
+        : (callError ?? null),
+      payload: {
+        provider, model,
+        request_type: suggestion?.request_type ?? null,
+        cost_usd: costUsd,
+        duration_ms: durationMs,
+      },
+    });
+
     if (callStatus !== "success") {
       return jsonErr(callError ?? "AI-kall feilet", 502, { status: callStatus });
     }

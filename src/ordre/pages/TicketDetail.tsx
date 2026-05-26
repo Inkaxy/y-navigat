@@ -31,6 +31,8 @@ import { AiSuggestionCard } from "@/ordre/components/orders/AiSuggestionCard";
 import { RelatedOrdersCard } from "@/ordre/components/orders/RelatedOrdersCard";
 import { ChangeProposalCard } from "@/ordre/components/orders/ChangeProposalCard";
 import { AiReplyDraftCard } from "@/ordre/components/orders/AiReplyDraftCard";
+import { TimelineCard } from "@/ordre/components/orders/TimelineCard";
+import { logTicketEvent } from "@/ordre/lib/ticketEvents";
 import { normalizeAiSuggestion } from "@/ordre/lib/aiSuggestion";
 
 const UNASSIGNED = "__unassigned__";
@@ -106,8 +108,20 @@ export default function TicketDetail() {
   };
 
   const setStatus = (status: TicketStatus) => {
+    const prev = ticket.status;
     update.mutate({ id: ticket.id, patch: { status } as never }, {
-      onSuccess: () => toast({ title: "Status oppdatert" }),
+      onSuccess: () => {
+        toast({ title: "Status oppdatert" });
+        const isResolve = (status === "resolved" || status === "closed") && prev !== status;
+        const isReopen = (prev === "resolved" || prev === "closed") && (status === "new" || status === "in_progress");
+        void logTicketEvent({
+          ticket_id: ticket.id,
+          order_id: ticket.related_order_id ?? null,
+          event_type: isResolve ? "ticket.resolved" : isReopen ? "ticket.reopened" : "ticket.status_changed",
+          summary: `${prev} → ${status}`,
+          payload: { from: prev, to: status },
+        });
+      },
     });
   };
   const setPriority = (priority: TicketPriority) => {
@@ -118,14 +132,31 @@ export default function TicketDetail() {
 
   const saveNotes = () => {
     update.mutate({ id: ticket.id, patch: { internal_notes: notesDraft } as never }, {
-      onSuccess: () => toast({ title: "Notat lagret" }),
+      onSuccess: () => {
+        toast({ title: "Notat lagret" });
+        void logTicketEvent({
+          ticket_id: ticket.id,
+          order_id: ticket.related_order_id ?? null,
+          event_type: "note.added",
+          summary: notesDraft.slice(0, 160),
+        });
+      },
     });
   };
 
   const setAssignee = (val: string) => {
     const newId = val === UNASSIGNED ? null : val;
+    const assigneeLabel = newId ? assignees.find((a) => a.id === newId)?.display_name ?? newId : null;
     update.mutate({ id: ticket.id, patch: { assigned_to: newId } as never }, {
-      onSuccess: () => toast({ title: newId ? "Tildelt" : "Tildeling fjernet" }),
+      onSuccess: () => {
+        toast({ title: newId ? "Tildelt" : "Tildeling fjernet" });
+        void logTicketEvent({
+          ticket_id: ticket.id,
+          order_id: ticket.related_order_id ?? null,
+          event_type: newId ? "ticket.assigned" : "ticket.unassigned",
+          summary: assigneeLabel ?? null,
+        });
+      },
     });
   };
 
@@ -382,12 +413,29 @@ export default function TicketDetail() {
                 candidates.find((c) => c.order_id === targetOrderId)?.order_number ?? referenced?.order_number ?? null;
               const handleLink = (orderId: string) => {
                 update.mutate({ id: ticket.id, patch: { related_order_id: orderId } as never }, {
-                  onSuccess: () => toast({ title: "Ticket koblet til ordre" }),
+                  onSuccess: () => {
+                    toast({ title: "Ticket koblet til ordre" });
+                    const cand = candidates.find((c) => c.order_id === orderId);
+                    void logTicketEvent({
+                      ticket_id: ticket.id,
+                      order_id: orderId,
+                      event_type: "ticket.linked_to_order",
+                      summary: cand?.order_number ?? null,
+                    });
+                  },
                 });
               };
               const handleUnlink = () => {
+                const prevOrderId = ticket.related_order_id;
                 update.mutate({ id: ticket.id, patch: { related_order_id: null } as never }, {
-                  onSuccess: () => toast({ title: "Kobling fjernet" }),
+                  onSuccess: () => {
+                    toast({ title: "Kobling fjernet" });
+                    void logTicketEvent({
+                      ticket_id: ticket.id,
+                      order_id: prevOrderId,
+                      event_type: "ticket.unlinked_from_order",
+                    });
+                  },
                 });
               };
               return (
@@ -431,6 +479,11 @@ export default function TicketDetail() {
                       targetOrderNumber={targetOrderNumber}
                     />
                   )}
+                  <TimelineCard
+                    ticketId={ticket.id}
+                    orderId={ticket.related_order_id ?? null}
+                    title="Tidslinje"
+                  />
                 </>
               );
             })()}
