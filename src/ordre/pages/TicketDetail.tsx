@@ -32,6 +32,7 @@ import { RelatedOrdersCard } from "@/ordre/components/orders/RelatedOrdersCard";
 import { ChangeProposalCard } from "@/ordre/components/orders/ChangeProposalCard";
 import { AiReplyDraftCard } from "@/ordre/components/orders/AiReplyDraftCard";
 import { AttachmentsCard } from "@/ordre/components/orders/AttachmentsCard";
+import { RuleWarningsCard } from "@/ordre/components/orders/RuleWarningsCard";
 import { TimelineCard } from "@/ordre/components/orders/TimelineCard";
 import { logTicketEvent } from "@/ordre/lib/ticketEvents";
 import { normalizeAiSuggestion } from "@/ordre/lib/aiSuggestion";
@@ -417,6 +418,7 @@ export default function TicketDetail() {
                     error={(ticket as any).ai_error ?? null}
                     confidence={(ticket as any).ai_confidence_score ?? null}
                   />
+                  <RuleWarningsCard aiSuggestion={(ticket as any).ai_suggestion ?? null} />
                   <AiReplyDraftCard
                     ticketId={ticket.id}
                     hasOrder={!!ticket.related_order_id}

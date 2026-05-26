@@ -3774,6 +3774,50 @@ export type Database = {
           },
         ]
       }
+      outlet_opening_exceptions: {
+        Row: {
+          closed: boolean
+          created_at: string
+          created_by: string | null
+          date: string
+          id: string
+          note: string | null
+          outlet_id: string
+          periods: Json | null
+          updated_at: string
+        }
+        Insert: {
+          closed?: boolean
+          created_at?: string
+          created_by?: string | null
+          date: string
+          id?: string
+          note?: string | null
+          outlet_id: string
+          periods?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          closed?: boolean
+          created_at?: string
+          created_by?: string | null
+          date?: string
+          id?: string
+          note?: string | null
+          outlet_id?: string
+          periods?: Json | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "outlet_opening_exceptions_outlet_id_fkey"
+            columns: ["outlet_id"]
+            isOneToOne: false
+            referencedRelation: "outlets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       outlets: {
         Row: {
           address_line1: string | null
