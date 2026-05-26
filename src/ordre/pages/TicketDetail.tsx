@@ -30,6 +30,7 @@ import { TicketPresenceBanner } from "@/ordre/components/shell/TicketPresenceBan
 import { AiSuggestionCard } from "@/ordre/components/orders/AiSuggestionCard";
 import { RelatedOrdersCard } from "@/ordre/components/orders/RelatedOrdersCard";
 import { ChangeProposalCard } from "@/ordre/components/orders/ChangeProposalCard";
+import { AiReplyDraftCard } from "@/ordre/components/orders/AiReplyDraftCard";
 import { normalizeAiSuggestion } from "@/ordre/lib/aiSuggestion";
 
 const UNASSIGNED = "__unassigned__";
@@ -403,6 +404,12 @@ export default function TicketDetail() {
                     costUsd={(ticket as any).ai_cost_usd ?? null}
                     error={(ticket as any).ai_error ?? null}
                     confidence={(ticket as any).ai_confidence_score ?? null}
+                  />
+                  <AiReplyDraftCard
+                    ticketId={ticket.id}
+                    hasOrder={!!ticket.related_order_id}
+                    requestType={sugg?.request_type ?? null}
+                    onDraft={(text) => setReplyDraft(text)}
                   />
                   {(candidates.length > 0 || ticket.related_order_id) && (
                     <RelatedOrdersCard
