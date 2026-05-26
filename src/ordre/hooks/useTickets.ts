@@ -169,11 +169,57 @@ export function useUpdateTicket() {
   });
 }
 
-export async function getTicketAttachmentSignedUrl(attachmentId: string): Promise<string> {
+export async function getTicketAttachmentSignedUrl(
+  attachmentId: string,
+  opts: { inline?: boolean } = {},
+): Promise<string> {
   const { data, error } = await supabase.functions.invoke("ticket-attachment-signed-url", {
-    body: { attachment_id: attachmentId },
+    body: { attachment_id: attachmentId, inline: !!opts.inline },
   });
   if (error) throw error;
   if (!data?.signed_url) throw new Error("Ingen URL returnert");
   return data.signed_url as string;
 }
+
+export function useUpdateAttachment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      id,
+      patch,
+    }: {
+      id: string;
+      patch: Partial<Pick<TicketAttachment, "kind" | "attached_to_order_id">> & {
+        attached_by?: string | null;
+        attached_at?: string | null;
+      };
+    }) => {
+      const { error } = await supabase
+        .from("ticket_attachments")
+        .update(patch as never)
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["ticket"] });
+      qc.invalidateQueries({ queryKey: ["order-attachments"] });
+    },
+  });
+}
+
+export function useOrderAttachments(orderId: string | undefined) {
+  return useQuery({
+    enabled: !!orderId,
+    queryKey: ["order-attachments", orderId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("ticket_attachments")
+        .select("*")
+        .eq("attached_to_order_id", orderId!)
+        .order("created_at");
+      if (error) throw error;
+      return (data ?? []) as TicketAttachment[];
+    },
+  });
+}
+
