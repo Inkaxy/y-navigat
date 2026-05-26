@@ -18,6 +18,7 @@ import { useNBCustomers, type CustomerOption } from "@/ordre/hooks/useNBCustomer
 import { useNBProducts, fetchEffectivePrice, categorizePriceSource, type ProductOption } from "@/ordre/hooks/useNBProducts";
 import { useDebouncedValue } from "@/ordre/hooks/useDebouncedValue";
 import { logAudit } from "@/ordre/lib/audit";
+import { logTicketEvent } from "@/ordre/lib/ticketEvents";
 import { TourPicker } from "@/ordre/components/orders/TourPicker";
 import { CopyFromPreviousOrderDialog } from "@/ordre/components/orders/CopyFromPreviousOrderDialog";
 import { DuplicateOrderWarning } from "@/ordre/components/orders/DuplicateOrderWarning";
