@@ -412,6 +412,21 @@ Begge notatene skal være på norsk, vennlige men telegrafiske. IKKE gjenta hele
           json.field_confidence = json.field_confidence ?? {};
           json.reasoning_per_field = json.reasoning_per_field ?? {};
         }
+        // Tolerate products entries that are null/non-object or missing required fields
+        if (json && Array.isArray(json.products)) {
+          json.products = json.products
+            .filter((p: unknown) => p && typeof p === "object")
+            .map((p: any) => ({
+              product_id: typeof p.product_id === "string" ? p.product_id : null,
+              product_name: p.product_name ?? p.name ?? p.title ?? "",
+              quantity: p.quantity ?? p.qty ?? p.count ?? 1,
+              size_or_servings: p.size_or_servings ?? p.size ?? null,
+              flavor: p.flavor ?? null,
+              filling: p.filling ?? null,
+              decoration: p.decoration ?? null,
+              match_confidence: p.match_confidence ?? p.confidence ?? 0.5,
+            }));
+        }
         const result = SuggestionSchema.safeParse(json);
         if (!result.success) {
           callStatus = "error";
