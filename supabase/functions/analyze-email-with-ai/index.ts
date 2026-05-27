@@ -63,15 +63,15 @@ const SuggestionSchema = z.object({
     contact_email: z.string().nullable().optional(),
   }).default({}),
   products: z.array(z.object({
-    product_id: z.string().uuid().nullable(),
-    product_name: z.string(),
-    quantity: z.number(),
+    product_id: z.string().uuid().nullable().optional().default(null),
+    product_name: z.string().nullable().optional().default("").transform((v) => v ?? ""),
+    quantity: z.coerce.number().nullable().optional().default(1).transform((v) => (v == null || Number.isNaN(v) ? 1 : v)),
     size_or_servings: z.string().nullable().optional(),
     flavor: z.string().nullable().optional(),
     filling: z.string().nullable().optional(),
     decoration: z.string().nullable().optional(),
-    match_confidence: z.number().min(0).max(1),
-  })),
+    match_confidence: z.coerce.number().min(0).max(1).nullable().optional().default(0.5).transform((v) => (v == null || Number.isNaN(v) ? 0.5 : v)),
+  })).default([]),
   missing_info: z.array(z.object({
     code: z.string(),
     label: z.string(),
@@ -411,6 +411,21 @@ Begge notatene skal være på norsk, vennlige men telegrafiske. IKKE gjenta hele
           json.risks = json.risks ?? [];
           json.field_confidence = json.field_confidence ?? {};
           json.reasoning_per_field = json.reasoning_per_field ?? {};
+        }
+        // Tolerate products entries that are null/non-object or missing required fields
+        if (json && Array.isArray(json.products)) {
+          json.products = json.products
+            .filter((p: unknown) => p && typeof p === "object")
+            .map((p: any) => ({
+              product_id: typeof p.product_id === "string" ? p.product_id : null,
+              product_name: p.product_name ?? p.name ?? p.title ?? "",
+              quantity: p.quantity ?? p.qty ?? p.count ?? 1,
+              size_or_servings: p.size_or_servings ?? p.size ?? null,
+              flavor: p.flavor ?? null,
+              filling: p.filling ?? null,
+              decoration: p.decoration ?? null,
+              match_confidence: p.match_confidence ?? p.confidence ?? 0.5,
+            }));
         }
         const result = SuggestionSchema.safeParse(json);
         if (!result.success) {
