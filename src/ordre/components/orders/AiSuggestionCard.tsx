@@ -41,6 +41,14 @@ function confBadge(n: number | null | undefined) {
   return "bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/30";
 }
 
+function getErrorMessage(err: unknown) {
+  return err instanceof Error ? err.message : String(err);
+}
+
+function hasErrorPayload(data: unknown): data is { error: string } {
+  return typeof data === "object" && data !== null && "error" in data && typeof (data as { error?: unknown }).error === "string";
+}
+
 function ConfDot({ n }: { n: number | undefined | null }) {
   if (n == null) return null;
   const cls = n >= 0.8 ? "bg-emerald-500" : n >= 0.5 ? "bg-amber-500" : "bg-rose-500";
@@ -85,11 +93,11 @@ export function AiSuggestionCard(props: Props) {
         body: { ticket_id: ticketId, force },
       });
       if (e) throw e;
-      if ((data as any)?.error) throw new Error((data as any).error);
+      if (hasErrorPayload(data)) throw new Error(data.error);
       toast({ title: force ? "Re-analyse fullført" : "AI-analyse fullført" });
       await qc.invalidateQueries({ queryKey: ["ticket", ticketId] });
-    } catch (err: any) {
-      const msg = err?.message ?? String(err);
+    } catch (err: unknown) {
+      const msg = getErrorMessage(err);
       toast({ title: "AI-analyse feilet", description: msg, variant: "destructive" });
     } finally {
       setLoading(false);
