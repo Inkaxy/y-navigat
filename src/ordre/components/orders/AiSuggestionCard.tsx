@@ -41,6 +41,14 @@ function confBadge(n: number | null | undefined) {
   return "bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/30";
 }
 
+function getErrorMessage(err: unknown) {
+  return err instanceof Error ? err.message : String(err);
+}
+
+function hasErrorPayload(data: unknown): data is { error: string } {
+  return typeof data === "object" && data !== null && "error" in data && typeof (data as { error?: unknown }).error === "string";
+}
+
 function ConfDot({ n }: { n: number | undefined | null }) {
   if (n == null) return null;
   const cls = n >= 0.8 ? "bg-emerald-500" : n >= 0.5 ? "bg-amber-500" : "bg-rose-500";
@@ -85,11 +93,11 @@ export function AiSuggestionCard(props: Props) {
         body: { ticket_id: ticketId, force },
       });
       if (e) throw e;
-      if ((data as any)?.error) throw new Error((data as any).error);
+      if (hasErrorPayload(data)) throw new Error(data.error);
       toast({ title: force ? "Re-analyse fullført" : "AI-analyse fullført" });
       await qc.invalidateQueries({ queryKey: ["ticket", ticketId] });
-    } catch (err: any) {
-      const msg = err?.message ?? String(err);
+    } catch (err: unknown) {
+      const msg = getErrorMessage(err);
       toast({ title: "AI-analyse feilet", description: msg, variant: "destructive" });
     } finally {
       setLoading(false);
@@ -146,10 +154,24 @@ export function AiSuggestionCard(props: Props) {
         {error && (
           <div className="flex gap-2 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm">
             <AlertCircle className="h-4 w-4 mt-0.5 shrink-0 text-destructive" />
-            <div>
+            <div className="min-w-0 flex-1 space-y-2">
               <div className="font-medium">Forrige analyse feilet</div>
               <div className="text-xs mt-1 text-muted-foreground">{error}</div>
+              {canAnalyze && !loading && (
+                <Button size="sm" variant="outline" onClick={() => runAnalyze(true)}>
+                  <RefreshCw className="mr-2 h-4 w-4" /> Analyser på nytt
+                </Button>
+              )}
             </div>
+          </div>
+        )}
+
+        {analyzedAt && !suggestion && !error && !loading && canAnalyze && (
+          <div className="space-y-2 rounded-md border bg-muted/30 p-3 text-sm">
+            <p className="text-muted-foreground">Ingen analyse er lagret for denne ticketen.</p>
+            <Button size="sm" variant="outline" onClick={() => runAnalyze(true)}>
+              <RefreshCw className="mr-2 h-4 w-4" /> Analyser på nytt
+            </Button>
           </div>
         )}
 

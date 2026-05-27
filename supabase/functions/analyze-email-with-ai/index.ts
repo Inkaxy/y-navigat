@@ -167,7 +167,7 @@ Deno.serve(async (req) => {
     if (tErr) throw tErr;
     if (!ticket) return jsonErr("Ticket ikke funnet", 404);
 
-    if (ticket.ai_analyzed_at && !force) {
+    if (ticket.ai_analyzed_at && ticket.ai_suggestion && !ticket.ai_error && !force) {
       return new Response(JSON.stringify({
         ok: true, cached: true, analysis: ticket.ai_suggestion,
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
