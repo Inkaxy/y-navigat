@@ -146,10 +146,24 @@ export function AiSuggestionCard(props: Props) {
         {error && (
           <div className="flex gap-2 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm">
             <AlertCircle className="h-4 w-4 mt-0.5 shrink-0 text-destructive" />
-            <div>
+            <div className="min-w-0 flex-1 space-y-2">
               <div className="font-medium">Forrige analyse feilet</div>
               <div className="text-xs mt-1 text-muted-foreground">{error}</div>
+              {canAnalyze && !loading && (
+                <Button size="sm" variant="outline" onClick={() => runAnalyze(true)}>
+                  <RefreshCw className="mr-2 h-4 w-4" /> Analyser på nytt
+                </Button>
+              )}
             </div>
+          </div>
+        )}
+
+        {analyzedAt && !suggestion && !error && !loading && canAnalyze && (
+          <div className="space-y-2 rounded-md border bg-muted/30 p-3 text-sm">
+            <p className="text-muted-foreground">Ingen analyse er lagret for denne ticketen.</p>
+            <Button size="sm" variant="outline" onClick={() => runAnalyze(true)}>
+              <RefreshCw className="mr-2 h-4 w-4" /> Analyser på nytt
+            </Button>
           </div>
         )}
 
