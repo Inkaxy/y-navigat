@@ -320,6 +320,8 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
       product_mva_rate: l.product!.mva_rate ?? 15,
       quantity: Number(l.quantity),
       unit_price: Number(l.unit_price) || 0,
+      merknad: l.merknad && !isMerknadEmpty(l.merknad) ? l.merknad : null,
+
     }));
 
     return {
