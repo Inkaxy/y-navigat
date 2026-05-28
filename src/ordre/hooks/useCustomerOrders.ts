@@ -155,7 +155,7 @@ export function useCustomerOrderDetail(orderId: string | null) {
         }),
       };
 
-      };
+
     },
   });
 }
