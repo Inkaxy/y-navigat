@@ -89,7 +89,7 @@ export type CustomerOrderLineDraftLoaded = {
   merknad: Merknad | null;
 };
 
-};
+
 
 export type CustomerOrderDetail = CustomerOrderRow & {
   lines: CustomerOrderLineDraftLoaded[];
