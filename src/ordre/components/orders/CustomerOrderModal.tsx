@@ -698,7 +698,7 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
 
                 {/* Totals */}
                 {totals.count > 0 && (
-                  <div className="grid grid-cols-[1fr_88px_120px_120px_36px] items-center gap-2 border-t border-border px-2 pt-2 text-sm">
+                  <div className="grid grid-cols-[1fr_88px_120px_120px_36px_36px] items-center gap-2 border-t border-border px-2 pt-2 text-sm">
                     <span className="text-right font-medium text-muted-foreground">
                       Totalt
                     </span>
@@ -710,6 +710,8 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
                       {fmtKr(totals.sum)} kr
                     </span>
                     <span />
+                    <span />
+
                   </div>
                 )}
               </fieldset>
