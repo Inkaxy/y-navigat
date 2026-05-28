@@ -205,7 +205,9 @@ export type CustomerOrderLineInput = {
   product_mva_rate?: number | null;
   quantity: number;
   unit_price: number;
+  merknad?: Merknad | null;
 };
+
 
 export type CustomerOrderInput = {
   customerId: string;
