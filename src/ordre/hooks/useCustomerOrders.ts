@@ -320,7 +320,8 @@ export function useCreateCustomerOrder() {
 
           };
         });
-        const { error: linesErr } = await supabase.from("order_lines").insert(lineRows);
+        const { error: linesErr } = await supabase.from("order_lines").insert(lineRows as never);
+
         if (linesErr) throw linesErr;
       }
 
