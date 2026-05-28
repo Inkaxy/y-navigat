@@ -115,7 +115,7 @@ export function useCustomerOrderDetail(orderId: string | null) {
 
       const { data: lines, error: linesErr } = await supabase
         .from("order_lines")
-        .select("id, product_id, product_snapshot, quantity, unit_price, sales_unit, line_number")
+        .select("id, product_id, product_snapshot, quantity, unit_price, sales_unit, line_number, merknad")
         .eq("order_id", orderId!)
         .order("line_number", { ascending: true });
       if (linesErr) throw linesErr;
@@ -150,8 +150,11 @@ export function useCustomerOrderDetail(orderId: string | null) {
             product_unit_of_sale: snap.unit_of_sale ?? l.sales_unit ?? "",
             quantity: Number(l.quantity),
             unit_price: Number(l.unit_price),
+            merknad: parseMerknad(l.merknad),
           };
         }),
+      };
+
       };
     },
   });
