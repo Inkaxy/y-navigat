@@ -667,12 +667,24 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
                             type="button"
                             variant="ghost"
                             size="icon"
+                            onClick={() => setMerknadFor(l.uid)}
+                            aria-label={hasMerknad ? "Rediger etikett-merknad" : "Legg til etikett-merknad"}
+                            title={hasMerknad ? "Etikett-merknad finnes" : "Etikett-felter / merknad"}
+                            className={`h-8 w-8 ${hasMerknad ? "text-primary" : ""}`}
+                          >
+                            <StickyNote className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
                             onClick={() => removeLine(l.uid)}
                             aria-label="Fjern linje"
                             className="h-8 w-8"
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
+
                         </div>
                       );
                     })}
