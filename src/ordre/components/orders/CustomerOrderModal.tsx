@@ -246,6 +246,8 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
       quantity: "1",
       unit_price: ep ? String(ep.price) : "0",
       is_fallback: !ep || ep.is_fallback,
+      merknad: null,
+
     };
     setLines((prev) => {
       const cleaned = prev.filter((l) => l.product);
