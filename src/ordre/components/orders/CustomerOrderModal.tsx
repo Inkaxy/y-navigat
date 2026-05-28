@@ -616,7 +616,9 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
                       const q = Number(l.quantity) || 0;
                       const p = Number(l.unit_price) || 0;
                       const lineSum = q * p;
+                      const hasMerknad = !!l.merknad && !isMerknadEmpty(l.merknad);
                       return (
+
                         <div
                           key={l.uid}
                           className={`grid grid-cols-[1fr_88px_120px_120px_36px] items-center gap-2 rounded-md border bg-card px-2 py-1.5 transition-colors hover:bg-muted/40 ${
