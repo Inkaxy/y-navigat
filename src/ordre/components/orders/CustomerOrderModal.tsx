@@ -162,6 +162,8 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
               product_unit_of_sale: l.product_unit_of_sale,
               quantity: String(l.quantity),
               unit_price: String(l.unit_price),
+              merknad: l.merknad,
+
               // Synthetic ProductOption-ish for re-submission
               ...({
                 product: {
