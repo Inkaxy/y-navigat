@@ -598,14 +598,16 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
 
                 {/* Column header */}
                 {lines.some((l) => l.product) && (
-                  <div className="grid grid-cols-[1fr_88px_120px_120px_36px] gap-2 px-2 text-[11px] uppercase tracking-wide text-muted-foreground">
+                  <div className="grid grid-cols-[1fr_88px_120px_120px_36px_36px] gap-2 px-2 text-[11px] uppercase tracking-wide text-muted-foreground">
                     <span>Produkt</span>
                     <span className="text-right">Antall</span>
                     <span className="text-right">Pris (kr)</span>
                     <span className="text-right">Sum</span>
                     <span />
+                    <span />
                   </div>
                 )}
+
 
                 <div className="space-y-1.5">
                   {lines
