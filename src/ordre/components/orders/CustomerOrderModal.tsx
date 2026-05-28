@@ -48,11 +48,11 @@ import {
 } from "@/ordre/hooks/useCustomerOrders";
 import type { CustomerOption } from "@/ordre/hooks/useNBCustomers";
 import { tomorrow } from "@/ordre/lib/format";
+import { logAudit } from "@/ordre/lib/audit";
 import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
 import { MerknadDialog } from "@/ordre/components/orders/MerknadDialog";
 import { type Merknad, isMerknadEmpty } from "@/ordre/lib/merknad";
 
-import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
 
 type Props = {
   open: boolean;
