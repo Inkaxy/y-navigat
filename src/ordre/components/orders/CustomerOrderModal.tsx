@@ -828,7 +828,48 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {(() => {
+        const activeLine = lines.find((l) => l.uid === merknadFor);
+        if (!activeLine || !activeLine.product) return null;
+        const autoTid = hour !== "--" ? `${hour}:${minute}` : "";
+        const autoSendesMed = distribution === "pickup" ? "hentes" : "leveres";
+        const initial: Merknad = activeLine.merknad ?? {
+          bestilt_av: name,
+          telefon: phone,
+          sukkerbilde: null,
+          fyll: "",
+          tekst: "",
+          pynt: "",
+          fritekst_1: "",
+          fritekst_2: "",
+          fritekst_3: "",
+          sendes_med: autoSendesMed,
+          tid: autoTid,
+          antall_etiketter: null,
+        };
+        return (
+          <MerknadDialog
+            open={!!merknadFor}
+            onOpenChange={(v) => { if (!v) setMerknadFor(null); }}
+            productName={activeLine.product.display_name}
+            quantity={Number(activeLine.quantity) || 0}
+            initial={initial}
+            canEdit
+            isSaving={false}
+            onSave={(m) => {
+              setLines((prev) => prev.map((x) => (x.uid === activeLine.uid ? { ...x, merknad: m } : x)));
+              setMerknadFor(null);
+            }}
+            onClear={() => {
+              setLines((prev) => prev.map((x) => (x.uid === activeLine.uid ? { ...x, merknad: null } : x)));
+              setMerknadFor(null);
+            }}
+          />
+        );
+      })()}
     </>
+
   );
 }
 
