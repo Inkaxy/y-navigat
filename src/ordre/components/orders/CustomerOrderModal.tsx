@@ -124,6 +124,8 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [merknadFor, setMerknadFor] = useState<string | null>(null);
+
 
   // Re-init when modal opens (or order loads)
   useEffect(() => {
