@@ -73,6 +73,7 @@ type LineDraft = {
   unit_price: string;
   /** true når sentralisert prisoppslag faller tilbake til 0 — vises som rød advarsel */
   is_fallback?: boolean;
+  merknad: Merknad | null;
 };
 
 function newLine(): LineDraft {
@@ -82,8 +83,9 @@ function newLine(): LineDraft {
     quantity: "1",
     unit_price: "0",
     is_fallback: false,
+    merknad: null,
   };
-}
+
 
 const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
 const MINUTES = ["00", "15", "30", "45"];
