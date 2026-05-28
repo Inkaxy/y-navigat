@@ -78,7 +78,6 @@ export function useCustomerOrders(params: {
   });
 }
 
-/** Hent én ordre med linjer for redigering. */
 export type CustomerOrderLineDraftLoaded = {
   id: string;
   product_id: string;
@@ -87,6 +86,9 @@ export type CustomerOrderLineDraftLoaded = {
   product_unit_of_sale: string;
   quantity: number;
   unit_price: number;
+  merknad: Merknad | null;
+};
+
 };
 
 export type CustomerOrderDetail = CustomerOrderRow & {
