@@ -618,11 +618,10 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
                       const lineSum = q * p;
                       const hasMerknad = !!l.merknad && !isMerknadEmpty(l.merknad);
                       return (
-                          className={`grid grid-cols-[1fr_88px_120px_120px_36px_36px] items-center gap-2 rounded-md border bg-card px-2 py-1.5 transition-colors hover:bg-muted/40 ${
-
                         <div
                           key={l.uid}
-                          className={`grid grid-cols-[1fr_88px_120px_120px_36px] items-center gap-2 rounded-md border bg-card px-2 py-1.5 transition-colors hover:bg-muted/40 ${
+                          className={`grid grid-cols-[1fr_88px_120px_120px_36px_36px] items-center gap-2 rounded-md border bg-card px-2 py-1.5 transition-colors hover:bg-muted/40 ${
+
                             l.is_fallback
                               ? "border-destructive ring-1 ring-destructive/40"
                               : "border-border"
