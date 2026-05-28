@@ -404,7 +404,8 @@ export function useUpdateCustomerOrder() {
 
           };
         });
-        const { error: insErr } = await supabase.from("order_lines").insert(lineRows);
+        const { error: insErr } = await supabase.from("order_lines").insert(lineRows as never);
+
         if (insErr) throw insErr;
       }
 
