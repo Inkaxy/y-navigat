@@ -316,6 +316,8 @@ export function useCreateCustomerOrder() {
             vat_rate: vatRate,
             line_vat: Number(vat.toFixed(2)),
             line_total_incl_vat: Number((subtotal + vat).toFixed(2)),
+            merknad: l.merknad ? (l.merknad as unknown as Record<string, unknown>) : null,
+
           };
         });
         const { error: linesErr } = await supabase.from("order_lines").insert(lineRows);
