@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Search, Trash2, AlertTriangle } from "lucide-react";
+import { Loader2, Search, Trash2, AlertTriangle, StickyNote } from "lucide-react";
+
 import { z } from "zod";
 import { toast } from "sonner";
 import {
@@ -49,6 +50,9 @@ import type { CustomerOption } from "@/ordre/hooks/useNBCustomers";
 import { tomorrow } from "@/ordre/lib/format";
 import { logAudit } from "@/ordre/lib/audit";
 import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
+import { MerknadDialog } from "@/ordre/components/orders/MerknadDialog";
+import { type Merknad, isMerknadEmpty } from "@/ordre/lib/merknad";
+
 
 type Props = {
   open: boolean;
@@ -69,6 +73,7 @@ type LineDraft = {
   unit_price: string;
   /** true når sentralisert prisoppslag faller tilbake til 0 — vises som rød advarsel */
   is_fallback?: boolean;
+  merknad: Merknad | null;
 };
 
 function newLine(): LineDraft {
@@ -78,8 +83,11 @@ function newLine(): LineDraft {
     quantity: "1",
     unit_price: "0",
     is_fallback: false,
+    merknad: null,
   };
 }
+
+
 
 const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
 const MINUTES = ["00", "15", "30", "45"];
@@ -116,6 +124,8 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [merknadFor, setMerknadFor] = useState<string | null>(null);
+
 
   // Re-init when modal opens (or order loads)
   useEffect(() => {
@@ -154,6 +164,8 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
               product_unit_of_sale: l.product_unit_of_sale,
               quantity: String(l.quantity),
               unit_price: String(l.unit_price),
+              merknad: l.merknad,
+
               // Synthetic ProductOption-ish for re-submission
               ...({
                 product: {
@@ -236,6 +248,8 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
       quantity: "1",
       unit_price: ep ? String(ep.price) : "0",
       is_fallback: !ep || ep.is_fallback,
+      merknad: null,
+
     };
     setLines((prev) => {
       const cleaned = prev.filter((l) => l.product);
@@ -308,6 +322,8 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
       product_mva_rate: l.product!.mva_rate ?? 15,
       quantity: Number(l.quantity),
       unit_price: Number(l.unit_price) || 0,
+      merknad: l.merknad && !isMerknadEmpty(l.merknad) ? l.merknad : null,
+
     }));
 
     return {
@@ -582,14 +598,16 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
 
                 {/* Column header */}
                 {lines.some((l) => l.product) && (
-                  <div className="grid grid-cols-[1fr_88px_120px_120px_36px] gap-2 px-2 text-[11px] uppercase tracking-wide text-muted-foreground">
+                  <div className="grid grid-cols-[1fr_88px_120px_120px_36px_36px] gap-2 px-2 text-[11px] uppercase tracking-wide text-muted-foreground">
                     <span>Produkt</span>
                     <span className="text-right">Antall</span>
                     <span className="text-right">Pris (kr)</span>
                     <span className="text-right">Sum</span>
                     <span />
+                    <span />
                   </div>
                 )}
+
 
                 <div className="space-y-1.5">
                   {lines
@@ -598,10 +616,12 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
                       const q = Number(l.quantity) || 0;
                       const p = Number(l.unit_price) || 0;
                       const lineSum = q * p;
+                      const hasMerknad = !!l.merknad && !isMerknadEmpty(l.merknad);
                       return (
                         <div
                           key={l.uid}
-                          className={`grid grid-cols-[1fr_88px_120px_120px_36px] items-center gap-2 rounded-md border bg-card px-2 py-1.5 transition-colors hover:bg-muted/40 ${
+                          className={`grid grid-cols-[1fr_88px_120px_120px_36px_36px] items-center gap-2 rounded-md border bg-card px-2 py-1.5 transition-colors hover:bg-muted/40 ${
+
                             l.is_fallback
                               ? "border-destructive ring-1 ring-destructive/40"
                               : "border-border"
@@ -647,12 +667,24 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
                             type="button"
                             variant="ghost"
                             size="icon"
+                            onClick={() => setMerknadFor(l.uid)}
+                            aria-label={hasMerknad ? "Rediger etikett-merknad" : "Legg til etikett-merknad"}
+                            title={hasMerknad ? "Etikett-merknad finnes" : "Etikett-felter / merknad"}
+                            className={`h-8 w-8 ${hasMerknad ? "text-primary" : ""}`}
+                          >
+                            <StickyNote className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
                             onClick={() => removeLine(l.uid)}
                             aria-label="Fjern linje"
                             className="h-8 w-8"
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
+
                         </div>
                       );
                     })}
@@ -666,7 +698,7 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
 
                 {/* Totals */}
                 {totals.count > 0 && (
-                  <div className="grid grid-cols-[1fr_88px_120px_120px_36px] items-center gap-2 border-t border-border px-2 pt-2 text-sm">
+                  <div className="grid grid-cols-[1fr_88px_120px_120px_36px_36px] items-center gap-2 border-t border-border px-2 pt-2 text-sm">
                     <span className="text-right font-medium text-muted-foreground">
                       Totalt
                     </span>
@@ -678,6 +710,8 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
                       {fmtKr(totals.sum)} kr
                     </span>
                     <span />
+                    <span />
+
                   </div>
                 )}
               </fieldset>
@@ -794,7 +828,48 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {(() => {
+        const activeLine = lines.find((l) => l.uid === merknadFor);
+        if (!activeLine || !activeLine.product) return null;
+        const autoTid = hour !== "--" ? `${hour}:${minute}` : "";
+        const autoSendesMed = distribution === "pickup" ? "hentes" : "leveres";
+        const initial: Merknad = activeLine.merknad ?? {
+          bestilt_av: name,
+          telefon: phone,
+          sukkerbilde: null,
+          fyll: "",
+          tekst: "",
+          pynt: "",
+          fritekst_1: "",
+          fritekst_2: "",
+          fritekst_3: "",
+          sendes_med: autoSendesMed,
+          tid: autoTid,
+          antall_etiketter: null,
+        };
+        return (
+          <MerknadDialog
+            open={!!merknadFor}
+            onOpenChange={(v) => { if (!v) setMerknadFor(null); }}
+            productName={activeLine.product.display_name}
+            quantity={Number(activeLine.quantity) || 0}
+            initial={initial}
+            canEdit
+            isSaving={false}
+            onSave={(m) => {
+              setLines((prev) => prev.map((x) => (x.uid === activeLine.uid ? { ...x, merknad: m } : x)));
+              setMerknadFor(null);
+            }}
+            onClear={() => {
+              setLines((prev) => prev.map((x) => (x.uid === activeLine.uid ? { ...x, merknad: null } : x)));
+              setMerknadFor(null);
+            }}
+          />
+        );
+      })()}
     </>
+
   );
 }
 

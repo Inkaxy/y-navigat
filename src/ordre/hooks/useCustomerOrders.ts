@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
 import { fetchEffectivePricesBatch, type PriceCaller } from "@/ordre/hooks/useNBProducts";
+import { parseMerknad, type Merknad } from "@/ordre/lib/merknad";
 
 export type CustomerOrderRow = {
   id: string;
@@ -77,7 +78,6 @@ export function useCustomerOrders(params: {
   });
 }
 
-/** Hent én ordre med linjer for redigering. */
 export type CustomerOrderLineDraftLoaded = {
   id: string;
   product_id: string;
@@ -86,7 +86,10 @@ export type CustomerOrderLineDraftLoaded = {
   product_unit_of_sale: string;
   quantity: number;
   unit_price: number;
+  merknad: Merknad | null;
 };
+
+
 
 export type CustomerOrderDetail = CustomerOrderRow & {
   lines: CustomerOrderLineDraftLoaded[];
@@ -112,7 +115,7 @@ export function useCustomerOrderDetail(orderId: string | null) {
 
       const { data: lines, error: linesErr } = await supabase
         .from("order_lines")
-        .select("id, product_id, product_snapshot, quantity, unit_price, sales_unit, line_number")
+        .select("id, product_id, product_snapshot, quantity, unit_price, sales_unit, line_number, merknad")
         .eq("order_id", orderId!)
         .order("line_number", { ascending: true });
       if (linesErr) throw linesErr;
@@ -147,9 +150,12 @@ export function useCustomerOrderDetail(orderId: string | null) {
             product_unit_of_sale: snap.unit_of_sale ?? l.sales_unit ?? "",
             quantity: Number(l.quantity),
             unit_price: Number(l.unit_price),
+            merknad: parseMerknad(l.merknad),
           };
         }),
       };
+
+
     },
   });
 }
@@ -199,7 +205,9 @@ export type CustomerOrderLineInput = {
   product_mva_rate?: number | null;
   quantity: number;
   unit_price: number;
+  merknad?: Merknad | null;
 };
+
 
 export type CustomerOrderInput = {
   customerId: string;
@@ -308,9 +316,12 @@ export function useCreateCustomerOrder() {
             vat_rate: vatRate,
             line_vat: Number(vat.toFixed(2)),
             line_total_incl_vat: Number((subtotal + vat).toFixed(2)),
+            merknad: l.merknad ? (l.merknad as unknown as Record<string, unknown>) : null,
+
           };
         });
-        const { error: linesErr } = await supabase.from("order_lines").insert(lineRows);
+        const { error: linesErr } = await supabase.from("order_lines").insert(lineRows as never);
+
         if (linesErr) throw linesErr;
       }
 
@@ -389,9 +400,12 @@ export function useUpdateCustomerOrder() {
             vat_rate: vatRate,
             line_vat: Number(vat.toFixed(2)),
             line_total_incl_vat: Number((subtotal + vat).toFixed(2)),
+            merknad: l.merknad ? (l.merknad as unknown as Record<string, unknown>) : null,
+
           };
         });
-        const { error: insErr } = await supabase.from("order_lines").insert(lineRows);
+        const { error: insErr } = await supabase.from("order_lines").insert(lineRows as never);
+
         if (insErr) throw insErr;
       }
 
