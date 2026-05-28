@@ -85,6 +85,8 @@ function newLine(): LineDraft {
     is_fallback: false,
     merknad: null,
   };
+}
+
 
 
 const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
