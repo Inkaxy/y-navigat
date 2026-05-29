@@ -209,13 +209,32 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
     setDirty(true);
     // intentional shallow listing of dependencies for "dirty" detection
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [name, email, phone, deliveryDate, hour, minute, tourId, distribution, source, sendSms, sendEmail, lines]);
-
   const { data: tours } = useDeliveryTours({ activeOnly: true });
   const validTours = useMemo(() => {
     if (!tours) return [];
     if (!deliveryDate) return tours;
     // Filter by day-of-week activity (ignore time-window, just dag-aktiv)
+    return tours.filter((t) => tourMatches(t, deliveryDate, t.time_from.slice(0, 5)));
+  }, [tours, deliveryDate]);
+
+  // Hvilke etikettprofiler tilhører produktene på linjene
+  const productIds = useMemo(
+    () => Array.from(new Set(lines.map((l) => l.product?.id).filter((x): x is string => !!x))),
+    [lines],
+  );
+  const { data: labelProfileMap } = useProductLabelProfiles(productIds, NB_LEGAL_ENTITY_ID);
+  const { data: labelProfiles } = useLabelPrintProfiles(NB_LEGAL_ENTITY_ID);
+  const profileById = useMemo(() => {
+    const m = new Map<string, (typeof labelProfiles)[number]>();
+    for (const p of labelProfiles ?? []) m.set(p.id, p);
+    return m;
+  }, [labelProfiles]);
+  function getLineProfile(productId: string | undefined | null) {
+    if (!productId) return null;
+    const id = labelProfileMap?.[productId];
+    if (!id) return null;
+    return profileById.get(id) ?? null;
+  }
     return tours.filter((t) => tourMatches(t, deliveryDate, t.time_from.slice(0, 5)));
   }, [tours, deliveryDate]);
 
