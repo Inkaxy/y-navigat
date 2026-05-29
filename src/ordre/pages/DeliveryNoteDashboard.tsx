@@ -307,6 +307,7 @@ export default function DeliveryNoteDashboard() {
     const row = tourStatus.rows.find((r) => r.id === tourId);
     return row?.status === "completed";
   }, [tourId, tourStatus]);
+  const modeSuffix = mode === "correction" ? "&mode=correction" : "";
   const allWidgets = [
     {
       key: "fast",
@@ -315,7 +316,7 @@ export default function DeliveryNoteDashboard() {
       classes: "bg-yellow-200 text-yellow-950 hover:bg-yellow-300",
       span: 1,
       onClick: () =>
-        navigate(`/ordre/pakksedler/liste?date=${date}&tour=${tourId}&type=fast`),
+        navigate(`/ordre/pakksedler/liste?date=${date}&tour=${tourId}&type=fast${modeSuffix}`),
     },
     {
       key: "datert",
@@ -325,7 +326,7 @@ export default function DeliveryNoteDashboard() {
         "bg-background border border-border text-foreground hover:bg-muted",
       span: 1,
       onClick: () =>
-        navigate(`/ordre/pakksedler/liste?date=${date}&tour=${tourId}&type=datert`),
+        navigate(`/ordre/pakksedler/liste?date=${date}&tour=${tourId}&type=datert${modeSuffix}`),
     },
     {
       key: "retur",
@@ -334,7 +335,7 @@ export default function DeliveryNoteDashboard() {
       classes: "bg-purple-200 text-purple-950 hover:bg-purple-300",
       span: 1,
       onClick: () =>
-        navigate(`/ordre/pakksedler/liste?date=${date}&tour=${tourId}&type=retur`),
+        navigate(`/ordre/pakksedler/liste?date=${date}&tour=${tourId}&type=retur${modeSuffix}`),
     },
     {
       key: "pakk",
@@ -344,7 +345,7 @@ export default function DeliveryNoteDashboard() {
       classes:
         "bg-brand-ink text-brand-cream hover:bg-brand-ink-deep ring-1 ring-brand-ink/40",
       span: 2,
-      onClick: () => navigate(`/ordre/pakksedler/liste?date=${date}&tour=${tourId}`),
+      onClick: () => navigate(`/ordre/pakksedler/liste?date=${date}&tour=${tourId}${modeSuffix}`),
     },
   ];
 
