@@ -12,25 +12,37 @@ export type DeliveryNoteCounts = {
   pakksedler: number;
 };
 
+export type DeliveryNoteCountsMode = "date" | "correction";
+
 /**
  * Teller fastordre / daterte ordre / returordre / pakksedler for valgt (dato, tur).
  * tourId === "all" → ingen tur-filter.
+ * mode === "correction" → inkluder alt t.o.m. valgt dato (lte) for datert/retur og pakksedler.
+ *                          Fastordre er ikke relevant i korreksjonsmodus.
  */
-export function useDeliveryNoteCounts(date: string, tourId: string) {
+export function useDeliveryNoteCounts(
+  date: string,
+  tourId: string,
+  mode: DeliveryNoteCountsMode = "date",
+) {
   const toursQ = useDeliveryTours({ activeOnly: true });
 
   return useQuery({
-    queryKey: ["delivery-note-counts", date, tourId, toursQ.data],
+    queryKey: ["delivery-note-counts", date, tourId, mode, toursQ.data],
     enabled: !toursQ.isLoading,
     queryFn: async (): Promise<DeliveryNoteCounts> => {
-      // Hent ordre-IDer som allerede har en aktiv pakkseddel for valgt dato/tur,
+      const isCorrection = mode === "correction";
+
+      // Hent ordre-IDer som allerede har en aktiv pakkseddel for valgt scope,
       // slik at "kø"-tellerne (FASTORDRE/DATERTE/RETUR) viser gjenstående arbeid.
       let notesQ = supabase
         .from("delivery_notes")
         .select("id, delivery_note_lines!inner(order_id)")
         .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
-        .eq("delivery_date", date)
         .neq("status", "cancelled");
+      notesQ = isCorrection
+        ? notesQ.lte("delivery_date", date)
+        : notesQ.eq("delivery_date", date);
       if (tourId === NULL_TOUR_KEY) notesQ = notesQ.is("delivery_tour_id", null);
       else if (tourId !== "all") notesQ = notesQ.eq("delivery_tour_id", tourId);
       const { data: notesWithLines, error: notesLinesErr } = await notesQ;
@@ -50,8 +62,8 @@ export function useDeliveryNoteCounts(date: string, tourId: string) {
         let q = supabase
           .from("orders")
           .select("id", { count: "exact", head: true })
-          .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
-          .eq("delivery_date", date);
+          .eq("legal_entity_id", NB_LEGAL_ENTITY_ID);
+        q = isCorrection ? q.lte("delivery_date", date) : q.eq("delivery_date", date);
         if (tourId === NULL_TOUR_KEY) q = q.is("delivery_tour_id", null);
         else if (tourId !== "all") q = q.eq("delivery_tour_id", tourId);
         if (packedOrderIds.size > 0) {
@@ -65,25 +77,30 @@ export function useDeliveryNoteCounts(date: string, tourId: string) {
       };
 
       const [fastRes, datertRes, returRes, pendingRecurring] = await Promise.all([
-        buildOrdersBase().eq("is_customer_order", false).eq("is_return", false),
+        isCorrection
+          ? Promise.resolve({ count: 0, error: null as null })
+          : buildOrdersBase().eq("is_customer_order", false).eq("is_return", false),
         buildOrdersBase().eq("is_customer_order", true).eq("is_return", false),
         buildOrdersBase().eq("is_return", true),
-        fetchPendingRecurringOrderCounts(date, toursQ.data ?? []),
+        isCorrection
+          ? Promise.resolve({ total: 0, nullTourCount: 0, byTour: {} as Record<string, number> })
+          : fetchPendingRecurringOrderCounts(date, toursQ.data ?? []),
       ]);
 
-      if (fastRes.error) throw fastRes.error;
+      if ((fastRes as any).error) throw (fastRes as any).error;
       if (datertRes.error) throw datertRes.error;
       if (returRes.error) throw returRes.error;
 
-      const pendingFastordre =
-        tourId === "all"
+      const pendingFastordre = isCorrection
+        ? 0
+        : tourId === "all"
           ? pendingRecurring.total
           : tourId === NULL_TOUR_KEY
             ? pendingRecurring.nullTourCount
             : pendingRecurring.byTour[tourId] ?? 0;
 
       return {
-        fastordre: (fastRes.count ?? 0) + pendingFastordre,
+        fastordre: ((fastRes as any).count ?? 0) + pendingFastordre,
         datert: datertRes.count ?? 0,
         retur: returRes.count ?? 0,
         pakksedler: pakksedlerCount,

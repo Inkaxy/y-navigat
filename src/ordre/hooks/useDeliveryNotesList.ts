@@ -3,6 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
 import { NULL_TOUR_KEY } from "@/ordre/hooks/useTourRunStatus";
 
+export type DeliveryNotesListMode = "date" | "correction";
+
 export type DeliveryNoteLineRow = {
   id: string;
   line_number: number;
@@ -25,24 +27,32 @@ export type DeliveryNoteRow = {
   total_incl_vat: number;
   line_count: number;
   notes: string | null;
+  /** Faktisk leveringsdato på pakkseddelen (YYYY-MM-DD). */
+  delivery_date: string;
   /** "fast" hvis alle linjer kommer fra fastordre, ellers "datert" */
   source_kind: "fast" | "datert" | "mixed";
   lines: DeliveryNoteLineRow[];
 };
 
-export function useDeliveryNotesList(date: string, tourId: string) {
+export function useDeliveryNotesList(
+  date: string,
+  tourId: string,
+  mode: DeliveryNotesListMode = "date",
+) {
   return useQuery({
-    queryKey: ["delivery-notes-list", date, tourId],
+    queryKey: ["delivery-notes-list", date, tourId, mode],
     queryFn: async (): Promise<DeliveryNoteRow[]> => {
       let q = supabase
         .from("delivery_notes")
         .select(
-          "id, display_number, customer_id, customer_snapshot, delivery_tour_id, route_label, status, total_incl_vat, notes, delivery_note_lines(id, line_number, quantity, sales_unit, notes, product_id, product_snapshot, order:orders(recurring_schedule_id))"
+          "id, display_number, customer_id, customer_snapshot, delivery_tour_id, delivery_date, route_label, status, total_incl_vat, notes, delivery_note_lines(id, line_number, quantity, sales_unit, notes, product_id, product_snapshot, order:orders(recurring_schedule_id))"
         )
         .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
-        .eq("delivery_date", date)
         .neq("status", "cancelled")
+        .order("delivery_date", { ascending: true })
         .order("display_number", { ascending: true });
+
+      q = mode === "correction" ? q.lte("delivery_date", date) : q.eq("delivery_date", date);
 
       if (tourId === NULL_TOUR_KEY) q = q.is("delivery_tour_id", null);
       else if (tourId !== "all") q = q.eq("delivery_tour_id", tourId);
@@ -84,6 +94,7 @@ export function useDeliveryNotesList(date: string, tourId: string) {
           total_incl_vat: Number(row.total_incl_vat ?? 0),
           line_count: lines.length,
           notes: row.notes ?? null,
+          delivery_date: row.delivery_date as string,
           source_kind,
           lines,
         } satisfies DeliveryNoteRow;

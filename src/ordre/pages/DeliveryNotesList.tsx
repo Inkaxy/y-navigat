@@ -115,6 +115,8 @@ export default function DeliveryNotesList() {
   const [params] = useSearchParams();
   const date = params.get("date") || todayISO();
   const tourParam = params.get("tour") || "all";
+  const mode: "date" | "correction" =
+    params.get("mode") === "correction" ? "correction" : "date";
   const typeParam = (params.get("type") as ListType | null) ?? "pakksedler";
   const type: ListType =
     typeParam === "fast" || typeParam === "datert" || typeParam === "retur"
@@ -122,11 +124,12 @@ export default function DeliveryNotesList() {
       : "pakksedler";
 
   const { data: tours = [] } = useDeliveryTours({ activeOnly: true });
-  const { data: rows = [], isLoading } = useDeliveryNotesList(date, tourParam);
+  const { data: rows = [], isLoading } = useDeliveryNotesList(date, tourParam, mode);
   const { data: pending = [], isLoading: pendingLoading } = usePendingOrdersList(
     date,
     tourParam,
     type === "pakksedler" ? "fast" : type,
+    mode,
   );
   const generate = useGenerateDeliveryNotes();
 
@@ -171,6 +174,27 @@ export default function DeliveryNotesList() {
 
   async function runGenerate(runType: "main" | "additional" = "main") {
     try {
+      if (mode === "correction") {
+        // Iterér over unike leveringsdatoer for pending-radene.
+        const uniqueDates = Array.from(
+          new Set(pending.map((p) => p.delivery_date).filter((d): d is string => !!d)),
+        ).sort();
+        if (uniqueDates.length === 0) {
+          toast.info("Ingen ordre å generere pakksedler for");
+          return;
+        }
+        let totalNotes = 0;
+        let totalLines = 0;
+        for (const d of uniqueDates) {
+          const r = await generate.mutateAsync({ date: d, tourFilter, runType });
+          totalNotes += r.notes_generated;
+          totalLines += r.lines_generated;
+        }
+        toast.success(
+          `Genererte ${totalNotes} pakksedler (${totalLines} linjer) over ${uniqueDates.length} dato${uniqueDates.length === 1 ? "" : "er"}`,
+        );
+        return;
+      }
       const result = await generate.mutateAsync({ date, tourFilter, runType });
       toast.success(
         `Genererte ${result.notes_generated} pakksedler (${result.lines_generated} linjer)` +
@@ -188,12 +212,12 @@ export default function DeliveryNotesList() {
       <div className="mx-auto w-full max-w-7xl px-4 py-6 space-y-4">
         {/* Tittel-stripe */}
         <div className="flex items-center gap-3 flex-wrap">
-          <Button variant="ghost" size="sm" onClick={() => navigate("/ordre/pakksedler")} className="gap-2">
+          <Button variant="ghost" size="sm" onClick={() => navigate(`/ordre/pakksedler${mode === "correction" ? "?mode=correction" : ""}`)} className="gap-2">
             <ArrowLeft className="h-4 w-4" />
             Tilbake
           </Button>
           <h1 className="text-2xl font-semibold tracking-tight">
-            {formatDate(date)} ({tourLabel}), {TYPE_LABEL[type]}
+            {mode === "correction" ? `T.o.m. ${formatDate(date)}` : formatDate(date)} ({tourLabel}), {TYPE_LABEL[type]}
           </h1>
           <Badge
             variant="outline"
@@ -296,9 +320,9 @@ export default function DeliveryNotesList() {
                   </div>
                   <div className="hidden sm:flex items-baseline gap-2 text-sm">
                     <span className="text-emerald-700 dark:text-emerald-400 font-medium tabular-nums">
-                      {formatDate(date)}
+                      {formatDate(p.delivery_date ?? date)}
                     </span>
-                    <span className="text-muted-foreground">({wd})</span>
+                    <span className="text-muted-foreground">({weekdayShort(p.delivery_date ?? date)})</span>
                     <span className="text-muted-foreground">
                       {p.tour_label ? tourLabelShort(p.tour_label) : "uten tur"}
                     </span>
@@ -371,9 +395,9 @@ export default function DeliveryNotesList() {
 
                       <div className="hidden sm:flex items-baseline gap-2 text-sm">
                         <span className="text-emerald-700 dark:text-emerald-400 font-medium tabular-nums">
-                          {formatDate(date)}
+                          {formatDate(r.delivery_date ?? date)}
                         </span>
-                        <span className="text-muted-foreground">({wd})</span>
+                        <span className="text-muted-foreground">({weekdayShort(r.delivery_date ?? date)})</span>
                         <span className="text-muted-foreground">{tour}</span>
                         <span className="text-muted-foreground tabular-nums">
                           {r.line_count} ordrelinjer

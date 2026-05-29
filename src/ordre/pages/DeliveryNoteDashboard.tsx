@@ -39,6 +39,7 @@ import { BulkPakkseddelPDFButton } from "@/ordre/components/pakksedler/BulkPakks
 import { DateContextChips } from "@/ordre/components/shell/DateContextChips";
 import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
 import { useUndoDeliveryRuns } from "@/ordre/hooks/useUndoDeliveryRuns";
+import { supabase } from "@/integrations/supabase/client";
 
 // HANDLING_ITEMS bygges nå dynamisk inni komponenten — for å støtte tilstand-aware
 // handlinger (Tilleggkjøring/Korreksjonskjøring krever at hovedkjøring er kjørt).
@@ -99,7 +100,7 @@ export default function DeliveryNoteDashboard() {
   const [confirmUndoOpen, setConfirmUndoOpen] = useState(false);
 
   const { data: tours = [] } = useDeliveryTours({ activeOnly: true });
-  const { data: counts, isLoading } = useDeliveryNoteCounts(date, tourId);
+  const { data: counts, isLoading } = useDeliveryNoteCounts(date, tourId, mode);
   const generate = useGenerateDeliveryNotes();
   const undoRuns = useUndoDeliveryRuns();
   const tourStatus = useTourRunStatus(date);
@@ -115,6 +116,23 @@ export default function DeliveryNoteDashboard() {
   }, [tourId, tourStatus.rows]);
 
   const buttonState = useMemo(() => {
+    if (mode === "correction") {
+      const pending = (counts?.datert ?? 0) + (counts?.retur ?? 0);
+      if (pending === 0) {
+        return {
+          mode: "all_done" as const,
+          label: "Ingen ordre å korrigere",
+          tooltip: "Alle daterte ordre og returordre t.o.m. valgt dato har pakksedler.",
+          disabled: true,
+        };
+      }
+      return {
+        mode: "pending" as const,
+        label: `Hovedkjøring (${pending} ordre t.o.m. ${formatDate(date)})`,
+        tooltip: "Generer pakksedler for alle daterte/retur-ordre t.o.m. valgt dato.",
+        disabled: false,
+      };
+    }
     if (tourId === "all") {
       // Alle turer
       if (tourStatus.totalOrders === 0) {
@@ -168,7 +186,7 @@ export default function DeliveryNoteDashboard() {
       tooltip: `Generer pakksedler for ${selectedRow.display_name}.`,
       disabled: false,
     };
-  }, [tourId, tourStatus, selectedRow]);
+  }, [mode, counts, date, tourId, tourStatus, selectedRow]);
 
   const canRunMain = !buttonState.disabled && !generate.isPending;
 
@@ -179,6 +197,46 @@ export default function DeliveryNoteDashboard() {
     // den eksplisitt, faller vi tilbake til ufiltrert kjøring.
     const tourFilter =
       tourId === "all" || tourId === NULL_TOUR_KEY ? null : [tourId];
+
+    if (mode === "correction") {
+      // Hent unike leveringsdatoer for pending datert/retur t.o.m. valgt dato,
+      // og kjør hovedkjøring sekvensielt per dato.
+      try {
+        let q = supabase
+          .from("orders")
+          .select("delivery_date")
+          .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
+          .lte("delivery_date", date)
+          .or("is_customer_order.eq.true,is_return.eq.true");
+        if (tourId === NULL_TOUR_KEY) q = q.is("delivery_tour_id", null);
+        else if (tourId !== "all") q = q.eq("delivery_tour_id", tourId);
+        const { data: dateRows, error: dateErr } = await q;
+        if (dateErr) throw dateErr;
+        const uniqueDates = Array.from(
+          new Set(((dateRows ?? []) as Array<{ delivery_date: string }>).map((r) => r.delivery_date)),
+        ).sort();
+        if (uniqueDates.length === 0) {
+          toast.info("Ingen ordre å generere pakksedler for");
+          return;
+        }
+        let totalNotes = 0;
+        let totalLines = 0;
+        let datesProcessed = 0;
+        for (const d of uniqueDates) {
+          const r = await generate.mutateAsync({ date: d, tourFilter });
+          totalNotes += r.notes_generated;
+          totalLines += r.lines_generated;
+          datesProcessed += 1;
+        }
+        toast.success(
+          `Korreksjon: ${totalNotes} pakksedler (${totalLines} linjer) generert over ${datesProcessed} dato${datesProcessed === 1 ? "" : "er"}`,
+        );
+      } catch (e: any) {
+        toast.error(e?.message ?? "Uventet feil ved hovedkjøring (korreksjon)");
+      }
+      return;
+    }
+
     try {
       const result = await generate.mutateAsync({ date, tourFilter });
       const recurring = result.recurring_orders_created ?? 0;
@@ -249,6 +307,7 @@ export default function DeliveryNoteDashboard() {
     const row = tourStatus.rows.find((r) => r.id === tourId);
     return row?.status === "completed";
   }, [tourId, tourStatus]);
+  const modeSuffix = mode === "correction" ? "&mode=correction" : "";
   const allWidgets = [
     {
       key: "fast",
@@ -257,7 +316,7 @@ export default function DeliveryNoteDashboard() {
       classes: "bg-yellow-200 text-yellow-950 hover:bg-yellow-300",
       span: 1,
       onClick: () =>
-        navigate(`/ordre/pakksedler/liste?date=${date}&tour=${tourId}&type=fast`),
+        navigate(`/ordre/pakksedler/liste?date=${date}&tour=${tourId}&type=fast${modeSuffix}`),
     },
     {
       key: "datert",
@@ -267,7 +326,7 @@ export default function DeliveryNoteDashboard() {
         "bg-background border border-border text-foreground hover:bg-muted",
       span: 1,
       onClick: () =>
-        navigate(`/ordre/pakksedler/liste?date=${date}&tour=${tourId}&type=datert`),
+        navigate(`/ordre/pakksedler/liste?date=${date}&tour=${tourId}&type=datert${modeSuffix}`),
     },
     {
       key: "retur",
@@ -276,7 +335,7 @@ export default function DeliveryNoteDashboard() {
       classes: "bg-purple-200 text-purple-950 hover:bg-purple-300",
       span: 1,
       onClick: () =>
-        navigate(`/ordre/pakksedler/liste?date=${date}&tour=${tourId}&type=retur`),
+        navigate(`/ordre/pakksedler/liste?date=${date}&tour=${tourId}&type=retur${modeSuffix}`),
     },
     {
       key: "pakk",
@@ -286,7 +345,7 @@ export default function DeliveryNoteDashboard() {
       classes:
         "bg-brand-ink text-brand-cream hover:bg-brand-ink-deep ring-1 ring-brand-ink/40",
       span: 2,
-      onClick: () => navigate(`/ordre/pakksedler/liste?date=${date}&tour=${tourId}`),
+      onClick: () => navigate(`/ordre/pakksedler/liste?date=${date}&tour=${tourId}${modeSuffix}`),
     },
   ];
 
@@ -589,17 +648,35 @@ export default function DeliveryNoteDashboard() {
           <AlertDialogHeader>
             <AlertDialogTitle>Kjør hovedkjøring?</AlertDialogTitle>
             <AlertDialogDescription>
-              Dette genererer pakksedler for {formatDate(date)} —{" "}
-              {tourId === "all"
-                ? "alle turer"
-                : tourId === NULL_TOUR_KEY
-                  ? "ordre uten tur"
-                  : (() => {
-                      const t = tours.find((x) => x.id === tourId);
-                      return t ? `tur ${t.tour_number} ${t.display_name}` : "valgt tur";
-                    })()}
-              . Operasjonen kan ikke angres, men pakkseddel-linjer kan justeres senere via
-              korreksjonskjøring.
+              {mode === "correction" ? (
+                <>
+                  Dette genererer pakksedler for alle daterte ordre og returordre{" "}
+                  <strong>t.o.m. {formatDate(date)}</strong> —{" "}
+                  {tourId === "all"
+                    ? "alle turer"
+                    : tourId === NULL_TOUR_KEY
+                      ? "ordre uten tur"
+                      : (() => {
+                          const t = tours.find((x) => x.id === tourId);
+                          return t ? `tur ${t.tour_number} ${t.display_name}` : "valgt tur";
+                        })()}
+                  . Brukes som korreksjon før fakturering. Kjøringen utføres per leveringsdato sekvensielt.
+                </>
+              ) : (
+                <>
+                  Dette genererer pakksedler for {formatDate(date)} —{" "}
+                  {tourId === "all"
+                    ? "alle turer"
+                    : tourId === NULL_TOUR_KEY
+                      ? "ordre uten tur"
+                      : (() => {
+                          const t = tours.find((x) => x.id === tourId);
+                          return t ? `tur ${t.tour_number} ${t.display_name}` : "valgt tur";
+                        })()}
+                  . Operasjonen kan ikke angres, men pakkseddel-linjer kan justeres senere via
+                  korreksjonskjøring.
+                </>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
