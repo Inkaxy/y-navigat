@@ -208,6 +208,26 @@ export default function DeliveryNoteDashboard() {
     }
   }
 
+  async function runUndo() {
+    setConfirmUndoOpen(false);
+    const tourFilter =
+      tourId === "all" || tourId === NULL_TOUR_KEY ? null : [tourId];
+    try {
+      const result = await undoRuns.mutateAsync({ date, tourFilter });
+      const parts = [
+        `${result.notes_deleted} pakksedler slettet`,
+        `${result.lines_deleted} linjer`,
+        `${result.runs_cancelled} kjøringer annullert`,
+      ];
+      if ((result.recurring_orders_deleted ?? 0) > 0) {
+        parts.push(`${result.recurring_orders_deleted} fastordre fjernet`);
+      }
+      toast.success(`Angring fullført — ${parts.join(", ")}.`);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Uventet feil ved angring");
+    }
+  }
+
   // Tilgjengelighet for handlinger som krever fullført hovedkjøring i scope.
   const mainCompletedInScope = useMemo(() => {
     if (tourId === "all") return tourStatus.completedRows.length > 0;
