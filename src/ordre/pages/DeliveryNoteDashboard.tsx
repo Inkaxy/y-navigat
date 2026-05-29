@@ -39,6 +39,7 @@ import { BulkPakkseddelPDFButton } from "@/ordre/components/pakksedler/BulkPakks
 import { DateContextChips } from "@/ordre/components/shell/DateContextChips";
 import { WeekMonthQuickPicker } from "@/ordre/components/shell/WeekMonthQuickPicker";
 import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
+import { useUndoDeliveryRuns } from "@/ordre/hooks/useUndoDeliveryRuns";
 
 // HANDLING_ITEMS bygges nå dynamisk inni komponenten — for å støtte tilstand-aware
 // handlinger (Tilleggkjøring/Korreksjonskjøring krever at hovedkjøring er kjørt).
@@ -80,10 +81,12 @@ export default function DeliveryNoteDashboard() {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmCorrectionOpen, setConfirmCorrectionOpen] = useState(false);
+  const [confirmUndoOpen, setConfirmUndoOpen] = useState(false);
 
   const { data: tours = [] } = useDeliveryTours({ activeOnly: true });
   const { data: counts, isLoading } = useDeliveryNoteCounts(date, tourId);
   const generate = useGenerateDeliveryNotes();
+  const undoRuns = useUndoDeliveryRuns();
   const tourStatus = useTourRunStatus(date);
 
   const rel = useMemo(() => relativeDateLabel(date), [date]);
@@ -202,6 +205,26 @@ export default function DeliveryNoteDashboard() {
       );
     } catch (e: any) {
       toast.error(e?.message ?? "Uventet feil ved korreksjonskjøring");
+    }
+  }
+
+  async function runUndo() {
+    setConfirmUndoOpen(false);
+    const tourFilter =
+      tourId === "all" || tourId === NULL_TOUR_KEY ? null : [tourId];
+    try {
+      const result = await undoRuns.mutateAsync({ date, tourFilter });
+      const parts = [
+        `${result.notes_deleted} pakksedler slettet`,
+        `${result.lines_deleted} linjer`,
+        `${result.runs_cancelled} kjøringer annullert`,
+      ];
+      if ((result.recurring_orders_deleted ?? 0) > 0) {
+        parts.push(`${result.recurring_orders_deleted} fastordre fjernet`);
+      }
+      toast.success(`Angring fullført — ${parts.join(", ")}.`);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Uventet feil ved angring");
     }
   }
 
@@ -426,6 +449,18 @@ export default function DeliveryNoteDashboard() {
                 >
                   Korreksjonskjøring
                 </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={!mainCompletedInScope || undoRuns.isPending || generate.isPending}
+                  title={
+                    !mainCompletedInScope
+                      ? "Ingen kjøring å angre for valgt dato/tur"
+                      : "Slett pakksedler og angre kjøringen for valgt dato/tur"
+                  }
+                  onSelect={() => setConfirmUndoOpen(true)}
+                  className="text-destructive focus:text-destructive"
+                >
+                  Angre kjøring
+                </DropdownMenuItem>
 
                 <DropdownMenuSeparator />
                 {/* Pakkseddelkjøringer-handlinger */}
@@ -575,6 +610,40 @@ export default function DeliveryNoteDashboard() {
             <AlertDialogCancel>Avbryt</AlertDialogCancel>
             <AlertDialogAction onClick={runKorreksjonskjoring}>
               Kjør korreksjon
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={confirmUndoOpen} onOpenChange={setConfirmUndoOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Angre pakkseddel-kjøring?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Dette sletter <strong>alle pakksedler</strong> for{" "}
+              <strong>{formatDate(date)}</strong> —{" "}
+              {tourId === "all"
+                ? "alle turer"
+                : tourId === NULL_TOUR_KEY
+                  ? "ordre uten tur"
+                  : (() => {
+                      const t = tours.find((x) => x.id === tourId);
+                      return t ? `tur ${t.tour_number} ${t.display_name}` : "valgt tur";
+                    })()}
+              , annullerer tilhørende kjøringer og fjerner fastordre som ble
+              automatisk opprettet for dagen. Vanlige ordre beholdes, og du kan
+              kjøre hovedkjøring på nytt etterpå. Operasjonen kan ikke angres
+              automatisk — bruk kun hvis kjøringen ble gjort for en dag det ikke
+              skal kjøres.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Avbryt</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={runUndo}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {undoRuns.isPending ? "Angrer…" : "Ja, angre kjøring"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
