@@ -309,7 +309,7 @@ export default function DeliveryNoteDashboard() {
           {/* Senter: dato + turer */}
           <div className="flex flex-1 flex-col items-center gap-4">
             <div className="flex flex-col items-center">
-              <div className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+              <div className="font-semibold uppercase tracking-wide text-muted-foreground text-xl">
                 {mode === "correction" ? "Til dato" : "Leveransedato"}
               </div>
               <div className="mt-1 flex items-center gap-3">
