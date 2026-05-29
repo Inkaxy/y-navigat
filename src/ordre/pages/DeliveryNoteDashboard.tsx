@@ -648,17 +648,35 @@ export default function DeliveryNoteDashboard() {
           <AlertDialogHeader>
             <AlertDialogTitle>Kjør hovedkjøring?</AlertDialogTitle>
             <AlertDialogDescription>
-              Dette genererer pakksedler for {formatDate(date)} —{" "}
-              {tourId === "all"
-                ? "alle turer"
-                : tourId === NULL_TOUR_KEY
-                  ? "ordre uten tur"
-                  : (() => {
-                      const t = tours.find((x) => x.id === tourId);
-                      return t ? `tur ${t.tour_number} ${t.display_name}` : "valgt tur";
-                    })()}
-              . Operasjonen kan ikke angres, men pakkseddel-linjer kan justeres senere via
-              korreksjonskjøring.
+              {mode === "correction" ? (
+                <>
+                  Dette genererer pakksedler for alle daterte ordre og returordre{" "}
+                  <strong>t.o.m. {formatDate(date)}</strong> —{" "}
+                  {tourId === "all"
+                    ? "alle turer"
+                    : tourId === NULL_TOUR_KEY
+                      ? "ordre uten tur"
+                      : (() => {
+                          const t = tours.find((x) => x.id === tourId);
+                          return t ? `tur ${t.tour_number} ${t.display_name}` : "valgt tur";
+                        })()}
+                  . Brukes som korreksjon før fakturering. Kjøringen utføres per leveringsdato sekvensielt.
+                </>
+              ) : (
+                <>
+                  Dette genererer pakksedler for {formatDate(date)} —{" "}
+                  {tourId === "all"
+                    ? "alle turer"
+                    : tourId === NULL_TOUR_KEY
+                      ? "ordre uten tur"
+                      : (() => {
+                          const t = tours.find((x) => x.id === tourId);
+                          return t ? `tur ${t.tour_number} ${t.display_name}` : "valgt tur";
+                        })()}
+                  . Operasjonen kan ikke angres, men pakkseddel-linjer kan justeres senere via
+                  korreksjonskjøring.
+                </>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
