@@ -209,11 +209,12 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
     setDirty(true);
     // intentional shallow listing of dependencies for "dirty" detection
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [name, email, phone, deliveryDate, hour, minute, tourId, distribution, source, sendSms, sendEmail, lines]);
+
   const { data: tours } = useDeliveryTours({ activeOnly: true });
   const validTours = useMemo(() => {
     if (!tours) return [];
     if (!deliveryDate) return tours;
-    // Filter by day-of-week activity (ignore time-window, just dag-aktiv)
     return tours.filter((t) => tourMatches(t, deliveryDate, t.time_from.slice(0, 5)));
   }, [tours, deliveryDate]);
 
@@ -225,7 +226,7 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
   const { data: labelProfileMap } = useProductLabelProfiles(productIds, NB_LEGAL_ENTITY_ID);
   const { data: labelProfiles } = useLabelPrintProfiles(NB_LEGAL_ENTITY_ID);
   const profileById = useMemo(() => {
-    const m = new Map<string, (typeof labelProfiles)[number]>();
+    const m = new Map<string, NonNullable<typeof labelProfiles>[number]>();
     for (const p of labelProfiles ?? []) m.set(p.id, p);
     return m;
   }, [labelProfiles]);
@@ -235,8 +236,6 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
     if (!id) return null;
     return profileById.get(id) ?? null;
   }
-    return tours.filter((t) => tourMatches(t, deliveryDate, t.time_from.slice(0, 5)));
-  }, [tours, deliveryDate]);
 
   // Reset tour if it's no longer valid for the chosen date
   useEffect(() => {
