@@ -599,6 +599,9 @@ export default function MatrixPage() {
       if (qty <= 0) {
         toast.info("Legg inn mengde først.");
         return;
+      if (!labelProfileByProduct.get(productId)) {
+        toast.info("Produktet er ikke koblet til en utskriftsprofil — ingen etikett-felter å fylle ut.");
+        return;
       }
       setMerknadCell({
         date,
