@@ -185,7 +185,7 @@ export default function DeliveryNoteDashboard() {
       tooltip: `Generer pakksedler for ${selectedRow.display_name}.`,
       disabled: false,
     };
-  }, [tourId, tourStatus, selectedRow]);
+  }, [mode, counts, date, tourId, tourStatus, selectedRow]);
 
   const canRunMain = !buttonState.disabled && !generate.isPending;
 
@@ -196,6 +196,46 @@ export default function DeliveryNoteDashboard() {
     // den eksplisitt, faller vi tilbake til ufiltrert kjøring.
     const tourFilter =
       tourId === "all" || tourId === NULL_TOUR_KEY ? null : [tourId];
+
+    if (mode === "correction") {
+      // Hent unike leveringsdatoer for pending datert/retur t.o.m. valgt dato,
+      // og kjør hovedkjøring sekvensielt per dato.
+      try {
+        let q = supabase
+          .from("orders")
+          .select("delivery_date")
+          .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
+          .lte("delivery_date", date)
+          .or("is_customer_order.eq.true,is_return.eq.true");
+        if (tourId === NULL_TOUR_KEY) q = q.is("delivery_tour_id", null);
+        else if (tourId !== "all") q = q.eq("delivery_tour_id", tourId);
+        const { data: dateRows, error: dateErr } = await q;
+        if (dateErr) throw dateErr;
+        const uniqueDates = Array.from(
+          new Set(((dateRows ?? []) as Array<{ delivery_date: string }>).map((r) => r.delivery_date)),
+        ).sort();
+        if (uniqueDates.length === 0) {
+          toast.info("Ingen ordre å generere pakksedler for");
+          return;
+        }
+        let totalNotes = 0;
+        let totalLines = 0;
+        let datesProcessed = 0;
+        for (const d of uniqueDates) {
+          const r = await generate.mutateAsync({ date: d, tourFilter });
+          totalNotes += r.notes_generated;
+          totalLines += r.lines_generated;
+          datesProcessed += 1;
+        }
+        toast.success(
+          `Korreksjon: ${totalNotes} pakksedler (${totalLines} linjer) generert over ${datesProcessed} dato${datesProcessed === 1 ? "" : "er"}`,
+        );
+      } catch (e: any) {
+        toast.error(e?.message ?? "Uventet feil ved hovedkjøring (korreksjon)");
+      }
+      return;
+    }
+
     try {
       const result = await generate.mutateAsync({ date, tourFilter });
       const recurring = result.recurring_orders_created ?? 0;
