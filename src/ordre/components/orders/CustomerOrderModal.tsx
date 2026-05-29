@@ -52,6 +52,8 @@ import { logAudit } from "@/ordre/lib/audit";
 import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
 import { MerknadDialog } from "@/ordre/components/orders/MerknadDialog";
 import { type Merknad, isMerknadEmpty } from "@/ordre/lib/merknad";
+import { useProductLabelProfiles } from "@/produksjon/features/etiketter/hooks/useProductLabelProfiles";
+import { useLabelPrintProfiles } from "@/produksjon/features/utskriftsprofiler/hooks/useLabelPrintProfiles";
 
 
 type Props = {
@@ -213,9 +215,27 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
   const validTours = useMemo(() => {
     if (!tours) return [];
     if (!deliveryDate) return tours;
-    // Filter by day-of-week activity (ignore time-window, just dag-aktiv)
     return tours.filter((t) => tourMatches(t, deliveryDate, t.time_from.slice(0, 5)));
   }, [tours, deliveryDate]);
+
+  // Hvilke etikettprofiler tilhører produktene på linjene
+  const productIds = useMemo(
+    () => Array.from(new Set(lines.map((l) => l.product?.id).filter((x): x is string => !!x))),
+    [lines],
+  );
+  const { data: labelProfileMap } = useProductLabelProfiles(productIds, NB_LEGAL_ENTITY_ID);
+  const { data: labelProfiles } = useLabelPrintProfiles(NB_LEGAL_ENTITY_ID);
+  const profileById = useMemo(() => {
+    const m = new Map<string, NonNullable<typeof labelProfiles>[number]>();
+    for (const p of labelProfiles ?? []) m.set(p.id, p);
+    return m;
+  }, [labelProfiles]);
+  function getLineProfile(productId: string | undefined | null) {
+    if (!productId) return null;
+    const id = labelProfileMap?.[productId];
+    if (!id) return null;
+    return profileById.get(id) ?? null;
+  }
 
   // Reset tour if it's no longer valid for the chosen date
   useEffect(() => {
@@ -617,6 +637,7 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
                       const p = Number(l.unit_price) || 0;
                       const lineSum = q * p;
                       const hasMerknad = !!l.merknad && !isMerknadEmpty(l.merknad);
+                      const lineProfile = getLineProfile(l.product?.id);
                       return (
                         <div
                           key={l.uid}
@@ -663,17 +684,21 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
                           <div className="text-right text-sm font-medium tabular-nums">
                             {fmtKr(lineSum)}
                           </div>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setMerknadFor(l.uid)}
-                            aria-label={hasMerknad ? "Rediger etikett-merknad" : "Legg til etikett-merknad"}
-                            title={hasMerknad ? "Etikett-merknad finnes" : "Etikett-felter / merknad"}
-                            className={`h-8 w-8 ${hasMerknad ? "text-primary" : ""}`}
-                          >
-                            <StickyNote className="h-4 w-4" />
-                          </Button>
+                          {lineProfile ? (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setMerknadFor(l.uid)}
+                              aria-label={hasMerknad ? "Rediger etikett-felter" : "Legg til etikett-felter"}
+                              title={hasMerknad ? "Etikett-felter (utfylt)" : `Etikett-felter (${lineProfile.name})`}
+                              className={`h-8 w-8 ${hasMerknad ? "text-primary" : ""}`}
+                            >
+                              <StickyNote className="h-4 w-4" />
+                            </Button>
+                          ) : (
+                            <span className="h-8 w-8" aria-hidden />
+                          )}
                           <Button
                             type="button"
                             variant="ghost"
@@ -832,11 +857,11 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
       {(() => {
         const activeLine = lines.find((l) => l.uid === merknadFor);
         if (!activeLine || !activeLine.product) return null;
-        const autoTid = hour !== "--" ? `${hour}:${minute}` : "";
-        const autoSendesMed = distribution === "pickup" ? "hentes" : "leveres";
+        const profile = getLineProfile(activeLine.product.id);
+        if (!profile) return null;
         const initial: Merknad = activeLine.merknad ?? {
           bestilt_av: name,
-          telefon: phone,
+          telefon: "",
           sukkerbilde: null,
           fyll: "",
           tekst: "",
@@ -844,8 +869,8 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
           fritekst_1: "",
           fritekst_2: "",
           fritekst_3: "",
-          sendes_med: autoSendesMed,
-          tid: autoTid,
+          sendes_med: "",
+          tid: "",
           antall_etiketter: null,
         };
         return (
@@ -854,6 +879,7 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
             onOpenChange={(v) => { if (!v) setMerknadFor(null); }}
             productName={activeLine.product.display_name}
             quantity={Number(activeLine.quantity) || 0}
+            profile={profile}
             initial={initial}
             canEdit
             isSaving={false}

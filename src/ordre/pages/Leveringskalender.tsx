@@ -55,6 +55,9 @@ import {
 import { DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { AddProductDialog } from "@/ordre/components/orders/AddProductDialog";
 import { MerknadDialog } from "@/ordre/components/orders/MerknadDialog";
+import { useProductLabelProfiles } from "@/produksjon/features/etiketter/hooks/useProductLabelProfiles";
+import { useLabelPrintProfiles } from "@/produksjon/features/utskriftsprofiler/hooks/useLabelPrintProfiles";
+import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
 import { ColumnCommentDialog } from "@/ordre/components/orders/matrix/ColumnCommentDialog";
 import { CopyColumnDialog, type CopyColumnInput } from "@/ordre/components/orders/matrix/CopyColumnDialog";
 import {
@@ -285,6 +288,22 @@ export default function MatrixPage() {
     for (const p of allProducts) m.set(p.id, p);
     return m;
   }, [allProducts]);
+
+  // Etikettprofiler pr produkt (matrise-celler)
+  const allProductIds = useMemo(() => allProducts.map((p) => p.id), [allProducts]);
+  const { data: labelProfileMap } = useProductLabelProfiles(allProductIds, NB_LEGAL_ENTITY_ID);
+  const { data: labelProfiles } = useLabelPrintProfiles(NB_LEGAL_ENTITY_ID);
+  const labelProfileByProduct = useMemo(() => {
+    const byId = new Map<string, NonNullable<typeof labelProfiles>[number]>();
+    for (const p of labelProfiles ?? []) byId.set(p.id, p);
+    const out = new Map<string, NonNullable<typeof labelProfiles>[number]>();
+    for (const pid of allProductIds) {
+      const profId = labelProfileMap?.[pid];
+      const prof = profId ? byId.get(profId) : null;
+      if (prof) out.set(pid, prof);
+    }
+    return out;
+  }, [allProductIds, labelProfileMap, labelProfiles]);
 
   const tourById = useMemo(() => {
     const m = new Map<string, MatrixTour>();
@@ -579,6 +598,10 @@ export default function MatrixPage() {
       const qty = getEffectiveQty(key);
       if (qty <= 0) {
         toast.info("Legg inn mengde først.");
+        return;
+      }
+      if (!labelProfileByProduct.get(productId)) {
+        toast.info("Produktet er ikke koblet til en utskriftsprofil — ingen etikett-felter å fylle ut.");
         return;
       }
       setMerknadCell({
@@ -1484,7 +1507,7 @@ export default function MatrixPage() {
         onPick={handleAddProduct}
       />
 
-      {merknadCell && (
+      {merknadCell && labelProfileByProduct.get(merknadCell.productId) && (
         <MerknadDialog
           open={!!merknadCell}
           onOpenChange={(v) => {
@@ -1492,6 +1515,7 @@ export default function MatrixPage() {
           }}
           productName={merknadCell.productName}
           quantity={merknadCell.quantity}
+          profile={labelProfileByProduct.get(merknadCell.productId)!}
           initial={existingMerknad[ckey(merknadCell.date, merknadCell.tourId, merknadCell.productId)] ?? null}
           canEdit={canEdit}
           isSaving={saveMatrix.isPending}
