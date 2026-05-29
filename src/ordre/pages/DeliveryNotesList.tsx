@@ -115,10 +115,19 @@ export default function DeliveryNotesList() {
   const [params] = useSearchParams();
   const date = params.get("date") || todayISO();
   const tourParam = params.get("tour") || "all";
+  const typeParam = (params.get("type") as ListType | null) ?? "pakksedler";
+  const type: ListType =
+    typeParam === "fast" || typeParam === "datert" || typeParam === "retur"
+      ? typeParam
+      : "pakksedler";
 
   const { data: tours = [] } = useDeliveryTours({ activeOnly: true });
   const { data: rows = [], isLoading } = useDeliveryNotesList(date, tourParam);
-  const { data: pendingRows = [], isLoading: pendingLoading } = usePendingRecurringOrderRows(date, tourParam);
+  const { data: pending = [], isLoading: pendingLoading } = usePendingOrdersList(
+    date,
+    tourParam,
+    type === "pakksedler" ? "fast" : type,
+  );
   const generate = useGenerateDeliveryNotes();
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -132,9 +141,13 @@ export default function DeliveryNotesList() {
     return t ? `tur ${t.tour_number}` : "valgt tur";
   }, [tourParam, tours]);
 
-  const totalCount = rows.length + pendingRows.length;
-  const allChecked = rows.length > 0 && selected.size === rows.length;
-  const someChecked = selected.size > 0 && selected.size < rows.length;
+  // Når type=pakksedler viser vi kun de genererte pakksedlene.
+  // Når type=fast/datert/retur viser vi pending-listen for den typen.
+  const isPending = type !== "pakksedler";
+  const totalCount = isPending ? pending.length : rows.length;
+  const loading = isPending ? pendingLoading : isLoading;
+  const allChecked = !isPending && rows.length > 0 && selected.size === rows.length;
+  const someChecked = !isPending && selected.size > 0 && selected.size < rows.length;
 
   function toggleAll(checked: boolean) {
     if (checked) setSelected(new Set(rows.map((r) => r.id)));
@@ -151,6 +164,7 @@ export default function DeliveryNotesList() {
   }
 
   const wd = weekdayShort(date);
+
 
   return (
     <TooltipProvider delayDuration={300}>
