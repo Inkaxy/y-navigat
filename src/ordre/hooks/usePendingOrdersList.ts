@@ -74,13 +74,15 @@ export function usePendingOrdersList(date: string, tourId: string, type: Pending
       const { data, error } = await q.order("order_number", { ascending: true });
       if (error) throw error;
 
+      const rows: PendingOrderRow[] = ((data ?? []) as any[])
+        .filter((o) => !packed.has(o.id))
         .map((o) => {
           const tour = o.delivery_tour_id ? tourById.get(o.delivery_tour_id) : null;
           const snap = (o.customer_snapshot ?? {}) as Record<string, any>;
           return {
             kind: "order" as const,
             id: o.id,
-            display_number: o.display_number ?? null,
+            display_number: o.order_number ?? null,
             customer_id: o.customer_id,
             customer_display_name: snap.display_name ?? snap.name ?? "—",
             customer_number: snap.customer_number ?? snap.number ?? null,
@@ -89,9 +91,10 @@ export function usePendingOrdersList(date: string, tourId: string, type: Pending
             line_count: Array.isArray(o.order_lines) ? o.order_lines.length : 0,
             total_incl_vat: Number(o.total_incl_vat ?? 0),
             type,
-            notes: o.notes ?? null,
+            notes: o.internal_notes ?? o.customer_notes ?? null,
           };
         });
+
 
       // For fastordre: legg til ikke-materialiserte fastordre (recurring schedules).
       if (type === "fast") {
