@@ -134,8 +134,10 @@ export default function DeliveryRules() {
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<NonNullable<DeliveryRuleFilter["status"]>>("active");
+  const [ruleType, setRuleType] = useState<NonNullable<DeliveryRuleFilter["ruleType"]>>("all");
 
-  const { data: rules = [], isLoading } = useDeliveryRules({ search, status });
+  const { data: rules = [], isLoading } = useDeliveryRules({ search, status, ruleType });
+
 
   const { data: tours = [] } = useDeliveryTours();
   const tourMap = useMemo(() => {
