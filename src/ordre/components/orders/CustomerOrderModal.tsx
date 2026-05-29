@@ -654,8 +654,7 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
                               {l.product!.display_name}
                             </div>
                             <div className="truncate text-xs text-muted-foreground">
-                              {l.product!.code || `#${l.product!.display_number ?? "—"}`} ·{" "}
-                              {l.product!.unit_of_sale}
+                              {"\u200B"}
                               {l.is_fallback && (
                                 <span className="ml-2 font-medium text-destructive">
                                   · pris mangler
