@@ -13,6 +13,7 @@ import type {
 } from "@/produksjon/features/utskriftsprofiler/types";
 import { FIELD_LABELS } from "@/produksjon/features/utskriftsprofiler/types";
 import type { LabelProductRow } from "../types";
+import type { Merknad } from "@/ordre/lib/merknad";
 
 const MM_TO_PT = 2.83465;
 const mm = (v: number) => v * MM_TO_PT;
@@ -24,6 +25,12 @@ export interface LabelPdfData {
   quantity: number;
   /** Hvor mange etiketter som skal genereres (ofte = quantity). Default 1. */
   copies?: number;
+  /** Merknad lagret på order_lines.merknad for denne ordrelinjen. Fyller etikett-felt. */
+  merknad?: Merknad | null;
+}
+
+function joinNonEmpty(parts: Array<string | undefined | null>, sep = " · "): string {
+  return parts.filter((s): s is string => !!s && s.trim().length > 0).join(sep);
 }
 
 /** Verdi for et felt basert på tilgjengelig data. */
@@ -31,7 +38,7 @@ function valueFor(
   type: FieldType,
   data: LabelPdfData,
 ): { text?: string; image?: string | null } {
-  const { profile, row, labelNumber, quantity } = data;
+  const { profile, row, labelNumber, quantity, merknad } = data;
   switch (type) {
     case "logo":
       return { image: profile.logo_url };
@@ -49,6 +56,31 @@ function valueFor(
       return { text: labelNumber || "—" };
     case "sist_endret":
       return { text: new Date().toLocaleString("nb-NO") };
+    case "bestilt_av":
+      return { text: merknad?.bestilt_av || "" };
+    case "fyll":
+      return { text: merknad?.fyll || "" };
+    case "tekst":
+      return { text: merknad?.tekst || "" };
+    case "pynt":
+      return { text: merknad?.pynt || "" };
+    case "sukkerbilde":
+      return {
+        text:
+          merknad?.sukkerbilde === true
+            ? "Ja"
+            : merknad?.sukkerbilde === false
+              ? "Nei"
+              : "",
+      };
+    case "kommentar": {
+      const inc = profile.comment_includes;
+      const parts: string[] = [];
+      if (inc.fritekst1 && merknad?.fritekst_1) parts.push(merknad.fritekst_1);
+      if (inc.fritekst2 && merknad?.fritekst_2) parts.push(merknad.fritekst_2);
+      if (inc.fritekst3 && merknad?.fritekst_3) parts.push(merknad.fritekst_3);
+      return { text: joinNonEmpty(parts, "\n") };
+    }
     default:
       return { text: `[${FIELD_LABELS[type]}]` };
   }
