@@ -320,9 +320,9 @@ export default function DeliveryNotesList() {
                   </div>
                   <div className="hidden sm:flex items-baseline gap-2 text-sm">
                     <span className="text-emerald-700 dark:text-emerald-400 font-medium tabular-nums">
-                      {formatDate(date)}
+                      {formatDate(p.delivery_date ?? date)}
                     </span>
-                    <span className="text-muted-foreground">({wd})</span>
+                    <span className="text-muted-foreground">({weekdayShort(p.delivery_date ?? date)})</span>
                     <span className="text-muted-foreground">
                       {p.tour_label ? tourLabelShort(p.tour_label) : "uten tur"}
                     </span>
