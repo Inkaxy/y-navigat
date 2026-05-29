@@ -56,8 +56,6 @@ export function usePendingOrdersList(date: string, tourId: string, type: Pending
 
       let q = supabase
         .from("orders")
-
-        .from("orders")
         .select(
           "id, order_number, customer_id, customer_snapshot, delivery_tour_id, total_incl_vat, internal_notes, customer_notes, is_customer_order, is_return, order_lines(id)"
         )
