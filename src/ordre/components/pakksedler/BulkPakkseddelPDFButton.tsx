@@ -6,11 +6,14 @@ import { useBulkPakksedlerPDF, type BulkScope } from "@/ordre/hooks/useBulkPakks
 
 interface Props {
   scope: BulkScope;
-  /** Synlig label på knappen */
+  /** Synlig label på knappen. Tom streng skjuler label (icon-only). */
   label?: string;
-  variant?: "default" | "outline" | "secondary";
-  size?: "default" | "sm" | "lg";
+  variant?: "default" | "outline" | "secondary" | "ghost";
+  size?: "default" | "sm" | "lg" | "icon";
   disabled?: boolean;
+  /** Custom ikon (default: Printer) */
+  icon?: React.ReactNode;
+  ariaLabel?: string;
 }
 
 function slugify(s: string): string {
@@ -31,7 +34,10 @@ export function BulkPakkseddelPDFButton({
   variant = "outline",
   size = "sm",
   disabled,
+  icon,
+  ariaLabel,
 }: Props) {
+
   const { data, isLoading, isFetching, error: queryError } = useBulkPakksedlerPDF(scope);
   const [generating, setGenerating] = useState(false);
 
@@ -127,7 +133,8 @@ export function BulkPakkseddelPDFButton({
       disabled={isDisabled}
       variant={variant}
       size={size}
-      className="gap-2"
+      className={label ? "gap-2" : ""}
+      aria-label={ariaLabel ?? (label || "Skriv ut")}
       title={
         queryError
           ? `Datafeil: ${(queryError as any)?.message ?? "ukjent"}`
@@ -139,15 +146,20 @@ export function BulkPakkseddelPDFButton({
       {generating ? (
         <>
           <Loader2 className="h-4 w-4 animate-spin" />
-          Genererer PDF…
+          {label && "Genererer PDF…"}
         </>
       ) : (
         <>
-          <Printer className="h-4 w-4" />
-          {label}
-          {data && data.total_notes > 0 && ` (${data.total_notes})`}
+          {icon ?? <Printer className="h-4 w-4" />}
+          {label && (
+            <>
+              {label}
+              {data && data.total_notes > 0 && ` (${data.total_notes})`}
+            </>
+          )}
         </>
       )}
     </Button>
   );
 }
+
