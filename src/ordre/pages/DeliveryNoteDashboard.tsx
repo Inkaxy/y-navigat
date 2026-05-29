@@ -537,7 +537,7 @@ export default function DeliveryNoteDashboard() {
           className={cn(
             "mx-auto grid w-full max-w-4xl gap-5",
             mode === "correction"
-              ? "grid-cols-2 max-w-2xl"
+              ? "grid-cols-2 max-w-lg"
               : "grid-cols-2 sm:grid-cols-4",
           )}
         >
