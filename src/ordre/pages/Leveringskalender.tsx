@@ -55,6 +55,9 @@ import {
 import { DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { AddProductDialog } from "@/ordre/components/orders/AddProductDialog";
 import { MerknadDialog } from "@/ordre/components/orders/MerknadDialog";
+import { useProductLabelProfiles } from "@/produksjon/features/etiketter/hooks/useProductLabelProfiles";
+import { useLabelPrintProfiles } from "@/produksjon/features/utskriftsprofiler/hooks/useLabelPrintProfiles";
+import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
 import { ColumnCommentDialog } from "@/ordre/components/orders/matrix/ColumnCommentDialog";
 import { CopyColumnDialog, type CopyColumnInput } from "@/ordre/components/orders/matrix/CopyColumnDialog";
 import {
