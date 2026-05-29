@@ -214,31 +214,45 @@ export default function DeliveryRules() {
     setFormOpen(true);
   }
 
-  async function handleSoftDelete() {
+  async function handleHardDelete() {
     if (!deleting) return;
     setBusy(true);
     try {
       const { error } = await supabase
         .from("delivery_rules")
-        .update({ is_active: false })
+        .delete()
         .eq("id", deleting.id);
       if (error) throw error;
       await logAudit({
-        action: "deactivated",
+        action: "deleted",
         entity_type: "delivery_rule",
         entity_id: deleting.id,
         entity_display_reference: deleting.name,
         legal_entity_id: NB_LEGAL_ENTITY_ID,
       });
-      toast.success("Regel deaktivert");
+      toast.success("Regel slettet");
       setDeleting(null);
       void qc.invalidateQueries({ queryKey: ["delivery-rules"] });
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Kunne ikke deaktivere regel");
+      toast.error(e instanceof Error ? e.message : "Kunne ikke slette regel");
     } finally {
       setBusy(false);
     }
   }
+
+  async function toggleActive(r: DeliveryRule) {
+    const { error } = await supabase
+      .from("delivery_rules")
+      .update({ is_active: !r.is_active })
+      .eq("id", r.id);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success(r.is_active ? "Regel deaktivert" : "Regel aktivert");
+    void qc.invalidateQueries({ queryKey: ["delivery-rules"] });
+  }
+
 
   function refresh() {
     void qc.invalidateQueries({ queryKey: ["delivery-rules"] });
