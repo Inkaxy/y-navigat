@@ -66,6 +66,33 @@ export function PrintLabelDialog({
   const profile = profiles?.find((p) => p.id === profileId) ?? null;
   const [downloading, setDownloading] = useState(false);
 
+  const orderLineIds = useMemo(() => row?.order_line_ids ?? [], [row]);
+  const { data: merknadMap } = useOrderLineMerknads(orderLineIds);
+
+  /** Bygg en LabelPdfData per ordrelinje, padder/trimmer til ønsket `quantity`. */
+  function buildItems(): LabelPdfData[] {
+    if (!profile || !row) return [];
+    const base = { profile, row, labelNumber };
+    if (orderLineIds.length === 0) {
+      return [{ ...base, quantity, copies: quantity, merknad: null }];
+    }
+    const perLine: LabelPdfData[] = orderLineIds.map((id) => ({
+      ...base,
+      quantity,
+      copies: 1,
+      merknad: merknadMap?.[id] ?? null,
+    }));
+    if (quantity <= perLine.length) {
+      return perLine.slice(0, quantity);
+    }
+    // Pad ekstra kopier med første merknad (vanligvis ikke aktuelt — quantity ≈ antall linjer)
+    const extras = quantity - perLine.length;
+    return [
+      ...perLine,
+      { ...base, quantity, copies: extras, merknad: perLine[0]?.merknad ?? null },
+    ];
+  }
+
   const handleDownloadPdf = async () => {
     if (!row) return;
     if (!profile) {
@@ -75,14 +102,8 @@ export function PrintLabelDialog({
     setDownloading(true);
     try {
       const { pdf } = await import("@react-pdf/renderer");
-      const data: LabelPdfData = {
-        profile,
-        row,
-        labelNumber,
-        quantity,
-        copies: quantity,
-      };
-      const blob = await pdf(<LabelPdfDocument data={data} />).toBlob();
+      const items = buildItems();
+      const blob = await pdf(<CombinedLabelPdfDocument items={items} />).toBlob();
       const url = URL.createObjectURL(blob);
       const fileName = `etikett_${row.display_number}_${slugifyLabel(row.display_name)}${labelNumber ? `_${labelNumber}` : ""}.pdf`;
       const a = document.createElement("a");
@@ -100,7 +121,6 @@ export function PrintLabelDialog({
       setDownloading(false);
     }
   };
-
   useEffect(() => {
     if (open && row) {
       setDeptId(eligibleDepts[0]?.id ?? "");
