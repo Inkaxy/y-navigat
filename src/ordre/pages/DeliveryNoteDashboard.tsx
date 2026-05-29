@@ -115,6 +115,23 @@ export default function DeliveryNoteDashboard() {
   }, [tourId, tourStatus.rows]);
 
   const buttonState = useMemo(() => {
+    if (mode === "correction") {
+      const pending = (counts?.datert ?? 0) + (counts?.retur ?? 0);
+      if (pending === 0) {
+        return {
+          mode: "all_done" as const,
+          label: "Ingen ordre å korrigere",
+          tooltip: "Alle daterte ordre og returordre t.o.m. valgt dato har pakksedler.",
+          disabled: true,
+        };
+      }
+      return {
+        mode: "pending" as const,
+        label: `Hovedkjøring (${pending} ordre t.o.m. ${formatDate(date)})`,
+        tooltip: "Generer pakksedler for alle daterte/retur-ordre t.o.m. valgt dato.",
+        disabled: false,
+      };
+    }
     if (tourId === "all") {
       // Alle turer
       if (tourStatus.totalOrders === 0) {
