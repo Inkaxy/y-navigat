@@ -7,6 +7,7 @@ import {
   slugifyLabel,
   type LabelPdfData,
 } from "@/produksjon/features/etiketter/lib/labelPdf";
+import { fetchOrderLineMerknads } from "@/produksjon/features/etiketter/hooks/useOrderLineMerknads";
 
 import { Button } from "@/components/ui/button";
 import {
