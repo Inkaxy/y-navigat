@@ -283,6 +283,9 @@ export default function MatrixPage() {
     return [...matrix.products, ...addedProducts, ...(ghostProducts ?? [])];
   }, [matrix, addedProducts, ghostProducts]);
 
+  const productById = useMemo(() => {
+    const m = new Map<string, MatrixProduct>();
+    for (const p of allProducts) m.set(p.id, p);
     return m;
   }, [allProducts]);
 
@@ -301,9 +304,6 @@ export default function MatrixPage() {
     }
     return out;
   }, [allProductIds, labelProfileMap, labelProfiles]);
-    for (const p of allProducts) m.set(p.id, p);
-    return m;
-  }, [allProducts]);
 
   const tourById = useMemo(() => {
     const m = new Map<string, MatrixTour>();
