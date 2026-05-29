@@ -614,6 +614,40 @@ export default function DeliveryNoteDashboard() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AlertDialog open={confirmUndoOpen} onOpenChange={setConfirmUndoOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Angre pakkseddel-kjøring?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Dette sletter <strong>alle pakksedler</strong> for{" "}
+              <strong>{formatDate(date)}</strong> —{" "}
+              {tourId === "all"
+                ? "alle turer"
+                : tourId === NULL_TOUR_KEY
+                  ? "ordre uten tur"
+                  : (() => {
+                      const t = tours.find((x) => x.id === tourId);
+                      return t ? `tur ${t.tour_number} ${t.display_name}` : "valgt tur";
+                    })()}
+              , annullerer tilhørende kjøringer og fjerner fastordre som ble
+              automatisk opprettet for dagen. Vanlige ordre beholdes, og du kan
+              kjøre hovedkjøring på nytt etterpå. Operasjonen kan ikke angres
+              automatisk — bruk kun hvis kjøringen ble gjort for en dag det ikke
+              skal kjøres.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Avbryt</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={runUndo}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {undoRuns.isPending ? "Angrer…" : "Ja, angre kjøring"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </TooltipProvider>
   );
 }
