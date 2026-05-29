@@ -1619,11 +1619,14 @@ export type Database = {
       }
       delivery_rules: {
         Row: {
+          blackout_from: string | null
+          blackout_until: string | null
           created_at: string
           created_by: string | null
+          customer_group_ids: string[] | null
           customer_ids: string[] | null
-          deadline_days_before: number
-          deadline_time: string
+          deadline_days_before: number | null
+          deadline_time: string | null
           description: string | null
           id: string
           is_active: boolean
@@ -1632,6 +1635,7 @@ export type Database = {
           product_group_ids: string[] | null
           product_ids: string[] | null
           rule_type: string
+          specific_delivery_date: string | null
           tour_filter: string[] | null
           updated_at: string
           valid_from: string
@@ -1639,11 +1643,14 @@ export type Database = {
           weekdays: number[] | null
         }
         Insert: {
+          blackout_from?: string | null
+          blackout_until?: string | null
           created_at?: string
           created_by?: string | null
+          customer_group_ids?: string[] | null
           customer_ids?: string[] | null
-          deadline_days_before: number
-          deadline_time: string
+          deadline_days_before?: number | null
+          deadline_time?: string | null
           description?: string | null
           id?: string
           is_active?: boolean
@@ -1652,6 +1659,7 @@ export type Database = {
           product_group_ids?: string[] | null
           product_ids?: string[] | null
           rule_type: string
+          specific_delivery_date?: string | null
           tour_filter?: string[] | null
           updated_at?: string
           valid_from?: string
@@ -1659,11 +1667,14 @@ export type Database = {
           weekdays?: number[] | null
         }
         Update: {
+          blackout_from?: string | null
+          blackout_until?: string | null
           created_at?: string
           created_by?: string | null
+          customer_group_ids?: string[] | null
           customer_ids?: string[] | null
-          deadline_days_before?: number
-          deadline_time?: string
+          deadline_days_before?: number | null
+          deadline_time?: string | null
           description?: string | null
           id?: string
           is_active?: boolean
@@ -1672,6 +1683,7 @@ export type Database = {
           product_group_ids?: string[] | null
           product_ids?: string[] | null
           rule_type?: string
+          specific_delivery_date?: string | null
           tour_filter?: string[] | null
           updated_at?: string
           valid_from?: string

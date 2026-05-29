@@ -37,25 +37,36 @@ import { formatDateLong } from "@/ordre/lib/format";
 import { logAudit } from "@/ordre/lib/audit";
 import {
   useDeliveryRules,
-  formatDeadlineDefinition,
+  formatRuleDefinition,
   WEEKDAY_LABELS_LONG,
+  RULE_TYPE_LABEL,
+  RULE_TYPE_SHORT_LABEL,
   type DeliveryRule,
+  type DeliveryRuleType,
   type DeliveryRuleFilter,
 } from "@/ordre/hooks/useDeliveryRules";
 import { useDeliveryTours, sortToursByPriority } from "@/ordre/hooks/useDeliveryTours";
 import { useQuery } from "@tanstack/react-query";
 import { DeliveryRuleFormDialog } from "@/ordre/components/orders/DeliveryRuleFormDialog";
 
-function RuleTypeBadge({ type }: { type: DeliveryRule["rule_type"] }) {
-  if (type === "order_deadline") {
-    return (
-      <span className="inline-flex rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
-        Ordrefrist
-      </span>
-    );
-  }
-  return null;
+const RULE_TYPE_BADGE: Record<DeliveryRuleType, string> = {
+  order_deadline: "bg-primary/10 text-primary",
+  delivery_weekdays: "bg-blue-500/10 text-blue-700 dark:text-blue-300",
+  available_tours: "bg-purple-500/10 text-purple-700 dark:text-purple-300",
+  available_products: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+  no_delivery: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+};
+
+function RuleTypeBadge({ type }: { type: DeliveryRuleType }) {
+  return (
+    <span
+      className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${RULE_TYPE_BADGE[type]}`}
+    >
+      {RULE_TYPE_SHORT_LABEL[type]}
+    </span>
+  );
 }
+
 
 function ScopeText({
   rule,
@@ -123,8 +134,10 @@ export default function DeliveryRules() {
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<NonNullable<DeliveryRuleFilter["status"]>>("active");
+  const [ruleType, setRuleType] = useState<NonNullable<DeliveryRuleFilter["ruleType"]>>("all");
 
-  const { data: rules = [], isLoading } = useDeliveryRules({ search, status });
+  const { data: rules = [], isLoading } = useDeliveryRules({ search, status, ruleType });
+
 
   const { data: tours = [] } = useDeliveryTours();
   const tourMap = useMemo(() => {
@@ -201,31 +214,45 @@ export default function DeliveryRules() {
     setFormOpen(true);
   }
 
-  async function handleSoftDelete() {
+  async function handleHardDelete() {
     if (!deleting) return;
     setBusy(true);
     try {
       const { error } = await supabase
         .from("delivery_rules")
-        .update({ is_active: false })
+        .delete()
         .eq("id", deleting.id);
       if (error) throw error;
       await logAudit({
-        action: "deactivated",
+        action: "deleted",
         entity_type: "delivery_rule",
         entity_id: deleting.id,
         entity_display_reference: deleting.name,
         legal_entity_id: NB_LEGAL_ENTITY_ID,
       });
-      toast.success("Regel deaktivert");
+      toast.success("Regel slettet");
       setDeleting(null);
       void qc.invalidateQueries({ queryKey: ["delivery-rules"] });
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Kunne ikke deaktivere regel");
+      toast.error(e instanceof Error ? e.message : "Kunne ikke slette regel");
     } finally {
       setBusy(false);
     }
   }
+
+  async function toggleActive(r: DeliveryRule) {
+    const { error } = await supabase
+      .from("delivery_rules")
+      .update({ is_active: !r.is_active })
+      .eq("id", r.id);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success(r.is_active ? "Regel deaktivert" : "Regel aktivert");
+    void qc.invalidateQueries({ queryKey: ["delivery-rules"] });
+  }
+
 
   function refresh() {
     void qc.invalidateQueries({ queryKey: ["delivery-rules"] });
@@ -255,14 +282,20 @@ export default function DeliveryRules() {
               className="pl-8"
             />
           </div>
-          <Select disabled value="order_deadline">
-            <SelectTrigger className="w-[180px]">
+          <Select value={ruleType} onValueChange={(v) => setRuleType(v as typeof ruleType)}>
+            <SelectTrigger className="w-[220px]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="order_deadline">Ordrefrist</SelectItem>
+              <SelectItem value="all">Alle regeltyper</SelectItem>
+              <SelectItem value="order_deadline">{RULE_TYPE_LABEL.order_deadline}</SelectItem>
+              <SelectItem value="delivery_weekdays">{RULE_TYPE_LABEL.delivery_weekdays}</SelectItem>
+              <SelectItem value="available_tours">{RULE_TYPE_LABEL.available_tours}</SelectItem>
+              <SelectItem value="available_products">{RULE_TYPE_LABEL.available_products}</SelectItem>
+              <SelectItem value="no_delivery">{RULE_TYPE_LABEL.no_delivery}</SelectItem>
             </SelectContent>
           </Select>
+
           <Select value={status} onValueChange={(v) => setStatus(v as typeof status)}>
             <SelectTrigger className="w-[140px]">
               <SelectValue />
@@ -332,9 +365,10 @@ export default function DeliveryRules() {
                           Inaktiv
                         </span>
                       )}
-                    </TableCell>
                     <TableCell className="text-sm">
-                      {formatDeadlineDefinition(r.deadline_time, r.deadline_days_before)}
+                      {formatRuleDefinition(r)}
+                    </TableCell>
+
                     </TableCell>
                     <TableCell>
                       <ScopeText
@@ -374,17 +408,25 @@ export default function DeliveryRules() {
                       >
                         <Copy className="h-3.5 w-3.5" />
                       </Button>
-                      {r.is_active && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => setDeleting(r)}
-                          className="h-7 w-7 p-0 text-destructive hover:bg-destructive/10"
-                          aria-label="Deaktiver regel"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      )}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => toggleActive(r)}
+                        className="h-7 px-2 text-xs"
+                        title={r.is_active ? "Deaktiver" : "Aktiver"}
+                      >
+                        {r.is_active ? "Deaktiver" : "Aktiver"}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setDeleting(r)}
+                        className="h-7 w-7 p-0 text-destructive hover:bg-destructive/10"
+                        aria-label="Slett regel"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+
                     </TableCell>
                   </TableRow>
                 ))
@@ -401,22 +443,20 @@ export default function DeliveryRules() {
         template={template}
         onSaved={refresh}
       />
-
       <AlertDialog open={!!deleting} onOpenChange={(o) => !o && setDeleting(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Deaktiver «{deleting?.name}»?</AlertDialogTitle>
+            <AlertDialogTitle>Slett «{deleting?.name}»?</AlertDialogTitle>
             <AlertDialogDescription>
-              Regelen vil ikke lenger evalueres for nye ordre. Du kan reaktivere
-              regelen senere via Inaktive-filteret. Dette er en myk sletting —
-              historiske regel-data bevares.
+              Regelen fjernes permanent og vil ikke lenger gjelde for nye ordre.
+              Bruk «Deaktiver» i stedet hvis du ønsker å kunne aktivere regelen senere.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={busy}>Avbryt</AlertDialogCancel>
-            <AlertDialogAction onClick={handleSoftDelete} disabled={busy}>
+            <AlertDialogAction onClick={handleHardDelete} disabled={busy}>
               {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Deaktiver
+              Slett
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -48,6 +48,9 @@ import {
 } from "@/ordre/hooks/useCustomerOrders";
 import type { CustomerOption } from "@/ordre/hooks/useNBCustomers";
 import { tomorrow } from "@/ordre/lib/format";
+import { useActiveDeliveryRules } from "@/ordre/hooks/useDeliveryRules";
+import { enforceDeliveryRules } from "@/ordre/lib/deliveryRuleEnforcement";
+
 import { logAudit } from "@/ordre/lib/audit";
 import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
 import { MerknadDialog } from "@/ordre/components/orders/MerknadDialog";
@@ -247,6 +250,23 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
 
   const today = new Date().toISOString().slice(0, 10);
 
+  // ----- Håndhevelse av leveringsregler -----
+  const { data: activeRules = [] } = useActiveDeliveryRules();
+  const ruleEnforcement = useMemo(
+    () =>
+      enforceDeliveryRules(
+        {
+          deliveryDate,
+          deliveryTourId: tourId === "none" ? null : tourId,
+          productIds,
+          customerId: customer.id,
+        },
+        activeRules,
+      ),
+    [activeRules, deliveryDate, tourId, productIds, customer.id],
+  );
+
+
   function removeLine(uid: string) {
     setLines((prev) => prev.filter((l) => l.uid !== uid));
   }
@@ -332,6 +352,13 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
       toast.error("Legg til minst én linje med produkt og mengde");
       return null;
     }
+    if (ruleEnforcement.blocked) {
+      toast.error(
+        `Kan ikke lagre — bryter leveringsregel: ${ruleEnforcement.violations[0]?.message ?? "ukjent"}`,
+      );
+      return null;
+    }
+
 
     const inputLines: CustomerOrderLineInput[] = validLines.map((l) => ({
       product_id: l.product!.id,
@@ -781,6 +808,22 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
             </div>
           )}
 
+          {ruleEnforcement.blocked && (
+            <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm">
+              <div className="mb-1 flex items-center gap-1.5 font-medium text-destructive">
+                <AlertTriangle className="h-4 w-4" />
+                Ordren bryter leveringsregler
+              </div>
+              <ul className="ml-5 list-disc space-y-0.5 text-xs text-destructive">
+                {ruleEnforcement.violations.map((v) => (
+                  <li key={v.rule_id}>
+                    <strong>{v.rule_name}:</strong> {v.message}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           <DialogFooter className="gap-2 sm:gap-2">
             {isEdit && (
               <Button
@@ -798,11 +841,21 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
             <Button type="button" variant="outline" onClick={handleClose} disabled={submitting}>
               Avbryt
             </Button>
-            <Button type="button" onClick={handleSave} disabled={submitting}>
+            <Button
+              type="button"
+              onClick={handleSave}
+              disabled={submitting || ruleEnforcement.blocked}
+              title={
+                ruleEnforcement.blocked
+                  ? "Ordren bryter en leveringsregel"
+                  : undefined
+              }
+            >
               {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               {isEdit ? "Lagre endringer" : "Opprett kundeordre"}
             </Button>
           </DialogFooter>
+
         </DialogContent>
       </Dialog>
 
