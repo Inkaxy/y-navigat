@@ -127,13 +127,8 @@ export function BulkPakkseddelPDFButton({
 
   const isDisabled = disabled || isLoading || isFetching || generating || empty || !data;
 
-  return (
-    <Button
-      onClick={handleClick}
-      disabled={isDisabled}
-      variant={variant}
-      size={size}
-      className="gap-2"
+      className={label ? "gap-2" : ""}
+      aria-label={ariaLabel ?? (label || "Skriv ut")}
       title={
         queryError
           ? `Datafeil: ${(queryError as any)?.message ?? "ukjent"}`
@@ -145,15 +140,21 @@ export function BulkPakkseddelPDFButton({
       {generating ? (
         <>
           <Loader2 className="h-4 w-4 animate-spin" />
-          Genererer PDF…
+          {label && "Genererer PDF…"}
         </>
       ) : (
         <>
-          <Printer className="h-4 w-4" />
-          {label}
-          {data && data.total_notes > 0 && ` (${data.total_notes})`}
+          {icon ?? <Printer className="h-4 w-4" />}
+          {label && (
+            <>
+              {label}
+              {data && data.total_notes > 0 && ` (${data.total_notes})`}
+            </>
+          )}
         </>
       )}
     </Button>
   );
+}
+
 }
