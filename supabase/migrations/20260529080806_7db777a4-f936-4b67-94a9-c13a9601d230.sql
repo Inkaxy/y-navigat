@@ -1,0 +1,2 @@
+ALTER TABLE public.delivery_note_runs DROP CONSTRAINT delivery_note_runs_status_check;
+ALTER TABLE public.delivery_note_runs ADD CONSTRAINT delivery_note_runs_status_check CHECK (status = ANY (ARRAY['pending'::text, 'running'::text, 'completed'::text, 'failed'::text, 'cancelled'::text]));
