@@ -697,3 +697,55 @@ function TourChip({ active, label, onClick }: { active: boolean; label: string; 
     </button>
   );
 }
+
+function ModeToggle({
+  mode,
+  onChange,
+}: {
+  mode: "date" | "correction";
+  onChange: (next: "date" | "correction") => void;
+}) {
+  const items: {
+    key: "date" | "correction";
+    label: string;
+    icon: typeof CalendarCheck2;
+  }[] = [
+    { key: "date", label: "For dato", icon: CalendarCheck2 },
+    { key: "correction", label: "For korreksjon", icon: CalendarClock },
+  ];
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        {mode === "correction" ? "For korreksjon:" : "For dato:"}
+      </div>
+      <div className="flex gap-1.5">
+        {items.map((it) => {
+          const active = mode === it.key;
+          const Icon = it.icon;
+          return (
+            <Tooltip key={it.key}>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  aria-label={it.label}
+                  onClick={() => onChange(it.key)}
+                  className={cn(
+                    "group flex h-11 w-11 items-center justify-center rounded-[10px] border-2 transition",
+                    active
+                      ? "border-emerald-600 bg-emerald-50 text-emerald-700 shadow-sm dark:bg-emerald-950/40"
+                      : "border-border bg-background text-muted-foreground hover:border-emerald-600/60 hover:text-emerald-700",
+                  )}
+                >
+                  <Icon className="h-5 w-5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">{it.label}</TooltipContent>
+            </Tooltip>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
