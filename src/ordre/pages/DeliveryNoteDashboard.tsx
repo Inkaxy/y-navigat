@@ -37,7 +37,6 @@ import { TourRunStatus } from "@/ordre/components/pakksedler/TourRunStatus";
 import { useTourRunStatus, NULL_TOUR_KEY } from "@/ordre/hooks/useTourRunStatus";
 import { BulkPakkseddelPDFButton } from "@/ordre/components/pakksedler/BulkPakkseddelPDFButton";
 import { DateContextChips } from "@/ordre/components/shell/DateContextChips";
-import { WeekMonthQuickPicker } from "@/ordre/components/shell/WeekMonthQuickPicker";
 import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
 import { useUndoDeliveryRuns } from "@/ordre/hooks/useUndoDeliveryRuns";
 
@@ -322,8 +321,6 @@ export default function DeliveryNoteDashboard() {
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
 
-                {/* Uke + måned-hurtigvalg (A.5.5.6 DEL A.2) */}
-                <WeekMonthQuickPicker date={date} onChange={setDate} />
 
                 <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
                   <PopoverTrigger asChild>
