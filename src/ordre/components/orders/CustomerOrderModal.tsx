@@ -352,6 +352,13 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
       toast.error("Legg til minst én linje med produkt og mengde");
       return null;
     }
+    if (ruleEnforcement.blocked) {
+      toast.error(
+        `Kan ikke lagre — bryter leveringsregel: ${ruleEnforcement.violations[0]?.message ?? "ukjent"}`,
+      );
+      return null;
+    }
+
 
     const inputLines: CustomerOrderLineInput[] = validLines.map((l) => ({
       product_id: l.product!.id,
