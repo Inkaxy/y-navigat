@@ -408,17 +408,25 @@ export default function DeliveryRules() {
                       >
                         <Copy className="h-3.5 w-3.5" />
                       </Button>
-                      {r.is_active && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => setDeleting(r)}
-                          className="h-7 w-7 p-0 text-destructive hover:bg-destructive/10"
-                          aria-label="Deaktiver regel"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      )}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => toggleActive(r)}
+                        className="h-7 px-2 text-xs"
+                        title={r.is_active ? "Deaktiver" : "Aktiver"}
+                      >
+                        {r.is_active ? "Deaktiver" : "Aktiver"}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setDeleting(r)}
+                        className="h-7 w-7 p-0 text-destructive hover:bg-destructive/10"
+                        aria-label="Slett regel"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+
                     </TableCell>
                   </TableRow>
                 ))
