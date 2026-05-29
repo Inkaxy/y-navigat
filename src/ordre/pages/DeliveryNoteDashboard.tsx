@@ -292,12 +292,9 @@ export default function DeliveryNoteDashboard() {
 
   const widgets =
     mode === "correction"
-      ? allWidgets
-          .filter((w) => w.key === "datert" || w.key === "retur")
-          .map((w) => ({ ...w, span: 1 }))
+      ? allWidgets.filter((w) => w.key === "datert" || w.key === "retur")
       : allWidgets;
-  const widgetGridCols =
-    mode === "correction" ? "lg:grid-cols-2" : "lg:grid-cols-5";
+
 
   return (
     <TooltipProvider>
