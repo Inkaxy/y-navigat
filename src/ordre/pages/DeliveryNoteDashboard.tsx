@@ -449,6 +449,18 @@ export default function DeliveryNoteDashboard() {
                 >
                   Korreksjonskjøring
                 </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={!mainCompletedInScope || undoRuns.isPending || generate.isPending}
+                  title={
+                    !mainCompletedInScope
+                      ? "Ingen kjøring å angre for valgt dato/tur"
+                      : "Slett pakksedler og angre kjøringen for valgt dato/tur"
+                  }
+                  onSelect={() => setConfirmUndoOpen(true)}
+                  className="text-destructive focus:text-destructive"
+                >
+                  Angre kjøring
+                </DropdownMenuItem>
 
                 <DropdownMenuSeparator />
                 {/* Pakkseddelkjøringer-handlinger */}
