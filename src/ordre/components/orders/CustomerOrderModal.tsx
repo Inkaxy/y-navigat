@@ -637,6 +637,7 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
                       const p = Number(l.unit_price) || 0;
                       const lineSum = q * p;
                       const hasMerknad = !!l.merknad && !isMerknadEmpty(l.merknad);
+                      const lineProfile = getLineProfile(l.product?.id);
                       return (
                         <div
                           key={l.uid}
