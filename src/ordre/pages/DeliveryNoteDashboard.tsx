@@ -81,10 +81,12 @@ export default function DeliveryNoteDashboard() {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmCorrectionOpen, setConfirmCorrectionOpen] = useState(false);
+  const [confirmUndoOpen, setConfirmUndoOpen] = useState(false);
 
   const { data: tours = [] } = useDeliveryTours({ activeOnly: true });
   const { data: counts, isLoading } = useDeliveryNoteCounts(date, tourId);
   const generate = useGenerateDeliveryNotes();
+  const undoRuns = useUndoDeliveryRuns();
   const tourStatus = useTourRunStatus(date);
 
   const rel = useMemo(() => relativeDateLabel(date), [date]);
