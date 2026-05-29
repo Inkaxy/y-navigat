@@ -56,8 +56,10 @@ export function usePendingOrdersList(date: string, tourId: string, type: Pending
 
       let q = supabase
         .from("orders")
+      let q = supabase
+        .from("orders")
         .select(
-          "id, display_number, customer_id, customer_snapshot, delivery_tour_id, total_incl_vat, notes, is_customer_order, is_return, order_lines(id)"
+          "id, order_number, customer_id, customer_snapshot, delivery_tour_id, total_incl_vat, internal_notes, customer_notes, is_customer_order, is_return, order_lines(id)"
         )
         .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
         .eq("delivery_date", date);
@@ -69,11 +71,9 @@ export function usePendingOrdersList(date: string, tourId: string, type: Pending
       else if (type === "datert") q = q.eq("is_customer_order", true).eq("is_return", false);
       else q = q.eq("is_return", true);
 
-      const { data, error } = await q.order("display_number", { ascending: true });
+      const { data, error } = await q.order("order_number", { ascending: true });
       if (error) throw error;
 
-      const rows: PendingOrderRow[] = ((data ?? []) as any[])
-        .filter((o) => !packed.has(o.id))
         .map((o) => {
           const tour = o.delivery_tour_id ? tourById.get(o.delivery_tour_id) : null;
           const snap = (o.customer_snapshot ?? {}) as Record<string, any>;
