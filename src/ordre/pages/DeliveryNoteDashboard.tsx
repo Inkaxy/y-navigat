@@ -99,7 +99,7 @@ export default function DeliveryNoteDashboard() {
   const [confirmUndoOpen, setConfirmUndoOpen] = useState(false);
 
   const { data: tours = [] } = useDeliveryTours({ activeOnly: true });
-  const { data: counts, isLoading } = useDeliveryNoteCounts(date, tourId);
+  const { data: counts, isLoading } = useDeliveryNoteCounts(date, tourId, mode);
   const generate = useGenerateDeliveryNotes();
   const undoRuns = useUndoDeliveryRuns();
   const tourStatus = useTourRunStatus(date);
