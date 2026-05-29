@@ -283,8 +283,24 @@ export default function MatrixPage() {
     return [...matrix.products, ...addedProducts, ...(ghostProducts ?? [])];
   }, [matrix, addedProducts, ghostProducts]);
 
-  const productById = useMemo(() => {
-    const m = new Map<string, MatrixProduct>();
+    return m;
+  }, [allProducts]);
+
+  // Etikettprofiler pr produkt (matrise-celler)
+  const allProductIds = useMemo(() => allProducts.map((p) => p.id), [allProducts]);
+  const { data: labelProfileMap } = useProductLabelProfiles(allProductIds, NB_LEGAL_ENTITY_ID);
+  const { data: labelProfiles } = useLabelPrintProfiles(NB_LEGAL_ENTITY_ID);
+  const labelProfileByProduct = useMemo(() => {
+    const byId = new Map<string, NonNullable<typeof labelProfiles>[number]>();
+    for (const p of labelProfiles ?? []) byId.set(p.id, p);
+    const out = new Map<string, NonNullable<typeof labelProfiles>[number]>();
+    for (const pid of allProductIds) {
+      const profId = labelProfileMap?.[pid];
+      const prof = profId ? byId.get(profId) : null;
+      if (prof) out.set(pid, prof);
+    }
+    return out;
+  }, [allProductIds, labelProfileMap, labelProfiles]);
     for (const p of allProducts) m.set(p.id, p);
     return m;
   }, [allProducts]);
