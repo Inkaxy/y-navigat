@@ -1,11 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Loader2, Printer, AlertCircle, Download, Info } from "lucide-react";
 import { useLabelPrintProfiles } from "@/produksjon/features/utskriftsprofiler/hooks/useLabelPrintProfiles";
 import {
-  LabelPdfDocument,
+  CombinedLabelPdfDocument,
   slugifyLabel,
   type LabelPdfData,
 } from "../lib/labelPdf";
+import { useOrderLineMerknads } from "../hooks/useOrderLineMerknads";
 import {
   Dialog,
   DialogContent,
