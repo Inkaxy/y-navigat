@@ -307,7 +307,7 @@ export default function DeliveryNoteDashboard() {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           {/* Venstre: modus-toggle + dato-blokk */}
           <div className="flex items-start gap-4">
-
+            <ModeToggle mode={mode} onChange={setMode} />
             <div className="text-center">
               <div className="text-xs uppercase tracking-wide text-muted-foreground">
                 {mode === "correction" ? "Til dato" : "Leveransedato"}
