@@ -37,25 +37,36 @@ import { formatDateLong } from "@/ordre/lib/format";
 import { logAudit } from "@/ordre/lib/audit";
 import {
   useDeliveryRules,
-  formatDeadlineDefinition,
+  formatRuleDefinition,
   WEEKDAY_LABELS_LONG,
+  RULE_TYPE_LABEL,
+  RULE_TYPE_SHORT_LABEL,
   type DeliveryRule,
+  type DeliveryRuleType,
   type DeliveryRuleFilter,
 } from "@/ordre/hooks/useDeliveryRules";
 import { useDeliveryTours, sortToursByPriority } from "@/ordre/hooks/useDeliveryTours";
 import { useQuery } from "@tanstack/react-query";
 import { DeliveryRuleFormDialog } from "@/ordre/components/orders/DeliveryRuleFormDialog";
 
-function RuleTypeBadge({ type }: { type: DeliveryRule["rule_type"] }) {
-  if (type === "order_deadline") {
-    return (
-      <span className="inline-flex rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
-        Ordrefrist
-      </span>
-    );
-  }
-  return null;
+const RULE_TYPE_BADGE: Record<DeliveryRuleType, string> = {
+  order_deadline: "bg-primary/10 text-primary",
+  delivery_weekdays: "bg-blue-500/10 text-blue-700 dark:text-blue-300",
+  available_tours: "bg-purple-500/10 text-purple-700 dark:text-purple-300",
+  available_products: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+  no_delivery: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+};
+
+function RuleTypeBadge({ type }: { type: DeliveryRuleType }) {
+  return (
+    <span
+      className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${RULE_TYPE_BADGE[type]}`}
+    >
+      {RULE_TYPE_SHORT_LABEL[type]}
+    </span>
+  );
 }
+
 
 function ScopeText({
   rule,
