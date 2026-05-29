@@ -443,23 +443,28 @@ export default function DeliveryRules() {
         template={template}
         onSaved={refresh}
       />
-
       <AlertDialog open={!!deleting} onOpenChange={(o) => !o && setDeleting(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Deaktiver «{deleting?.name}»?</AlertDialogTitle>
+            <AlertDialogTitle>Slett «{deleting?.name}»?</AlertDialogTitle>
             <AlertDialogDescription>
-              Regelen vil ikke lenger evalueres for nye ordre. Du kan reaktivere
-              regelen senere via Inaktive-filteret. Dette er en myk sletting —
-              historiske regel-data bevares.
+              Regelen fjernes permanent og vil ikke lenger gjelde for nye ordre.
+              Bruk «Deaktiver» i stedet hvis du ønsker å kunne aktivere regelen senere.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={busy}>Avbryt</AlertDialogCancel>
-            <AlertDialogAction onClick={handleSoftDelete} disabled={busy}>
+            <AlertDialogAction onClick={handleHardDelete} disabled={busy}>
               {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Deaktiver
+              Slett
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
+
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
