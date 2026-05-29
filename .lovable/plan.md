@@ -1,91 +1,44 @@
-## Mål
+# Korreksjonsmodus — t.o.m. valgt dato
 
-Gjøre Leveringsregler-modulen mer brukervennlig og omfattende, basert på vedlagte skjermbilder. Reglene skal håndheves (kunder/operatører kan ikke bryte dem) og kunne fjernes helt — ikke bare deaktiveres.
+I dag behandler korreksjonsmodus kun ordre på nøyaktig valgt dato. Endringen gjør modusen til et "korrigér før fakturering"-verktøy: alt av daterte ordre og returordre med leveringsdato ≤ valgt dato vises, og kan dekkes av én "Hovedkjøring".
 
-## Fem regeltyper
+## Endringer
 
-| Type | Definerer | Bruk |
-|---|---|---|
-| `order_deadline` | Antall dager + klokkeslett før leveranse | Ordrefrist (eksisterer) |
-| `delivery_weekdays` | Hvilke ukedager leveranse er tillatt | Sperrer datoer på andre ukedager |
-| `available_tours` | Hvilke turer som er tilgjengelige | Begrenser turvalg |
-| `available_products` | Hvilke varer/salgsgrupper som kan bestilles | Skjuler/sperrer varer |
-| `no_delivery` | Stengt fra/til-dato | Total leveransestopp i periode |
+**1. Tellinger (`useDeliveryNoteCounts`)**
+- Ta `mode` som parameter.
+- I `correction`: bytt `eq("delivery_date", date)` → `lte("delivery_date", date)` for både ordre-tellingene og aktive pakksedler. Bare daterte og retur teller; fastordre settes til 0 (skjules uansett i UI).
 
-Alle typene kan filtreres på (valgfritt): kundegruppe, kunder, ukedager, turer, spesiell leveransedato, salgsgruppe, varer — samt gyldighetsperiode.
+**2. Liste over pending ordre (`usePendingOrdersList`)**
+- Ta `mode` som parameter.
+- I `correction`: filtrer `delivery_date <= date`. Begrens til typene `datert` / `retur` (fastordre er ikke relevant her).
+- Pakket-sjekk (`fetchPackedOrderIds`) må også bruke `lte`.
+- Returner `delivery_date` per rad så listevisningen kan vise faktisk leveringsdato.
 
-## UI
+**3. Pakksedler-liste (`useDeliveryNotesList`)**
+- Ta `mode` som parameter.
+- I `correction`: `lte("delivery_date", date)`, og returner `delivery_date` per rad.
 
-**Skjema (`DeliveryRuleFormDialog`)**
+**4. Listeside (`DeliveryNotesList.tsx`)**
+- Les `mode` fra URL og videresend til hookene.
+- Når `mode === "correction"`: vis leveringsdato-kolonne per rad (i stedet for global header-dato), og oppdater overskrift til "t.o.m. {dato}".
+- Sjekk at navigasjon fra widget-kortene tar med `mode=correction` (ligger allerede i URL — sørg for at det propageres).
 
-Bytt fra ett-typers skjema til typevelger-kort øverst (slik mockup viser): 5 knapper i en vertikal liste, aktivt valg markert med grønn ramme. Under typevelgeren vises kun feltene som hører til valgt type:
+**5. Dashboard (`DeliveryNoteDashboard.tsx`)**
+- Send `mode` til `useDeliveryNoteCounts`.
+- Sørg for at widget-kortene navigerer med `&mode=correction` slik at listen arver modus.
+- Hovedkjøring-knappen i korreksjonsmodus:
+  - Aktiv når `counts.datert + counts.retur > 0`.
+  - Tekst: `Hovedkjøring (N ordre t.o.m. {dato})`.
+  - Ved kjøring: hent unike `delivery_date` for pending datert/retur ≤ valgt dato, kall RPC `generate_delivery_notes` per dato sekvensielt med `run_type='main'`. Aggregér resultatet i én toast.
+- Bekreftelsesdialog oppdateres til å si "t.o.m. {dato}" i korreksjonsmodus.
+- Tilleggkjøring / Korreksjonskjøring / Angre / "Skriv ut alle" forblir per-dato (uendret) — vises som i dag.
 
-- `order_deadline` → «Antall dager før leveranse» + «før klokken HH:MM»
-- `delivery_weekdays` → ukedag-checkboxer (man–søn)
-- `available_tours` → turliste-checkboxer
-- `available_products` → salgsgruppe-velger + vare-velger
-- `no_delivery` → fra/til-dato + gul info-boks «Dette er kun en regel for å stoppe registrering av nye ordre…»
-
-Felles seksjoner under (alle typer):
-- «Hvem gjelder regelen for (valgfritt)» — kundegruppe, kunder
-- «Tidspunkt (valgfritt)» — ukedager, turer, én spesifikk leveransedato (skjules for `delivery_weekdays`/`available_tours`/`no_delivery` der det er redundant)
-- «Varer (valgfritt)» — salgsgruppe, varer (skjules for `available_products`)
-- «Navn og gyldighet» — navn, gyldig fra/til
-- Sidepanel «Regelen i ord» som oppsummerer regelen i klartekst live
-
-**Listevisning (`DeliveryRules.tsx`)**
-- Vis alle regeltyper (ikke disabled select)
-- Egen badge-farge per type
-- Definerer-kolonne formatert per type
-- Sletteknapp utfører hard delete (DELETE) etter bekreftelse — ikke soft delete. Beholder også «deaktiver»-toggle som egen handling.
-
-## Håndheving (blokkerende)
-
-Ny modul `src/ordre/lib/deliveryRuleEnforcement.ts` med funksjon
-```ts
-enforceRules(input, rules): { blocked: boolean; violations: Violation[] }
-```
-som returnerer harde brudd (rød) per regeltype.
-
-Integreres i:
-- `NewOrder.tsx`: hindrer lagring når `blocked = true`, viser feilmelding per brudd
-- `CustomerOrderModal.tsx`: blokkerer «Lagre» + sperrer ukedager/turer/varer i UI når de bryter regler
-- `Leveringskalender.tsx`: viser stengte dager fra `no_delivery`
-
-Reglene leses fortsatt via `useOrderRulesContext` som utvides til å returnere alle aktive regler (ikke bare `order_deadline`).
-
-## Database
-
-Migrasjon:
-1. Behold `rule_type TEXT` (allerede tekst) — bare nye verdier
-2. Gjør `deadline_time`/`deadline_days_before` NULLABLE (kun relevant for `order_deadline`)
-3. Legg til nullable kolonner:
-   - `blackout_from DATE`, `blackout_until DATE` (for `no_delivery`)
-   - `specific_delivery_date DATE` (felles tidspunkt-filter)
-   - `customer_group_ids UUID[]`, `product_group_ids UUID[]` (sales group + customer group)
-4. CHECK-trigger som validerer at riktige felter er satt per `rule_type`
-
-RLS er allerede på plass — ingen endring der.
+**6. RPC**
+- Ingen DB-endringer. Vi itererer per dato fra klienten siden `generate_delivery_notes` er per-dato.
 
 ## Tekniske detaljer
 
-- Type `DeliveryRuleType` utvides i `useDeliveryRules.ts`
-- `formatRuleDefinition(rule)` erstatter `formatDeadlineDefinition` og dekker alle 5 typer
-- Sidepanelet bruker en `describeRule(rule, lookups)` helper
-
-## Filer som endres/opprettes
-
-- `supabase/migrations/<ny>.sql` (skjema-utvidelse)
-- `src/ordre/hooks/useDeliveryRules.ts` (typer + filtre)
-- `src/ordre/hooks/useOrderRulesContext.ts` (returner alle typer)
-- `src/ordre/lib/orderRules.ts` (utvid for nye typer)
-- `src/ordre/lib/deliveryRuleEnforcement.ts` (ny — blokkerende sjekk)
-- `src/ordre/components/orders/DeliveryRuleFormDialog.tsx` (full redesign)
-- `src/ordre/pages/DeliveryRules.tsx` (badges + hard delete)
-- `src/ordre/pages/NewOrder.tsx` + `src/ordre/components/orders/CustomerOrderModal.tsx` (håndhev brudd)
-
-## Spørsmål før jeg starter
-
-1. Skal **hard sletting** være tilgjengelig, eller kun «deaktiver»? (Mockup viser at de skal kunne fjernes — jeg antar hard delete med bekreftelsesdialog.)
-2. Skal håndhevingen være **absolutt blokkerende** også for interne operatører i NewOrder, eller kun for kundeportalen — der operatører får en overstyringsmulighet?
-3. Trenger vi virkelig alle 5 typene nå, eller skal jeg starte med de mest kritiske (`no_delivery` + `delivery_weekdays`) og legge til resten etterpå?
+- `mode` defaulter til `"date"` i alle hooks → eksisterende kallsteder uendret.
+- `queryKey` utvides med `mode` for å unngå cache-kollisjon.
+- Sekvensiell RPC-kjøring (ikke parallell) for å unngå låsekonflikter på pakksedel-tellere.
+- Hvis ingen pending dato finnes: vis info-toast og avbryt.
