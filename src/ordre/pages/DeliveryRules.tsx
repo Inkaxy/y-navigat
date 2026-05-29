@@ -282,14 +282,20 @@ export default function DeliveryRules() {
               className="pl-8"
             />
           </div>
-          <Select disabled value="order_deadline">
-            <SelectTrigger className="w-[180px]">
+          <Select value={ruleType} onValueChange={(v) => setRuleType(v as typeof ruleType)}>
+            <SelectTrigger className="w-[220px]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="order_deadline">Ordrefrist</SelectItem>
+              <SelectItem value="all">Alle regeltyper</SelectItem>
+              <SelectItem value="order_deadline">{RULE_TYPE_LABEL.order_deadline}</SelectItem>
+              <SelectItem value="delivery_weekdays">{RULE_TYPE_LABEL.delivery_weekdays}</SelectItem>
+              <SelectItem value="available_tours">{RULE_TYPE_LABEL.available_tours}</SelectItem>
+              <SelectItem value="available_products">{RULE_TYPE_LABEL.available_products}</SelectItem>
+              <SelectItem value="no_delivery">{RULE_TYPE_LABEL.no_delivery}</SelectItem>
             </SelectContent>
           </Select>
+
           <Select value={status} onValueChange={(v) => setStatus(v as typeof status)}>
             <SelectTrigger className="w-[140px]">
               <SelectValue />
