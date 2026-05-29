@@ -665,6 +665,7 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
                               </span>
                             )}
                           </div>
+                          <Input
                             type="text"
                             inputMode="decimal"
                             value={l.quantity}
