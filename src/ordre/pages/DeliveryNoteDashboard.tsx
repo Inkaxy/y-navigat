@@ -301,31 +301,37 @@ export default function DeliveryNoteDashboard() {
 
   return (
     <TooltipProvider>
-      <div className="mx-auto w-full max-w-7xl px-4 py-6 space-y-6">
-        {/* Header / dato-nav */}
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          {/* Venstre: modus-toggle + dato-blokk */}
-          <div className="flex items-start gap-4">
+      <div className="mx-auto w-full max-w-7xl px-4 py-8 space-y-8">
+        {/* Toppseksjon — modus venstre, dato sentrert, handlinger høyre */}
+        <div className="relative flex items-start justify-between gap-6">
+          {/* Venstre: modus-toggle */}
+          <div className="flex-shrink-0">
             <ModeToggle mode={mode} onChange={setMode} />
-            <div className="text-center">
-              <div className="text-xs uppercase tracking-wide text-muted-foreground">
+          </div>
+
+          {/* Senter: dato + turer */}
+          <div className="flex flex-1 flex-col items-center gap-4">
+            <div className="flex flex-col items-center">
+              <div className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                 {mode === "correction" ? "Til dato" : "Leveransedato"}
               </div>
-              <div className="mt-1 flex items-center gap-2">
+              <div className="mt-1 flex items-center gap-3">
                 <Button
-                  variant="outline"
+                  variant="ghost"
                   size="icon"
                   aria-label="Forrige dag"
                   onClick={() => setDate((d) => shiftIsoDate(d, -1))}
+                  className="h-9 w-9"
                 >
-                  <ChevronLeft className="h-4 w-4" />
+                  <ChevronLeft className="h-5 w-5" />
                 </Button>
-
 
                 <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
                   <PopoverTrigger asChild>
-                    <Button variant="ghost" className="min-w-[180px] text-xl font-semibold">
-                      <CalendarIcon className="mr-2 h-5 w-5 opacity-60" />
+                    <Button
+                      variant="ghost"
+                      className="min-w-[200px] text-3xl font-bold tracking-tight hover:bg-transparent hover:text-primary"
+                    >
                       {formatDate(date)}
                     </Button>
                   </PopoverTrigger>
@@ -360,17 +366,18 @@ export default function DeliveryNoteDashboard() {
                 </Popover>
 
                 <Button
-                  variant="outline"
+                  variant="ghost"
                   size="icon"
                   aria-label="Neste dag"
                   onClick={() => setDate((d) => shiftIsoDate(d, 1))}
+                  className="h-9 w-9"
                 >
-                  <ChevronRight className="h-4 w-4" />
+                  <ChevronRight className="h-5 w-5" />
                 </Button>
               </div>
               <div
                 className={cn(
-                  "mt-1 text-sm font-medium",
+                  "mt-0.5 text-sm font-medium",
                   rel.tone === "past" && "text-orange-600",
                   rel.tone === "today" && "text-emerald-600",
                   rel.tone === "future" && "text-emerald-600",
@@ -380,13 +387,12 @@ export default function DeliveryNoteDashboard() {
               </div>
             </div>
 
-            {/* Hurtig dato-chips (STEG 2.3) */}
-            <DateContextChips date={date} onChange={setDate} className="pl-4" />
-
-            {/* Tur-filter */}
-            <div className="flex items-center gap-2 pl-4">
-              <span className="text-xs uppercase tracking-wide text-muted-foreground">Turer:</span>
-              <div role="radiogroup" aria-label="Tur-filter" className="flex flex-wrap gap-1">
+            {/* Tur-filter — kompakt inline */}
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                Turer:
+              </span>
+              <div role="radiogroup" aria-label="Tur-filter" className="flex items-center gap-1">
                 <TourChip
                   active={tourId === "all"}
                   label="Alle"
@@ -402,27 +408,27 @@ export default function DeliveryNoteDashboard() {
                 ))}
               </div>
             </div>
+
+            {/* Hurtig dato-chips — subtilt under */}
+            <DateContextChips date={date} onChange={setDate} />
           </div>
 
           {/* Høyre: Hovedkjøring + Handling */}
-          <div className="flex items-center gap-2">
+          <div className="flex flex-shrink-0 items-center gap-2">
             <Tooltip>
               <TooltipTrigger asChild>
                 <span tabIndex={0}>
                   <Button
+                    variant="brand"
                     size="lg"
                     disabled={!canRunMain}
                     onClick={() => setConfirmOpen(true)}
-                    className={cn(
-                      "gap-2",
-                      buttonState.mode === "pending" &&
-                        "bg-orange-600 text-white hover:bg-orange-700",
-                    )}
+                    className="gap-2"
                   >
                     {generate.isPending ? (
                       <>
                         <Loader2 className="h-4 w-4 animate-spin" />
-                        Kjører hovedkjøring…
+                        Kjører…
                       </>
                     ) : (
                       <>
@@ -444,7 +450,6 @@ export default function DeliveryNoteDashboard() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-64">
-                {/* Pakkseddelkjøringer */}
                 <DropdownMenuItem
                   disabled={!canRunMain}
                   onSelect={() => setConfirmOpen(true)}
@@ -487,7 +492,6 @@ export default function DeliveryNoteDashboard() {
                 </DropdownMenuItem>
 
                 <DropdownMenuSeparator />
-                {/* Pakkseddelkjøringer-handlinger */}
                 <DropdownMenuItem
                   onSelect={(e) => e.preventDefault()}
                   className="p-0"
@@ -531,13 +535,15 @@ export default function DeliveryNoteDashboard() {
           </div>
         </div>
 
-        {/* Run-status-banner + per-tur-status + leveransepauser */}
-        <RunStatusBanner legalEntityId={NB_LEGAL_ENTITY_ID} date={date} />
-        <TourRunStatus date={date} />
-        <ActivePausesPanel legalEntityId={NB_LEGAL_ENTITY_ID} date={date} />
-
-        {/* Widgets — A.5.5.6 DEL A.1: 140px høyde, 64pt tall, PAKKSEDLER 30% bredere (col-span-2) */}
-        <div className={cn("grid grid-cols-2 gap-4", widgetGridCols)}>
+        {/* Widgets — store, sentrerte kort */}
+        <div
+          className={cn(
+            "mx-auto grid w-full max-w-4xl gap-5",
+            mode === "correction"
+              ? "grid-cols-2 max-w-2xl"
+              : "grid-cols-2 sm:grid-cols-4",
+          )}
+        >
           {widgets.map((w) => {
             const clickable = !!w.onClick;
             const isPakk = w.key === "pakk";
@@ -550,29 +556,22 @@ export default function DeliveryNoteDashboard() {
                     onClick={w.onClick}
                     aria-label={`${w.label}, ${w.value} stk${clickable ? ", åpne liste" : ""}`}
                     className={cn(
-                      "group relative flex h-[140px] flex-col items-center justify-center rounded-lg px-6 py-5 shadow-sm transition-all",
+                      "group relative flex aspect-square min-h-[170px] flex-col items-center justify-center rounded-2xl px-5 py-6 shadow-sm transition-all",
                       clickable
-                        ? "cursor-pointer hover:-translate-y-0.5 hover:shadow-md hover:ring-2 hover:ring-offset-2 hover:ring-offset-background"
+                        ? "cursor-pointer hover:-translate-y-1 hover:shadow-lg"
                         : "cursor-not-allowed opacity-95",
-                      w.span === 2 && "col-span-2",
                       w.classes,
                     )}
                   >
                     <div
                       className={cn(
-                        "text-[11px] font-semibold uppercase tracking-wider",
-                        isPakk ? "opacity-90" : "opacity-80",
+                        "text-[12px] font-semibold uppercase tracking-wider",
+                        isPakk ? "opacity-95" : "opacity-80",
                       )}
                     >
                       {w.label}
                     </div>
-                    <div
-                      className={cn(
-                        "mt-2 font-bold leading-none tabular-nums",
-                        // 64pt ~= text-6xl/text-7xl. Bruk text-6xl (60px) for å holde innhold innenfor 140px.
-                        "text-6xl",
-                      )}
-                    >
+                    <div className="mt-3 text-7xl font-bold leading-none tabular-nums">
                       {isLoading ? "—" : w.value}
                     </div>
                   </button>
@@ -584,7 +583,15 @@ export default function DeliveryNoteDashboard() {
             );
           })}
         </div>
+
+        {/* Status-info under kortene */}
+        <div className="mx-auto w-full max-w-4xl space-y-3">
+          <RunStatusBanner legalEntityId={NB_LEGAL_ENTITY_ID} date={date} />
+          <TourRunStatus date={date} />
+          <ActivePausesPanel legalEntityId={NB_LEGAL_ENTITY_ID} date={date} />
+        </div>
       </div>
+
 
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <AlertDialogContent>
