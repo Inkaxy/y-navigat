@@ -50,7 +50,7 @@ const STATIC_SUBMENUS: Record<string, { prefix: string; appSlug: string; items: 
       { kind: "link", to: "/ordre/pakksedler", label: "Pakksedler" },
       { kind: "link", to: "/ordre/turer", label: "Turer" },
       { kind: "link", to: "/ordre/leveringsregler", label: "Leveringsregler" },
-      { kind: "link", to: "/ordre/faste-rutiner", label: "Faste rutiner" },
+      { kind: "link", to: "/ordre/faste-rutiner", label: "Fastordre" },
       { kind: "link", to: "/ordre/ticket", label: "Ticket" },
       { kind: "link", to: "/ordre/ai-forslag", label: "AI-forslag" },
       { kind: "link", to: "/ordre/ticket-rapporter", label: "Rapporter" },
