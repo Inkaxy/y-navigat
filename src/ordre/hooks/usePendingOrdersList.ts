@@ -1,0 +1,127 @@
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
+import { NULL_TOUR_KEY, useTourRunStatus } from "@/ordre/hooks/useTourRunStatus";
+import { useDeliveryTours } from "@/ordre/hooks/useDeliveryTours";
+import {
+  fetchPendingRecurringOrderRows,
+  type PendingRecurringOrderRow,
+} from "@/ordre/hooks/usePendingRecurringOrders";
+
+export type PendingOrderType = "fast" | "datert" | "retur";
+
+export type PendingOrderRow = {
+  kind: "order" | "schedule";
+  id: string;
+  display_number: string | null;
+  customer_id: string;
+  customer_display_name: string;
+  customer_number: string | null;
+  tour_id: string | null;
+  tour_label: string | null;
+  line_count: number;
+  total_incl_vat: number;
+  type: PendingOrderType;
+  notes: string | null;
+};
+
+async function fetchPackedOrderIds(date: string, tourId: string): Promise<Set<string>> {
+  let q = supabase
+    .from("delivery_notes")
+    .select("delivery_note_lines!inner(order_id)")
+    .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
+    .eq("delivery_date", date)
+    .neq("status", "cancelled");
+  if (tourId === NULL_TOUR_KEY) q = q.is("delivery_tour_id", null);
+  else if (tourId !== "all") q = q.eq("delivery_tour_id", tourId);
+  const { data, error } = await q;
+  if (error) throw error;
+  const out = new Set<string>();
+  for (const n of (data ?? []) as Array<{ delivery_note_lines: Array<{ order_id: string | null }> }>) {
+    for (const l of n.delivery_note_lines ?? []) if (l.order_id) out.add(l.order_id);
+  }
+  return out;
+}
+
+export function usePendingOrdersList(date: string, tourId: string, type: PendingOrderType) {
+  const toursQ = useDeliveryTours({ activeOnly: true });
+
+  return useQuery({
+    queryKey: ["pending-orders-list", date, tourId, type, toursQ.data?.length ?? 0],
+    enabled: !toursQ.isLoading,
+    queryFn: async (): Promise<PendingOrderRow[]> => {
+      const tours = toursQ.data ?? [];
+      const tourById = new Map(tours.map((t) => [t.id, t] as const));
+      const packed = await fetchPackedOrderIds(date, tourId);
+
+      let q = supabase
+        .from("orders")
+        .select(
+          "id, display_number, customer_id, customer_snapshot, delivery_tour_id, total_incl_vat, notes, is_customer_order, is_return, order_lines(id)"
+        )
+        .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
+        .eq("delivery_date", date);
+
+      if (tourId === NULL_TOUR_KEY) q = q.is("delivery_tour_id", null);
+      else if (tourId !== "all") q = q.eq("delivery_tour_id", tourId);
+
+      if (type === "fast") q = q.eq("is_customer_order", false).eq("is_return", false);
+      else if (type === "datert") q = q.eq("is_customer_order", true).eq("is_return", false);
+      else q = q.eq("is_return", true);
+
+      const { data, error } = await q.order("display_number", { ascending: true });
+      if (error) throw error;
+
+      const rows: PendingOrderRow[] = ((data ?? []) as any[])
+        .filter((o) => !packed.has(o.id))
+        .map((o) => {
+          const tour = o.delivery_tour_id ? tourById.get(o.delivery_tour_id) : null;
+          const snap = (o.customer_snapshot ?? {}) as Record<string, any>;
+          return {
+            kind: "order" as const,
+            id: o.id,
+            display_number: o.display_number ?? null,
+            customer_id: o.customer_id,
+            customer_display_name: snap.display_name ?? snap.name ?? "—",
+            customer_number: snap.customer_number ?? snap.number ?? null,
+            tour_id: o.delivery_tour_id ?? null,
+            tour_label: tour ? `Tur ${tour.tour_number}` : null,
+            line_count: Array.isArray(o.order_lines) ? o.order_lines.length : 0,
+            total_incl_vat: Number(o.total_incl_vat ?? 0),
+            type,
+            notes: o.notes ?? null,
+          };
+        });
+
+      // For fastordre: legg til ikke-materialiserte fastordre (recurring schedules).
+      if (type === "fast") {
+        const pending: PendingRecurringOrderRow[] = await fetchPendingRecurringOrderRows(
+          date,
+          tours,
+          tourId,
+        );
+        for (const p of pending) {
+          rows.push({
+            kind: "schedule",
+            id: p.schedule_id,
+            display_number: null,
+            customer_id: p.customer_id,
+            customer_display_name: p.customer_display_name,
+            customer_number: p.customer_number,
+            tour_id: p.tour_id,
+            tour_label: p.tour_label,
+            line_count: 0,
+            total_incl_vat: 0,
+            type: "fast",
+            notes: null,
+          });
+        }
+      }
+
+      return rows.sort((a, b) =>
+        a.customer_display_name.localeCompare(b.customer_display_name, "nb"),
+      );
+    },
+    staleTime: 15_000,
+  });
+}
