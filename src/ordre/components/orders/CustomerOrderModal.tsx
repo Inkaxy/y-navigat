@@ -605,16 +605,12 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
                   </span>
                 </div>
 
-                {/* Add via search — always available */}
-                <div className="rounded-md border border-dashed border-border bg-muted/30 p-2">
-                  <Label className="mb-1.5 block text-xs font-medium">
-                    Ny ordrelinje — søk produkt
-                  </Label>
-                  <ProductCombobox
-                    onSelect={appendProductLine}
-                    priceListId={customer.default_price_list_id}
-                  />
-                </div>
+                {/* Add via inline search — always available */}
+                <ProductCombobox
+                  onSelect={appendProductLine}
+                  priceListId={customer.default_price_list_id}
+                />
+
 
                 {/* Column header */}
                 {lines.some((l) => l.product) && (
