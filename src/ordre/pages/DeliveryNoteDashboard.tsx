@@ -1,6 +1,6 @@
 import { useMemo, useState, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { ChevronLeft, ChevronRight, CalendarIcon, ChevronDown, Play, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, CalendarIcon, ChevronDown, Play, Loader2, CalendarCheck2, CalendarClock } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -49,6 +49,22 @@ export default function DeliveryNoteDashboard() {
   const [searchParams, setSearchParams] = useSearchParams();
   const date = searchParams.get("date") || todayISO();
   const tourId = searchParams.get("tour") || "all";
+  const mode: "date" | "correction" =
+    searchParams.get("mode") === "correction" ? "correction" : "date";
+  const setMode = useCallback(
+    (next: "date" | "correction") => {
+      setSearchParams(
+        (prev) => {
+          const np = new URLSearchParams(prev);
+          if (next === "correction") np.set("mode", "correction");
+          else np.delete("mode");
+          return np;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
   const setDate = useCallback(
     (next: string | ((prev: string) => string)) => {
       setSearchParams(
@@ -234,8 +250,7 @@ export default function DeliveryNoteDashboard() {
     const row = tourStatus.rows.find((r) => r.id === tourId);
     return row?.status === "completed";
   }, [tourId, tourStatus]);
-
-  const widgets = [
+  const allWidgets = [
     {
       key: "fast",
       label: "FASTORDRE",
@@ -276,15 +291,27 @@ export default function DeliveryNoteDashboard() {
     },
   ];
 
+  const widgets =
+    mode === "correction"
+      ? allWidgets
+          .filter((w) => w.key === "datert" || w.key === "retur")
+          .map((w) => ({ ...w, span: 1 }))
+      : allWidgets;
+  const widgetGridCols =
+    mode === "correction" ? "lg:grid-cols-2" : "lg:grid-cols-5";
+
   return (
     <TooltipProvider>
       <div className="mx-auto w-full max-w-7xl px-4 py-6 space-y-6">
         {/* Header / dato-nav */}
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          {/* Venstre: dato-blokk */}
-          <div className="flex items-center gap-4">
+          {/* Venstre: modus-toggle + dato-blokk */}
+          <div className="flex items-start gap-4">
+            <ModeToggle mode={mode} onChange={setMode} />
             <div className="text-center">
-              <div className="text-xs uppercase tracking-wide text-muted-foreground">Leveransedato</div>
+              <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                {mode === "correction" ? "Til dato" : "Leveransedato"}
+              </div>
               <div className="mt-1 flex items-center gap-2">
                 <Button
                   variant="outline"
@@ -513,7 +540,7 @@ export default function DeliveryNoteDashboard() {
         <ActivePausesPanel legalEntityId={NB_LEGAL_ENTITY_ID} date={date} />
 
         {/* Widgets — A.5.5.6 DEL A.1: 140px høyde, 64pt tall, PAKKSEDLER 30% bredere (col-span-2) */}
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+        <div className={cn("grid grid-cols-2 gap-4", widgetGridCols)}>
           {widgets.map((w) => {
             const clickable = !!w.onClick;
             const isPakk = w.key === "pakk";
@@ -668,5 +695,57 @@ function TourChip({ active, label, onClick }: { active: boolean; label: string; 
     >
       {label}
     </button>
+  );
+}
+
+function ModeToggle({
+  mode,
+  onChange,
+}: {
+  mode: "date" | "correction";
+  onChange: (next: "date" | "correction") => void;
+}) {
+  const items: {
+    key: "date" | "correction";
+    label: string;
+    icon: typeof CalendarCheck2;
+  }[] = [
+    { key: "date", label: "For dato", icon: CalendarCheck2 },
+    { key: "correction", label: "For korreksjon", icon: CalendarClock },
+  ];
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        {mode === "correction" ? "For korreksjon:" : "For dato:"}
+      </div>
+      <div className="flex gap-1.5">
+        {items.map((it) => {
+          const active = mode === it.key;
+          const Icon = it.icon;
+          return (
+            <Tooltip key={it.key}>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  aria-label={it.label}
+                  onClick={() => onChange(it.key)}
+                  className={cn(
+                    "group flex h-11 w-11 items-center justify-center rounded-[10px] border-2 transition",
+                    active
+                      ? "border-emerald-600 bg-emerald-50 text-emerald-700 shadow-sm dark:bg-emerald-950/40"
+                      : "border-border bg-background text-muted-foreground hover:border-emerald-600/60 hover:text-emerald-700",
+                  )}
+                >
+                  <Icon className="h-5 w-5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">{it.label}</TooltipContent>
+            </Tooltip>
+          );
+        })}
+      </div>
+    </div>
   );
 }
