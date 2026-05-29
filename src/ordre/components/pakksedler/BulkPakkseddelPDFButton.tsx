@@ -6,11 +6,14 @@ import { useBulkPakksedlerPDF, type BulkScope } from "@/ordre/hooks/useBulkPakks
 
 interface Props {
   scope: BulkScope;
-  /** Synlig label på knappen */
+  /** Synlig label på knappen. Tom streng skjuler label (icon-only). */
   label?: string;
-  variant?: "default" | "outline" | "secondary";
-  size?: "default" | "sm" | "lg";
+  variant?: "default" | "outline" | "secondary" | "ghost";
+  size?: "default" | "sm" | "lg" | "icon";
   disabled?: boolean;
+  /** Custom ikon (default: Printer) */
+  icon?: React.ReactNode;
+  ariaLabel?: string;
 }
 
 function slugify(s: string): string {
@@ -31,7 +34,10 @@ export function BulkPakkseddelPDFButton({
   variant = "outline",
   size = "sm",
   disabled,
+  icon,
+  ariaLabel,
 }: Props) {
+
   const { data, isLoading, isFetching, error: queryError } = useBulkPakksedlerPDF(scope);
   const [generating, setGenerating] = useState(false);
 
