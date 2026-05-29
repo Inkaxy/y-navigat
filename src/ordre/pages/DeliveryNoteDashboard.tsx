@@ -322,8 +322,6 @@ export default function DeliveryNoteDashboard() {
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
 
-                {/* Uke + måned-hurtigvalg (A.5.5.6 DEL A.2) */}
-                <WeekMonthQuickPicker date={date} onChange={setDate} />
 
                 <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
                   <PopoverTrigger asChild>
