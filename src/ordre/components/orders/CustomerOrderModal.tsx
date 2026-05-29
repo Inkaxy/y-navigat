@@ -857,11 +857,11 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
       {(() => {
         const activeLine = lines.find((l) => l.uid === merknadFor);
         if (!activeLine || !activeLine.product) return null;
-        const autoTid = hour !== "--" ? `${hour}:${minute}` : "";
-        const autoSendesMed = distribution === "pickup" ? "hentes" : "leveres";
+        const profile = getLineProfile(activeLine.product.id);
+        if (!profile) return null;
         const initial: Merknad = activeLine.merknad ?? {
           bestilt_av: name,
-          telefon: phone,
+          telefon: "",
           sukkerbilde: null,
           fyll: "",
           tekst: "",
@@ -869,8 +869,8 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
           fritekst_1: "",
           fritekst_2: "",
           fritekst_3: "",
-          sendes_med: autoSendesMed,
-          tid: autoTid,
+          sendes_med: "",
+          tid: "",
           antall_etiketter: null,
         };
         return (
@@ -879,6 +879,7 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
             onOpenChange={(v) => { if (!v) setMerknadFor(null); }}
             productName={activeLine.product.display_name}
             quantity={Number(activeLine.quantity) || 0}
+            profile={profile}
             initial={initial}
             canEdit
             isSaving={false}
