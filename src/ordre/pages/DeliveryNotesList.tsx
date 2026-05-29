@@ -12,12 +12,24 @@ import {
   type DeliveryNoteLineRow,
 } from "@/ordre/hooks/useDeliveryNotesList";
 import { useDeliveryTours } from "@/ordre/hooks/useDeliveryTours";
-import { usePendingRecurringOrderRows } from "@/ordre/hooks/usePendingRecurringOrders";
 import { useGenerateDeliveryNotes } from "@/ordre/hooks/useGenerateDeliveryNotes";
-import { formatDate, todayISO } from "@/ordre/lib/format";
+import {
+  usePendingOrdersList,
+  type PendingOrderType,
+} from "@/ordre/hooks/usePendingOrdersList";
+import { formatDate, formatNOK, todayISO } from "@/ordre/lib/format";
 import { cn } from "@/lib/utils";
 import { BulkPakkseddelPDFButton } from "@/ordre/components/pakksedler/BulkPakkseddelPDFButton";
 import { NULL_TOUR_KEY } from "@/ordre/hooks/useTourRunStatus";
+
+type ListType = "pakksedler" | PendingOrderType;
+
+const TYPE_LABEL: Record<ListType, string> = {
+  pakksedler: "pakksedler",
+  fast: "fastordre",
+  datert: "daterte ordre",
+  retur: "returordre",
+};
 
 const WEEKDAY_SHORT = ["søn", "man", "tir", "ons", "tor", "fre", "lør"];
 
