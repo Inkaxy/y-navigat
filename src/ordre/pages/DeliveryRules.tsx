@@ -343,9 +343,10 @@ export default function DeliveryRules() {
                           Inaktiv
                         </span>
                       )}
-                    </TableCell>
                     <TableCell className="text-sm">
-                      {formatDeadlineDefinition(r.deadline_time, r.deadline_days_before)}
+                      {formatRuleDefinition(r)}
+                    </TableCell>
+
                     </TableCell>
                     <TableCell>
                       <ScopeText
