@@ -250,6 +250,23 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
 
   const today = new Date().toISOString().slice(0, 10);
 
+  // ----- Håndhevelse av leveringsregler -----
+  const { data: activeRules = [] } = useActiveDeliveryRules();
+  const ruleEnforcement = useMemo(
+    () =>
+      enforceDeliveryRules(
+        {
+          deliveryDate,
+          deliveryTourId: tourId === "none" ? null : tourId,
+          productIds,
+          customerId: customer.id,
+        },
+        activeRules,
+      ),
+    [activeRules, deliveryDate, tourId, productIds, customer.id],
+  );
+
+
   function removeLine(uid: string) {
     setLines((prev) => prev.filter((l) => l.uid !== uid));
   }
