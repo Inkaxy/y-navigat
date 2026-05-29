@@ -127,6 +127,12 @@ export function BulkPakkseddelPDFButton({
 
   const isDisabled = disabled || isLoading || isFetching || generating || empty || !data;
 
+  return (
+    <Button
+      onClick={handleClick}
+      disabled={isDisabled}
+      variant={variant}
+      size={size}
       className={label ? "gap-2" : ""}
       aria-label={ariaLabel ?? (label || "Skriv ut")}
       title={
@@ -157,4 +163,3 @@ export function BulkPakkseddelPDFButton({
   );
 }
 
-}
