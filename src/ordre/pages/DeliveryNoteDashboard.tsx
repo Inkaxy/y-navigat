@@ -733,13 +733,13 @@ function ModeToggle({
                   aria-label={it.label}
                   onClick={() => onChange(it.key)}
                   className={cn(
-                    "group flex h-11 w-11 items-center justify-center rounded-[10px] border-2 transition",
+                    "group flex h-16 w-16 items-center justify-center rounded-[12px] border-2 transition",
                     active
                       ? "border-emerald-600 bg-emerald-50 text-emerald-700 shadow-sm dark:bg-emerald-950/40"
                       : "border-border bg-background text-muted-foreground hover:border-emerald-600/60 hover:text-emerald-700",
                   )}
                 >
-                  <Icon className="h-5 w-5" />
+                  <Icon className="h-8 w-8" />
                 </button>
               </TooltipTrigger>
               <TooltipContent side="bottom">{it.label}</TooltipContent>
