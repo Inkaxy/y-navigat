@@ -318,16 +318,16 @@ export default function DeliveryNoteDashboard() {
                   size="icon"
                   aria-label="Forrige dag"
                   onClick={() => setDate((d) => shiftIsoDate(d, -1))}
-                  className="h-9 w-9"
+                  className="h-12 w-12"
                 >
-                  <ChevronLeft className="h-5 w-5" />
+                  <ChevronLeft className="h-7 w-7" />
                 </Button>
 
                 <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
                   <PopoverTrigger asChild>
                     <Button
                       variant="ghost"
-                      className="min-w-[200px] text-3xl font-bold tracking-tight hover:bg-transparent hover:text-primary"
+                      className="h-auto min-w-[300px] py-2 text-5xl font-bold tracking-tight hover:bg-transparent hover:text-primary"
                     >
                       {formatDate(date)}
                     </Button>
@@ -367,9 +367,9 @@ export default function DeliveryNoteDashboard() {
                   size="icon"
                   aria-label="Neste dag"
                   onClick={() => setDate((d) => shiftIsoDate(d, 1))}
-                  className="h-9 w-9"
+                  className="h-12 w-12"
                 >
-                  <ChevronRight className="h-5 w-5" />
+                  <ChevronRight className="h-7 w-7" />
                 </Button>
               </div>
               <div
