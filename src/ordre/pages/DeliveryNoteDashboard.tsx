@@ -37,7 +37,6 @@ import { TourRunStatus } from "@/ordre/components/pakksedler/TourRunStatus";
 import { useTourRunStatus, NULL_TOUR_KEY } from "@/ordre/hooks/useTourRunStatus";
 import { BulkPakkseddelPDFButton } from "@/ordre/components/pakksedler/BulkPakkseddelPDFButton";
 import { DateContextChips } from "@/ordre/components/shell/DateContextChips";
-import { WeekMonthQuickPicker } from "@/ordre/components/shell/WeekMonthQuickPicker";
 import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
 import { useUndoDeliveryRuns } from "@/ordre/hooks/useUndoDeliveryRuns";
 
