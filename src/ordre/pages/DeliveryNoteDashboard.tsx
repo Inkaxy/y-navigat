@@ -39,6 +39,7 @@ import { BulkPakkseddelPDFButton } from "@/ordre/components/pakksedler/BulkPakks
 import { DateContextChips } from "@/ordre/components/shell/DateContextChips";
 import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
 import { useUndoDeliveryRuns } from "@/ordre/hooks/useUndoDeliveryRuns";
+import { supabase } from "@/integrations/supabase/client";
 
 // HANDLING_ITEMS bygges nå dynamisk inni komponenten — for å støtte tilstand-aware
 // handlinger (Tilleggkjøring/Korreksjonskjøring krever at hovedkjøring er kjørt).
