@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Loader2, Search, Trash2, AlertTriangle, StickyNote } from "lucide-react";
 
 import { z } from "zod";
