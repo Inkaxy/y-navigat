@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { StickyNote, Loader2, Trash2 } from "lucide-react";
 import {
   Dialog,
@@ -23,13 +23,34 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { type Merknad, emptyMerknad, isMerknadEmpty, merknadSchema } from "@/ordre/lib/merknad";
+import type { LabelPrintProfile } from "@/produksjon/features/utskriftsprofiler/types";
 import { toast } from "sonner";
+
+/**
+ * Felter fra utskriftsprofilen som faktisk er manuelt utfyllbare pr ordrelinje.
+ * Andre felt (kundenavn, hentested, distribusjon, varenavn, antall, …) hentes
+ * automatisk fra ordre/produkt og vises ikke her.
+ */
+const EDITABLE_TYPES = [
+  "bestilt_av",
+  "fyll",
+  "tekst",
+  "pynt",
+  "sukkerbilde",
+  "kommentar",
+] as const;
+type EditableType = (typeof EDITABLE_TYPES)[number];
+
+function isEditable(t: string): t is EditableType {
+  return (EDITABLE_TYPES as readonly string[]).includes(t);
+}
 
 export function MerknadDialog({
   open,
   onOpenChange,
   productName,
   quantity,
+  profile,
   initial,
   canEdit,
   isSaving,
@@ -40,6 +61,8 @@ export function MerknadDialog({
   onOpenChange: (v: boolean) => void;
   productName: string;
   quantity: number;
+  /** Utskriftsprofilen produktet er tilknyttet — styrer hvilke felt som vises. */
+  profile: LabelPrintProfile;
   initial: Merknad | null;
   canEdit: boolean;
   isSaving: boolean;
@@ -59,6 +82,24 @@ export function MerknadDialog({
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
+  // Bygg listen av aktive, manuelt utfyllbare felt — i profil-rekkefølge.
+  const activeFields = useMemo<EditableType[]>(() => {
+    const seen = new Set<EditableType>();
+    const result: EditableType[] = [];
+    for (const f of profile.fields) {
+      if (!f.include) continue;
+      if (!isEditable(f.field_type)) continue;
+      if (seen.has(f.field_type)) continue;
+      seen.add(f.field_type);
+      result.push(f.field_type);
+    }
+    return result;
+  }, [profile.fields]);
+
+  const showFritekst1 = activeFields.includes("kommentar") && profile.comment_includes.fritekst1;
+  const showFritekst2 = activeFields.includes("kommentar") && profile.comment_includes.fritekst2;
+  const showFritekst3 = activeFields.includes("kommentar") && profile.comment_includes.fritekst3;
+
   async function handleSave() {
     const parsed = merknadSchema.safeParse(form);
     if (!parsed.success) {
@@ -70,6 +111,7 @@ export function MerknadDialog({
   }
 
   const hasExisting = initial != null && !isMerknadEmpty(initial);
+  const hasAnyField = activeFields.length > 0;
 
   return (
     <>
@@ -78,137 +120,133 @@ export function MerknadDialog({
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <StickyNote className="h-4 w-4 text-primary" />
-              Merknader til: {productName} ({quantity} stk)
+              Etikett-felter: {productName} ({quantity} stk)
             </DialogTitle>
+            <p className="text-xs text-muted-foreground">
+              Profil: <span className="font-medium">{profile.name}</span>
+            </p>
           </DialogHeader>
 
-          <div className="grid grid-cols-[140px_1fr] gap-x-4 gap-y-3 py-2">
-            <Label htmlFor="m-bestilt_av" className="self-center">Bestilt av</Label>
-            <Input
-              id="m-bestilt_av"
-              value={form.bestilt_av}
-              onChange={(e) => update("bestilt_av", e.target.value)}
-              disabled={!canEdit}
-            />
+          {!hasAnyField ? (
+            <div className="rounded-md border border-dashed border-border bg-muted/30 p-6 text-center text-sm text-muted-foreground">
+              Utskriftsprofilen «{profile.name}» har ingen manuelt utfyllbare felt.
+              Alle etikettverdier hentes automatisk fra ordren.
+            </div>
+          ) : (
+            <div className="grid grid-cols-[140px_1fr] gap-x-4 gap-y-3 py-2">
+              {activeFields.includes("bestilt_av") && (
+                <>
+                  <Label htmlFor="m-bestilt_av" className="self-center">Bestilt av</Label>
+                  <Input
+                    id="m-bestilt_av"
+                    value={form.bestilt_av}
+                    onChange={(e) => update("bestilt_av", e.target.value)}
+                    disabled={!canEdit}
+                  />
+                </>
+              )}
 
-            <Label htmlFor="m-telefon" className="self-center">Telefon</Label>
-            <Input
-              id="m-telefon"
-              type="tel"
-              value={form.telefon}
-              onChange={(e) => update("telefon", e.target.value)}
-              disabled={!canEdit}
-            />
+              {activeFields.includes("fyll") && (
+                <>
+                  <Label htmlFor="m-fyll" className="self-center">Fyll</Label>
+                  <Input
+                    id="m-fyll"
+                    value={form.fyll}
+                    onChange={(e) => update("fyll", e.target.value)}
+                    disabled={!canEdit}
+                  />
+                </>
+              )}
 
-            <Label className="self-center">Sukkerbilde</Label>
-            <RadioGroup
-              className="flex gap-4"
-              value={form.sukkerbilde === true ? "ja" : form.sukkerbilde === false ? "nei" : "null"}
-              onValueChange={(v) =>
-                update("sukkerbilde", v === "ja" ? true : v === "nei" ? false : null)
-              }
-              disabled={!canEdit}
-            >
-              <label className="flex items-center gap-2 text-sm">
-                <RadioGroupItem value="ja" /> Ja
-              </label>
-              <label className="flex items-center gap-2 text-sm">
-                <RadioGroupItem value="nei" /> Nei
-              </label>
-              <label className="flex items-center gap-2 text-sm text-muted-foreground">
-                <RadioGroupItem value="null" /> Ikke spesifisert
-              </label>
-            </RadioGroup>
+              {activeFields.includes("tekst") && (
+                <>
+                  <Label htmlFor="m-tekst" className="self-center">Tekst</Label>
+                  <Input
+                    id="m-tekst"
+                    value={form.tekst}
+                    onChange={(e) => update("tekst", e.target.value)}
+                    disabled={!canEdit}
+                    placeholder="Tekst på kake"
+                  />
+                </>
+              )}
 
-            <Label htmlFor="m-fyll" className="self-center">Fyll</Label>
-            <Input
-              id="m-fyll"
-              value={form.fyll}
-              onChange={(e) => update("fyll", e.target.value)}
-              disabled={!canEdit}
-            />
+              {activeFields.includes("pynt") && (
+                <>
+                  <Label htmlFor="m-pynt" className="self-center">Pynt</Label>
+                  <Input
+                    id="m-pynt"
+                    value={form.pynt}
+                    onChange={(e) => update("pynt", e.target.value)}
+                    disabled={!canEdit}
+                  />
+                </>
+              )}
 
-            <Label htmlFor="m-tekst" className="self-center">Tekst</Label>
-            <Input
-              id="m-tekst"
-              value={form.tekst}
-              onChange={(e) => update("tekst", e.target.value)}
-              disabled={!canEdit}
-              placeholder="Tekst på kake"
-            />
+              {activeFields.includes("sukkerbilde") && (
+                <>
+                  <Label className="self-center">Sukkerbilde</Label>
+                  <RadioGroup
+                    className="flex gap-4"
+                    value={form.sukkerbilde === true ? "ja" : form.sukkerbilde === false ? "nei" : "null"}
+                    onValueChange={(v) =>
+                      update("sukkerbilde", v === "ja" ? true : v === "nei" ? false : null)
+                    }
+                    disabled={!canEdit}
+                  >
+                    <label className="flex items-center gap-2 text-sm">
+                      <RadioGroupItem value="ja" /> Ja
+                    </label>
+                    <label className="flex items-center gap-2 text-sm">
+                      <RadioGroupItem value="nei" /> Nei
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <RadioGroupItem value="null" /> Ikke spesifisert
+                    </label>
+                  </RadioGroup>
+                </>
+              )}
 
-            <Label htmlFor="m-pynt" className="self-center">Pynt</Label>
-            <Input
-              id="m-pynt"
-              value={form.pynt}
-              onChange={(e) => update("pynt", e.target.value)}
-              disabled={!canEdit}
-            />
+              {showFritekst1 && (
+                <>
+                  <Label htmlFor="m-ft1" className="pt-2">Fritekst 1</Label>
+                  <Textarea
+                    id="m-ft1"
+                    rows={2}
+                    value={form.fritekst_1}
+                    onChange={(e) => update("fritekst_1", e.target.value)}
+                    disabled={!canEdit}
+                  />
+                </>
+              )}
 
-            <Label htmlFor="m-ft1" className="pt-2">Fritekst 1</Label>
-            <Textarea
-              id="m-ft1"
-              rows={2}
-              value={form.fritekst_1}
-              onChange={(e) => update("fritekst_1", e.target.value)}
-              disabled={!canEdit}
-            />
+              {showFritekst2 && (
+                <>
+                  <Label htmlFor="m-ft2" className="pt-2">Fritekst 2</Label>
+                  <Textarea
+                    id="m-ft2"
+                    rows={2}
+                    value={form.fritekst_2}
+                    onChange={(e) => update("fritekst_2", e.target.value)}
+                    disabled={!canEdit}
+                  />
+                </>
+              )}
 
-            <Label htmlFor="m-ft2" className="pt-2">Fritekst 2</Label>
-            <Textarea
-              id="m-ft2"
-              rows={2}
-              value={form.fritekst_2}
-              onChange={(e) => update("fritekst_2", e.target.value)}
-              disabled={!canEdit}
-            />
-
-            <Label htmlFor="m-ft3" className="pt-2">Fritekst 3</Label>
-            <Textarea
-              id="m-ft3"
-              rows={2}
-              value={form.fritekst_3}
-              onChange={(e) => update("fritekst_3", e.target.value)}
-              disabled={!canEdit}
-            />
-
-            <Label htmlFor="m-sendes" className="self-center">Sendes med</Label>
-            <>
-              <Input
-                id="m-sendes"
-                list="merknad-sendes-med-list"
-                value={form.sendes_med}
-                onChange={(e) => update("sendes_med", e.target.value)}
-                disabled={!canEdit}
-              />
-              <datalist id="merknad-sendes-med-list">
-                <option value="hentes" />
-                <option value="leveres" />
-              </datalist>
-            </>
-
-            <Label htmlFor="m-tid" className="self-center">Tid</Label>
-            <Input
-              id="m-tid"
-              type="time"
-              value={form.tid}
-              onChange={(e) => update("tid", e.target.value)}
-              disabled={!canEdit}
-            />
-
-            <Label htmlFor="m-etiketter" className="self-center">Antall etiketter</Label>
-            <Input
-              id="m-etiketter"
-              type="number"
-              min={0}
-              value={form.antall_etiketter ?? ""}
-              onChange={(e) => {
-                const v = e.target.value;
-                update("antall_etiketter", v === "" ? null : Math.max(0, Math.floor(Number(v))));
-              }}
-              disabled={!canEdit}
-            />
-          </div>
+              {showFritekst3 && (
+                <>
+                  <Label htmlFor="m-ft3" className="pt-2">Fritekst 3</Label>
+                  <Textarea
+                    id="m-ft3"
+                    rows={2}
+                    value={form.fritekst_3}
+                    onChange={(e) => update("fritekst_3", e.target.value)}
+                    disabled={!canEdit}
+                  />
+                </>
+              )}
+            </div>
+          )}
 
           <DialogFooter className="gap-2">
             {hasExisting && canEdit && (
@@ -225,7 +263,7 @@ export function MerknadDialog({
             <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={isSaving}>
               Lukk
             </Button>
-            {canEdit && (
+            {canEdit && hasAnyField && (
               <Button onClick={handleSave} disabled={isSaving}>
                 {isSaving ? <Loader2 className="animate-spin" /> : <StickyNote />}
                 Lagre
