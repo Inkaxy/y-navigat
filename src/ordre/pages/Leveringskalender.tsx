@@ -1507,7 +1507,7 @@ export default function MatrixPage() {
         onPick={handleAddProduct}
       />
 
-      {merknadCell && (
+      {merknadCell && labelProfileByProduct.get(merknadCell.productId) && (
         <MerknadDialog
           open={!!merknadCell}
           onOpenChange={(v) => {
@@ -1515,6 +1515,7 @@ export default function MatrixPage() {
           }}
           productName={merknadCell.productName}
           quantity={merknadCell.quantity}
+          profile={labelProfileByProduct.get(merknadCell.productId)!}
           initial={existingMerknad[ckey(merknadCell.date, merknadCell.tourId, merknadCell.productId)] ?? null}
           canEdit={canEdit}
           isSaving={saveMatrix.isPending}
