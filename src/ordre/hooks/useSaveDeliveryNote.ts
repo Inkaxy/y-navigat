@@ -94,7 +94,7 @@ export function useSaveDeliveryNote() {
       const updateWork = Promise.all(
         existing.flatMap(({ l, c, idx }) => {
           const line_number = idx + 1;
-          const tasks: Promise<any>[] = [
+          const tasks: PromiseLike<any>[] = [
             supabase
               .from("delivery_note_lines")
               .update({
