@@ -250,8 +250,7 @@ export default function DeliveryNoteDashboard() {
     const row = tourStatus.rows.find((r) => r.id === tourId);
     return row?.status === "completed";
   }, [tourId, tourStatus]);
-
-  const widgets = [
+  const allWidgets = [
     {
       key: "fast",
       label: "FASTORDRE",
@@ -291,6 +290,15 @@ export default function DeliveryNoteDashboard() {
       onClick: () => navigate(`/ordre/pakksedler/liste?date=${date}&tour=${tourId}`),
     },
   ];
+
+  const widgets =
+    mode === "correction"
+      ? allWidgets
+          .filter((w) => w.key === "datert" || w.key === "retur")
+          .map((w) => ({ ...w, span: 1 }))
+      : allWidgets;
+  const widgetGridCols =
+    mode === "correction" ? "lg:grid-cols-2" : "lg:grid-cols-5";
 
   return (
     <TooltipProvider>
