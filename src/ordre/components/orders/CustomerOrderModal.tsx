@@ -649,20 +649,22 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
                               : undefined
                           }
                         >
-                          <div className="min-w-0">
-                            <div className="truncate text-sm font-medium">
+                          <div className="flex min-w-0 items-center gap-2">
+                            <span className="shrink-0 rounded border border-border bg-muted px-2 py-0.5 text-xs font-medium tabular-nums text-muted-foreground">
+                              {l.product!.display_number ?? "—"}
+                            </span>
+                            <span className="truncate text-sm font-medium">
                               {l.product!.display_name}
-                            </div>
-                            <div className="truncate text-xs text-muted-foreground">
-                              {"\u200B"}
-                              {l.is_fallback && (
-                                <span className="ml-2 font-medium text-destructive">
-                                  · pris mangler
-                                </span>
-                              )}
-                            </div>
+                            </span>
+                            <span className="shrink-0 text-xs text-muted-foreground">
+                              {l.product!.unit_of_sale}
+                            </span>
+                            {l.is_fallback && (
+                              <span className="shrink-0 text-xs font-medium text-destructive">
+                                · pris mangler
+                              </span>
+                            )}
                           </div>
-                          <Input
                             type="text"
                             inputMode="decimal"
                             value={l.quantity}
