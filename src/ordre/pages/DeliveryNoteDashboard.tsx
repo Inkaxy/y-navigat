@@ -537,7 +537,7 @@ export default function DeliveryNoteDashboard() {
         <ActivePausesPanel legalEntityId={NB_LEGAL_ENTITY_ID} date={date} />
 
         {/* Widgets — A.5.5.6 DEL A.1: 140px høyde, 64pt tall, PAKKSEDLER 30% bredere (col-span-2) */}
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+        <div className={cn("grid grid-cols-2 gap-4", widgetGridCols)}>
           {widgets.map((w) => {
             const clickable = !!w.onClick;
             const isPakk = w.key === "pakk";
