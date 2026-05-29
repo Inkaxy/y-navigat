@@ -464,10 +464,3 @@ export default function DeliveryRules() {
     </>
   );
 }
-
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </>
-  );
-}
