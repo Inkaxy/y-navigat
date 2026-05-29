@@ -684,17 +684,21 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
                           <div className="text-right text-sm font-medium tabular-nums">
                             {fmtKr(lineSum)}
                           </div>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setMerknadFor(l.uid)}
-                            aria-label={hasMerknad ? "Rediger etikett-merknad" : "Legg til etikett-merknad"}
-                            title={hasMerknad ? "Etikett-merknad finnes" : "Etikett-felter / merknad"}
-                            className={`h-8 w-8 ${hasMerknad ? "text-primary" : ""}`}
-                          >
-                            <StickyNote className="h-4 w-4" />
-                          </Button>
+                          {lineProfile ? (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setMerknadFor(l.uid)}
+                              aria-label={hasMerknad ? "Rediger etikett-felter" : "Legg til etikett-felter"}
+                              title={hasMerknad ? "Etikett-felter (utfylt)" : `Etikett-felter (${lineProfile.name})`}
+                              className={`h-8 w-8 ${hasMerknad ? "text-primary" : ""}`}
+                            >
+                              <StickyNote className="h-4 w-4" />
+                            </Button>
+                          ) : (
+                            <span className="h-8 w-8" aria-hidden />
+                          )}
                           <Button
                             type="button"
                             variant="ghost"
