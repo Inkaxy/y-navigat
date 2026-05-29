@@ -224,21 +224,54 @@ export default function EtiketterPage() {
       setMissingProfileOpen(true);
       return;
     }
-    setBulkPdfRunning(true);
     try {
       const { pdf } = await import("@react-pdf/renderer");
+      // Hent merknader for alle ordrelinjer på tvers av rader (én batch).
+      const allLineIds = Array.from(
+        new Set(printableRows.flatMap((r) => r.order_line_ids ?? [])),
+      );
+      const merknadMap = allLineIds.length > 0
+        ? await fetchOrderLineMerknads(allLineIds)
+        : {};
       const items: LabelPdfData[] = [];
       for (const r of printableRows) {
         const profileId = productProfiles[r.product_id];
         const profile = profiles.find((p) => p.id === profileId);
         if (!profile) continue;
-        items.push({
-          profile,
-          row: r,
-          labelNumber: null,
-          quantity: r.total_labels || 1,
-          copies: r.total_labels || 1,
-        });
+        const totalCopies = r.total_labels || 1;
+        const lineIds = r.order_line_ids ?? [];
+        if (lineIds.length === 0) {
+          items.push({
+            profile,
+            row: r,
+            labelNumber: null,
+            quantity: totalCopies,
+            copies: totalCopies,
+            merknad: null,
+          });
+          continue;
+        }
+        // Én side per ordrelinje (med dens merknad); padder ved behov.
+        for (const id of lineIds.slice(0, totalCopies)) {
+          items.push({
+            profile,
+            row: r,
+            labelNumber: null,
+            quantity: totalCopies,
+            copies: 1,
+            merknad: merknadMap[id] ?? null,
+          });
+        }
+        if (totalCopies > lineIds.length) {
+          items.push({
+            profile,
+            row: r,
+            labelNumber: null,
+            quantity: totalCopies,
+            copies: totalCopies - lineIds.length,
+            merknad: merknadMap[lineIds[0]] ?? null,
+          });
+        }
       }
       if (items.length === 0) {
         toast.warning("Ingen etiketter å generere.");
