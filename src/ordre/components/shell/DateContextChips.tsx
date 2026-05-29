@@ -9,7 +9,6 @@ export type DateChipKind = "today" | "tomorrow" | "this_week" | "next_week";
 const CHIPS: { kind: DateChipKind; label: string }[] = [
   { kind: "today", label: "I dag" },
   { kind: "tomorrow", label: "I morgen" },
-  { kind: "this_week", label: "Denne uken" },
   { kind: "next_week", label: "Neste uken" },
 ];
 
