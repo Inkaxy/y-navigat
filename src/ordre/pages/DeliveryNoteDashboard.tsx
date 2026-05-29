@@ -532,15 +532,8 @@ export default function DeliveryNoteDashboard() {
           </div>
         </div>
 
-        {/* Widgets — store, sentrerte kort */}
-        <div
-          className={cn(
-            "mx-auto grid w-full max-w-4xl gap-5",
-            mode === "correction"
-              ? "grid-cols-2 max-w-lg"
-              : "grid-cols-2 sm:grid-cols-4",
-          )}
-        >
+        {/* Widgets — store, sentrerte kort (lik størrelse i begge moduser) */}
+        <div className="mx-auto flex w-full max-w-4xl flex-wrap justify-center gap-5">
           {widgets.map((w) => {
             const clickable = !!w.onClick;
             const isPakk = w.key === "pakk";
@@ -553,13 +546,14 @@ export default function DeliveryNoteDashboard() {
                     onClick={w.onClick}
                     aria-label={`${w.label}, ${w.value} stk${clickable ? ", åpne liste" : ""}`}
                     className={cn(
-                      "group relative flex aspect-square min-h-[170px] flex-col items-center justify-center rounded-2xl px-5 py-6 shadow-sm transition-all",
+                      "group relative flex h-[200px] w-[200px] flex-col items-center justify-center rounded-2xl px-5 py-6 shadow-sm transition-all",
                       clickable
                         ? "cursor-pointer hover:-translate-y-1 hover:shadow-lg"
                         : "cursor-not-allowed opacity-95",
                       w.classes,
                     )}
                   >
+
                     <div
                       className={cn(
                         "text-[12px] font-semibold uppercase tracking-wider",
