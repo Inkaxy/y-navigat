@@ -9177,6 +9177,14 @@ export type Database = {
         }[]
       }
       unaccent: { Args: { "": string }; Returns: string }
+      undo_delivery_runs: {
+        Args: {
+          p_delivery_date: string
+          p_legal_entity_id: string
+          p_tour_filter?: string[]
+        }
+        Returns: Json
+      }
       upsert_matrix_column_comment: {
         Args: {
           p_comment: string
