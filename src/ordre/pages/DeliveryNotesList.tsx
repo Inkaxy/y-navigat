@@ -217,7 +217,7 @@ export default function DeliveryNotesList() {
             Tilbake
           </Button>
           <h1 className="text-2xl font-semibold tracking-tight">
-            {formatDate(date)} ({tourLabel}), {TYPE_LABEL[type]}
+            {mode === "correction" ? `T.o.m. ${formatDate(date)}` : formatDate(date)} ({tourLabel}), {TYPE_LABEL[type]}
           </h1>
           <Badge
             variant="outline"
