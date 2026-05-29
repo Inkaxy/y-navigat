@@ -49,6 +49,22 @@ export default function DeliveryNoteDashboard() {
   const [searchParams, setSearchParams] = useSearchParams();
   const date = searchParams.get("date") || todayISO();
   const tourId = searchParams.get("tour") || "all";
+  const mode: "date" | "correction" =
+    searchParams.get("mode") === "correction" ? "correction" : "date";
+  const setMode = useCallback(
+    (next: "date" | "correction") => {
+      setSearchParams(
+        (prev) => {
+          const np = new URLSearchParams(prev);
+          if (next === "correction") np.set("mode", "correction");
+          else np.delete("mode");
+          return np;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
   const setDate = useCallback(
     (next: string | ((prev: string) => string)) => {
       setSearchParams(
