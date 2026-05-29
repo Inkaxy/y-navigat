@@ -305,10 +305,13 @@ export default function DeliveryNoteDashboard() {
       <div className="mx-auto w-full max-w-7xl px-4 py-6 space-y-6">
         {/* Header / dato-nav */}
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          {/* Venstre: dato-blokk */}
-          <div className="flex items-center gap-4">
+          {/* Venstre: modus-toggle + dato-blokk */}
+          <div className="flex items-start gap-4">
+            <ModeToggle mode={mode} onChange={setMode} />
             <div className="text-center">
-              <div className="text-xs uppercase tracking-wide text-muted-foreground">Leveransedato</div>
+              <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                {mode === "correction" ? "Til dato" : "Leveransedato"}
+              </div>
               <div className="mt-1 flex items-center gap-2">
                 <Button
                   variant="outline"
