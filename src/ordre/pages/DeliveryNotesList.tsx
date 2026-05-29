@@ -212,7 +212,7 @@ export default function DeliveryNotesList() {
       <div className="mx-auto w-full max-w-7xl px-4 py-6 space-y-4">
         {/* Tittel-stripe */}
         <div className="flex items-center gap-3 flex-wrap">
-          <Button variant="ghost" size="sm" onClick={() => navigate("/ordre/pakksedler")} className="gap-2">
+          <Button variant="ghost" size="sm" onClick={() => navigate(`/ordre/pakksedler${mode === "correction" ? "?mode=correction" : ""}`)} className="gap-2">
             <ArrowLeft className="h-4 w-4" />
             Tilbake
           </Button>
