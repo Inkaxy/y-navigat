@@ -545,8 +545,8 @@ export default function OrdersList() {
           ]}
         />
 
-        {/* Tabell — kompakt */}
-        <Card className="overflow-hidden">
+        {/* Tabell — desktop/tablet */}
+        <Card className="hidden overflow-hidden md:block">
           <div className="relative max-h-[calc(100vh-22rem)] overflow-auto">
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">
