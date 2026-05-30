@@ -774,7 +774,144 @@ export default function OrdersList() {
             </div>
           </div>
         </Card>
+
+        {/* Mobil — kort-liste i stedet for tabell */}
+        <div className="space-y-2 md:hidden">
+          {isLoading ? (
+            Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton key={i} className="h-24 w-full rounded-lg" />
+            ))
+          ) : rows.length === 0 ? (
+            <Card className="p-6 text-center text-body text-muted-foreground">
+              Ingen ordrer matcher filtrene.
+              {activeFilterCount > 0 && (
+                <Button
+                  variant="link"
+                  size="sm"
+                  onClick={clearFilters}
+                  className="ml-2 h-auto p-0 text-body"
+                >
+                  Nullstill filtrene
+                </Button>
+              )}
+            </Card>
+          ) : (
+            rows.map((r) => {
+              const tour = r.delivery_tour_id ? tourMap.get(r.delivery_tour_id) : null;
+              const isCancelled = r.status === "cancelled";
+              const isSelected = selectedIds.has(r.id);
+              return (
+                <Card
+                  key={r.id}
+                  onClick={() => navigate(`/ordre/ordrer/${r.id}`)}
+                  className={cn(
+                    "cursor-pointer p-3 transition-colors active:bg-accent/60",
+                    isSelected && "bg-primary/5 border-primary/40",
+                    isCancelled && "opacity-70",
+                  )}
+                >
+                  <div className="flex items-start gap-3">
+                    <div onClick={(e) => e.stopPropagation()} className="pt-0.5">
+                      <Checkbox
+                        aria-label={`Velg ordre ${r.order_number}`}
+                        checked={isSelected}
+                        onCheckedChange={(checked) => {
+                          setSelectedIds((prev) => {
+                            const next = new Set(prev);
+                            if (checked) next.add(r.id);
+                            else next.delete(r.id);
+                            return next;
+                          });
+                        }}
+                      />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <span
+                          className={cn(
+                            "font-mono text-sm font-semibold text-primary",
+                            isCancelled && "line-through",
+                          )}
+                        >
+                          {r.order_number}
+                        </span>
+                        <StatusBadge status={r.status} />
+                      </div>
+                      <div className="mt-1 truncate text-base font-medium text-foreground">
+                        {r.customer_snapshot?.display_name ?? "—"}
+                      </div>
+                      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                        <span>Lev. {formatDate(r.delivery_date)}</span>
+                        {r.delivery_time && <span>{r.delivery_time}</span>}
+                        {tour && (
+                          <span className="rounded bg-primary/10 px-1.5 font-mono text-[10px] text-primary">
+                            {tour.tour_number}
+                          </span>
+                        )}
+                        <span>{r.line_count ?? 0} linjer</span>
+                        <span className="ml-auto font-medium tabular-nums text-foreground">
+                          {formatNOK(r.total_incl_vat)}
+                        </span>
+                      </div>
+                      {acceptanceOnly && r.status === "awaiting_confirmation" && (
+                        <div
+                          className="mt-3 flex gap-2"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Button
+                            size="sm"
+                            className="flex-1 touch-target gap-1"
+                            onClick={() => openAccept(r)}
+                          >
+                            <Check className="h-4 w-4" />
+                            Aksepter
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            className="flex-1 touch-target gap-1"
+                            onClick={() => openReject(r)}
+                          >
+                            <X className="h-4 w-4" />
+                            Avvis
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </Card>
+              );
+            })
+          )}
+          {/* Mobil-paginering */}
+          {rows.length > 0 && (
+            <div className="flex items-center justify-between gap-2 pt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page === 0}
+                onClick={() => setPage((p) => p - 1)}
+                className="touch-target flex-1"
+              >
+                Forrige
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                {page + 1} / {pages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page >= pages - 1}
+                onClick={() => setPage((p) => p + 1)}
+                className="touch-target flex-1"
+              >
+                Neste
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
+
 
       <StatusChangeDialog
         open={!!acceptIntent}
