@@ -266,7 +266,6 @@ function NavBar({ appSlug, items }: { appSlug: string; items: NavItem[] }) {
       : { padding: "7px 14px", border: "1px solid transparent" };
 
   // På mobil bruker Ordre en fast bottom-nav i stedet for denne submenyen.
-  const { pathname } = useLocation();
   const isOrdre = pathname === "/ordre" || pathname.startsWith("/ordre/");
   return (
     <nav
