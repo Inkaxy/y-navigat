@@ -33,3 +33,10 @@ verify_jwt = true
 
 [functions.create-user-with-password]
 verify_jwt = true
+
+[functions.met-forecast]
+verify_jwt = false
+
+[functions.geocode-customer]
+verify_jwt = true
+
