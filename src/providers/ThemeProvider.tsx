@@ -13,11 +13,11 @@ interface ThemeContextValue {
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
 function readStoredMode(): ThemeMode {
-  if (typeof window === "undefined") return "dark";
+  if (typeof window === "undefined") return "light";
   const stored = window.localStorage.getItem(STORAGE_KEY);
   if (stored === "light" || stored === "dark" || stored === "system") return stored;
-  // Default for nye brukere: mørk. Eksisterende valg i localStorage respekteres.
-  return "dark";
+  // Default for nye brukere: lys. Eksisterende valg i localStorage respekteres.
+  return "light";
 }
 
 function applyTheme(mode: ThemeMode) {
@@ -30,7 +30,7 @@ function applyTheme(mode: ThemeMode) {
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [mode, setModeState] = useState<ThemeMode>(() => readStoredMode());
   const [resolved, setResolved] = useState<"light" | "dark">(() => {
-    if (typeof window === "undefined") return "dark";
+    if (typeof window === "undefined") return "light";
     return applyTheme(readStoredMode()) as "light" | "dark";
   });
 
