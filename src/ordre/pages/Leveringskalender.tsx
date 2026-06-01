@@ -94,6 +94,7 @@ import { useProductsByIds } from "@/ordre/hooks/useProductsByIds";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserAccess } from "@/ordre/hooks/useUserAccess";
 import { useWeatherForecast, type WeatherMap } from "@/ordre/hooks/useWeatherForecast";
+import { useAutoGeocodeCustomer } from "@/ordre/hooks/useGeocodeCustomer";
 import { WeatherCell } from "@/ordre/components/orders/WeatherCell";
 import { useRecurringGhost, type RecurringGhostMap } from "@/ordre/hooks/useRecurringGhost";
 import { useRecurringSchedules, type RecurringScheduleWithCustomer } from "@/ordre/hooks/useRecurringOrders";
@@ -170,6 +171,7 @@ export default function MatrixPage() {
   const navigate = useNavigate();
   const customerLat = selectedCustomer?.geocode_latitude ?? null;
   const customerLon = selectedCustomer?.geocode_longitude ?? null;
+  useAutoGeocodeCustomer(selectedCustomer ?? null);
   const { data: weatherMap } = useWeatherForecast(customerLat, customerLon);
   const { data: ghostMap } = useRecurringGhost(customerId, dateFrom, dateTo);
   const { data: pauseMap } = useDeliveryPausesForCustomer(customerId, dateFrom, dateTo);
