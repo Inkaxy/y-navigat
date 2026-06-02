@@ -72,7 +72,7 @@ export interface AssignLabelNumberInput {
   deptId: string;
   productId: string;
   orderLineId?: string | null;
-  /** ISO date (YYYY-MM-DD). Default = i dag (Europe/Oslo) hvis ikke satt. */
+  /** ISO date (YYYY-MM-DD). Default = i dag (Europe/Oslo). */
   seqDate?: string | null;
 }
 
@@ -83,18 +83,14 @@ export interface AssignLabelNumberInput {
  */
 export function useNextLabelNumber() {
   return useMutation({
-    mutationFn: async (input: AssignLabelNumberInput | string): Promise<string> => {
-      // Bakoverkompatibilitet: hvis bare deptId sendes, oppfør deg som før (i dag).
-      const payload =
-        typeof input === "string"
-          ? { p_dept_id: input, p_product_id: null as unknown as string, p_order_line_id: null }
-          : {
-              p_dept_id: input.deptId,
-              p_product_id: input.productId,
-              p_order_line_id: input.orderLineId ?? null,
-              ...(input.seqDate ? { p_seq_date: input.seqDate } : {}),
-            };
-      const { data, error } = await supabase.rpc("assign_label_number", payload as never);
+    mutationFn: async (input: AssignLabelNumberInput): Promise<string> => {
+      const params: Record<string, unknown> = {
+        p_dept_id: input.deptId,
+        p_product_id: input.productId,
+        p_order_line_id: input.orderLineId ?? null,
+      };
+      if (input.seqDate) params.p_seq_date = input.seqDate;
+      const { data, error } = await supabase.rpc("assign_label_number", params as never);
       if (error) throw error;
       return data as string;
     },
