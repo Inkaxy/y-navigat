@@ -27,6 +27,8 @@ export interface LabelPdfData {
   copies?: number;
   /** Merknad lagret på order_lines.merknad for denne ordrelinjen. Fyller etikett-felt. */
   merknad?: Merknad | null;
+  /** Tur-etikett (f.eks. "Tur 1") for ordrelinjen. */
+  tourLabel?: string | null;
 }
 
 function joinNonEmpty(parts: Array<string | undefined | null>, sep = " · "): string {
@@ -38,7 +40,7 @@ function valueFor(
   type: FieldType,
   data: LabelPdfData,
 ): { text?: string; image?: string | null } {
-  const { profile, row, labelNumber, quantity, merknad } = data;
+  const { profile, row, labelNumber, quantity, merknad, tourLabel } = data;
   switch (type) {
     case "logo":
       return { image: profile.logo_url };
@@ -54,6 +56,8 @@ function valueFor(
       return { text: String(quantity) };
     case "etikett_nr":
       return { text: labelNumber || "—" };
+    case "tur":
+      return { text: tourLabel || "" };
     case "sist_endret":
       return { text: new Date().toLocaleString("nb-NO") };
     case "bestilt_av":

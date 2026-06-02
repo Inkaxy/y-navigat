@@ -60,6 +60,7 @@ const FIELD_ICONS: Record<FieldType, React.ComponentType<{ className?: string }>
   bestilt_av: UserCircle,
   distribusjon: Truck,
   kjorerute: Route,
+  tur: Route,
   leveringsadresse: MapPin,
   varenr: Hash,
   varenavn: Tag,
