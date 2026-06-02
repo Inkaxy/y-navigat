@@ -40,7 +40,7 @@ function valueFor(
   type: FieldType,
   data: LabelPdfData,
 ): { text?: string; image?: string | null } {
-  const { profile, row, labelNumber, quantity, merknad } = data;
+  const { profile, row, labelNumber, quantity, merknad, tourLabel } = data;
   switch (type) {
     case "logo":
       return { image: profile.logo_url };
