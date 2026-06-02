@@ -418,6 +418,8 @@ function CanvasFieldBox({
     content = "Teie";
   } else if (field.field_type === "telefon") {
     content = "+47 999 99 999";
+  } else if (field.field_type === "leveringsdato") {
+    content = "02.06.2026";
   } else {
     content = `[${FIELD_LABELS[field.field_type]}]`;
   }
