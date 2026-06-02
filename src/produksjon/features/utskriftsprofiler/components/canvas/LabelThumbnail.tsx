@@ -131,6 +131,22 @@ export function LabelThumbnail({
                 </div>
               );
             })}
+            {lines.map((ln) => {
+              const isH = ln.orientation === "horizontal";
+              return (
+                <div
+                  key={ln.id}
+                  className="pointer-events-none absolute"
+                  style={{
+                    left: ln.x_mm * pxPerMm,
+                    top: ln.y_mm * pxPerMm,
+                    width: isH ? ln.length_mm * pxPerMm : Math.max(0.5, ln.thickness_mm * pxPerMm),
+                    height: isH ? Math.max(0.5, ln.thickness_mm * pxPerMm) : ln.length_mm * pxPerMm,
+                    background: "#555",
+                  }}
+                />
+              );
+            })}
           </div>
         </div>
       </div>
