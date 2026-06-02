@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from "react";
-import { FIELD_LABELS, type ProfileField } from "../../types";
+import { FIELD_LABELS, type ProfileField, type ProfileLine } from "../../types";
 
 interface Props {
   paperWidth: number;
@@ -10,6 +10,7 @@ interface Props {
   marginLeft: number;
   landscape: boolean;
   fields: ProfileField[];
+  lines?: ProfileLine[];
   companyName: string;
   logoUrl: string | null;
 }
