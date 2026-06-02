@@ -3,10 +3,13 @@ import {
   AlignJustify,
   AlignLeft,
   AlignRight,
+  Minus,
+  Plus,
   Square,
   Underline,
   Trash2,
 } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -145,12 +148,11 @@ export function RightInspector({ selected, innerW, innerH, onChange, onRemove }:
             >
               {selected.bold ? "Bold" : "Medium"}
             </button>
-            <UnitInput
+            <FontSizeStepper
               value={selected.font_size}
-              onChange={(v) =>
-                onChange({ font_size: Math.max(6, Math.min(48, Math.round(v))) })
-              }
+              onChange={(v) => onChange({ font_size: v })}
             />
+
           </Row>
           <Row label="Justering">
             <div className="col-span-2 grid grid-cols-4 rounded-[10px] border border-border bg-background p-0.5">
@@ -303,3 +305,71 @@ function alignIcon(a: Alignment) {
   if (a === "right") return <AlignRight className="h-3.5 w-3.5" />;
   return <AlignLeft className="h-3.5 w-3.5" />;
 }
+
+export function FontSizeStepper({
+  value,
+  onChange,
+  min = 6,
+  max = 48,
+}: {
+  value: number;
+  onChange: (v: number) => void;
+  min?: number;
+  max?: number;
+}) {
+  const [draft, setDraft] = useState<string>(String(value));
+  useEffect(() => {
+    setDraft(String(value));
+  }, [value]);
+
+  const clampVal = (n: number) => Math.max(min, Math.min(max, Math.round(n)));
+  const commit = (raw: string) => {
+    const n = Number(raw);
+    if (!raw || Number.isNaN(n)) {
+      setDraft(String(value));
+      return;
+    }
+    const c = clampVal(n);
+    setDraft(String(c));
+    if (c !== value) onChange(c);
+  };
+
+  return (
+    <div className="flex h-9 items-center rounded-[10px] border border-border bg-background focus-within:border-brand-bronze focus-within:ring-1 focus-within:ring-brand-bronze/30">
+      <button
+        type="button"
+        onClick={() => onChange(clampVal(value - 1))}
+        disabled={value <= min}
+        aria-label="Mindre skrift"
+        className="flex h-full w-8 items-center justify-center rounded-l-[10px] text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:opacity-40"
+      >
+        <Minus className="h-3.5 w-3.5" />
+      </button>
+      <Input
+        type="number"
+        inputMode="numeric"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={(e) => commit(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            commit((e.target as HTMLInputElement).value);
+          }
+        }}
+        aria-label="Skriftstørrelse"
+        className="h-7 w-full min-w-0 border-0 bg-transparent p-0 text-center text-xs tabular-nums shadow-none focus-visible:ring-0 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+      />
+      <button
+        type="button"
+        onClick={() => onChange(clampVal(value + 1))}
+        disabled={value >= max}
+        aria-label="Større skrift"
+        className="flex h-full w-8 items-center justify-center rounded-r-[10px] text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:opacity-40"
+      >
+        <Plus className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  );
+}
+

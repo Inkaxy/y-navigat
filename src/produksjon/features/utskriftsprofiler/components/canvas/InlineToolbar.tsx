@@ -20,6 +20,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { ALIGNMENTS, type ProfileField, type Alignment } from "../../types";
+import { FontSizeStepper } from "./RightInspector";
 
 interface Props {
   field: ProfileField;
@@ -39,17 +40,11 @@ export function InlineToolbar({ field, onChange, onRemove }: Props) {
       className="pointer-events-auto flex items-center gap-1 rounded-md border border-border bg-popover p-1 shadow-md"
       onMouseDown={(e) => e.stopPropagation()}
     >
-      <Input
-        type="number"
-        min={6}
-        max={48}
+      <FontSizeStepper
         value={field.font_size}
-        onChange={(e) =>
-          onChange({ font_size: Math.max(6, Number(e.target.value) || 10) })
-        }
-        className="h-7 w-14 text-xs"
-        aria-label="Skriftstørrelse"
+        onChange={(v) => onChange({ font_size: v })}
       />
+
       <Button
         type="button"
         variant={field.bold ? "default" : "ghost"}
