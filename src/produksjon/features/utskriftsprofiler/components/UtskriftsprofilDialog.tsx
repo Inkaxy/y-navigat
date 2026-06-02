@@ -238,6 +238,38 @@ export function UtskriftsprofilDialog({
     addFieldAt(type, 0, Math.min(maxY + 1, Math.max(0, inner.h - sz.h)));
   };
 
+  const addLine = (orientation: "horizontal" | "vertical") => {
+    const id =
+      typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `line-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const isH = orientation === "horizontal";
+    const length = isH
+      ? Math.min(Math.max(20, inner.w * 0.6), inner.w)
+      : Math.min(Math.max(15, inner.h * 0.6), inner.h);
+    const newLine: ProfileLine = {
+      id,
+      orientation,
+      x_mm: isH ? Math.max(0, (inner.w - length) / 2) : Math.max(0, inner.w / 2),
+      y_mm: isH ? Math.max(0, inner.h / 2) : Math.max(0, (inner.h - length) / 2),
+      length_mm: length,
+      thickness_mm: 0.3,
+    };
+    setLines((prev) => [...prev, newLine]);
+    setSelectedFieldType(null);
+    setSelectedLineId(id);
+  };
+
+  const updateLine = (id: string, patch: Partial<ProfileLine>) => {
+    setLines((prev) => prev.map((l) => (l.id === id ? { ...l, ...patch } : l)));
+  };
+
+  const removeLine = (id: string) => {
+    setLines((prev) => prev.filter((l) => l.id !== id));
+    setSelectedLineId((s) => (s === id ? null : s));
+  };
+
+
   const handleLogoUpload = async (file: File) => {
     if (!legalEntity) {
       toast.error("Velg et selskap først.");
