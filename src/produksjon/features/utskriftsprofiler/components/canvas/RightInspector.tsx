@@ -284,7 +284,7 @@ function UnitInput({
   return (
     <div className="flex h-9 items-center gap-1 rounded-[10px] border border-border bg-background px-2 text-xs focus-within:border-brand-bronze focus-within:ring-1 focus-within:ring-brand-bronze/30">
       {prefix && (
-        <span className="text-muted-foreground">{prefix}</span>
+        <span className="text-[11px] font-semibold text-foreground/80">{prefix}</span>
       )}
       <Input
         type="number"
