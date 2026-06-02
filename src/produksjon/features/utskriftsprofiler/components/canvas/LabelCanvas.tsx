@@ -308,8 +308,10 @@ export function LabelCanvas(props: Props) {
             >
               {includedFields.map((f) => {
                 const isSelected = !readOnly && f.field_type === selectedFieldType;
+                const isOverlapping = !readOnly && overlappingTypes.has(f.field_type);
                 return (
                   <CanvasFieldBox
+                    overlapping={isOverlapping}
                     key={f.field_type}
                     field={f}
                     pxPerMm={pxPerMm}
