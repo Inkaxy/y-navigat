@@ -5,6 +5,7 @@ import {
   CombinedLabelPdfDocument,
   slugifyLabel,
   type LabelPdfData,
+  type CombinedLabelItem,
 } from "../lib/labelPdf";
 import { useOrderLineMerknads } from "../hooks/useOrderLineMerknads";
 import { useOrderLineTours } from "../hooks/useOrderLineTours";
@@ -78,7 +79,7 @@ export function PrintLabelDialog({
   const { data: customerInfoMap } = useOrderLineCustomerInfo(orderLineIds);
 
   /** Bygg en LabelPdfData per ordrelinje, padder/trimmer til ønsket `quantity`. */
-  function buildItems(): LabelPdfData[] {
+  function buildItems(): CombinedLabelItem[] {
     if (!profile || !row) return [];
     const base = { profile, row, labelNumber };
     const isOrigPlusCopy = row.label_print_model === "orig_plus_copy";
@@ -134,8 +135,12 @@ export function PrintLabelDialog({
       // [A, A, B, B, ...] — bevarer `copies` (dobles per item)
       return base_items.map((it) => ({ ...it, copies: (it.copies ?? 1) * 2 }));
     }
-    // "stack" — [A, B, C, A, B, C]: full sekvens to ganger
-    return [...base_items, ...base_items.map((it) => ({ ...it }))];
+    // "stack" — [A, B, C, ---- KOPI ----, A, B, C]
+    return [
+      ...base_items,
+      { separator: true as const, profile, text: "---- KOPI ----" },
+      ...base_items.map((it) => ({ ...it })),
+    ];
   }
 
   const handleDownloadPdf = async () => {
