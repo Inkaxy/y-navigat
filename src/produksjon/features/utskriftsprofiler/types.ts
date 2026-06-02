@@ -196,6 +196,7 @@ const DEFAULT_SIZES: Record<FieldType, { w: number; h: number }> = {
   leveringsadresse: { w: 60, h: 12 },
   distribusjon: { w: 40, h: 5 },
   kjorerute: { w: 40, h: 5 },
+  tur: { w: 30, h: 5 },
   hentested: { w: 40, h: 5 },
   varenavn: { w: 60, h: 6 },
   varenr: { w: 30, h: 5 },
