@@ -131,6 +131,7 @@ export function UtskriftsprofilDialog({
         existing.orientation === "landscape",
       );
       setFields(migrateLegacyFields(baseFields, inner.w, inner.h));
+      setLines(Array.isArray(existing.lines) ? existing.lines : []);
       setCommentFt1(existing.comment_includes.fritekst1);
       setCommentFt2(existing.comment_includes.fritekst2);
       setCommentFt3(existing.comment_includes.fritekst3);
