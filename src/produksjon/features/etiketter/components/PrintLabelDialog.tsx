@@ -69,19 +69,21 @@ export function PrintLabelDialog({
 
   const orderLineIds = useMemo(() => row?.order_line_ids ?? [], [row]);
   const { data: merknadMap } = useOrderLineMerknads(orderLineIds);
+  const { data: tourMap } = useOrderLineTours(orderLineIds);
 
   /** Bygg en LabelPdfData per ordrelinje, padder/trimmer til ønsket `quantity`. */
   function buildItems(): LabelPdfData[] {
     if (!profile || !row) return [];
     const base = { profile, row, labelNumber };
     if (orderLineIds.length === 0) {
-      return [{ ...base, quantity, copies: quantity, merknad: null }];
+      return [{ ...base, quantity, copies: quantity, merknad: null, tourLabel: null }];
     }
     const perLine: LabelPdfData[] = orderLineIds.map((id) => ({
       ...base,
       quantity,
       copies: 1,
       merknad: merknadMap?.[id] ?? null,
+      tourLabel: tourMap?.[id] ?? null,
     }));
     if (quantity <= perLine.length) {
       return perLine.slice(0, quantity);
@@ -90,7 +92,13 @@ export function PrintLabelDialog({
     const extras = quantity - perLine.length;
     return [
       ...perLine,
-      { ...base, quantity, copies: extras, merknad: perLine[0]?.merknad ?? null },
+      {
+        ...base,
+        quantity,
+        copies: extras,
+        merknad: perLine[0]?.merknad ?? null,
+        tourLabel: perLine[0]?.tourLabel ?? null,
+      },
     ];
   }
 
