@@ -5,6 +5,7 @@ import {
   CombinedLabelPdfDocument,
   slugifyLabel,
   type LabelPdfData,
+  type CombinedLabelItem,
 } from "../lib/labelPdf";
 import { useOrderLineMerknads } from "../hooks/useOrderLineMerknads";
 import { useOrderLineTours } from "../hooks/useOrderLineTours";
