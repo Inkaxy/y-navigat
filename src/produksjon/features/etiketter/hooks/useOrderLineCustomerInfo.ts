@@ -24,7 +24,7 @@ export function useOrderLineCustomerInfo(orderLineIds: string[] | undefined) {
     enabled: ids.length > 0,
     queryFn: async (): Promise<Record<string, OrderLineCustomerInfo>> => {
       const out: Record<string, OrderLineCustomerInfo> = {};
-      for (const id of ids) out[id] = { pickupLabel: null, phone: null };
+      for (const id of ids) out[id] = { pickupLabel: null, phone: null, deliveryDate: null };
 
       const { data: lines, error } = await supabase
         .from("order_lines")
@@ -39,7 +39,7 @@ export function useOrderLineCustomerInfo(orderLineIds: string[] | undefined) {
 
       const { data: orders, error: oErr } = await supabase
         .from("orders")
-        .select("id, customer_id, final_customer_phone")
+        .select("id, customer_id, final_customer_phone, delivery_date")
         .in("id", orderIds);
       if (oErr) throw oErr;
 
