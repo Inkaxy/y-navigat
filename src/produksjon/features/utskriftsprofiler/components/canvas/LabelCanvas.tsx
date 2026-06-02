@@ -673,6 +673,8 @@ function CanvasFieldBox({
     content = "+47 999 99 999";
   } else if (field.field_type === "leveringsdato") {
     content = "02.06.2026";
+  } else if (field.field_type === "hentetidspunkt") {
+    content = "Hentes kl 10:00";
   } else {
     content = `[${FIELD_LABELS[field.field_type]}]`;
   }

@@ -75,6 +75,7 @@ const FIELD_ICONS: Record<FieldType, React.ComponentType<{ className?: string }>
   firmamerknad: Info,
   telefon: User,
   leveringsdato: Calendar,
+  hentetidspunkt: Clock,
 };
 
 const NEW_FIELDS: ReadonlySet<FieldType> = new Set(["etikett_nr"]);

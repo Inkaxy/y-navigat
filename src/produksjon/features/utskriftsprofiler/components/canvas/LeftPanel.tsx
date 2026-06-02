@@ -79,6 +79,7 @@ const FIELD_ICONS: Record<FieldType, React.ComponentType<{ className?: string }>
   firmamerknad: Info,
   telefon: User,
   leveringsdato: Calendar,
+  hentetidspunkt: Clock,
 };
 
 export function LeftPanel(props: Props) {
