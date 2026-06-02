@@ -52,7 +52,7 @@ function valueFor(
   type: FieldType,
   data: LabelPdfData,
 ): { text?: string; image?: string | null } {
-  const { profile, row, labelNumber, quantity, merknad, tourLabel, pickupLabel, phone, deliveryDate, pickupTime } = data;
+  const { profile, row, labelNumber, quantity, merknad, tourLabel, pickupLabel, customerName, deliveryAddress, phone, deliveryDate, pickupTime } = data;
   switch (type) {
     case "logo":
       return { image: profile.logo_url };
