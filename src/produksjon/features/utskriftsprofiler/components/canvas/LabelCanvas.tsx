@@ -760,3 +760,34 @@ function handleClass(h: ResizeHandle): string {
   };
   return map[h];
 }
+
+function LineEndHandle({
+  position,
+  orientation,
+  onPointerDown,
+}: {
+  position: "start" | "end";
+  orientation: "horizontal" | "vertical";
+  onPointerDown: (e: React.PointerEvent) => void;
+}) {
+  const isH = orientation === "horizontal";
+  const cursor = isH ? "cursor-ew-resize" : "cursor-ns-resize";
+  const pos = isH
+    ? position === "start"
+      ? "left-0 top-1/2 -translate-x-1/2 -translate-y-1/2"
+      : "right-0 top-1/2 translate-x-1/2 -translate-y-1/2"
+    : position === "start"
+      ? "top-0 left-1/2 -translate-x-1/2 -translate-y-1/2"
+      : "bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2";
+  return (
+    <div
+      onPointerDown={onPointerDown}
+      className={cn(
+        "absolute h-2.5 w-2.5 rounded-sm border border-primary bg-background",
+        pos,
+        cursor,
+      )}
+      style={{ touchAction: "none" }}
+    />
+  );
+}
