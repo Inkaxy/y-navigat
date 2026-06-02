@@ -459,6 +459,7 @@ interface CanvasFieldBoxProps {
   pxPerMm: number;
   selected: boolean;
   readOnly: boolean;
+  overlapping?: boolean;
   companyName: string;
   logoUrl: string | null;
   includeFieldLabels: boolean;
@@ -469,6 +470,10 @@ interface CanvasFieldBoxProps {
 function CanvasFieldBox({
   field,
   pxPerMm,
+  selected,
+  readOnly,
+  overlapping = false,
+  companyName,
   selected,
   readOnly,
   companyName,
