@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { StickyNote, Loader2, Trash2 } from "lucide-react";
+import { StickyNote, Loader2, Trash2, Lock } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -23,13 +23,14 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { type Merknad, emptyMerknad, isMerknadEmpty, merknadSchema } from "@/ordre/lib/merknad";
-import type { LabelPrintProfile } from "@/produksjon/features/utskriftsprofiler/types";
+import type { FieldType, LabelPrintProfile } from "@/produksjon/features/utskriftsprofiler/types";
+import { FIELD_LABELS } from "@/produksjon/features/utskriftsprofiler/types";
 import { toast } from "sonner";
 
 /**
- * Felter fra utskriftsprofilen som faktisk er manuelt utfyllbare pr ordrelinje.
- * Andre felt (kundenavn, hentested, distribusjon, varenavn, antall, …) hentes
- * automatisk fra ordre/produkt og vises ikke her.
+ * Felter som er manuelt utfyllbare pr ordrelinje (inputs).
+ * Andre aktive felter på profilen vises som låste read-only rader så
+ * brukeren ser nøyaktig hva som faktisk havner på etiketten.
  */
 const EDITABLE_TYPES = [
   "bestilt_av",
@@ -41,9 +42,19 @@ const EDITABLE_TYPES = [
 ] as const;
 type EditableType = (typeof EDITABLE_TYPES)[number];
 
+/** Rent visuelle felter som ikke gir mening å vise som rad i dialogen. */
+const HIDDEN_IN_DIALOG: ReadonlySet<FieldType> = new Set<FieldType>([
+  "logo",
+  "strekkode",
+  "sist_endret",
+  "etikett_nr",
+]);
+
 function isEditable(t: string): t is EditableType {
   return (EDITABLE_TYPES as readonly string[]).includes(t);
 }
+
+export type MerknadAutoValues = Partial<Record<FieldType, string>>;
 
 export function MerknadDialog({
   open,
@@ -56,6 +67,7 @@ export function MerknadDialog({
   isSaving,
   onSave,
   onClear,
+  autoValues,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -68,6 +80,9 @@ export function MerknadDialog({
   isSaving: boolean;
   onSave: (merknad: Merknad | null) => Promise<void> | void;
   onClear: () => Promise<void> | void;
+  /** Allerede kjente verdier (kundenavn, tur, leveringsadresse, telefon, …)
+   *  som vises som låste rader. Mangler en verdi vises «(hentes fra ordre)». */
+  autoValues?: MerknadAutoValues;
 }) {
   const [form, setForm] = useState<Merknad>(emptyMerknad);
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);
@@ -82,26 +97,36 @@ export function MerknadDialog({
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
-  // Bygg listen av aktive, manuelt utfyllbare felt — sortert etter visuell
-  // posisjon på etiketten (y, så x), slik at dialogen følger profil-layouten.
-  const activeFields = useMemo<EditableType[]>(() => {
-    const seen = new Set<EditableType>();
-    const result: EditableType[] = [];
+  // Alle aktive felter på profilen, sortert etter visuell posisjon (y, så x).
+  // Dedupliseres på field_type slik at samme type ikke får to rader.
+  const orderedFields = useMemo<FieldType[]>(() => {
+    const seen = new Set<FieldType>();
+    const out: FieldType[] = [];
     const sorted = [...profile.fields]
-      .filter((f) => f.include && isEditable(f.field_type))
+      .filter((f) => f.include && !HIDDEN_IN_DIALOG.has(f.field_type))
       .sort((a, b) => (a.y_mm - b.y_mm) || (a.x_mm - b.x_mm));
     for (const f of sorted) {
-      const t = f.field_type as EditableType;
-      if (seen.has(t)) continue;
-      seen.add(t);
-      result.push(t);
+      if (seen.has(f.field_type)) continue;
+      seen.add(f.field_type);
+      out.push(f.field_type);
     }
-    return result;
+    return out;
   }, [profile.fields]);
 
-  const showFritekst1 = activeFields.includes("kommentar") && profile.comment_includes.fritekst1;
-  const showFritekst2 = activeFields.includes("kommentar") && profile.comment_includes.fritekst2;
-  const showFritekst3 = activeFields.includes("kommentar") && profile.comment_includes.fritekst3;
+  // Verdier vi automatisk kan utlede uten input fra brukeren.
+  const derivedAuto = useMemo<MerknadAutoValues>(() => {
+    return {
+      varenavn: productName,
+      antall: String(quantity),
+      firmanavn: profile.company_name,
+      firmamerknad: profile.company_note ?? "",
+      ...(autoValues ?? {}),
+    };
+  }, [productName, quantity, profile.company_name, profile.company_note, autoValues]);
+
+  const showFritekst1 = orderedFields.includes("kommentar") && profile.comment_includes.fritekst1;
+  const showFritekst2 = orderedFields.includes("kommentar") && profile.comment_includes.fritekst2;
+  const showFritekst3 = orderedFields.includes("kommentar") && profile.comment_includes.fritekst3;
 
   async function handleSave() {
     const parsed = merknadSchema.safeParse(form);
@@ -114,7 +139,28 @@ export function MerknadDialog({
   }
 
   const hasExisting = initial != null && !isMerknadEmpty(initial);
-  const hasAnyField = activeFields.length > 0;
+  const hasAnyField = orderedFields.length > 0;
+  const hasEditable = orderedFields.some(isEditable);
+
+  function renderAutoRow(ft: FieldType) {
+    const value = (derivedAuto[ft] ?? "").trim();
+    const placeholder = "(hentes fra ordre)";
+    return (
+      <div key={ft} className="contents">
+        <Label className="self-center text-muted-foreground">{FIELD_LABELS[ft]}</Label>
+        <div className="flex items-center gap-2">
+          <Input
+            value={value}
+            readOnly
+            disabled
+            placeholder={placeholder}
+            className="bg-muted/40 text-muted-foreground"
+          />
+          <Lock className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -126,18 +172,20 @@ export function MerknadDialog({
               Etikett-felter: {productName} ({quantity} stk)
             </DialogTitle>
             <p className="text-xs text-muted-foreground">
-              Profil: <span className="font-medium">{profile.name}</span>
+              Profil: <span className="font-medium">{profile.name}</span> — låste felt fylles automatisk fra ordren.
             </p>
           </DialogHeader>
 
           {!hasAnyField ? (
             <div className="rounded-md border border-dashed border-border bg-muted/30 p-6 text-center text-sm text-muted-foreground">
-              Utskriftsprofilen «{profile.name}» har ingen manuelt utfyllbare felt.
-              Alle etikettverdier hentes automatisk fra ordren.
+              Utskriftsprofilen «{profile.name}» har ingen aktive felter.
             </div>
           ) : (
-            <div className="grid grid-cols-[140px_1fr] gap-x-4 gap-y-3 py-2">
-              {activeFields.map((ft) => {
+            <div className="grid grid-cols-[160px_1fr] gap-x-4 gap-y-3 py-2">
+              {orderedFields.map((ft) => {
+                if (!isEditable(ft)) {
+                  return renderAutoRow(ft);
+                }
                 switch (ft) {
                   case "bestilt_av":
                     return (
@@ -275,7 +323,7 @@ export function MerknadDialog({
             <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={isSaving}>
               Lukk
             </Button>
-            {canEdit && hasAnyField && (
+            {canEdit && hasEditable && (
               <Button onClick={handleSave} disabled={isSaving}>
                 {isSaving ? <Loader2 className="animate-spin" /> : <StickyNote />}
                 Lagre
