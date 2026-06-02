@@ -207,6 +207,32 @@ export function RightInspector({ selected, innerW, innerH, onChange, onRemove }:
               <Underline className="h-3.5 w-3.5" />
             </button>
           </Row>
+          {selected.field_type !== "logo" && (
+            <Row label="Tittel">
+              <button
+                type="button"
+                onClick={() =>
+                  onChange({ show_label: !(selected.show_label ?? true) })
+                }
+                className={cn(
+                  "col-span-2 flex h-9 items-center justify-between rounded-[10px] border px-3 text-xs transition",
+                  (selected.show_label ?? true)
+                    ? "border-brand-bronze bg-brand-bronze/10 text-foreground"
+                    : "border-border bg-background text-muted-foreground hover:text-foreground",
+                )}
+                title="Vis felt-tittel foran verdien"
+              >
+                <span>
+                  {(selected.show_label ?? true)
+                    ? `Vis «${FIELD_LABELS[selected.field_type]}:»`
+                    : "Kun verdi"}
+                </span>
+                <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                  {(selected.show_label ?? true) ? "På" : "Av"}
+                </span>
+              </button>
+            </Row>
+          )}
         </Section>
 
         {/* Field binding (informational) */}
