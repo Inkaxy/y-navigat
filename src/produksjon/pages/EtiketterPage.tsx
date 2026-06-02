@@ -108,7 +108,7 @@ export default function EtiketterPage() {
   }, []);
 
   const totalProducts = filteredRows?.length ?? 0;
-  const totalLabels = filteredRows?.reduce((s, r) => s + r.total_labels, 0) ?? 0;
+  
 
   // Print-dialog
   const [printRow, setPrintRow] = useState<LabelProductRow | null>(null);
