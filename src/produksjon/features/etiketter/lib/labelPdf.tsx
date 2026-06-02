@@ -56,6 +56,8 @@ function valueFor(
       return { text: String(quantity) };
     case "etikett_nr":
       return { text: labelNumber || "—" };
+    case "tur":
+      return { text: tourLabel || "" };
     case "sist_endret":
       return { text: new Date().toLocaleString("nb-NO") };
     case "bestilt_av":
