@@ -61,6 +61,10 @@ export function PrintLabelDialog({
   const [quantity, setQuantity] = useState<number>(1);
   const [labelNumber, setLabelNumber] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  /** Sortering når `label_print_model === "orig_plus_copy"`:
+   *  - "stack":      [A, B, C, A, B, C]   (alle originaler, så alle kopier)
+   *  - "interleave": [A, A, B, B, C, C]   (orig + kopi annenhver) */
+  const [copySortMode, setCopySortMode] = useState<"stack" | "interleave">("stack");
 
   const nextNumber = useNextLabelNumber();
   const insertJob = useInsertLabelPrintJob();
@@ -77,43 +81,61 @@ export function PrintLabelDialog({
   function buildItems(): LabelPdfData[] {
     if (!profile || !row) return [];
     const base = { profile, row, labelNumber };
+    const isOrigPlusCopy = row.label_print_model === "orig_plus_copy";
+
+    let base_items: LabelPdfData[];
     if (orderLineIds.length === 0) {
-      return [{ ...base, quantity, copies: quantity, merknad: null, tourLabel: null, pickupLabel: null, customerName: null, deliveryAddress: null, phone: null, deliveryDate: null, pickupTime: null }];
-    }
-    const perLine: LabelPdfData[] = orderLineIds.map((id) => ({
-      ...base,
-      quantity,
-      copies: 1,
-      merknad: merknadMap?.[id] ?? null,
-      tourLabel: tourMap?.[id] ?? null,
-      pickupLabel: customerInfoMap?.[id]?.pickupLabel ?? null,
-      customerName: customerInfoMap?.[id]?.customerName ?? null,
-      deliveryAddress: customerInfoMap?.[id]?.deliveryAddress ?? null,
-      phone: customerInfoMap?.[id]?.phone ?? null,
-      deliveryDate: customerInfoMap?.[id]?.deliveryDate ?? null,
-      pickupTime: customerInfoMap?.[id]?.pickupTime ?? null,
-    }));
-    if (quantity <= perLine.length) {
-      return perLine.slice(0, quantity);
-    }
-    // Pad ekstra kopier med første merknad (vanligvis ikke aktuelt — quantity ≈ antall linjer)
-    const extras = quantity - perLine.length;
-    return [
-      ...perLine,
-      {
+      base_items = [{
+        ...base, quantity, copies: quantity, merknad: null, tourLabel: null,
+        pickupLabel: null, customerName: null, deliveryAddress: null,
+        phone: null, deliveryDate: null, pickupTime: null,
+      }];
+    } else {
+      const perLine: LabelPdfData[] = orderLineIds.map((id) => ({
         ...base,
         quantity,
-        copies: extras,
-        merknad: perLine[0]?.merknad ?? null,
-        tourLabel: perLine[0]?.tourLabel ?? null,
-        pickupLabel: perLine[0]?.pickupLabel ?? null,
-        customerName: perLine[0]?.customerName ?? null,
-        deliveryAddress: perLine[0]?.deliveryAddress ?? null,
-        phone: perLine[0]?.phone ?? null,
-        deliveryDate: perLine[0]?.deliveryDate ?? null,
-        pickupTime: perLine[0]?.pickupTime ?? null,
-      },
-    ];
+        copies: 1,
+        merknad: merknadMap?.[id] ?? null,
+        tourLabel: tourMap?.[id] ?? null,
+        pickupLabel: customerInfoMap?.[id]?.pickupLabel ?? null,
+        customerName: customerInfoMap?.[id]?.customerName ?? null,
+        deliveryAddress: customerInfoMap?.[id]?.deliveryAddress ?? null,
+        phone: customerInfoMap?.[id]?.phone ?? null,
+        deliveryDate: customerInfoMap?.[id]?.deliveryDate ?? null,
+        pickupTime: customerInfoMap?.[id]?.pickupTime ?? null,
+      }));
+      if (quantity <= perLine.length) {
+        base_items = perLine.slice(0, quantity);
+      } else {
+        const extras = quantity - perLine.length;
+        base_items = [
+          ...perLine,
+          {
+            ...base,
+            quantity,
+            copies: extras,
+            merknad: perLine[0]?.merknad ?? null,
+            tourLabel: perLine[0]?.tourLabel ?? null,
+            pickupLabel: perLine[0]?.pickupLabel ?? null,
+            customerName: perLine[0]?.customerName ?? null,
+            deliveryAddress: perLine[0]?.deliveryAddress ?? null,
+            phone: perLine[0]?.phone ?? null,
+            deliveryDate: perLine[0]?.deliveryDate ?? null,
+            pickupTime: perLine[0]?.pickupTime ?? null,
+          },
+        ];
+      }
+    }
+
+    if (!isOrigPlusCopy) return base_items;
+
+    // Dupliser hver etikett 1 gang ekstra (original + kopi).
+    if (copySortMode === "interleave") {
+      // [A, A, B, B, ...] — bevarer `copies` (dobles per item)
+      return base_items.map((it) => ({ ...it, copies: (it.copies ?? 1) * 2 }));
+    }
+    // "stack" — [A, B, C, A, B, C]: full sekvens to ganger
+    return [...base_items, ...base_items.map((it) => ({ ...it }))];
   }
 
   const handleDownloadPdf = async () => {
@@ -274,6 +296,31 @@ export function PrintLabelDialog({
               onChange={(e) => setQuantity(Math.max(1, Number(e.target.value)))}
             />
           </div>
+
+          {row.label_print_model === "orig_plus_copy" && (
+            <div className="space-y-1">
+              <Label>Sortering (original + kopi)</Label>
+              <Select
+                value={copySortMode}
+                onValueChange={(v) => setCopySortMode(v as "stack" | "interleave")}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="stack">
+                    Originaler først, deretter kopier
+                  </SelectItem>
+                  <SelectItem value="interleave">
+                    Annenhver: original + kopi
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Hver etikett skrives ut to ganger. Velg hvordan bunken sorteres.
+              </p>
+            </div>
+          )}
         </div>
 
         <div className="flex items-start gap-2 rounded-md border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
