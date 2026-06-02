@@ -72,6 +72,10 @@ function valueFor(
       return { text: tourLabel || "" };
     case "hentested":
       return { text: pickupLabel || "" };
+    case "kundenavn":
+      return { text: customerName || "" };
+    case "leveringsadresse":
+      return { text: deliveryAddress || "" };
     case "telefon":
       return { text: phone || "" };
     case "leveringsdato":
