@@ -41,6 +41,7 @@ export function useCreateLabelPrintProfile() {
         logo_url: input.logo_url,
         logo_height_mm: input.logo_height_mm,
         fields: input.fields as unknown as never,
+        lines: input.lines as unknown as never,
         comment_includes: input.comment_includes as unknown as never,
         include_field_labels: input.include_field_labels,
         field_labels_bold: input.field_labels_bold,
