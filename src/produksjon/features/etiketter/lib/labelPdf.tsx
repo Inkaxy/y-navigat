@@ -239,13 +239,41 @@ export function LabelPdfDocument({ data }: { data: LabelPdfData }) {
   );
 }
 
-export function CombinedLabelPdfDocument({ items }: { items: LabelPdfData[] }) {
+export type CombinedLabelItem =
+  | LabelPdfData
+  | { separator: true; profile: LabelPrintProfile; text?: string };
+
+export function CombinedLabelPdfDocument({ items }: { items: CombinedLabelItem[] }) {
   return (
     <Document>
-      {items.map((d, i) => (
-        <LabelPages key={i} data={d} />
-      ))}
+      {items.map((d, i) =>
+        "separator" in d ? (
+          <SeparatorPage key={i} profile={d.profile} text={d.text ?? "---- KOPI ----"} />
+        ) : (
+          <LabelPages key={i} data={d} />
+        ),
+      )}
     </Document>
+  );
+}
+
+function SeparatorPage({ profile, text }: { profile: LabelPrintProfile; text: string }) {
+  const landscape = profile.orientation === "landscape";
+  const paperW = landscape ? profile.paper_width_mm : profile.paper_height_mm;
+  const paperH = landscape ? profile.paper_height_mm : profile.paper_width_mm;
+  return (
+    <Page size={[mm(paperW), mm(paperH)]} style={styles.page}>
+      <View
+        style={{
+          width: "100%",
+          height: "100%",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <Text style={{ fontSize: 18, fontWeight: 700, letterSpacing: 2 }}>{text}</Text>
+      </View>
+    </Page>
   );
 }
 
