@@ -513,7 +513,8 @@ function CanvasFieldBox({
         "absolute select-none overflow-hidden",
         readOnly ? "cursor-default" : "cursor-move",
         selected && !readOnly && "ring-2 ring-primary",
-        !selected && !readOnly && "hover:ring-1 hover:ring-primary/50",
+        !selected && !readOnly && overlapping && "ring-2 ring-destructive",
+        !selected && !readOnly && !overlapping && "hover:ring-1 hover:ring-primary/50",
       )}
       style={{
         left: field.x_mm * pxPerMm,
@@ -524,7 +525,11 @@ function CanvasFieldBox({
         border: field.show_border ? "1px solid #777" : undefined,
         borderBottom:
           field.show_line && !field.show_border ? "1px solid #777" : undefined,
-        background: selected && !readOnly ? "hsl(var(--primary) / 0.05)" : undefined,
+        background: selected && !readOnly
+          ? "hsl(var(--primary) / 0.05)"
+          : overlapping && !readOnly
+            ? "hsl(var(--destructive) / 0.08)"
+            : undefined,
       }}
     >
       <div
