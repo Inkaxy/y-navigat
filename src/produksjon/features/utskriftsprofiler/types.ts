@@ -22,6 +22,7 @@ export const FIELD_TYPES = [
   "firmanavn",
   "firmamerknad",
   "sukkerbilde",
+  "telefon",
 ] as const;
 
 export type FieldType = (typeof FIELD_TYPES)[number];
@@ -50,6 +51,7 @@ export const FIELD_LABELS: Record<FieldType, string> = {
   firmamerknad: "Firmamerknad",
   sukkerbilde: "Bilde",
   etikett_nr: "Etikett-nr",
+  telefon: "Telefon",
 };
 
 export type FieldGroup = "bestilling" | "vare" | "pakkseddel" | "firma" | "system";
@@ -78,6 +80,7 @@ export const FIELD_GROUPS: Record<FieldType, FieldGroup> = {
   strekkode: "system",
   sist_endret: "system",
   etikett_nr: "system",
+  telefon: "bestilling",
 };
 
 export const GROUP_LABELS: Record<FieldGroup, string> = {
@@ -211,6 +214,7 @@ const DEFAULT_SIZES: Record<FieldType, { w: number; h: number }> = {
   strekkode: { w: 50, h: 12 },
   sist_endret: { w: 40, h: 4 },
   etikett_nr: { w: 35, h: 8 },
+  telefon: { w: 40, h: 5 },
 };
 
 export function defaultFieldSize(type: FieldType): { w: number; h: number } {

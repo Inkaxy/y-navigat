@@ -29,6 +29,10 @@ export interface LabelPdfData {
   merknad?: Merknad | null;
   /** Tur-etikett (f.eks. "Tur 1") for ordrelinjen. */
   tourLabel?: string | null;
+  /** Hentested-navn (pickup_locations.display_name) for ordrelinjen. */
+  pickupLabel?: string | null;
+  /** Kundens telefonnummer for ordrelinjen. */
+  phone?: string | null;
 }
 
 function joinNonEmpty(parts: Array<string | undefined | null>, sep = " · "): string {
@@ -40,7 +44,7 @@ function valueFor(
   type: FieldType,
   data: LabelPdfData,
 ): { text?: string; image?: string | null } {
-  const { profile, row, labelNumber, quantity, merknad, tourLabel } = data;
+  const { profile, row, labelNumber, quantity, merknad, tourLabel, pickupLabel, phone } = data;
   switch (type) {
     case "logo":
       return { image: profile.logo_url };
@@ -58,6 +62,10 @@ function valueFor(
       return { text: labelNumber || "—" };
     case "tur":
       return { text: tourLabel || "" };
+    case "hentested":
+      return { text: pickupLabel || "" };
+    case "telefon":
+      return { text: phone || "" };
     case "sist_endret":
       return { text: new Date().toLocaleString("nb-NO") };
     case "bestilt_av":

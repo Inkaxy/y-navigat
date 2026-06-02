@@ -8,6 +8,7 @@ import {
 } from "../lib/labelPdf";
 import { useOrderLineMerknads } from "../hooks/useOrderLineMerknads";
 import { useOrderLineTours } from "../hooks/useOrderLineTours";
+import { useOrderLineCustomerInfo } from "../hooks/useOrderLineCustomerInfo";
 import {
   Dialog,
   DialogContent,
@@ -70,13 +71,14 @@ export function PrintLabelDialog({
   const orderLineIds = useMemo(() => row?.order_line_ids ?? [], [row]);
   const { data: merknadMap } = useOrderLineMerknads(orderLineIds);
   const { data: tourMap } = useOrderLineTours(orderLineIds);
+  const { data: customerInfoMap } = useOrderLineCustomerInfo(orderLineIds);
 
   /** Bygg en LabelPdfData per ordrelinje, padder/trimmer til ønsket `quantity`. */
   function buildItems(): LabelPdfData[] {
     if (!profile || !row) return [];
     const base = { profile, row, labelNumber };
     if (orderLineIds.length === 0) {
-      return [{ ...base, quantity, copies: quantity, merknad: null, tourLabel: null }];
+      return [{ ...base, quantity, copies: quantity, merknad: null, tourLabel: null, pickupLabel: null, phone: null }];
     }
     const perLine: LabelPdfData[] = orderLineIds.map((id) => ({
       ...base,
@@ -84,6 +86,8 @@ export function PrintLabelDialog({
       copies: 1,
       merknad: merknadMap?.[id] ?? null,
       tourLabel: tourMap?.[id] ?? null,
+      pickupLabel: customerInfoMap?.[id]?.pickupLabel ?? null,
+      phone: customerInfoMap?.[id]?.phone ?? null,
     }));
     if (quantity <= perLine.length) {
       return perLine.slice(0, quantity);
@@ -98,6 +102,8 @@ export function PrintLabelDialog({
         copies: extras,
         merknad: perLine[0]?.merknad ?? null,
         tourLabel: perLine[0]?.tourLabel ?? null,
+        pickupLabel: perLine[0]?.pickupLabel ?? null,
+        phone: perLine[0]?.phone ?? null,
       },
     ];
   }
