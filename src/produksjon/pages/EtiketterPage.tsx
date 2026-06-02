@@ -51,6 +51,7 @@ import { useLabelDepartments } from "@/produksjon/features/etiketter/hooks/useLa
 import { useLabelProducts } from "@/produksjon/features/etiketter/hooks/useLabelProducts";
 import { useLabelChangeTracking } from "@/produksjon/features/etiketter/hooks/useLabelChangeTracking";
 import { useLabelRealtime } from "@/produksjon/features/etiketter/hooks/useLabelRealtime";
+import { usePrintedLabelCount } from "@/produksjon/features/etiketter/hooks/usePrintedLabelCount";
 import { useProductLabelProfiles } from "@/produksjon/features/etiketter/hooks/useProductLabelProfiles";
 import {
   useInsertLabelPrintJob,
