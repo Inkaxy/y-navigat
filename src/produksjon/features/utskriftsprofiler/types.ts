@@ -46,7 +46,7 @@ export const FIELD_LABELS: Record<FieldType, string> = {
   sist_endret: "Sist endret",
   firmanavn: "Firmanavn",
   firmamerknad: "Firmamerknad",
-  sukkerbilde: "Sukkerbilde",
+  sukkerbilde: "Bilde",
   etikett_nr: "Etikett-nr",
 };
 
