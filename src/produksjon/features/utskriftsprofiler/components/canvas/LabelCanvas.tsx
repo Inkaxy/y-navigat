@@ -263,6 +263,38 @@ export function LabelCanvas(props: Props) {
     return () => window.removeEventListener("keydown", onKey);
   }, [readOnly, selectedFieldType, fields, inner.w, inner.h, onUpdateField, onSelectField]);
 
+  // === keyboard for selected line ===
+  useEffect(() => {
+    if (readOnly || !selectedLineId) return;
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) return;
+      const ln = lines.find((l) => l.id === selectedLineId);
+      if (!ln) return;
+      if (e.key === "Delete" || e.key === "Backspace") {
+        e.preventDefault();
+        onRemoveLine?.(selectedLineId);
+        return;
+      }
+      const step = e.shiftKey ? 5 : 1;
+      let dx = 0, dy = 0;
+      if (e.key === "ArrowLeft") dx = -step;
+      else if (e.key === "ArrowRight") dx = step;
+      else if (e.key === "ArrowUp") dy = -step;
+      else if (e.key === "ArrowDown") dy = step;
+      else return;
+      e.preventDefault();
+      const maxX = Math.max(0, inner.w - (ln.orientation === "horizontal" ? ln.length_mm : 0));
+      const maxY = Math.max(0, inner.h - (ln.orientation === "vertical" ? ln.length_mm : 0));
+      onUpdateLine?.(selectedLineId, {
+        x_mm: clamp(round1(ln.x_mm + dx), 0, maxX),
+        y_mm: clamp(round1(ln.y_mm + dy), 0, maxY),
+      });
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [readOnly, selectedLineId, lines, inner.w, inner.h, onUpdateLine, onRemoveLine]);
+
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
