@@ -108,6 +108,12 @@ function renderField(field: ProfileField, data: LabelPdfData, key: string) {
   const justify =
     align === "center" ? "center" : align === "right" ? "flex-end" : "flex-start";
 
+  const showLabel =
+    data.profile.include_field_labels &&
+    (field.show_label ?? true) &&
+    field.field_type !== "logo";
+  const labelText = showLabel ? `${FIELD_LABELS[field.field_type]}: ` : "";
+
   return (
     <View
       key={key}
@@ -140,6 +146,11 @@ function renderField(field: ProfileField, data: LabelPdfData, key: string) {
             textAlign: align,
           }}
         >
+          {showLabel ? (
+            <Text style={{ fontWeight: data.profile.field_labels_bold ? 700 : 400 }}>
+              {labelText}
+            </Text>
+          ) : null}
           {v.text ?? ""}
         </Text>
       )}
