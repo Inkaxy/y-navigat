@@ -20,6 +20,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { ALIGNMENTS, type ProfileField, type Alignment } from "../../types";
+import { FontSizeStepper } from "./RightInspector";
 
 interface Props {
   field: ProfileField;
