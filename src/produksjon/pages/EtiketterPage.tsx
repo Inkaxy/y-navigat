@@ -415,13 +415,17 @@ export default function EtiketterPage() {
       </div>
 
       {/* KPI-kort */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <KpiCard label="Nye" value={newCount} tone="warn" />
         <KpiCard label="Endret" value={changedCount} tone="warn" />
         <KpiCard label="Slettet" value={deletedCount} tone="warn" />
-        <KpiCard label="Totalt" value={totalProducts} subtitle="Etikettvarer" />
-        <KpiCard label="Bestilt" value={totalLabels} subtitle="Antall etiketter" />
+        <KpiCard
+          label="Skrevet ut"
+          value={printedCount}
+          subtitle={`av ${totalProducts} etikettvarer`}
+        />
       </div>
+
 
       <div className="flex justify-end">
         <Button
