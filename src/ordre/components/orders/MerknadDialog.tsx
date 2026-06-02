@@ -124,9 +124,7 @@ export function MerknadDialog({
     };
   }, [productName, quantity, profile.company_name, profile.company_note, autoValues]);
 
-  const showFritekst1 = orderedFields.includes("kommentar") && profile.comment_includes.fritekst1;
-  const showFritekst2 = orderedFields.includes("kommentar") && profile.comment_includes.fritekst2;
-  const showFritekst3 = orderedFields.includes("kommentar") && profile.comment_includes.fritekst3;
+  const showKommentar = orderedFields.includes("kommentar");
 
   async function handleSave() {
     const parsed = merknadSchema.safeParse(form);
