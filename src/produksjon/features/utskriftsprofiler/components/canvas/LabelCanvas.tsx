@@ -288,6 +288,15 @@ export function LabelCanvas(props: Props) {
                 !readOnly &&
                   "outline outline-1 outline-dashed outline-border/60",
               )}
+              style={
+                !readOnly
+                  ? {
+                      backgroundImage:
+                        "linear-gradient(to right, hsl(var(--border) / 0.25) 1px, transparent 1px), linear-gradient(to bottom, hsl(var(--border) / 0.25) 1px, transparent 1px)",
+                      backgroundSize: `${pxPerMm * 5}px ${pxPerMm * 5}px`,
+                    }
+                  : undefined
+              }
               onDragOver={(e) => {
                 if (readOnly) return;
                 e.preventDefault();
