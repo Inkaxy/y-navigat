@@ -237,7 +237,16 @@ export function LabelCanvas(props: Props) {
   return (
     <div className="flex h-full flex-col">
       {!readOnly && (
-        <div className="flex items-center justify-end border-b border-border bg-card/40 px-4 py-1.5 text-[11px] text-muted-foreground">
+        <div className="flex items-center justify-between gap-3 border-b border-border bg-card/40 px-4 py-1.5 text-[11px] text-muted-foreground">
+          <span>
+            {overlappingTypes.size > 0 ? (
+              <span className="font-medium text-destructive">
+                ⚠ {overlappingTypes.size} felt overlapper – juster plassering
+              </span>
+            ) : (
+              <span>Tips: dra felt for justeringslinjer · rutenett = 1 mm</span>
+            )}
+          </span>
           <span>
             Etikett: {paperW} × {paperH} mm · innhold {round1(inner.w)} × {round1(inner.h)} mm
           </span>
