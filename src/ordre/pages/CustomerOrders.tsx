@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Loader2, Search, Check, Users } from "lucide-react";
 import { AppBanner } from "@/ordre/components/shell/AppBanner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { useNBCustomers, type CustomerOption } from "@/ordre/hooks/useNBCustomers";
+import { useNBCustomers, useCustomerById, type CustomerOption } from "@/ordre/hooks/useNBCustomers";
 import { useDebouncedValue } from "@/ordre/hooks/useDebouncedValue";
 import { CustomerOrdersTab } from "@/ordre/components/orders/CustomerOrdersTab";
 
