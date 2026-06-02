@@ -31,8 +31,8 @@ function formatAddress(
 
 /**
  * Henter hentested, kundenavn, leveringsadresse, telefon, dato og hentetid for et sett av order_lines.
- *  - Hentested resolves via orders.customer_id → customers.customer_profile_id →
- *    customer_profiles.pickup_location_id → pickup_locations.display_name.
+ *  - Hentested resolves via customer profile_overrides.pickup_location_id først,
+ *    ellers customers.customer_profile_id → customer_profiles.pickup_location_id → pickup_locations.display_name.
  *  - Kundenavn prioriterer order.final_customer_name, deretter customer.display_name.
  *  - Leveringsadresse prioriterer ordrens egne felter, ellers kundens delivery_address.
  */
@@ -90,13 +90,14 @@ export function useOrderLineCustomerInfo(orderLineIds: string[] | undefined) {
           d_line1: string | null;
           d_postal: string | null;
           d_city: string | null;
+          profile_overrides: Record<string, unknown>;
         }
       > = {};
       if (customerIds.length > 0) {
         const { data: customers, error: cErr } = await supabase
           .from("customers")
           .select(
-            "id, customer_profile_id, display_name, mobile_phone, primary_contact_phone, delivery_address_line1, delivery_postal_code, delivery_city",
+            "id, customer_profile_id, profile_overrides, display_name, mobile_phone, primary_contact_phone, delivery_address_line1, delivery_postal_code, delivery_city",
           )
           .in("id", customerIds);
         if (cErr) throw cErr;
@@ -104,6 +105,7 @@ export function useOrderLineCustomerInfo(orderLineIds: string[] | undefined) {
           const row = c as {
             id: string;
             customer_profile_id: string | null;
+            profile_overrides: Record<string, unknown> | null;
             display_name: string | null;
             mobile_phone: string | null;
             primary_contact_phone: string | null;
@@ -119,6 +121,7 @@ export function useOrderLineCustomerInfo(orderLineIds: string[] | undefined) {
             d_line1: row.delivery_address_line1,
             d_postal: row.delivery_postal_code,
             d_city: row.delivery_city,
+            profile_overrides: row.profile_overrides ?? {},
           };
         }
       }
@@ -145,7 +148,15 @@ export function useOrderLineCustomerInfo(orderLineIds: string[] | undefined) {
       }
 
       const pickupIds = Array.from(
-        new Set(Object.values(profileToPickup).filter((x): x is string => !!x)),
+        new Set(
+          [
+            ...Object.values(profileToPickup),
+            ...Object.values(customerMap).map((c) => {
+              const override = c.profile_overrides.pickup_location_id;
+              return typeof override === "string" && override.length > 0 ? override : null;
+            }),
+          ].filter((x): x is string => !!x),
+        ),
       );
       const pickupMap: Record<string, string> = {};
       if (pickupIds.length > 0) {
@@ -175,7 +186,13 @@ export function useOrderLineCustomerInfo(orderLineIds: string[] | undefined) {
           use_customer_default_address: boolean | null;
         };
         const cust = row.customer_id ? customerMap[row.customer_id] : null;
-        const pickupId = cust?.profile_id ? profileToPickup[cust.profile_id] : null;
+        const overridePickup = cust?.profile_overrides.pickup_location_id;
+        const pickupId =
+          typeof overridePickup === "string" && overridePickup.length > 0
+            ? overridePickup
+            : cust?.profile_id
+              ? profileToPickup[cust.profile_id]
+              : null;
         const pickupLabel = pickupId ? pickupMap[pickupId] ?? null : null;
 
         const customerName = row.final_customer_name?.trim() || cust?.display_name || null;
