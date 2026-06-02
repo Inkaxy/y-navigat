@@ -412,6 +412,8 @@ export function UtskriftsprofilDialog({
             onChangePaperHeight={setPaperHeight}
             onToggleLandscape={setLandscape}
             onChangeMode={setEditorMode}
+            onAddHorizontalLine={() => addLine("horizontal")}
+            onAddVerticalLine={() => addLine("vertical")}
             onOpenSettings={() => setSettingsOpen(true)}
             onCancel={() => onOpenChange(false)}
           />
