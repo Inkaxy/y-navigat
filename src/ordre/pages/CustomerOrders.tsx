@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Loader2, Search, Check, Users } from "lucide-react";
 import { AppBanner } from "@/ordre/components/shell/AppBanner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { useNBCustomers, type CustomerOption } from "@/ordre/hooks/useNBCustomers";
+import { useNBCustomers, useCustomerById, type CustomerOption } from "@/ordre/hooks/useNBCustomers";
 import { useDebouncedValue } from "@/ordre/hooks/useDebouncedValue";
 import { CustomerOrdersTab } from "@/ordre/components/orders/CustomerOrdersTab";
 
@@ -73,7 +74,21 @@ function CustomerCombobox({
 }
 
 export default function CustomerOrdersPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialCustomerId = searchParams.get("customerId");
   const [customer, setCustomer] = useState<CustomerOption | null>(null);
+  const { data: preselected } = useCustomerById(
+    initialCustomerId && !customer ? initialCustomerId : null,
+  );
+
+  useEffect(() => {
+    if (preselected && !customer) {
+      setCustomer(preselected);
+      // Rydd opp URL etter forhåndsvalg
+      searchParams.delete("customerId");
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [preselected, customer, searchParams, setSearchParams]);
 
   return (
     <div className="flex h-full flex-col">
