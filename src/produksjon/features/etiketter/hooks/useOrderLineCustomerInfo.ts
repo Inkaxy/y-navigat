@@ -4,20 +4,37 @@ import { supabase } from "@/integrations/supabase/client";
 export interface OrderLineCustomerInfo {
   /** Visningsnavn for hentested (pickup_locations.display_name), eller null. */
   pickupLabel: string | null;
-  /** Kundens telefon, prioritert: order.final_customer_phone → customer.mobile_phone → customer.primary_contact_phone. */
-  /** Formatert leveringsdato (f.eks. "02.06.2026") fra orders.delivery_date. */
+  /** Navn på den som skal hente/motta kaken. Prioritert:
+   *  orders.final_customer_name → customers.display_name. */
+  customerName: string | null;
+  /** Formatert leveringsadresse (linje1 + (postnr by)). Prioritert:
+   *  ordrens leveringsadresse → kundens leveringsadresse. */
+  deliveryAddress: string | null;
+  /** Formatert leveringsdato (f.eks. "02.jun.26") fra orders.delivery_date. */
   deliveryDate: string | null;
   /** Formatert hentetidspunkt (f.eks. "Hentes kl 10:00") fra orders.delivery_time. */
   pickupTime: string | null;
+  /** Kundens telefon, prioritert: order.final_customer_phone → customer.mobile_phone → customer.primary_contact_phone. */
   phone: string | null;
 }
 
+function formatAddress(
+  line1: string | null,
+  postal: string | null,
+  city: string | null,
+): string | null {
+  const l1 = (line1 || "").trim();
+  const post = [postal, city].filter((s) => !!s && String(s).trim().length > 0).join(" ").trim();
+  const parts = [l1, post].filter((s) => s.length > 0);
+  return parts.length > 0 ? parts.join(", ") : null;
+}
+
 /**
- * Henter hentested og telefonnummer for et sett av order_lines.
+ * Henter hentested, kundenavn, leveringsadresse, telefon, dato og hentetid for et sett av order_lines.
  *  - Hentested resolves via orders.customer_id → customers.customer_profile_id →
  *    customer_profiles.pickup_location_id → pickup_locations.display_name.
- *  - Telefon prioriterer order.final_customer_phone, deretter customer.mobile_phone /
- *    primary_contact_phone.
+ *  - Kundenavn prioriterer order.final_customer_name, deretter customer.display_name.
+ *  - Leveringsadresse prioriterer ordrens egne felter, ellers kundens delivery_address.
  */
 export function useOrderLineCustomerInfo(orderLineIds: string[] | undefined) {
   const ids = (orderLineIds ?? []).filter(Boolean).slice().sort();
@@ -25,8 +42,16 @@ export function useOrderLineCustomerInfo(orderLineIds: string[] | undefined) {
     queryKey: ["order_line_customer_info", ids.join(",")],
     enabled: ids.length > 0,
     queryFn: async (): Promise<Record<string, OrderLineCustomerInfo>> => {
+      const empty: OrderLineCustomerInfo = {
+        pickupLabel: null,
+        customerName: null,
+        deliveryAddress: null,
+        deliveryDate: null,
+        pickupTime: null,
+        phone: null,
+      };
       const out: Record<string, OrderLineCustomerInfo> = {};
-      for (const id of ids) out[id] = { pickupLabel: null, phone: null, deliveryDate: null, pickupTime: null };
+      for (const id of ids) out[id] = { ...empty };
 
       const { data: lines, error } = await supabase
         .from("order_lines")
@@ -41,7 +66,9 @@ export function useOrderLineCustomerInfo(orderLineIds: string[] | undefined) {
 
       const { data: orders, error: oErr } = await supabase
         .from("orders")
-        .select("id, customer_id, final_customer_phone, delivery_date, delivery_time")
+        .select(
+          "id, customer_id, final_customer_name, final_customer_phone, delivery_date, delivery_time, delivery_address_line1, delivery_postal_code, delivery_city, use_customer_default_address",
+        )
         .in("id", orderIds);
       if (oErr) throw oErr;
 
@@ -55,25 +82,43 @@ export function useOrderLineCustomerInfo(orderLineIds: string[] | undefined) {
 
       const customerMap: Record<
         string,
-        { profile_id: string | null; mobile: string | null; primary: string | null }
+        {
+          profile_id: string | null;
+          display_name: string | null;
+          mobile: string | null;
+          primary: string | null;
+          d_line1: string | null;
+          d_postal: string | null;
+          d_city: string | null;
+        }
       > = {};
       if (customerIds.length > 0) {
         const { data: customers, error: cErr } = await supabase
           .from("customers")
-          .select("id, customer_profile_id, mobile_phone, primary_contact_phone")
+          .select(
+            "id, customer_profile_id, display_name, mobile_phone, primary_contact_phone, delivery_address_line1, delivery_postal_code, delivery_city",
+          )
           .in("id", customerIds);
         if (cErr) throw cErr;
         for (const c of customers ?? []) {
           const row = c as {
             id: string;
             customer_profile_id: string | null;
+            display_name: string | null;
             mobile_phone: string | null;
             primary_contact_phone: string | null;
+            delivery_address_line1: string | null;
+            delivery_postal_code: string | null;
+            delivery_city: string | null;
           };
           customerMap[row.id] = {
             profile_id: row.customer_profile_id,
+            display_name: row.display_name,
             mobile: row.mobile_phone,
             primary: row.primary_contact_phone,
+            d_line1: row.delivery_address_line1,
+            d_postal: row.delivery_postal_code,
+            d_city: row.delivery_city,
           };
         }
       }
@@ -100,9 +145,7 @@ export function useOrderLineCustomerInfo(orderLineIds: string[] | undefined) {
       }
 
       const pickupIds = Array.from(
-        new Set(
-          Object.values(profileToPickup).filter((x): x is string => !!x),
-        ),
+        new Set(Object.values(profileToPickup).filter((x): x is string => !!x)),
       );
       const pickupMap: Record<string, string> = {};
       if (pickupIds.length > 0) {
@@ -122,15 +165,36 @@ export function useOrderLineCustomerInfo(orderLineIds: string[] | undefined) {
         const row = o as {
           id: string;
           customer_id: string | null;
+          final_customer_name: string | null;
           final_customer_phone: string | null;
           delivery_date: string | null;
           delivery_time: string | null;
+          delivery_address_line1: string | null;
+          delivery_postal_code: string | null;
+          delivery_city: string | null;
+          use_customer_default_address: boolean | null;
         };
         const cust = row.customer_id ? customerMap[row.customer_id] : null;
         const pickupId = cust?.profile_id ? profileToPickup[cust.profile_id] : null;
         const pickupLabel = pickupId ? pickupMap[pickupId] ?? null : null;
-        const phone =
-          row.final_customer_phone || cust?.mobile || cust?.primary || null;
+
+        const customerName = row.final_customer_name?.trim() || cust?.display_name || null;
+
+        const orderAddress = formatAddress(
+          row.delivery_address_line1,
+          row.delivery_postal_code,
+          row.delivery_city,
+        );
+        const customerAddress = cust
+          ? formatAddress(cust.d_line1, cust.d_postal, cust.d_city)
+          : null;
+        const deliveryAddress =
+          row.use_customer_default_address === false
+            ? orderAddress ?? customerAddress
+            : customerAddress ?? orderAddress;
+
+        const phone = row.final_customer_phone || cust?.mobile || cust?.primary || null;
+
         const deliveryDate = row.delivery_date
           ? (() => {
               const d = new Date(row.delivery_date);
@@ -144,12 +208,20 @@ export function useOrderLineCustomerInfo(orderLineIds: string[] | undefined) {
         const pickupTime = row.delivery_time
           ? `Hentes kl ${row.delivery_time.slice(0, 5)}`
           : null;
-        orderInfo[row.id] = { pickupLabel, phone, deliveryDate, pickupTime };
+
+        orderInfo[row.id] = {
+          pickupLabel,
+          customerName,
+          deliveryAddress,
+          deliveryDate,
+          pickupTime,
+          phone,
+        };
       }
 
       for (const l of lines ?? []) {
         const row = l as { id: string; order_id: string };
-        out[row.id] = orderInfo[row.order_id] ?? { pickupLabel: null, phone: null, deliveryDate: null, pickupTime: null };
+        out[row.id] = orderInfo[row.order_id] ?? { ...empty };
       }
       return out;
     },
