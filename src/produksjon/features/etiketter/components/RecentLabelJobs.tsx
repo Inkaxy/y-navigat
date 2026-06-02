@@ -44,7 +44,11 @@ export function RecentLabelJobs({ deptId, department, legalEntityId }: Props) {
 
   const handleReprint = async (job: LabelPrintJob) => {
     try {
-      const newNumber = await nextNumber.mutateAsync(job.production_department_id);
+      const newNumber = await nextNumber.mutateAsync({
+        deptId: job.production_department_id,
+        productId: job.product_id,
+        orderLineId: job.order_line_id,
+      });
       await insertJob.mutateAsync({
         label_number: newNumber,
         product_id: job.product_id,
