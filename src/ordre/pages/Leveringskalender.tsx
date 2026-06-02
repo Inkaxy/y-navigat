@@ -1343,7 +1343,15 @@ export default function MatrixPage() {
                   <MessageSquare className="h-4 w-4 mr-2" />
                   Se korrigeringer
                 </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => navigate("/ordre/kundeordrer")}>
+                <DropdownMenuItem
+                  onSelect={() =>
+                    navigate(
+                      customerId
+                        ? `/ordre/kundeordrer?customerId=${customerId}`
+                        : "/ordre/kundeordrer",
+                    )
+                  }
+                >
                   <Plus className="h-4 w-4 mr-2" />
                   Kundeordre
                 </DropdownMenuItem>
