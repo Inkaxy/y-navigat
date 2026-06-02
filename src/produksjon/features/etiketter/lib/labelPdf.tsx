@@ -31,6 +31,10 @@ export interface LabelPdfData {
   tourLabel?: string | null;
   /** Hentested-navn (pickup_locations.display_name) for ordrelinjen. */
   pickupLabel?: string | null;
+  /** Navn på kunden / mottakeren av kaken. */
+  customerName?: string | null;
+  /** Formatert leveringsadresse. */
+  deliveryAddress?: string | null;
   /** Kundens telefonnummer for ordrelinjen. */
   phone?: string | null;
   /** Formatert leveringsdato for ordrelinjen. */
@@ -48,7 +52,7 @@ function valueFor(
   type: FieldType,
   data: LabelPdfData,
 ): { text?: string; image?: string | null } {
-  const { profile, row, labelNumber, quantity, merknad, tourLabel, pickupLabel, phone, deliveryDate, pickupTime } = data;
+  const { profile, row, labelNumber, quantity, merknad, tourLabel, pickupLabel, customerName, deliveryAddress, phone, deliveryDate, pickupTime } = data;
   switch (type) {
     case "logo":
       return { image: profile.logo_url };
@@ -68,6 +72,10 @@ function valueFor(
       return { text: tourLabel || "" };
     case "hentested":
       return { text: pickupLabel || "" };
+    case "kundenavn":
+      return { text: customerName || "" };
+    case "leveringsadresse":
+      return { text: deliveryAddress || "" };
     case "telefon":
       return { text: phone || "" };
     case "leveringsdato":
