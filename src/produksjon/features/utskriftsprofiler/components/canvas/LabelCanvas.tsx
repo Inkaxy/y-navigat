@@ -4,6 +4,7 @@ import {
   FIELD_LABELS,
   type FieldType,
   type ProfileField,
+  type ProfileLine,
   defaultFieldSize,
 } from "../../types";
 import { clamp, getInnerArea, round1, snap } from "../../lib/canvasUtils";
