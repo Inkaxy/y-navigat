@@ -154,6 +154,7 @@ export function UtskriftsprofilDialog({
       setLogoUrl(null);
       setLogoHeight(15);
       setFields(defaultFields());
+      setLines([]);
       setCommentFt1(true);
       setCommentFt2(true);
       setCommentFt3(true);
