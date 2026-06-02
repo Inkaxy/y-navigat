@@ -27,6 +27,8 @@ export interface LabelPdfData {
   copies?: number;
   /** Merknad lagret på order_lines.merknad for denne ordrelinjen. Fyller etikett-felt. */
   merknad?: Merknad | null;
+  /** Tur-etikett (f.eks. "Tur 1") for ordrelinjen. */
+  tourLabel?: string | null;
 }
 
 function joinNonEmpty(parts: Array<string | undefined | null>, sep = " · "): string {
