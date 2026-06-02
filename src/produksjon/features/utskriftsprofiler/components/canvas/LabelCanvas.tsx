@@ -411,7 +411,7 @@ function CanvasFieldBox({
   } else if (field.field_type === "firmanavn") {
     content = companyName || FIELD_LABELS.firmanavn;
   } else if (field.field_type === "etikett_nr") {
-    content = "1";
+    content = "1000";
   } else {
     content = `[${FIELD_LABELS[field.field_type]}]`;
   }
