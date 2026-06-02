@@ -5,6 +5,8 @@ export interface OrderLineCustomerInfo {
   /** Visningsnavn for hentested (pickup_locations.display_name), eller null. */
   pickupLabel: string | null;
   /** Kundens telefon, prioritert: order.final_customer_phone → customer.mobile_phone → customer.primary_contact_phone. */
+  /** Formatert leveringsdato (f.eks. "02.06.2026") fra orders.delivery_date. */
+  deliveryDate: string | null;
   phone: string | null;
 }
 
