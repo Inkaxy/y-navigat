@@ -207,6 +207,22 @@ function LabelPages({ data }: { data: LabelPdfData }) {
             {fields.map((f, idx) =>
               renderField(f, data, `${f.field_type}-${idx}`),
             )}
+            {(profile.lines ?? []).map((ln) => {
+              const isH = ln.orientation === "horizontal";
+              return (
+                <View
+                  key={ln.id}
+                  style={{
+                    position: "absolute",
+                    left: mm(ln.x_mm),
+                    top: mm(ln.y_mm),
+                    width: isH ? mm(ln.length_mm) : Math.max(0.3, mm(ln.thickness_mm)),
+                    height: isH ? Math.max(0.3, mm(ln.thickness_mm)) : mm(ln.length_mm),
+                    backgroundColor: "#555",
+                  }}
+                />
+              );
+            })}
           </View>
         </Page>
       ))}
