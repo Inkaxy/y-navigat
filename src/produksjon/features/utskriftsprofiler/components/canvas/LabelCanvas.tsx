@@ -453,7 +453,7 @@ function CanvasFieldBox({
         }}
       >
         <span className="truncate">
-          {includeFieldLabels && field.field_type !== "logo" && (
+          {includeFieldLabels && (field.show_label ?? true) && field.field_type !== "logo" && (
             <span className="text-muted-foreground">
               {FIELD_LABELS[field.field_type]}:{" "}
             </span>

@@ -46,7 +46,7 @@ export const FIELD_LABELS: Record<FieldType, string> = {
   sist_endret: "Sist endret",
   firmanavn: "Firmanavn",
   firmamerknad: "Firmamerknad",
-  sukkerbilde: "Sukkerbilde",
+  sukkerbilde: "Bilde",
   etikett_nr: "Etikett-nr",
 };
 
@@ -109,6 +109,8 @@ export interface ProfileField {
   alignment: Alignment;
   show_line: boolean;
   show_border: boolean;
+  /** Vis felt-tittel (f.eks. "Kundenavn: ") foran verdien. Default true. */
+  show_label?: boolean;
   /** @deprecated Use y_mm */
   print_at_bottom: boolean;
   // New canvas-coordinate model (in mm, relative to label margin box)
@@ -228,6 +230,7 @@ export function defaultFields(): ProfileField[] {
       alignment: "left" as Alignment,
       show_line: false,
       show_border: false,
+      show_label: true,
       print_at_bottom: false,
       x_mm: 0,
       y_mm: 0,
