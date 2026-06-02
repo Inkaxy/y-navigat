@@ -7,6 +7,7 @@ import {
   type LabelPdfData,
 } from "../lib/labelPdf";
 import { useOrderLineMerknads } from "../hooks/useOrderLineMerknads";
+import { useOrderLineTours } from "../hooks/useOrderLineTours";
 import {
   Dialog,
   DialogContent,
