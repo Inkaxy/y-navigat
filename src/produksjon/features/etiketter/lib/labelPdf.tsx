@@ -33,6 +33,8 @@ export interface LabelPdfData {
   pickupLabel?: string | null;
   /** Kundens telefonnummer for ordrelinjen. */
   phone?: string | null;
+  /** Formatert leveringsdato for ordrelinjen. */
+  deliveryDate?: string | null;
 }
 
 function joinNonEmpty(parts: Array<string | undefined | null>, sep = " · "): string {
@@ -44,7 +46,7 @@ function valueFor(
   type: FieldType,
   data: LabelPdfData,
 ): { text?: string; image?: string | null } {
-  const { profile, row, labelNumber, quantity, merknad, tourLabel, pickupLabel, phone } = data;
+  const { profile, row, labelNumber, quantity, merknad, tourLabel, pickupLabel, phone, deliveryDate } = data;
   switch (type) {
     case "logo":
       return { image: profile.logo_url };
@@ -66,6 +68,8 @@ function valueFor(
       return { text: pickupLabel || "" };
     case "telefon":
       return { text: phone || "" };
+    case "leveringsdato":
+      return { text: deliveryDate || "" };
     case "sist_endret":
       return { text: new Date().toLocaleString("nb-NO") };
     case "bestilt_av":
