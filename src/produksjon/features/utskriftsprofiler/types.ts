@@ -80,6 +80,7 @@ export const FIELD_GROUPS: Record<FieldType, FieldGroup> = {
   strekkode: "system",
   sist_endret: "system",
   etikett_nr: "system",
+  telefon: "bestilling",
 };
 
 export const GROUP_LABELS: Record<FieldGroup, string> = {

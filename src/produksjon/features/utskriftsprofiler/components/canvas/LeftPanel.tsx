@@ -76,6 +76,7 @@ const FIELD_ICONS: Record<FieldType, React.ComponentType<{ className?: string }>
   logo: ImageIcon,
   firmanavn: Building2,
   firmamerknad: Info,
+  telefon: User,
 };
 
 export function LeftPanel(props: Props) {

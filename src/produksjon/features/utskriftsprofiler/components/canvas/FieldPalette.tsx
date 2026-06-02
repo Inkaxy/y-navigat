@@ -72,6 +72,7 @@ const FIELD_ICONS: Record<FieldType, React.ComponentType<{ className?: string }>
   logo: ImageIcon,
   firmanavn: Building2,
   firmamerknad: Info,
+  telefon: User,
 };
 
 const NEW_FIELDS: ReadonlySet<FieldType> = new Set(["etikett_nr"]);
