@@ -90,6 +90,46 @@ export function LabelCanvas(props: Props) {
     [fields],
   );
 
+  // === overlap detection ===
+  const overlappingTypes = useMemo(() => {
+    const set = new Set<FieldType>();
+    for (let i = 0; i < includedFields.length; i++) {
+      const a = includedFields[i];
+      for (let j = i + 1; j < includedFields.length; j++) {
+        const b = includedFields[j];
+        const overlap =
+          a.x_mm < b.x_mm + b.width_mm &&
+          a.x_mm + a.width_mm > b.x_mm &&
+          a.y_mm < b.y_mm + b.height_mm &&
+          a.y_mm + a.height_mm > b.y_mm;
+        if (overlap) {
+          set.add(a.field_type);
+          set.add(b.field_type);
+        }
+      }
+    }
+    return set;
+  }, [includedFields]);
+
+  // === alignment guides while dragging ===
+  const guides = useMemo(() => {
+    if (!dragMode) return { v: [] as number[], h: [] as number[] };
+    const active = fields.find((f) => f.field_type === dragMode.type);
+    if (!active) return { v: [], h: [] };
+    const v: number[] = [];
+    const h: number[] = [];
+    const aEdgesX = [active.x_mm, active.x_mm + active.width_mm / 2, active.x_mm + active.width_mm];
+    const aEdgesY = [active.y_mm, active.y_mm + active.height_mm / 2, active.y_mm + active.height_mm];
+    for (const f of includedFields) {
+      if (f.field_type === active.field_type) continue;
+      const bx = [f.x_mm, f.x_mm + f.width_mm / 2, f.x_mm + f.width_mm];
+      const by = [f.y_mm, f.y_mm + f.height_mm / 2, f.y_mm + f.height_mm];
+      for (const a of aEdgesX) for (const b of bx) if (Math.abs(a - b) < 0.6) v.push(b);
+      for (const a of aEdgesY) for (const b of by) if (Math.abs(a - b) < 0.6) h.push(b);
+    }
+    return { v, h };
+  }, [dragMode, fields, includedFields]);
+
   // === pointer drag ===
   useEffect(() => {
     if (!dragMode) return;
