@@ -186,15 +186,15 @@ function DimInput({
   onChange: (v: number) => void;
 }) {
   return (
-    <label className="flex items-center gap-1.5 text-[11px] text-brand-cream/60">
-      <span className="font-medium uppercase tracking-wide">{label}</span>
+    <label className="flex items-center gap-1.5 text-[11px]">
+      <span className="font-semibold uppercase tracking-wide text-brand-cream">{label}</span>
       <Input
         type="number"
         value={value}
         onChange={(e) => onChange(Math.max(10, Number(e.target.value) || 0))}
-        className="h-7 w-14 border-white/10 bg-white/5 px-2 text-center text-xs tabular-nums text-brand-cream placeholder:text-brand-cream/40 focus-visible:ring-brand-bronze"
+        className="h-7 w-16 border-white/20 bg-white/10 px-2 text-center text-xs font-semibold tabular-nums text-brand-cream placeholder:text-brand-cream/40 focus-visible:ring-brand-bronze"
       />
-      <span className="text-brand-cream/40">mm</span>
+      <span className="text-brand-cream/60">mm</span>
     </label>
   );
 }
