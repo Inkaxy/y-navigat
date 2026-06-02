@@ -22,6 +22,7 @@ export const FIELD_TYPES = [
   "firmanavn",
   "firmamerknad",
   "sukkerbilde",
+  "telefon",
 ] as const;
 
 export type FieldType = (typeof FIELD_TYPES)[number];
@@ -50,6 +51,7 @@ export const FIELD_LABELS: Record<FieldType, string> = {
   firmamerknad: "Firmamerknad",
   sukkerbilde: "Bilde",
   etikett_nr: "Etikett-nr",
+  telefon: "Telefon",
 };
 
 export type FieldGroup = "bestilling" | "vare" | "pakkseddel" | "firma" | "system";
