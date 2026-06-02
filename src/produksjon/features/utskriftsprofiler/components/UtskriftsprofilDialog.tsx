@@ -305,6 +305,7 @@ export function UtskriftsprofilDialog({
       logo_url: logoUrl,
       logo_height_mm: typeof logoHeight === "number" ? logoHeight : null,
       fields,
+      lines,
       comment_includes: {
         fritekst1: commentFt1,
         fritekst2: commentFt2,
