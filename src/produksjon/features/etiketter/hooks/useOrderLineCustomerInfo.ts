@@ -132,11 +132,14 @@ export function useOrderLineCustomerInfo(orderLineIds: string[] | undefined) {
         const phone =
           row.final_customer_phone || cust?.mobile || cust?.primary || null;
         const deliveryDate = row.delivery_date
-          ? new Date(row.delivery_date).toLocaleDateString("nb-NO", {
-              day: "2-digit",
-              month: "2-digit",
-              year: "numeric",
-            })
+          ? (() => {
+              const d = new Date(row.delivery_date);
+              const day = String(d.getDate()).padStart(2, "0");
+              const months = ["jan","feb","mar","apr","mai","jun","jul","aug","sep","okt","nov","des"];
+              const mon = months[d.getMonth()];
+              const yy = String(d.getFullYear()).slice(-2);
+              return `${day}.${mon}.${yy}`;
+            })()
           : null;
         const pickupTime = row.delivery_time
           ? `Hentes kl ${row.delivery_time.slice(0, 5)}`
