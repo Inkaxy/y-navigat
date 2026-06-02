@@ -90,6 +90,46 @@ export function LabelCanvas(props: Props) {
     [fields],
   );
 
+  // === overlap detection ===
+  const overlappingTypes = useMemo(() => {
+    const set = new Set<FieldType>();
+    for (let i = 0; i < includedFields.length; i++) {
+      const a = includedFields[i];
+      for (let j = i + 1; j < includedFields.length; j++) {
+        const b = includedFields[j];
+        const overlap =
+          a.x_mm < b.x_mm + b.width_mm &&
+          a.x_mm + a.width_mm > b.x_mm &&
+          a.y_mm < b.y_mm + b.height_mm &&
+          a.y_mm + a.height_mm > b.y_mm;
+        if (overlap) {
+          set.add(a.field_type);
+          set.add(b.field_type);
+        }
+      }
+    }
+    return set;
+  }, [includedFields]);
+
+  // === alignment guides while dragging ===
+  const guides = useMemo(() => {
+    if (!dragMode) return { v: [] as number[], h: [] as number[] };
+    const active = fields.find((f) => f.field_type === dragMode.type);
+    if (!active) return { v: [], h: [] };
+    const v: number[] = [];
+    const h: number[] = [];
+    const aEdgesX = [active.x_mm, active.x_mm + active.width_mm / 2, active.x_mm + active.width_mm];
+    const aEdgesY = [active.y_mm, active.y_mm + active.height_mm / 2, active.y_mm + active.height_mm];
+    for (const f of includedFields) {
+      if (f.field_type === active.field_type) continue;
+      const bx = [f.x_mm, f.x_mm + f.width_mm / 2, f.x_mm + f.width_mm];
+      const by = [f.y_mm, f.y_mm + f.height_mm / 2, f.y_mm + f.height_mm];
+      for (const a of aEdgesX) for (const b of bx) if (Math.abs(a - b) < 0.6) v.push(b);
+      for (const a of aEdgesY) for (const b of by) if (Math.abs(a - b) < 0.6) h.push(b);
+    }
+    return { v, h };
+  }, [dragMode, fields, includedFields]);
+
   // === pointer drag ===
   useEffect(() => {
     if (!dragMode) return;
@@ -197,7 +237,16 @@ export function LabelCanvas(props: Props) {
   return (
     <div className="flex h-full flex-col">
       {!readOnly && (
-        <div className="flex items-center justify-end border-b border-border bg-card/40 px-4 py-1.5 text-[11px] text-muted-foreground">
+        <div className="flex items-center justify-between gap-3 border-b border-border bg-card/40 px-4 py-1.5 text-[11px] text-muted-foreground">
+          <span>
+            {overlappingTypes.size > 0 ? (
+              <span className="font-medium text-destructive">
+                ⚠ {overlappingTypes.size} felt overlapper – juster plassering
+              </span>
+            ) : (
+              <span>Tips: dra felt for justeringslinjer · rutenett = 1 mm</span>
+            )}
+          </span>
           <span>
             Etikett: {paperW} × {paperH} mm · innhold {round1(inner.w)} × {round1(inner.h)} mm
           </span>
@@ -239,6 +288,15 @@ export function LabelCanvas(props: Props) {
                 !readOnly &&
                   "outline outline-1 outline-dashed outline-border/60",
               )}
+              style={
+                !readOnly
+                  ? {
+                      backgroundImage:
+                        "linear-gradient(to right, hsl(var(--border) / 0.25) 1px, transparent 1px), linear-gradient(to bottom, hsl(var(--border) / 0.25) 1px, transparent 1px)",
+                      backgroundSize: `${pxPerMm * 5}px ${pxPerMm * 5}px`,
+                    }
+                  : undefined
+              }
               onDragOver={(e) => {
                 if (readOnly) return;
                 e.preventDefault();
@@ -250,8 +308,10 @@ export function LabelCanvas(props: Props) {
             >
               {includedFields.map((f) => {
                 const isSelected = !readOnly && f.field_type === selectedFieldType;
+                const isOverlapping = !readOnly && overlappingTypes.has(f.field_type);
                 return (
                   <CanvasFieldBox
+                    overlapping={isOverlapping}
                     key={f.field_type}
                     field={f}
                     pxPerMm={pxPerMm}
@@ -318,6 +378,26 @@ export function LabelCanvas(props: Props) {
                   </p>
                 </div>
               )}
+
+              {/* Alignment guides while dragging */}
+              {!readOnly && dragMode && (
+                <>
+                  {guides.v.map((x, i) => (
+                    <div
+                      key={`gv-${i}-${x}`}
+                      className="pointer-events-none absolute top-0 bottom-0 z-40"
+                      style={{ left: x * pxPerMm, width: 1, background: "hsl(var(--primary))" }}
+                    />
+                  ))}
+                  {guides.h.map((y, i) => (
+                    <div
+                      key={`gh-${i}-${y}`}
+                      className="pointer-events-none absolute left-0 right-0 z-40"
+                      style={{ top: y * pxPerMm, height: 1, background: "hsl(var(--primary))" }}
+                    />
+                  ))}
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -379,6 +459,7 @@ interface CanvasFieldBoxProps {
   pxPerMm: number;
   selected: boolean;
   readOnly: boolean;
+  overlapping?: boolean;
   companyName: string;
   logoUrl: string | null;
   includeFieldLabels: boolean;
@@ -391,6 +472,7 @@ function CanvasFieldBox({
   pxPerMm,
   selected,
   readOnly,
+  overlapping = false,
   companyName,
   logoUrl,
   includeFieldLabels,
@@ -431,7 +513,8 @@ function CanvasFieldBox({
         "absolute select-none overflow-hidden",
         readOnly ? "cursor-default" : "cursor-move",
         selected && !readOnly && "ring-2 ring-primary",
-        !selected && !readOnly && "hover:ring-1 hover:ring-primary/50",
+        !selected && !readOnly && overlapping && "ring-2 ring-destructive",
+        !selected && !readOnly && !overlapping && "hover:ring-1 hover:ring-primary/50",
       )}
       style={{
         left: field.x_mm * pxPerMm,
@@ -442,7 +525,11 @@ function CanvasFieldBox({
         border: field.show_border ? "1px solid #777" : undefined,
         borderBottom:
           field.show_line && !field.show_border ? "1px solid #777" : undefined,
-        background: selected && !readOnly ? "hsl(var(--primary) / 0.05)" : undefined,
+        background: selected && !readOnly
+          ? "hsl(var(--primary) / 0.05)"
+          : overlapping && !readOnly
+            ? "hsl(var(--destructive) / 0.08)"
+            : undefined,
       }}
     >
       <div
