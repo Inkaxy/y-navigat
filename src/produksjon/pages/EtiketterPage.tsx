@@ -130,6 +130,8 @@ export default function EtiketterPage() {
     [profiles],
   );
 
+  const { data: printedCount = 0 } = usePrintedLabelCount(filter, productIds);
+
   // Bulk-print
   const nextNumber = useNextLabelNumber();
   const insertJob = useInsertLabelPrintJob();
