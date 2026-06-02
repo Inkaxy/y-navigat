@@ -109,6 +109,8 @@ export interface ProfileField {
   alignment: Alignment;
   show_line: boolean;
   show_border: boolean;
+  /** Vis felt-tittel (f.eks. "Kundenavn: ") foran verdien. Default true. */
+  show_label?: boolean;
   /** @deprecated Use y_mm */
   print_at_bottom: boolean;
   // New canvas-coordinate model (in mm, relative to label margin box)
