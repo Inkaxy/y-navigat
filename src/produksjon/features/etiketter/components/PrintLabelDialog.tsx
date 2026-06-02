@@ -78,7 +78,7 @@ export function PrintLabelDialog({
     if (!profile || !row) return [];
     const base = { profile, row, labelNumber };
     if (orderLineIds.length === 0) {
-      return [{ ...base, quantity, copies: quantity, merknad: null, tourLabel: null, pickupLabel: null, phone: null }];
+      return [{ ...base, quantity, copies: quantity, merknad: null, tourLabel: null, pickupLabel: null, phone: null, deliveryDate: null }];
     }
     const perLine: LabelPdfData[] = orderLineIds.map((id) => ({
       ...base,
@@ -88,6 +88,7 @@ export function PrintLabelDialog({
       tourLabel: tourMap?.[id] ?? null,
       pickupLabel: customerInfoMap?.[id]?.pickupLabel ?? null,
       phone: customerInfoMap?.[id]?.phone ?? null,
+      deliveryDate: customerInfoMap?.[id]?.deliveryDate ?? null,
     }));
     if (quantity <= perLine.length) {
       return perLine.slice(0, quantity);
@@ -104,6 +105,7 @@ export function PrintLabelDialog({
         tourLabel: perLine[0]?.tourLabel ?? null,
         pickupLabel: perLine[0]?.pickupLabel ?? null,
         phone: perLine[0]?.phone ?? null,
+        deliveryDate: perLine[0]?.deliveryDate ?? null,
       },
     ];
   }
