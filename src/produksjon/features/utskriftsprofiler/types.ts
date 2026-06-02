@@ -60,6 +60,7 @@ export const FIELD_GROUPS: Record<FieldType, FieldGroup> = {
   leveringsadresse: "bestilling",
   distribusjon: "bestilling",
   kjorerute: "bestilling",
+  tur: "bestilling",
   varenavn: "vare",
   varenr: "vare",
   antall: "vare",
