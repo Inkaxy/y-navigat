@@ -7,6 +7,8 @@ export interface OrderLineCustomerInfo {
   /** Kundens telefon, prioritert: order.final_customer_phone → customer.mobile_phone → customer.primary_contact_phone. */
   /** Formatert leveringsdato (f.eks. "02.06.2026") fra orders.delivery_date. */
   deliveryDate: string | null;
+  /** Formatert hentetidspunkt (f.eks. "Hentes kl 10:00") fra orders.delivery_time. */
+  pickupTime: string | null;
   phone: string | null;
 }
 
@@ -24,7 +26,7 @@ export function useOrderLineCustomerInfo(orderLineIds: string[] | undefined) {
     enabled: ids.length > 0,
     queryFn: async (): Promise<Record<string, OrderLineCustomerInfo>> => {
       const out: Record<string, OrderLineCustomerInfo> = {};
-      for (const id of ids) out[id] = { pickupLabel: null, phone: null, deliveryDate: null };
+      for (const id of ids) out[id] = { pickupLabel: null, phone: null, deliveryDate: null, pickupTime: null };
 
       const { data: lines, error } = await supabase
         .from("order_lines")
@@ -39,7 +41,7 @@ export function useOrderLineCustomerInfo(orderLineIds: string[] | undefined) {
 
       const { data: orders, error: oErr } = await supabase
         .from("orders")
-        .select("id, customer_id, final_customer_phone, delivery_date")
+        .select("id, customer_id, final_customer_phone, delivery_date, delivery_time")
         .in("id", orderIds);
       if (oErr) throw oErr;
 
@@ -122,6 +124,7 @@ export function useOrderLineCustomerInfo(orderLineIds: string[] | undefined) {
           customer_id: string | null;
           final_customer_phone: string | null;
           delivery_date: string | null;
+          delivery_time: string | null;
         };
         const cust = row.customer_id ? customerMap[row.customer_id] : null;
         const pickupId = cust?.profile_id ? profileToPickup[cust.profile_id] : null;
@@ -135,12 +138,15 @@ export function useOrderLineCustomerInfo(orderLineIds: string[] | undefined) {
               year: "numeric",
             })
           : null;
-        orderInfo[row.id] = { pickupLabel, phone, deliveryDate };
+        const pickupTime = row.delivery_time
+          ? `Hentes kl ${row.delivery_time.slice(0, 5)}`
+          : null;
+        orderInfo[row.id] = { pickupLabel, phone, deliveryDate, pickupTime };
       }
 
       for (const l of lines ?? []) {
         const row = l as { id: string; order_id: string };
-        out[row.id] = orderInfo[row.order_id] ?? { pickupLabel: null, phone: null, deliveryDate: null };
+        out[row.id] = orderInfo[row.order_id] ?? { pickupLabel: null, phone: null, deliveryDate: null, pickupTime: null };
       }
       return out;
     },
