@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from "react";
-import { FIELD_LABELS, type ProfileField } from "../../types";
+import { FIELD_LABELS, type ProfileField, type ProfileLine } from "../../types";
 
 interface Props {
   paperWidth: number;
@@ -10,6 +10,7 @@ interface Props {
   marginLeft: number;
   landscape: boolean;
   fields: ProfileField[];
+  lines?: ProfileLine[];
   companyName: string;
   logoUrl: string | null;
 }
@@ -28,6 +29,7 @@ export function LabelThumbnail({
   marginLeft,
   landscape,
   fields,
+  lines = [],
   companyName,
   logoUrl,
 }: Props) {
@@ -127,6 +129,22 @@ export function LabelThumbnail({
                     <span className="truncate">{content}</span>
                   </div>
                 </div>
+              );
+            })}
+            {lines.map((ln) => {
+              const isH = ln.orientation === "horizontal";
+              return (
+                <div
+                  key={ln.id}
+                  className="pointer-events-none absolute"
+                  style={{
+                    left: ln.x_mm * pxPerMm,
+                    top: ln.y_mm * pxPerMm,
+                    width: isH ? ln.length_mm * pxPerMm : Math.max(0.5, ln.thickness_mm * pxPerMm),
+                    height: isH ? Math.max(0.5, ln.thickness_mm * pxPerMm) : ln.length_mm * pxPerMm,
+                    background: "#555",
+                  }}
+                />
               );
             })}
           </div>

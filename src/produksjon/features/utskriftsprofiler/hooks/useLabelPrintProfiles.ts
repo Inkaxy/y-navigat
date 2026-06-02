@@ -5,6 +5,7 @@ import type {
   CommentIncludes,
   LabelPrintProfile,
   ProfileField,
+  ProfileLine,
 } from "../types";
 import { defaultFields } from "../types";
 
@@ -13,6 +14,10 @@ function normalize(row: Record<string, unknown>): LabelPrintProfile {
   const fields: ProfileField[] = Array.isArray(rawFields)
     ? (rawFields as ProfileField[])
     : defaultFields();
+  const rawLines = row.lines;
+  const lines: ProfileLine[] = Array.isArray(rawLines)
+    ? (rawLines as ProfileLine[])
+    : [];
   const rawComment = row.comment_includes as Partial<CommentIncludes> | null;
   const comment_includes: CommentIncludes = {
     fritekst1: rawComment?.fritekst1 ?? true,
@@ -22,6 +27,7 @@ function normalize(row: Record<string, unknown>): LabelPrintProfile {
   return {
     ...(row as unknown as LabelPrintProfile),
     fields,
+    lines,
     comment_includes,
   };
 }

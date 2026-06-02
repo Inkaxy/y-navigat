@@ -130,6 +130,18 @@ export interface ProfileField {
   z_index: number;
 }
 
+export interface ProfileLine {
+  id: string;
+  orientation: "horizontal" | "vertical";
+  /** Startpunkt i mm relativt til margin-box. */
+  x_mm: number;
+  y_mm: number;
+  /** Lengde i mm. */
+  length_mm: number;
+  /** Tykkelse i mm. Default 0.3. */
+  thickness_mm: number;
+}
+
 export interface CommentIncludes {
   fritekst1: boolean;
   fritekst2: boolean;
@@ -152,6 +164,7 @@ export interface LabelPrintProfile {
   logo_url: string | null;
   logo_height_mm: number | null;
   fields: ProfileField[];
+  lines: ProfileLine[];
   comment_includes: CommentIncludes;
   include_field_labels: boolean;
   field_labels_bold: boolean;
@@ -179,6 +192,7 @@ export interface LabelPrintProfileInput {
   logo_url: string | null;
   logo_height_mm: number | null;
   fields: ProfileField[];
+  lines: ProfileLine[];
   comment_includes: CommentIncludes;
   include_field_labels: boolean;
   field_labels_bold: boolean;

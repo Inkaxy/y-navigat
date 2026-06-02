@@ -1,4 +1,4 @@
-import { ArrowLeft, RectangleVertical, RectangleHorizontal, Settings2, Undo2, Redo2, Eye, MousePointer2 } from "lucide-react";
+import { ArrowLeft, RectangleVertical, RectangleHorizontal, Settings2, Undo2, Redo2, Eye, MousePointer2, Minus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -21,6 +21,8 @@ interface Props {
   onChangeMode: (m: "design" | "preview") => void;
   onUndo?: () => void;
   onRedo?: () => void;
+  onAddHorizontalLine?: () => void;
+  onAddVerticalLine?: () => void;
   onOpenSettings: () => void;
   onCancel: () => void;
 }
@@ -111,6 +113,30 @@ export function EditorTopbar(p: Props) {
           Forhåndsvis
         </button>
       </div>
+
+      {/* Add line */}
+      {(p.onAddHorizontalLine || p.onAddVerticalLine) && (
+        <div className="flex items-center rounded-[10px] border border-white/10 bg-white/5 p-0.5">
+          <button
+            type="button"
+            onClick={p.onAddHorizontalLine}
+            className="flex h-7 w-8 items-center justify-center rounded-md text-brand-cream/70 transition hover:bg-white/10 hover:text-brand-cream"
+            aria-label="Legg til vannrett linje"
+            title="Legg til vannrett linje"
+          >
+            <Minus className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={p.onAddVerticalLine}
+            className="flex h-7 w-8 items-center justify-center rounded-md text-brand-cream/70 transition hover:bg-white/10 hover:text-brand-cream"
+            aria-label="Legg til loddrett linje"
+            title="Legg til loddrett linje"
+          >
+            <Minus className="h-4 w-4 rotate-90" />
+          </button>
+        </div>
+      )}
 
       {/* Saved status */}
       {p.saved && (

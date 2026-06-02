@@ -10,6 +10,7 @@ import {
   type FieldType,
   type LabelPrintProfile,
   type ProfileField,
+  type ProfileLine,
 } from "../types";
 import {
   DuplicateProfileNameError,
@@ -74,6 +75,8 @@ export function UtskriftsprofilDialog({
   const [logoHeight, setLogoHeight] = useState<number | "">(15);
   const [logoUploading, setLogoUploading] = useState(false);
   const [fields, setFields] = useState<ProfileField[]>(defaultFields());
+  const [lines, setLines] = useState<ProfileLine[]>([]);
+  const [selectedLineId, setSelectedLineId] = useState<string | null>(null);
   const [commentFt1, setCommentFt1] = useState(true);
   const [commentFt2, setCommentFt2] = useState(true);
   const [commentFt3, setCommentFt3] = useState(true);
@@ -128,6 +131,7 @@ export function UtskriftsprofilDialog({
         existing.orientation === "landscape",
       );
       setFields(migrateLegacyFields(baseFields, inner.w, inner.h));
+      setLines(Array.isArray(existing.lines) ? existing.lines : []);
       setCommentFt1(existing.comment_includes.fritekst1);
       setCommentFt2(existing.comment_includes.fritekst2);
       setCommentFt3(existing.comment_includes.fritekst3);
@@ -150,6 +154,7 @@ export function UtskriftsprofilDialog({
       setLogoUrl(null);
       setLogoHeight(15);
       setFields(defaultFields());
+      setLines([]);
       setCommentFt1(true);
       setCommentFt2(true);
       setCommentFt3(true);
@@ -233,6 +238,38 @@ export function UtskriftsprofilDialog({
     addFieldAt(type, 0, Math.min(maxY + 1, Math.max(0, inner.h - sz.h)));
   };
 
+  const addLine = (orientation: "horizontal" | "vertical") => {
+    const id =
+      typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `line-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const isH = orientation === "horizontal";
+    const length = isH
+      ? Math.min(Math.max(20, inner.w * 0.6), inner.w)
+      : Math.min(Math.max(15, inner.h * 0.6), inner.h);
+    const newLine: ProfileLine = {
+      id,
+      orientation,
+      x_mm: isH ? Math.max(0, (inner.w - length) / 2) : Math.max(0, inner.w / 2),
+      y_mm: isH ? Math.max(0, inner.h / 2) : Math.max(0, (inner.h - length) / 2),
+      length_mm: length,
+      thickness_mm: 0.3,
+    };
+    setLines((prev) => [...prev, newLine]);
+    setSelectedFieldType(null);
+    setSelectedLineId(id);
+  };
+
+  const updateLine = (id: string, patch: Partial<ProfileLine>) => {
+    setLines((prev) => prev.map((l) => (l.id === id ? { ...l, ...patch } : l)));
+  };
+
+  const removeLine = (id: string) => {
+    setLines((prev) => prev.filter((l) => l.id !== id));
+    setSelectedLineId((s) => (s === id ? null : s));
+  };
+
+
   const handleLogoUpload = async (file: File) => {
     if (!legalEntity) {
       toast.error("Velg et selskap først.");
@@ -300,6 +337,7 @@ export function UtskriftsprofilDialog({
       logo_url: logoUrl,
       logo_height_mm: typeof logoHeight === "number" ? logoHeight : null,
       fields,
+      lines,
       comment_includes: {
         fritekst1: commentFt1,
         fritekst2: commentFt2,
@@ -374,6 +412,8 @@ export function UtskriftsprofilDialog({
             onChangePaperHeight={setPaperHeight}
             onToggleLandscape={setLandscape}
             onChangeMode={setEditorMode}
+            onAddHorizontalLine={() => addLine("horizontal")}
+            onAddVerticalLine={() => addLine("vertical")}
             onOpenSettings={() => setSettingsOpen(true)}
             onCancel={() => onOpenChange(false)}
           />
@@ -418,7 +458,18 @@ export function UtskriftsprofilDialog({
                 companyName={companyName}
                 logoUrl={logoUrl}
                 includeFieldLabels={includeFieldLabels}
-                onSelectField={setSelectedFieldType}
+                lines={lines}
+                selectedLineId={isPreview ? null : selectedLineId}
+                onSelectLine={(id) => {
+                  setSelectedLineId(id);
+                  if (id) setSelectedFieldType(null);
+                }}
+                onUpdateLine={updateLine}
+                onRemoveLine={removeLine}
+                onSelectField={(t) => {
+                  setSelectedFieldType(t);
+                  if (t) setSelectedLineId(null);
+                }}
                 onUpdateField={updateField}
                 onAddFieldAt={addFieldAt}
                 readOnly={isPreview}

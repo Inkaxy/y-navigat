@@ -4,6 +4,7 @@ import {
   FIELD_LABELS,
   type FieldType,
   type ProfileField,
+  type ProfileLine,
   defaultFieldSize,
 } from "../../types";
 import { clamp, getInnerArea, round1, snap } from "../../lib/canvasUtils";
@@ -34,11 +35,19 @@ interface Props {
   zoom?: number;
   /** Show rulers at top + left. */
   showRulers?: boolean;
+  /** Dekorative linjer på etiketten. */
+  lines?: ProfileLine[];
+  selectedLineId?: string | null;
+  onSelectLine?: (id: string | null) => void;
+  onUpdateLine?: (id: string, patch: Partial<ProfileLine>) => void;
+  onRemoveLine?: (id: string) => void;
 }
 
 type DragMode =
   | { kind: "move"; type: FieldType; startX: number; startY: number; origX: number; origY: number }
-  | { kind: "resize"; type: FieldType; handle: ResizeHandle; startX: number; startY: number; origX: number; origY: number; origW: number; origH: number };
+  | { kind: "resize"; type: FieldType; handle: ResizeHandle; startX: number; startY: number; origX: number; origY: number; origW: number; origH: number }
+  | { kind: "line-move"; id: string; startX: number; startY: number; origX: number; origY: number }
+  | { kind: "line-resize"; id: string; end: "start" | "end"; startX: number; startY: number; origX: number; origY: number; origLength: number };
 
 type ResizeHandle = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
 
@@ -64,6 +73,11 @@ export function LabelCanvas(props: Props) {
     renderInlineToolbar,
     readOnly = false,
     fixedPxPerMm,
+    lines = [],
+    selectedLineId = null,
+    onSelectLine,
+    onUpdateLine,
+    onRemoveLine,
   } = props;
 
   const inner = getInnerArea(
@@ -114,6 +128,9 @@ export function LabelCanvas(props: Props) {
   // === alignment guides while dragging ===
   const guides = useMemo(() => {
     if (!dragMode) return { v: [] as number[], h: [] as number[] };
+    if (dragMode.kind !== "move" && dragMode.kind !== "resize") {
+      return { v: [], h: [] };
+    }
     const active = fields.find((f) => f.field_type === dragMode.type);
     if (!active) return { v: [], h: [] };
     const v: number[] = [];
@@ -138,19 +155,52 @@ export function LabelCanvas(props: Props) {
       const dyPx = e.clientY - dragMode.startY;
       const dxMm = dxPx / pxPerMm;
       const dyMm = dyPx / pxPerMm;
+      const snapStep = e.shiftKey ? 0.5 : 1;
+
+      if (dragMode.kind === "line-move") {
+        const ln = lines.find((l) => l.id === dragMode.id);
+        if (!ln || !onUpdateLine) return;
+        const maxX = Math.max(0, inner.w - (ln.orientation === "horizontal" ? ln.length_mm : 0));
+        const maxY = Math.max(0, inner.h - (ln.orientation === "vertical" ? ln.length_mm : 0));
+        onUpdateLine(dragMode.id, {
+          x_mm: round1(snap(clamp(dragMode.origX + dxMm, 0, maxX), snapStep)),
+          y_mm: round1(snap(clamp(dragMode.origY + dyMm, 0, maxY), snapStep)),
+        });
+        return;
+      }
+      if (dragMode.kind === "line-resize") {
+        const ln = lines.find((l) => l.id === dragMode.id);
+        if (!ln || !onUpdateLine) return;
+        const isH = ln.orientation === "horizontal";
+        const delta = isH ? dxMm : dyMm;
+        if (dragMode.end === "end") {
+          const max = (isH ? inner.w : inner.h) - dragMode.origX > 0 ? (isH ? inner.w - dragMode.origX : inner.h - dragMode.origY) : dragMode.origLength;
+          const nLen = clamp(dragMode.origLength + delta, 2, isH ? inner.w - ln.x_mm : inner.h - ln.y_mm);
+          onUpdateLine(dragMode.id, { length_mm: round1(snap(nLen, snapStep)) });
+        } else {
+          const newLen = clamp(dragMode.origLength - delta, 2, dragMode.origLength + (isH ? dragMode.origX : dragMode.origY));
+          const newPos = (isH ? dragMode.origX : dragMode.origY) + (dragMode.origLength - newLen);
+          if (isH) {
+            onUpdateLine(dragMode.id, { x_mm: round1(snap(newPos, snapStep)), length_mm: round1(snap(newLen, snapStep)) });
+          } else {
+            onUpdateLine(dragMode.id, { y_mm: round1(snap(newPos, snapStep)), length_mm: round1(snap(newLen, snapStep)) });
+          }
+        }
+        return;
+      }
+
       const f = fields.find((x) => x.field_type === dragMode.type);
       if (!f) return;
 
       if (dragMode.kind === "move") {
         const nx = clamp(dragMode.origX + dxMm, 0, Math.max(0, inner.w - f.width_mm));
         const ny = clamp(dragMode.origY + dyMm, 0, Math.max(0, inner.h - f.height_mm));
-        const snapStep = e.shiftKey ? 0.5 : 1;
         onUpdateField(dragMode.type, {
           x_mm: round1(snap(nx, snapStep)),
           y_mm: round1(snap(ny, snapStep)),
         });
-      } else {
-        let { origX, origY, origW, origH } = dragMode;
+      } else if (dragMode.kind === "resize") {
+        const { origX, origY, origW, origH } = dragMode;
         let nx = origX, ny = origY, nw = origW, nh = origH;
         const minSize = 5;
         if (dragMode.handle.includes("e")) nw = clamp(origW + dxMm, minSize, inner.w - origX);
@@ -165,7 +215,6 @@ export function LabelCanvas(props: Props) {
           ny = origY + (origH - newH);
           nh = newH;
         }
-        const snapStep = e.shiftKey ? 0.5 : 1;
         onUpdateField(dragMode.type, {
           x_mm: round1(snap(nx, snapStep)),
           y_mm: round1(snap(ny, snapStep)),
@@ -181,7 +230,7 @@ export function LabelCanvas(props: Props) {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
     };
-  }, [dragMode, fields, inner.w, inner.h, onUpdateField, pxPerMm]);
+  }, [dragMode, fields, lines, inner.w, inner.h, onUpdateField, onUpdateLine, pxPerMm]);
 
   // === keyboard nudge ===
   useEffect(() => {
@@ -213,6 +262,38 @@ export function LabelCanvas(props: Props) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [readOnly, selectedFieldType, fields, inner.w, inner.h, onUpdateField, onSelectField]);
+
+  // === keyboard for selected line ===
+  useEffect(() => {
+    if (readOnly || !selectedLineId) return;
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) return;
+      const ln = lines.find((l) => l.id === selectedLineId);
+      if (!ln) return;
+      if (e.key === "Delete" || e.key === "Backspace") {
+        e.preventDefault();
+        onRemoveLine?.(selectedLineId);
+        return;
+      }
+      const step = e.shiftKey ? 5 : 1;
+      let dx = 0, dy = 0;
+      if (e.key === "ArrowLeft") dx = -step;
+      else if (e.key === "ArrowRight") dx = step;
+      else if (e.key === "ArrowUp") dy = -step;
+      else if (e.key === "ArrowDown") dy = step;
+      else return;
+      e.preventDefault();
+      const maxX = Math.max(0, inner.w - (ln.orientation === "horizontal" ? ln.length_mm : 0));
+      const maxY = Math.max(0, inner.h - (ln.orientation === "vertical" ? ln.length_mm : 0));
+      onUpdateLine?.(selectedLineId, {
+        x_mm: clamp(round1(ln.x_mm + dx), 0, maxX),
+        y_mm: clamp(round1(ln.y_mm + dy), 0, maxY),
+      });
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [readOnly, selectedLineId, lines, inner.w, inner.h, onUpdateLine, onRemoveLine]);
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
@@ -354,6 +435,96 @@ export function LabelCanvas(props: Props) {
                   />
                 );
               })}
+
+              {/* Decorative lines */}
+              {lines.map((ln) => {
+                const isH = ln.orientation === "horizontal";
+                const isSelected = !readOnly && ln.id === selectedLineId;
+                const hitW = isH ? ln.length_mm * pxPerMm : Math.max(8, ln.thickness_mm * pxPerMm + 6);
+                const hitH = isH ? Math.max(8, ln.thickness_mm * pxPerMm + 6) : ln.length_mm * pxPerMm;
+                const offsetX = isH ? 0 : -hitW / 2;
+                const offsetY = isH ? -hitH / 2 : 0;
+                return (
+                  <div
+                    key={ln.id}
+                    className={cn(
+                      "absolute z-30 flex items-center justify-center",
+                      readOnly ? "pointer-events-none" : "cursor-move",
+                    )}
+                    style={{
+                      left: ln.x_mm * pxPerMm + offsetX,
+                      top: ln.y_mm * pxPerMm + offsetY,
+                      width: hitW,
+                      height: hitH,
+                    }}
+                    onPointerDown={(e) => {
+                      if (readOnly) return;
+                      e.stopPropagation();
+                      onSelectLine?.(ln.id);
+                      (e.target as Element).setPointerCapture?.(e.pointerId);
+                      setDragMode({
+                        kind: "line-move",
+                        id: ln.id,
+                        startX: e.clientX,
+                        startY: e.clientY,
+                        origX: ln.x_mm,
+                        origY: ln.y_mm,
+                      });
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: isH ? "100%" : Math.max(1, ln.thickness_mm * pxPerMm),
+                        height: isH ? Math.max(1, ln.thickness_mm * pxPerMm) : "100%",
+                        background: isSelected ? "hsl(var(--primary))" : "#555",
+                        outline: isSelected ? "1px dashed hsl(var(--primary))" : undefined,
+                        outlineOffset: 3,
+                      }}
+                    />
+                    {isSelected && !readOnly && (
+                      <>
+                        <LineEndHandle
+                          position="start"
+                          orientation={ln.orientation}
+                          onPointerDown={(e) => {
+                            e.stopPropagation();
+                            (e.target as Element).setPointerCapture?.(e.pointerId);
+                            setDragMode({
+                              kind: "line-resize",
+                              id: ln.id,
+                              end: "start",
+                              startX: e.clientX,
+                              startY: e.clientY,
+                              origX: ln.x_mm,
+                              origY: ln.y_mm,
+                              origLength: ln.length_mm,
+                            });
+                          }}
+                        />
+                        <LineEndHandle
+                          position="end"
+                          orientation={ln.orientation}
+                          onPointerDown={(e) => {
+                            e.stopPropagation();
+                            (e.target as Element).setPointerCapture?.(e.pointerId);
+                            setDragMode({
+                              kind: "line-resize",
+                              id: ln.id,
+                              end: "end",
+                              startX: e.clientX,
+                              startY: e.clientY,
+                              origX: ln.x_mm,
+                              origY: ln.y_mm,
+                              origLength: ln.length_mm,
+                            });
+                          }}
+                        />
+                      </>
+                    )}
+                  </div>
+                );
+              })}
+
 
               {/* Inline toolbar anchored above selected field */}
               {!readOnly && selected && renderInlineToolbar && (
@@ -588,4 +759,35 @@ function handleClass(h: ResizeHandle): string {
     sw: "-left-1 -bottom-1 cursor-sw-resize",
   };
   return map[h];
+}
+
+function LineEndHandle({
+  position,
+  orientation,
+  onPointerDown,
+}: {
+  position: "start" | "end";
+  orientation: "horizontal" | "vertical";
+  onPointerDown: (e: React.PointerEvent) => void;
+}) {
+  const isH = orientation === "horizontal";
+  const cursor = isH ? "cursor-ew-resize" : "cursor-ns-resize";
+  const pos = isH
+    ? position === "start"
+      ? "left-0 top-1/2 -translate-x-1/2 -translate-y-1/2"
+      : "right-0 top-1/2 translate-x-1/2 -translate-y-1/2"
+    : position === "start"
+      ? "top-0 left-1/2 -translate-x-1/2 -translate-y-1/2"
+      : "bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2";
+  return (
+    <div
+      onPointerDown={onPointerDown}
+      className={cn(
+        "absolute h-2.5 w-2.5 rounded-sm border border-primary bg-background",
+        pos,
+        cursor,
+      )}
+      style={{ touchAction: "none" }}
+    />
+  );
 }
