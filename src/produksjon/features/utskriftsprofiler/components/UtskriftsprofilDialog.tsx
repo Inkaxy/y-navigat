@@ -458,7 +458,18 @@ export function UtskriftsprofilDialog({
                 companyName={companyName}
                 logoUrl={logoUrl}
                 includeFieldLabels={includeFieldLabels}
-                onSelectField={setSelectedFieldType}
+                lines={lines}
+                selectedLineId={isPreview ? null : selectedLineId}
+                onSelectLine={(id) => {
+                  setSelectedLineId(id);
+                  if (id) setSelectedFieldType(null);
+                }}
+                onUpdateLine={updateLine}
+                onRemoveLine={removeLine}
+                onSelectField={(t) => {
+                  setSelectedFieldType(t);
+                  if (t) setSelectedLineId(null);
+                }}
                 onUpdateField={updateField}
                 onAddFieldAt={addFieldAt}
                 readOnly={isPreview}
