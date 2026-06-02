@@ -192,6 +192,7 @@ export interface LabelPrintProfileInput {
   logo_url: string | null;
   logo_height_mm: number | null;
   fields: ProfileField[];
+  lines: ProfileLine[];
   comment_includes: CommentIncludes;
   include_field_labels: boolean;
   field_labels_bold: boolean;
