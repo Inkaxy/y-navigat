@@ -230,6 +230,7 @@ export function defaultFields(): ProfileField[] {
       alignment: "left" as Alignment,
       show_line: false,
       show_border: false,
+      show_label: true,
       print_at_bottom: false,
       x_mm: 0,
       y_mm: 0,
