@@ -51,6 +51,7 @@ import { useLabelDepartments } from "@/produksjon/features/etiketter/hooks/useLa
 import { useLabelProducts } from "@/produksjon/features/etiketter/hooks/useLabelProducts";
 import { useLabelChangeTracking } from "@/produksjon/features/etiketter/hooks/useLabelChangeTracking";
 import { useLabelRealtime } from "@/produksjon/features/etiketter/hooks/useLabelRealtime";
+import { usePrintedLabelCount } from "@/produksjon/features/etiketter/hooks/usePrintedLabelCount";
 import { useProductLabelProfiles } from "@/produksjon/features/etiketter/hooks/useProductLabelProfiles";
 import {
   useInsertLabelPrintJob,
@@ -107,7 +108,7 @@ export default function EtiketterPage() {
   }, []);
 
   const totalProducts = filteredRows?.length ?? 0;
-  const totalLabels = filteredRows?.reduce((s, r) => s + r.total_labels, 0) ?? 0;
+  
 
   // Print-dialog
   const [printRow, setPrintRow] = useState<LabelProductRow | null>(null);
@@ -128,6 +129,8 @@ export default function EtiketterPage() {
     () => (profiles ?? []).filter((p) => p.status === "active").length,
     [profiles],
   );
+
+  const { data: printedCount = 0 } = usePrintedLabelCount(filter, productIds);
 
   // Bulk-print
   const nextNumber = useNextLabelNumber();
@@ -412,13 +415,17 @@ export default function EtiketterPage() {
       </div>
 
       {/* KPI-kort */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <KpiCard label="Nye" value={newCount} tone="warn" />
         <KpiCard label="Endret" value={changedCount} tone="warn" />
         <KpiCard label="Slettet" value={deletedCount} tone="warn" />
-        <KpiCard label="Totalt" value={totalProducts} subtitle="Etikettvarer" />
-        <KpiCard label="Bestilt" value={totalLabels} subtitle="Antall etiketter" />
+        <KpiCard
+          label="Skrevet ut"
+          value={printedCount}
+          subtitle={`av ${totalProducts} etikettvarer`}
+        />
       </div>
+
 
       <div className="flex justify-end">
         <Button
