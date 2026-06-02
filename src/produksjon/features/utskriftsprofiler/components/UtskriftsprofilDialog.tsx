@@ -10,6 +10,7 @@ import {
   type FieldType,
   type LabelPrintProfile,
   type ProfileField,
+  type ProfileLine,
 } from "../types";
 import {
   DuplicateProfileNameError,
