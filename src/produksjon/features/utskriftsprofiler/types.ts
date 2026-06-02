@@ -36,6 +36,7 @@ export const FIELD_LABELS: Record<FieldType, string> = {
   varenavn: "Varenavn",
   antall: "Antall",
   kjorerute: "Kjørerute",
+  tur: "Tur",
   pakkseddelnr: "Pakkseddelnr",
   melding_pakkseddel: "Melding på pakkseddel",
   fyll: "Fyll",
