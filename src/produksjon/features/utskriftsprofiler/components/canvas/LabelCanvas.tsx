@@ -35,11 +35,19 @@ interface Props {
   zoom?: number;
   /** Show rulers at top + left. */
   showRulers?: boolean;
+  /** Dekorative linjer på etiketten. */
+  lines?: ProfileLine[];
+  selectedLineId?: string | null;
+  onSelectLine?: (id: string | null) => void;
+  onUpdateLine?: (id: string, patch: Partial<ProfileLine>) => void;
+  onRemoveLine?: (id: string) => void;
 }
 
 type DragMode =
   | { kind: "move"; type: FieldType; startX: number; startY: number; origX: number; origY: number }
-  | { kind: "resize"; type: FieldType; handle: ResizeHandle; startX: number; startY: number; origX: number; origY: number; origW: number; origH: number };
+  | { kind: "resize"; type: FieldType; handle: ResizeHandle; startX: number; startY: number; origX: number; origY: number; origW: number; origH: number }
+  | { kind: "line-move"; id: string; startX: number; startY: number; origX: number; origY: number }
+  | { kind: "line-resize"; id: string; end: "start" | "end"; startX: number; startY: number; origX: number; origY: number; origLength: number };
 
 type ResizeHandle = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
 
