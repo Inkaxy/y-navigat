@@ -296,6 +296,31 @@ export function PrintLabelDialog({
               onChange={(e) => setQuantity(Math.max(1, Number(e.target.value)))}
             />
           </div>
+
+          {row.label_print_model === "orig_plus_copy" && (
+            <div className="space-y-1">
+              <Label>Sortering (original + kopi)</Label>
+              <Select
+                value={copySortMode}
+                onValueChange={(v) => setCopySortMode(v as "stack" | "interleave")}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="stack">
+                    Originaler først, deretter kopier
+                  </SelectItem>
+                  <SelectItem value="interleave">
+                    Annenhver: original + kopi
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Hver etikett skrives ut to ganger. Velg hvordan bunken sorteres.
+              </p>
+            </div>
+          )}
         </div>
 
         <div className="flex items-start gap-2 rounded-md border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
