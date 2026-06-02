@@ -2487,6 +2487,7 @@ export type Database = {
           include_field_labels: boolean
           include_route_name: boolean
           legal_entity_id: string
+          lines: Json
           logo_height_mm: number | null
           logo_url: string | null
           margin_bottom_mm: number
@@ -2514,6 +2515,7 @@ export type Database = {
           include_field_labels?: boolean
           include_route_name?: boolean
           legal_entity_id: string
+          lines?: Json
           logo_height_mm?: number | null
           logo_url?: string | null
           margin_bottom_mm?: number
@@ -2541,6 +2543,7 @@ export type Database = {
           include_field_labels?: boolean
           include_route_name?: boolean
           legal_entity_id?: string
+          lines?: Json
           logo_height_mm?: number | null
           logo_url?: string | null
           margin_bottom_mm?: number
