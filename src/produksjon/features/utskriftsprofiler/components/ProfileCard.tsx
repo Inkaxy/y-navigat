@@ -68,6 +68,7 @@ export function ProfileCard({ profile, onEdit, onArchive }: Props) {
             marginLeft={Number(profile.margin_left_mm)}
             landscape={profile.orientation === "landscape"}
             fields={fields}
+            lines={profile.lines ?? []}
             companyName={profile.company_name}
             logoUrl={profile.logo_url}
           />
