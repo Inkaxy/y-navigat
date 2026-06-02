@@ -82,16 +82,19 @@ export function MerknadDialog({
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
-  // Bygg listen av aktive, manuelt utfyllbare felt — i profil-rekkefølge.
+  // Bygg listen av aktive, manuelt utfyllbare felt — sortert etter visuell
+  // posisjon på etiketten (y, så x), slik at dialogen følger profil-layouten.
   const activeFields = useMemo<EditableType[]>(() => {
     const seen = new Set<EditableType>();
     const result: EditableType[] = [];
-    for (const f of profile.fields) {
-      if (!f.include) continue;
-      if (!isEditable(f.field_type)) continue;
-      if (seen.has(f.field_type)) continue;
-      seen.add(f.field_type);
-      result.push(f.field_type);
+    const sorted = [...profile.fields]
+      .filter((f) => f.include && isEditable(f.field_type))
+      .sort((a, b) => (a.y_mm - b.y_mm) || (a.x_mm - b.x_mm));
+    for (const f of sorted) {
+      const t = f.field_type as EditableType;
+      if (seen.has(t)) continue;
+      seen.add(t);
+      result.push(t);
     }
     return result;
   }, [profile.fields]);
