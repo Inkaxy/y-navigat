@@ -74,7 +74,21 @@ function CustomerCombobox({
 }
 
 export default function CustomerOrdersPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialCustomerId = searchParams.get("customerId");
   const [customer, setCustomer] = useState<CustomerOption | null>(null);
+  const { data: preselected } = useCustomerById(
+    initialCustomerId && !customer ? initialCustomerId : null,
+  );
+
+  useEffect(() => {
+    if (preselected && !customer) {
+      setCustomer(preselected);
+      // Rydd opp URL etter forhåndsvalg
+      searchParams.delete("customerId");
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [preselected, customer, searchParams, setSearchParams]);
 
   return (
     <div className="flex h-full flex-col">
