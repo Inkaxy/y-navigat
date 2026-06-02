@@ -134,8 +134,12 @@ export function PrintLabelDialog({
       // [A, A, B, B, ...] — bevarer `copies` (dobles per item)
       return base_items.map((it) => ({ ...it, copies: (it.copies ?? 1) * 2 }));
     }
-    // "stack" — [A, B, C, A, B, C]: full sekvens to ganger
-    return [...base_items, ...base_items.map((it) => ({ ...it }))];
+    // "stack" — [A, B, C, ---- KOPI ----, A, B, C]
+    return [
+      ...base_items,
+      { separator: true as const, profile, text: "---- KOPI ----" },
+      ...base_items.map((it) => ({ ...it })),
+    ];
   }
 
   const handleDownloadPdf = async () => {
