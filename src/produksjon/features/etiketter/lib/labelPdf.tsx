@@ -88,14 +88,8 @@ function valueFor(
       return {
         text: merknad?.sukkerbilde === true ? "+ BILDE" : "",
       };
-    case "kommentar": {
-      const inc = profile.comment_includes;
-      const parts: string[] = [];
-      if (inc.fritekst1 && merknad?.fritekst_1) parts.push(merknad.fritekst_1);
-      if (inc.fritekst2 && merknad?.fritekst_2) parts.push(merknad.fritekst_2);
-      if (inc.fritekst3 && merknad?.fritekst_3) parts.push(merknad.fritekst_3);
-      return { text: joinNonEmpty(parts, "\n") };
-    }
+    case "kommentar":
+      return { text: merknad?.fritekst_1 || "" };
     default:
       return { text: `[${FIELD_LABELS[type]}]` };
   }
