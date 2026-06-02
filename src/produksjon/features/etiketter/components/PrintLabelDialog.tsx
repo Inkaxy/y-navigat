@@ -61,6 +61,10 @@ export function PrintLabelDialog({
   const [quantity, setQuantity] = useState<number>(1);
   const [labelNumber, setLabelNumber] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  /** Sortering når `label_print_model === "orig_plus_copy"`:
+   *  - "stack":      [A, B, C, A, B, C]   (alle originaler, så alle kopier)
+   *  - "interleave": [A, A, B, B, C, C]   (orig + kopi annenhver) */
+  const [copySortMode, setCopySortMode] = useState<"stack" | "interleave">("stack");
 
   const nextNumber = useNextLabelNumber();
   const insertJob = useInsertLabelPrintJob();
