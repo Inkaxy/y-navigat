@@ -29,6 +29,7 @@ export function LabelThumbnail({
   marginLeft,
   landscape,
   fields,
+  lines = [],
   companyName,
   logoUrl,
 }: Props) {
