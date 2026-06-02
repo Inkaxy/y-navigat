@@ -134,117 +134,126 @@ export function MerknadDialog({
             </div>
           ) : (
             <div className="grid grid-cols-[140px_1fr] gap-x-4 gap-y-3 py-2">
-              {activeFields.includes("bestilt_av") && (
-                <>
-                  <Label htmlFor="m-bestilt_av" className="self-center">Bestilt av</Label>
-                  <Input
-                    id="m-bestilt_av"
-                    value={form.bestilt_av}
-                    onChange={(e) => update("bestilt_av", e.target.value)}
-                    disabled={!canEdit}
-                  />
-                </>
-              )}
-
-              {activeFields.includes("fyll") && (
-                <>
-                  <Label htmlFor="m-fyll" className="self-center">Fyll</Label>
-                  <Input
-                    id="m-fyll"
-                    value={form.fyll}
-                    onChange={(e) => update("fyll", e.target.value)}
-                    disabled={!canEdit}
-                  />
-                </>
-              )}
-
-              {activeFields.includes("tekst") && (
-                <>
-                  <Label htmlFor="m-tekst" className="self-center">Tekst</Label>
-                  <Input
-                    id="m-tekst"
-                    value={form.tekst}
-                    onChange={(e) => update("tekst", e.target.value)}
-                    disabled={!canEdit}
-                    placeholder="Tekst på kake"
-                  />
-                </>
-              )}
-
-              {activeFields.includes("pynt") && (
-                <>
-                  <Label htmlFor="m-pynt" className="self-center">Pynt</Label>
-                  <Input
-                    id="m-pynt"
-                    value={form.pynt}
-                    onChange={(e) => update("pynt", e.target.value)}
-                    disabled={!canEdit}
-                  />
-                </>
-              )}
-
-              {activeFields.includes("sukkerbilde") && (
-                <>
-                  <Label className="self-center">Sukkerbilde</Label>
-                  <RadioGroup
-                    className="flex gap-4"
-                    value={form.sukkerbilde === true ? "ja" : form.sukkerbilde === false ? "nei" : "null"}
-                    onValueChange={(v) =>
-                      update("sukkerbilde", v === "ja" ? true : v === "nei" ? false : null)
-                    }
-                    disabled={!canEdit}
-                  >
-                    <label className="flex items-center gap-2 text-sm">
-                      <RadioGroupItem value="ja" /> Ja
-                    </label>
-                    <label className="flex items-center gap-2 text-sm">
-                      <RadioGroupItem value="nei" /> Nei
-                    </label>
-                    <label className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <RadioGroupItem value="null" /> Ikke spesifisert
-                    </label>
-                  </RadioGroup>
-                </>
-              )}
-
-              {showFritekst1 && (
-                <>
-                  <Label htmlFor="m-ft1" className="pt-2">Fritekst 1</Label>
-                  <Textarea
-                    id="m-ft1"
-                    rows={2}
-                    value={form.fritekst_1}
-                    onChange={(e) => update("fritekst_1", e.target.value)}
-                    disabled={!canEdit}
-                  />
-                </>
-              )}
-
-              {showFritekst2 && (
-                <>
-                  <Label htmlFor="m-ft2" className="pt-2">Fritekst 2</Label>
-                  <Textarea
-                    id="m-ft2"
-                    rows={2}
-                    value={form.fritekst_2}
-                    onChange={(e) => update("fritekst_2", e.target.value)}
-                    disabled={!canEdit}
-                  />
-                </>
-              )}
-
-              {showFritekst3 && (
-                <>
-                  <Label htmlFor="m-ft3" className="pt-2">Fritekst 3</Label>
-                  <Textarea
-                    id="m-ft3"
-                    rows={2}
-                    value={form.fritekst_3}
-                    onChange={(e) => update("fritekst_3", e.target.value)}
-                    disabled={!canEdit}
-                  />
-                </>
-              )}
+              {activeFields.map((ft) => {
+                switch (ft) {
+                  case "bestilt_av":
+                    return (
+                      <div key={ft} className="contents">
+                        <Label htmlFor="m-bestilt_av" className="self-center">Bestilt av</Label>
+                        <Input
+                          id="m-bestilt_av"
+                          value={form.bestilt_av}
+                          onChange={(e) => update("bestilt_av", e.target.value)}
+                          disabled={!canEdit}
+                        />
+                      </div>
+                    );
+                  case "fyll":
+                    return (
+                      <div key={ft} className="contents">
+                        <Label htmlFor="m-fyll" className="self-center">Fyll</Label>
+                        <Input
+                          id="m-fyll"
+                          value={form.fyll}
+                          onChange={(e) => update("fyll", e.target.value)}
+                          disabled={!canEdit}
+                        />
+                      </div>
+                    );
+                  case "tekst":
+                    return (
+                      <div key={ft} className="contents">
+                        <Label htmlFor="m-tekst" className="self-center">Tekst</Label>
+                        <Input
+                          id="m-tekst"
+                          value={form.tekst}
+                          onChange={(e) => update("tekst", e.target.value)}
+                          disabled={!canEdit}
+                          placeholder="Tekst på kake"
+                        />
+                      </div>
+                    );
+                  case "pynt":
+                    return (
+                      <div key={ft} className="contents">
+                        <Label htmlFor="m-pynt" className="self-center">Pynt</Label>
+                        <Input
+                          id="m-pynt"
+                          value={form.pynt}
+                          onChange={(e) => update("pynt", e.target.value)}
+                          disabled={!canEdit}
+                        />
+                      </div>
+                    );
+                  case "sukkerbilde":
+                    return (
+                      <div key={ft} className="contents">
+                        <Label className="self-center">Sukkerbilde</Label>
+                        <RadioGroup
+                          className="flex gap-4"
+                          value={form.sukkerbilde === true ? "ja" : form.sukkerbilde === false ? "nei" : "null"}
+                          onValueChange={(v) =>
+                            update("sukkerbilde", v === "ja" ? true : v === "nei" ? false : null)
+                          }
+                          disabled={!canEdit}
+                        >
+                          <label className="flex items-center gap-2 text-sm">
+                            <RadioGroupItem value="ja" /> Ja
+                          </label>
+                          <label className="flex items-center gap-2 text-sm">
+                            <RadioGroupItem value="nei" /> Nei
+                          </label>
+                          <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <RadioGroupItem value="null" /> Ikke spesifisert
+                          </label>
+                        </RadioGroup>
+                      </div>
+                    );
+                  case "kommentar":
+                    return (
+                      <div key={ft} className="contents">
+                        {showFritekst1 && (
+                          <>
+                            <Label htmlFor="m-ft1" className="pt-2">Fritekst 1</Label>
+                            <Textarea
+                              id="m-ft1"
+                              rows={2}
+                              value={form.fritekst_1}
+                              onChange={(e) => update("fritekst_1", e.target.value)}
+                              disabled={!canEdit}
+                            />
+                          </>
+                        )}
+                        {showFritekst2 && (
+                          <>
+                            <Label htmlFor="m-ft2" className="pt-2">Fritekst 2</Label>
+                            <Textarea
+                              id="m-ft2"
+                              rows={2}
+                              value={form.fritekst_2}
+                              onChange={(e) => update("fritekst_2", e.target.value)}
+                              disabled={!canEdit}
+                            />
+                          </>
+                        )}
+                        {showFritekst3 && (
+                          <>
+                            <Label htmlFor="m-ft3" className="pt-2">Fritekst 3</Label>
+                            <Textarea
+                              id="m-ft3"
+                              rows={2}
+                              value={form.fritekst_3}
+                              onChange={(e) => update("fritekst_3", e.target.value)}
+                              disabled={!canEdit}
+                            />
+                          </>
+                        )}
+                      </div>
+                    );
+                  default:
+                    return null;
+                }
+              })}
             </div>
           )}
 
