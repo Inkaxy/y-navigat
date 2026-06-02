@@ -378,6 +378,26 @@ export function LabelCanvas(props: Props) {
                   </p>
                 </div>
               )}
+
+              {/* Alignment guides while dragging */}
+              {!readOnly && dragMode && (
+                <>
+                  {guides.v.map((x, i) => (
+                    <div
+                      key={`gv-${i}-${x}`}
+                      className="pointer-events-none absolute top-0 bottom-0 z-40"
+                      style={{ left: x * pxPerMm, width: 1, background: "hsl(var(--primary))" }}
+                    />
+                  ))}
+                  {guides.h.map((y, i) => (
+                    <div
+                      key={`gh-${i}-${y}`}
+                      className="pointer-events-none absolute left-0 right-0 z-40"
+                      style={{ top: y * pxPerMm, height: 1, background: "hsl(var(--primary))" }}
+                    />
+                  ))}
+                </>
+              )}
             </div>
           </div>
         </div>
