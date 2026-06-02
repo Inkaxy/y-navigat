@@ -244,8 +244,9 @@ export default function EtiketterPage() {
         if (!profile) continue;
         const totalCopies = r.total_labels || 1;
         const lineIds = r.order_line_ids ?? [];
+        const rowItems: LabelPdfData[] = [];
         if (lineIds.length === 0) {
-          items.push({
+          rowItems.push({
             profile,
             row: r,
             labelNumber: null,
@@ -253,28 +254,34 @@ export default function EtiketterPage() {
             copies: totalCopies,
             merknad: null,
           });
-          continue;
+        } else {
+          // Én side per ordrelinje (med dens merknad); padder ved behov.
+          for (const id of lineIds.slice(0, totalCopies)) {
+            rowItems.push({
+              profile,
+              row: r,
+              labelNumber: null,
+              quantity: totalCopies,
+              copies: 1,
+              merknad: merknadMap[id] ?? null,
+            });
+          }
+          if (totalCopies > lineIds.length) {
+            rowItems.push({
+              profile,
+              row: r,
+              labelNumber: null,
+              quantity: totalCopies,
+              copies: totalCopies - lineIds.length,
+              merknad: merknadMap[lineIds[0]] ?? null,
+            });
+          }
         }
-        // Én side per ordrelinje (med dens merknad); padder ved behov.
-        for (const id of lineIds.slice(0, totalCopies)) {
-          items.push({
-            profile,
-            row: r,
-            labelNumber: null,
-            quantity: totalCopies,
-            copies: 1,
-            merknad: merknadMap[id] ?? null,
-          });
-        }
-        if (totalCopies > lineIds.length) {
-          items.push({
-            profile,
-            row: r,
-            labelNumber: null,
-            quantity: totalCopies,
-            copies: totalCopies - lineIds.length,
-            merknad: merknadMap[lineIds[0]] ?? null,
-          });
+        // Original + kopi: dobler etikettene (stack-sortering: originaler først, så kopier).
+        if (r.label_print_model === "orig_plus_copy") {
+          items.push(...rowItems, ...rowItems.map((it) => ({ ...it })));
+        } else {
+          items.push(...rowItems);
         }
       }
       if (items.length === 0) {
