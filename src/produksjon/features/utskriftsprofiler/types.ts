@@ -8,6 +8,7 @@ export const FIELD_TYPES = [
   "varenavn",
   "antall",
   "kjorerute",
+  "tur",
   "pakkseddelnr",
   "melding_pakkseddel",
   "fyll",
