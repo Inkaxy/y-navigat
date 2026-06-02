@@ -128,6 +128,9 @@ export function LabelCanvas(props: Props) {
   // === alignment guides while dragging ===
   const guides = useMemo(() => {
     if (!dragMode) return { v: [] as number[], h: [] as number[] };
+    if (dragMode.kind !== "move" && dragMode.kind !== "resize") {
+      return { v: [], h: [] };
+    }
     const active = fields.find((f) => f.field_type === dragMode.type);
     if (!active) return { v: [], h: [] };
     const v: number[] = [];
@@ -152,19 +155,52 @@ export function LabelCanvas(props: Props) {
       const dyPx = e.clientY - dragMode.startY;
       const dxMm = dxPx / pxPerMm;
       const dyMm = dyPx / pxPerMm;
+      const snapStep = e.shiftKey ? 0.5 : 1;
+
+      if (dragMode.kind === "line-move") {
+        const ln = lines.find((l) => l.id === dragMode.id);
+        if (!ln || !onUpdateLine) return;
+        const maxX = Math.max(0, inner.w - (ln.orientation === "horizontal" ? ln.length_mm : 0));
+        const maxY = Math.max(0, inner.h - (ln.orientation === "vertical" ? ln.length_mm : 0));
+        onUpdateLine(dragMode.id, {
+          x_mm: round1(snap(clamp(dragMode.origX + dxMm, 0, maxX), snapStep)),
+          y_mm: round1(snap(clamp(dragMode.origY + dyMm, 0, maxY), snapStep)),
+        });
+        return;
+      }
+      if (dragMode.kind === "line-resize") {
+        const ln = lines.find((l) => l.id === dragMode.id);
+        if (!ln || !onUpdateLine) return;
+        const isH = ln.orientation === "horizontal";
+        const delta = isH ? dxMm : dyMm;
+        if (dragMode.end === "end") {
+          const max = (isH ? inner.w : inner.h) - dragMode.origX > 0 ? (isH ? inner.w - dragMode.origX : inner.h - dragMode.origY) : dragMode.origLength;
+          const nLen = clamp(dragMode.origLength + delta, 2, isH ? inner.w - ln.x_mm : inner.h - ln.y_mm);
+          onUpdateLine(dragMode.id, { length_mm: round1(snap(nLen, snapStep)) });
+        } else {
+          const newLen = clamp(dragMode.origLength - delta, 2, dragMode.origLength + (isH ? dragMode.origX : dragMode.origY));
+          const newPos = (isH ? dragMode.origX : dragMode.origY) + (dragMode.origLength - newLen);
+          if (isH) {
+            onUpdateLine(dragMode.id, { x_mm: round1(snap(newPos, snapStep)), length_mm: round1(snap(newLen, snapStep)) });
+          } else {
+            onUpdateLine(dragMode.id, { y_mm: round1(snap(newPos, snapStep)), length_mm: round1(snap(newLen, snapStep)) });
+          }
+        }
+        return;
+      }
+
       const f = fields.find((x) => x.field_type === dragMode.type);
       if (!f) return;
 
       if (dragMode.kind === "move") {
         const nx = clamp(dragMode.origX + dxMm, 0, Math.max(0, inner.w - f.width_mm));
         const ny = clamp(dragMode.origY + dyMm, 0, Math.max(0, inner.h - f.height_mm));
-        const snapStep = e.shiftKey ? 0.5 : 1;
         onUpdateField(dragMode.type, {
           x_mm: round1(snap(nx, snapStep)),
           y_mm: round1(snap(ny, snapStep)),
         });
-      } else {
-        let { origX, origY, origW, origH } = dragMode;
+      } else if (dragMode.kind === "resize") {
+        const { origX, origY, origW, origH } = dragMode;
         let nx = origX, ny = origY, nw = origW, nh = origH;
         const minSize = 5;
         if (dragMode.handle.includes("e")) nw = clamp(origW + dxMm, minSize, inner.w - origX);
@@ -179,7 +215,6 @@ export function LabelCanvas(props: Props) {
           ny = origY + (origH - newH);
           nh = newH;
         }
-        const snapStep = e.shiftKey ? 0.5 : 1;
         onUpdateField(dragMode.type, {
           x_mm: round1(snap(nx, snapStep)),
           y_mm: round1(snap(ny, snapStep)),
@@ -195,7 +230,7 @@ export function LabelCanvas(props: Props) {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
     };
-  }, [dragMode, fields, inner.w, inner.h, onUpdateField, pxPerMm]);
+  }, [dragMode, fields, lines, inner.w, inner.h, onUpdateField, onUpdateLine, pxPerMm]);
 
   // === keyboard nudge ===
   useEffect(() => {
