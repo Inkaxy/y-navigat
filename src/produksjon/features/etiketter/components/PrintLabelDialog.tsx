@@ -79,7 +79,7 @@ export function PrintLabelDialog({
   const { data: customerInfoMap } = useOrderLineCustomerInfo(orderLineIds);
 
   /** Bygg en LabelPdfData per ordrelinje, padder/trimmer til ønsket `quantity`. */
-  function buildItems(): LabelPdfData[] {
+  function buildItems(): CombinedLabelItem[] {
     if (!profile || !row) return [];
     const base = { profile, row, labelNumber };
     const isOrigPlusCopy = row.label_print_model === "orig_plus_copy";
