@@ -239,7 +239,7 @@ export function MerknadDialog({
                   case "sukkerbilde":
                     return (
                       <div key={ft} className="contents">
-                        <Label className="self-center">Sukkerbilde</Label>
+                        <Label className="self-center">Bilde</Label>
                         <RadioGroup
                           className="flex gap-4"
                           value={form.sukkerbilde === true ? "ja" : form.sukkerbilde === false ? "nei" : "null"}
