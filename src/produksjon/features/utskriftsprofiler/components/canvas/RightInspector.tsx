@@ -148,12 +148,11 @@ export function RightInspector({ selected, innerW, innerH, onChange, onRemove }:
             >
               {selected.bold ? "Bold" : "Medium"}
             </button>
-            <UnitInput
+            <FontSizeStepper
               value={selected.font_size}
-              onChange={(v) =>
-                onChange({ font_size: Math.max(6, Math.min(48, Math.round(v))) })
-              }
+              onChange={(v) => onChange({ font_size: v })}
             />
+
           </Row>
           <Row label="Justering">
             <div className="col-span-2 grid grid-cols-4 rounded-[10px] border border-border bg-background p-0.5">
