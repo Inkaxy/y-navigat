@@ -159,7 +159,11 @@ export function PrintLabelDialog({
     setErrorMessage(null);
     let assignedNumber: string;
     try {
-      assignedNumber = await nextNumber.mutateAsync(deptId);
+      assignedNumber = await nextNumber.mutateAsync({
+        deptId,
+        productId: row.product_id,
+        orderLineId: row.order_line_ids[0] ?? null,
+      });
       setLabelNumber(assignedNumber);
       toast.success(`Etikett ${assignedNumber} tildelt`);
     } catch (e) {

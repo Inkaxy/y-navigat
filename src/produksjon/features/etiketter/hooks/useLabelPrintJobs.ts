@@ -68,12 +68,29 @@ export function useRecentLabelJobs(
   });
 }
 
+export interface AssignLabelNumberInput {
+  deptId: string;
+  productId: string;
+  orderLineId?: string | null;
+  /** ISO date (YYYY-MM-DD). Default = i dag (Europe/Oslo). */
+  seqDate?: string | null;
+}
+
+/**
+ * Tildeler etikett-nummer. Hvis samme vare/ordrelinje allerede er printet
+ * for samme produksjonsavdeling, gjenbrukes det eksisterende nummeret —
+ * ellers tildeles neste ledige i sekvensen for `seqDate`.
+ */
 export function useNextLabelNumber() {
   return useMutation({
-    mutationFn: async (deptId: string): Promise<string> => {
-      const { data, error } = await supabase.rpc("next_label_number", {
-        p_dept_id: deptId,
-      });
+    mutationFn: async (input: AssignLabelNumberInput): Promise<string> => {
+      const params: Record<string, unknown> = {
+        p_dept_id: input.deptId,
+        p_product_id: input.productId,
+        p_order_line_id: input.orderLineId ?? null,
+      };
+      if (input.seqDate) params.p_seq_date = input.seqDate;
+      const { data, error } = await supabase.rpc("assign_label_number", params as never);
       if (error) throw error;
       return data as string;
     },

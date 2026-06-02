@@ -8495,6 +8495,15 @@ export type Database = {
         Args: { p_app_code: string }
         Returns: Database["public"]["Enums"]["access_level"]
       }
+      assign_label_number: {
+        Args: {
+          p_dept_id: string
+          p_order_line_id: string
+          p_product_id: string
+          p_seq_date?: string
+        }
+        Returns: string
+      }
       build_cake_order_line: {
         Args: {
           p_category_id: string

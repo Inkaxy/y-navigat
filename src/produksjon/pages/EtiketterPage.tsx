@@ -186,7 +186,11 @@ export default function EtiketterPage() {
           continue;
         }
         try {
-          const labelNumber = await nextNumber.mutateAsync(deptId);
+          const labelNumber = await nextNumber.mutateAsync({
+            deptId,
+            productId: r.product_id,
+            orderLineId: r.order_line_ids[0] ?? null,
+          });
           await insertJob.mutateAsync({
             label_number: labelNumber,
             product_id: r.product_id,
