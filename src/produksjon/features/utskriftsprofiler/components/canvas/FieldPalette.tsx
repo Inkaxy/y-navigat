@@ -22,6 +22,7 @@ import {
   Barcode,
   Clock,
   ListOrdered,
+  Calendar,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -73,6 +74,7 @@ const FIELD_ICONS: Record<FieldType, React.ComponentType<{ className?: string }>
   firmanavn: Building2,
   firmamerknad: Info,
   telefon: User,
+  leveringsdato: Calendar,
 };
 
 const NEW_FIELDS: ReadonlySet<FieldType> = new Set(["etikett_nr"]);

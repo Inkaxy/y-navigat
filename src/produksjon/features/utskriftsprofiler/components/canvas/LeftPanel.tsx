@@ -22,6 +22,7 @@ import {
   Barcode,
   Clock,
   ListOrdered,
+  Calendar,
   Eye,
   EyeOff,
   Trash2,
@@ -77,6 +78,7 @@ const FIELD_ICONS: Record<FieldType, React.ComponentType<{ className?: string }>
   firmanavn: Building2,
   firmamerknad: Info,
   telefon: User,
+  leveringsdato: Calendar,
 };
 
 export function LeftPanel(props: Props) {
