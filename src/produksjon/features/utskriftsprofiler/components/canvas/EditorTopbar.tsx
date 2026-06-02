@@ -21,6 +21,8 @@ interface Props {
   onChangeMode: (m: "design" | "preview") => void;
   onUndo?: () => void;
   onRedo?: () => void;
+  onAddHorizontalLine?: () => void;
+  onAddVerticalLine?: () => void;
   onOpenSettings: () => void;
   onCancel: () => void;
 }
