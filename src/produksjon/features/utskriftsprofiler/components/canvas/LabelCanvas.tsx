@@ -436,6 +436,96 @@ export function LabelCanvas(props: Props) {
                 );
               })}
 
+              {/* Decorative lines */}
+              {lines.map((ln) => {
+                const isH = ln.orientation === "horizontal";
+                const isSelected = !readOnly && ln.id === selectedLineId;
+                const hitW = isH ? ln.length_mm * pxPerMm : Math.max(8, ln.thickness_mm * pxPerMm + 6);
+                const hitH = isH ? Math.max(8, ln.thickness_mm * pxPerMm + 6) : ln.length_mm * pxPerMm;
+                const offsetX = isH ? 0 : -hitW / 2;
+                const offsetY = isH ? -hitH / 2 : 0;
+                return (
+                  <div
+                    key={ln.id}
+                    className={cn(
+                      "absolute z-30 flex items-center justify-center",
+                      readOnly ? "pointer-events-none" : "cursor-move",
+                    )}
+                    style={{
+                      left: ln.x_mm * pxPerMm + offsetX,
+                      top: ln.y_mm * pxPerMm + offsetY,
+                      width: hitW,
+                      height: hitH,
+                    }}
+                    onPointerDown={(e) => {
+                      if (readOnly) return;
+                      e.stopPropagation();
+                      onSelectLine?.(ln.id);
+                      (e.target as Element).setPointerCapture?.(e.pointerId);
+                      setDragMode({
+                        kind: "line-move",
+                        id: ln.id,
+                        startX: e.clientX,
+                        startY: e.clientY,
+                        origX: ln.x_mm,
+                        origY: ln.y_mm,
+                      });
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: isH ? "100%" : Math.max(1, ln.thickness_mm * pxPerMm),
+                        height: isH ? Math.max(1, ln.thickness_mm * pxPerMm) : "100%",
+                        background: isSelected ? "hsl(var(--primary))" : "#555",
+                        outline: isSelected ? "1px dashed hsl(var(--primary))" : undefined,
+                        outlineOffset: 3,
+                      }}
+                    />
+                    {isSelected && !readOnly && (
+                      <>
+                        <LineEndHandle
+                          position="start"
+                          orientation={ln.orientation}
+                          onPointerDown={(e) => {
+                            e.stopPropagation();
+                            (e.target as Element).setPointerCapture?.(e.pointerId);
+                            setDragMode({
+                              kind: "line-resize",
+                              id: ln.id,
+                              end: "start",
+                              startX: e.clientX,
+                              startY: e.clientY,
+                              origX: ln.x_mm,
+                              origY: ln.y_mm,
+                              origLength: ln.length_mm,
+                            });
+                          }}
+                        />
+                        <LineEndHandle
+                          position="end"
+                          orientation={ln.orientation}
+                          onPointerDown={(e) => {
+                            e.stopPropagation();
+                            (e.target as Element).setPointerCapture?.(e.pointerId);
+                            setDragMode({
+                              kind: "line-resize",
+                              id: ln.id,
+                              end: "end",
+                              startX: e.clientX,
+                              startY: e.clientY,
+                              origX: ln.x_mm,
+                              origY: ln.y_mm,
+                              origLength: ln.length_mm,
+                            });
+                          }}
+                        />
+                      </>
+                    )}
+                  </div>
+                );
+              })}
+
+
               {/* Inline toolbar anchored above selected field */}
               {!readOnly && selected && renderInlineToolbar && (
                 <div
