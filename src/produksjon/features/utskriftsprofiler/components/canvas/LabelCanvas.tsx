@@ -414,6 +414,10 @@ function CanvasFieldBox({
     content = "1000";
   } else if (field.field_type === "tur") {
     content = "Tur 1";
+  } else if (field.field_type === "hentested") {
+    content = "Teie";
+  } else if (field.field_type === "telefon") {
+    content = "+47 999 99 999";
   } else {
     content = `[${FIELD_LABELS[field.field_type]}]`;
   }
