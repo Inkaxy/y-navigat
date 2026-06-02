@@ -8,7 +8,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import { LabelCanvas } from "./canvas/LabelCanvas";
+import { LabelThumbnail } from "./canvas/LabelThumbnail";
 import { migrateLegacyFields } from "../lib/canvasUtils";
 import { getInnerArea } from "../lib/canvasUtils";
 import type { LabelPrintProfile } from "../types";
@@ -59,7 +59,7 @@ export function ProfileCard({ profile, onEdit, onArchive }: Props) {
         aria-label={`Rediger ${profile.name}`}
       >
         <div className="pointer-events-none h-full w-full">
-          <LabelCanvas
+          <LabelThumbnail
             paperWidth={Number(profile.paper_width_mm)}
             paperHeight={Number(profile.paper_height_mm)}
             marginTop={Number(profile.margin_top_mm)}
@@ -68,15 +68,8 @@ export function ProfileCard({ profile, onEdit, onArchive }: Props) {
             marginLeft={Number(profile.margin_left_mm)}
             landscape={profile.orientation === "landscape"}
             fields={fields}
-            selectedFieldType={null}
             companyName={profile.company_name}
             logoUrl={profile.logo_url}
-            includeFieldLabels={profile.include_field_labels}
-            onSelectField={() => {}}
-            onUpdateField={() => {}}
-            onAddFieldAt={() => {}}
-            readOnly
-            fixedPxPerMm={1.6}
           />
         </div>
       </button>
