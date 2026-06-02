@@ -73,6 +73,11 @@ export function LabelCanvas(props: Props) {
     renderInlineToolbar,
     readOnly = false,
     fixedPxPerMm,
+    lines = [],
+    selectedLineId = null,
+    onSelectLine,
+    onUpdateLine,
+    onRemoveLine,
   } = props;
 
   const inner = getInnerArea(
