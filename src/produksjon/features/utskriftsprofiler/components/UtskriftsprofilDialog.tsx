@@ -75,6 +75,8 @@ export function UtskriftsprofilDialog({
   const [logoHeight, setLogoHeight] = useState<number | "">(15);
   const [logoUploading, setLogoUploading] = useState(false);
   const [fields, setFields] = useState<ProfileField[]>(defaultFields());
+  const [lines, setLines] = useState<ProfileLine[]>([]);
+  const [selectedLineId, setSelectedLineId] = useState<string | null>(null);
   const [commentFt1, setCommentFt1] = useState(true);
   const [commentFt2, setCommentFt2] = useState(true);
   const [commentFt3, setCommentFt3] = useState(true);
