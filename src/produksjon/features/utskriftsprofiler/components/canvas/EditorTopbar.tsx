@@ -1,4 +1,4 @@
-import { ArrowLeft, RectangleVertical, RectangleHorizontal, Settings2, Undo2, Redo2, Eye, MousePointer2 } from "lucide-react";
+import { ArrowLeft, RectangleVertical, RectangleHorizontal, Settings2, Undo2, Redo2, Eye, MousePointer2, Minus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
