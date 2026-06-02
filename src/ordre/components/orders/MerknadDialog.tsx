@@ -124,9 +124,7 @@ export function MerknadDialog({
     };
   }, [productName, quantity, profile.company_name, profile.company_note, autoValues]);
 
-  const showFritekst1 = orderedFields.includes("kommentar") && profile.comment_includes.fritekst1;
-  const showFritekst2 = orderedFields.includes("kommentar") && profile.comment_includes.fritekst2;
-  const showFritekst3 = orderedFields.includes("kommentar") && profile.comment_includes.fritekst3;
+  const showKommentar = orderedFields.includes("kommentar");
 
   async function handleSave() {
     const parsed = merknadSchema.safeParse(form);
@@ -261,44 +259,18 @@ export function MerknadDialog({
                       </div>
                     );
                   case "kommentar":
+                    if (!showKommentar) return null;
                     return (
                       <div key={ft} className="contents">
-                        {showFritekst1 && (
-                          <>
-                            <Label htmlFor="m-ft1" className="pt-2">Fritekst 1</Label>
-                            <Textarea
-                              id="m-ft1"
-                              rows={2}
-                              value={form.fritekst_1}
-                              onChange={(e) => update("fritekst_1", e.target.value)}
-                              disabled={!canEdit}
-                            />
-                          </>
-                        )}
-                        {showFritekst2 && (
-                          <>
-                            <Label htmlFor="m-ft2" className="pt-2">Fritekst 2</Label>
-                            <Textarea
-                              id="m-ft2"
-                              rows={2}
-                              value={form.fritekst_2}
-                              onChange={(e) => update("fritekst_2", e.target.value)}
-                              disabled={!canEdit}
-                            />
-                          </>
-                        )}
-                        {showFritekst3 && (
-                          <>
-                            <Label htmlFor="m-ft3" className="pt-2">Fritekst 3</Label>
-                            <Textarea
-                              id="m-ft3"
-                              rows={2}
-                              value={form.fritekst_3}
-                              onChange={(e) => update("fritekst_3", e.target.value)}
-                              disabled={!canEdit}
-                            />
-                          </>
-                        )}
+                        <Label htmlFor="m-kommentar" className="pt-2 self-start">Kommentar</Label>
+                        <Textarea
+                          id="m-kommentar"
+                          rows={3}
+                          value={form.fritekst_1}
+                          onChange={(e) => update("fritekst_1", e.target.value)}
+                          disabled={!canEdit}
+                          placeholder="Kommentar til etiketten"
+                        />
                       </div>
                     );
                   default:
