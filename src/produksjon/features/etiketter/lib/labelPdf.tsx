@@ -86,12 +86,7 @@ function valueFor(
       return { text: merknad?.pynt || "" };
     case "sukkerbilde":
       return {
-        text:
-          merknad?.sukkerbilde === true
-            ? "Ja"
-            : merknad?.sukkerbilde === false
-              ? "Nei"
-              : "",
+        text: merknad?.sukkerbilde === true ? "+ BILDE" : "",
       };
     case "kommentar": {
       const inc = profile.comment_includes;
