@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { FIELD_LABELS, type ProfileField, type ProfileLine } from "../../types";
+import { fitFontSizePt } from "../../lib/fitText";
 
 interface Props {
   paperWidth: number;
