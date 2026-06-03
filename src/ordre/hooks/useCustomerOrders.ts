@@ -19,8 +19,10 @@ export type CustomerOrderRow = {
   send_sms_confirm: boolean;
   send_email_confirm: boolean;
   delivery_tour_id: string | null;
+  is_paid: boolean;
   line_count: number;
 };
+
 
 export function useCustomerOrders(params: {
   customerId: string | null;
@@ -39,7 +41,8 @@ export function useCustomerOrders(params: {
           `id, order_number, delivery_date, delivery_time, distribution,
            final_customer_name, final_customer_email, final_customer_phone,
            picked_up_at, status, source, send_sms_confirm, send_email_confirm,
-           delivery_tour_id, order_lines(count)`,
+           delivery_tour_id, is_paid, order_lines(count)`,
+
         )
         .eq("customer_id", customerId!)
         .eq("is_customer_order", true)
@@ -70,7 +73,9 @@ export function useCustomerOrders(params: {
           send_sms_confirm: !!row.send_sms_confirm,
           send_email_confirm: !!row.send_email_confirm,
           delivery_tour_id: row.delivery_tour_id as string | null,
+          is_paid: !!(row as unknown as { is_paid?: boolean }).is_paid,
           line_count: Array.isArray(lc) && lc[0] ? Number(lc[0].count) : 0,
+
         } satisfies CustomerOrderRow;
       });
     },
@@ -106,7 +111,7 @@ export function useCustomerOrderDetail(orderId: string | null) {
           `id, order_number, delivery_date, delivery_time, distribution,
            final_customer_name, final_customer_email, final_customer_phone,
            picked_up_at, status, source, send_sms_confirm, send_email_confirm,
-           delivery_tour_id`,
+           delivery_tour_id, is_paid`,
         )
         .eq("id", orderId!)
         .maybeSingle();
@@ -135,7 +140,9 @@ export function useCustomerOrderDetail(orderId: string | null) {
         send_sms_confirm: !!order.send_sms_confirm,
         send_email_confirm: !!order.send_email_confirm,
         delivery_tour_id: order.delivery_tour_id as string | null,
+        is_paid: !!(order as unknown as { is_paid?: boolean }).is_paid,
         line_count: (lines ?? []).length,
+
         lines: (lines ?? []).map((l) => {
           const snap = (l.product_snapshot ?? {}) as {
             display_number?: number;
@@ -223,7 +230,9 @@ export type CustomerOrderInput = {
   source: "phone" | "email" | "in_store" | "manual";
   sendSms: boolean;
   sendEmail: boolean;
+  isPaid: boolean;
   lines: CustomerOrderLineInput[];
+
 };
 
 export function useCreateCustomerOrder() {
@@ -266,7 +275,9 @@ export function useCreateCustomerOrder() {
         final_customer_phone: input.finalCustomerPhone,
         send_sms_confirm: input.sendSms,
         send_email_confirm: input.sendEmail,
+        is_paid: input.isPaid,
         created_by: userId,
+
       };
       const { data: orderRow, error: orderErr } = await supabase
         .from("orders")
@@ -350,7 +361,9 @@ export function useUpdateCustomerOrder() {
         final_customer_phone: input.finalCustomerPhone,
         send_sms_confirm: input.sendSms,
         send_email_confirm: input.sendEmail,
+        is_paid: input.isPaid,
       };
+
       const { error: updErr } = await supabase
         .from("orders")
         .update(updatePayload as never)

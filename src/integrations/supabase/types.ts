@@ -3554,6 +3554,7 @@ export type Database = {
           invoice_recipient_customer_id: string | null
           invoice_recipient_snapshot: Json | null
           is_customer_order: boolean
+          is_paid: boolean
           is_return: boolean
           legal_entity_id: string
           order_number: string
@@ -3611,6 +3612,7 @@ export type Database = {
           invoice_recipient_customer_id?: string | null
           invoice_recipient_snapshot?: Json | null
           is_customer_order?: boolean
+          is_paid?: boolean
           is_return?: boolean
           legal_entity_id: string
           order_number: string
@@ -3668,6 +3670,7 @@ export type Database = {
           invoice_recipient_customer_id?: string | null
           invoice_recipient_snapshot?: Json | null
           is_customer_order?: boolean
+          is_paid?: boolean
           is_return?: boolean
           legal_entity_id?: string
           order_number?: string

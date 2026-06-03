@@ -16,7 +16,10 @@ export interface OrderLineCustomerInfo {
   pickupTime: string | null;
   /** Kundens telefon, prioritert: order.final_customer_phone → customer.mobile_phone → customer.primary_contact_phone. */
   phone: string | null;
+  /** Om kundeordren er betalt. */
+  isPaid: boolean;
 }
+
 
 function formatAddress(
   line1: string | null,
@@ -49,6 +52,8 @@ export function useOrderLineCustomerInfo(orderLineIds: string[] | undefined) {
         deliveryDate: null,
         pickupTime: null,
         phone: null,
+        isPaid: false,
+
       };
       const out: Record<string, OrderLineCustomerInfo> = {};
       for (const id of ids) out[id] = { ...empty };
@@ -67,7 +72,7 @@ export function useOrderLineCustomerInfo(orderLineIds: string[] | undefined) {
       const { data: orders, error: oErr } = await supabase
         .from("orders")
         .select(
-          "id, customer_id, final_customer_name, final_customer_phone, delivery_date, delivery_time, delivery_address_line1, delivery_postal_code, delivery_city, use_customer_default_address",
+          "id, customer_id, final_customer_name, final_customer_phone, delivery_date, delivery_time, delivery_address_line1, delivery_postal_code, delivery_city, use_customer_default_address, is_paid",
         )
         .in("id", orderIds);
       if (oErr) throw oErr;
@@ -184,7 +189,9 @@ export function useOrderLineCustomerInfo(orderLineIds: string[] | undefined) {
           delivery_postal_code: string | null;
           delivery_city: string | null;
           use_customer_default_address: boolean | null;
+          is_paid: boolean | null;
         };
+
         const cust = row.customer_id ? customerMap[row.customer_id] : null;
         const overridePickup = cust?.profile_overrides.pickup_location_id;
         const pickupId =
@@ -234,6 +241,8 @@ export function useOrderLineCustomerInfo(orderLineIds: string[] | undefined) {
           deliveryDate,
           pickupTime,
           phone,
+          isPaid: !!row.is_paid,
+
         };
       }
 

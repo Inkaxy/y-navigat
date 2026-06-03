@@ -42,7 +42,10 @@ export interface LabelPdfData {
   deliveryDate?: string | null;
   /** Formatert hentetidspunkt (f.eks. "Hentes kl 10:00"). */
   pickupTime?: string | null;
+  /** Om kundeordren er betalt. */
+  isPaid?: boolean | null;
 }
+
 
 function joinNonEmpty(parts: Array<string | undefined | null>, sep = " · "): string {
   return parts.filter((s): s is string => !!s && s.trim().length > 0).join(sep);
@@ -53,7 +56,7 @@ function valueFor(
   type: FieldType,
   data: LabelPdfData,
 ): { text?: string; image?: string | null } {
-  const { profile, row, labelNumber, quantity, merknad, tourLabel, pickupLabel, customerName, deliveryAddress, phone, deliveryDate, pickupTime } = data;
+  const { profile, row, labelNumber, quantity, merknad, tourLabel, pickupLabel, customerName, deliveryAddress, phone, deliveryDate, pickupTime, isPaid } = data;
   switch (type) {
     case "logo":
       return { image: profile.logo_url };
@@ -83,6 +86,9 @@ function valueFor(
       return { text: deliveryDate || "" };
     case "hentetidspunkt":
       return { text: pickupTime || "" };
+    case "er_betalt":
+      return { text: isPaid ? "Ja" : "Nei" };
+
     case "sist_endret":
       return { text: new Date().toLocaleString("nb-NO") };
     case "bestilt_av":

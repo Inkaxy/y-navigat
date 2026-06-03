@@ -124,6 +124,8 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
   const [source, setSource] = useState<"phone" | "email" | "in_store" | "manual">("phone");
   const [sendSms, setSendSms] = useState(false);
   const [sendEmail, setSendEmail] = useState(false);
+  const [isPaid, setIsPaid] = useState(false);
+
   const [lines, setLines] = useState<LineDraft[]>([newLine()]);
   const [submitting, setSubmitting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -159,6 +161,8 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
       );
       setSendSms(existing.send_sms_confirm);
       setSendEmail(existing.send_email_confirm);
+      setIsPaid(existing.is_paid);
+
       setLines(
         existing.lines.length > 0
           ? existing.lines.map((l) => ({
@@ -201,6 +205,8 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
       setSource("phone");
       setSendSms(false);
       setSendEmail(false);
+      setIsPaid(false);
+
       setLines([newLine()]);
       setDirty(false);
     }
@@ -212,7 +218,7 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
     setDirty(true);
     // intentional shallow listing of dependencies for "dirty" detection
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [name, email, phone, deliveryDate, hour, minute, tourId, distribution, source, sendSms, sendEmail, lines]);
+  }, [name, email, phone, deliveryDate, hour, minute, tourId, distribution, source, sendSms, sendEmail, isPaid, lines]);
 
   const { data: tours } = useDeliveryTours({ activeOnly: true });
   const validTours = useMemo(() => {
@@ -393,8 +399,10 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
       source,
       sendSms,
       sendEmail,
+      isPaid,
       lines: inputLines,
     };
+
   }
 
   async function handleSave() {
@@ -805,6 +813,29 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
                   </p>
                 </div>
               </fieldset>
+
+              {/* Betaling */}
+              <fieldset className="space-y-3">
+                <legend className="text-sm font-semibold">Betaling</legend>
+                <RadioGroup
+                  value={isPaid ? "yes" : "no"}
+                  onValueChange={(v) => setIsPaid(v === "yes")}
+                  className="flex gap-4"
+                >
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <RadioGroupItem value="no" id="is-paid-no" />
+                    Nei
+                  </label>
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <RadioGroupItem value="yes" id="is-paid-yes" />
+                    Ja
+                  </label>
+                </RadioGroup>
+                <p className="text-xs text-muted-foreground">
+                  Vises på etiketter når feltet «Er betalt» er aktivert på utskriftsprofilen.
+                </p>
+              </fieldset>
+
             </div>
           )}
 

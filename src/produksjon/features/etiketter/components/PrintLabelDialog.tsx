@@ -89,7 +89,7 @@ export function PrintLabelDialog({
       base_items = [{
         ...base, quantity, copies: quantity, merknad: null, tourLabel: null,
         pickupLabel: null, customerName: null, deliveryAddress: null,
-        phone: null, deliveryDate: null, pickupTime: null,
+        phone: null, deliveryDate: null, pickupTime: null, isPaid: false,
       }];
     } else {
       const perLine: LabelPdfData[] = orderLineIds.map((id) => ({
@@ -104,6 +104,7 @@ export function PrintLabelDialog({
         phone: customerInfoMap?.[id]?.phone ?? null,
         deliveryDate: customerInfoMap?.[id]?.deliveryDate ?? null,
         pickupTime: customerInfoMap?.[id]?.pickupTime ?? null,
+        isPaid: customerInfoMap?.[id]?.isPaid ?? false,
       }));
       if (quantity <= perLine.length) {
         base_items = perLine.slice(0, quantity);
@@ -123,10 +124,12 @@ export function PrintLabelDialog({
             phone: perLine[0]?.phone ?? null,
             deliveryDate: perLine[0]?.deliveryDate ?? null,
             pickupTime: perLine[0]?.pickupTime ?? null,
+            isPaid: perLine[0]?.isPaid ?? false,
           },
         ];
       }
     }
+
 
     if (!isOrigPlusCopy) return base_items;
 

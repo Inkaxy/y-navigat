@@ -23,6 +23,8 @@ import {
   Clock,
   ListOrdered,
   Calendar,
+  CheckCircle2,
+
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -76,6 +78,8 @@ const FIELD_ICONS: Record<FieldType, React.ComponentType<{ className?: string }>
   telefon: User,
   leveringsdato: Calendar,
   hentetidspunkt: Clock,
+  er_betalt: CheckCircle2,
+
 };
 
 const NEW_FIELDS: ReadonlySet<FieldType> = new Set(["etikett_nr"]);
