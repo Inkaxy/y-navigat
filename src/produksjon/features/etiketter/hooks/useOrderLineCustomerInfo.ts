@@ -241,6 +241,8 @@ export function useOrderLineCustomerInfo(orderLineIds: string[] | undefined) {
           deliveryDate,
           pickupTime,
           phone,
+          isPaid: !!row.is_paid,
+
         };
       }
 
