@@ -8770,6 +8770,18 @@ export type Database = {
           special_price_id: string
         }[]
       }
+      get_email_m365_status: {
+        Args: never
+        Returns: {
+          account_email: string
+          connected: boolean
+          connected_at: string
+          expires_at: string
+          last_refresh_at: string
+          scope: string
+          tenant_id: string
+        }[]
+      }
       get_label_products_for_date: {
         Args: {
           p_date: string

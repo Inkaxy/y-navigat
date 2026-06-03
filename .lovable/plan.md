@@ -1,58 +1,61 @@
-# To endringer
+# Samle integrasjoner under /admin/integrasjoner
 
-## 1. Bruk `display_name` (visningsnavn) overalt der selskap vises
+I dag viser siden bare Tripletex + tre "Kommer"-placeholders. Microsoft 365-e-post er allerede satt opp men gjemt i Ordre-app/innstillinger, og AI-konfig/forbruk ligger i Råvarer-app/innstillinger. Vi løfter disse opp på integrasjonssiden så plattform-admin har én oversikt.
 
-I dag vises `legal_name` ("Nøtterø Bakeri & Konditori AS") og `short_code` ("NK") i topbar, dropdown, command palette og selskapsliste. Visningsnavnet ("NB") fra Rediger selskap-dialogen lagres, men brukes ingen steder.
+## Endring 1 — E-post (Microsoft 365)
 
-**Endring:** Innfør en helper `entityLabel(e) = e.display_name?.trim() || e.legal_name` og bruk den som primær visning:
+Microsoft-tokens ligger i `microsoft_oauth_tokens` (service_role-only), så vi kan ikke lese direkte fra browser. Vi lager en `SECURITY DEFINER`-RPC `get_email_m365_status()` som returnerer kun ufarlig metadata for plattform-admin:
 
-- `src/components/layout/CompanySelector.tsx` — knappetekst, dropdown-rader, initialer
-- `src/components/layout/CompanyBlock.tsx` — brand-label
-- `src/components/layout/CommandPalette.tsx` — "Bytt til …"
-- `src/pages/admin/Selskaper.tsx` — ny kolonne "Visningsnavn", behold "Juridisk navn"
-- Alle tre `select(...)` legger til `display_name`
-
-`legal_name` beholdes som sekundær (liten grå tekst under) der det er plass, så formell tittel ikke forsvinner.
-
-## 2. Aktivere/deaktivere apper per selskap
-
-I dag styres app-tilgang av stilling (`position_app_access`). Vi legger på et selskaps-nivå filter: en app kan markeres som "ikke i bruk" for et selskap, og forsvinner da fra meny / launcher / command palette for ALLE brukere som er aktive i det selskapet.
-
-### Database (migrasjon)
-
-Ny tabell `legal_entity_app_access`:
 ```
-legal_entity_id uuid → legal_entities.id  (cascade)
-app_id          uuid → apps.id            (cascade)
-enabled         bool default true
-created_at, updated_at
-PRIMARY KEY (legal_entity_id, app_id)
+{ connected boolean, email_address text, display_name text,
+  connected_at timestamptz, scope text, expires_at timestamptz }
 ```
-- GRANTs: select for authenticated, all for service_role
-- RLS: les for innloggede med stilling i selskapet (via `current_user_entity_ids`); skriv kun for platform owners
-- Konvensjon: rad **mangler** = enabled. Rad med `enabled=false` = skjult. Slik trenger vi ikke seede noe.
 
-Oppdater `public.get_my_accessible_apps()` til å filtrere ut apper hvor det finnes en `enabled=false`-rad for det aktivt valgte selskapet. Siden RPC-en ikke kjenner aktivt selskap, eksponerer vi i stedet en ny RPC `get_apps_for_entity(entity_id uuid)` som returnerer apper brukeren har tilgang til OG som er aktivert for selskapet. `useAccessibleApps` kaller den nye RPC-en med `legalEntityId` fra `SelectionProvider` og inkluderer id-en i query-key så menyen oppdateres ved bytte av selskap.
+Nytt kort på `Integrasjoner.tsx`:
+- Tittel "E-post (Microsoft 365)", subtittel "Felles avsender-konto for utgående og innkommende e-post."
+- Status-badge: "Tilkoblet" / "Ikke konfigurert".
+- Kobler til detalj-side `/admin/integrasjoner/email-m365`.
 
-### UI
+Ny detalj-side `src/pages/admin/EmailM365Integrasjon.tsx`:
+- Tilkoblet konto (email, navn, tilkoblet-dato, scope).
+- Knapp "Administrer i Ordre-appen" → `/ordre/innstillinger` (hvor selve OAuth-flow bor).
+- Liten 7/30-dagers oppsummering fra `email_send_log` (sendt / feilet / suppressed) deduplisert på `message_id` — link til ekstern liste hvis ønskelig.
 
-I `Rediger selskap`-dialogen (`Selskaper.tsx`) — ny seksjon **APPER**:
-- Liste over alle aktive apper, hver med en `Switch` (på/av)
-- Lagring: upsert i `legal_entity_app_access` ved toggle; toast ved suksess/feil
-- Invalider `["accessible-apps", entityId]` etterpå
+## Endring 2 — AI-tjenester
 
-### Tekniske detaljer
+Nytt kort på `Integrasjoner.tsx`:
+- Tittel "AI-tjenester", subtittel "Provider, modell og forbruk for AI-funksjoner."
+- Badge med antall aktive purpose-konfig + "$X siste 30 dager".
+- Kobler til `/admin/integrasjoner/ai`.
 
-- `useAccessibleApps`: `queryKey: ["accessible-apps", legalEntityId]`, `enabled: !!legalEntityId`, kaller `get_apps_for_entity(legalEntityId)`.
-- Topbar/launcher/MobileMenu bruker allerede hooken — endring er transparent.
-- Bytte av selskap i `CompanySelector` trigger ny query → menyen reagerer umiddelbart.
-- Bakoverkompat: behold `get_my_accessible_apps` i en periode i tilfelle andre kallesteder finnes; ny RPC supplerer.
+Ny detalj-side `src/pages/admin/AiIntegrasjon.tsx`:
+- Seksjon "Aktive konfigurasjoner": rad per `purpose` med provider/modell/temperatur/max_tokens og hvilke som er aktive. Knapp "Rediger" → går til Råvarer-innstillinger der full editor bor (gjenbruker eksisterende `AiServicesSettings` uten å duplisere).
+- Seksjon "Forbruk siste 30 dager" fra `ai_usage_log`:
+  - Stat-kort: totale kall, suksessrate, input-tokens, output-tokens, total kost USD.
+  - Tabell gruppert pr `purpose` × `provider` × `model`: kall, suksess, tokens inn/ut, kost.
+  - Tidsperiode-toggle: 24t / 7d / 30d.
+- Også samlestats fra `ai_call_log` (ticket-AI) hvis det viser noe — provider/model breakdown.
 
-### Filer som endres
-- ny migrasjon: tabell, GRANTs, RLS-policies, `get_apps_for_entity` RPC
-- `src/hooks/useAccessibleApps.ts`
-- `src/pages/admin/Selskaper.tsx` (Apper-seksjon + Visningsnavn-kolonne)
-- `src/components/layout/CompanySelector.tsx`
-- `src/components/layout/CompanyBlock.tsx`
-- `src/components/layout/CommandPalette.tsx`
-- liten `src/lib/entityLabel.ts` helper
+## Endring 3 — Rydding i integrasjons-oversikten
+
+- Fjern "E-post (SMTP/IMAP)"-placeholder (erstattet av M365-kortet).
+- Behold Tedebe og Fiken som "Kommer".
+- Sorter kortene: faste øverst (Tripletex, M365, AI), så generiske, så placeholders.
+
+## Database
+
+En ny migrasjon med kun ny RPC `get_email_m365_status()` (ingen tabellendringer). Funksjonen kjører som SECURITY DEFINER, sjekker `is_platform_owner(auth.uid())` og returnerer kun metadata, aldri tokens.
+
+## Filer
+
+- ny migrasjon: `get_email_m365_status()`
+- `src/pages/admin/Integrasjoner.tsx` — tre nye kort, fjern e-post-placeholder, ny status-fetcher
+- `src/pages/admin/EmailM365Integrasjon.tsx` (ny)
+- `src/pages/admin/AiIntegrasjon.tsx` (ny)
+- `src/App.tsx` — to nye ruter `/admin/integrasjoner/email-m365` og `/admin/integrasjoner/ai`
+
+## Ute av scope (gjøres senere ved behov)
+
+- Flytte selve M365 OAuth-flowen fra Ordre-app til admin (krever endring av redirect-URI).
+- Flytte AI-config-editoren fra Råvarer til admin (krever refaktor av `AiServicesSettings`).
+- Per-selskap AI-config (i dag er purpose globalt).
