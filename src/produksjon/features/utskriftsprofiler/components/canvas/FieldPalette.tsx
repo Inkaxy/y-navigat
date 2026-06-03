@@ -78,7 +78,7 @@ const FIELD_ICONS: Record<FieldType, React.ComponentType<{ className?: string }>
   telefon: User,
   leveringsdato: Calendar,
   hentetidspunkt: Clock,
-  er_betalt: Check,
+  er_betalt: CheckCircle2,
 
 };
 
