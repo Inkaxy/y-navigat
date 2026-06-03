@@ -196,7 +196,10 @@ const App = () => (
               <Route path="/admin/apper" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><Apper /></AppAccessGuard></Shell>} />
               <Route path="/admin/integrasjoner" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><Integrasjoner /></AppAccessGuard></Shell>} />
               <Route path="/admin/integrasjoner/tripletex" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><TripletexIntegrasjon /></AppAccessGuard></Shell>} />
+              <Route path="/admin/integrasjoner/email-m365" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><EmailM365Integrasjon /></AppAccessGuard></Shell>} />
+              <Route path="/admin/integrasjoner/ai" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><AiIntegrasjon /></AppAccessGuard></Shell>} />
               <Route path="/admin/integrasjoner/:integrationType" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><IntegrasjonDetalj /></AppAccessGuard></Shell>} />
+
               <Route path="/admin/helsesenter" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><Helsesenter /></AppAccessGuard></Shell>} />
               <Route path="/admin/audit" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><Audit /></AppAccessGuard></Shell>} />
               {/* Varer embed routes — frosset kontrakt, INGEN AppShell */}
