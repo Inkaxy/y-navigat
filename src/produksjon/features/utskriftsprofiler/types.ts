@@ -25,7 +25,9 @@ export const FIELD_TYPES = [
   "telefon",
   "leveringsdato",
   "hentetidspunkt",
+  "er_betalt",
 ] as const;
+
 
 export type FieldType = (typeof FIELD_TYPES)[number];
 
