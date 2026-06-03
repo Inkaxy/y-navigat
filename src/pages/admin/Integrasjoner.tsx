@@ -138,16 +138,75 @@ export default function Integrasjoner() {
         </Card>
       </Link>
 
+      {/* M365 + AI plattform-kort */}
+      <Link to="/admin/integrasjoner/email-m365" className="block">
+        <Card className="transition hover:border-app hover:shadow-sm">
+          <CardContent className="flex flex-wrap items-center justify-between gap-4 p-5">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-app/10 text-app">
+                <Mail className="h-5 w-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-semibold">E-post (Microsoft 365)</h3>
+                  {m365?.connected ? (
+                    <Badge variant="default" className="gap-1">
+                      <CheckCircle2 className="h-3 w-3" /> Tilkoblet
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline">Ikke konfigurert</Badge>
+                  )}
+                </div>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Felles avsender-konto for utgående og innkommende e-post.
+                  {m365?.connected && m365.account_email && <> Konto: <strong>{m365.account_email}</strong>.</>}
+                </p>
+              </div>
+            </div>
+            <ArrowRight className="h-4 w-4 text-muted-foreground" />
+          </CardContent>
+        </Card>
+      </Link>
+
+      <Link to="/admin/integrasjoner/ai" className="block">
+        <Card className="transition hover:border-app hover:shadow-sm">
+          <CardContent className="flex flex-wrap items-center justify-between gap-4 p-5">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-app/10 text-app">
+                <Sparkles className="h-5 w-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-semibold">AI-tjenester</h3>
+                  {aiConfigs.length > 0 ? (
+                    <Badge variant="default" className="gap-1">
+                      <CheckCircle2 className="h-3 w-3" /> {aiConfigs.length} aktive
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline">Ingen konfig</Badge>
+                  )}
+                </div>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Provider, modell og forbruk for AI-funksjoner. Siste 30 dager: <strong>${Number(aiCost30d).toFixed(2)}</strong>.
+                </p>
+              </div>
+            </div>
+            <ArrowRight className="h-4 w-4 text-muted-foreground" />
+          </CardContent>
+        </Card>
+      </Link>
+
       {/* Generiske integrasjoner */}
       <div>
         <div className="mb-2 flex items-center justify-between">
           <h2 className="text-sm font-semibold">Generiske integrasjoner</h2>
           {!isLoading && integrations.length === 0 && (
             <span className="text-xs text-muted-foreground">
-              Ingen generiske integrasjoner er seedet ennå. Tedebe, Fiken og e-post seedes i egen prompt.
+              Ingen generiske integrasjoner er seedet ennå. Tedebe og Fiken seedes i egen prompt.
             </span>
           )}
         </div>
+
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {integrations.map((row: any) => (
