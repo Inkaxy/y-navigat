@@ -176,6 +176,7 @@ const App = () => (
             <Routes>
               <Route path="/login" element={<Login />} />
               <Route path="/auth/accept-invite" element={<AcceptInvite />} />
+              <Route path="/aktiver" element={<AcceptInvite />} />
               <Route path="/" element={<Index />} />
               <Route path="/hjem" element={<Navigate to="/" replace />} />
               <Route path="/mine-apper" element={<Navigate to="/" replace />} />
