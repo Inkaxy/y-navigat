@@ -89,7 +89,7 @@ export default function AiIntegrasjon() {
           </Link>
         </Button>
         <Button asChild size="sm">
-          <Link to="/ravarer/innstillinger/ai" className="inline-flex items-center gap-1.5">
+          <Link to="/ravarer/innstillinger/ai-tjenester" className="inline-flex items-center gap-1.5">
             <Settings2 className="h-4 w-4" /> Rediger AI-konfig
           </Link>
         </Button>
