@@ -62,8 +62,10 @@ export function CompanyBlock({ className }: { className?: string }) {
 
 
   const active = entities?.find((e) => e.id === legalEntityId) ?? entities?.[0] ?? null;
-  const label = active ? brandLabel(active.legal_name) : "VELG SELSKAP";
+  const rawLabel = active ? entityLabel(active) : "";
+  const label = rawLabel ? brandLabel(rawLabel) : "VELG SELSKAP";
   const year = active?.founded_year ?? null;
+
 
   return (
     <DropdownMenu>
