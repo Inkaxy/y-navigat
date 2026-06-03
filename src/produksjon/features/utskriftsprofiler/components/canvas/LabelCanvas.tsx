@@ -651,7 +651,28 @@ function CanvasFieldBox({
   onPointerDownMove,
   onPointerDownResize,
 }: CanvasFieldBoxProps) {
-  const fontPx = Math.max(6, field.font_size * pxPerMm * 0.32);
+  const autoFit = field.auto_fit ?? false;
+  const vAlign = field.vertical_alignment ?? "middle";
+
+  // For auto_fit: regn ut justert skriftstørrelse i pt basert på boksstørrelsen.
+  const baseFontPt = field.font_size;
+  const labelPrefix =
+    includeFieldLabels && (field.show_label ?? true) && field.field_type !== "logo"
+      ? `${FIELD_LABELS[field.field_type]}: `
+      : "";
+  // Vi måler kun stringen, ikke logo/img-content
+  const measureText =
+    typeof (field.field_type === "logo" ? "" : "" ) === "string" ? "" : "";
+  const effectiveFontPt = autoFit && field.field_type !== "logo"
+    ? fitFontSizePt(
+        labelPrefix + (typeof undefined === "string" ? "" : "Eksempel tekst som kan brytes"),
+        baseFontPt,
+        field.width_mm,
+        field.height_mm,
+        { bold: field.bold },
+      )
+    : baseFontPt;
+  const fontPx = Math.max(6, effectiveFontPt * pxPerMm * 0.32);
 
   let content: React.ReactNode;
   if (field.field_type === "logo" && logoUrl) {
