@@ -58,6 +58,8 @@ export const FIELD_LABELS: Record<FieldType, string> = {
   telefon: "Telefon",
   leveringsdato: "Leveringsdato",
   hentetidspunkt: "Hentetidspunkt",
+  er_betalt: "Er betalt",
+
 };
 
 export type FieldGroup = "bestilling" | "vare" | "pakkseddel" | "firma" | "system";
