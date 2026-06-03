@@ -205,6 +205,8 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
       setSource("phone");
       setSendSms(false);
       setSendEmail(false);
+      setIsPaid(false);
+
       setLines([newLine()]);
       setDirty(false);
     }
