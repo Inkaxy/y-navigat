@@ -35,8 +35,36 @@ export default function Brukere() {
   const [companyId, setCompanyId] = useState<string>("all");
   const [inviteOpen, setInviteOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  const [resendingId, setResendingId] = useState<string | null>(null);
   const qc = useQueryClient();
   const { data: isOwner = false } = useIsPlatformOwner();
+
+  const resendInvite = async (u: Row) => {
+    setResendingId(u.id);
+    const [first, ...rest] = (u.display_name ?? "").split(" ");
+    const last = rest.join(" ") || first;
+    const { data, error } = await supabase.functions.invoke("invite-user", {
+      body: {
+        email: u.email,
+        first_name: first || u.email,
+        last_name: last,
+        assignments: [],
+        resend: true,
+      },
+    });
+    setResendingId(null);
+    if (error || (data as any)?.error) {
+      toast.error("Kunne ikke sende ny kode", { description: (data as any)?.error ?? error?.message });
+      return;
+    }
+    const d = data as { email_sent?: boolean; code?: string | null };
+    if (d.email_sent) {
+      toast.success(`Ny kode sendt til ${u.email}`);
+    } else if (d.code) {
+      try { await navigator.clipboard.writeText(d.code); } catch { /* ignore */ }
+      toast.warning(`E-post feilet — kode ${d.code} kopiert til utklippstavlen`);
+    }
+  };
 
   const { data: companies = [] } = useQuery({
     queryKey: ["admin-le-options"],
