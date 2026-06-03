@@ -275,7 +275,9 @@ export function useCreateCustomerOrder() {
         final_customer_phone: input.finalCustomerPhone,
         send_sms_confirm: input.sendSms,
         send_email_confirm: input.sendEmail,
+        is_paid: input.isPaid,
         created_by: userId,
+
       };
       const { data: orderRow, error: orderErr } = await supabase
         .from("orders")
