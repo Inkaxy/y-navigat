@@ -161,6 +161,8 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
       );
       setSendSms(existing.send_sms_confirm);
       setSendEmail(existing.send_email_confirm);
+      setIsPaid(existing.is_paid);
+
       setLines(
         existing.lines.length > 0
           ? existing.lines.map((l) => ({
