@@ -112,7 +112,7 @@ import FakturaerReviewQueue from "@/fakturaer/pages/ReviewQueue";
 import FakturaerImport from "@/fakturaer/pages/ImportInvoice";
 import FakturaerRegistrerLinjer from "@/fakturaer/pages/RegistrerLinjer";
 import { InvoiceAccessGuard } from "@/ravarer/components/InvoiceAccessGuard";
-import TripletexSettings from "@/ravarer/pages/innstillinger/TripletexSettings";
+
 import AiServicesSettings from "@/ravarer/pages/innstillinger/AiServicesSettings";
 import MatchToleranserSettings from "@/ravarer/pages/innstillinger/MatchToleranser";
 import KategorierSettings from "@/ravarer/pages/innstillinger/KategorierSettings";
