@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useSelection } from "@/providers/SelectionProvider";
 
 export type AccessLevel = "admin" | "write" | "read";
 
@@ -18,10 +19,14 @@ export type AccessibleApp = {
 };
 
 export function useAccessibleApps() {
+  const { legalEntityId } = useSelection();
   return useQuery({
-    queryKey: ["accessible-apps"],
+    queryKey: ["accessible-apps", legalEntityId],
+    enabled: !!legalEntityId,
     queryFn: async (): Promise<AccessibleApp[]> => {
-      const { data, error } = await supabase.rpc("get_my_accessible_apps");
+      const { data, error } = await supabase.rpc("get_apps_for_entity", {
+        entity_id: legalEntityId!,
+      });
       if (error) throw error;
       return ((data ?? []) as unknown as AccessibleApp[]).sort(
         (a, b) => a.sort_order - b.sort_order,
