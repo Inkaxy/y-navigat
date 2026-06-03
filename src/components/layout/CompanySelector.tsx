@@ -13,6 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSelection } from "@/providers/SelectionProvider";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
+import { entityLabel } from "@/lib/entityLabel";
 
 export function CompanySelector() {
   const { user } = useAuth();
@@ -22,7 +23,6 @@ export function CompanySelector() {
     queryKey: ["my-legal-entities", user?.id],
     enabled: !!user?.id,
     queryFn: async () => {
-      // Hent kun selskaper brukeren har aktive stillinger i
       const { data: ids, error: idsErr } = await supabase.rpc("current_user_entity_ids");
       if (idsErr) throw idsErr;
       const entityIds = (ids ?? []) as unknown as string[];
@@ -30,7 +30,7 @@ export function CompanySelector() {
 
       const { data, error } = await supabase
         .from("legal_entities")
-        .select("id, short_code, legal_name, status, signature_color")
+        .select("id, short_code, legal_name, display_name, status, signature_color")
         .in("id", entityIds)
         .eq("status", "active")
         .order("legal_name", { ascending: true });
@@ -46,7 +46,8 @@ export function CompanySelector() {
   }, [entities, legalEntityId, setLegalEntityId]);
 
   const active = entities?.find((e) => e.id === legalEntityId) ?? entities?.[0] ?? null;
-  const initials = (active?.legal_name ?? "NB")
+  const activeLabel = active ? entityLabel(active) : "";
+  const initials = (activeLabel || "NB")
     .split(/\s+/)
     .map((w) => w[0])
     .filter(Boolean)
@@ -72,7 +73,7 @@ export function CompanySelector() {
           {initials || "NB"}
         </span>
         <span className="hidden max-w-[180px] truncate sm:inline">
-          {active?.legal_name ?? "Velg selskap"}
+          {activeLabel || "Velg selskap"}
         </span>
         <ChevronDown className="h-4 w-4 opacity-80" />
       </DropdownMenuTrigger>
@@ -87,8 +88,8 @@ export function CompanySelector() {
               className="flex items-center justify-between gap-2"
             >
               <span className="flex flex-col">
-                <span className="text-sm font-medium">{e.legal_name}</span>
-                <span className="text-xs text-muted-foreground">{e.short_code}</span>
+                <span className="text-sm font-medium">{entityLabel(e)}</span>
+                <span className="text-xs text-muted-foreground">{e.legal_name}</span>
               </span>
               {legalEntityId === e.id && (
                 <span className="h-2 w-2 rounded-full bg-app" aria-hidden />
