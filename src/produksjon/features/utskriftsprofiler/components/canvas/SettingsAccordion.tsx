@@ -1,5 +1,5 @@
-import { useRef } from "react";
-import { Trash2, Upload } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Minus, Plus, Trash2, Upload } from "lucide-react";
 import {
   Accordion,
   AccordionContent,
