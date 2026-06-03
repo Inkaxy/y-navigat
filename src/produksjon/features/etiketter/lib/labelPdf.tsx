@@ -86,6 +86,9 @@ function valueFor(
       return { text: deliveryDate || "" };
     case "hentetidspunkt":
       return { text: pickupTime || "" };
+    case "er_betalt":
+      return { text: isPaid ? "Ja" : "Nei" };
+
     case "sist_endret":
       return { text: new Date().toLocaleString("nb-NO") };
     case "bestilt_av":
