@@ -685,6 +685,10 @@ function CanvasFieldBox({
   } else if (field.field_type === "hentetidspunkt") {
     measureString = "Hentes kl 10:00";
     content = measureString;
+  } else if (field.field_type === "er_betalt") {
+    measureString = "Nei";
+    content = measureString;
+
   } else {
     measureString = `[${FIELD_LABELS[field.field_type]}]`;
     content = measureString;
