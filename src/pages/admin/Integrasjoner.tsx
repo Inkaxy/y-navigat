@@ -52,6 +52,42 @@ export default function Integrasjoner() {
     },
   });
 
+  const { data: m365 } = useQuery({
+    queryKey: ["admin-integrations-m365"],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).rpc("get_email_m365_status");
+      if (error) return null;
+      const row = Array.isArray(data) ? data[0] : data;
+      return row as { connected: boolean; account_email: string | null; connected_at: string | null } | null;
+    },
+  });
+
+  const { data: aiConfigs = [] } = useQuery({
+    queryKey: ["admin-integrations-ai-configs"],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("ai_provider_config")
+        .select("id, provider, model, purpose, is_active")
+        .eq("is_active", true);
+      if (error) return [];
+      return data ?? [];
+    },
+  });
+
+  const { data: aiCost30d = 0 } = useQuery({
+    queryKey: ["admin-integrations-ai-cost-30d"],
+    queryFn: async () => {
+      const since = new Date(Date.now() - 30 * 86400e3).toISOString();
+      const { data, error } = await (supabase as any)
+        .from("ai_usage_log")
+        .select("estimated_cost_usd")
+        .gte("created_at", since)
+        .limit(5000);
+      if (error) return 0;
+      return (data as any[]).reduce((s, r) => s + Number(r.estimated_cost_usd ?? 0), 0);
+    },
+  });
+
   const tConfigured = tripletex.length;
   const tErrors = tripletex.filter((c: any) => c.last_sync_status === "error").length;
   const tLast = tripletex.map((c: any) => c.last_synced_at).filter(Boolean).sort().reverse()[0];
