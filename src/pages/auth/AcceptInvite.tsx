@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,47 +10,48 @@ import { toast } from "sonner";
 
 export default function AcceptInvite() {
   const navigate = useNavigate();
-  const [ready, setReady] = useState(false);
-  const [hasSession, setHasSession] = useState(false);
+  const [params] = useSearchParams();
+  const [email, setEmail] = useState(params.get("email") ?? "");
+  const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    document.title = "Aktiver konto — NBHub";
-    // Supabase sets session from #access_token in URL automatically (detectSessionInUrl)
-    supabase.auth.getSession().then(({ data }) => {
-      setHasSession(!!data.session);
-      setReady(true);
-    });
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      setHasSession(!!session);
-    });
-    return () => sub.subscription.unsubscribe();
+    document.title = "Aktiver konto — NBhub";
   }, []);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const cleanCode = code.replace(/\s+/g, "");
+    if (!/^\d{6}$/.test(cleanCode)) { toast.error("Koden må være 6 sifre"); return; }
     if (password.length < 8) { toast.error("Passord må være minst 8 tegn"); return; }
     if (password !== confirm) { toast.error("Passordene stemmer ikke"); return; }
+
     setSubmitting(true);
-    const { error: pwErr } = await supabase.auth.updateUser({ password });
-    if (pwErr) {
+    const { data, error } = await supabase.functions.invoke("redeem-invitation", {
+      body: { email: email.trim().toLowerCase(), code: cleanCode, password },
+    });
+    if (error || (data as any)?.error) {
       setSubmitting(false);
-      toast.error("Kunne ikke sette passord", { description: pwErr.message });
+      toast.error("Kunne ikke aktivere konto", { description: (data as any)?.error ?? error?.message });
       return;
     }
-    // Mark profile active
-    const { data: u } = await supabase.auth.getUser();
-    if (u.user) {
-      await supabase.from("users").update({ status: "active", onboarded_at: new Date().toISOString() }).eq("id", u.user.id);
-    }
-    setSubmitting(false);
-    toast.success("Konto aktivert");
-    navigate("/hjem", { replace: true });
-  };
 
-  if (!ready) return null;
+    // Logg inn med det nye passordet
+    const { error: signInErr } = await supabase.auth.signInWithPassword({
+      email: email.trim().toLowerCase(),
+      password,
+    });
+    setSubmitting(false);
+    if (signInErr) {
+      toast.success("Konto aktivert", { description: "Logg inn med det nye passordet." });
+      navigate("/login", { replace: true });
+      return;
+    }
+    toast.success("Konto aktivert");
+    navigate("/", { replace: true });
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -59,29 +60,50 @@ export default function AcceptInvite() {
           <div className="flex justify-center"><Logo className="h-16 w-auto" /></div>
           <CardTitle>Aktiver konto</CardTitle>
           <CardDescription>
-            {hasSession ? "Sett et passord for å fullføre invitasjonen." : "Invitasjonslenken er ugyldig eller utløpt."}
+            Skriv inn e-postadressen din, den 6-sifrede koden fra invitasjonen, og velg et nytt passord.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {hasSession ? (
-            <form onSubmit={submit} className="space-y-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="pw">Passord</Label>
-                <Input id="pw" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoFocus />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="pw2">Bekreft passord</Label>
-                <Input id="pw2" type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
-              </div>
-              <Button type="submit" variant="brand" className="w-full" disabled={submitting}>
-                {submitting ? "Lagrer…" : "Aktiver konto"}
-              </Button>
-            </form>
-          ) : (
-            <Button variant="outline" className="w-full" onClick={() => navigate("/login")}>
-              Til innlogging
+          <form onSubmit={submit} className="space-y-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="email">E-post</Label>
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                autoComplete="email"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="code">Aktiveringskode</Label>
+              <Input
+                id="code"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                placeholder="123 456"
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                className="tracking-[0.4em] text-center text-lg font-semibold"
+                maxLength={9}
+                autoFocus
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="pw">Nytt passord</Label>
+              <Input id="pw" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="pw2">Bekreft passord</Label>
+              <Input id="pw2" type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="new-password" />
+            </div>
+            <Button type="submit" variant="brand" className="w-full" disabled={submitting}>
+              {submitting ? "Aktiverer…" : "Aktiver konto"}
             </Button>
-          )}
+            <p className="text-xs text-muted-foreground text-center">
+              Koden er gyldig i 7 dager. Mangler du den? Be administrator om å sende en ny.
+            </p>
+          </form>
         </CardContent>
       </Card>
     </div>

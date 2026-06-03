@@ -8,6 +8,7 @@ const corsHeaders = {
 };
 
 const INVITE_FROM_EMAIL = "NBOS@nottero-bakeri.no";
+const CODE_TTL_DAYS = 7;
 
 interface Assignment {
   legal_entity_id: string;
@@ -18,6 +19,8 @@ interface InvitePayload {
   first_name: string;
   last_name: string;
   assignments: Assignment[];
+  /** Hvis true: bare regenerer kode for eksisterende bruker (ikke opprett ny / ikke tilordne stillinger på nytt) */
+  resend?: boolean;
 }
 
 const json = (status: number, body: unknown) =>
@@ -25,6 +28,19 @@ const json = (status: number, body: unknown) =>
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
+
+async function sha256Hex(input: string): Promise<string> {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input));
+  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function generateOtp(): string {
+  // 6 sifre, ledende nuller tillatt
+  const buf = new Uint8Array(4);
+  crypto.getRandomValues(buf);
+  const n = (buf[0] << 24 | buf[1] << 16 | buf[2] << 8 | buf[3]) >>> 0;
+  return String(n % 1_000_000).padStart(6, "0");
+}
 
 async function getGraphAccessToken(admin: ReturnType<typeof createClient>): Promise<string> {
   const tenantId = Deno.env.get("MICROSOFT_GRAPH_TENANT_ID");
@@ -62,23 +78,27 @@ async function getGraphAccessToken(admin: ReturnType<typeof createClient>): Prom
   return accessToken;
 }
 
-function buildInviteHtml(opts: { first_name: string; display_name: string; invite_url: string }): string {
-  const safeUrl = opts.invite_url.replace(/"/g, "&quot;");
+function buildInviteHtml(opts: { first_name: string; code: string; activate_url: string; days: number }): string {
+  const safeUrl = opts.activate_url.replace(/"/g, "&quot;");
+  const spaced = opts.code.split("").join(" ");
   return `
 <!doctype html>
 <html><body style="font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; color: #1c1814; line-height: 1.5;">
   <p>Hei ${opts.first_name},</p>
   <p>Du er invitert til <strong>NBhub</strong> — Nøtterø Bakeris interne plattform.</p>
-  <p>Klikk på lenken under for å sette passord og fullføre kontoen din:</p>
+  <p>Bruk koden under på aktiveringssiden for å sette passord og fullføre kontoen din:</p>
+  <p style="font-size:28px;font-weight:700;letter-spacing:6px;background:#f5efe6;border:1px solid #e2d6c2;border-radius:10px;padding:14px 18px;display:inline-block;color:#1c1814;">
+    ${spaced}
+  </p>
   <p>
     <a href="${safeUrl}" style="display:inline-block;background:#8d5a2b;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:600;">
-      Aktiver konto
+      Åpne aktiveringssiden
     </a>
   </p>
-  <p style="font-size:12px;color:#6b6b6b;">Hvis knappen ikke fungerer, kopier denne lenken inn i nettleseren din:<br/>
+  <p style="font-size:12px;color:#6b6b6b;">Eller gå manuelt til:<br/>
     <span style="word-break:break-all;">${safeUrl}</span>
   </p>
-  <p style="font-size:12px;color:#6b6b6b;">Lenken er gyldig i en begrenset periode. Hvis du ikke forventet denne invitasjonen, kan du ignorere e-posten.</p>
+  <p style="font-size:12px;color:#6b6b6b;">Koden er gyldig i ${opts.days} dager. Hvis du ikke forventet denne invitasjonen, kan du ignorere e-posten.</p>
   <p style="font-size:12px;color:#6b6b6b;">— NBhub / Nøtterø Bakeri</p>
 </body></html>`.trim();
 }
@@ -110,18 +130,21 @@ Deno.serve(async (req) => {
     if (!ownerCheck) return json(403, { error: "Kun eiere kan invitere brukere" });
 
     const body = (await req.json()) as Partial<InvitePayload>;
-    const required = ["email", "first_name", "last_name"] as const;
-    for (const f of required) {
+    const resend = body.resend === true;
+
+    for (const f of ["email", "first_name", "last_name"] as const) {
       if (!body[f] || typeof body[f] !== "string") {
         return json(400, { error: `Mangler felt: ${f}` });
       }
     }
-    if (!Array.isArray(body.assignments) || body.assignments.length === 0) {
-      return json(400, { error: "Minst én stilling må oppgis" });
-    }
-    for (const a of body.assignments) {
-      if (!a?.legal_entity_id || !a?.position_id) {
-        return json(400, { error: "Hver stilling må ha selskap og stilling" });
+    if (!resend) {
+      if (!Array.isArray(body.assignments) || body.assignments.length === 0) {
+        return json(400, { error: "Minst én stilling må oppgis" });
+      }
+      for (const a of body.assignments!) {
+        if (!a?.legal_entity_id || !a?.position_id) {
+          return json(400, { error: "Hver stilling må ha selskap og stilling" });
+        }
       }
     }
     const email = body.email!.trim().toLowerCase();
@@ -131,88 +154,98 @@ Deno.serve(async (req) => {
 
     const display_name = `${body.first_name!.trim()} ${body.last_name!.trim()}`.trim();
     const origin = req.headers.get("origin") ?? "https://nbhub.no";
-    const redirectTo = `${origin}/auth/accept-invite`;
+    const activateUrl = `${origin}/aktiver?email=${encodeURIComponent(email)}`;
 
-    // 1) Opprett bruker i auth + generer invitasjons-lenke (sender IKKE e-post via Supabase)
+    // 1) Finn eller opprett auth-bruker (uten e-postbekreftelse — vi håndterer aktivering selv)
     let newUserId: string | null = null;
-    let inviteUrl: string | null = null;
 
-    const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
-      type: "invite",
-      email,
-      options: {
-        data: { first_name: body.first_name, last_name: body.last_name, display_name },
-        redirectTo,
-      },
-    });
+    // Sjekk om bruker finnes
+    const { data: list, error: listErr } = await admin.auth.admin.listUsers({ page: 1, perPage: 200 });
+    if (listErr) return json(500, { error: listErr.message });
+    const existing = list.users.find((u) => u.email?.toLowerCase() === email);
 
-    if (linkData?.user) {
-      newUserId = linkData.user.id;
-      inviteUrl = linkData.properties?.action_link ?? null;
-    } else if (linkErr && /already.*registered|already exists|already been registered/i.test(linkErr.message)) {
-      // Bruker finnes — generer recovery-lenke i stedet (passord-reset fungerer som re-invite)
-      const { data: list, error: listErr } = await admin.auth.admin.listUsers({ page: 1, perPage: 200 });
-      if (listErr) return json(500, { error: listErr.message });
-      const existing = list.users.find((u) => u.email?.toLowerCase() === email);
-      if (!existing) {
-        return json(400, { error: "Bruker finnes i auth, men kunne ikke finnes via listUsers" });
-      }
+    if (existing) {
       newUserId = existing.id;
-      const { data: rec, error: recErr } = await admin.auth.admin.generateLink({
-        type: "recovery",
-        email,
-        options: { redirectTo },
-      });
-      if (recErr) return json(500, { error: `Kunne ikke generere lenke: ${recErr.message}` });
-      inviteUrl = rec.properties?.action_link ?? null;
     } else {
-      return json(400, { error: linkErr?.message ?? "Kunne ikke opprette invitasjon" });
+      // Opprett uten passord; email_confirm=true så de kan logge inn etter aktivering
+      const tempPw = crypto.randomUUID() + "Aa1!";
+      const { data: created, error: createErr } = await admin.auth.admin.createUser({
+        email,
+        password: tempPw,
+        email_confirm: true,
+        user_metadata: { first_name: body.first_name, last_name: body.last_name, display_name },
+      });
+      if (createErr || !created?.user) {
+        return json(400, { error: createErr?.message ?? "Kunne ikke opprette bruker" });
+      }
+      newUserId = created.user.id;
     }
 
-    if (!inviteUrl) return json(500, { error: "Mangler invitasjons-lenke fra Supabase" });
-
-    // 2) Opprett profil-rad
-    const { error: insErr } = await admin.from("users").insert({
+    // 2) Opprett/oppdater profil-rad
+    const { error: insErr } = await admin.from("users").upsert({
       id: newUserId,
       display_name,
       first_name: body.first_name,
       last_name: body.last_name,
       email,
       status: "onboarding",
-    });
-    if (insErr && !insErr.message.includes("duplicate")) {
-      return json(500, { error: `Bruker opprettet i auth, men feilet å lagre profil: ${insErr.message}` });
+    }, { onConflict: "id" });
+    if (insErr) {
+      return json(500, { error: `Profil-feil: ${insErr.message}` });
     }
 
-    // 3) Tilordne stillinger
-    const today = new Date().toISOString().slice(0, 10);
-    const rows = body.assignments!.map((a, idx) => ({
+    // 3) Tilordne stillinger (hopp over ved resend)
+    if (!resend) {
+      const today = new Date().toISOString().slice(0, 10);
+      const rows = body.assignments!.map((a, idx) => ({
+        user_id: newUserId,
+        position_id: a.position_id,
+        legal_entity_id: a.legal_entity_id,
+        is_primary: idx === 0,
+        valid_from: today,
+        assigned_by: callerId,
+        outlet_scope: "all",
+        outlet_ids: [],
+      }));
+      const { error: posErr } = await admin.from("user_positions").insert(rows);
+      if (posErr && !posErr.message.includes("duplicate")) {
+        return json(500, { error: `Stillinger kunne ikke tilordnes: ${posErr.message}` });
+      }
+    }
+
+    // 4) Generer OTP, lagre hash, ugyldiggjør gamle aktive koder
+    const code = generateOtp();
+    const codeHash = await sha256Hex(`${newUserId}:${code}`);
+    const expiresAt = new Date(Date.now() + CODE_TTL_DAYS * 24 * 60 * 60 * 1000).toISOString();
+
+    // Ugyldiggjør ubrukte koder for samme bruker
+    await admin.from("user_invitations")
+      .update({ consumed_at: new Date().toISOString() })
+      .eq("user_id", newUserId)
+      .is("consumed_at", null);
+
+    const { error: invErr } = await admin.from("user_invitations").insert({
       user_id: newUserId,
-      position_id: a.position_id,
-      legal_entity_id: a.legal_entity_id,
-      is_primary: idx === 0,
-      valid_from: today,
-      assigned_by: callerId,
-      outlet_scope: "all",
-      outlet_ids: [],
-    }));
-    const { error: posErr } = await admin.from("user_positions").insert(rows);
-    if (posErr && !posErr.message.includes("duplicate")) {
-      return json(500, { error: `Stillinger kunne ikke tilordnes: ${posErr.message}` });
-    }
+      email,
+      code_hash: codeHash,
+      expires_at: expiresAt,
+      created_by: callerId,
+    });
+    if (invErr) return json(500, { error: `Kunne ikke lagre invitasjonskode: ${invErr.message}` });
 
-    // 4) Send invitasjons-e-post via Microsoft Graph (NBOS@nottero-bakeri.no)
+    // 5) Send e-post via Microsoft Graph
     let emailSent = false;
     let emailError: string | null = null;
     try {
       const accessToken = await getGraphAccessToken(admin);
       const html = buildInviteHtml({
         first_name: body.first_name!.trim(),
-        display_name,
-        invite_url: inviteUrl,
+        code,
+        activate_url: activateUrl,
+        days: CODE_TTL_DAYS,
       });
       const message = {
-        subject: "Velkommen til NBhub – aktiver kontoen din",
+        subject: "Aktiveringskode til NBhub",
         body: { contentType: "HTML", content: html },
         toRecipients: [{ emailAddress: { address: email } }],
       };
@@ -244,8 +277,10 @@ Deno.serve(async (req) => {
       email_sent: emailSent,
       email_error: emailError,
       sent_from: emailSent ? INVITE_FROM_EMAIL : null,
-      // Returner lenken slik at admin kan kopiere/dele manuelt om e-post feiler
-      invite_url: emailSent ? null : inviteUrl,
+      // Returner koden bare hvis e-post feilet, så admin kan dele manuelt
+      code: emailSent ? null : code,
+      activate_url: activateUrl,
+      expires_at: expiresAt,
     });
   } catch (e) {
     console.error("invite-user", e);

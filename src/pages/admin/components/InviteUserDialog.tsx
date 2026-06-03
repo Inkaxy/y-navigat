@@ -110,19 +110,27 @@ export function InviteUserDialog({ open, onOpenChange, onInvited }: Props) {
       });
       return;
     }
-    const d = data as { email_sent?: boolean; email_error?: string | null; sent_from?: string | null; invite_url?: string | null };
+    const d = data as {
+      email_sent?: boolean;
+      email_error?: string | null;
+      sent_from?: string | null;
+      code?: string | null;
+      activate_url?: string | null;
+      expires_at?: string | null;
+    };
     if (d.email_sent) {
       toast.success(`Invitasjon sendt til ${email}`, {
-        description: d.sent_from ? `Fra ${d.sent_from}` : undefined,
+        description: `Koden er gyldig i 7 dager. ${d.sent_from ? `Sendt fra ${d.sent_from}.` : ""}`,
       });
     } else {
       toast.warning("Bruker opprettet, men e-post ble ikke sendt", {
-        description: d.email_error ?? "Kopier lenken under og send manuelt.",
+        description: d.email_error ?? "Del koden manuelt med brukeren.",
         duration: 20000,
       });
-      if (d.invite_url) {
-        try { await navigator.clipboard.writeText(d.invite_url); } catch { /* ignore */ }
-        toast.info("Invitasjons-lenke kopiert til utklippstavlen", { duration: 10000 });
+      if (d.code && d.activate_url) {
+        const text = `Aktiveringskode: ${d.code}\nGå til: ${d.activate_url}`;
+        try { await navigator.clipboard.writeText(text); } catch { /* ignore */ }
+        toast.info(`Kode ${d.code} kopiert til utklippstavlen`, { duration: 15000 });
       }
     }
     onOpenChange(false);
@@ -135,8 +143,7 @@ export function InviteUserDialog({ open, onOpenChange, onInvited }: Props) {
         <DialogHeader>
           <DialogTitle>Inviter ny bruker</DialogTitle>
           <DialogDescription>
-            Brukeren mottar en e-post med lenke for å sette passord. Du kan tilordne
-            flere selskap og stillinger.
+            Brukeren mottar en e-post med en 6-sifret aktiveringskode. Koden er gyldig i 7 dager. Du kan tilordne flere selskap og stillinger.
           </DialogDescription>
         </DialogHeader>
 
