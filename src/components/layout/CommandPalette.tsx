@@ -37,13 +37,14 @@ export function CommandPalette({ open, onOpenChange }: Props) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("legal_entities")
-        .select("id, legal_name, short_code")
+        .select("id, legal_name, short_code, display_name")
         .eq("status", "active")
         .order("legal_name");
       if (error) throw error;
       return data ?? [];
     },
   });
+
 
   // Global ⌘K / Ctrl+K toggle
   useEffect(() => {
