@@ -52,6 +52,8 @@ export function useOrderLineCustomerInfo(orderLineIds: string[] | undefined) {
         deliveryDate: null,
         pickupTime: null,
         phone: null,
+        isPaid: false,
+
       };
       const out: Record<string, OrderLineCustomerInfo> = {};
       for (const id of ids) out[id] = { ...empty };
