@@ -361,7 +361,9 @@ export function useUpdateCustomerOrder() {
         final_customer_phone: input.finalCustomerPhone,
         send_sms_confirm: input.sendSms,
         send_email_confirm: input.sendEmail,
+        is_paid: input.isPaid,
       };
+
       const { error: updErr } = await supabase
         .from("orders")
         .update(updatePayload as never)
