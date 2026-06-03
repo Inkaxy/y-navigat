@@ -8,6 +8,7 @@ import {
   defaultFieldSize,
 } from "../../types";
 import { clamp, getInnerArea, round1, snap } from "../../lib/canvasUtils";
+import { fitFontSizePt } from "../../lib/fitText";
 
 interface Props {
   paperWidth: number;
