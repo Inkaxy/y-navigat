@@ -22,7 +22,7 @@ export function useOrderRulesContext(productIds: string[] = []) {
   return useQuery({
     queryKey: ["order-rules-context", ids],
     queryFn: async (): Promise<OrderRulesContext> => {
-      const [outletsRes, exceptionsRes, productsRes, rulesRes] = await Promise.all([
+      const [outletsRes, exceptionsRes, productsRes, rulesRes, pickupsRes] = await Promise.all([
         supabase
           .from("outlets")
           .select("id, short_name, full_name, city, status, opening_hours")
@@ -44,10 +44,34 @@ export function useOrderRulesContext(productIds: string[] = []) {
           .select("rule_type, weekdays, deadline_time, deadline_days_before, product_ids")
           .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
           .eq("is_active", true),
+        supabase
+          .from("pickup_locations" as any)
+          .select("id, display_name, city, status")
+          .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
+          .eq("status", "active"),
       ]);
 
+      // Slå sammen outlets (med åpningstider) og pickup_locations (hentesteder uten åpningstider).
+      // Pickup locations brukes for navn-matching i regelsjekken «Hentested ikke gjenkjent».
+      const outletsCombined: Outlet[] = [
+        ...((outletsRes.data ?? []) as unknown as Outlet[]),
+        ...(((pickupsRes as any).data ?? []) as Array<{
+          id: string;
+          display_name: string | null;
+          city: string | null;
+          status: string | null;
+        }>).map((p) => ({
+          id: p.id,
+          short_name: p.display_name,
+          full_name: p.display_name,
+          city: p.city,
+          status: p.status,
+          opening_hours: null,
+        })),
+      ];
+
       return {
-        outlets: (outletsRes.data ?? []) as unknown as Outlet[],
+        outlets: outletsCombined,
         outlet_exceptions: (exceptionsRes.data ?? []) as unknown as OutletException[],
         products: (productsRes.data ?? []) as unknown as ProductForRules[],
         delivery_rules: (rulesRes.data ?? []) as unknown as DeliveryRule[],
