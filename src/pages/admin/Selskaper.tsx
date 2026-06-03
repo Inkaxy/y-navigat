@@ -174,26 +174,27 @@ export default function Selskaper() {
           <TableHeader>
             <TableRow>
               <TableHead>Kode</TableHead>
-              <TableHead>Navn</TableHead>
+              <TableHead>Visningsnavn</TableHead>
+              <TableHead>Juridisk navn</TableHead>
               <TableHead>Org.nr</TableHead>
-              <TableHead>Adresse</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>Opprettet</TableHead>
               <TableHead className="text-right">Handling</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading && (
-              <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">Laster…</TableCell></TableRow>
+              <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">Laster…</TableCell></TableRow>
             )}
             {!isLoading && filtered.length === 0 && (
-              <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">Ingen treff</TableCell></TableRow>
+              <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">Ingen treff</TableCell></TableRow>
             )}
             {filtered.map((r) => (
               <TableRow key={r.id}>
                 <TableCell className="font-mono">{r.short_code}</TableCell>
-                <TableCell className="font-medium">{r.legal_name}</TableCell>
+                <TableCell className="font-medium">{r.display_name?.trim() || "—"}</TableCell>
+                <TableCell className="text-sm text-muted-foreground">{r.legal_name}</TableCell>
                 <TableCell>{r.org_number}</TableCell>
+
                 <TableCell className="text-sm text-muted-foreground">
                   {[r.invoice_address_line1, r.invoice_postal_code, r.invoice_city].filter(Boolean).join(", ")}
                 </TableCell>
