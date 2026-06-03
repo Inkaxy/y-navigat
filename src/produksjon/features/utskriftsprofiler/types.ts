@@ -265,7 +265,7 @@ export function defaultFieldSize(type: FieldType): { w: number; h: number } {
 /** Default-felt for ny profil — alle 21, alle off, sensible defaults. */
 export function defaultFields(): ProfileField[] {
   return FIELD_TYPES.map((field_type, idx) => {
-    const size = DEFAULT_SIZES[field_type];
+    const size = DEFAULT_SIZES[field_type] ?? { w: 40, h: 5 };
     return {
       field_type,
       include: false,
