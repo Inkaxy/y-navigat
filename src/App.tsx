@@ -23,6 +23,8 @@ import AdminPlaceholder from "./pages/admin/AdminPlaceholder";
 import Integrasjoner from "./pages/admin/Integrasjoner";
 import IntegrasjonDetalj from "./pages/admin/IntegrasjonDetalj";
 import TripletexIntegrasjon from "./pages/admin/TripletexIntegrasjon";
+import EmailM365Integrasjon from "./pages/admin/EmailM365Integrasjon";
+import AiIntegrasjon from "./pages/admin/AiIntegrasjon";
 import Helsesenter from "./pages/admin/Helsesenter";
 import Audit from "./pages/admin/Audit";
 import Selskaper from "./pages/admin/Selskaper";
