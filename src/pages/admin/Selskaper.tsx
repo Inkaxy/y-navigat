@@ -333,3 +333,84 @@ function Section({ title, children }: { title: string; children: React.ReactNode
     </div>
   );
 }
+
+function EntityAppsSection({ entityId }: { entityId: string }) {
+  const qc = useQueryClient();
+  const { data, isLoading } = useQuery({
+    queryKey: ["entity-apps-config", entityId],
+    queryFn: async () => {
+      const [appsRes, accessRes] = await Promise.all([
+        supabase
+          .from("apps")
+          .select("id, code, display_name, category, status, color_hex")
+          .in("status", ["active", "beta"])
+          .order("sort_order", { ascending: true }),
+        supabase
+          .from("legal_entity_app_access")
+          .select("app_id, enabled")
+          .eq("legal_entity_id", entityId),
+      ]);
+      if (appsRes.error) throw appsRes.error;
+      if (accessRes.error) throw accessRes.error;
+      const disabled = new Map<string, boolean>();
+      for (const row of accessRes.data ?? []) {
+        disabled.set(row.app_id, row.enabled === false);
+      }
+      return (appsRes.data ?? []).map((a) => ({
+        ...a,
+        enabled: !disabled.get(a.id),
+      }));
+    },
+  });
+
+  const toggle = useMutation({
+    mutationFn: async ({ appId, enabled }: { appId: string; enabled: boolean }) => {
+      const { error } = await supabase
+        .from("legal_entity_app_access")
+        .upsert(
+          { legal_entity_id: entityId, app_id: appId, enabled },
+          { onConflict: "legal_entity_id,app_id" },
+        );
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["entity-apps-config", entityId] });
+      qc.invalidateQueries({ queryKey: ["accessible-apps"] });
+      toast.success("App-tilgang oppdatert");
+    },
+    onError: (e: any) => toast.error(e.message ?? "Kunne ikke oppdatere"),
+  });
+
+  return (
+    <Section title="Apper">
+      <p className="text-xs text-muted-foreground mb-3">
+        Skru av apper som ikke skal være tilgjengelige for brukere i dette selskapet.
+        Endringen påvirker meny, app-launcher og kommandopalett for alle som jobber her.
+      </p>
+      {isLoading && <div className="text-sm text-muted-foreground">Laster …</div>}
+      {!isLoading && (
+        <div className="space-y-2 rounded-md border border-line bg-surface-canvas p-3">
+          {(data ?? []).map((app) => (
+            <div key={app.id} className="flex items-center justify-between gap-3 py-1">
+              <div className="flex flex-col">
+                <span className="text-sm font-medium">{app.display_name}</span>
+                <span className="text-xs text-muted-foreground font-mono">{app.code}</span>
+              </div>
+              <Switch
+                checked={app.enabled}
+                disabled={toggle.isPending}
+                onCheckedChange={(checked) =>
+                  toggle.mutate({ appId: app.id, enabled: checked })
+                }
+              />
+            </div>
+          ))}
+          {(data ?? []).length === 0 && (
+            <div className="text-sm text-muted-foreground">Ingen aktive apper</div>
+          )}
+        </div>
+      )}
+    </Section>
+  );
+}
+
