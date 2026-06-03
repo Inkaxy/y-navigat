@@ -42,7 +42,10 @@ export interface LabelPdfData {
   deliveryDate?: string | null;
   /** Formatert hentetidspunkt (f.eks. "Hentes kl 10:00"). */
   pickupTime?: string | null;
+  /** Om kundeordren er betalt. */
+  isPaid?: boolean | null;
 }
+
 
 function joinNonEmpty(parts: Array<string | undefined | null>, sep = " · "): string {
   return parts.filter((s): s is string => !!s && s.trim().length > 0).join(sep);
