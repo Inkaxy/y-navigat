@@ -680,7 +680,7 @@ function CanvasFieldBox({
     measureString = "+47 999 99 999";
     content = measureString;
   } else if (field.field_type === "leveringsdato") {
-    measureString = "02.jun.26";
+    measureString = "06.06.26";
     content = measureString;
   } else if (field.field_type === "hentetidspunkt") {
     measureString = "Hentes kl 10:00";
