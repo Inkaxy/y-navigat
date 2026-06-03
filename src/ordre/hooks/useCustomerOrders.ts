@@ -140,7 +140,9 @@ export function useCustomerOrderDetail(orderId: string | null) {
         send_sms_confirm: !!order.send_sms_confirm,
         send_email_confirm: !!order.send_email_confirm,
         delivery_tour_id: order.delivery_tour_id as string | null,
+        is_paid: !!(order as unknown as { is_paid?: boolean }).is_paid,
         line_count: (lines ?? []).length,
+
         lines: (lines ?? []).map((l) => {
           const snap = (l.product_snapshot ?? {}) as {
             display_number?: number;
