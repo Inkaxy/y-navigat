@@ -1,5 +1,5 @@
-import { useRef } from "react";
-import { Trash2, Upload } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Minus, Plus, Trash2, Upload } from "lucide-react";
 import {
   Accordion,
   AccordionContent,
@@ -94,12 +94,12 @@ export function SettingsAccordion(p: Props) {
             />
           </div>
           <Separator />
-          <p className="text-xs font-medium text-muted-foreground">Marger</p>
+          <p className="text-xs font-medium text-muted-foreground">Marger (mm)</p>
           <div className="grid grid-cols-2 gap-3">
-            <NumField label="Topp" value={p.marginTop} onChange={p.setMarginTop} />
-            <NumField label="Bunn" value={p.marginBottom} onChange={p.setMarginBottom} />
-            <NumField label="Venstre" value={p.marginLeft} onChange={p.setMarginLeft} />
-            <NumField label="Høyre" value={p.marginRight} onChange={p.setMarginRight} />
+            <MarginStepper label="Topp" value={p.marginTop} onChange={p.setMarginTop} />
+            <MarginStepper label="Bunn" value={p.marginBottom} onChange={p.setMarginBottom} />
+            <MarginStepper label="Venstre" value={p.marginLeft} onChange={p.setMarginLeft} />
+            <MarginStepper label="Høyre" value={p.marginRight} onChange={p.setMarginRight} />
           </div>
         </AccordionContent>
       </AccordionItem>
@@ -270,6 +270,104 @@ function NumField({
         onChange={(e) => onChange(Number(e.target.value) || 0)}
         className="h-8"
       />
+    </div>
+  );
+}
+
+function MarginStepper({
+  label,
+  value,
+  onChange,
+  min = 0,
+  max = 50,
+  step = 0.5,
+}: {
+  label: string;
+  value: number;
+  onChange: (v: number) => void;
+  min?: number;
+  max?: number;
+  step?: number;
+}) {
+  const [draft, setDraft] = useState<string>(String(value));
+  useEffect(() => {
+    setDraft(String(value));
+  }, [value]);
+
+  const round1 = (n: number) => Math.round(n * 10) / 10;
+  const clampVal = (n: number) => Math.max(min, Math.min(max, round1(n)));
+  const commit = (raw: string) => {
+    const normalized = raw.replace(",", ".");
+    const n = Number(normalized);
+    if (!raw || Number.isNaN(n)) {
+      setDraft(String(value));
+      return;
+    }
+    const c = clampVal(n);
+    setDraft(String(c));
+    if (c !== value) onChange(c);
+  };
+
+  const holdRef = useRef<number | null>(null);
+  const startHold = (delta: number) => {
+    onChange(clampVal(value + delta));
+    let cur = value;
+    holdRef.current = window.setInterval(() => {
+      cur = clampVal(cur + delta);
+      onChange(cur);
+    }, 120) as unknown as number;
+  };
+  const stopHold = () => {
+    if (holdRef.current !== null) {
+      clearInterval(holdRef.current);
+      holdRef.current = null;
+    }
+  };
+
+  return (
+    <div className="space-y-1">
+      <Label className="text-xs text-muted-foreground">{label}</Label>
+      <div className="flex h-9 items-center rounded-[10px] border border-border bg-background focus-within:border-brand-bronze focus-within:ring-1 focus-within:ring-brand-bronze/30">
+        <button
+          type="button"
+          onPointerDown={() => startHold(-step)}
+          onPointerUp={stopHold}
+          onPointerLeave={stopHold}
+          onPointerCancel={stopHold}
+          disabled={value <= min}
+          aria-label={`Mindre ${label.toLowerCase()}-marg`}
+          className="flex h-full w-8 items-center justify-center rounded-l-[10px] text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:opacity-40"
+        >
+          <Minus className="h-3.5 w-3.5" />
+        </button>
+        <Input
+          type="text"
+          inputMode="decimal"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={(e) => commit(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              commit((e.target as HTMLInputElement).value);
+            }
+          }}
+          aria-label={`${label}-marg i mm`}
+          className="h-7 w-full min-w-0 border-0 bg-transparent p-0 text-center text-xs tabular-nums shadow-none focus-visible:ring-0"
+        />
+        <button
+          type="button"
+          onPointerDown={() => startHold(step)}
+          onPointerUp={stopHold}
+          onPointerLeave={stopHold}
+          onPointerCancel={stopHold}
+          disabled={value >= max}
+          aria-label={`Større ${label.toLowerCase()}-marg`}
+          className="flex h-full w-8 items-center justify-center rounded-r-[10px] text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:opacity-40"
+        >
+          <Plus className="h-3.5 w-3.5" />
+        </button>
+      </div>
     </div>
   );
 }
