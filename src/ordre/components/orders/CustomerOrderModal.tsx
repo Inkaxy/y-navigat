@@ -124,6 +124,8 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
   const [source, setSource] = useState<"phone" | "email" | "in_store" | "manual">("phone");
   const [sendSms, setSendSms] = useState(false);
   const [sendEmail, setSendEmail] = useState(false);
+  const [isPaid, setIsPaid] = useState(false);
+
   const [lines, setLines] = useState<LineDraft[]>([newLine()]);
   const [submitting, setSubmitting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
