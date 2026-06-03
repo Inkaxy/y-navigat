@@ -366,6 +366,12 @@ function alignIcon(a: Alignment) {
   return <AlignLeft className="h-3.5 w-3.5" />;
 }
 
+function vAlignIcon(v: VerticalAlignment) {
+  if (v === "top") return <AlignStartVertical className="h-3.5 w-3.5 rotate-90" />;
+  if (v === "bottom") return <AlignEndVertical className="h-3.5 w-3.5 rotate-90" />;
+  return <AlignVerticalSpaceAround className="h-3.5 w-3.5" />;
+}
+
 export function FontSizeStepper({
   value,
   onChange,
