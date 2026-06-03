@@ -111,7 +111,7 @@ export function useCustomerOrderDetail(orderId: string | null) {
           `id, order_number, delivery_date, delivery_time, distribution,
            final_customer_name, final_customer_email, final_customer_phone,
            picked_up_at, status, source, send_sms_confirm, send_email_confirm,
-           delivery_tour_id`,
+           delivery_tour_id, is_paid`,
         )
         .eq("id", orderId!)
         .maybeSingle();
