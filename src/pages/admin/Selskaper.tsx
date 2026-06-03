@@ -231,6 +231,10 @@ export default function Selskaper() {
                 </div>
               </Section>
 
+              {editing.id && <EntityAppsSection entityId={editing.id} />}
+
+
+
               <Section title="GS1">
                 <div className="grid grid-cols-2 gap-3">
                   <Field
