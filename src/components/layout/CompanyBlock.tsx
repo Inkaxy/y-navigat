@@ -13,19 +13,17 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSelection } from "@/providers/SelectionProvider";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
+import { entityLabel, brandLabel } from "@/lib/entityLabel";
 
 interface Entity {
   id: string;
   legal_name: string;
   short_code: string;
+  display_name: string | null;
   status: string;
   founded_year: number | null;
 }
 
-/** Strips trailing " AS" / " ASA" / " AB" and uppercases. */
-function brandLabel(legalName: string): string {
-  return legalName.replace(/\s+(AS|ASA|AB|SA|BV)\s*$/i, "").toUpperCase();
-}
 
 /**
  * CompanyBlock — venstre i topbar.
