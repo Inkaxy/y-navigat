@@ -159,11 +159,12 @@ export default function Brukere() {
               <TableHead>Aktive stillinger</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Sist innlogget</TableHead>
+              <TableHead className="w-[140px] text-right">Handling</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">Laster…</TableCell></TableRow>}
-            {!isLoading && filtered.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">Ingen treff</TableCell></TableRow>}
+            {isLoading && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">Laster…</TableCell></TableRow>}
+            {!isLoading && filtered.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">Ingen treff</TableCell></TableRow>}
             {filtered.map((u) => (
               <TableRow key={u.id} className="cursor-pointer">
                 <TableCell className="font-medium">
@@ -174,6 +175,19 @@ export default function Brukere() {
                 <TableCell><Badge variant={u.status === "active" ? "default" : "secondary"}>{u.status}</Badge></TableCell>
                 <TableCell className="text-sm text-muted-foreground">
                   {u.last_login_at ? new Date(u.last_login_at).toLocaleString("no-NO") : "—"}
+                </TableCell>
+                <TableCell className="text-right">
+                  {isOwner && u.status === "onboarding" && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={resendingId === u.id}
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); resendInvite(u); }}
+                    >
+                      <Send className="h-3.5 w-3.5" />
+                      {resendingId === u.id ? "Sender…" : "Send ny kode"}
+                    </Button>
+                  )}
                 </TableCell>
               </TableRow>
             ))}
