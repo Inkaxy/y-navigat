@@ -10,7 +10,7 @@ export interface OrderLineCustomerInfo {
   /** Formatert leveringsadresse (linje1 + (postnr by)). Prioritert:
    *  ordrens leveringsadresse → kundens leveringsadresse. */
   deliveryAddress: string | null;
-  /** Formatert leveringsdato (f.eks. "02.jun.26") fra orders.delivery_date. */
+  /** Formatert leveringsdato (f.eks. "06.06.26") fra orders.delivery_date. */
   deliveryDate: string | null;
   /** Formatert hentetidspunkt (f.eks. "Hentes kl 10:00") fra orders.delivery_time. */
   pickupTime: string | null;
