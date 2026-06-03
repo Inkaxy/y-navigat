@@ -1,13 +1,17 @@
 import {
   AlignCenter,
+  AlignEndVertical,
   AlignJustify,
   AlignLeft,
   AlignRight,
+  AlignStartVertical,
+  AlignVerticalSpaceAround,
   Minus,
   Plus,
   Square,
   Underline,
   Trash2,
+  WrapText,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
@@ -19,8 +23,10 @@ import {
   FIELD_GROUPS,
   FIELD_LABELS,
   GROUP_LABELS,
+  VERTICAL_ALIGNMENTS,
   type Alignment,
   type ProfileField,
+  type VerticalAlignment,
 } from "../../types";
 import { clamp, round1 } from "../../lib/canvasUtils";
 
@@ -177,7 +183,61 @@ export function RightInspector({ selected, innerW, innerH, onChange, onRemove }:
               </div>
             </div>
           </Row>
+          <Row label="Vertikalt">
+            <div className="col-span-2 grid grid-cols-3 rounded-[10px] border border-border bg-background p-0.5">
+              {VERTICAL_ALIGNMENTS.map((v) => {
+                const current = selected.vertical_alignment ?? "middle";
+                return (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => onChange({ vertical_alignment: v })}
+                    className={cn(
+                      "flex h-7 items-center justify-center rounded-md transition",
+                      current === v
+                        ? "bg-brand-bronze/15 text-foreground"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                    aria-label={`Vertikal: ${v}`}
+                    title={
+                      v === "top"
+                        ? "Øverst"
+                        : v === "bottom"
+                          ? "Nederst"
+                          : "Midten"
+                    }
+                  >
+                    {vAlignIcon(v)}
+                  </button>
+                );
+              })}
+            </div>
+          </Row>
+          {selected.field_type !== "logo" && (
+            <Row label="Tilpass">
+              <button
+                type="button"
+                onClick={() => onChange({ auto_fit: !(selected.auto_fit ?? false) })}
+                className={cn(
+                  "col-span-2 flex h-9 items-center justify-between gap-2 rounded-[10px] border px-3 text-xs transition",
+                  (selected.auto_fit ?? false)
+                    ? "border-brand-bronze bg-brand-bronze/10 text-foreground"
+                    : "border-border bg-background text-muted-foreground hover:text-foreground",
+                )}
+                title="Bryt lang tekst til flere linjer og krymp skriftstørrelsen automatisk."
+              >
+                <span className="flex items-center gap-1.5">
+                  <WrapText className="h-3.5 w-3.5" />
+                  Bryt linje + krymp
+                </span>
+                <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                  {(selected.auto_fit ?? false) ? "På" : "Av"}
+                </span>
+              </button>
+            </Row>
+          )}
         </Section>
+
 
         {/* Decoration */}
         <Section title="Dekorasjon">
@@ -304,6 +364,12 @@ function alignIcon(a: Alignment) {
   if (a === "center") return <AlignCenter className="h-3.5 w-3.5" />;
   if (a === "right") return <AlignRight className="h-3.5 w-3.5" />;
   return <AlignLeft className="h-3.5 w-3.5" />;
+}
+
+function vAlignIcon(v: VerticalAlignment) {
+  if (v === "top") return <AlignStartVertical className="h-3.5 w-3.5 rotate-90" />;
+  if (v === "bottom") return <AlignEndVertical className="h-3.5 w-3.5 rotate-90" />;
+  return <AlignVerticalSpaceAround className="h-3.5 w-3.5" />;
 }
 
 export function FontSizeStepper({

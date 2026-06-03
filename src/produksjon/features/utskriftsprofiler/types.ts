@@ -103,6 +103,9 @@ export type WidthFraction = (typeof WIDTH_FRACTIONS)[number];
 export const ALIGNMENTS = ["left", "center", "right"] as const;
 export type Alignment = (typeof ALIGNMENTS)[number];
 
+export const VERTICAL_ALIGNMENTS = ["top", "middle", "bottom"] as const;
+export type VerticalAlignment = (typeof VERTICAL_ALIGNMENTS)[number];
+
 export interface ProfileField {
   field_type: FieldType;
   include: boolean;
@@ -119,6 +122,14 @@ export interface ProfileField {
   /** @deprecated Use height_mm */
   row_count: number | null;
   alignment: Alignment;
+  /** Vertikal plassering av tekst i boksen. Default "middle". */
+  vertical_alignment?: VerticalAlignment;
+  /**
+   * Hvis true: lang tekst brytes til flere linjer og skriftstørrelsen
+   * reduseres automatisk til innholdet passer i boksen.
+   * Hvis false (default): tekst kuttes med "…".
+   */
+  auto_fit?: boolean;
   show_line: boolean;
   show_border: boolean;
   /** Vis felt-tittel (f.eks. "Kundenavn: ") foran verdien. Default true. */

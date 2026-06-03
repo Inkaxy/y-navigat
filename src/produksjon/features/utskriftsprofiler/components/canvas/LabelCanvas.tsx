@@ -8,6 +8,7 @@ import {
   defaultFieldSize,
 } from "../../types";
 import { clamp, getInnerArea, round1, snap } from "../../lib/canvasUtils";
+import { fitFontSizePt } from "../../lib/fitText";
 
 interface Props {
   paperWidth: number;
@@ -650,9 +651,11 @@ function CanvasFieldBox({
   onPointerDownMove,
   onPointerDownResize,
 }: CanvasFieldBoxProps) {
-  const fontPx = Math.max(6, field.font_size * pxPerMm * 0.32);
+  const autoFit = field.auto_fit ?? false;
+  const vAlign = field.vertical_alignment ?? "middle";
 
   let content: React.ReactNode;
+  let measureString = "";
   if (field.field_type === "logo" && logoUrl) {
     content = (
       <img
@@ -662,22 +665,49 @@ function CanvasFieldBox({
       />
     );
   } else if (field.field_type === "firmanavn") {
-    content = companyName || FIELD_LABELS.firmanavn;
+    measureString = companyName || FIELD_LABELS.firmanavn;
+    content = measureString;
   } else if (field.field_type === "etikett_nr") {
-    content = "1000";
+    measureString = "1000";
+    content = measureString;
   } else if (field.field_type === "tur") {
-    content = "Tur 1";
+    measureString = "Tur 1";
+    content = measureString;
   } else if (field.field_type === "hentested") {
-    content = "Teie";
+    measureString = "Teie";
+    content = measureString;
   } else if (field.field_type === "telefon") {
-    content = "+47 999 99 999";
+    measureString = "+47 999 99 999";
+    content = measureString;
   } else if (field.field_type === "leveringsdato") {
-    content = "02.jun.26";
+    measureString = "02.jun.26";
+    content = measureString;
   } else if (field.field_type === "hentetidspunkt") {
-    content = "Hentes kl 10:00";
+    measureString = "Hentes kl 10:00";
+    content = measureString;
   } else {
-    content = `[${FIELD_LABELS[field.field_type]}]`;
+    measureString = `[${FIELD_LABELS[field.field_type]}]`;
+    content = measureString;
   }
+
+  const labelPrefix =
+    includeFieldLabels && (field.show_label ?? true) && field.field_type !== "logo"
+      ? `${FIELD_LABELS[field.field_type]}: `
+      : "";
+  const effectiveFontPt =
+    autoFit && field.field_type !== "logo"
+      ? fitFontSizePt(
+          labelPrefix + measureString,
+          field.font_size,
+          field.width_mm,
+          field.height_mm,
+          { bold: field.bold },
+        )
+      : field.font_size;
+  const fontPx = Math.max(6, effectiveFontPt * pxPerMm * 0.32);
+
+  const alignItems =
+    vAlign === "top" ? "flex-start" : vAlign === "bottom" ? "flex-end" : "center";
 
   return (
     <div
@@ -706,10 +736,11 @@ function CanvasFieldBox({
       }}
     >
       <div
-        className="flex h-full w-full items-center px-0.5"
+        className="flex h-full w-full px-0.5"
         style={{
           fontSize: fontPx,
           fontWeight: field.bold ? 700 : 400,
+          alignItems,
           justifyContent:
             field.alignment === "center"
               ? "center"
@@ -717,10 +748,15 @@ function CanvasFieldBox({
                 ? "flex-end"
                 : "flex-start",
           textAlign: field.alignment,
-          lineHeight: 1.1,
+          lineHeight: 1.15,
         }}
       >
-        <span className="truncate">
+        <span
+          className={cn(
+            autoFit ? "whitespace-pre-wrap break-words" : "truncate",
+            "block w-full",
+          )}
+        >
           {includeFieldLabels && (field.show_label ?? true) && field.field_type !== "logo" && (
             <span className="text-muted-foreground">
               {FIELD_LABELS[field.field_type]}:{" "}
