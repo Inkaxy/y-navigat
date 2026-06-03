@@ -91,6 +91,8 @@ export const FIELD_GROUPS: Record<FieldType, FieldGroup> = {
   telefon: "bestilling",
   leveringsdato: "bestilling",
   hentetidspunkt: "bestilling",
+  er_betalt: "bestilling",
+
 };
 
 export const GROUP_LABELS: Record<FieldGroup, string> = {
