@@ -7,18 +7,17 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  Plug, RefreshCw, AlertTriangle, CheckCircle2, Settings2, ArrowRight,
+  Plug, RefreshCw, AlertTriangle, CheckCircle2, Settings2, ArrowRight, Mail, Sparkles,
 } from "lucide-react";
 
 // NOTE: Tripletex uses its own dedicated tables (tripletex_credentials +
-// tripletex_sync_log) and is rendered as a top card here. The generic
-// `integrations` grid below is empty until seed-rader legges inn (egen prompt).
-// Unifisering av modellene tas i en senere prompt.
+// tripletex_sync_log) and is rendered as a top card here. Microsoft 365 og
+// AI-tjenester har egne kort som leser fra egne tabeller/RPC-er. Det generiske
+// `integrations`-griddet under er for fremtidige seedede integrasjoner.
 
 const PLACEHOLDERS = [
   { type: "tedebe", name: "Tedebe", desc: "Råvarer-katalog og databladimport." },
   { type: "fiken",  name: "Fiken",  desc: "Regnskap og fakturering." },
-  { type: "email",  name: "E-post (SMTP/IMAP)", desc: "Utgående og innkommende e-post." },
 ];
 
 const STATUS_LABEL: Record<string, string> = {
