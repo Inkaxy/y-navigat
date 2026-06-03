@@ -2674,6 +2674,45 @@ export type Database = {
         }
         Relationships: []
       }
+      legal_entity_app_access: {
+        Row: {
+          app_id: string
+          created_at: string
+          enabled: boolean
+          legal_entity_id: string
+          updated_at: string
+        }
+        Insert: {
+          app_id: string
+          created_at?: string
+          enabled?: boolean
+          legal_entity_id: string
+          updated_at?: string
+        }
+        Update: {
+          app_id?: string
+          created_at?: string
+          enabled?: boolean
+          legal_entity_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "legal_entity_app_access_app_id_fkey"
+            columns: ["app_id"]
+            isOneToOne: false
+            referencedRelation: "apps"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "legal_entity_app_access_legal_entity_id_fkey"
+            columns: ["legal_entity_id"]
+            isOneToOne: false
+            referencedRelation: "legal_entities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       legal_entity_margin_thresholds: {
         Row: {
           critical_below_pct: number
@@ -8637,6 +8676,22 @@ export type Database = {
           id: string
           sales_unit: string
           unit_price: number
+        }[]
+      }
+      get_apps_for_entity: {
+        Args: { entity_id: string }
+        Returns: {
+          access_level: Database["public"]["Enums"]["access_level"]
+          category: string
+          color_hex: string
+          deploy_url: string
+          display_name: string
+          icon_name: string
+          id: string
+          slug: string
+          sort_order: number
+          start_path: string
+          status: string
         }[]
       }
       get_cake_categories_with_counts: {

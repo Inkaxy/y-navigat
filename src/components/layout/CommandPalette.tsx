@@ -37,13 +37,14 @@ export function CommandPalette({ open, onOpenChange }: Props) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("legal_entities")
-        .select("id, legal_name, short_code")
+        .select("id, legal_name, short_code, display_name")
         .eq("status", "active")
         .order("legal_name");
       if (error) throw error;
       return data ?? [];
     },
   });
+
 
   // Global ⌘K / Ctrl+K toggle
   useEffect(() => {
@@ -134,21 +135,25 @@ export function CommandPalette({ open, onOpenChange }: Props) {
                 heading="Selskap"
                 className="[&_[cmdk-group-heading]]:eyebrow [&_[cmdk-group-heading]]:px-[18px] [&_[cmdk-group-heading]]:pb-1 [&_[cmdk-group-heading]]:pt-2.5"
               >
-                {entities.map((e) => (
-                  <PaletteItem
-                    key={e.id}
-                    onSelect={() => handleCompany(e.id)}
-                    value={`selskap ${e.legal_name} ${e.short_code}`}
-                  >
-                    <span
-                      className={cn(
-                        "h-2 w-2 rounded-full",
-                        legalEntityId === e.id ? "bg-app" : "bg-line-strong",
-                      )}
-                    />
-                    <span>Bytt til {e.legal_name}</span>
-                  </PaletteItem>
-                ))}
+                {entities.map((e) => {
+                  const label = (e.display_name?.trim() || e.legal_name) ?? e.short_code;
+                  return (
+                    <PaletteItem
+                      key={e.id}
+                      onSelect={() => handleCompany(e.id)}
+                      value={`selskap ${label} ${e.legal_name} ${e.short_code}`}
+                    >
+                      <span
+                        className={cn(
+                          "h-2 w-2 rounded-full",
+                          legalEntityId === e.id ? "bg-app" : "bg-line-strong",
+                        )}
+                      />
+                      <span>Bytt til {label}</span>
+                    </PaletteItem>
+                  );
+                })}
+
               </Command.Group>
             )}
 
