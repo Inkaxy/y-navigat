@@ -194,16 +194,10 @@ export default function Selskaper() {
                 <TableCell className="font-medium">{r.display_name?.trim() || "—"}</TableCell>
                 <TableCell className="text-sm text-muted-foreground">{r.legal_name}</TableCell>
                 <TableCell>{r.org_number}</TableCell>
-
-                <TableCell className="text-sm text-muted-foreground">
-                  {[r.invoice_address_line1, r.invoice_postal_code, r.invoice_city].filter(Boolean).join(", ")}
-                </TableCell>
                 <TableCell>
                   <Badge variant={r.status === "active" ? "default" : "secondary"}>{r.status}</Badge>
                 </TableCell>
-                <TableCell className="text-sm text-muted-foreground">
-                  {new Date(r.created_at).toLocaleDateString("no-NO")}
-                </TableCell>
+
                 <TableCell className="text-right">
                   <Button size="sm" variant="ghost" onClick={() => setEditing(r)}>
                     <Pencil className="h-3.5 w-3.5" />
