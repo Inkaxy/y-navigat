@@ -813,6 +813,29 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
                   </p>
                 </div>
               </fieldset>
+
+              {/* Betaling */}
+              <fieldset className="space-y-3">
+                <legend className="text-sm font-semibold">Betaling</legend>
+                <RadioGroup
+                  value={isPaid ? "yes" : "no"}
+                  onValueChange={(v) => setIsPaid(v === "yes")}
+                  className="flex gap-4"
+                >
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <RadioGroupItem value="no" id="is-paid-no" />
+                    Nei
+                  </label>
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <RadioGroupItem value="yes" id="is-paid-yes" />
+                    Ja
+                  </label>
+                </RadioGroup>
+                <p className="text-xs text-muted-foreground">
+                  Vises på etiketter når feltet «Er betalt» er aktivert på utskriftsprofilen.
+                </p>
+              </fieldset>
+
             </div>
           )}
 
