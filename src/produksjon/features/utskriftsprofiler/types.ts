@@ -254,6 +254,8 @@ const DEFAULT_SIZES: Record<FieldType, { w: number; h: number }> = {
   telefon: { w: 40, h: 5 },
   leveringsdato: { w: 40, h: 5 },
   hentetidspunkt: { w: 40, h: 5 },
+  er_betalt: { w: 30, h: 5 },
+
 };
 
 export function defaultFieldSize(type: FieldType): { w: number; h: number } {
