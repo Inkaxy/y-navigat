@@ -94,12 +94,12 @@ export function SettingsAccordion(p: Props) {
             />
           </div>
           <Separator />
-          <p className="text-xs font-medium text-muted-foreground">Marger</p>
+          <p className="text-xs font-medium text-muted-foreground">Marger (mm)</p>
           <div className="grid grid-cols-2 gap-3">
-            <NumField label="Topp" value={p.marginTop} onChange={p.setMarginTop} />
-            <NumField label="Bunn" value={p.marginBottom} onChange={p.setMarginBottom} />
-            <NumField label="Venstre" value={p.marginLeft} onChange={p.setMarginLeft} />
-            <NumField label="Høyre" value={p.marginRight} onChange={p.setMarginRight} />
+            <MarginStepper label="Topp" value={p.marginTop} onChange={p.setMarginTop} />
+            <MarginStepper label="Bunn" value={p.marginBottom} onChange={p.setMarginBottom} />
+            <MarginStepper label="Venstre" value={p.marginLeft} onChange={p.setMarginLeft} />
+            <MarginStepper label="Høyre" value={p.marginRight} onChange={p.setMarginRight} />
           </div>
         </AccordionContent>
       </AccordionItem>
