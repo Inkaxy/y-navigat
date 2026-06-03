@@ -189,7 +189,9 @@ export function useOrderLineCustomerInfo(orderLineIds: string[] | undefined) {
           delivery_postal_code: string | null;
           delivery_city: string | null;
           use_customer_default_address: boolean | null;
+          is_paid: boolean | null;
         };
+
         const cust = row.customer_id ? customerMap[row.customer_id] : null;
         const overridePickup = cust?.profile_overrides.pickup_location_id;
         const pickupId =
