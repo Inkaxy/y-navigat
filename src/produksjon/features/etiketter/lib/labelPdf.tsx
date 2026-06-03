@@ -126,11 +126,24 @@ function renderField(field: ProfileField, data: LabelPdfData, key: string) {
   const justify =
     align === "center" ? "center" : align === "right" ? "flex-end" : "flex-start";
 
+  const vAlign = field.vertical_alignment ?? "middle";
+  const alignItems =
+    vAlign === "top" ? "flex-start" : vAlign === "bottom" ? "flex-end" : "center";
+
   const showLabel =
     data.profile.include_field_labels &&
     (field.show_label ?? true) &&
     field.field_type !== "logo";
   const labelText = showLabel ? `${FIELD_LABELS[field.field_type]}: ` : "";
+
+  const autoFit = field.auto_fit ?? false;
+  const fullText = labelText + (v.text ?? "");
+  const fontPt =
+    autoFit && field.field_type !== "logo"
+      ? fitFontSizePt(fullText, field.font_size, field.width_mm, field.height_mm, {
+          bold: field.bold,
+        })
+      : field.font_size;
 
   return (
     <View
@@ -146,9 +159,10 @@ function renderField(field: ProfileField, data: LabelPdfData, key: string) {
         borderBottomWidth: field.show_line && !field.show_border ? 0.5 : field.show_border ? 0.5 : 0,
         borderColor: "#777",
         flexDirection: "row",
-        alignItems: "center",
+        alignItems,
         justifyContent: justify,
         paddingHorizontal: 1,
+        overflow: "hidden",
       }}
     >
       {field.field_type === "logo" && v.image ? (
@@ -159,9 +173,10 @@ function renderField(field: ProfileField, data: LabelPdfData, key: string) {
       ) : (
         <Text
           style={{
-            fontSize: field.font_size,
+            fontSize: fontPt,
             fontWeight: field.bold ? 700 : 400,
             textAlign: align,
+            lineHeight: 1.15,
           }}
         >
           {showLabel ? (
