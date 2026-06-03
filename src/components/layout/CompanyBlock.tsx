@@ -45,7 +45,7 @@ export function CompanyBlock({ className }: { className?: string }) {
 
       const { data, error } = await supabase
         .from("legal_entities")
-        .select("id, short_code, legal_name, status, founded_year")
+        .select("id, short_code, legal_name, display_name, status, founded_year")
         .in("id", entityIds)
         .eq("status", "active")
         .order("legal_name", { ascending: true });
@@ -59,6 +59,7 @@ export function CompanyBlock({ className }: { className?: string }) {
     const firstActive = entities.find((e) => e.status === "active") ?? entities[0];
     if (firstActive) setLegalEntityId(firstActive.id);
   }, [entities, legalEntityId, setLegalEntityId]);
+
 
   const active = entities?.find((e) => e.id === legalEntityId) ?? entities?.[0] ?? null;
   const label = active ? brandLabel(active.legal_name) : "VELG SELSKAP";
