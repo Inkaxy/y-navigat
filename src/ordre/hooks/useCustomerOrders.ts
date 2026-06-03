@@ -19,8 +19,10 @@ export type CustomerOrderRow = {
   send_sms_confirm: boolean;
   send_email_confirm: boolean;
   delivery_tour_id: string | null;
+  is_paid: boolean;
   line_count: number;
 };
+
 
 export function useCustomerOrders(params: {
   customerId: string | null;
