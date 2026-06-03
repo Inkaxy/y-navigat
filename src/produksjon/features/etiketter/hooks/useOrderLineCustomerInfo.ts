@@ -16,7 +16,10 @@ export interface OrderLineCustomerInfo {
   pickupTime: string | null;
   /** Kundens telefon, prioritert: order.final_customer_phone → customer.mobile_phone → customer.primary_contact_phone. */
   phone: string | null;
+  /** Om kundeordren er betalt. */
+  isPaid: boolean;
 }
+
 
 function formatAddress(
   line1: string | null,
