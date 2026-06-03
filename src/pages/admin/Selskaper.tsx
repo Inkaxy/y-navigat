@@ -20,6 +20,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
+import { CATEGORY_LABELS } from "@/hooks/useAccessibleApps";
 
 
 type LE = {
