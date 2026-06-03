@@ -216,10 +216,9 @@ export function useOrderLineCustomerInfo(orderLineIds: string[] | undefined) {
           ? (() => {
               const d = new Date(row.delivery_date);
               const day = String(d.getDate()).padStart(2, "0");
-              const months = ["jan","feb","mar","apr","mai","jun","jul","aug","sep","okt","nov","des"];
-              const mon = months[d.getMonth()];
+              const mm = String(d.getMonth() + 1).padStart(2, "0");
               const yy = String(d.getFullYear()).slice(-2);
-              return `${day}.${mon}.${yy}`;
+              return `${day}.${mm}.${yy}`;
             })()
           : null;
         const pickupTime = row.delivery_time
