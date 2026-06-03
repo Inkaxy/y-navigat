@@ -73,7 +73,9 @@ export function useCustomerOrders(params: {
           send_sms_confirm: !!row.send_sms_confirm,
           send_email_confirm: !!row.send_email_confirm,
           delivery_tour_id: row.delivery_tour_id as string | null,
+          is_paid: !!(row as unknown as { is_paid?: boolean }).is_paid,
           line_count: Array.isArray(lc) && lc[0] ? Number(lc[0].count) : 0,
+
         } satisfies CustomerOrderRow;
       });
     },
