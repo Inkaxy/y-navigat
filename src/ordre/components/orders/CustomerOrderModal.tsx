@@ -399,8 +399,10 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
       source,
       sendSms,
       sendEmail,
+      isPaid,
       lines: inputLines,
     };
+
   }
 
   async function handleSave() {
