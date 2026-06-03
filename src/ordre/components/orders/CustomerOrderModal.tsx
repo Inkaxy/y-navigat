@@ -218,7 +218,7 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
     setDirty(true);
     // intentional shallow listing of dependencies for "dirty" detection
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [name, email, phone, deliveryDate, hour, minute, tourId, distribution, source, sendSms, sendEmail, lines]);
+  }, [name, email, phone, deliveryDate, hour, minute, tourId, distribution, source, sendSms, sendEmail, isPaid, lines]);
 
   const { data: tours } = useDeliveryTours({ activeOnly: true });
   const validTours = useMemo(() => {
