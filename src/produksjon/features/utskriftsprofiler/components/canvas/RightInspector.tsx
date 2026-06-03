@@ -1,13 +1,17 @@
 import {
   AlignCenter,
+  AlignEndVertical,
   AlignJustify,
   AlignLeft,
   AlignRight,
+  AlignStartVertical,
+  AlignVerticalSpaceAround,
   Minus,
   Plus,
   Square,
   Underline,
   Trash2,
+  WrapText,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
@@ -19,8 +23,10 @@ import {
   FIELD_GROUPS,
   FIELD_LABELS,
   GROUP_LABELS,
+  VERTICAL_ALIGNMENTS,
   type Alignment,
   type ProfileField,
+  type VerticalAlignment,
 } from "../../types";
 import { clamp, round1 } from "../../lib/canvasUtils";
 
