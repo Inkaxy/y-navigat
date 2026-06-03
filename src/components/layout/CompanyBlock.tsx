@@ -111,10 +111,11 @@ export function CompanyBlock({ className }: { className?: string }) {
               className="flex items-center justify-between gap-2"
             >
               <span className="flex flex-col">
-                <span className="text-sm font-medium">{e.legal_name}</span>
-                <span className="text-xs text-muted-foreground">{e.short_code}</span>
+                <span className="text-sm font-medium">{entityLabel(e)}</span>
+                <span className="text-xs text-muted-foreground">{e.legal_name}</span>
               </span>
               {legalEntityId === e.id && <span className="h-2 w-2 rounded-full bg-app" aria-hidden />}
+
             </DropdownMenuItem>
           ))
         ) : (
