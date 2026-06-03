@@ -10,7 +10,7 @@ export interface OrderLineCustomerInfo {
   /** Formatert leveringsadresse (linje1 + (postnr by)). Prioritert:
    *  ordrens leveringsadresse → kundens leveringsadresse. */
   deliveryAddress: string | null;
-  /** Formatert leveringsdato (f.eks. "02.jun.26") fra orders.delivery_date. */
+  /** Formatert leveringsdato (f.eks. "06.06.26") fra orders.delivery_date. */
   deliveryDate: string | null;
   /** Formatert hentetidspunkt (f.eks. "Hentes kl 10:00") fra orders.delivery_time. */
   pickupTime: string | null;
@@ -216,10 +216,11 @@ export function useOrderLineCustomerInfo(orderLineIds: string[] | undefined) {
           ? (() => {
               const d = new Date(row.delivery_date);
               const day = String(d.getDate()).padStart(2, "0");
-              const months = ["jan","feb","mar","apr","mai","jun","jul","aug","sep","okt","nov","des"];
-              const mon = months[d.getMonth()];
+              const mm = String(d.getMonth() + 1).padStart(2, "0");
               const yy = String(d.getFullYear()).slice(-2);
-              return `${day}.${mon}.${yy}`;
+              // U+200B (zero-width space) lar dato brytes mellom "06.06." og "26"
+              // når "Bryt linje + krymp" er på, men vises som "06.06.26" ellers.
+              return `${day}.${mm}.\u200B${yy}`;
             })()
           : null;
         const pickupTime = row.delivery_time
