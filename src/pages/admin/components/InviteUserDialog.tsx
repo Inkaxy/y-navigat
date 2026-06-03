@@ -143,8 +143,7 @@ export function InviteUserDialog({ open, onOpenChange, onInvited }: Props) {
         <DialogHeader>
           <DialogTitle>Inviter ny bruker</DialogTitle>
           <DialogDescription>
-            Brukeren mottar en e-post med lenke for å sette passord. Du kan tilordne
-            flere selskap og stillinger.
+            Brukeren mottar en e-post med en 6-sifret aktiveringskode. Koden er gyldig i 7 dager. Du kan tilordne flere selskap og stillinger.
           </DialogDescription>
         </DialogHeader>
 
