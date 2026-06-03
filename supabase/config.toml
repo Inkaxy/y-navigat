@@ -34,6 +34,9 @@ verify_jwt = true
 [functions.create-user-with-password]
 verify_jwt = true
 
+[functions.redeem-invitation]
+verify_jwt = false
+
 [functions.met-forecast]
 verify_jwt = false
 
