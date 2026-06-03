@@ -230,7 +230,9 @@ export type CustomerOrderInput = {
   source: "phone" | "email" | "in_store" | "manual";
   sendSms: boolean;
   sendEmail: boolean;
+  isPaid: boolean;
   lines: CustomerOrderLineInput[];
+
 };
 
 export function useCreateCustomerOrder() {
