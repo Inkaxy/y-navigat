@@ -81,8 +81,10 @@ export function LabelThumbnail({
         >
           <div className="relative h-full w-full">
             {included.map((f) => {
-              const fontPx = Math.max(4, f.font_size * pxPerMm * 0.32);
+              const autoFit = f.auto_fit ?? false;
+              const vAlign = f.vertical_alignment ?? "middle";
               let content: React.ReactNode;
+              let measureString = "";
               if (f.field_type === "logo" && logoUrl) {
                 content = (
                   <img
@@ -92,10 +94,25 @@ export function LabelThumbnail({
                   />
                 );
               } else if (f.field_type === "firmanavn") {
-                content = companyName || FIELD_LABELS.firmanavn;
+                measureString = companyName || FIELD_LABELS.firmanavn;
+                content = measureString;
               } else {
-                content = `[${FIELD_LABELS[f.field_type]}]`;
+                measureString = `[${FIELD_LABELS[f.field_type]}]`;
+                content = measureString;
               }
+              const effectivePt =
+                autoFit && f.field_type !== "logo"
+                  ? fitFontSizePt(measureString, f.font_size, f.width_mm, f.height_mm, {
+                      bold: f.bold,
+                    })
+                  : f.font_size;
+              const fontPx = Math.max(4, effectivePt * pxPerMm * 0.32);
+              const alignItems =
+                vAlign === "top"
+                  ? "flex-start"
+                  : vAlign === "bottom"
+                    ? "flex-end"
+                    : "center";
               return (
                 <div
                   key={f.field_type}
@@ -113,10 +130,11 @@ export function LabelThumbnail({
                   }}
                 >
                   <div
-                    className="flex h-full w-full items-center px-0.5 leading-tight"
+                    className="flex h-full w-full px-0.5 leading-tight"
                     style={{
                       fontSize: fontPx,
                       fontWeight: f.bold ? 700 : 400,
+                      alignItems,
                       justifyContent:
                         f.alignment === "center"
                           ? "center"
@@ -126,7 +144,15 @@ export function LabelThumbnail({
                       textAlign: f.alignment,
                     }}
                   >
-                    <span className="truncate">{content}</span>
+                    <span
+                      className={
+                        autoFit
+                          ? "block w-full whitespace-pre-wrap break-words"
+                          : "block w-full truncate"
+                      }
+                    >
+                      {content}
+                    </span>
                   </div>
                 </div>
               );
