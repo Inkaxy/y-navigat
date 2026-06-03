@@ -12,6 +12,7 @@ import type {
   FieldType,
 } from "@/produksjon/features/utskriftsprofiler/types";
 import { FIELD_LABELS } from "@/produksjon/features/utskriftsprofiler/types";
+import { fitFontSizePt } from "@/produksjon/features/utskriftsprofiler/lib/fitText";
 import type { LabelProductRow } from "../types";
 import type { Merknad } from "@/ordre/lib/merknad";
 
