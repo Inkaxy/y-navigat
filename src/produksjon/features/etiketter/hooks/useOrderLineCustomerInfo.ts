@@ -218,7 +218,9 @@ export function useOrderLineCustomerInfo(orderLineIds: string[] | undefined) {
               const day = String(d.getDate()).padStart(2, "0");
               const mm = String(d.getMonth() + 1).padStart(2, "0");
               const yy = String(d.getFullYear()).slice(-2);
-              return `${day}.${mm}.${yy}`;
+              // U+200B (zero-width space) lar dato brytes mellom "06.06." og "26"
+              // når "Bryt linje + krymp" er på, men vises som "06.06.26" ellers.
+              return `${day}.${mm}.\u200B${yy}`;
             })()
           : null;
         const pickupTime = row.delivery_time
