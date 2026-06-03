@@ -72,7 +72,7 @@ export function useOrderLineCustomerInfo(orderLineIds: string[] | undefined) {
       const { data: orders, error: oErr } = await supabase
         .from("orders")
         .select(
-          "id, customer_id, final_customer_name, final_customer_phone, delivery_date, delivery_time, delivery_address_line1, delivery_postal_code, delivery_city, use_customer_default_address",
+          "id, customer_id, final_customer_name, final_customer_phone, delivery_date, delivery_time, delivery_address_line1, delivery_postal_code, delivery_city, use_customer_default_address, is_paid",
         )
         .in("id", orderIds);
       if (oErr) throw oErr;
