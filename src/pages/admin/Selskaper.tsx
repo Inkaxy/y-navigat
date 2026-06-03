@@ -20,6 +20,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
+import { CATEGORY_LABELS } from "@/hooks/useAccessibleApps";
 
 
 type LE = {
@@ -342,8 +343,8 @@ function EntityAppsSection({ entityId }: { entityId: string }) {
       const [appsRes, accessRes] = await Promise.all([
         supabase
           .from("apps")
-          .select("id, code, display_name, category, status, color_hex")
-          .in("status", ["active", "beta"])
+          .select("id, code, display_name, category, status, color_hex, sort_order")
+          .neq("status", "archived")
           .order("sort_order", { ascending: true }),
         supabase
           .from("legal_entity_app_access")
@@ -381,36 +382,135 @@ function EntityAppsSection({ entityId }: { entityId: string }) {
     onError: (e: any) => toast.error(e.message ?? "Kunne ikke oppdatere"),
   });
 
+  const bulkSet = useMutation({
+    mutationFn: async ({ appIds, enabled }: { appIds: string[]; enabled: boolean }) => {
+      if (appIds.length === 0) return;
+      const rows = appIds.map((app_id) => ({
+        legal_entity_id: entityId,
+        app_id,
+        enabled,
+      }));
+      const { error } = await supabase
+        .from("legal_entity_app_access")
+        .upsert(rows, { onConflict: "legal_entity_id,app_id" });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["entity-apps-config", entityId] });
+      qc.invalidateQueries({ queryKey: ["accessible-apps"] });
+      toast.success("App-tilgang oppdatert");
+    },
+    onError: (e: any) => toast.error(e.message ?? "Kunne ikke oppdatere"),
+  });
+
+  const apps = data ?? [];
+  const enabledCount = apps.filter((a) => a.enabled).length;
+  const totalCount = apps.length;
+  const allIds = apps.map((a) => a.id);
+
+  const grouped = apps.reduce<Record<string, typeof apps>>((acc, app) => {
+    (acc[app.category] ||= []).push(app);
+    return acc;
+  }, {});
+  const categoryOrder = ["platform", "masterdata", "operations", "retail", "finance", "analytics", "hr", "public", "general"];
+  const sortedCategories = Object.keys(grouped).sort((a, b) => {
+    const ai = categoryOrder.indexOf(a);
+    const bi = categoryOrder.indexOf(b);
+    return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+  });
+
+  const statusLabel = (s: string) =>
+    ({ active: "Aktiv", beta: "Beta", in_development: "Under utvikling", planned: "Planlagt" } as Record<string, string>)[s] ?? s;
+
   return (
     <Section title="Apper">
-      <p className="text-xs text-muted-foreground mb-3">
-        Skru av apper som ikke skal være tilgjengelige for brukere i dette selskapet.
-        Endringen påvirker meny, app-launcher og kommandopalett for alle som jobber her.
-      </p>
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <p className="text-xs text-muted-foreground flex-1">
+          Skru av apper som ikke skal være tilgjengelige for brukere i dette selskapet.
+          Endringen påvirker meny, app-launcher og kommandopalett for alle som jobber her.
+        </p>
+        {!isLoading && totalCount > 0 && (
+          <div className="flex items-center gap-2 shrink-0">
+            <Badge variant="secondary" className="text-xs">
+              {enabledCount}/{totalCount}
+            </Badge>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 px-2 text-xs"
+              disabled={bulkSet.isPending || enabledCount === totalCount}
+              onClick={() => bulkSet.mutate({ appIds: allIds, enabled: true })}
+            >
+              Alle på
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 px-2 text-xs"
+              disabled={bulkSet.isPending || enabledCount === 0}
+              onClick={() => bulkSet.mutate({ appIds: allIds, enabled: false })}
+            >
+              Alle av
+            </Button>
+          </div>
+        )}
+      </div>
+
       {isLoading && <div className="text-sm text-muted-foreground">Laster …</div>}
+
       {!isLoading && (
-        <div className="space-y-2 rounded-md border border-line bg-surface-canvas p-3">
-          {(data ?? []).map((app) => (
-            <div key={app.id} className="flex items-center justify-between gap-3 py-1">
-              <div className="flex flex-col">
-                <span className="text-sm font-medium">{app.display_name}</span>
-                <span className="text-xs text-muted-foreground font-mono">{app.code}</span>
+        <div className="space-y-4 rounded-md border border-line bg-surface-canvas p-3">
+          {sortedCategories.map((cat) => (
+            <div key={cat}>
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5 px-1">
+                {CATEGORY_LABELS[cat] ?? cat}
               </div>
-              <Switch
-                checked={app.enabled}
-                disabled={toggle.isPending}
-                onCheckedChange={(checked) =>
-                  toggle.mutate({ appId: app.id, enabled: checked })
-                }
-              />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                {grouped[cat].map((app) => {
+                  const isPlanned = app.status === "planned" || app.status === "in_development";
+                  return (
+                    <div
+                      key={app.id}
+                      className="flex items-center justify-between gap-3 rounded-md border border-line/60 bg-background px-2.5 py-2"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span
+                          className="h-2.5 w-2.5 rounded-full shrink-0"
+                          style={{ background: app.color_hex }}
+                          aria-hidden
+                        />
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-sm font-medium truncate">{app.display_name}</span>
+                            {isPlanned && (
+                              <span className="text-[10px] rounded bg-muted px-1 py-0.5 text-muted-foreground">
+                                {statusLabel(app.status)}
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-[11px] text-muted-foreground font-mono">{app.code}</span>
+                        </div>
+                      </div>
+                      <Switch
+                        checked={app.enabled}
+                        disabled={toggle.isPending || bulkSet.isPending}
+                        onCheckedChange={(checked) =>
+                          toggle.mutate({ appId: app.id, enabled: checked })
+                        }
+                      />
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           ))}
-          {(data ?? []).length === 0 && (
-            <div className="text-sm text-muted-foreground">Ingen aktive apper</div>
+          {totalCount === 0 && (
+            <div className="text-sm text-muted-foreground">Ingen apper</div>
           )}
         </div>
       )}
     </Section>
   );
 }
+
 
