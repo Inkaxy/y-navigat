@@ -60,6 +60,7 @@ import KunderCustomerDetail from "@/kunder/pages/CustomerDetail";
 import KunderProfileList from "@/kunder/pages/ProfileList";
 import KunderProfileDetail from "@/kunder/pages/ProfileDetail";
 import KunderPickupLocations from "@/kunder/pages/PickupLocations";
+import KunderInnstillinger from "@/kunder/pages/Innstillinger";
 import KunderCustomerGroups from "@/kunder/pages/CustomerGroups";
 import KunderCustomerHistory from "@/kunder/pages/CustomerHistory";
 import KunderPlaceholder from "@/kunder/pages/Placeholder";
