@@ -59,6 +59,20 @@ const STATIC_SUBMENUS: Record<string, { prefix: string; appSlug: string; items: 
       { kind: "link", to: "/ordre/innstillinger", label: "Innstillinger" },
     ],
   },
+  produksjon: {
+    prefix: "/produksjon",
+    appSlug: "produksjon",
+    items: [
+      { kind: "link", to: "/produksjon/oversikt", label: "Oversikt" },
+      { kind: "link", to: "/produksjon/produksjonsplan", label: "Produksjonsplan" },
+      { kind: "link", to: "/produksjon/etiketter", label: "Etiketter" },
+      { kind: "dropdown", label: "Innstillinger", basePath: "/produksjon/innstillinger", links: [
+        { to: "/produksjon/innstillinger/produksjonsavdelinger", label: "Produksjonsavdelinger" },
+        { to: "/produksjon/innstillinger/pakkeomrader", label: "Pakkeområder" },
+        { to: "/produksjon/innstillinger/utskriftsprofiler", label: "Utskriftsprofiler" },
+      ] },
+    ],
+  },
   admin: {
     prefix: "/admin",
     appSlug: "nbos",
