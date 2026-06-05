@@ -175,6 +175,7 @@ function RavarerNav() {
       basePath: "/ravarer/innstillinger",
       links: [
         { to: "/ravarer/innstillinger/match-toleranser", label: "Match-toleranser" },
+        { to: "/ravarer/innstillinger/tripletex", label: "Tripletex-tilkobling" },
         { to: "/ravarer/innstillinger/kategorier", label: "Kategorier" },
         { to: "/ravarer/innstillinger/ai-tjenester", label: "AI-tjenester" },
       ],

@@ -7,17 +7,18 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  Plug, RefreshCw, AlertTriangle, CheckCircle2, Settings2, ArrowRight, Mail, Sparkles,
+  Plug, RefreshCw, AlertTriangle, CheckCircle2, Settings2, ArrowRight,
 } from "lucide-react";
 
 // NOTE: Tripletex uses its own dedicated tables (tripletex_credentials +
-// tripletex_sync_log) and is rendered as a top card here. Microsoft 365 og
-// AI-tjenester har egne kort som leser fra egne tabeller/RPC-er. Det generiske
-// `integrations`-griddet under er for fremtidige seedede integrasjoner.
+// tripletex_sync_log) and is rendered as a top card here. The generic
+// `integrations` grid below is empty until seed-rader legges inn (egen prompt).
+// Unifisering av modellene tas i en senere prompt.
 
 const PLACEHOLDERS = [
   { type: "tedebe", name: "Tedebe", desc: "Råvarer-katalog og databladimport." },
   { type: "fiken",  name: "Fiken",  desc: "Regnskap og fakturering." },
+  { type: "email",  name: "E-post (SMTP/IMAP)", desc: "Utgående og innkommende e-post." },
 ];
 
 const STATUS_LABEL: Record<string, string> = {
@@ -49,42 +50,6 @@ export default function Integrasjoner() {
         .order("legal_entity_id");
       if (error) throw error;
       return data ?? [];
-    },
-  });
-
-  const { data: m365 } = useQuery({
-    queryKey: ["admin-integrations-m365"],
-    queryFn: async () => {
-      const { data, error } = await (supabase as any).rpc("get_email_m365_status");
-      if (error) return null;
-      const row = Array.isArray(data) ? data[0] : data;
-      return row as { connected: boolean; account_email: string | null; connected_at: string | null } | null;
-    },
-  });
-
-  const { data: aiConfigs = [] } = useQuery({
-    queryKey: ["admin-integrations-ai-configs"],
-    queryFn: async () => {
-      const { data, error } = await (supabase as any)
-        .from("ai_provider_config")
-        .select("id, provider, model, purpose, is_active")
-        .eq("is_active", true);
-      if (error) return [];
-      return data ?? [];
-    },
-  });
-
-  const { data: aiCost30d = 0 } = useQuery({
-    queryKey: ["admin-integrations-ai-cost-30d"],
-    queryFn: async () => {
-      const since = new Date(Date.now() - 30 * 86400e3).toISOString();
-      const { data, error } = await (supabase as any)
-        .from("ai_usage_log")
-        .select("estimated_cost_usd")
-        .gte("created_at", since)
-        .limit(5000);
-      if (error) return 0;
-      return (data as any[]).reduce((s, r) => s + Number(r.estimated_cost_usd ?? 0), 0);
     },
   });
 
@@ -138,75 +103,16 @@ export default function Integrasjoner() {
         </Card>
       </Link>
 
-      {/* M365 + AI plattform-kort */}
-      <Link to="/admin/integrasjoner/email-m365" className="block">
-        <Card className="transition hover:border-app hover:shadow-sm">
-          <CardContent className="flex flex-wrap items-center justify-between gap-4 p-5">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-app/10 text-app">
-                <Mail className="h-5 w-5" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="font-semibold">E-post (Microsoft 365)</h3>
-                  {m365?.connected ? (
-                    <Badge variant="default" className="gap-1">
-                      <CheckCircle2 className="h-3 w-3" /> Tilkoblet
-                    </Badge>
-                  ) : (
-                    <Badge variant="outline">Ikke konfigurert</Badge>
-                  )}
-                </div>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  Felles avsender-konto for utgående og innkommende e-post.
-                  {m365?.connected && m365.account_email && <> Konto: <strong>{m365.account_email}</strong>.</>}
-                </p>
-              </div>
-            </div>
-            <ArrowRight className="h-4 w-4 text-muted-foreground" />
-          </CardContent>
-        </Card>
-      </Link>
-
-      <Link to="/admin/integrasjoner/ai" className="block">
-        <Card className="transition hover:border-app hover:shadow-sm">
-          <CardContent className="flex flex-wrap items-center justify-between gap-4 p-5">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-app/10 text-app">
-                <Sparkles className="h-5 w-5" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="font-semibold">AI-tjenester</h3>
-                  {aiConfigs.length > 0 ? (
-                    <Badge variant="default" className="gap-1">
-                      <CheckCircle2 className="h-3 w-3" /> {aiConfigs.length} aktive
-                    </Badge>
-                  ) : (
-                    <Badge variant="outline">Ingen konfig</Badge>
-                  )}
-                </div>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  Provider, modell og forbruk for AI-funksjoner. Siste 30 dager: <strong>${Number(aiCost30d).toFixed(2)}</strong>.
-                </p>
-              </div>
-            </div>
-            <ArrowRight className="h-4 w-4 text-muted-foreground" />
-          </CardContent>
-        </Card>
-      </Link>
-
       {/* Generiske integrasjoner */}
       <div>
         <div className="mb-2 flex items-center justify-between">
           <h2 className="text-sm font-semibold">Generiske integrasjoner</h2>
           {!isLoading && integrations.length === 0 && (
             <span className="text-xs text-muted-foreground">
-              Ingen generiske integrasjoner er seedet ennå. Tedebe og Fiken seedes i egen prompt.
+              Ingen generiske integrasjoner er seedet ennå. Tedebe, Fiken og e-post seedes i egen prompt.
             </span>
           )}
         </div>
-
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {integrations.map((row: any) => (

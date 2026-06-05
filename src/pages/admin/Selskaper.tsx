@@ -18,10 +18,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { CATEGORY_LABELS } from "@/hooks/useAccessibleApps";
-
 
 type LE = {
   id: string;
@@ -175,30 +172,35 @@ export default function Selskaper() {
           <TableHeader>
             <TableRow>
               <TableHead>Kode</TableHead>
-              <TableHead>Visningsnavn</TableHead>
-              <TableHead>Juridisk navn</TableHead>
+              <TableHead>Navn</TableHead>
               <TableHead>Org.nr</TableHead>
+              <TableHead>Adresse</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>Opprettet</TableHead>
               <TableHead className="text-right">Handling</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading && (
-              <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">Laster…</TableCell></TableRow>
+              <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">Laster…</TableCell></TableRow>
             )}
             {!isLoading && filtered.length === 0 && (
-              <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">Ingen treff</TableCell></TableRow>
+              <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">Ingen treff</TableCell></TableRow>
             )}
             {filtered.map((r) => (
               <TableRow key={r.id}>
                 <TableCell className="font-mono">{r.short_code}</TableCell>
-                <TableCell className="font-medium">{r.display_name?.trim() || "—"}</TableCell>
-                <TableCell className="text-sm text-muted-foreground">{r.legal_name}</TableCell>
+                <TableCell className="font-medium">{r.legal_name}</TableCell>
                 <TableCell>{r.org_number}</TableCell>
+                <TableCell className="text-sm text-muted-foreground">
+                  {[r.invoice_address_line1, r.invoice_postal_code, r.invoice_city].filter(Boolean).join(", ")}
+                </TableCell>
                 <TableCell>
                   <Badge variant={r.status === "active" ? "default" : "secondary"}>{r.status}</Badge>
                 </TableCell>
-
+                <TableCell className="text-sm text-muted-foreground">
+                  {new Date(r.created_at).toLocaleDateString("no-NO")}
+                </TableCell>
                 <TableCell className="text-right">
                   <Button size="sm" variant="ghost" onClick={() => setEditing(r)}>
                     <Pencil className="h-3.5 w-3.5" />
@@ -231,10 +233,6 @@ export default function Selskaper() {
                   <Field label="Visningsnavn" value={editing.display_name ?? ""} onChange={(v) => setEditing({ ...editing, display_name: v })} className="col-span-2" />
                 </div>
               </Section>
-
-              {editing.id && <EntityAppsSection entityId={editing.id} />}
-
-
 
               <Section title="GS1">
                 <div className="grid grid-cols-2 gap-3">
@@ -334,183 +332,3 @@ function Section({ title, children }: { title: string; children: React.ReactNode
     </div>
   );
 }
-
-function EntityAppsSection({ entityId }: { entityId: string }) {
-  const qc = useQueryClient();
-  const { data, isLoading } = useQuery({
-    queryKey: ["entity-apps-config", entityId],
-    queryFn: async () => {
-      const [appsRes, accessRes] = await Promise.all([
-        supabase
-          .from("apps")
-          .select("id, code, display_name, category, status, color_hex, sort_order")
-          .neq("status", "archived")
-          .order("sort_order", { ascending: true }),
-        supabase
-          .from("legal_entity_app_access")
-          .select("app_id, enabled")
-          .eq("legal_entity_id", entityId),
-      ]);
-      if (appsRes.error) throw appsRes.error;
-      if (accessRes.error) throw accessRes.error;
-      const disabled = new Map<string, boolean>();
-      for (const row of accessRes.data ?? []) {
-        disabled.set(row.app_id, row.enabled === false);
-      }
-      return (appsRes.data ?? []).map((a) => ({
-        ...a,
-        enabled: !disabled.get(a.id),
-      }));
-    },
-  });
-
-  const toggle = useMutation({
-    mutationFn: async ({ appId, enabled }: { appId: string; enabled: boolean }) => {
-      const { error } = await supabase
-        .from("legal_entity_app_access")
-        .upsert(
-          { legal_entity_id: entityId, app_id: appId, enabled },
-          { onConflict: "legal_entity_id,app_id" },
-        );
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["entity-apps-config", entityId] });
-      qc.invalidateQueries({ queryKey: ["accessible-apps"] });
-      toast.success("App-tilgang oppdatert");
-    },
-    onError: (e: any) => toast.error(e.message ?? "Kunne ikke oppdatere"),
-  });
-
-  const bulkSet = useMutation({
-    mutationFn: async ({ appIds, enabled }: { appIds: string[]; enabled: boolean }) => {
-      if (appIds.length === 0) return;
-      const rows = appIds.map((app_id) => ({
-        legal_entity_id: entityId,
-        app_id,
-        enabled,
-      }));
-      const { error } = await supabase
-        .from("legal_entity_app_access")
-        .upsert(rows, { onConflict: "legal_entity_id,app_id" });
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["entity-apps-config", entityId] });
-      qc.invalidateQueries({ queryKey: ["accessible-apps"] });
-      toast.success("App-tilgang oppdatert");
-    },
-    onError: (e: any) => toast.error(e.message ?? "Kunne ikke oppdatere"),
-  });
-
-  const apps = data ?? [];
-  const enabledCount = apps.filter((a) => a.enabled).length;
-  const totalCount = apps.length;
-  const allIds = apps.map((a) => a.id);
-
-  const grouped = apps.reduce<Record<string, typeof apps>>((acc, app) => {
-    (acc[app.category] ||= []).push(app);
-    return acc;
-  }, {});
-  const categoryOrder = ["platform", "masterdata", "operations", "retail", "finance", "analytics", "hr", "public", "general"];
-  const sortedCategories = Object.keys(grouped).sort((a, b) => {
-    const ai = categoryOrder.indexOf(a);
-    const bi = categoryOrder.indexOf(b);
-    return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
-  });
-
-  const statusLabel = (s: string) =>
-    ({ active: "Aktiv", beta: "Beta", in_development: "Under utvikling", planned: "Planlagt" } as Record<string, string>)[s] ?? s;
-
-  return (
-    <Section title="Apper">
-      <div className="flex items-start justify-between gap-3 mb-3">
-        <p className="text-xs text-muted-foreground flex-1">
-          Skru av apper som ikke skal være tilgjengelige for brukere i dette selskapet.
-          Endringen påvirker meny, app-launcher og kommandopalett for alle som jobber her.
-        </p>
-        {!isLoading && totalCount > 0 && (
-          <div className="flex items-center gap-2 shrink-0">
-            <Badge variant="secondary" className="text-xs">
-              {enabledCount}/{totalCount}
-            </Badge>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-7 px-2 text-xs"
-              disabled={bulkSet.isPending || enabledCount === totalCount}
-              onClick={() => bulkSet.mutate({ appIds: allIds, enabled: true })}
-            >
-              Alle på
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-7 px-2 text-xs"
-              disabled={bulkSet.isPending || enabledCount === 0}
-              onClick={() => bulkSet.mutate({ appIds: allIds, enabled: false })}
-            >
-              Alle av
-            </Button>
-          </div>
-        )}
-      </div>
-
-      {isLoading && <div className="text-sm text-muted-foreground">Laster …</div>}
-
-      {!isLoading && (
-        <div className="space-y-4 rounded-md border border-line bg-surface-canvas p-3">
-          {sortedCategories.map((cat) => (
-            <div key={cat}>
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5 px-1">
-                {CATEGORY_LABELS[cat] ?? cat}
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                {grouped[cat].map((app) => {
-                  const isPlanned = app.status === "planned" || app.status === "in_development";
-                  return (
-                    <div
-                      key={app.id}
-                      className="flex items-center justify-between gap-3 rounded-md border border-line/60 bg-background px-2.5 py-2"
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <span
-                          className="h-2.5 w-2.5 rounded-full shrink-0"
-                          style={{ background: app.color_hex }}
-                          aria-hidden
-                        />
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-sm font-medium truncate">{app.display_name}</span>
-                            {isPlanned && (
-                              <span className="text-[10px] rounded bg-muted px-1 py-0.5 text-muted-foreground">
-                                {statusLabel(app.status)}
-                              </span>
-                            )}
-                          </div>
-                          <span className="text-[11px] text-muted-foreground font-mono">{app.code}</span>
-                        </div>
-                      </div>
-                      <Switch
-                        checked={app.enabled}
-                        disabled={toggle.isPending || bulkSet.isPending}
-                        onCheckedChange={(checked) =>
-                          toggle.mutate({ appId: app.id, enabled: checked })
-                        }
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-          {totalCount === 0 && (
-            <div className="text-sm text-muted-foreground">Ingen apper</div>
-          )}
-        </div>
-      )}
-    </Section>
-  );
-}
-
-

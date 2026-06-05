@@ -13,17 +13,19 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSelection } from "@/providers/SelectionProvider";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
-import { entityLabel, brandLabel } from "@/lib/entityLabel";
 
 interface Entity {
   id: string;
   legal_name: string;
   short_code: string;
-  display_name: string | null;
   status: string;
   founded_year: number | null;
 }
 
+/** Strips trailing " AS" / " ASA" / " AB" and uppercases. */
+function brandLabel(legalName: string): string {
+  return legalName.replace(/\s+(AS|ASA|AB|SA|BV)\s*$/i, "").toUpperCase();
+}
 
 /**
  * CompanyBlock — venstre i topbar.
@@ -45,7 +47,7 @@ export function CompanyBlock({ className }: { className?: string }) {
 
       const { data, error } = await supabase
         .from("legal_entities")
-        .select("id, short_code, legal_name, display_name, status, founded_year")
+        .select("id, short_code, legal_name, status, founded_year")
         .in("id", entityIds)
         .eq("status", "active")
         .order("legal_name", { ascending: true });
@@ -60,12 +62,9 @@ export function CompanyBlock({ className }: { className?: string }) {
     if (firstActive) setLegalEntityId(firstActive.id);
   }, [entities, legalEntityId, setLegalEntityId]);
 
-
   const active = entities?.find((e) => e.id === legalEntityId) ?? entities?.[0] ?? null;
-  const rawLabel = active ? entityLabel(active) : "";
-  const label = rawLabel ? brandLabel(rawLabel) : "VELG SELSKAP";
+  const label = active ? brandLabel(active.legal_name) : "VELG SELSKAP";
   const year = active?.founded_year ?? null;
-
 
   return (
     <DropdownMenu>
@@ -111,11 +110,10 @@ export function CompanyBlock({ className }: { className?: string }) {
               className="flex items-center justify-between gap-2"
             >
               <span className="flex flex-col">
-                <span className="text-sm font-medium">{entityLabel(e)}</span>
-                <span className="text-xs text-muted-foreground">{e.legal_name}</span>
+                <span className="text-sm font-medium">{e.legal_name}</span>
+                <span className="text-xs text-muted-foreground">{e.short_code}</span>
               </span>
               {legalEntityId === e.id && <span className="h-2 w-2 rounded-full bg-app" aria-hidden />}
-
             </DropdownMenuItem>
           ))
         ) : (

@@ -64,7 +64,7 @@ export function TripletexStatusCard() {
           </div>
         </div>
         <Button asChild variant="outline" size="sm" className="gap-2">
-          <Link to="/admin/integrasjoner/tripletex">
+          <Link to="/ravarer/innstillinger/tripletex">
             <RefreshCw className="h-4 w-4" />
             {configured === 0 ? "Konfigurer Tripletex" : "Administrer"}
           </Link>

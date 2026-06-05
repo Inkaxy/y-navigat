@@ -23,8 +23,6 @@ import AdminPlaceholder from "./pages/admin/AdminPlaceholder";
 import Integrasjoner from "./pages/admin/Integrasjoner";
 import IntegrasjonDetalj from "./pages/admin/IntegrasjonDetalj";
 import TripletexIntegrasjon from "./pages/admin/TripletexIntegrasjon";
-import EmailM365Integrasjon from "./pages/admin/EmailM365Integrasjon";
-import AiIntegrasjon from "./pages/admin/AiIntegrasjon";
 import Helsesenter from "./pages/admin/Helsesenter";
 import Audit from "./pages/admin/Audit";
 import Selskaper from "./pages/admin/Selskaper";
@@ -112,7 +110,7 @@ import FakturaerReviewQueue from "@/fakturaer/pages/ReviewQueue";
 import FakturaerImport from "@/fakturaer/pages/ImportInvoice";
 import FakturaerRegistrerLinjer from "@/fakturaer/pages/RegistrerLinjer";
 import { InvoiceAccessGuard } from "@/ravarer/components/InvoiceAccessGuard";
-
+import TripletexSettings from "@/ravarer/pages/innstillinger/TripletexSettings";
 import AiServicesSettings from "@/ravarer/pages/innstillinger/AiServicesSettings";
 import MatchToleranserSettings from "@/ravarer/pages/innstillinger/MatchToleranser";
 import KategorierSettings from "@/ravarer/pages/innstillinger/KategorierSettings";
@@ -196,10 +194,7 @@ const App = () => (
               <Route path="/admin/apper" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><Apper /></AppAccessGuard></Shell>} />
               <Route path="/admin/integrasjoner" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><Integrasjoner /></AppAccessGuard></Shell>} />
               <Route path="/admin/integrasjoner/tripletex" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><TripletexIntegrasjon /></AppAccessGuard></Shell>} />
-              <Route path="/admin/integrasjoner/email-m365" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><EmailM365Integrasjon /></AppAccessGuard></Shell>} />
-              <Route path="/admin/integrasjoner/ai" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><AiIntegrasjon /></AppAccessGuard></Shell>} />
               <Route path="/admin/integrasjoner/:integrationType" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><IntegrasjonDetalj /></AppAccessGuard></Shell>} />
-
               <Route path="/admin/helsesenter" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><Helsesenter /></AppAccessGuard></Shell>} />
               <Route path="/admin/audit" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><Audit /></AppAccessGuard></Shell>} />
               {/* Varer embed routes — frosset kontrakt, INGEN AppShell */}
@@ -257,7 +252,7 @@ const App = () => (
               <Route path="/ravarer/fakturaer/til-behandling" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><InvoiceAccessGuard><FakturaerProvider><FakturaerReviewQueue /></FakturaerProvider></InvoiceAccessGuard></RavarerProvider></AppAccessGuard></Shell>} />
               <Route path="/ravarer/fakturaer/:id/registrer-linjer" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><InvoiceAccessGuard><FakturaerProvider><FakturaerRegistrerLinjer /></FakturaerProvider></InvoiceAccessGuard></RavarerProvider></AppAccessGuard></Shell>} />
               <Route path="/ravarer/fakturaer/:id" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><InvoiceAccessGuard><FakturaerProvider><FakturaerDetail /></FakturaerProvider></InvoiceAccessGuard></RavarerProvider></AppAccessGuard></Shell>} />
-              <Route path="/ravarer/innstillinger" element={<Navigate to="/ravarer/innstillinger/match-toleranser" replace />} />
+              <Route path="/ravarer/innstillinger" element={<Navigate to="/ravarer/innstillinger/tripletex" replace />} />
               <Route path="/ravarer/leverandorer" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><RavarerLeverandorer /></RavarerProvider></AppAccessGuard></Shell>} />
               <Route path="/ravarer/avtaler" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><RavarerAvtaler /></RavarerProvider></AppAccessGuard></Shell>} />
               <Route path="/ravarer/datablad-endringer" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><RavarerDatabladEndringer /></RavarerProvider></AppAccessGuard></Shell>} />
@@ -268,7 +263,7 @@ const App = () => (
               <Route path="/ravarer/forhandlinger/live/:id" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><InvoiceAccessGuard><RavarerLiveForhandlingWorkspace /></InvoiceAccessGuard></RavarerProvider></AppAccessGuard></Shell>} />
               <Route path="/ravarer/forhandlinger/:id/rediger" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><InvoiceAccessGuard><RavarerForhandlingWizard /></InvoiceAccessGuard></RavarerProvider></AppAccessGuard></Shell>} />
               <Route path="/ravarer/forhandlinger/:id" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><InvoiceAccessGuard><RavarerForhandlingDetail /></InvoiceAccessGuard></RavarerProvider></AppAccessGuard></Shell>} />
-              <Route path="/ravarer/innstillinger/tripletex" element={<Navigate to="/admin/integrasjoner/tripletex" replace />} />
+              <Route path="/ravarer/innstillinger/tripletex" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><TripletexSettings /></RavarerProvider></AppAccessGuard></Shell>} />
               <Route path="/ravarer/innstillinger/ai-tjenester" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><AiServicesSettings /></RavarerProvider></AppAccessGuard></Shell>} />
               <Route path="/ravarer/innstillinger/match-toleranser" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><MatchToleranserSettings /></RavarerProvider></AppAccessGuard></Shell>} />
               <Route path="/ravarer/innstillinger/kategorier" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><KategorierSettings /></RavarerProvider></AppAccessGuard></Shell>} />
