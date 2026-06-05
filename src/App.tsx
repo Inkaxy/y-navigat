@@ -60,6 +60,7 @@ import KunderCustomerDetail from "@/kunder/pages/CustomerDetail";
 import KunderProfileList from "@/kunder/pages/ProfileList";
 import KunderProfileDetail from "@/kunder/pages/ProfileDetail";
 import KunderPickupLocations from "@/kunder/pages/PickupLocations";
+import KunderInnstillinger from "@/kunder/pages/Innstillinger";
 import KunderCustomerGroups from "@/kunder/pages/CustomerGroups";
 import KunderCustomerHistory from "@/kunder/pages/CustomerHistory";
 import KunderPlaceholder from "@/kunder/pages/Placeholder";
@@ -235,7 +236,7 @@ const App = () => (
               <Route path="/kunder/profiler/:id" element={<Shell><AppAccessGuard appCode="kunder" appName="Kunder"><KunderEntityProvider><KunderProfileDetail /></KunderEntityProvider></AppAccessGuard></Shell>} />
               <Route path="/kunder/kundegrupper" element={<Shell><AppAccessGuard appCode="kunder" appName="Kunder"><KunderEntityProvider><KunderCustomerGroups /></KunderEntityProvider></AppAccessGuard></Shell>} />
               <Route path="/kunder/historikk" element={<Shell><AppAccessGuard appCode="kunder" appName="Kunder"><KunderEntityProvider><KunderCustomerHistory /></KunderEntityProvider></AppAccessGuard></Shell>} />
-              <Route path="/kunder/innstillinger" element={<Shell><AppAccessGuard appCode="kunder" appName="Kunder"><KunderEntityProvider><KunderPlaceholder title="Innstillinger" description="App-spesifikke innstillinger" /></KunderEntityProvider></AppAccessGuard></Shell>} />
+              <Route path="/kunder/innstillinger" element={<Shell><AppAccessGuard appCode="kunder" appName="Kunder"><KunderEntityProvider><KunderInnstillinger /></KunderEntityProvider></AppAccessGuard></Shell>} />
               <Route path="/kunder/innstillinger/hentesteder" element={<Shell><AppAccessGuard appCode="kunder" appName="Kunder"><KunderEntityProvider><KunderPickupLocations /></KunderEntityProvider></AppAccessGuard></Shell>} />
               <Route path="/ravarer" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><Navigate to="/ravarer/vareliste" replace /></RavarerProvider></AppAccessGuard></Shell>} />
               <Route path="/ravarer/vareliste" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><RavarerVareliste /></RavarerProvider></AppAccessGuard></Shell>} />
