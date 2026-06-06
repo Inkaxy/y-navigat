@@ -202,6 +202,7 @@ export default function TicketsList() {
   const { data: tickets = [], isLoading } = useTickets({
     search: serverSearch,
     status: statusFilter.length ? statusFilter : undefined,
+    priority: priorityFilter.length ? priorityFilter : undefined,
     assigned: assignedFilter === "all" ? "all" : assignedFilter,
   });
 
