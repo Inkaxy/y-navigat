@@ -621,7 +621,6 @@ export default function TicketsList() {
             </TableBody>
           </Table>
         </Card>
-      </div>
-    </>
+    </div>
   );
 }
