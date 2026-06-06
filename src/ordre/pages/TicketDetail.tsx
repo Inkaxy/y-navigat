@@ -22,7 +22,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/use-toast";
 import {
   useTicket, useTickets, useUpdateTicket,
-  type TicketStatus, type TicketPriority, type Ticket,
+  type TicketStatus, type TicketPriority,
 } from "@/ordre/hooks/useTickets";
 import {
   useTicketReplies, useSendTicketReply, useOrdrekontorAssignees,
