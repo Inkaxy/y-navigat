@@ -1,13 +1,12 @@
 import { useMemo, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { format, formatDistanceToNow } from "date-fns";
 import { nb } from "date-fns/locale";
 import {
-  ArrowDown, ArrowUp, ArrowUpDown, Calendar, Inbox, Link2, MapPin,
+  ArrowDown, ArrowUp, ArrowUpDown, Calendar, Flag, Inbox, Link2, MapPin,
   Paperclip, Search, Sparkles, UserCheck, X,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { AppBanner } from "@/ordre/components/shell/AppBanner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -58,6 +57,48 @@ type QuickFilter =
   | "changes" | "cancellations" | "complaints"
   | "pickup_today" | "pickup_tomorrow"
   | "awaiting_internal";
+
+function KpiTopbar({
+  ticketsCount, autoDraftPct, avgReplyMin, filteredCount,
+}: {
+  ticketsCount: number; autoDraftPct: number; avgReplyMin: number; filteredCount: number;
+}) {
+  return (
+    <div className="h-14 border-b bg-card flex items-center px-4 md:px-6 justify-between rounded-md mb-3">
+      <div className="flex items-center gap-6 flex-wrap">
+        <div className="flex items-center gap-2">
+          <Inbox className="h-4 w-4 text-muted-foreground" />
+          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">E-poster</span>
+          <span className="text-base font-semibold text-foreground">{ticketsCount}</span>
+          {filteredCount !== ticketsCount && (
+            <span className="text-[10px] text-muted-foreground">({filteredCount} filtrert)</span>
+          )}
+        </div>
+        <div className="h-4 w-px bg-border" />
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Auto-utkast</span>
+          <span className="text-base font-semibold text-[hsl(var(--brand-bronze,26_48%_43%))]">{autoDraftPct}%</span>
+          <div className="w-12 h-1.5 bg-muted rounded-full overflow-hidden">
+            <div
+              className="h-full bg-[hsl(var(--brand-bronze,26_48%_43%))]"
+              style={{ width: `${Math.min(100, Math.max(0, autoDraftPct))}%` }}
+            />
+          </div>
+        </div>
+        <div className="h-4 w-px bg-border" />
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Snitt svar</span>
+          <span className="text-base font-semibold text-foreground">{avgReplyMin}m</span>
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <Button asChild variant="outline" size="sm" className="gap-2">
+          <Link to="/ordre"><Inbox className="h-4 w-4" /> Dashboard</Link>
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 const QUICK_FILTERS: { key: QuickFilter; label: string; icon?: React.ReactNode }[] = [
   { key: "new", label: "Nye" },
@@ -132,6 +173,7 @@ export default function TicketsList() {
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<TicketStatus[]>(initialStatus);
+  const [priorityFilter, setPriorityFilter] = useState<TicketPriority[]>([]);
   const [assignedFilter, setAssignedFilter] = useState<string>(initialAssigned);
   const [outletFilter, setOutletFilter] = useState<string>("all");
   const [quickFilters, setQuickFilters] = useState<Set<QuickFilter>>(new Set());
@@ -160,6 +202,7 @@ export default function TicketsList() {
   const { data: tickets = [], isLoading } = useTickets({
     search: serverSearch,
     status: statusFilter.length ? statusFilter : undefined,
+    priority: priorityFilter.length ? priorityFilter : undefined,
     assigned: assignedFilter === "all" ? "all" : assignedFilter,
   });
 
@@ -283,102 +326,154 @@ export default function TicketsList() {
       return next;
     });
 
+  const togglePriority = (p: TicketPriority) =>
+    setPriorityFilter((prev) => (prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]));
+
   const hasAnyFilter =
-    statusFilter.length > 0 || assignedFilter !== "all" || outletFilter !== "all"
-    || quickFilters.size > 0 || !!search;
+    statusFilter.length > 0 || priorityFilter.length > 0 || assignedFilter !== "all"
+    || outletFilter !== "all" || quickFilters.size > 0 || !!search;
+
+  const kpis = useMemo(() => {
+    const total = rows.length;
+    const aiReadyCount = rows.filter((r) => r.aiReady).length;
+    return {
+      ticketsCount: total,
+      autoDraftPct: total === 0 ? 0 : Math.round((aiReadyCount / total) * 100),
+      avgReplyMin: 0,
+    };
+  }, [rows]);
 
   return (
-    <>
-      <AppBanner title="Ticket" subtitle="Innkommende e-poster og forespørsler" />
-      <div className="container mx-auto px-4 py-6 space-y-4 max-w-[1400px]">
-        <UnreadMentionsBanner />
-        {/* Søk + presise selects */}
-        <Card>
-          <CardContent className="pt-4 space-y-3">
-            <div className="grid gap-3 md:grid-cols-[1fr_220px_220px]">
-              <div className="relative">
-                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Søk i navn, epost, telefon, ordrenr, produkt, hentested, emne, innhold …"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="pl-8"
-                />
-              </div>
-              <Select value={assignedFilter} onValueChange={setAssignedFilter}>
-                <SelectTrigger>
-                  <UserCheck className="mr-2 h-3.5 w-3.5 text-muted-foreground" />
-                  <SelectValue placeholder="Ansvarlig" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Alle ansvarlige</SelectItem>
-                  <SelectItem value="mine">Mine</SelectItem>
-                  <SelectItem value="unassigned">Utildelte</SelectItem>
-                  {assignees.map((a) => (
-                    <SelectItem key={a.id} value={a.id}>{a.display_name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={outletFilter} onValueChange={setOutletFilter}>
-                <SelectTrigger>
-                  <MapPin className="mr-2 h-3.5 w-3.5 text-muted-foreground" />
-                  <SelectValue placeholder="Hentested" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Alle hentesteder</SelectItem>
-                  {outlets.map((o) => (
-                    <SelectItem key={o.id} value={o.id}>{o.short_name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+    <div className="container mx-auto px-4 py-4 space-y-3 max-w-[1400px]">
+      <UnreadMentionsBanner />
+      <KpiTopbar {...kpis} filteredCount={sorted.length} />
 
-            {/* Quick filters */}
-            <div className="flex flex-wrap gap-1.5">
-              {QUICK_FILTERS.map((f) => {
-                const active = quickFilters.has(f.key);
-                return (
-                  <Badge
-                    key={f.key}
-                    variant={active ? "default" : "outline"}
-                    className="cursor-pointer select-none"
-                    onClick={() => toggleQuick(f.key)}
-                  >
-                    {f.icon}{f.label}
-                  </Badge>
-                );
-              })}
+      {/* Filterpanel */}
+      <Card>
+        <CardContent className="pt-4 space-y-3">
+          <div className="grid gap-3 md:grid-cols-[1fr_220px_220px]">
+            <div className="relative">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Søk i navn, epost, telefon, ordrenr, produkt, hentested, emne, innhold …"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-8"
+              />
             </div>
+            <Select value={assignedFilter} onValueChange={setAssignedFilter}>
+              <SelectTrigger>
+                <UserCheck className="mr-2 h-3.5 w-3.5 text-muted-foreground" />
+                <SelectValue placeholder="Ansvarlig" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Alle ansvarlige</SelectItem>
+                <SelectItem value="mine">Mine</SelectItem>
+                <SelectItem value="unassigned">Utildelte</SelectItem>
+                {assignees.map((a) => (
+                  <SelectItem key={a.id} value={a.id}>{a.display_name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={outletFilter} onValueChange={setOutletFilter}>
+              <SelectTrigger>
+                <MapPin className="mr-2 h-3.5 w-3.5 text-muted-foreground" />
+                <SelectValue placeholder="Hentested" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Alle hentesteder</SelectItem>
+                {outlets.map((o) => (
+                  <SelectItem key={o.id} value={o.id}>{o.short_name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-            {/* Status chips */}
-            <div className="flex flex-wrap gap-1.5">
-              <span className="text-xs text-muted-foreground self-center mr-1">Status:</span>
-              {(Object.keys(STATUS_LABELS) as TicketStatus[]).map((s) => (
-                <Badge
+          {/* Status chips */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-[10px] uppercase tracking-wide text-muted-foreground mr-1">Status</span>
+            {(Object.keys(STATUS_LABELS) as TicketStatus[]).map((s) => {
+              const active = statusFilter.includes(s);
+              return (
+                <button
                   key={s}
-                  variant={statusFilter.includes(s) ? "default" : "outline"}
-                  className="cursor-pointer"
+                  type="button"
                   onClick={() => toggleStatus(s)}
+                  className={cn(
+                    "rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-colors",
+                    active
+                      ? "border-[hsl(var(--brand-bronze,26_48%_43%))]/50 bg-[hsl(var(--brand-bronze,26_48%_43%))]/12 text-[hsl(var(--brand-bronze,26_48%_43%))]"
+                      : "border-border bg-background text-muted-foreground hover:border-[hsl(var(--brand-bronze,26_48%_43%))]/30 hover:text-foreground",
+                  )}
                 >
                   {STATUS_LABELS[s]}
-                </Badge>
-              ))}
-              {hasAnyFilter && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-6 ml-auto"
-                  onClick={() => {
-                    setStatusFilter([]); setAssignedFilter("all"); setOutletFilter("all");
-                    setQuickFilters(new Set()); setSearch(""); setParams({});
-                  }}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Prioritet chips */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground mr-1">
+              <Flag className="h-3 w-3" /> Prioritet
+            </span>
+            {(Object.keys(PRIORITY_LABELS) as TicketPriority[]).map((p) => {
+              const active = priorityFilter.includes(p);
+              return (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => togglePriority(p)}
+                  className={cn(
+                    "rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-colors",
+                    active
+                      ? "border-[hsl(var(--brand-bronze,26_48%_43%))]/50 bg-[hsl(var(--brand-bronze,26_48%_43%))]/12 text-[hsl(var(--brand-bronze,26_48%_43%))]"
+                      : "border-border bg-background text-muted-foreground hover:border-[hsl(var(--brand-bronze,26_48%_43%))]/30 hover:text-foreground",
+                  )}
                 >
-                  <X className="mr-1 h-3 w-3" /> Fjern alle filtre
-                </Button>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+                  {PRIORITY_LABELS[p]}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Andre quick filters */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-[10px] uppercase tracking-wide text-muted-foreground mr-1">Snarvei</span>
+            {QUICK_FILTERS.map((f) => {
+              const active = quickFilters.has(f.key);
+              return (
+                <Badge
+                  key={f.key}
+                  variant={active ? "default" : "outline"}
+                  className={cn(
+                    "cursor-pointer select-none",
+                    active && "bg-[hsl(var(--brand-bronze,26_48%_43%))]/15 text-[hsl(var(--brand-bronze,26_48%_43%))] border-[hsl(var(--brand-bronze,26_48%_43%))]/40 hover:bg-[hsl(var(--brand-bronze,26_48%_43%))]/20",
+                  )}
+                  onClick={() => toggleQuick(f.key)}
+                >
+                  {f.icon}{f.label}
+                </Badge>
+              );
+            })}
+            {hasAnyFilter && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 ml-auto"
+                onClick={() => {
+                  setStatusFilter([]); setPriorityFilter([]); setAssignedFilter("all");
+                  setOutletFilter("all"); setQuickFilters(new Set()); setSearch(""); setParams({});
+                }}
+              >
+                <X className="mr-1 h-3 w-3" /> Fjern alle filtre
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+
 
         {/* Resultat-teller */}
         <div className="text-xs text-muted-foreground">
@@ -526,7 +621,6 @@ export default function TicketsList() {
             </TableBody>
           </Table>
         </Card>
-      </div>
-    </>
+    </div>
   );
 }
