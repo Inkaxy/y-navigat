@@ -1,13 +1,12 @@
 import { useMemo, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { format, formatDistanceToNow } from "date-fns";
 import { nb } from "date-fns/locale";
 import {
-  ArrowDown, ArrowUp, ArrowUpDown, Calendar, Inbox, Link2, MapPin,
+  ArrowDown, ArrowUp, ArrowUpDown, Calendar, Flag, Inbox, Link2, MapPin,
   Paperclip, Search, Sparkles, UserCheck, X,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { AppBanner } from "@/ordre/components/shell/AppBanner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -58,6 +57,48 @@ type QuickFilter =
   | "changes" | "cancellations" | "complaints"
   | "pickup_today" | "pickup_tomorrow"
   | "awaiting_internal";
+
+function KpiTopbar({
+  ticketsCount, autoDraftPct, avgReplyMin, filteredCount,
+}: {
+  ticketsCount: number; autoDraftPct: number; avgReplyMin: number; filteredCount: number;
+}) {
+  return (
+    <div className="h-14 border-b bg-card flex items-center px-4 md:px-6 justify-between rounded-md mb-3">
+      <div className="flex items-center gap-6 flex-wrap">
+        <div className="flex items-center gap-2">
+          <Inbox className="h-4 w-4 text-muted-foreground" />
+          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">E-poster</span>
+          <span className="text-base font-semibold text-foreground">{ticketsCount}</span>
+          {filteredCount !== ticketsCount && (
+            <span className="text-[10px] text-muted-foreground">({filteredCount} filtrert)</span>
+          )}
+        </div>
+        <div className="h-4 w-px bg-border" />
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Auto-utkast</span>
+          <span className="text-base font-semibold text-[hsl(var(--brand-bronze,26_48%_43%))]">{autoDraftPct}%</span>
+          <div className="w-12 h-1.5 bg-muted rounded-full overflow-hidden">
+            <div
+              className="h-full bg-[hsl(var(--brand-bronze,26_48%_43%))]"
+              style={{ width: `${Math.min(100, Math.max(0, autoDraftPct))}%` }}
+            />
+          </div>
+        </div>
+        <div className="h-4 w-px bg-border" />
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Snitt svar</span>
+          <span className="text-base font-semibold text-foreground">{avgReplyMin}m</span>
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <Button asChild variant="outline" size="sm" className="gap-2">
+          <Link to="/ordre"><Inbox className="h-4 w-4" /> Dashboard</Link>
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 const QUICK_FILTERS: { key: QuickFilter; label: string; icon?: React.ReactNode }[] = [
   { key: "new", label: "Nye" },
