@@ -173,6 +173,7 @@ export default function TicketsList() {
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<TicketStatus[]>(initialStatus);
+  const [priorityFilter, setPriorityFilter] = useState<TicketPriority[]>([]);
   const [assignedFilter, setAssignedFilter] = useState<string>(initialAssigned);
   const [outletFilter, setOutletFilter] = useState<string>("all");
   const [quickFilters, setQuickFilters] = useState<Set<QuickFilter>>(new Set());
