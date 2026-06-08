@@ -20,7 +20,7 @@ const AREAS: Area[] = [
   { to: "/admin/selskaper",    title: "Selskaper",    desc: "Juridiske enheter (AS) i konsernet.",        icon: Building2, active: true },
   { to: "/admin/brukere",      title: "Brukere",      desc: "Ansatte og deres stillinger.",                icon: Users, active: true },
   { to: "/admin/tilganger",    title: "Tilganger",    desc: "Stilling × app tilgangsmatrise.",             icon: KeyRound, active: true },
-  { to: "/admin/outlets",      title: "Outlets",      desc: "Butikker, bakerier og produksjonssteder.",    icon: Store, active: true },
+  { to: "/admin/outlets",      title: "Butikker",     desc: "Butikker, bakerier og produksjonssteder.",    icon: Store, active: true },
   { to: "/admin/stillinger",   title: "Stillinger",   desc: "Stillingsmaler og kategorier.",               icon: Briefcase, active: true },
   { to: "/admin/apper",        title: "Apper",        desc: "Registrerte NBOS-apper og status.",           icon: AppWindow, active: true },
   { to: "/admin/integrasjoner",title: "Integrasjoner",desc: "Eksterne systemer og API-koblinger.",         icon: Plug, active: true },
