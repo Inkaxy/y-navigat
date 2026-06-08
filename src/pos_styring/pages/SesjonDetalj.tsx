@@ -410,7 +410,11 @@ export default function SesjonDetalj() {
             </TableHeader>
             <TableBody>
               {(txQuery.data ?? []).map((t) => (
-                <TableRow key={t.id}>
+                <TableRow
+                  key={t.id}
+                  interactive
+                  onClick={() => navigate(`/pos-styring/transaksjoner/${t.id}`)}
+                >
                   <TableCell className="font-mono text-sm">{t.receipt_number}</TableCell>
                   <TableCell><TxTypeBadge type={t.transaction_type} training={t.is_training} /></TableCell>
                   <TableCell className="text-sm text-muted-foreground">
@@ -420,16 +424,16 @@ export default function SesjonDetalj() {
                   <TableCell className="text-right tabular-nums">{fmtMoney(t.total_mva)}</TableCell>
                   <TableCell className="text-right tabular-nums font-medium">{fmtMoney(t.total_incl_mva)}</TableCell>
                   <TableCell>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span>
-                          <Button variant="ghost" size="sm" disabled>
-                            Detaljer
-                          </Button>
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent>Bygges i F4 (Transaksjoner)</TooltipContent>
-                    </Tooltip>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/pos-styring/transaksjoner/${t.id}`);
+                      }}
+                    >
+                      Detaljer
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}
