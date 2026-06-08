@@ -205,6 +205,16 @@ export function NewCustomerDialog({
     };
   }, [profileId, selectedProfile, legalEntityId, form]);
 
+  // Auto-velg standard prisliste fra profilens prislister (første i sort_order)
+  // slik at nye kunder umiddelbart får produkter/priser ved ordreopprettelse.
+  useEffect(() => {
+    if (!profileId || !profilePriceLists || profilePriceLists.length === 0) return;
+    const current = form.getValues("default_price_list_id");
+    if (current) return;
+    const first = profilePriceLists[0]?.price_list_id;
+    if (first) form.setValue("default_price_list_id", first);
+  }, [profileId, profilePriceLists, form]);
+
   const mutation = useMutation({
     mutationFn: async (values: FormValues) => {
       if (!profileId) throw new Error("Profil mangler");
