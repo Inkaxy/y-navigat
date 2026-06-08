@@ -274,7 +274,7 @@ export default function Outlets() {
       <AlertDialog open={!!deleting} onOpenChange={(o) => !o && setDeleting(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Slette outlet?</AlertDialogTitle>
+            <AlertDialogTitle>Slette butikk?</AlertDialogTitle>
             <AlertDialogDescription>
               Er du sikker på at du vil slette <strong>{deleting?.short_name}</strong>? Denne handlingen kan ikke angres.
             </AlertDialogDescription>
