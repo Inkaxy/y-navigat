@@ -1,4 +1,4 @@
-import { CrudPageScaffold } from "@/components/CrudPageScaffold";
+import { CrudPageScaffold } from "@/pos_styring/components/CrudPageScaffold";
 
 export default function Operatorer() {
   return (

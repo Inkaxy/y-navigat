@@ -60,7 +60,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { useLegalEntity } from "@/contexts/LegalEntityContext";
+import { useLegalEntity } from "@/pos_styring/contexts/LegalEntityContext";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 

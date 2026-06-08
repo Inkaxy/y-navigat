@@ -46,7 +46,7 @@ import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useLegalEntity } from "@/contexts/LegalEntityContext";
+import { useLegalEntity } from "@/pos_styring/contexts/LegalEntityContext";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 

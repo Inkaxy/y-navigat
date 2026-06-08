@@ -1,4 +1,4 @@
-import { PlaceholderPage } from "@/components/PlaceholderPage";
+import { PlaceholderPage } from "@/pos_styring/components/PlaceholderPage";
 
 export default function Sesjoner() {
   return (

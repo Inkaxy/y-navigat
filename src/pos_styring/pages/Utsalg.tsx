@@ -9,7 +9,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useLegalEntity } from "@/contexts/LegalEntityContext";
+import { useLegalEntity } from "@/pos_styring/contexts/LegalEntityContext";
 import { cn } from "@/lib/utils";
 
 export default function Utsalg() {

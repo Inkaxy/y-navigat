@@ -33,7 +33,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useLegalEntity } from "@/contexts/LegalEntityContext";
+import { useLegalEntity } from "@/pos_styring/contexts/LegalEntityContext";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 
