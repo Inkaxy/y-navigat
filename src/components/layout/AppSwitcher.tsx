@@ -271,8 +271,8 @@ export function AppSwitcher() {
           aria-label="App-velger (⌘J)"
           title="App-velger — ⌘J"
           className={cn(
-            "group inline-flex items-center gap-2 rounded-full px-3 py-1.5",
-            "border border-brand-cream/15 bg-transparent text-[13px] font-medium text-brand-cream",
+            "group inline-flex items-center gap-2.5 rounded-full px-5 py-2.5",
+            "border border-brand-cream/15 bg-transparent text-[17px] font-semibold text-brand-cream",
             "transition-all duration-150",
             "hover:bg-brand-cream/[0.05] hover:border-brand-bronze/40",
             "focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-bronze/50",
@@ -280,14 +280,14 @@ export function AppSwitcher() {
           )}
         >
           <span
-            className="inline-block h-2.5 w-2.5 rounded-full"
+            className="inline-block h-3 w-3 rounded-full"
             style={{ backgroundColor: triggerColor }}
             aria-hidden
           />
-          <span className="max-w-[140px] truncate">{triggerLabel}</span>
+          <span className="max-w-[200px] truncate tracking-tight">{triggerLabel}</span>
           <ChevronDown
             className={cn(
-              "h-3.5 w-3.5 text-brand-cream/70 transition-transform duration-200",
+              "h-4 w-4 text-brand-cream/70 transition-transform duration-200",
               open && "rotate-180",
             )}
           />
