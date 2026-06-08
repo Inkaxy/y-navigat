@@ -85,6 +85,7 @@ import PosStyringTastaturEditor from "@/pos_styring/pages/TastaturEditor";
 import PosStyringPosKunder from "@/pos_styring/pages/PosKunder";
 import PosStyringProdukter from "@/pos_styring/pages/Produkter";
 import PosStyringSesjoner from "@/pos_styring/pages/Sesjoner";
+import PosStyringSesjonDetalj from "@/pos_styring/pages/SesjonDetalj";
 import PosStyringTransaksjoner from "@/pos_styring/pages/Transaksjoner";
 import PosStyringRapporter from "@/pos_styring/pages/Rapporter";
 import PosStyringInnstillinger from "@/pos_styring/pages/Innstillinger";
@@ -347,6 +348,7 @@ const App = () => (
               <Route path="/pos-styring/pos-kunder" element={<PosStyringShell><PosStyringPosKunder /></PosStyringShell>} />
               <Route path="/pos-styring/produkter" element={<PosStyringShell><PosStyringProdukter /></PosStyringShell>} />
               <Route path="/pos-styring/sesjoner" element={<PosStyringShell><PosStyringSesjoner /></PosStyringShell>} />
+              <Route path="/pos-styring/sesjoner/:id" element={<PosStyringShell><PosStyringSesjonDetalj /></PosStyringShell>} />
               <Route path="/pos-styring/transaksjoner" element={<PosStyringShell><PosStyringTransaksjoner /></PosStyringShell>} />
               <Route path="/pos-styring/rapporter" element={<PosStyringShell><PosStyringRapporter /></PosStyringShell>} />
               <Route path="/pos-styring/innstillinger" element={<PosStyringShell><PosStyringInnstillinger /></PosStyringShell>} />
