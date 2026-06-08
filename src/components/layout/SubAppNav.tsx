@@ -110,6 +110,23 @@ const STATIC_SUBMENUS: Record<string, { prefix: string; appSlug: string; items: 
       ] },
     ],
   },
+  pos_styring: {
+    prefix: "/pos-styring",
+    appSlug: "pos_styring",
+    items: [
+      { kind: "link", to: "/pos-styring/oversikt", label: "Oversikt", icon: LayoutDashboard },
+      { kind: "link", to: "/pos-styring/utsalg", label: "Utsalg", icon: ShoppingBag },
+      { kind: "link", to: "/pos-styring/terminaler", label: "Terminaler", icon: LayoutGrid },
+      { kind: "link", to: "/pos-styring/operatorer", label: "Operatører", icon: Users },
+      { kind: "link", to: "/pos-styring/tastatur", label: "Tastatur", icon: LayoutGrid },
+      { kind: "link", to: "/pos-styring/pos-kunder", label: "POS-kunder", icon: Users },
+      { kind: "link", to: "/pos-styring/produkter", label: "Produkter", icon: Boxes },
+      { kind: "link", to: "/pos-styring/sesjoner", label: "Sesjoner", icon: ClipboardList },
+      { kind: "link", to: "/pos-styring/transaksjoner", label: "Transaksjoner", icon: Receipt },
+      { kind: "link", to: "/pos-styring/rapporter", label: "Rapporter", icon: BarChart3 },
+      { kind: "link", to: "/pos-styring/innstillinger", label: "Innstillinger", icon: Settings },
+    ],
+  },
   admin: {
     prefix: "/admin",
     appSlug: "nbos",
