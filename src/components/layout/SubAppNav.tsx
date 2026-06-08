@@ -290,16 +290,16 @@ function NavBar({ appSlug, items }: { appSlug: string; items: NavItem[] }) {
 
   const itemClass = (active: boolean) =>
     cn(
-      "group relative flex flex-col items-center justify-center gap-1 rounded-xl px-3 py-1.5 min-w-[68px] text-[11px] leading-tight transition-all",
+      "group relative flex flex-col items-center justify-center gap-1.5 rounded-xl px-4 py-2 min-w-[88px] text-[13px] leading-tight transition-all",
       active
         ? "font-semibold text-brand-cream"
-        : "font-medium text-brand-cream/70 hover:bg-brand-cream/[0.06] hover:text-brand-cream",
+        : "font-medium text-brand-cream/75 hover:bg-brand-cream/[0.06] hover:text-brand-cream",
     );
   const itemStyle = (active: boolean) =>
     active
       ? {
           backgroundColor: `${color}1f`,
-          boxShadow: `inset 0 -2px 0 0 ${color}`,
+          boxShadow: `inset 0 -3px 0 0 ${color}`,
         }
       : undefined;
 
