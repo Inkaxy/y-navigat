@@ -16,7 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { useDeliveryDayStats } from "@/ordre/hooks/useOrders";
 import { useTicketCounts } from "@/ordre/hooks/useTickets";
 import { usePendingRecurringOrderRows } from "@/ordre/hooks/usePendingRecurringOrders";
-import { formatNOK, todayISO, tomorrow, formatDateLong, formatRelative } from "@/ordre/lib/format";
+import { formatNOK, todayISO, tomorrow, formatDateLong } from "@/ordre/lib/format";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
