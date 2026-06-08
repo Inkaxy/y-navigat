@@ -1,4 +1,5 @@
 import { Store, Info, Check } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,17 +10,62 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { supabase } from "@/integrations/supabase/client";
+import { useSelection } from "@/providers/SelectionProvider";
+import { useAuth } from "@/hooks/useAuth";
+import { useMyPositions } from "@/hooks/useMyPositions";
 import { useLegalEntity } from "@/pos_styring/contexts/LegalEntityContext";
 import { cn } from "@/lib/utils";
 
+interface OutletRow {
+  id: string;
+  legal_entity_id: string;
+  display_number: number | null;
+  short_name: string;
+  full_name: string | null;
+  outlet_type: string | null;
+  status: string | null;
+  city: string | null;
+}
+
 export default function Utsalg() {
-  const {
-    activeEntity,
-    availableEntities,
-    setActiveEntity,
-    isLoading,
-    hasNoAccess,
-  } = useLegalEntity();
+  const { user } = useAuth();
+  const { legalEntityId, outletId, setOutletId } = useSelection();
+  const { activeEntity } = useLegalEntity();
+  const { data: positions } = useMyPositions();
+
+  const { data: outlets = [], isLoading } = useQuery({
+    queryKey: ["pos-styring", "outlets", legalEntityId],
+    enabled: !!user?.id && !!legalEntityId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("outlets")
+        .select(
+          "id, legal_entity_id, display_number, short_name, full_name, outlet_type, status, city",
+        )
+        .eq("legal_entity_id", legalEntityId!)
+        .order("display_number", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as OutletRow[];
+    },
+  });
+
+  // Filtrer på posisjonenes outlet-scope (samme logikk som OutletSelector)
+  const accessible = (() => {
+    if (!outlets || !positions) return outlets;
+    const entityPositions = (positions as any[]).filter(
+      (p) => p.legal_entity?.id === legalEntityId,
+    );
+    if (entityPositions.length === 0) return [];
+    const hasAll = entityPositions.some((p) => p.outlet_scope === "all");
+    if (hasAll) return outlets;
+    const allowedIds = new Set<string>(
+      entityPositions.flatMap((p) => p.outlet_ids ?? []),
+    );
+    return outlets.filter((o) => allowedIds.has(o.id));
+  })();
+
+  const activeOutlet = accessible.find((o) => o.id === outletId) ?? null;
 
   return (
     <div className="flex flex-col gap-4">
@@ -30,7 +76,16 @@ export default function Utsalg() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Utsalg</h1>
           <p className="text-sm text-muted-foreground">
-            Velg hvilket utsalg POS Styring skal vise data for.
+            Velg hvilket utsalg POS Styring skal vise data for.{" "}
+            {activeEntity && (
+              <>
+                Viser utsalg under{" "}
+                <span className="font-medium text-foreground">
+                  {activeEntity.short_code} — {activeEntity.legal_name}
+                </span>
+                .
+              </>
+            )}
           </p>
         </div>
       </div>
@@ -40,17 +95,16 @@ export default function Utsalg() {
           Aktivt utsalg
         </div>
         <div className="mt-1 text-lg font-semibold">
-          {activeEntity
-            ? `${activeEntity.short_code} — ${activeEntity.legal_name}`
+          {activeOutlet
+            ? `#${activeOutlet.display_number ?? "—"} ${activeOutlet.short_name}`
             : isLoading
               ? "Laster…"
-              : hasNoAccess
-                ? "Ingen tilgang"
-                : "Ikke valgt"}
+              : "Ikke valgt"}
         </div>
-        {activeEntity?.org_number && (
+        {activeOutlet?.full_name && (
           <div className="text-xs text-muted-foreground">
-            Org.nr {activeEntity.org_number}
+            {activeOutlet.full_name}
+            {activeOutlet.city ? ` · ${activeOutlet.city}` : ""}
           </div>
         )}
       </Card>
@@ -58,12 +112,10 @@ export default function Utsalg() {
       <Card className="flex items-start gap-3 border-app-pastel-border bg-muted/40 p-3 text-xs text-muted-foreground">
         <Info className="mt-0.5 h-4 w-4 shrink-0 text-app-dark" />
         <div>
-          Nye utsalg opprettes i NBHub — denne listen speiler{" "}
-          <code className="rounded bg-background px-1 py-0.5 text-[11px]">
-            legal_entities
-          </code>
-          -tabellen og viser kun utsalg der du har en posisjon og write-tilgang
-          til POS Styring.
+          Utsalg ligger under selskapet (legal entity) og opprettes i NBHub-admin
+          under <code className="rounded bg-background px-1 py-0.5 text-[11px]">Outlets</code>.
+          Bytt selskap i topbar (CompanyBlock) for å se utsalg under et annet
+          selskap. Listen viser kun utsalg du har stillingstilgang til.
         </div>
       </Card>
 
@@ -71,54 +123,60 @@ export default function Utsalg() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[120px]">Kode</TableHead>
-              <TableHead>Navn</TableHead>
-              <TableHead className="w-[160px]">Org.nr</TableHead>
+              <TableHead className="w-[80px]">Nr</TableHead>
+              <TableHead>Kortnavn</TableHead>
+              <TableHead>Fullt navn</TableHead>
+              <TableHead className="w-[140px]">By</TableHead>
+              <TableHead className="w-[120px]">Type</TableHead>
               <TableHead className="w-[160px] text-right">Handling</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading && (
+            {!legalEntityId && (
               <TableRow>
-                <TableCell
-                  colSpan={4}
-                  className="py-8 text-center text-sm text-muted-foreground"
-                >
+                <TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
+                  Velg selskap i topbar først.
+                </TableCell>
+              </TableRow>
+            )}
+            {legalEntityId && isLoading && (
+              <TableRow>
+                <TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
                   Laster utsalg…
                 </TableCell>
               </TableRow>
             )}
-            {!isLoading && availableEntities.length === 0 && (
+            {legalEntityId && !isLoading && accessible.length === 0 && (
               <TableRow>
-                <TableCell
-                  colSpan={4}
-                  className="py-8 text-center text-sm text-muted-foreground"
-                >
-                  Du har ingen POS-tilgang i noen utsalg ennå. Kontakt
-                  administrator i NBHub.
+                <TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
+                  Ingen utsalg registrert under dette selskapet ennå. Opprett
+                  utsalg i NBHub-admin → Outlets.
                 </TableCell>
               </TableRow>
             )}
-            {availableEntities.map((entity) => {
-              const isActive = entity.id === activeEntity?.id;
+            {accessible.map((o) => {
+              const isActive = o.id === outletId;
               return (
-                <TableRow
-                  key={entity.id}
-                  className={cn(isActive && "bg-app-light/40")}
-                >
-                  <TableCell className="font-mono text-sm font-medium">
-                    {entity.short_code}
+                <TableRow key={o.id} className={cn(isActive && "bg-app-light/40")}>
+                  <TableCell className="font-mono text-sm">
+                    #{o.display_number ?? "—"}
                   </TableCell>
-                  <TableCell className="text-sm">{entity.legal_name}</TableCell>
+                  <TableCell className="text-sm font-medium">{o.short_name}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">
-                    {entity.org_number}
+                    {o.full_name ?? "—"}
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {o.city ?? "—"}
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {o.outlet_type ?? "—"}
                   </TableCell>
                   <TableCell className="text-right">
                     <Button
                       variant={isActive ? "ghost" : "secondary"}
                       size="sm"
                       disabled={isActive}
-                      onClick={() => setActiveEntity(entity.id)}
+                      onClick={() => setOutletId(o.id)}
                       className="gap-1.5"
                     >
                       {isActive ? (
