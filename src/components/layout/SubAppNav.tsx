@@ -312,9 +312,10 @@ function NavBar({ appSlug, items }: { appSlug: string; items: NavItem[] }) {
       )}
       style={{
         padding: "10px 20px",
-        background: "hsl(var(--brand-ink))",
+        background: "hsl(var(--brand-ink-raised))",
         backgroundImage:
-          "linear-gradient(180deg, hsl(var(--brand-cream) / 0.03) 0%, hsl(var(--brand-cream) / 0) 100%)",
+          "linear-gradient(180deg, hsl(var(--brand-cream) / 0.04) 0%, hsl(var(--brand-ink-deep) / 0.25) 100%)",
+        boxShadow: "inset 0 1px 0 0 hsl(var(--brand-cream) / 0.06)",
       }}
     >
       <ul className="no-scrollbar mx-auto flex max-w-[1280px] items-stretch gap-0.5 overflow-x-auto">

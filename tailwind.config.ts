@@ -56,6 +56,7 @@ export default {
         brand: {
           ink: "hsl(var(--brand-ink))",
           "ink-deep": "hsl(var(--brand-ink-deep))",
+          "ink-raised": "hsl(var(--brand-ink-raised))",
           cream: "hsl(var(--brand-cream))",
           "cream-deep": "hsl(var(--brand-cream-deep))",
           bronze: "hsl(var(--brand-bronze))",
