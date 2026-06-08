@@ -16,6 +16,7 @@ export const APP_INTERNAL_ROUTES: Record<string, string> = {
   ravarer: "/ravarer/vareliste",
   ordre: "/ordre",
   produksjon: "/produksjon",
+  pos_styring: "/pos-styring",
 };
 
 export function getAppInternalRoute(slug: string): string | null {
