@@ -29,7 +29,7 @@ import {
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { logAudit } from "@/kunder/lib/audit";
-import { useCustomerProfiles } from "@/kunder/hooks/useCustomerProfiles";
+import { useCustomerProfiles, useProfilePriceLists } from "@/kunder/hooks/useCustomerProfiles";
 import { usePriceLists } from "@/kunder/hooks/useCustomers";
 
 const schema = z
