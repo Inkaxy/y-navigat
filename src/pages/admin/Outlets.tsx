@@ -152,14 +152,14 @@ export default function Outlets() {
   });
 
   return (
-    <AdminLayout title="Outlets">
+    <AdminLayout title="Butikker">
       <AppHeaderBanner
         icon={Store}
-        title="Outlets"
+        title="Butikker"
         subtitle="Butikker, bakerier og produksjonssteder."
         actions={
           <Button size="sm" onClick={() => setEditing({ ...empty })}>
-            <Plus className="h-4 w-4" /> Ny outlet
+            <Plus className="h-4 w-4" /> Ny butikk
           </Button>
         }
       />
