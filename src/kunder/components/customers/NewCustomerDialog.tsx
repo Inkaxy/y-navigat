@@ -29,7 +29,7 @@ import {
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { logAudit } from "@/kunder/lib/audit";
-import { useCustomerProfiles } from "@/kunder/hooks/useCustomerProfiles";
+import { useCustomerProfiles, useProfilePriceLists } from "@/kunder/hooks/useCustomerProfiles";
 import { usePriceLists } from "@/kunder/hooks/useCustomers";
 
 const schema = z
@@ -146,6 +146,7 @@ export function NewCustomerDialog({
 
   const selectedProfile = profiles?.find((p) => p.id === profileId);
   const activeProfiles = (profiles ?? []).filter((p) => p.status === "active");
+  const { data: profilePriceLists } = useProfilePriceLists(profileId ?? undefined);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema) as any,
@@ -203,6 +204,16 @@ export function NewCustomerDialog({
       cancelled = true;
     };
   }, [profileId, selectedProfile, legalEntityId, form]);
+
+  // Auto-velg standard prisliste fra profilens prislister (første i sort_order)
+  // slik at nye kunder umiddelbart får produkter/priser ved ordreopprettelse.
+  useEffect(() => {
+    if (!profileId || !profilePriceLists || profilePriceLists.length === 0) return;
+    const current = form.getValues("default_price_list_id");
+    if (current) return;
+    const first = profilePriceLists[0]?.price_list_id;
+    if (first) form.setValue("default_price_list_id", first);
+  }, [profileId, profilePriceLists, form]);
 
   const mutation = useMutation({
     mutationFn: async (values: FormValues) => {
@@ -667,27 +678,38 @@ export function NewCustomerDialog({
                 <div className="grid gap-x-6 gap-y-4 md:grid-cols-2">
                   <div className="space-y-1.5">
                     <Label>Standard prisliste</Label>
-                    <Select
-                      value={form.watch("default_price_list_id") || "none"}
-                      onValueChange={(v) =>
-                        form.setValue("default_price_list_id", v === "none" ? "" : v)
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Velg prisliste" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Ingen / arv fra profil</SelectItem>
-                        {(priceLists ?? []).map((p: any) => (
-                          <SelectItem key={p.id} value={p.id}>
-                            {p.display_name}
-                            {p.is_default ? " (standard)" : ""}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    {(() => {
+                      const allowedIds = new Set(
+                        (profilePriceLists ?? []).map((p: any) => p.price_list_id),
+                      );
+                      const list = allowedIds.size
+                        ? (priceLists ?? []).filter((p: any) => allowedIds.has(p.id))
+                        : (priceLists ?? []);
+                      return (
+                        <Select
+                          value={form.watch("default_price_list_id") || "none"}
+                          onValueChange={(v) =>
+                            form.setValue("default_price_list_id", v === "none" ? "" : v)
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Velg prisliste" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">Ingen</SelectItem>
+                            {list.map((p: any) => (
+                              <SelectItem key={p.id} value={p.id}>
+                                {p.display_name}
+                                {p.is_default ? " (standard)" : ""}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      );
+                    })()}
                     <p className="text-xs text-muted-foreground">
-                      Detaljerte pris-overstyringer kan settes etter opprettelse.
+                      Settes automatisk fra profilens prisliste. Uten prisliste vil
+                      kunden ikke få opp produkter ved ordreopprettelse.
                     </p>
                   </div>
                 </div>
