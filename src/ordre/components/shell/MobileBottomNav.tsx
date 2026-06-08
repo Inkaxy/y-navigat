@@ -23,11 +23,11 @@ const PRIMARY = [
 ];
 
 const SECONDARY = [
+  { to: "/ordre/ticket", label: "Ticket" },
   { to: "/ordre/kundeordrer", label: "Kundeordrer" },
   { to: "/ordre/turer", label: "Turer" },
   { to: "/ordre/leveringsregler", label: "Leveringsregler" },
   { to: "/ordre/faste-rutiner", label: "Fastordre" },
-  { to: "/ordre/ticket", label: "Ticket" },
   { to: "/ordre/ai-forslag", label: "AI-forslag" },
   { to: "/ordre/ticket-rapporter", label: "Rapporter" },
   { to: "/ordre/avvik", label: "Avvik" },

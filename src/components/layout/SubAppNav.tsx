@@ -45,6 +45,7 @@ const STATIC_SUBMENUS: Record<string, { prefix: string; appSlug: string; items: 
     appSlug: "ordre",
     items: [
       { kind: "link", to: "/ordre/dashbord", label: "Dashbord" },
+      { kind: "link", to: "/ordre/ticket", label: "Ticket" },
       { kind: "link", to: "/ordre/leveringskalender", label: "Ordre" },
       { kind: "link", to: "/ordre/kundeordrer", label: "Kundeordrer" },
       { kind: "link", to: "/ordre/ordrer", label: "Bestillinger" },
@@ -52,7 +53,6 @@ const STATIC_SUBMENUS: Record<string, { prefix: string; appSlug: string; items: 
       { kind: "link", to: "/ordre/turer", label: "Turer" },
       { kind: "link", to: "/ordre/leveringsregler", label: "Leveringsregler" },
       { kind: "link", to: "/ordre/faste-rutiner", label: "Fastordre" },
-      { kind: "link", to: "/ordre/ticket", label: "Ticket" },
       { kind: "link", to: "/ordre/ai-forslag", label: "AI-forslag" },
       { kind: "link", to: "/ordre/ticket-rapporter", label: "Rapporter" },
       { kind: "link", to: "/ordre/avvik", label: "Avvik" },
