@@ -326,7 +326,7 @@ function NavBar({ appSlug, items }: { appSlug: string; items: NavItem[] }) {
               <li key={item.to} className="shrink-0">
                 <NavLink to={item.to} className={itemClass(active)} style={itemStyle(active)}>
                   <span className="relative">
-                    <Icon className="h-[18px] w-[18px]" strokeWidth={active ? 2.25 : 1.75} />
+                    <Icon className="h-6 w-6" strokeWidth={active ? 2.25 : 1.75} />
                     {item.badge != null && item.badge > 0 && (
                       <span className="absolute -right-2 -top-1.5"><CountBadge value={item.badge} /></span>
                     )}
