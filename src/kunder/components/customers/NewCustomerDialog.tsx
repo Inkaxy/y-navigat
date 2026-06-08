@@ -146,6 +146,7 @@ export function NewCustomerDialog({
 
   const selectedProfile = profiles?.find((p) => p.id === profileId);
   const activeProfiles = (profiles ?? []).filter((p) => p.status === "active");
+  const { data: profilePriceLists } = useProfilePriceLists(profileId ?? undefined);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema) as any,
