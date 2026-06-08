@@ -224,7 +224,7 @@ export default function Outlets() {
 
       <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
         <DialogContent>
-          <DialogHeader><DialogTitle>{editing?.id ? "Rediger outlet" : "Ny outlet"}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editing?.id ? "Rediger butikk" : "Ny butikk"}</DialogTitle></DialogHeader>
           {editing && (
             <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2">
