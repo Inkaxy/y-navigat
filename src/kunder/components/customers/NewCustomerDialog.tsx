@@ -678,27 +678,38 @@ export function NewCustomerDialog({
                 <div className="grid gap-x-6 gap-y-4 md:grid-cols-2">
                   <div className="space-y-1.5">
                     <Label>Standard prisliste</Label>
-                    <Select
-                      value={form.watch("default_price_list_id") || "none"}
-                      onValueChange={(v) =>
-                        form.setValue("default_price_list_id", v === "none" ? "" : v)
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Velg prisliste" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Ingen / arv fra profil</SelectItem>
-                        {(priceLists ?? []).map((p: any) => (
-                          <SelectItem key={p.id} value={p.id}>
-                            {p.display_name}
-                            {p.is_default ? " (standard)" : ""}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    {(() => {
+                      const allowedIds = new Set(
+                        (profilePriceLists ?? []).map((p: any) => p.price_list_id),
+                      );
+                      const list = allowedIds.size
+                        ? (priceLists ?? []).filter((p: any) => allowedIds.has(p.id))
+                        : (priceLists ?? []);
+                      return (
+                        <Select
+                          value={form.watch("default_price_list_id") || "none"}
+                          onValueChange={(v) =>
+                            form.setValue("default_price_list_id", v === "none" ? "" : v)
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Velg prisliste" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">Ingen</SelectItem>
+                            {list.map((p: any) => (
+                              <SelectItem key={p.id} value={p.id}>
+                                {p.display_name}
+                                {p.is_default ? " (standard)" : ""}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      );
+                    })()}
                     <p className="text-xs text-muted-foreground">
-                      Detaljerte pris-overstyringer kan settes etter opprettelse.
+                      Settes automatisk fra profilens prisliste. Uten prisliste vil
+                      kunden ikke få opp produkter ved ordreopprettelse.
                     </p>
                   </div>
                 </div>
