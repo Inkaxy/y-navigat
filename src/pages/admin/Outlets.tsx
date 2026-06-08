@@ -101,7 +101,19 @@ export default function Outlets() {
         const { error } = await supabase.from("outlets").update(patch).eq("id", id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("outlets").insert(row as any);
+        // Auto-tildel display_number = max+1 innen samme selskap (starter på 1)
+        const { data: maxRow, error: maxErr } = await supabase
+          .from("outlets")
+          .select("display_number")
+          .eq("legal_entity_id", row.legal_entity_id)
+          .order("display_number", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (maxErr) throw maxErr;
+        const nextNumber = (maxRow?.display_number ?? 0) + 1;
+        const { error } = await supabase
+          .from("outlets")
+          .insert({ ...(row as any), display_number: nextNumber });
         if (error) throw error;
       }
     },
