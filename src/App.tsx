@@ -73,6 +73,23 @@ import ProduksjonsavdelingerPage from "@/produksjon/pages/innstillinger/Produksj
 import PakkeomraderPage from "@/produksjon/pages/innstillinger/PakkeomraderPage";
 import UtskriftsprofilerPage from "@/produksjon/pages/innstillinger/UtskriftsprofilerPage";
 
+// POS Styring (importert fra POS Manager Hub)
+import { AppColorProvider } from "@/providers/AppColorProvider";
+import { LegalEntityProvider as PosStyringEntityProvider } from "@/pos_styring/contexts/LegalEntityContext";
+import PosStyringIndex from "@/pos_styring/pages/Index";
+import PosStyringUtsalg from "@/pos_styring/pages/Utsalg";
+import PosStyringTerminaler from "@/pos_styring/pages/Terminaler";
+import PosStyringOperatorer from "@/pos_styring/pages/Operatorer";
+import PosStyringTastatur from "@/pos_styring/pages/Tastatur";
+import PosStyringTastaturEditor from "@/pos_styring/pages/TastaturEditor";
+import PosStyringPosKunder from "@/pos_styring/pages/PosKunder";
+import PosStyringProdukter from "@/pos_styring/pages/Produkter";
+import PosStyringSesjoner from "@/pos_styring/pages/Sesjoner";
+import PosStyringTransaksjoner from "@/pos_styring/pages/Transaksjoner";
+import PosStyringRapporter from "@/pos_styring/pages/Rapporter";
+import PosStyringInnstillinger from "@/pos_styring/pages/Innstillinger";
+
+
 // Ordre-app
 import OrdreDashboard from "@/ordre/pages/Dashboard";
 import OrdreOrdersList from "@/ordre/pages/OrdersList";
@@ -148,6 +165,16 @@ const Shell = ({ children }: { children: React.ReactNode }) => (
   <ProtectedRoute>
     <AppShell>{children}</AppShell>
   </ProtectedRoute>
+);
+
+const PosStyringShell = ({ children }: { children: React.ReactNode }) => (
+  <Shell>
+    <AppAccessGuard appCode="pos_styring" appName="POS Styring">
+      <AppColorProvider appCode="pos_styring">
+        <PosStyringEntityProvider>{children}</PosStyringEntityProvider>
+      </AppColorProvider>
+    </AppAccessGuard>
+  </Shell>
 );
 
 const AppRoute = ({
@@ -308,6 +335,22 @@ const App = () => (
               <Route path="/produksjon/innstillinger/produksjonsavdelinger" element={<Shell><AppAccessGuard appCode="produksjon" appName="Produksjon"><ProduksjonsavdelingerPage /></AppAccessGuard></Shell>} />
               <Route path="/produksjon/innstillinger/pakkeomrader" element={<Shell><AppAccessGuard appCode="produksjon" appName="Produksjon"><PakkeomraderPage /></AppAccessGuard></Shell>} />
               <Route path="/produksjon/innstillinger/utskriftsprofiler" element={<Shell><AppAccessGuard appCode="produksjon" appName="Produksjon"><UtskriftsprofilerPage /></AppAccessGuard></Shell>} />
+
+              {/* POS Styring — importert fra POS Manager Hub */}
+              <Route path="/pos-styring" element={<PosStyringShell><Navigate to="/pos-styring/terminaler" replace /></PosStyringShell>} />
+              <Route path="/pos-styring/oversikt" element={<PosStyringShell><PosStyringIndex /></PosStyringShell>} />
+              <Route path="/pos-styring/utsalg" element={<PosStyringShell><PosStyringUtsalg /></PosStyringShell>} />
+              <Route path="/pos-styring/terminaler" element={<PosStyringShell><PosStyringTerminaler /></PosStyringShell>} />
+              <Route path="/pos-styring/operatorer" element={<PosStyringShell><PosStyringOperatorer /></PosStyringShell>} />
+              <Route path="/pos-styring/tastatur" element={<PosStyringShell><PosStyringTastatur /></PosStyringShell>} />
+              <Route path="/pos-styring/tastatur/:id" element={<PosStyringShell><PosStyringTastaturEditor /></PosStyringShell>} />
+              <Route path="/pos-styring/pos-kunder" element={<PosStyringShell><PosStyringPosKunder /></PosStyringShell>} />
+              <Route path="/pos-styring/produkter" element={<PosStyringShell><PosStyringProdukter /></PosStyringShell>} />
+              <Route path="/pos-styring/sesjoner" element={<PosStyringShell><PosStyringSesjoner /></PosStyringShell>} />
+              <Route path="/pos-styring/transaksjoner" element={<PosStyringShell><PosStyringTransaksjoner /></PosStyringShell>} />
+              <Route path="/pos-styring/rapporter" element={<PosStyringShell><PosStyringRapporter /></PosStyringShell>} />
+              <Route path="/pos-styring/innstillinger" element={<PosStyringShell><PosStyringInnstillinger /></PosStyringShell>} />
+
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

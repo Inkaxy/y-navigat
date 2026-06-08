@@ -1,0 +1,403 @@
+import { useMemo, useRef, useState } from "react";
+import { ImageIcon, Loader2, MoreHorizontal, Search, Star, Trash2, Upload } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useLegalEntity } from "@/pos_styring/contexts/LegalEntityContext";
+import { supabase } from "@/integrations/supabase/client";
+import { cn } from "@/lib/utils";
+
+const BUCKET = "pos-product-images";
+const MAX_FILE_SIZE = 5 * 1024 * 1024;
+const ALLOWED_MIME = new Set(["image/jpeg", "image/png", "image/webp"]);
+const signedUrlCache = new Map<string, { url: string; expiresAt: number }>();
+
+interface ProductImage {
+  id: string;
+  product_id: string;
+  storage_path: string;
+  is_primary: boolean;
+  signed_url?: string;
+}
+
+interface ProductCardItem {
+  id: string;
+  display_name: string;
+  status: string;
+  mva_rate: number;
+  primary_storage_path: string | null;
+  primary_signed_url?: string;
+  image_count: number;
+}
+
+async function getSignedUrl(storagePath: string | null) {
+  if (!storagePath) return undefined;
+  const cached = signedUrlCache.get(storagePath);
+  if (cached && cached.expiresAt > Date.now()) return cached.url;
+
+  const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(storagePath, 3600);
+  if (error) throw error;
+  signedUrlCache.set(storagePath, { url: data.signedUrl, expiresAt: Date.now() + 55 * 60 * 1000 });
+  return data.signedUrl;
+}
+
+async function fetchProductsForPos(activeEntityId: string): Promise<ProductCardItem[]> {
+  const { data: products, error: productError } = await supabase
+    .from("products")
+    .select("id, display_name, status, mva_rate")
+    .eq("legal_entity_id", activeEntityId)
+    .in("status", ["active", "published", "draft"])
+    .order("display_name", { ascending: true });
+  if (productError) throw productError;
+
+  const productIds = (products ?? []).map((product) => product.id);
+  const { data: images, error: imageError } = productIds.length
+    ? await supabase.from("pos_product_images").select("id, product_id, storage_path, is_primary").in("product_id", productIds)
+    : { data: [], error: null };
+  if (imageError) throw imageError;
+
+  const imagesByProduct = new Map<string, ProductImage[]>();
+  for (const image of (images ?? []) as ProductImage[]) {
+    const current = imagesByProduct.get(image.product_id) ?? [];
+    current.push(image);
+    imagesByProduct.set(image.product_id, current);
+  }
+
+  return Promise.all(
+    (products ?? []).map(async (product) => {
+      const productImages = imagesByProduct.get(product.id) ?? [];
+      const primaryPath = productImages.find((image) => image.is_primary)?.storage_path ?? null;
+      return {
+        ...product,
+        primary_storage_path: primaryPath,
+        primary_signed_url: await getSignedUrl(primaryPath),
+        image_count: productImages.length,
+      };
+    }),
+  );
+}
+
+async function fetchProductImages(productId: string): Promise<ProductImage[]> {
+  const { data, error } = await supabase
+    .from("pos_product_images")
+    .select("id, product_id, storage_path, is_primary")
+    .eq("product_id", productId)
+    .order("is_primary", { ascending: false })
+    .order("uploaded_at", { ascending: true });
+  if (error) throw error;
+
+  return Promise.all(
+    ((data ?? []) as ProductImage[]).map(async (image) => ({
+      ...image,
+      signed_url: await getSignedUrl(image.storage_path),
+    })),
+  );
+}
+
+function extensionFor(file: File) {
+  if (file.type === "image/png") return "png";
+  if (file.type === "image/webp") return "webp";
+  return "jpg";
+}
+
+function ProductsSkeleton() {
+  return (
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {Array.from({ length: 8 }).map((_, index) => (
+        <Card key={index}>
+          <Skeleton className="aspect-[4/3] rounded-b-none" />
+          <CardHeader>
+            <Skeleton className="h-5 w-3/4" />
+            <Skeleton className="h-4 w-1/2" />
+          </CardHeader>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+function ProductImageDialog({ product, activeEntityId, open, onOpenChange }: { product: ProductCardItem | null; activeEntityId: string; open: boolean; onOpenChange: (open: boolean) => void }) {
+  const queryClient = useQueryClient();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [imageToDelete, setImageToDelete] = useState<ProductImage | null>(null);
+
+  const { data: images = [], isLoading } = useQuery({
+    queryKey: ["product_images", product?.id],
+    queryFn: () => fetchProductImages(product!.id),
+    enabled: open && !!product?.id,
+  });
+
+  const invalidate = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["product_images", product?.id] }),
+      queryClient.invalidateQueries({ queryKey: ["products_for_pos", activeEntityId] }),
+    ]);
+  };
+
+  const uploadMutation = useMutation({
+    mutationFn: async (file: File) => {
+      if (!product) return;
+      if (!ALLOWED_MIME.has(file.type)) throw new Error("Kun JPEG, PNG og WebP er tillatt");
+      if (file.size > MAX_FILE_SIZE) throw new Error("Bildet kan maks være 5 MB");
+
+      let storagePath = "";
+      let uploadError: Error | null = null;
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        storagePath = `${activeEntityId}/${product.id}/${crypto.randomUUID()}.${extensionFor(file)}`;
+        const { error } = await supabase.storage.from(BUCKET).upload(storagePath, file, { cacheControl: "3600", upsert: false });
+        if (!error) {
+          uploadError = null;
+          break;
+        }
+        uploadError = error;
+        if (!error.message.includes("409") && !error.message.toLowerCase().includes("already")) break;
+      }
+      if (uploadError) {
+        if (uploadError.message.toLowerCase().includes("quota")) throw new Error("Lagringskvote overskredet — kontakt admin");
+        throw uploadError;
+      }
+
+      const { count, error: countError } = await supabase
+        .from("pos_product_images")
+        .select("id", { count: "exact", head: true })
+        .eq("product_id", product.id);
+      if (countError) throw countError;
+
+      const { error } = await supabase.from("pos_product_images").insert({
+        product_id: product.id,
+        storage_path: storagePath,
+        is_primary: (count ?? 0) === 0,
+      });
+      if (error) throw error;
+    },
+    onSuccess: async () => {
+      toast.success("Bilde lastet opp");
+      await invalidate();
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Kunne ikke laste opp bilde"),
+  });
+
+  const primaryMutation = useMutation({
+    mutationFn: async (image: ProductImage) => {
+      if (!product) return;
+      const { error: unsetError } = await supabase.from("pos_product_images").update({ is_primary: false }).eq("product_id", product.id);
+      if (unsetError) throw unsetError;
+      const { error: setError } = await supabase.from("pos_product_images").update({ is_primary: true }).eq("id", image.id);
+      if (setError) throw setError;
+    },
+    onSuccess: async () => {
+      toast.success("Primærbilde oppdatert");
+      await invalidate();
+    },
+    onError: (error) => toast.error("Kunne ikke sette primærbilde", { description: error instanceof Error ? error.message : "Ukjent feil" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (image: ProductImage) => {
+      if (!product) return;
+      const remaining = images.filter((item) => item.id !== image.id);
+      const { error: dbError } = await supabase.from("pos_product_images").delete().eq("id", image.id);
+      if (dbError) throw dbError;
+
+      const { error: storageError } = await supabase.storage.from(BUCKET).remove([image.storage_path]);
+      if (storageError) console.warn("Orphaned product image file", storageError);
+
+      if (image.is_primary && remaining.length > 0) {
+        const next = remaining[0];
+        const { error } = await supabase.from("pos_product_images").update({ is_primary: true }).eq("id", next.id);
+        if (error) throw error;
+      }
+    },
+    onSuccess: async () => {
+      toast.success("Bilde slettet");
+      setImageToDelete(null);
+      await invalidate();
+    },
+    onError: (error) => toast.error("Kunne ikke slette bilde", { description: error instanceof Error ? error.message : "Ukjent feil" }),
+  });
+
+  const handleFile = (file?: File) => {
+    if (file) uploadMutation.mutate(file);
+  };
+
+  return (
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>{product?.display_name ?? "Produktbilder"}</DialogTitle>
+            <DialogDescription>Administrer bildene som vises i POS Kiosk og tastatur-layouts.</DialogDescription>
+          </DialogHeader>
+
+          {isLoading ? (
+            <div className="grid gap-3 sm:grid-cols-3"><Skeleton className="h-40" /><Skeleton className="h-40" /><Skeleton className="h-40" /></div>
+          ) : images.length > 0 ? (
+            <div className="grid gap-3 sm:grid-cols-3">
+              {images.map((image) => (
+                <div key={image.id} className="overflow-hidden rounded-lg border bg-card">
+                  <div className="relative aspect-[4/3] bg-muted">
+                    {image.signed_url ? <img src={image.signed_url} alt="Produktbilde" className="h-full w-full object-cover" /> : <ImageIcon className="m-auto h-10 w-10 text-muted-foreground" />}
+                    {image.is_primary && <Badge className="absolute left-2 top-2"><Star className="h-3 w-3" /> Primær</Badge>}
+                  </div>
+                  <div className="flex items-center justify-between p-2">
+                    <span className="truncate text-xs text-muted-foreground">{image.storage_path.split("/").pop()}</span>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem disabled={image.is_primary} onClick={() => primaryMutation.mutate(image)}>Sett som primær</DropdownMenuItem>
+                        <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setImageToDelete(image)}><Trash2 className="h-4 w-4" /> Slett</DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex min-h-40 items-center justify-center rounded-lg border border-dashed text-sm text-muted-foreground">Ingen bilder er lastet opp for dette produktet.</div>
+          )}
+
+          <div
+            className={cn("rounded-lg border border-dashed bg-muted/30 p-6 text-center transition-colors", uploadMutation.isPending && "opacity-70")}
+            onDragOver={(event) => event.preventDefault()}
+            onDrop={(event) => {
+              event.preventDefault();
+              handleFile(event.dataTransfer.files?.[0]);
+            }}
+          >
+            <Upload className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
+            <p className="text-sm font-medium">Dra et bilde hit, eller velg fil</p>
+            <p className="mt-1 text-xs text-muted-foreground">JPEG, PNG eller WebP · maks 5 MB</p>
+            <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(event) => handleFile(event.target.files?.[0])} />
+            <Button type="button" variant="outline" className="mt-4" disabled={uploadMutation.isPending} onClick={() => fileInputRef.current?.click()}>
+              {uploadMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+              {uploadMutation.isPending ? "Laster opp…" : "Velg fil"}
+            </Button>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => onOpenChange(false)}>Lukk</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={!!imageToDelete} onOpenChange={(open) => !open && setImageToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Slett bildet?</AlertDialogTitle>
+            <AlertDialogDescription>Det kan ikke gjenopprettes.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Avbryt</AlertDialogCancel>
+            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => imageToDelete && deleteMutation.mutate(imageToDelete)}>Slett</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
+
+export default function Produkter() {
+  const { activeEntityId, activeEntity } = useLegalEntity();
+  const [search, setSearch] = useState("");
+  const [selectedProduct, setSelectedProduct] = useState<ProductCardItem | null>(null);
+
+  const { data: products = [], isLoading, error } = useQuery({
+    queryKey: ["products_for_pos", activeEntityId],
+    queryFn: () => fetchProductsForPos(activeEntityId!),
+    enabled: !!activeEntityId,
+  });
+
+  const filteredProducts = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return products;
+    return products.filter((product) => product.display_name.toLowerCase().includes(term));
+  }, [products, search]);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <h1 className="text-3xl font-semibold tracking-normal">Produkter</h1>
+          <p className="mt-1 text-sm text-muted-foreground">{activeEntity ? `${activeEntity.short_code} — ${activeEntity.legal_name}` : "Velg aktiv enhet"}</p>
+        </div>
+        <div className="relative w-full lg:w-80">
+          <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+          <Input className="pl-9" placeholder="Søk produkt" value={search} onChange={(event) => setSearch(event.target.value)} />
+        </div>
+      </div>
+
+      <Alert>
+        <ImageIcon className="h-4 w-4" />
+        <AlertTitle>Bilde-forvaltning</AlertTitle>
+        <AlertDescription>Produkter opprettes i Varer-appen. Her forvaltes bilder som vises i POS Kiosk.</AlertDescription>
+      </Alert>
+
+      {isLoading ? <ProductsSkeleton /> : error ? (
+        <Alert variant="destructive">
+          <AlertTitle>Kunne ikke laste produkter</AlertTitle>
+          <AlertDescription>{error instanceof Error ? error.message : "Ukjent feil"}</AlertDescription>
+        </Alert>
+      ) : filteredProducts.length === 0 ? (
+        <div className="flex min-h-72 items-center justify-center rounded-lg border border-dashed text-muted-foreground">
+          Ingen produkter for {activeEntity?.short_code ?? "valgt enhet"}. Opprett produkter i Varer-appen først.
+        </div>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {filteredProducts.map((product) => (
+            <Card key={product.id} className="overflow-hidden transition-shadow hover:shadow-md">
+              <button type="button" className="block w-full text-left" onClick={() => setSelectedProduct(product)}>
+                <div className="flex aspect-[4/3] items-center justify-center bg-muted">
+                  {product.primary_signed_url ? (
+                    <img src={product.primary_signed_url} alt={product.display_name} className="h-full w-full object-cover" />
+                  ) : (
+                    <ImageIcon className="h-12 w-12 text-muted-foreground" />
+                  )}
+                </div>
+                <CardHeader className="space-y-3">
+                  <CardTitle className="line-clamp-2 text-base">{product.display_name}</CardTitle>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant={product.status === "draft" ? "secondary" : "default"}>{product.status}</Badge>
+                    <Badge variant="outline">{product.image_count} bilder</Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0 text-xs text-muted-foreground">MVA {product.mva_rate}%</CardContent>
+              </button>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      <ProductImageDialog product={selectedProduct} activeEntityId={activeEntityId ?? ""} open={!!selectedProduct} onOpenChange={(open) => !open && setSelectedProduct(null)} />
+    </div>
+  );
+}
