@@ -310,6 +310,7 @@ function NavBar({ appSlug, items }: { appSlug: string; items: NavItem[] }) {
         "border-b border-brand-cream/10",
         isOrdre && "hidden md:block",
       )}
+      style={{
         padding: "10px 20px",
         background: "hsl(var(--brand-ink))",
         backgroundImage:
