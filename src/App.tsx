@@ -167,6 +167,16 @@ const Shell = ({ children }: { children: React.ReactNode }) => (
   </ProtectedRoute>
 );
 
+const PosStyringShell = ({ children }: { children: React.ReactNode }) => (
+  <Shell>
+    <AppAccessGuard appCode="pos_styring" appName="POS Styring">
+      <AppColorProvider appCode="pos_styring">
+        <PosStyringEntityProvider>{children}</PosStyringEntityProvider>
+      </AppColorProvider>
+    </AppAccessGuard>
+  </Shell>
+);
+
 const AppRoute = ({
   code,
   name,
