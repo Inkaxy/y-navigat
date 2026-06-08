@@ -73,6 +73,23 @@ import ProduksjonsavdelingerPage from "@/produksjon/pages/innstillinger/Produksj
 import PakkeomraderPage from "@/produksjon/pages/innstillinger/PakkeomraderPage";
 import UtskriftsprofilerPage from "@/produksjon/pages/innstillinger/UtskriftsprofilerPage";
 
+// POS Styring (importert fra POS Manager Hub)
+import { AppColorProvider } from "@/providers/AppColorProvider";
+import { LegalEntityProvider as PosStyringEntityProvider } from "@/pos_styring/contexts/LegalEntityContext";
+import PosStyringIndex from "@/pos_styring/pages/Index";
+import PosStyringUtsalg from "@/pos_styring/pages/Utsalg";
+import PosStyringTerminaler from "@/pos_styring/pages/Terminaler";
+import PosStyringOperatorer from "@/pos_styring/pages/Operatorer";
+import PosStyringTastatur from "@/pos_styring/pages/Tastatur";
+import PosStyringTastaturEditor from "@/pos_styring/pages/TastaturEditor";
+import PosStyringPosKunder from "@/pos_styring/pages/PosKunder";
+import PosStyringProdukter from "@/pos_styring/pages/Produkter";
+import PosStyringSesjoner from "@/pos_styring/pages/Sesjoner";
+import PosStyringTransaksjoner from "@/pos_styring/pages/Transaksjoner";
+import PosStyringRapporter from "@/pos_styring/pages/Rapporter";
+import PosStyringInnstillinger from "@/pos_styring/pages/Innstillinger";
+
+
 // Ordre-app
 import OrdreDashboard from "@/ordre/pages/Dashboard";
 import OrdreOrdersList from "@/ordre/pages/OrdersList";
