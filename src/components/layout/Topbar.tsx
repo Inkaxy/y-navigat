@@ -17,8 +17,8 @@ export function Topbar() {
       <header
         className="sticky top-0 z-40 flex items-center backdrop-blur-md"
         style={{
-          height: "60px",
-          padding: "0 16px",
+          height: "72px",
+          padding: "0 20px",
           background: "hsl(var(--brand-ink))",
           borderBottom: "1px solid hsl(var(--brand-cream) / 0.10)",
           boxShadow: "0 1px 0 0 hsl(var(--brand-bronze) / 0.25), 0 2px 8px -2px hsl(0 0% 0% / 0.30)",
@@ -30,9 +30,9 @@ export function Topbar() {
         <Link
           to="/"
           aria-label="Nøtterø Bakeri — hjem"
-          className="hidden h-[60px] shrink-0 items-center overflow-hidden pr-3 text-brand-cream md:flex"
+          className="hidden h-[72px] shrink-0 items-center overflow-hidden pr-4 text-brand-cream md:flex"
         >
-          <Logo variant="horizontal" className="h-12 w-auto" />
+          <Logo variant="horizontal" className="h-14 w-auto" />
         </Link>
 
         <div className="hidden shrink-0 items-center gap-2 md:flex">
