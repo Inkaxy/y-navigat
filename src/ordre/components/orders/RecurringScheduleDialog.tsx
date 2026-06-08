@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog,
   DialogContent,
@@ -104,9 +106,23 @@ export function RecurringScheduleDialog({
 
   const [productSearch, setProductSearch] = useState("");
   const [productPickerOpen, setProductPickerOpen] = useState(false);
-  const { data: searchedProducts = [] } = useNBProducts(productSearch);
+  // Hent kundens prisliste — useNBProducts krever priceListId for å vise produkter
+  const { data: customerPriceListId = null } = useQuery({
+    queryKey: ["recurring-customer-price-list", customerId],
+    enabled: !!customerId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("customers")
+        .select("default_price_list_id")
+        .eq("id", customerId!)
+        .maybeSingle();
+      if (error) throw error;
+      return (data?.default_price_list_id as string | null) ?? null;
+    },
+  });
+  const { data: searchedProducts = [] } = useNBProducts(productSearch, customerPriceListId);
   // Vi trenger også full liste for å vise navn/nummer på allerede valgte produkter
-  const { data: allProducts = [] } = useNBProducts();
+  const { data: allProducts = [] } = useNBProducts(undefined, customerPriceListId);
   const { data: tours = [] } = useDeliveryTours({ activeOnly: true });
   const sortedTours = useMemo(() => sortToursByPriority(tours), [tours]);
   const rowProductIds = useMemo(
