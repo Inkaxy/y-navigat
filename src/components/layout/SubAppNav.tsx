@@ -10,19 +10,56 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ChevronDown } from "lucide-react";
+import {
+  ChevronDown,
+  LayoutDashboard,
+  Ticket,
+  CalendarRange,
+  ShoppingBag,
+  ClipboardList,
+  Package,
+  Truck,
+  Route,
+  Repeat,
+  Sparkles,
+  BarChart3,
+  AlertTriangle,
+  Settings,
+  Users,
+  UserCog,
+  Building2,
+  Briefcase,
+  LayoutGrid,
+  Plug,
+  HeartPulse,
+  ScrollText,
+  Boxes,
+  FileText,
+  FolderTree,
+  Database,
+  HandCoins,
+  Receipt,
+  Tags,
+  ChefHat,
+  CakeSlice,
+  Cookie,
+  ListChecks,
+  type LucideIcon,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface SimpleItem {
   kind: "link";
   to: string;
   label: string;
+  icon: LucideIcon;
   badge?: number;
 }
 interface DropdownLink { to: string; label: string; badge?: number }
 interface DropdownItem {
   kind: "dropdown";
   label: string;
+  icon: LucideIcon;
   basePath: string;
   links: DropdownLink[];
 }
@@ -33,40 +70,40 @@ const STATIC_SUBMENUS: Record<string, { prefix: string; appSlug: string; items: 
     prefix: "/kunder",
     appSlug: "kunder",
     items: [
-      { kind: "link", to: "/kunder/kundeliste", label: "Kundeliste" },
-      { kind: "link", to: "/kunder/profiler", label: "Profiler" },
-      { kind: "link", to: "/kunder/kundegrupper", label: "Kundegrupper" },
-      { kind: "link", to: "/kunder/historikk", label: "Historikk" },
-      { kind: "link", to: "/kunder/innstillinger", label: "Innstillinger" },
+      { kind: "link", to: "/kunder/kundeliste", label: "Kundeliste", icon: Users },
+      { kind: "link", to: "/kunder/profiler", label: "Profiler", icon: UserCog },
+      { kind: "link", to: "/kunder/kundegrupper", label: "Kundegrupper", icon: FolderTree },
+      { kind: "link", to: "/kunder/historikk", label: "Historikk", icon: ScrollText },
+      { kind: "link", to: "/kunder/innstillinger", label: "Innstillinger", icon: Settings },
     ],
   },
   ordre: {
     prefix: "/ordre",
     appSlug: "ordre",
     items: [
-      { kind: "link", to: "/ordre/dashbord", label: "Dashbord" },
-      { kind: "link", to: "/ordre/ticket", label: "Ticket" },
-      { kind: "link", to: "/ordre/leveringskalender", label: "Ordre" },
-      { kind: "link", to: "/ordre/kundeordrer", label: "Kundeordrer" },
-      { kind: "link", to: "/ordre/ordrer", label: "Bestillinger" },
-      { kind: "link", to: "/ordre/pakksedler", label: "Pakksedler" },
-      { kind: "link", to: "/ordre/turer", label: "Turer" },
-      { kind: "link", to: "/ordre/leveringsregler", label: "Leveringsregler" },
-      { kind: "link", to: "/ordre/faste-rutiner", label: "Fastordre" },
-      { kind: "link", to: "/ordre/ai-forslag", label: "AI-forslag" },
-      { kind: "link", to: "/ordre/ticket-rapporter", label: "Rapporter" },
-      { kind: "link", to: "/ordre/avvik", label: "Avvik" },
-      { kind: "link", to: "/ordre/innstillinger", label: "Innstillinger" },
+      { kind: "link", to: "/ordre/dashbord", label: "Dashbord", icon: LayoutDashboard },
+      { kind: "link", to: "/ordre/ticket", label: "Ticket", icon: Ticket },
+      { kind: "link", to: "/ordre/leveringskalender", label: "Ordre", icon: CalendarRange },
+      { kind: "link", to: "/ordre/kundeordrer", label: "Kundeordrer", icon: ShoppingBag },
+      { kind: "link", to: "/ordre/ordrer", label: "Bestillinger", icon: ClipboardList },
+      { kind: "link", to: "/ordre/pakksedler", label: "Pakksedler", icon: Package },
+      { kind: "link", to: "/ordre/turer", label: "Turer", icon: Truck },
+      { kind: "link", to: "/ordre/leveringsregler", label: "Leveringsregler", icon: Route },
+      { kind: "link", to: "/ordre/faste-rutiner", label: "Fastordre", icon: Repeat },
+      { kind: "link", to: "/ordre/ai-forslag", label: "AI-forslag", icon: Sparkles },
+      { kind: "link", to: "/ordre/ticket-rapporter", label: "Rapporter", icon: BarChart3 },
+      { kind: "link", to: "/ordre/avvik", label: "Avvik", icon: AlertTriangle },
+      { kind: "link", to: "/ordre/innstillinger", label: "Innstillinger", icon: Settings },
     ],
   },
   produksjon: {
     prefix: "/produksjon",
     appSlug: "produksjon",
     items: [
-      { kind: "link", to: "/produksjon/oversikt", label: "Oversikt" },
-      { kind: "link", to: "/produksjon/produksjonsplan", label: "Produksjonsplan" },
-      { kind: "link", to: "/produksjon/etiketter", label: "Etiketter" },
-      { kind: "dropdown", label: "Innstillinger", basePath: "/produksjon/innstillinger", links: [
+      { kind: "link", to: "/produksjon/oversikt", label: "Oversikt", icon: LayoutDashboard },
+      { kind: "link", to: "/produksjon/produksjonsplan", label: "Produksjonsplan", icon: ClipboardList },
+      { kind: "link", to: "/produksjon/etiketter", label: "Etiketter", icon: Tags },
+      { kind: "dropdown", label: "Innstillinger", icon: Settings, basePath: "/produksjon/innstillinger", links: [
         { to: "/produksjon/innstillinger/produksjonsavdelinger", label: "Produksjonsavdelinger" },
         { to: "/produksjon/innstillinger/pakkeomrader", label: "Pakkeområder" },
         { to: "/produksjon/innstillinger/utskriftsprofiler", label: "Utskriftsprofiler" },
@@ -77,15 +114,15 @@ const STATIC_SUBMENUS: Record<string, { prefix: string; appSlug: string; items: 
     prefix: "/admin",
     appSlug: "nbos",
     items: [
-      { kind: "link", to: "/admin/selskaper", label: "Selskaper" },
-      { kind: "link", to: "/admin/brukere", label: "Brukere" },
-      { kind: "link", to: "/admin/tilganger", label: "Tilganger" },
-      { kind: "link", to: "/admin/outlets", label: "Outlets" },
-      { kind: "link", to: "/admin/stillinger", label: "Stillinger" },
-      { kind: "link", to: "/admin/apper", label: "Apper" },
-      { kind: "link", to: "/admin/integrasjoner", label: "Integrasjoner" },
-      { kind: "link", to: "/admin/helsesenter", label: "Helsesenter" },
-      { kind: "link", to: "/admin/audit", label: "Audit" },
+      { kind: "link", to: "/admin/selskaper", label: "Selskaper", icon: Building2 },
+      { kind: "link", to: "/admin/brukere", label: "Brukere", icon: Users },
+      { kind: "link", to: "/admin/tilganger", label: "Tilganger", icon: UserCog },
+      { kind: "link", to: "/admin/outlets", label: "Outlets", icon: ShoppingBag },
+      { kind: "link", to: "/admin/stillinger", label: "Stillinger", icon: Briefcase },
+      { kind: "link", to: "/admin/apper", label: "Apper", icon: LayoutGrid },
+      { kind: "link", to: "/admin/integrasjoner", label: "Integrasjoner", icon: Plug },
+      { kind: "link", to: "/admin/helsesenter", label: "Helsesenter", icon: HeartPulse },
+      { kind: "link", to: "/admin/audit", label: "Audit", icon: ScrollText },
     ],
   },
 };
@@ -133,10 +170,10 @@ function RavarerNav() {
   const canManage = accessLevel === "admin" || accessLevel === "approve";
 
   const items: NavItem[] = [
-    { kind: "link", to: "/ravarer/vareliste", label: "Vareliste" },
-    { kind: "link", to: "/ravarer/leverandorer", label: "Leverandører" },
-    { kind: "link", to: "/ravarer/avtaler", label: "Avtaler" },
-    { kind: "dropdown", label: "Datablad", basePath: "/ravarer/datablad", links: [
+    { kind: "link", to: "/ravarer/vareliste", label: "Vareliste", icon: Boxes },
+    { kind: "link", to: "/ravarer/leverandorer", label: "Leverandører", icon: Building2 },
+    { kind: "link", to: "/ravarer/avtaler", label: "Avtaler", icon: FileText },
+    { kind: "dropdown", label: "Datablad", icon: Database, basePath: "/ravarer/datablad", links: [
       { to: "/ravarer/datablad-endringer", label: "Endringer", badge: changelogCount },
       { to: "/ravarer/datablad-bulk", label: "Bulk-opplasting" },
     ] },
@@ -146,6 +183,7 @@ function RavarerNav() {
     items.push({
       kind: "dropdown",
       label: "Forhandlinger",
+      icon: HandCoins,
       basePath: "/ravarer/forhandlinger",
       links: [
         { to: "/ravarer/forhandlinger", label: "Aktive forhandlinger" },
@@ -158,6 +196,7 @@ function RavarerNav() {
     items.push({
       kind: "dropdown",
       label: "Fakturaer",
+      icon: Receipt,
       basePath: "/ravarer/fakturaer",
       links: [
         { to: "/ravarer/fakturaer", label: "Alle fakturaer" },
@@ -172,6 +211,7 @@ function RavarerNav() {
     items.push({
       kind: "dropdown",
       label: "Innstillinger",
+      icon: Settings,
       basePath: "/ravarer/innstillinger",
       links: [
         { to: "/ravarer/innstillinger/match-toleranser", label: "Match-toleranser" },
@@ -202,22 +242,23 @@ function VarerNav() {
   });
 
   const items: NavItem[] = [
-    { kind: "link", to: "/varer/vareliste", label: "Vareliste" },
-    { kind: "link", to: "/varer/priser", label: "Priser" },
-    { kind: "link", to: "/varer/spesialpriser", label: "Spesialpriser" },
-    { kind: "link", to: "/varer/kakebygger", label: "Kakebygger" },
+    { kind: "link", to: "/varer/vareliste", label: "Vareliste", icon: Cookie },
+    { kind: "link", to: "/varer/priser", label: "Priser", icon: Tags },
+    { kind: "link", to: "/varer/spesialpriser", label: "Spesialpriser", icon: HandCoins },
+    { kind: "link", to: "/varer/kakebygger", label: "Kakebygger", icon: CakeSlice },
     {
       kind: "dropdown",
       label: "Oppskrifter",
+      icon: ChefHat,
       basePath: "/varer/oppskrifter",
       links: [
         { to: "/varer/oppskrifter", label: "Alle oppskrifter" },
         { to: "/varer/oppskrifter/krever-opprydding", label: "Krever opprydding", badge: cleanupCount },
       ],
     },
-    { kind: "link", to: "/varer/sortiment", label: "Sortiment" },
-    { kind: "link", to: "/varer/avvik", label: "Avvik" },
-    { kind: "link", to: "/varer/innstillinger", label: "Innstillinger" },
+    { kind: "link", to: "/varer/sortiment", label: "Sortiment", icon: ListChecks },
+    { kind: "link", to: "/varer/avvik", label: "Avvik", icon: AlertTriangle },
+    { kind: "link", to: "/varer/innstillinger", label: "Innstillinger", icon: Settings },
   ];
 
   return <NavBar appSlug="varer" items={items} />;
@@ -233,7 +274,6 @@ function NavBar({ appSlug, items }: { appSlug: string; items: NavItem[] }) {
   const isLinkActive = (to: string) => {
     const [path, query] = to.split("?");
     if (path === "/ravarer/fakturaer" && !query) {
-      // "Alle fakturaer" — active only when on /ravarer/fakturaer without status
       return pathname === path && !new URLSearchParams(search).get("status");
     }
     if (query) {
@@ -248,25 +288,21 @@ function NavBar({ appSlug, items }: { appSlug: string; items: NavItem[] }) {
   const isDropdownActive = (basePath: string) =>
     pathname === basePath || pathname.startsWith(basePath + "/");
 
-  const baseClass = (active: boolean) =>
+  const itemClass = (active: boolean) =>
     cn(
-      "flex items-center whitespace-nowrap rounded-full text-sm transition-all",
+      "group relative flex flex-col items-center justify-center gap-1 rounded-xl px-3 py-1.5 min-w-[68px] text-[11px] leading-tight transition-all",
       active
         ? "font-semibold text-brand-cream"
-        : "text-brand-cream/70 font-medium hover:bg-brand-cream/[0.06] hover:text-brand-cream/90",
+        : "font-medium text-brand-cream/70 hover:bg-brand-cream/[0.06] hover:text-brand-cream",
     );
-  const baseStyle = (active: boolean) =>
+  const itemStyle = (active: boolean) =>
     active
       ? {
-          padding: "7px 14px",
-          color: "hsl(var(--brand-cream))",
           backgroundColor: `${color}1f`,
           boxShadow: `inset 0 -2px 0 0 ${color}`,
-          border: "1px solid transparent",
         }
-      : { padding: "7px 14px", border: "1px solid transparent" };
+      : undefined;
 
-  // På mobil bruker Ordre en fast bottom-nav i stedet for denne submenyen.
   const isOrdre = pathname === "/ordre" || pathname.startsWith("/ordre/");
   return (
     <nav
@@ -275,22 +311,27 @@ function NavBar({ appSlug, items }: { appSlug: string; items: NavItem[] }) {
         isOrdre && "hidden md:block",
       )}
       style={{
-        padding: "8px 16px",
+        padding: "6px 16px",
         background: "hsl(var(--brand-ink))",
-        // tone-on-tone: lyset opp 4% via en subtil overlay
         backgroundImage:
           "linear-gradient(180deg, hsl(var(--brand-cream) / 0.03) 0%, hsl(var(--brand-cream) / 0) 100%)",
       }}
     >
-      <ul className="no-scrollbar mx-auto flex max-w-[1280px] items-stretch gap-1 overflow-x-auto">
+      <ul className="no-scrollbar mx-auto flex max-w-[1280px] items-stretch gap-0.5 overflow-x-auto">
         {items.map((item) => {
+          const Icon = item.icon;
           if (item.kind === "link") {
             const active = isLinkActive(item.to);
             return (
               <li key={item.to} className="shrink-0">
-                <NavLink to={item.to} className={baseClass(active)} style={baseStyle(active)}>
-                  {item.label}
-                  {item.badge != null && item.badge > 0 && <CountBadge value={item.badge} />}
+                <NavLink to={item.to} className={itemClass(active)} style={itemStyle(active)}>
+                  <span className="relative">
+                    <Icon className="h-[18px] w-[18px]" strokeWidth={active ? 2.25 : 1.75} />
+                    {item.badge != null && item.badge > 0 && (
+                      <span className="absolute -right-2 -top-1.5"><CountBadge value={item.badge} /></span>
+                    )}
+                  </span>
+                  <span className="whitespace-nowrap">{item.label}</span>
                 </NavLink>
               </li>
             );
@@ -300,9 +341,12 @@ function NavBar({ appSlug, items }: { appSlug: string; items: NavItem[] }) {
             <li key={item.label} className="shrink-0">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className={baseClass(active)} style={baseStyle(active)}>
-                    {item.label}
-                    <ChevronDown className="ml-1 h-3.5 w-3.5" />
+                  <button className={itemClass(active)} style={itemStyle(active)}>
+                    <Icon className="h-[18px] w-[18px]" strokeWidth={active ? 2.25 : 1.75} />
+                    <span className="flex items-center gap-0.5 whitespace-nowrap">
+                      {item.label}
+                      <ChevronDown className="h-3 w-3" />
+                    </span>
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" className="min-w-[220px]">
@@ -326,7 +370,7 @@ function CountBadge({ value }: { value: number }) {
   return (
     <span
       className={cn(
-        "ml-2 rounded-full px-1.5 py-0.5 text-[10px] font-semibold",
+        "rounded-full px-1.5 py-0.5 text-[10px] font-semibold",
         value > 10 ? "bg-destructive text-destructive-foreground" : "bg-warning/20 text-warning",
       )}
     >
