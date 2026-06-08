@@ -3,42 +3,36 @@ import { Link } from "react-router-dom";
 import {
   Plus,
   TruckIcon,
-  PauseCircle,
-  FileEdit,
-  Package,
   ArrowRight,
-  
+  Mail,
+  CalendarClock,
+  AlertCircle,
 } from "lucide-react";
 import { TicketsInbox } from "@/ordre/components/shell/TicketsInbox";
 import { AppBanner } from "@/ordre/components/shell/AppBanner";
-import { DateContextChips } from "@/ordre/components/shell/DateContextChips";
+import { AlertCircle as _AC } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  useStatusCounts,
-  useDeliveryDayStats,
-  useActionQueueCounts,
-} from "@/ordre/hooks/useOrders";
-import { ORDER_STATUSES } from "@/ordre/lib/orderStatus";
-import { formatNOK, todayISO, tomorrow, formatDateLong } from "@/ordre/lib/format";
+import { Badge } from "@/components/ui/badge";
+import { useDeliveryDayStats } from "@/ordre/hooks/useOrders";
+import { useTicketCounts } from "@/ordre/hooks/useTickets";
+import { usePendingRecurringOrderRows } from "@/ordre/hooks/usePendingRecurringOrders";
+import { formatNOK, todayISO, tomorrow, formatDateLong, formatRelative } from "@/ordre/lib/format";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 export default function Dashboard() {
-  const [contextDate, setContextDate] = useState<string>(todayISO());
-  const { data: counts, isLoading: countsLoading } = useStatusCounts();
   const today = todayISO();
   const tom = tomorrow();
-  const { data: ctxStats, isLoading: ctxLoading } = useDeliveryDayStats(contextDate);
+  const [pendingDate, setPendingDate] = useState<string>(tom);
+
+  const { data: todayStats, isLoading: todayLoading } = useDeliveryDayStats(today);
   const { data: tomStats, isLoading: tomLoading } = useDeliveryDayStats(tom);
-  const { data: queue, isLoading: queueLoading } = useActionQueueCounts();
-  
-
-  const countOf = (status: string) => counts?.find((c) => c.status === status)?.count ?? 0;
-  const ctxCountOf = (status: string) =>
-    ctxStats?.statusBreakdown?.find((s) => s.status === status)?.count ?? 0;
-
-  const isToday = contextDate === today;
+  const { data: ticketCounts, isLoading: ticketsLoading } = useTicketCounts();
+  const { data: pendingRows = [], isLoading: pendingLoading } = usePendingRecurringOrderRows(
+    pendingDate,
+    "all",
+  );
 
   return (
     <>
@@ -53,248 +47,257 @@ export default function Dashboard() {
         }
       />
       <div className="container mx-auto space-y-6 px-page py-6 sm:px-page">
-        {/* Dato-kontekst */}
-        <DateContextChips date={contextDate} onChange={setContextDate} />
-
-        {/* Hero: Innboks (tickets) — ordrekontorets primære arbeidsflate */}
-        <TicketsInbox />
-
-        {/* Hero-rad: valgt dato + i morgen + tiltakskø */}
-        <section className="grid gap-4 lg:grid-cols-3">
-          {/* Valgt dato (default i dag) */}
-          <Card className="lg:col-span-2 border-primary/20">
-            <CardHeader className="flex flex-row items-center justify-between pb-3">
-              <div>
-                <CardTitle className="text-caption uppercase tracking-wide text-muted-foreground">
-                  {isToday ? "Levering i dag" : `Levering ${formatDateLong(contextDate)}`}
-                </CardTitle>
-                <div className="mt-1 flex items-baseline gap-3">
-                  {ctxLoading ? (
-                    <Skeleton className="h-9 w-16" />
-                  ) : (
-                    <>
-                      <span className="text-display font-semibold text-foreground">
-                        {ctxStats?.count ?? 0}
-                      </span>
-                      <span className="text-body text-muted-foreground">
-                        {formatNOK(ctxStats?.total ?? 0)}
-                      </span>
-                    </>
-                  )}
-                </div>
-              </div>
-              <TruckIcon className="h-6 w-6 text-primary" />
-            </CardHeader>
-            <CardContent>
-              {ctxLoading ? (
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <Skeleton key={i} className="h-12" />
-                  ))}
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-                  {[
-                    "confirmed",
-                    "in_production",
-                    "packed",
-                    "partial_delivery",
-                    "delivered",
-                  ].map((status) => {
-                    const meta = ORDER_STATUSES.find((s) => s.value === status)!;
-                    const c = ctxCountOf(status);
-                    return (
-                      <Link
-                        key={status}
-                        to={`/ordre/ordrer?status=${status}&deliveryFrom=${contextDate}&deliveryTo=${contextDate}`}
-                        className={cn(
-                          "rounded-md border border-border bg-background px-2.5 py-2 transition-colors hover:border-primary/50 hover:bg-muted/50",
-                          c === 0 && "opacity-50",
-                        )}
-                      >
-                        <div className="flex items-center gap-1.5">
-                          <span
-                            className="h-1.5 w-1.5 rounded-full"
-                            style={{ backgroundColor: `hsl(var(${meta.tokenVar}))` }}
-                          />
-                          <span className="truncate text-caption text-muted-foreground">
-                            {meta.label}
-                          </span>
-                        </div>
-                        <div className="mt-1 text-title font-semibold leading-none">{c}</div>
-                      </Link>
-                    );
-                  })}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* I morgen */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-caption uppercase tracking-wide text-muted-foreground">
-                Levering i morgen
-              </CardTitle>
-              <div className="mt-1 flex items-baseline gap-3">
-                {tomLoading ? (
-                  <Skeleton className="h-9 w-16" />
-                ) : (
-                  <>
-                    <span className="text-display font-semibold text-foreground">
-                      {tomStats?.count ?? 0}
-                    </span>
-                    <span className="text-body text-muted-foreground">
-                      {formatNOK(tomStats?.total ?? 0)}
-                    </span>
-                  </>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent>
-              <Link
-                to={`/ordre/ordrer?deliveryFrom=${tom}&deliveryTo=${tom}`}
-                className="inline-flex items-center gap-1 text-body text-primary hover:underline"
-              >
-                Vis ordrer for i morgen
-                <ArrowRight className="h-3.5 w-3.5" />
-              </Link>
-            </CardContent>
-          </Card>
+        {/* KPI-strip */}
+        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <KpiCard
+            label="Nye e-poster"
+            value={ticketCounts?.newCount ?? 0}
+            sub={`${ticketCounts?.inProgressCount ?? 0} pågår`}
+            loading={ticketsLoading}
+            icon={Mail}
+            tone="info"
+            to="/ordre/ticket?status=new"
+          />
+          <KpiCard
+            label="Uregulert fastordre"
+            value={pendingRows.length}
+            sub={pendingDate === tom ? "for i morgen" : `for ${formatDateLong(pendingDate)}`}
+            loading={pendingLoading}
+            icon={AlertCircle}
+            tone={pendingRows.length > 0 ? "warning" : "ok"}
+            to={`/ordre/faste-rutiner?date=${pendingDate}`}
+          />
+          <KpiCard
+            label="Levering i dag"
+            value={todayStats?.count ?? 0}
+            sub={formatNOK(todayStats?.total ?? 0)}
+            loading={todayLoading}
+            icon={TruckIcon}
+            tone="default"
+            to={`/ordre/ordrer?deliveryFrom=${today}&deliveryTo=${today}`}
+          />
+          <KpiCard
+            label="Levering i morgen"
+            value={tomStats?.count ?? 0}
+            sub={formatNOK(tomStats?.total ?? 0)}
+            loading={tomLoading}
+            icon={CalendarClock}
+            tone="default"
+            to={`/ordre/ordrer?deliveryFrom=${tom}&deliveryTo=${tom}`}
+          />
         </section>
 
+        {/* Hovedrad: e-post + fastordre side ved side */}
+        <section className="grid gap-6 xl:grid-cols-5">
+          {/* Nye e-poster — bruker eksisterende TicketsInbox */}
+          <div className="xl:col-span-3">
+            <TicketsInbox />
+          </div>
 
-        {/* Tiltakskø — kompakte tellere */}
-        <section>
-          <h2 className="mb-3 text-caption font-semibold uppercase tracking-wide text-muted-foreground">
-            Tiltakskø
-          </h2>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <ActionTile
-              icon={PauseCircle}
-              label="På vent"
-              count={queue?.onHold ?? 0}
-              loading={queueLoading}
-              tokenVar="--status-on-hold"
-              to="/ordre/ordrer?status=on_hold"
-            />
-            {(queue?.drafts ?? 0) > 0 && (
-              <ActionTile
-                icon={FileEdit}
-                label="Utkast (parkerte ordre)"
-                count={queue?.drafts ?? 0}
-                loading={queueLoading}
-                tokenVar="--status-draft"
-                to="/ordre/ordrer?status=draft"
-              />
-            )}
-            <ActionTile
-              icon={Package}
-              label="Pakket i dag"
-              count={queue?.packedToday ?? 0}
-              loading={queueLoading}
-              tokenVar="--status-packed"
-              to={`/ordre/ordrer?status=packed&deliveryFrom=${today}&deliveryTo=${today}`}
+          {/* Uregulert fastordre */}
+          <div className="xl:col-span-2">
+            <PendingRecurringCard
+              date={pendingDate}
+              onChangeDate={setPendingDate}
+              rows={pendingRows}
+              loading={pendingLoading}
             />
           </div>
-        </section>
-
-
-        {/* Kompakt status-strip — alle 10 statuser */}
-        <section>
-          <h2 className="mb-3 text-caption font-semibold uppercase tracking-wide text-muted-foreground">
-            Alle ordrer per status
-          </h2>
-          {countsLoading ? (
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-5 lg:grid-cols-10">
-              {Array.from({ length: 10 }).map((_, i) => (
-                <Skeleton key={i} className="h-16" />
-              ))}
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-5 lg:grid-cols-10">
-              {ORDER_STATUSES.map((s) => {
-                const count = countOf(s.value);
-                return (
-                  <Link
-                    key={s.value}
-                    to={`/ordre/ordrer?status=${s.value}`}
-                    className={cn(
-                      "group rounded-md border border-border bg-card px-2.5 py-2 transition-all hover:border-primary/50 hover:shadow-sm",
-                      count === 0 && "opacity-60",
-                    )}
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <span
-                        className="h-1.5 w-1.5 rounded-full flex-shrink-0"
-                        style={{ backgroundColor: `hsl(var(${s.tokenVar}))` }}
-                      />
-                      <span className="truncate text-caption text-muted-foreground">
-                        {s.label}
-                      </span>
-                    </div>
-                    <div
-                      className="mt-1 text-title font-semibold leading-none"
-                      style={{ color: `hsl(var(${s.tokenVar}))` }}
-                    >
-                      {count}
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
-          )}
         </section>
       </div>
     </>
   );
 }
 
-function ActionTile({
-  icon: Icon,
+function KpiCard({
   label,
-  count,
+  value,
+  sub,
   loading,
-  tokenVar,
+  icon: Icon,
+  tone,
   to,
-  urgent,
 }: {
-  icon: React.ComponentType<{ className?: string }>;
   label: string;
-  count: number;
-  loading: boolean;
-  tokenVar: string;
+  value: number;
+  sub?: string;
+  loading?: boolean;
+  icon: React.ComponentType<{ className?: string }>;
+  tone: "info" | "warning" | "ok" | "default";
   to: string;
-  urgent?: boolean;
 }) {
+  const toneClass =
+    tone === "info"
+      ? "text-[hsl(var(--alert-info))] bg-[hsl(var(--alert-info))]/10"
+      : tone === "warning"
+        ? "text-[hsl(var(--alert-warning))] bg-[hsl(var(--alert-warning))]/10"
+        : tone === "ok"
+          ? "text-[hsl(var(--alert-success))] bg-[hsl(var(--alert-success))]/10"
+          : "text-primary bg-primary/10";
+
   return (
     <Link
       to={to}
-      className={cn(
-        "group flex items-center gap-3 rounded-lg border bg-card p-3 transition-all hover:shadow-md",
-        urgent && count > 0
-          ? "border-[hsl(var(--alert-warning))]/40 bg-[hsl(var(--alert-warning))]/5"
-          : "border-border hover:border-primary/40",
-      )}
+      className="group rounded-lg border border-border bg-card p-4 transition-all hover:border-primary/40 hover:shadow-sm"
     >
-      <span
-        className="flex h-9 w-9 items-center justify-center rounded-md"
-        style={{
-          backgroundColor: `hsl(var(${tokenVar}) / 0.12)`,
-          color: `hsl(var(${tokenVar}))`,
-        }}
-      >
-        <Icon className="h-4 w-4" />
-      </span>
-      <div className="min-w-0 flex-1">
-        <div className="text-caption text-muted-foreground">{label}</div>
-        {loading ? (
-          <Skeleton className="mt-0.5 h-6 w-10" />
-        ) : (
-          <div className="text-title font-semibold leading-tight text-foreground">{count}</div>
-        )}
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="text-caption uppercase tracking-wide text-muted-foreground">{label}</div>
+          {loading ? (
+            <Skeleton className="mt-2 h-8 w-16" />
+          ) : (
+            <div className="mt-1 text-display font-semibold leading-none text-foreground">
+              {value}
+            </div>
+          )}
+          {sub && !loading && (
+            <div className="mt-1.5 text-caption text-muted-foreground">{sub}</div>
+          )}
+        </div>
+        <span className={cn("flex h-9 w-9 items-center justify-center rounded-md", toneClass)}>
+          <Icon className="h-4 w-4" />
+        </span>
       </div>
-      <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
     </Link>
   );
 }
+
+function PendingRecurringCard({
+  date,
+  onChangeDate,
+  rows,
+  loading,
+}: {
+  date: string;
+  onChangeDate: (d: string) => void;
+  rows: Array<{
+    schedule_id: string;
+    customer_id: string;
+    customer_display_name: string;
+    customer_number: string | null;
+    tour_label: string | null;
+  }>;
+  loading: boolean;
+}) {
+  const today = todayISO();
+  const tom = tomorrow();
+  const dayAfter = (() => {
+    const d = new Date(`${today}T12:00:00`);
+    d.setDate(d.getDate() + 2);
+    return d.toISOString().slice(0, 10);
+  })();
+
+  const VISIBLE = 12;
+  const visibleRows = rows.slice(0, VISIBLE);
+  const overflow = rows.length - visibleRows.length;
+
+  return (
+    <Card className="h-full">
+      <CardHeader className="space-y-3 pb-3">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <AlertCircle className="h-4 w-4 text-[hsl(var(--alert-warning))]" />
+              Uregulert fastordre
+            </CardTitle>
+            <p className="mt-1 text-caption text-muted-foreground">
+              Kunder med fastordre som ennå ikke er bekreftet eller justert for valgt dato.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-1.5">
+          <DateChip label="I dag" active={date === today} onClick={() => onChangeDate(today)} />
+          <DateChip label="I morgen" active={date === tom} onClick={() => onChangeDate(tom)} />
+          <DateChip
+            label="Overmorgen"
+            active={date === dayAfter}
+            onClick={() => onChangeDate(dayAfter)}
+          />
+        </div>
+      </CardHeader>
+
+      <CardContent className="pt-0">
+        {loading ? (
+          <div className="space-y-2">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton key={i} className="h-12" />
+            ))}
+          </div>
+        ) : rows.length === 0 ? (
+          <div className="rounded-md border border-dashed border-border bg-muted/30 p-6 text-center text-body text-muted-foreground">
+            Alle fastordrekunder er regulert for {formatDateLong(date)}.
+          </div>
+        ) : (
+          <>
+            <ul className="divide-y divide-border rounded-md border border-border bg-card">
+              {visibleRows.map((row) => (
+                <li key={row.schedule_id}>
+                  <Link
+                    to={`/kunder/kundeliste/${row.customer_id}`}
+                    className="flex items-center justify-between gap-3 px-3 py-2.5 transition-colors hover:bg-muted/50"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-body font-medium text-foreground">
+                        {row.customer_display_name}
+                      </div>
+                      <div className="mt-0.5 flex items-center gap-2 text-caption text-muted-foreground">
+                        {row.customer_number && <span>#{row.customer_number}</span>}
+                        {row.tour_label && (
+                          <Badge variant="outline" className="h-4 px-1.5 text-[10px]">
+                            {row.tour_label}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                    <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+
+            <div className="mt-3 flex items-center justify-between text-caption">
+              <span className="text-muted-foreground">
+                {overflow > 0 ? `+${overflow} flere kunder` : `Viser alle ${rows.length}`}
+              </span>
+              <Button asChild variant="ghost" size="sm" className="h-7 gap-1 px-2 text-xs">
+                <Link to={`/ordre/faste-rutiner?date=${date}`}>
+                  Åpne fastordre
+                  <ArrowRight className="h-3 w-3" />
+                </Link>
+              </Button>
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function DateChip({
+  label,
+  active,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "rounded-full border px-2.5 py-1 text-caption font-medium transition-colors",
+        active
+          ? "border-primary bg-primary/10 text-primary"
+          : "border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground",
+      )}
+    >
+      {label}
+    </button>
+  );
+}
+
+// brukes ikke lenger, men eksportert for å beholde import-overflate ved behov
+export { formatRelative };
