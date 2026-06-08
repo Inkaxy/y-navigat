@@ -145,7 +145,7 @@ export default function Outlets() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin-outlets"] });
-      toast.success("Outlet slettet");
+      toast.success("Butikk slettet");
       setDeleting(null);
     },
     onError: (e: any) => toast.error(e.message ?? "Kunne ikke slette"),
