@@ -10,7 +10,6 @@ import {
 } from "lucide-react";
 import { TicketsInbox } from "@/ordre/components/shell/TicketsInbox";
 import { AppBanner } from "@/ordre/components/shell/AppBanner";
-import { AlertCircle as _AC } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
