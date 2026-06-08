@@ -298,5 +298,3 @@ function DateChip({
   );
 }
 
-// brukes ikke lenger, men eksportert for å beholde import-overflate ved behov
-export { formatRelative };
