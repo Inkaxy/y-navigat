@@ -89,26 +89,48 @@ export function NewCustomerDialog({
     }
   }, [open, form]);
 
-  // Når profil velges: foreslå neste kundenr og default-customer-type
+  // Når profil velges: foreslå neste ledige kundenr og default-customer-type
   useEffect(() => {
     if (!profileId || !selectedProfile) return;
     let cancelled = false;
     (async () => {
       setReservingNumber(true);
-      // Bruk profilens neste-nummer som forslag (uten å reservere — reservasjon skjer ved opprettelse)
-      const suggested = String(selectedProfile.next_customer_number);
-      if (!cancelled) {
-        form.setValue("customer_number", suggested);
-        if (selectedProfile.is_private_person_default) {
-          form.setValue("customer_type", "consumer");
+      try {
+        // Hent eksisterende kundenumre for selskapet og finn første ledige
+        // som er >= profilens next_customer_number
+        const { data: existing, error } = await supabase
+          .from("customers")
+          .select("customer_number")
+          .eq("legal_entity_id", legalEntityId);
+        if (error) throw error;
+
+        const used = new Set<number>();
+        for (const row of existing ?? []) {
+          const n = parseInt(row.customer_number, 10);
+          if (!Number.isNaN(n)) used.add(n);
         }
+        let candidate = Number(selectedProfile.next_customer_number) || 1;
+        while (used.has(candidate)) candidate++;
+
+        if (!cancelled) {
+          form.setValue("customer_number", String(candidate));
+          if (selectedProfile.is_private_person_default) {
+            form.setValue("customer_type", "consumer");
+          }
+        }
+      } catch (e) {
+        if (!cancelled) {
+          form.setValue("customer_number", String(selectedProfile.next_customer_number));
+        }
+      } finally {
+        if (!cancelled) setReservingNumber(false);
       }
-      setReservingNumber(false);
     })();
     return () => {
       cancelled = true;
     };
-  }, [profileId, selectedProfile, form]);
+  }, [profileId, selectedProfile, legalEntityId, form]);
+
 
   const mutation = useMutation({
     mutationFn: async (values: FormValues) => {
