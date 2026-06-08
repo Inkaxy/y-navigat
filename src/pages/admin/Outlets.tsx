@@ -101,7 +101,19 @@ export default function Outlets() {
         const { error } = await supabase.from("outlets").update(patch).eq("id", id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("outlets").insert(row as any);
+        // Auto-tildel display_number = max+1 innen samme selskap (starter på 1)
+        const { data: maxRow, error: maxErr } = await supabase
+          .from("outlets")
+          .select("display_number")
+          .eq("legal_entity_id", row.legal_entity_id)
+          .order("display_number", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (maxErr) throw maxErr;
+        const nextNumber = (maxRow?.display_number ?? 0) + 1;
+        const { error } = await supabase
+          .from("outlets")
+          .insert({ ...(row as any), display_number: nextNumber });
         if (error) throw error;
       }
     },
@@ -133,21 +145,21 @@ export default function Outlets() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin-outlets"] });
-      toast.success("Outlet slettet");
+      toast.success("Butikk slettet");
       setDeleting(null);
     },
     onError: (e: any) => toast.error(e.message ?? "Kunne ikke slette"),
   });
 
   return (
-    <AdminLayout title="Outlets">
+    <AdminLayout title="Butikker">
       <AppHeaderBanner
         icon={Store}
-        title="Outlets"
+        title="Butikker"
         subtitle="Butikker, bakerier og produksjonssteder."
         actions={
           <Button size="sm" onClick={() => setEditing({ ...empty })}>
-            <Plus className="h-4 w-4" /> Ny outlet
+            <Plus className="h-4 w-4" /> Ny butikk
           </Button>
         }
       />
@@ -212,7 +224,7 @@ export default function Outlets() {
 
       <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
         <DialogContent>
-          <DialogHeader><DialogTitle>{editing?.id ? "Rediger outlet" : "Ny outlet"}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editing?.id ? "Rediger butikk" : "Ny butikk"}</DialogTitle></DialogHeader>
           {editing && (
             <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2">
@@ -262,7 +274,7 @@ export default function Outlets() {
       <AlertDialog open={!!deleting} onOpenChange={(o) => !o && setDeleting(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Slette outlet?</AlertDialogTitle>
+            <AlertDialogTitle>Slette butikk?</AlertDialogTitle>
             <AlertDialogDescription>
               Er du sikker på at du vil slette <strong>{deleting?.short_name}</strong>? Denne handlingen kan ikke angres.
             </AlertDialogDescription>
