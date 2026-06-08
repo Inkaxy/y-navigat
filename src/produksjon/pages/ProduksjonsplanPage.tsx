@@ -382,25 +382,26 @@ export default function ProduksjonsplanPage() {
 
         {activeTemplate && (
           <div
-            className="inline-flex items-center gap-1 rounded-full border border-border px-3 py-1 text-sm"
+            className="mx-auto inline-flex items-center justify-center gap-2 rounded-full border-2 border-brand-bronze/40 px-5 py-2 text-base font-semibold shadow-sm"
             style={{ backgroundColor: activeColor ?? undefined }}
           >
-            <span className="font-medium">{activeTemplate.name}</span>
-            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setPrintProdDialog(true)} title="Skriv ut">
-              <Printer className="h-3.5 w-3.5" />
+            <span className="font-display tracking-tight">{activeTemplate.name}</span>
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setPrintProdDialog(true)} title="Skriv ut">
+              <Printer className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setSaveDialog(true)} title="Lagre">
-              <Save className="h-3.5 w-3.5" />
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setSaveDialog(true)} title="Lagre">
+              <Save className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => plan.refetch()} title="Last på nytt">
-              <RefreshCw className="h-3.5 w-3.5" />
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => plan.refetch()} title="Last på nytt">
+              <RefreshCw className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setActiveTemplate(null)} title="Fjern">
-              <X className="h-3.5 w-3.5" />
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setActiveTemplate(null)} title="Fjern">
+              <X className="h-4 w-4" />
             </Button>
           </div>
         )}
       </div>
+
 
       {/* Status-tekst */}
       {counts && (
