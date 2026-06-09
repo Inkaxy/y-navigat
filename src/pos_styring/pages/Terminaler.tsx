@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertCircle, Info, MoreHorizontal, PenLine, Plus } from "lucide-react";
+import { AlertCircle, Copy, Info, Link2, MoreHorizontal, PenLine, Plus } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -65,6 +65,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 
 type TerminalStatus = "active" | "inactive" | "maintenance";
+type CustomerScreenMode = "logo_only" | "logo_and_cart";
 
 interface Terminal {
   id: string;
@@ -77,6 +78,8 @@ interface Terminal {
   next_z_number: number;
   outlet_id: string;
   default_price_list_id: string | null;
+  logo_url: string | null;
+  customer_screen_mode: CustomerScreenMode;
   updated_at: string;
   outlet?: {
     display_name: string;
@@ -118,6 +121,13 @@ const terminalSchema = z.object({
     .max(10, "Maks 10 tegn")
     .regex(/^[A-Z0-9-]{1,10}$/i, "Kun bokstaver, tall og bindestrek"),
   status: z.enum(["active", "inactive", "maintenance"]),
+  logo_url: z
+    .string()
+    .trim()
+    .max(500, "Maks 500 tegn")
+    .optional()
+    .or(z.literal("")),
+  customer_screen_mode: z.enum(["logo_only", "logo_and_cart"]),
 });
 
 type TerminalFormValues = z.infer<typeof terminalSchema>;
@@ -174,7 +184,7 @@ async function fetchTerminals(activeEntityId: string): Promise<Terminal[]> {
   const { data, error } = await supabase
     .from("pos_terminals")
     .select(
-      "id, terminal_code, display_name, receipt_prefix, status, next_receipt_number, next_session_number, next_z_number, outlet_id, default_price_list_id, updated_at, outlet:pickup_locations!pos_terminals_outlet_id_fkey(display_name, pos_display_name), price_list:price_lists!pos_terminals_default_price_list_id_fkey(display_name)",
+      "id, terminal_code, display_name, receipt_prefix, status, next_receipt_number, next_session_number, next_z_number, outlet_id, default_price_list_id, logo_url, customer_screen_mode, updated_at, outlet:pickup_locations!pos_terminals_outlet_id_fkey(display_name, pos_display_name), price_list:price_lists!pos_terminals_default_price_list_id_fkey(display_name)",
     )
     .eq("legal_entity_id", activeEntityId)
     .order("terminal_code", { ascending: true });
@@ -237,6 +247,8 @@ function TerminalDialog({
       default_price_list_id: NO_PRICE_LIST,
       receipt_prefix: "",
       status: "active",
+      logo_url: "",
+      customer_screen_mode: "logo_and_cart",
     },
   });
 
@@ -249,6 +261,8 @@ function TerminalDialog({
       default_price_list_id: terminal?.default_price_list_id ?? NO_PRICE_LIST,
       receipt_prefix: terminal?.receipt_prefix ?? "",
       status: terminal?.status ?? "active",
+      logo_url: terminal?.logo_url ?? "",
+      customer_screen_mode: terminal?.customer_screen_mode ?? "logo_and_cart",
     });
   }, [form, open, terminal]);
 
@@ -262,6 +276,8 @@ function TerminalDialog({
           values.default_price_list_id === NO_PRICE_LIST ? null : values.default_price_list_id,
         receipt_prefix: values.receipt_prefix.trim().toUpperCase(),
         status: values.status,
+        logo_url: values.logo_url?.trim() ? values.logo_url.trim() : null,
+        customer_screen_mode: values.customer_screen_mode,
       };
 
       if (isEdit) {
