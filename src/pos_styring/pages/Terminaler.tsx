@@ -571,6 +571,7 @@ export default function Terminaler() {
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedTerminal, setSelectedTerminal] = useState<Terminal | null>(null);
+  const [linksTerminal, setLinksTerminal] = useState<Terminal | null>(null);
   const [pendingStatus, setPendingStatus] = useState<{
     terminal: Terminal;
     status: TerminalStatus;
@@ -748,6 +749,10 @@ export default function Terminaler() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => setLinksTerminal(terminal)}>
+                            <Link2 className="mr-2 h-4 w-4" />
+                            Kiosk-lenker
+                          </DropdownMenuItem>
                           <DropdownMenuItem
                             disabled={terminal.status === "active"}
                             onClick={() => requestStatusChange(terminal, "active")}
@@ -806,7 +811,71 @@ export default function Terminaler() {
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
-      </AlertDialog>
+      <KioskLinksDialog
+        terminal={linksTerminal}
+        onOpenChange={(open) => !open && setLinksTerminal(null)}
+      />
+    </div>
+  );
+}
+
+interface KioskLinksDialogProps {
+  terminal: Terminal | null;
+  onOpenChange: (open: boolean) => void;
+}
+
+function KioskLinksDialog({ terminal, onOpenChange }: KioskLinksDialogProps) {
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const operatorUrl = terminal ? `${origin}/kiosk/o/${terminal.id}` : "";
+  const customerUrl = terminal ? `${origin}/kiosk/k/${terminal.id}` : "";
+
+  const copy = async (url: string, label: string) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success(`Kopiert: ${label}`);
+    } catch {
+      toast.error("Kunne ikke kopiere — kopier manuelt fra feltet.");
+    }
+  };
+
+  return (
+    <Dialog open={!!terminal} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-xl">
+        <DialogHeader>
+          <DialogTitle>Kiosk-lenker — {terminal?.display_name}</DialogTitle>
+          <DialogDescription>
+            Åpne lenkene i Chrome <code>--kiosk</code> eller installer som PWA på den
+            fysiske terminalen.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <LinkRow label="Operatør-skjerm" url={operatorUrl} onCopy={() => copy(operatorUrl, "Operatør-skjerm")} />
+          <LinkRow label="Kunde-skjerm" url={customerUrl} onCopy={() => copy(customerUrl, "Kunde-skjerm")} />
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Lukk
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function LinkRow({ label, url, onCopy }: { label: string; url: string; onCopy: () => void }) {
+  return (
+    <div className="space-y-1.5">
+      <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        {label}
+      </div>
+      <div className="flex gap-2">
+        <Input value={url} readOnly className="font-mono text-xs" onFocus={(e) => e.currentTarget.select()} />
+        <Button variant="outline" onClick={onCopy} className="gap-2">
+          <Copy className="h-4 w-4" /> Kopier
+        </Button>
+      </div>
     </div>
   );
 }
