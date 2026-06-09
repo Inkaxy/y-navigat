@@ -91,6 +91,10 @@ import PosStyringTransaksjonDetalj from "@/pos_styring/pages/TransaksjonDetalj";
 import PosStyringRapporter from "@/pos_styring/pages/Rapporter";
 import PosStyringInnstillinger from "@/pos_styring/pages/Innstillinger";
 
+// Kiosk-ruter — bypass NBhub-shell + auth-guard, egen Supabase-klient
+import { KioskOperatorRoute, KioskCustomerRoute } from "@/kiosk/routes";
+
+
 
 // Ordre-app
 import OrdreDashboard from "@/ordre/pages/Dashboard";
@@ -354,6 +358,10 @@ const App = () => (
               <Route path="/pos-styring/transaksjoner/:id" element={<PosStyringShell><PosStyringTransaksjonDetalj /></PosStyringShell>} />
               <Route path="/pos-styring/rapporter" element={<PosStyringShell><PosStyringRapporter /></PosStyringShell>} />
               <Route path="/pos-styring/innstillinger" element={<PosStyringShell><PosStyringInnstillinger /></PosStyringShell>} />
+
+              {/* Kiosk-ruter — bypasser NBhub <Shell>/<ProtectedRoute>; egen Supabase-klient (storageKey 'pos-kiosk-auth') */}
+              <Route path="/kiosk/o/:terminalId" element={<KioskOperatorRoute />} />
+              <Route path="/kiosk/k/:terminalId" element={<KioskCustomerRoute />} />
 
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
