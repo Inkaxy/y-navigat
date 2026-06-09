@@ -9210,31 +9210,19 @@ export type Database = {
           operator_id: string
         }[]
       }
-      pos_record_sale:
-        | {
-            Args: {
-              p_customer_id?: string
-              p_dining_mode?: string
-              p_is_training?: boolean
-              p_lines: Json
-              p_payment_summary: Json
-              p_reference_transaction_id?: string
-              p_session_id: string
-              p_transaction_type?: string
-            }
-            Returns: string
-          }
-        | {
-            Args: {
-              p_customer_id?: string
-              p_dining_mode?: string
-              p_is_training?: boolean
-              p_lines: Json
-              p_payments: Json
-              p_session_id: string
-            }
-            Returns: string
-          }
+      pos_record_sale: {
+        Args: {
+          p_customer_id?: string
+          p_dining_mode?: string
+          p_is_training?: boolean
+          p_lines: Json
+          p_payment_summary: Json
+          p_reference_transaction_id?: string
+          p_session_id: string
+          p_transaction_type?: string
+        }
+        Returns: string
+      }
       pos_set_operator_pin: {
         Args: { p_new_pin: string; p_operator_id: string }
         Returns: undefined
