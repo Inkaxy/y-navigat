@@ -638,12 +638,12 @@ export default function Rapporter() {
             <div className="space-y-3">
               <div>
                 <h2 className="text-lg font-semibold">
-                  X-rapport for {xResult.header.terminal_code} sesjon{" "}
-                  {xResult.header.session_number}
+                  X-rapport for {xResult.terminal_code} sesjon{" "}
+                  {xResult.session_number}
                 </h2>
                 {xGeneratedAt && (
                   <p className="text-sm text-muted-foreground">
-                    Generert kl. {format(xGeneratedAt, "HH:mm:ss")} ({xResult.header.operator_name})
+                    Generert kl. {format(xGeneratedAt, "HH:mm:ss")} ({xResult.operator_name})
                   </p>
                 )}
               </div>
