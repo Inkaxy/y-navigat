@@ -1,9 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTerminal } from "@/kiosk/context/TerminalContext";
 import { useKioskChannel } from "@/kiosk/context/RealtimeContext";
 import { Logo } from "@/components/brand/Logo";
 import type { CustomerCartPayload } from "@/kiosk/lib/cart";
-import { CART_UPDATE_EVENT } from "@/kiosk/lib/realtime";
+import {
+  CART_UPDATE_EVENT,
+  SALE_COMPLETE_EVENT,
+  type SaleCompletePayload,
+} from "@/kiosk/lib/realtime";
 
 export default function CustomerDisplay() {
   const { terminal } = useTerminal();
