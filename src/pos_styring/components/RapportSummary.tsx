@@ -8,11 +8,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
+// Intern totals-shape matcher faktisk pos_generate_x_report.totals + pos_z_reports-rad
+// (mappet via helper i ZDetalj).
 export interface RapportTotals {
-  sales_incl: number;
-  sales_excl: number;
+  gross: number;
+  net: number;
   mva: number;
-  tx_count: number;
+  transaction_count: number;
   refund_count: number;
   refund_total: number;
 }
@@ -67,13 +69,15 @@ function StatCard({ label, value, tone }: { label: string; value: string; tone?:
 }
 
 export default function RapportSummary({ totals, mva_breakdown, payment_breakdown }: Props) {
+  const sortedMva = [...mva_breakdown].sort((a, b) => a.rate - b.rate);
+
   return (
     <div className="space-y-6">
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <StatCard label="Brutto (inkl. MVA)" value={fmtMoney(totals.sales_incl)} />
+        <StatCard label="Brutto (inkl. MVA)" value={fmtMoney(totals.gross)} />
         <StatCard label="MVA totalt" value={fmtMoney(totals.mva)} />
-        <StatCard label="Netto (eks. MVA)" value={fmtMoney(totals.sales_excl)} />
-        <StatCard label="Antall transaksjoner" value={String(totals.tx_count)} />
+        <StatCard label="Netto (eks. MVA)" value={fmtMoney(totals.net)} />
+        <StatCard label="Antall transaksjoner" value={String(totals.transaction_count)} />
         <StatCard label="Antall returer" value={String(totals.refund_count)} />
         <StatCard
           label="Sum returer"
@@ -86,7 +90,7 @@ export default function RapportSummary({ totals, mva_breakdown, payment_breakdow
         <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
           MVA-fordeling
         </h3>
-        {mva_breakdown.length === 0 ? (
+        {sortedMva.length === 0 ? (
           <div className="rounded-lg border bg-card p-4 text-sm text-muted-foreground">
             Ingen MVA-data.
           </div>
@@ -101,7 +105,7 @@ export default function RapportSummary({ totals, mva_breakdown, payment_breakdow
               </TableRow>
             </TableHeader>
             <TableBody>
-              {mva_breakdown.map((m) => (
+              {sortedMva.map((m) => (
                 <TableRow key={m.rate}>
                   <TableCell className="font-mono">{m.rate}%</TableCell>
                   <TableCell className="text-right tabular-nums">{fmtMoney(m.net)}</TableCell>
