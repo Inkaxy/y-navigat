@@ -811,6 +811,8 @@ export default function Terminaler() {
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
+      </AlertDialog>
+
       <KioskLinksDialog
         terminal={linksTerminal}
         onOpenChange={(open) => !open && setLinksTerminal(null)}
