@@ -311,36 +311,8 @@ export default function Rapporter() {
         p_session_id: sessionId,
       });
       if (error) throw error;
-      const raw = (data ?? {}) as Record<string, unknown>;
-      const t = (raw.totals ?? {}) as Record<string, unknown>;
-      const adapted: XReport = {
-        report_type: "x",
-        header: {
-          session_id: String(raw.session_id ?? ""),
-          session_number: Number(raw.session_number ?? 0),
-          terminal_id: String(raw.terminal_id ?? ""),
-          terminal_code: String(raw.terminal_code ?? "?"),
-          terminal_name: String(raw.terminal_name ?? ""),
-          operator_id: String(raw.operator_id ?? ""),
-          operator_code: String(raw.operator_code ?? ""),
-          operator_name: String(raw.operator_name ?? ""),
-          period_start: String(raw.period_start ?? ""),
-          period_end: String(raw.period_end ?? ""),
-          generated_at: String(raw.generated_at ?? ""),
-        },
-        totals: {
-          sales_incl: Number(t.gross ?? 0),
-          sales_excl: Number(t.net ?? 0),
-          mva: Number(t.mva ?? 0),
-          tx_count: Number(t.transaction_count ?? 0),
-          refund_count: Number(t.refund_count ?? 0),
-          refund_total: Number(t.refund_total ?? 0),
-        },
-        mva_breakdown: (raw.mva_breakdown as MvaBreakdownEntry[]) ?? [],
-        payment_breakdown: (raw.payment_breakdown as PaymentBreakdownEntry[]) ?? [],
-        last_journal_id: (raw.last_journal_id as number | null) ?? null,
-      };
-      return adapted;
+      // RPC returnerer kanonisk shape (flat, totals med gross/net/transaction_count).
+      return data as unknown as XReport;
     },
     onSuccess: (data) => {
       setXResult(data);
