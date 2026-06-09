@@ -1,0 +1,1 @@
+DROP FUNCTION IF EXISTS public.pos_record_sale(uuid, jsonb, jsonb, text, uuid, boolean);
