@@ -8577,6 +8577,14 @@ export type Database = {
         Args: { p_price: number; p_price_list_id: string; p_product_id: string }
         Returns: number
       }
+      _pos_period_aggregate: {
+        Args: {
+          p_period_end: string
+          p_period_start: string
+          p_terminal_id: string
+        }
+        Returns: Json
+      }
       _validate_and_resolve_cake_line: {
         Args: { p_legal_entity_id: string; p_merknad: Json }
         Returns: {
@@ -9199,9 +9207,13 @@ export type Database = {
         }
         Returns: string
       }
-      pos_generate_x_report: { Args: { p_terminal_id: string }; Returns: Json }
+      pos_generate_x_report: { Args: { p_session_id: string }; Returns: Json }
       pos_generate_z_report: {
-        Args: { p_terminal_id: string }
+        Args: {
+          p_period_end: string
+          p_period_start: string
+          p_terminal_id: string
+        }
         Returns: string
       }
       pos_next_receipt_number: {
