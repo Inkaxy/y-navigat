@@ -7,9 +7,13 @@ export function getKioskCredentials(): { email: string; password: string } | nul
   return { email, password };
 }
 
-export async function ensureKioskSession(): Promise<
-  { ok: true } | { ok: false; reason: "missing_env" | "auth_failed"; error?: string }
-> {
+export type EnsureSessionResult = {
+  ok: boolean;
+  reason?: "missing_env" | "auth_failed";
+  error?: string;
+};
+
+export async function ensureKioskSession(): Promise<EnsureSessionResult> {
   const creds = getKioskCredentials();
   if (!creds) return { ok: false, reason: "missing_env" };
 

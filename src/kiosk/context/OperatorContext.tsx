@@ -9,9 +9,11 @@ export interface Operator {
   legal_entity_id?: string | null;
 }
 
+export type LoginResult = { ok: boolean; error?: string };
+
 interface State {
   operator: Operator | null;
-  login: (code: string, pin: string) => Promise<{ ok: true } | { ok: false; error: string }>;
+  login: (code: string, pin: string) => Promise<LoginResult>;
   logout: () => void;
 }
 
