@@ -94,7 +94,32 @@ export default function CustomerDisplay() {
 
         {!logoOnly && (
           <div className="mt-8 w-full max-w-3xl flex-1">
-            {hasItems ? (
+            {showThanks ? (
+              <div className="rounded-2xl border border-amber-400/30 bg-amber-500/10 p-10 text-center">
+                <div className="text-4xl font-bold text-amber-300">
+                  Takk for handelen!
+                </div>
+                <div className="mt-4 text-xl text-[#F4ECDC]/80">
+                  Sum:{" "}
+                  <span className="tabular-nums font-semibold">
+                    {thanks!.total_incl_mva.toFixed(2)}
+                  </span>
+                </div>
+                {thanks!.change_given > 0 && (
+                  <div className="mt-2 text-lg text-[#F4ECDC]/70">
+                    Veksel:{" "}
+                    <span className="tabular-nums font-semibold">
+                      {thanks!.change_given.toFixed(2)}
+                    </span>
+                  </div>
+                )}
+                {thanks!.receipt_number && (
+                  <div className="mt-3 text-sm text-[#F4ECDC]/40">
+                    {thanks!.receipt_number}
+                  </div>
+                )}
+              </div>
+            ) : hasItems ? (
               <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-6">
                 <div className="space-y-1">
                   {cart!.items.map((it, i) => (
