@@ -32,6 +32,27 @@ export type Database = {
         }
         Relationships: []
       }
+      _pos_smoke_results: {
+        Row: {
+          msg: string | null
+          recorded_at: string | null
+          sqlstate: string | null
+          test: string
+        }
+        Insert: {
+          msg?: string | null
+          recorded_at?: string | null
+          sqlstate?: string | null
+          test: string
+        }
+        Update: {
+          msg?: string | null
+          recorded_at?: string | null
+          sqlstate?: string | null
+          test?: string
+        }
+        Relationships: []
+      }
       ai_call_log: {
         Row: {
           completion_tokens: number | null
