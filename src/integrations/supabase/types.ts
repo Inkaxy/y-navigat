@@ -53,6 +53,21 @@ export type Database = {
         }
         Relationships: []
       }
+      _x_audit: {
+        Row: {
+          result: Json | null
+          sid: string | null
+        }
+        Insert: {
+          result?: Json | null
+          sid?: string | null
+        }
+        Update: {
+          result?: Json | null
+          sid?: string | null
+        }
+        Relationships: []
+      }
       ai_call_log: {
         Row: {
           completion_tokens: number | null

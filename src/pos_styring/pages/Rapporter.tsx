@@ -76,21 +76,20 @@ interface OpenSession {
   opened_at: string;
 }
 
+// Matcher faktisk pos_generate_x_report-output (flat, ingen header-wrapper).
 interface XReport {
   report_type: "x";
-  header: {
-    session_id: string;
-    session_number: number;
-    terminal_id: string;
-    terminal_code: string;
-    terminal_name: string;
-    operator_id: string;
-    operator_code: string;
-    operator_name: string;
-    period_start: string;
-    period_end: string;
-    generated_at: string;
-  };
+  session_id: string;
+  session_number: number;
+  terminal_id: string;
+  terminal_code: string;
+  terminal_name: string;
+  operator_id: string;
+  operator_code: string;
+  operator_name: string;
+  period_start: string;
+  period_end: string;
+  generated_at: string;
   totals: RapportTotals;
   mva_breakdown: MvaBreakdownEntry[];
   payment_breakdown: PaymentBreakdownEntry[];
@@ -312,36 +311,8 @@ export default function Rapporter() {
         p_session_id: sessionId,
       });
       if (error) throw error;
-      const raw = (data ?? {}) as Record<string, unknown>;
-      const t = (raw.totals ?? {}) as Record<string, unknown>;
-      const adapted: XReport = {
-        report_type: "x",
-        header: {
-          session_id: String(raw.session_id ?? ""),
-          session_number: Number(raw.session_number ?? 0),
-          terminal_id: String(raw.terminal_id ?? ""),
-          terminal_code: String(raw.terminal_code ?? "?"),
-          terminal_name: String(raw.terminal_name ?? ""),
-          operator_id: String(raw.operator_id ?? ""),
-          operator_code: String(raw.operator_code ?? ""),
-          operator_name: String(raw.operator_name ?? ""),
-          period_start: String(raw.period_start ?? ""),
-          period_end: String(raw.period_end ?? ""),
-          generated_at: String(raw.generated_at ?? ""),
-        },
-        totals: {
-          sales_incl: Number(t.gross ?? 0),
-          sales_excl: Number(t.net ?? 0),
-          mva: Number(t.mva ?? 0),
-          tx_count: Number(t.transaction_count ?? 0),
-          refund_count: Number(t.refund_count ?? 0),
-          refund_total: Number(t.refund_total ?? 0),
-        },
-        mva_breakdown: (raw.mva_breakdown as MvaBreakdownEntry[]) ?? [],
-        payment_breakdown: (raw.payment_breakdown as PaymentBreakdownEntry[]) ?? [],
-        last_journal_id: (raw.last_journal_id as number | null) ?? null,
-      };
-      return adapted;
+      // RPC returnerer kanonisk shape (flat, totals med gross/net/transaction_count).
+      return data as unknown as XReport;
     },
     onSuccess: (data) => {
       setXResult(data);
@@ -402,8 +373,10 @@ export default function Rapporter() {
         toast.error("Du har ikke tilgang");
       } else if (msg.includes("Invalid period")) {
         toast.error("Periodens slutt må være etter start");
-      } else if (msg.toLowerCase().includes("session") && msg.toLowerCase().includes("open")) {
-        toast.error(msg);
+      } else if (msg.toLowerCase().includes("cannot generate z while sessions are open")) {
+        toast.error(
+          "Det er en åpen sesjon i perioden. Lukk den fra kassen først, eller velg en annen periode.",
+        );
       } else {
         toast.error(msg);
       }
@@ -645,7 +618,7 @@ export default function Rapporter() {
                     variant="outline"
                     onClick={() =>
                       downloadJson(
-                        `x-snapshot-${xResult.header.terminal_code}-s${xResult.header.session_number}.json`,
+                        `x-snapshot-${xResult.terminal_code}-s${xResult.session_number}.json`,
                         xResult,
                       )
                     }
@@ -667,12 +640,12 @@ export default function Rapporter() {
             <div className="space-y-3">
               <div>
                 <h2 className="text-lg font-semibold">
-                  X-rapport for {xResult.header.terminal_code} sesjon{" "}
-                  {xResult.header.session_number}
+                  X-rapport for {xResult.terminal_code} sesjon{" "}
+                  {xResult.session_number}
                 </h2>
                 {xGeneratedAt && (
                   <p className="text-sm text-muted-foreground">
-                    Generert kl. {format(xGeneratedAt, "HH:mm:ss")} ({xResult.header.operator_name})
+                    Generert kl. {format(xGeneratedAt, "HH:mm:ss")} ({xResult.operator_name})
                   </p>
                 )}
               </div>
