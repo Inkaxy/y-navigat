@@ -102,7 +102,7 @@ export function CartPanel({ onPay }: Props) {
           <BigButton
             className="flex-[2] text-base"
             disabled={isEmpty}
-            onClick={() => toast.info("Betaling bygges i K.1c")}
+            onClick={onPay}
           >
             Betal
           </BigButton>
