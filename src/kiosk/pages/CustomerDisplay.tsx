@@ -13,6 +13,8 @@ export default function CustomerDisplay() {
   const { terminal } = useTerminal();
   const channel = useKioskChannel();
   const [cart, setCart] = useState<CustomerCartPayload | null>(null);
+  const [thanks, setThanks] = useState<SaleCompletePayload | null>(null);
+  const thanksTimer = useRef<number | null>(null);
 
   // Hold skjermen våken så lenge kunde-skjermen er åpen.
   useEffect(() => {
@@ -34,18 +36,31 @@ export default function CustomerDisplay() {
     };
   }, []);
 
-  // Lytt på cart_update fra operatør-skjermen.
+  // Lytt på cart_update + sale_complete fra operatør-skjermen.
   useEffect(() => {
     channel.on("broadcast", { event: CART_UPDATE_EVENT }, (msg) => {
       const payload = (msg as { payload?: unknown }).payload;
       if (payload && typeof payload === "object") {
         setCart(payload as CustomerCartPayload);
+        // Ny cart_update overskriver takke-state.
+        if (thanksTimer.current) window.clearTimeout(thanksTimer.current);
+        setThanks(null);
+      }
+    });
+    channel.on("broadcast", { event: SALE_COMPLETE_EVENT }, (msg) => {
+      const payload = (msg as { payload?: unknown }).payload;
+      if (payload && typeof payload === "object") {
+        setThanks(payload as SaleCompletePayload);
+        setCart(null);
+        if (thanksTimer.current) window.clearTimeout(thanksTimer.current);
+        thanksTimer.current = window.setTimeout(() => setThanks(null), 6000);
       }
     });
   }, [channel]);
 
   const logoOnly = terminal?.customer_screen_mode === "logo_only";
   const hasItems = !!cart && cart.items.length > 0;
+  const showThanks = !!thanks;
 
   return (
     <div
