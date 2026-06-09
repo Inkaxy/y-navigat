@@ -473,6 +473,54 @@ function TerminalDialog({
               />
             </div>
 
+            <div className="rounded-lg border bg-muted/20 p-4 space-y-4">
+              <div className="text-sm font-medium">Kunde-skjerm (Kiosk)</div>
+              <FormField
+                control={form.control}
+                name="logo_url"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Logo-URL</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        placeholder="https://… (tom = Nøtterø Bakeri-seglet)"
+                        maxLength={500}
+                        autoComplete="off"
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Vises på kunde-skjermen ({`/kiosk/k/<terminal-id>`}). La stå tom for standard segl.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="customer_screen_mode"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Modus</FormLabel>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="logo_and_cart">Logo + live handlekurv</SelectItem>
+                        <SelectItem value="logo_only">Bare logo</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+
+
             {terminal && (
               <div className="rounded-lg border bg-muted/30 p-4">
                 <div className="mb-3 flex items-center gap-2 text-sm font-medium">
