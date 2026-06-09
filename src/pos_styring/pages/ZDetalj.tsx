@@ -194,14 +194,7 @@ export default function ZDetalj() {
       </div>
 
       <RapportSummary
-        totals={{
-          sales_incl: z.total_sales_incl_mva,
-          sales_excl: z.total_sales_excl_mva,
-          mva: z.total_mva,
-          tx_count: z.transaction_count,
-          refund_count: z.refund_count,
-          refund_total: z.refund_total,
-        }}
+        totals={zRowToTotals(z)}
         mva_breakdown={z.mva_breakdown}
         payment_breakdown={z.payment_breakdown}
       />
