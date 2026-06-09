@@ -14,6 +14,24 @@ export type Database = {
   }
   public: {
     Tables: {
+      _pos_smoke_debug: {
+        Row: {
+          id: number
+          note: string | null
+          ts: string | null
+        }
+        Insert: {
+          id?: number
+          note?: string | null
+          ts?: string | null
+        }
+        Update: {
+          id?: number
+          note?: string | null
+          ts?: string | null
+        }
+        Relationships: []
+      }
       ai_call_log: {
         Row: {
           completion_tokens: number | null
