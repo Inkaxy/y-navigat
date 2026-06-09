@@ -4392,6 +4392,24 @@ export type Database = {
           },
         ]
       }
+      pos_kiosk_users: {
+        Row: {
+          created_at: string
+          note: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          note?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          note?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       pos_operator_terminals: {
         Row: {
           created_at: string
@@ -8956,6 +8974,7 @@ export type Database = {
         }
         Returns: Json
       }
+      is_kiosk_user: { Args: never; Returns: boolean }
       is_platform_admin: { Args: never; Returns: boolean }
       is_platform_owner: { Args: { _user_id: string }; Returns: boolean }
       is_ravarer_owner: { Args: { _user_id: string }; Returns: boolean }
@@ -9200,7 +9219,11 @@ export type Database = {
         Returns: Json
       }
       pos_close_session: {
-        Args: { p_counted_cash: number; p_session_id: string }
+        Args: {
+          p_closing_float: number
+          p_counted_cash: number
+          p_session_id: string
+        }
         Returns: undefined
       }
       pos_create_operator: {
