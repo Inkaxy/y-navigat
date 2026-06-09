@@ -7,6 +7,7 @@ export interface KioskTerminal {
   terminal_code: string;
   display_name: string;
   legal_entity_id: string;
+  default_price_list_id: string | null;
   logo_url: string | null;
   customer_screen_mode: "logo_only" | "logo_and_cart";
 }
