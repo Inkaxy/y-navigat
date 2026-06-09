@@ -76,21 +76,20 @@ interface OpenSession {
   opened_at: string;
 }
 
+// Matcher faktisk pos_generate_x_report-output (flat, ingen header-wrapper).
 interface XReport {
   report_type: "x";
-  header: {
-    session_id: string;
-    session_number: number;
-    terminal_id: string;
-    terminal_code: string;
-    terminal_name: string;
-    operator_id: string;
-    operator_code: string;
-    operator_name: string;
-    period_start: string;
-    period_end: string;
-    generated_at: string;
-  };
+  session_id: string;
+  session_number: number;
+  terminal_id: string;
+  terminal_code: string;
+  terminal_name: string;
+  operator_id: string;
+  operator_code: string;
+  operator_name: string;
+  period_start: string;
+  period_end: string;
+  generated_at: string;
   totals: RapportTotals;
   mva_breakdown: MvaBreakdownEntry[];
   payment_breakdown: PaymentBreakdownEntry[];
