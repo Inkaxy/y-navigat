@@ -1,6 +1,17 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { toast } from "sonner";
-import type { KeypadData, KeypadButton } from "@/kiosk/hooks/useKeypadLayout";
+import { ChevronLeft } from "lucide-react";
+import type {
+  KeypadButton,
+  KeypadData,
+} from "@/kiosk/hooks/useKeypadLayout";
+import { useKeypadNav } from "@/kiosk/context/KeypadNavContext";
+import { useCart } from "@/kiosk/context/CartContext";
+import {
+  usePriceListConfig,
+  useProductLookup,
+} from "@/kiosk/hooks/useProductLookup";
+import { useTerminal } from "@/kiosk/context/TerminalContext";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -9,51 +20,137 @@ interface Props {
 
 export function KeypadGrid({ data }: Props) {
   const { layout, pages, buttons } = data;
+  const { terminal } = useTerminal();
+  const nav = useKeypadNav();
+  const { addItem } = useCart();
+  const priceListId = terminal?.default_price_list_id ?? null;
+  const { data: priceListCfg } = usePriceListConfig(priceListId);
+  const lookupProduct = useProductLookup(
+    priceListId,
+    priceListCfg?.prices_include_mva ?? false,
+  );
+
   const sortedPages = useMemo(
     () => [...pages].sort((a, b) => a.sort_order - b.sort_order),
     [pages],
   );
-  const [pageId, setPageId] = useState<string | null>(
-    sortedPages[0]?.id ?? null,
+  const currentPageId = nav.currentPageId ?? sortedPages[0]?.id ?? null;
+  const currentPage = sortedPages.find((p) => p.id === currentPageId);
+  const pageButtons = useMemo(
+    () => buttons.filter((b) => b.page_id === currentPageId),
+    [buttons, currentPageId],
   );
 
-  const pageButtons = useMemo(
-    () => buttons.filter((b) => b.page_id === pageId),
-    [buttons, pageId],
-  );
+  const handleProduct = async (b: KeypadButton) => {
+    if (!b.product_id) {
+      toast.error("Produkt-knapp mangler product_id");
+      return;
+    }
+    if (!priceListId) {
+      toast.error("Terminal mangler default_price_list_id");
+      return;
+    }
+    try {
+      const p = await lookupProduct(b.product_id);
+      if (!p) {
+        toast.error(
+          `${b.display_label ?? "Produkt"}: mangler pris i prisliste`,
+        );
+        return;
+      }
+      addItem({
+        product_id: p.id,
+        product_snapshot: {
+          display_name: p.display_name,
+          display_number: String(p.display_number),
+          unit: p.unit_of_sale,
+          mva_rate: p.mva_rate,
+        },
+        unit_price_excl_mva: p.unit_price_excl_mva,
+        mva_rate: p.mva_rate,
+        quantity: 1,
+      });
+    } catch (e) {
+      toast.error("Feil ved produkt-oppslag", {
+        description: (e as Error).message,
+      });
+    }
+  };
+
+  const handleCategory = (b: KeypadButton) => {
+    const label = (b.display_label ?? "").trim().toLowerCase();
+    if (!label) {
+      toast.warning("Kategori-knapp uten etikett");
+      return;
+    }
+    const target = sortedPages.find(
+      (p) => p.page_name.trim().toLowerCase() === label,
+    );
+    if (target) {
+      nav.navigateTo(target.id);
+    } else {
+      toast.warning(
+        `${b.display_label}: underside ikke konfigurert`,
+      );
+    }
+  };
+
+  const handleFunction = (b: KeypadButton) => {
+    toast.info(
+      `${b.display_label ?? b.function_code ?? "Funksjon"}: bygges senere`,
+    );
+  };
 
   const handleClick = (b: KeypadButton) => {
-    console.log("[kiosk] keypad button click", {
-      id: b.id,
-      type: b.button_type,
-      product_id: b.product_id,
-      function_code: b.function_code,
-      label: b.display_label,
-    });
-    toast(b.display_label ?? "(uten etikett)", {
-      description: `type=${b.button_type}`,
-    });
+    switch (b.button_type) {
+      case "product":
+        void handleProduct(b);
+        return;
+      case "category":
+        handleCategory(b);
+        return;
+      case "function":
+      case "function_code":
+        handleFunction(b);
+        return;
+      default:
+        toast.info(`Knapp-type "${b.button_type}" ikke støttet ennå`);
+    }
   };
 
   return (
     <div className="flex h-full flex-col gap-3">
-      {sortedPages.length > 1 && (
-        <div className="flex flex-wrap gap-2">
-          {sortedPages.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => setPageId(p.id)}
-              className={cn(
-                "rounded-lg px-4 py-2 text-sm font-medium transition-colors",
-                p.id === pageId
-                  ? "bg-amber-500 text-[#1B1410]"
-                  : "bg-white/5 text-[#F4ECDC]/70 hover:bg-white/10",
-              )}
-            >
-              {p.page_name}
-            </button>
-          ))}
+      {nav.canGoBack ? (
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => nav.goBack()}
+            className="flex items-center gap-1 rounded-lg bg-white/5 px-4 py-2 text-sm font-medium text-[#F4ECDC] hover:bg-white/10 active:scale-95"
+          >
+            <ChevronLeft className="h-4 w-4" /> Tilbake
+          </button>
+          <span className="text-sm text-[#F4ECDC]/60">
+            {currentPage?.page_name}
+          </span>
         </div>
+      ) : (
+        sortedPages.length > 1 && (
+          <div className="flex flex-wrap gap-2">
+            {sortedPages.map((p) => (
+              <button
+                key={p.id}
+                onClick={() => nav.replaceTo(p.id)}
+                className={cn(
+                  "rounded-lg px-4 py-2 text-sm font-medium transition-colors",
+                  p.id === currentPageId
+                    ? "bg-amber-500 text-[#1B1410]"
+                    : "bg-white/5 text-[#F4ECDC]/70 hover:bg-white/10",
+                )}
+              >
+                {p.page_name}
+              </button>
+            ))}
+          </div>
+        )
       )}
 
       {pageButtons.length === 0 ? (
