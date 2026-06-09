@@ -616,7 +616,7 @@ export default function Rapporter() {
                     variant="outline"
                     onClick={() =>
                       downloadJson(
-                        `x-snapshot-${xResult.header.terminal_code}-s${xResult.header.session_number}.json`,
+                        `x-snapshot-${xResult.terminal_code}-s${xResult.session_number}.json`,
                         xResult,
                       )
                     }
