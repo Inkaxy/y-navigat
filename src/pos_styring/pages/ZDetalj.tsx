@@ -14,7 +14,21 @@ import { supabase } from "@/integrations/supabase/client";
 import RapportSummary, {
   MvaBreakdownEntry,
   PaymentBreakdownEntry,
+  RapportTotals,
 } from "@/pos_styring/components/RapportSummary";
+
+// Mapper en pos_z_reports-rad til den kanoniske totals-shapen
+// som RapportSummary forventer (matcher pos_generate_x_report.totals).
+function zRowToTotals(z: ZRow): RapportTotals {
+  return {
+    gross: z.total_sales_incl_mva,
+    net: z.total_sales_excl_mva,
+    mva: z.total_mva,
+    transaction_count: z.transaction_count,
+    refund_count: z.refund_count,
+    refund_total: z.refund_total,
+  };
+}
 
 interface ZRow {
   id: string;
