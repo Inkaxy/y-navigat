@@ -9,7 +9,6 @@ import OperatorBoot from "@/kiosk/pages/OperatorBoot";
 import KioskError from "@/kiosk/pages/KioskError";
 import { useOperator } from "@/kiosk/context/OperatorContext";
 import { SessionProvider, useSession } from "@/kiosk/context/SessionContext";
-import { useParams as _u } from "react-router-dom";
 
 function SessionSwitch() {
   const { status } = useSession();
