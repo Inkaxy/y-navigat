@@ -38,7 +38,7 @@ export function TerminalProvider({
     (async () => {
       const { data, error } = await kioskSupabase
         .from("pos_terminals")
-        .select("id, terminal_code, display_name, legal_entity_id, logo_url, customer_screen_mode")
+        .select("id, terminal_code, display_name, legal_entity_id, default_price_list_id, logo_url, customer_screen_mode")
         .eq("id", terminalId)
         .maybeSingle();
       if (cancelled) return;
