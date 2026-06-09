@@ -14,12 +14,12 @@ import {
   KeypadNavProvider,
   useKeypadNav,
 } from "@/kiosk/context/KeypadNavContext";
-import { useKeypadLayout } from "@/kiosk/hooks/useKeypadLayout";
+import { useKeypadLayout, type KeypadData } from "@/kiosk/hooks/useKeypadLayout";
 import { kioskSupabase } from "@/kiosk/integrations/supabase/client";
 import { broadcastSaleComplete } from "@/kiosk/lib/realtime";
 import type { CartItem } from "@/kiosk/lib/cart";
 
-// ───────────────────── RPC line-payload (eksakt 7-nøkkel-shape) ───────────────────
+// ─── RPC line-payload: eksakt 7-nøkkel-shape RPC-en leser ────────────────────
 type LinePayload = {
   product_id: string | null;
   product_snapshot: AddItemInput["product_snapshot"];
@@ -41,7 +41,7 @@ export function toLinePayload(item: CartItem): LinePayload {
     dining_mode_override: item.dining_mode_override ?? null,
   };
 }
-// ───────────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function Kasse() {
   const { terminal } = useTerminal();
@@ -65,76 +65,23 @@ export default function Kasse() {
 
   return (
     <CartProvider channel={channel}>
-      <div className="flex min-h-screen flex-col bg-[#0F0E0E] text-[#F4ECDC]">
-        <KioskHeader />
-
-        <div className="flex flex-1 gap-4 p-4">
-          <div className="flex flex-1 flex-col">
-            {isLoading && (
-              <div className="flex flex-1 items-center justify-center text-[#F4ECDC]/60">
-                Laster tastatur…
-              </div>
-            )}
-            {error && (
-              <div className="flex flex-1 items-center justify-center rounded-xl border border-red-500/30 bg-red-500/5 p-8 text-center text-red-300">
-                Feil ved lasting av tastatur: {(error as Error).message}
-              </div>
-            )}
-            {!isLoading && !error && !data && (
-              <div className="flex flex-1 items-center justify-center rounded-xl border border-dashed border-white/10 p-12 text-center">
-                <div>
-                  <p className="text-lg font-medium text-[#F4ECDC]/80">
-                    Ingen tastatur konfigurert
-                  </p>
-                  <p className="mt-2 max-w-md text-sm text-[#F4ECDC]/50">
-                    Det finnes ingen layout bundet til denne terminalen, og
-                    ingen default-layout for selskapet. Åpne POS Styring →
-                    Tastatur for å sette opp et tastatur.
-                  </p>
-                </div>
-              </div>
-            )}
-            {data && (
-              <KeypadNavProvider
-                key={data.layout.id}
-                rootPageId={rootPageId}
-              >
-                <KasseInner />
-                <KeypadGrid data={data} />
-              </KeypadNavProvider>
-            )}
-            {!data && <KassePanelOnly />}
-          </div>
+      <KeypadNavProvider key={data?.layout.id ?? "none"} rootPageId={rootPageId}>
+        <div className="flex min-h-screen flex-col bg-[#0F0E0E] text-[#F4ECDC]">
+          <KioskHeader />
+          <SaleFlow data={data ?? null} loading={isLoading} loadError={error as Error | null} />
         </div>
-      </div>
+      </KeypadNavProvider>
     </CartProvider>
   );
 }
 
-/**
- * Inner-komponent: trenger CartProvider + KeypadNavProvider + Session i kontekst
- * for å håndtere betalings-flow.
- */
-function KasseInner() {
-  return null;
-}
-
-function KassePanelOnly() {
-  return (
-    <SaleFlow>
-      {(onPay) => <CartPanel onPay={onPay} />}
-    </SaleFlow>
-  );
-}
-
-// SaleFlow rendres som sibling til KeypadGrid via render-prop nedover.
-// Vi flytter CartPanel/PaymentModal/ReceiptView inn her.
-
 interface SaleFlowProps {
-  children?: (onPay: () => void) => React.ReactNode;
+  data: KeypadData | null;
+  loading: boolean;
+  loadError: Error | null;
 }
 
-function SaleFlow({ children }: SaleFlowProps) {
+function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
   const cart = useCart();
   const { terminal } = useTerminal();
   const { session } = useSession();
@@ -145,8 +92,10 @@ function SaleFlow({ children }: SaleFlowProps) {
   const [submitting, setSubmitting] = useState(false);
   const [rpcError, setRpcError] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<{
-    tx: Parameters<typeof ReceiptView>[0]["tx"];
-    lines: Parameters<typeof ReceiptView>[0]["lines"];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    tx: any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    lines: any[];
   } | null>(null);
 
   const handleConfirm = async (summary: {
@@ -205,13 +154,12 @@ function SaleFlow({ children }: SaleFlowProps) {
       if (linesErr) throw linesErr;
       if (!tx) throw new Error("Fant ikke transaksjonen etter insert");
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      setReceipt({ tx: tx as any, lines: (lines ?? []) as any });
+      setReceipt({ tx, lines: lines ?? [] });
       setPayOpen(false);
 
       void broadcastSaleComplete(channel, {
-        receipt_number: tx.receipt_number ?? null,
-        total_incl_mva: Number(tx.total_incl_mva),
+        receipt_number: (tx as { receipt_number: string | null }).receipt_number ?? null,
+        total_incl_mva: Number((tx as { total_incl_mva: number }).total_incl_mva),
         change_given: summary.change_given,
         timestamp: Date.now(),
       });
@@ -231,11 +179,44 @@ function SaleFlow({ children }: SaleFlowProps) {
 
   return (
     <>
-      {children?.(() => {
-        if (cart.items.length === 0) return;
-        setRpcError(null);
-        setPayOpen(true);
-      })}
+      <div className="flex flex-1 gap-4 p-4">
+        <div className="flex flex-1 flex-col">
+          {loading && (
+            <div className="flex flex-1 items-center justify-center text-[#F4ECDC]/60">
+              Laster tastatur…
+            </div>
+          )}
+          {loadError && (
+            <div className="flex flex-1 items-center justify-center rounded-xl border border-red-500/30 bg-red-500/5 p-8 text-center text-red-300">
+              Feil ved lasting av tastatur: {loadError.message}
+            </div>
+          )}
+          {!loading && !loadError && !data && (
+            <div className="flex flex-1 items-center justify-center rounded-xl border border-dashed border-white/10 p-12 text-center">
+              <div>
+                <p className="text-lg font-medium text-[#F4ECDC]/80">
+                  Ingen tastatur konfigurert
+                </p>
+                <p className="mt-2 max-w-md text-sm text-[#F4ECDC]/50">
+                  Det finnes ingen layout bundet til denne terminalen, og ingen
+                  default-layout for selskapet. Åpne POS Styring → Tastatur for
+                  å sette opp et tastatur.
+                </p>
+              </div>
+            </div>
+          )}
+          {data && <KeypadGrid data={data} />}
+        </div>
+
+        <CartPanel
+          onPay={() => {
+            if (cart.items.length === 0) return;
+            setRpcError(null);
+            setPayOpen(true);
+          }}
+        />
+      </div>
+
       <PaymentModal
         open={payOpen}
         onOpenChange={(v) => {
