@@ -1,11 +1,14 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useTerminal } from "@/kiosk/context/TerminalContext";
 import { useKioskChannel } from "@/kiosk/context/RealtimeContext";
 import { Logo } from "@/components/brand/Logo";
+import type { CustomerCartPayload } from "@/kiosk/lib/cart";
+import { CART_UPDATE_EVENT } from "@/kiosk/lib/realtime";
 
 export default function CustomerDisplay() {
   const { terminal } = useTerminal();
   const channel = useKioskChannel();
+  const [cart, setCart] = useState<CustomerCartPayload | null>(null);
 
   // Hold skjermen våken så lenge kunde-skjermen er åpen.
   useEffect(() => {
@@ -27,16 +30,18 @@ export default function CustomerDisplay() {
     };
   }, []);
 
-  // Lytte-rør for K.1: kurv-oppdateringer fra operatør-skjermen.
+  // Lytt på cart_update fra operatør-skjermen.
   useEffect(() => {
-    const handler = (payload: unknown) => {
-      // eslint-disable-next-line no-console
-      console.debug("[kiosk:customer] cart_update", payload);
-    };
-    channel.on("broadcast", { event: "cart_update" }, handler);
+    channel.on("broadcast", { event: CART_UPDATE_EVENT }, (msg) => {
+      const payload = (msg as { payload?: unknown }).payload;
+      if (payload && typeof payload === "object") {
+        setCart(payload as CustomerCartPayload);
+      }
+    });
   }, [channel]);
 
   const logoOnly = terminal?.customer_screen_mode === "logo_only";
+  const hasItems = !!cart && cart.items.length > 0;
 
   return (
     <div
@@ -55,7 +60,9 @@ export default function CustomerDisplay() {
             src={terminal.logo_url}
             alt=""
             draggable={false}
-            className={logoOnly ? "max-h-[60vh] max-w-[80vw]" : "max-h-40 max-w-md"}
+            className={
+              logoOnly ? "max-h-[60vh] max-w-[80vw]" : "max-h-40 max-w-md"
+            }
           />
         ) : (
           <div className="text-amber-400">
@@ -68,9 +75,39 @@ export default function CustomerDisplay() {
 
         {!logoOnly && (
           <div className="mt-8 w-full max-w-3xl flex-1">
-            <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-8 text-center text-[#F4ECDC]/40">
-              Handlekurv vises her når salget starter.
-            </div>
+            {hasItems ? (
+              <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-6">
+                <div className="space-y-1">
+                  {cart!.items.map((it, i) => (
+                    <div
+                      key={i}
+                      className="flex items-center justify-between border-b border-white/5 py-3 text-lg last:border-0"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate font-medium">{it.label}</div>
+                        <div className="text-sm text-[#F4ECDC]/50">
+                          {it.quantity}
+                          {it.unit ? ` ${it.unit}` : ""}
+                        </div>
+                      </div>
+                      <div className="ml-4 font-semibold tabular-nums">
+                        {it.line_total.toFixed(2)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-4 flex items-center justify-between border-t border-white/20 pt-4 text-2xl font-bold">
+                  <span>Totalt</span>
+                  <span className="tabular-nums">
+                    {cart!.totals.total_incl_mva.toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-8 text-center text-[#F4ECDC]/40">
+                Handlekurv vises her når salget starter.
+              </div>
+            )}
           </div>
         )}
       </div>
