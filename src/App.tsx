@@ -89,6 +89,7 @@ import PosStyringSesjonDetalj from "@/pos_styring/pages/SesjonDetalj";
 import PosStyringTransaksjoner from "@/pos_styring/pages/Transaksjoner";
 import PosStyringTransaksjonDetalj from "@/pos_styring/pages/TransaksjonDetalj";
 import PosStyringRapporter from "@/pos_styring/pages/Rapporter";
+import PosStyringZDetalj from "@/pos_styring/pages/ZDetalj";
 import PosStyringInnstillinger from "@/pos_styring/pages/Innstillinger";
 
 // Kiosk-ruter — bypass NBhub-shell + auth-guard, egen Supabase-klient
@@ -357,6 +358,7 @@ const App = () => (
               <Route path="/pos-styring/transaksjoner" element={<PosStyringShell><PosStyringTransaksjoner /></PosStyringShell>} />
               <Route path="/pos-styring/transaksjoner/:id" element={<PosStyringShell><PosStyringTransaksjonDetalj /></PosStyringShell>} />
               <Route path="/pos-styring/rapporter" element={<PosStyringShell><PosStyringRapporter /></PosStyringShell>} />
+              <Route path="/pos-styring/rapporter/z/:id" element={<PosStyringShell><PosStyringZDetalj /></PosStyringShell>} />
               <Route path="/pos-styring/innstillinger" element={<PosStyringShell><PosStyringInnstillinger /></PosStyringShell>} />
 
               {/* Kiosk-ruter — bypasser NBhub <Shell>/<ProtectedRoute>; egen Supabase-klient (storageKey 'pos-kiosk-auth') */}
