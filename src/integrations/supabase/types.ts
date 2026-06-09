@@ -4564,10 +4564,12 @@ export type Database = {
       pos_terminals: {
         Row: {
           created_at: string
+          customer_screen_mode: string
           default_price_list_id: string | null
           display_name: string
           id: string
           legal_entity_id: string
+          logo_url: string | null
           next_receipt_number: number
           next_session_number: number
           next_z_number: number
@@ -4580,10 +4582,12 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          customer_screen_mode?: string
           default_price_list_id?: string | null
           display_name: string
           id?: string
           legal_entity_id: string
+          logo_url?: string | null
           next_receipt_number?: number
           next_session_number?: number
           next_z_number?: number
@@ -4596,10 +4600,12 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          customer_screen_mode?: string
           default_price_list_id?: string | null
           display_name?: string
           id?: string
           legal_entity_id?: string
+          logo_url?: string | null
           next_receipt_number?: number
           next_session_number?: number
           next_z_number?: number
