@@ -556,7 +556,7 @@ export default function TastaturEditor() {
   useEffect(() => {
     if (layout && activeEntityId && layout.legal_entity_id !== activeEntityId) {
       toast.warning(`Layout ikke tilgjengelig for ${activeEntity?.short_code ?? "valgt entity"}`);
-      navigate("/tastatur", { replace: true });
+      navigate("/pos-styring/tastatur", { replace: true });
     }
   }, [activeEntity?.short_code, activeEntityId, layout, navigate]);
 
@@ -678,7 +678,7 @@ export default function TastaturEditor() {
       <div className="flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <Button variant="ghost" size="sm" asChild className="mb-2 -ml-3">
-            <Link to="/tastatur"><ArrowLeft className="h-4 w-4" /> Tilbake til layouts</Link>
+            <Link to="/pos-styring/tastatur"><ArrowLeft className="h-4 w-4" /> Tilbake til layouts</Link>
           </Button>
           <h1 className="text-3xl font-semibold tracking-normal">{layout.display_name}</h1>
           <p className="mt-1 text-sm text-muted-foreground">{layout.grid_cols} × {layout.grid_rows} grid · {activeEntity?.short_code}</p>

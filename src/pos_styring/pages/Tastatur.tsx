@@ -267,7 +267,7 @@ function LayoutDialog({ open, onOpenChange, layout, activeEntityId, terminals }:
       await queryClient.invalidateQueries({ queryKey: ["pos_keypad_layouts", activeEntityId] });
       onOpenChange(false);
       toast.success("Layout lagret");
-      if (!isEdit) navigate(`/tastatur/${id}`);
+      if (!isEdit) navigate(`/pos-styring/tastatur/${id}`);
     },
     onError: (error) => toast.error("Kunne ikke lagre layout", { description: error instanceof Error ? error.message : "Ukjent feil" }),
   });
@@ -533,7 +533,7 @@ export default function Tastatur() {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => navigate(`/tastatur/${layout.id}`)}>
+                    <DropdownMenuItem onClick={() => navigate(`/pos-styring/tastatur/${layout.id}`)}>
                       <PenLine className="mr-2 h-4 w-4" /> Rediger editor
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => { setEditingLayout(layout); setDialogOpen(true); }}>
@@ -553,10 +553,10 @@ export default function Tastatur() {
                 </DropdownMenu>
               </CardHeader>
               <CardContent className="space-y-4">
-                <button className="block w-full text-left" onClick={() => navigate(`/tastatur/${layout.id}`)}>
+                <button className="block w-full text-left" onClick={() => navigate(`/pos-styring/tastatur/${layout.id}`)}>
                   <KeypadPreview layout={layout} />
                 </button>
-                <Button variant="outline" className="w-full" onClick={() => navigate(`/tastatur/${layout.id}`)}>
+                <Button variant="outline" className="w-full" onClick={() => navigate(`/pos-styring/tastatur/${layout.id}`)}>
                   Åpne editor
                 </Button>
               </CardContent>
