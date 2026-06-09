@@ -1,14 +1,20 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTerminal } from "@/kiosk/context/TerminalContext";
 import { useKioskChannel } from "@/kiosk/context/RealtimeContext";
 import { Logo } from "@/components/brand/Logo";
 import type { CustomerCartPayload } from "@/kiosk/lib/cart";
-import { CART_UPDATE_EVENT } from "@/kiosk/lib/realtime";
+import {
+  CART_UPDATE_EVENT,
+  SALE_COMPLETE_EVENT,
+  type SaleCompletePayload,
+} from "@/kiosk/lib/realtime";
 
 export default function CustomerDisplay() {
   const { terminal } = useTerminal();
   const channel = useKioskChannel();
   const [cart, setCart] = useState<CustomerCartPayload | null>(null);
+  const [thanks, setThanks] = useState<SaleCompletePayload | null>(null);
+  const thanksTimer = useRef<number | null>(null);
 
   // Hold skjermen våken så lenge kunde-skjermen er åpen.
   useEffect(() => {
@@ -30,18 +36,31 @@ export default function CustomerDisplay() {
     };
   }, []);
 
-  // Lytt på cart_update fra operatør-skjermen.
+  // Lytt på cart_update + sale_complete fra operatør-skjermen.
   useEffect(() => {
     channel.on("broadcast", { event: CART_UPDATE_EVENT }, (msg) => {
       const payload = (msg as { payload?: unknown }).payload;
       if (payload && typeof payload === "object") {
         setCart(payload as CustomerCartPayload);
+        // Ny cart_update overskriver takke-state.
+        if (thanksTimer.current) window.clearTimeout(thanksTimer.current);
+        setThanks(null);
+      }
+    });
+    channel.on("broadcast", { event: SALE_COMPLETE_EVENT }, (msg) => {
+      const payload = (msg as { payload?: unknown }).payload;
+      if (payload && typeof payload === "object") {
+        setThanks(payload as SaleCompletePayload);
+        setCart(null);
+        if (thanksTimer.current) window.clearTimeout(thanksTimer.current);
+        thanksTimer.current = window.setTimeout(() => setThanks(null), 6000);
       }
     });
   }, [channel]);
 
   const logoOnly = terminal?.customer_screen_mode === "logo_only";
   const hasItems = !!cart && cart.items.length > 0;
+  const showThanks = !!thanks;
 
   return (
     <div
@@ -75,7 +94,32 @@ export default function CustomerDisplay() {
 
         {!logoOnly && (
           <div className="mt-8 w-full max-w-3xl flex-1">
-            {hasItems ? (
+            {showThanks ? (
+              <div className="rounded-2xl border border-amber-400/30 bg-amber-500/10 p-10 text-center">
+                <div className="text-4xl font-bold text-amber-300">
+                  Takk for handelen!
+                </div>
+                <div className="mt-4 text-xl text-[#F4ECDC]/80">
+                  Sum:{" "}
+                  <span className="tabular-nums font-semibold">
+                    {thanks!.total_incl_mva.toFixed(2)}
+                  </span>
+                </div>
+                {thanks!.change_given > 0 && (
+                  <div className="mt-2 text-lg text-[#F4ECDC]/70">
+                    Veksel:{" "}
+                    <span className="tabular-nums font-semibold">
+                      {thanks!.change_given.toFixed(2)}
+                    </span>
+                  </div>
+                )}
+                {thanks!.receipt_number && (
+                  <div className="mt-3 text-sm text-[#F4ECDC]/40">
+                    {thanks!.receipt_number}
+                  </div>
+                )}
+              </div>
+            ) : hasItems ? (
               <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-6">
                 <div className="space-y-1">
                   {cart!.items.map((it, i) => (

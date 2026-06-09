@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { toast } from "sonner";
 import { useCart } from "@/kiosk/context/CartContext";
 import { CartLine } from "./CartLine";
 import { CartTotals } from "./CartTotals";
@@ -16,7 +15,11 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
-export function CartPanel() {
+interface Props {
+  onPay: () => void;
+}
+
+export function CartPanel({ onPay }: Props) {
   const { items, totals, diningMode, setDiningMode, clear } = useCart();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const isEmpty = items.length === 0;
@@ -99,7 +102,7 @@ export function CartPanel() {
           <BigButton
             className="flex-[2] text-base"
             disabled={isEmpty}
-            onClick={() => toast.info("Betaling bygges i K.1c")}
+            onClick={onPay}
           >
             Betal
           </BigButton>
