@@ -58,7 +58,7 @@ export function PinPad() {
   return (
     <div className="w-full max-w-sm space-y-6">
       <div className="space-y-2">
-        <label className="block text-xs uppercase tracking-[0.18em] text-[#F4ECDC]/60">
+        <label className="block text-xs uppercase tracking-[0.18em] text-[hsl(var(--brand-cream))]/60">
           Operatør-kode
         </label>
         <input
@@ -69,20 +69,20 @@ export function PinPad() {
           spellCheck={false}
           value={code}
           onChange={(e) => setCode(e.target.value.toUpperCase())}
-          className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-2xl font-mono uppercase tracking-widest text-[#F4ECDC] focus:outline-none focus:ring-2 focus:ring-amber-400/40"
+          className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-2xl font-mono uppercase tracking-widest text-[hsl(var(--brand-cream))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--brand-bronze))]/50"
           maxLength={20}
           disabled={busy}
         />
       </div>
 
       <div className="space-y-2">
-        <label className="block text-xs uppercase tracking-[0.18em] text-[#F4ECDC]/60">PIN</label>
+        <label className="block text-xs uppercase tracking-[0.18em] text-[hsl(var(--brand-cream))]/60">PIN</label>
         <div className="flex h-14 items-center justify-center gap-3 rounded-xl border border-white/10 bg-white/5">
           {Array.from({ length: Math.max(4, pin.length) }).map((_, i) => (
             <span
               key={i}
               className={`h-4 w-4 rounded-full transition-colors ${
-                i < pin.length ? "bg-amber-400" : "bg-white/15"
+                i < pin.length ? "bg-[hsl(var(--brand-bronze))]" : "bg-white/15"
               }`}
             />
           ))}
