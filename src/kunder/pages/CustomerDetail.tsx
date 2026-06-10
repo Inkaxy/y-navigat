@@ -834,6 +834,28 @@ export default function CustomerDetail() {
                       <span className="text-sm text-muted-foreground">{watchAllowsReturns ? "Ja" : "Nei"}</span>
                     </div>
                   </Field>
+                  <Field
+                    label="Overfør til POS"
+                    className="col-span-2"
+                    hint="Hvis aktivert, blir kunden tilgjengelig som POS-kunde i kassen. Skru av for å sette POS-kunden til inaktiv."
+                  >
+                    <div className="flex h-10 items-center gap-2">
+                      <Switch
+                        checked={posSyncActive}
+                        onCheckedChange={(v) => posSyncMutation.mutate(!!v)}
+                        disabled={!canWrite || posSyncMutation.isPending || posSyncQuery.isLoading}
+                      />
+                      <span className="text-sm text-muted-foreground">
+                        {posSyncMutation.isPending
+                          ? "Synkroniserer…"
+                          : posSyncActive
+                            ? `Aktiv i POS${posSyncQuery.data?.last_synced_at ? ` · sist synket ${new Date(posSyncQuery.data.last_synced_at).toLocaleString("nb-NO")}` : ""}`
+                            : posSyncQuery.data
+                              ? "Inaktiv i POS"
+                              : "Ikke overført"}
+                      </span>
+                    </div>
+                  </Field>
                   <Field label="Status">
                     <div className="flex h-10 items-center gap-2">
                       <Switch
