@@ -291,6 +291,38 @@ export default function CustomerDetail() {
   const watchEnforceCustomRef = form.watch("enforce_custom_reference");
   const watchCustomReference = form.watch("custom_reference");
 
+  // POS-kobling: status fra pos_customers for denne kunden
+  const posSyncQuery = useQuery({
+    queryKey: ["pos_customers", "by-source", customer?.id],
+    enabled: !!customer?.id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("pos_customers")
+        .select("id, status, last_synced_at")
+        .eq("source_customer_id", customer!.id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+  const posSyncActive = posSyncQuery.data?.status === "active";
+
+  const posSyncMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      if (!customer) throw new Error("Mangler kunde");
+      const { error } = await supabase.rpc("pos_sync_customer", {
+        p_customer_id: customer.id,
+        p_enabled: enabled,
+      });
+      if (error) throw error;
+    },
+    onSuccess: (_, enabled) => {
+      toast.success(enabled ? "Kunde overført til POS" : "Kunde deaktivert i POS");
+      queryClient.invalidateQueries({ queryKey: ["pos_customers", "by-source", customer?.id] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Kunne ikke synkronisere mot POS"),
+  });
+
   useEffect(() => {
     if (!isDirty) return;
     const handler = (e: BeforeUnloadEvent) => {
