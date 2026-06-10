@@ -5957,6 +5957,7 @@ export type Database = {
           gtin: string | null
           id: string
           image_url: string | null
+          in_pos: boolean
           in_web_shop: boolean
           include_in_price_lists: boolean
           internal_sku: string | null
@@ -6034,6 +6035,7 @@ export type Database = {
           gtin?: string | null
           id?: string
           image_url?: string | null
+          in_pos?: boolean
           in_web_shop?: boolean
           include_in_price_lists?: boolean
           internal_sku?: string | null
@@ -6111,6 +6113,7 @@ export type Database = {
           gtin?: string | null
           id?: string
           image_url?: string | null
+          in_pos?: boolean
           in_web_shop?: boolean
           include_in_price_lists?: boolean
           internal_sku?: string | null
@@ -9321,6 +9324,32 @@ export type Database = {
       pos_set_operator_pin: {
         Args: { p_new_pin: string; p_operator_id: string }
         Returns: undefined
+      }
+      pos_sync_customer: {
+        Args: { p_customer_id: string; p_enabled: boolean }
+        Returns: {
+          created_at: string
+          credit_limit: number | null
+          default_invoice_method: string | null
+          display_name: string
+          email: string | null
+          id: string
+          invoice_address: Json | null
+          last_synced_at: string | null
+          legal_entity_id: string
+          notes: string | null
+          org_number: string | null
+          phone: string | null
+          source_customer_id: string | null
+          status: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "pos_customers"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       pos_verify_journal_chain: {
         Args: { p_terminal_id: string }
