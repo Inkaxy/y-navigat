@@ -293,6 +293,9 @@ function NavBar({ appSlug, items }: { appSlug: string; items: NavItem[] }) {
     if (path === "/ravarer/fakturaer" && !query) {
       return pathname === path && !new URLSearchParams(search).get("status");
     }
+    if (path === "/pos-styring" && !query) {
+      return pathname === path;
+    }
     if (query) {
       const want = new URLSearchParams(query);
       const cur = new URLSearchParams(search);
