@@ -39,6 +39,7 @@ export const productSchema = z.object({
   is_for_sale: z.boolean(),
   in_web_shop: z.boolean(),
   include_in_price_lists: z.boolean(),
+  in_pos: z.boolean(),
   gtin: z.preprocess(
     (v) => (v === "" || v === null || v === undefined ? null : String(v)),
     z.string().regex(/^\d{13}$/, "GTIN må være 13 siffer").nullable(),
