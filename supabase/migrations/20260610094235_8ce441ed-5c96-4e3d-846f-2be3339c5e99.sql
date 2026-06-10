@@ -1,0 +1,1 @@
+INSERT INTO public.pos_kiosk_users (user_id) VALUES ('aa9625b6-62a1-4b08-ae2d-b3d9d7a61fe4') ON CONFLICT DO NOTHING;
