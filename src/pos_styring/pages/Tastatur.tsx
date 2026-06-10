@@ -184,7 +184,7 @@ function KeypadPreview({ layout }: { layout: KeypadLayout }) {
             color: button.text_color ?? undefined,
           }}
         >
-          <span className="line-clamp-2 px-1 py-0.5">{button.display_label || button.function_code || button.button_type}</span>
+          <span className="line-clamp-2 px-1 py-0.5">{button.display_label || button.product?.display_name || button.function_code || button.button_type}</span>
         </div>
       ))}
     </div>
