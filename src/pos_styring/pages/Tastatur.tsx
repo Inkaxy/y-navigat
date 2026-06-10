@@ -80,6 +80,8 @@ interface KeypadButtonPreview {
   button_type: string;
   display_label: string | null;
   function_code: string | null;
+  product_id: string | null;
+  product?: { display_name: string } | null;
   background_color: string | null;
   text_color: string | null;
   grid_x: number;
@@ -132,10 +134,10 @@ async function fetchLayouts(activeEntityId: string): Promise<KeypadLayout[]> {
   if (firstPageIds.length > 0) {
     const { data: buttonsData, error: buttonsError } = await supabase
       .from("pos_keypad_buttons")
-      .select("id, page_id, button_type, display_label, function_code, background_color, text_color, grid_x, grid_y, grid_width, grid_height")
+      .select("id, page_id, button_type, display_label, function_code, product_id, product:products!pos_keypad_buttons_product_id_fkey(display_name), background_color, text_color, grid_x, grid_y, grid_width, grid_height")
       .in("page_id", firstPageIds);
     if (buttonsError) throw buttonsError;
-    for (const button of (buttonsData ?? []) as KeypadButtonPreview[]) {
+    for (const button of (buttonsData ?? []) as unknown as KeypadButtonPreview[]) {
       buttonsByPage.set(button.page_id, [...(buttonsByPage.get(button.page_id) ?? []), button]);
     }
   }
@@ -182,7 +184,7 @@ function KeypadPreview({ layout }: { layout: KeypadLayout }) {
             color: button.text_color ?? undefined,
           }}
         >
-          <span className="line-clamp-2 px-1 py-0.5">{button.display_label || button.function_code || button.button_type}</span>
+          <span className="line-clamp-2 px-1 py-0.5">{button.display_label || button.product?.display_name || button.function_code || button.button_type}</span>
         </div>
       ))}
     </div>
