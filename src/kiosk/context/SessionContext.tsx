@@ -49,11 +49,13 @@ export function SessionProvider({
       return;
     }
     setStatus("loading");
+    // Én åpen sesjon per terminal — ikke filtrer på operator_id, slik at
+    // en pågående sesjon åpnet av en annen operatør blir overtatt korrekt
+    // (i stedet for at vi prøver å åpne en ny og treffer SESSION_ALREADY_OPEN).
     const { data, error } = await kioskSupabase
       .from("pos_sessions")
       .select("*")
       .eq("terminal_id", terminalId)
-      .eq("operator_id", operator.id)
       .eq("status", "open")
       .order("opened_at", { ascending: false })
       .limit(1);
