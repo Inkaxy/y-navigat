@@ -80,6 +80,8 @@ interface KeypadButtonPreview {
   button_type: string;
   display_label: string | null;
   function_code: string | null;
+  product_id: string | null;
+  product?: { display_name: string } | null;
   background_color: string | null;
   text_color: string | null;
   grid_x: number;
