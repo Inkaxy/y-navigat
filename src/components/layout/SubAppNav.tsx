@@ -114,7 +114,7 @@ const STATIC_SUBMENUS: Record<string, { prefix: string; appSlug: string; items: 
     prefix: "/pos-styring",
     appSlug: "pos_styring",
     items: [
-      { kind: "link", to: "/pos-styring/oversikt", label: "Oversikt", icon: LayoutDashboard },
+      { kind: "link", to: "/pos-styring", label: "Oversikt", icon: LayoutDashboard },
       { kind: "link", to: "/pos-styring/utsalg", label: "Utsalg", icon: ShoppingBag },
       { kind: "link", to: "/pos-styring/terminaler", label: "Terminaler", icon: LayoutGrid },
       { kind: "link", to: "/pos-styring/operatorer", label: "Operatører", icon: Users },

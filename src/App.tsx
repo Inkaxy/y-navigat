@@ -76,7 +76,7 @@ import UtskriftsprofilerPage from "@/produksjon/pages/innstillinger/Utskriftspro
 // POS Styring (importert fra POS Manager Hub)
 import { AppColorProvider } from "@/providers/AppColorProvider";
 import { LegalEntityProvider as PosStyringEntityProvider } from "@/pos_styring/contexts/LegalEntityContext";
-import PosStyringIndex from "@/pos_styring/pages/Index";
+import PosStyringDashboard from "@/pos_styring/pages/Dashboard";
 import PosStyringUtsalg from "@/pos_styring/pages/Utsalg";
 import PosStyringTerminaler from "@/pos_styring/pages/Terminaler";
 import PosStyringOperatorer from "@/pos_styring/pages/Operatorer";
@@ -344,8 +344,9 @@ const App = () => (
               <Route path="/produksjon/innstillinger/utskriftsprofiler" element={<Shell><AppAccessGuard appCode="produksjon" appName="Produksjon"><UtskriftsprofilerPage /></AppAccessGuard></Shell>} />
 
               {/* POS Styring — importert fra POS Manager Hub */}
-              <Route path="/pos-styring" element={<PosStyringShell><Navigate to="/pos-styring/terminaler" replace /></PosStyringShell>} />
-              <Route path="/pos-styring/oversikt" element={<PosStyringShell><PosStyringIndex /></PosStyringShell>} />
+              <Route path="/pos-styring" element={<PosStyringShell><PosStyringDashboard /></PosStyringShell>} />
+              <Route path="/pos-styring/oversikt" element={<Navigate to="/pos-styring" replace />} />
+
               <Route path="/pos-styring/utsalg" element={<PosStyringShell><PosStyringUtsalg /></PosStyringShell>} />
               <Route path="/pos-styring/terminaler" element={<PosStyringShell><PosStyringTerminaler /></PosStyringShell>} />
               <Route path="/pos-styring/operatorer" element={<PosStyringShell><PosStyringOperatorer /></PosStyringShell>} />
