@@ -160,6 +160,7 @@ export function NavnOgNummerTab({ product, canWrite, hasGs1Prefix }: Props) {
               ["is_for_sale", "Til salgs"],
               ["in_web_shop", "I nettbutikken"],
               ["include_in_price_lists", "Ta med på prislister"],
+              ["in_pos", "Tilgjengelig i kasse (POS)"],
             ].map(([name, label]) => (
               <Controller
                 key={name}

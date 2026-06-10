@@ -39,6 +39,7 @@ export const productSchema = z.object({
   is_for_sale: z.boolean(),
   in_web_shop: z.boolean(),
   include_in_price_lists: z.boolean(),
+  in_pos: z.boolean(),
   gtin: z.preprocess(
     (v) => (v === "" || v === null || v === undefined ? null : String(v)),
     z.string().regex(/^\d{13}$/, "GTIN må være 13 siffer").nullable(),
@@ -126,6 +127,7 @@ export function productToFormValues(p: any): ProductFormValues {
     is_for_sale: p.is_for_sale ?? true,
     in_web_shop: p.in_web_shop ?? false,
     include_in_price_lists: p.include_in_price_lists ?? true,
+    in_pos: !!p.in_pos,
     gtin: p.gtin ?? null,
     epd_number: p.epd_number ?? null,
     mva_rate: Number(p.mva_rate ?? 15),
@@ -198,6 +200,7 @@ export const FIELD_TO_TAB: Record<keyof ProductFormValues, string> = {
   is_for_sale: "navn",
   in_web_shop: "navn",
   include_in_price_lists: "navn",
+  in_pos: "navn",
   gtin: "navn",
   epd_number: "navn",
   mva_rate: "navn",

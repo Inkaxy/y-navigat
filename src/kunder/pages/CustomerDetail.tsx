@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -290,6 +290,38 @@ export default function CustomerDetail() {
   const watchAllowsReturns = form.watch("allows_returns");
   const watchEnforceCustomRef = form.watch("enforce_custom_reference");
   const watchCustomReference = form.watch("custom_reference");
+
+  // POS-kobling: status fra pos_customers for denne kunden
+  const posSyncQuery = useQuery({
+    queryKey: ["pos_customers", "by-source", customer?.id],
+    enabled: !!customer?.id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("pos_customers")
+        .select("id, status, last_synced_at")
+        .eq("source_customer_id", customer!.id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+  const posSyncActive = posSyncQuery.data?.status === "active";
+
+  const posSyncMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      if (!customer) throw new Error("Mangler kunde");
+      const { error } = await supabase.rpc("pos_sync_customer", {
+        p_customer_id: customer.id,
+        p_enabled: enabled,
+      });
+      if (error) throw error;
+    },
+    onSuccess: (_, enabled) => {
+      toast.success(enabled ? "Kunde overført til POS" : "Kunde deaktivert i POS");
+      queryClient.invalidateQueries({ queryKey: ["pos_customers", "by-source", customer?.id] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Kunne ikke synkronisere mot POS"),
+  });
 
   useEffect(() => {
     if (!isDirty) return;
@@ -800,6 +832,28 @@ export default function CustomerDetail() {
                         disabled={!canWrite}
                       />
                       <span className="text-sm text-muted-foreground">{watchAllowsReturns ? "Ja" : "Nei"}</span>
+                    </div>
+                  </Field>
+                  <Field
+                    label="Overfør til POS"
+                    className="col-span-2"
+                    hint="Hvis aktivert, blir kunden tilgjengelig som POS-kunde i kassen. Skru av for å sette POS-kunden til inaktiv."
+                  >
+                    <div className="flex h-10 items-center gap-2">
+                      <Switch
+                        checked={posSyncActive}
+                        onCheckedChange={(v) => posSyncMutation.mutate(!!v)}
+                        disabled={!canWrite || posSyncMutation.isPending || posSyncQuery.isLoading}
+                      />
+                      <span className="text-sm text-muted-foreground">
+                        {posSyncMutation.isPending
+                          ? "Synkroniserer…"
+                          : posSyncActive
+                            ? `Aktiv i POS${posSyncQuery.data?.last_synced_at ? ` · sist synket ${new Date(posSyncQuery.data.last_synced_at).toLocaleString("nb-NO")}` : ""}`
+                            : posSyncQuery.data
+                              ? "Inaktiv i POS"
+                              : "Ikke overført"}
+                      </span>
                     </div>
                   </Field>
                   <Field label="Status">

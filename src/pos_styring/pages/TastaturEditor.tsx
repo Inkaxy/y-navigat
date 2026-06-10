@@ -83,7 +83,7 @@ interface KeypadButton {
   grid_y: number;
   grid_width: number;
   grid_height: number;
-  product?: { display_name: string; product_category: string | null } | null;
+  product?: { display_name: string; product_category: string | null; in_pos: boolean } | null;
 }
 
 interface ProductOption {
@@ -176,7 +176,7 @@ async function fetchPages(layoutId: string): Promise<KeypadPage[]> {
 async function fetchButtons(pageId: string): Promise<KeypadButton[]> {
   const { data, error } = await supabase
     .from("pos_keypad_buttons")
-    .select("id, page_id, button_type, product_id, function_code, display_label, image_url, background_color, text_color, grid_x, grid_y, grid_width, grid_height, product:products!pos_keypad_buttons_product_id_fkey(display_name, product_category)")
+    .select("id, page_id, button_type, product_id, function_code, display_label, image_url, background_color, text_color, grid_x, grid_y, grid_width, grid_height, product:products!pos_keypad_buttons_product_id_fkey(display_name, product_category, in_pos)")
     .eq("page_id", pageId);
   if (error) throw error;
   return (data ?? []) as unknown as KeypadButton[];
@@ -187,6 +187,7 @@ async function fetchProducts(activeEntityId: string, search: string): Promise<Pr
     .from("products")
     .select("id, display_name, product_category")
     .eq("legal_entity_id", activeEntityId)
+    .eq("in_pos", true)
     .in("status", ["active", "published"])
     .order("display_name", { ascending: true })
     .limit(30);
@@ -228,14 +229,20 @@ function DroppableCell({ x, y, children }: { x: number; y: number; children?: Re
 }
 
 function KeypadButtonTile({ button, onEdit, dragging }: { button: KeypadButton; onEdit?: () => void; dragging?: boolean }) {
+  const notInPos = button.button_type === "product" && button.product && button.product.in_pos === false;
   return (
     <button
       type="button"
       onClick={onEdit}
-      className={cn("relative flex h-full w-full overflow-hidden rounded-md border border-primary/20 bg-primary/15 p-2 text-left text-sm font-semibold shadow-card transition hover:ring-2 hover:ring-ring", dragging && "opacity-60")}
+      className={cn("relative flex h-full w-full overflow-hidden rounded-md border border-primary/20 bg-primary/15 p-2 text-left text-sm font-semibold shadow-card transition hover:ring-2 hover:ring-ring", dragging && "opacity-60", notInPos && "border-destructive/60 ring-1 ring-destructive/40")}
       style={{ backgroundColor: button.background_color ?? undefined, color: button.text_color ?? undefined }}
     >
       {button.image_url && <span className="absolute inset-0 bg-cover bg-center opacity-35" style={{ backgroundImage: `url(${button.image_url})` }} />}
+      {notInPos && (
+        <span className="absolute left-1 top-1 z-10 rounded-sm bg-destructive px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-destructive-foreground" title="Produktet er ikke aktivert for POS">
+          Ikke i POS
+        </span>
+      )}
       <span className="relative z-10 line-clamp-3 self-end rounded-sm bg-background/75 px-1.5 py-1 text-foreground">{buttonLabel(button)}</span>
     </button>
   );
