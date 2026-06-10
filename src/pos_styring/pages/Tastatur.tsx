@@ -134,7 +134,7 @@ async function fetchLayouts(activeEntityId: string): Promise<KeypadLayout[]> {
   if (firstPageIds.length > 0) {
     const { data: buttonsData, error: buttonsError } = await supabase
       .from("pos_keypad_buttons")
-      .select("id, page_id, button_type, display_label, function_code, background_color, text_color, grid_x, grid_y, grid_width, grid_height")
+      .select("id, page_id, button_type, display_label, function_code, product_id, product:products!pos_keypad_buttons_product_id_fkey(display_name), background_color, text_color, grid_x, grid_y, grid_width, grid_height")
       .in("page_id", firstPageIds);
     if (buttonsError) throw buttonsError;
     for (const button of (buttonsData ?? []) as KeypadButtonPreview[]) {
