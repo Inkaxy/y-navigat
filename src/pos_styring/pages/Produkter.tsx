@@ -431,7 +431,12 @@ export default function Produkter() {
                 </div>
                 <CardHeader className="space-y-2">
                   <div className="flex items-start justify-between gap-2">
-                    <CardTitle className="line-clamp-2 text-base">{product.display_name}</CardTitle>
+                    <div className="min-w-0">
+                      <CardTitle className="line-clamp-2 text-base">{product.pos_display_name?.trim() || product.display_name}</CardTitle>
+                      {product.pos_display_name?.trim() && (
+                        <p className="mt-0.5 text-xs text-muted-foreground line-clamp-1">Varer: {product.display_name}</p>
+                      )}
+                    </div>
                     {product.display_number && (
                       <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground">
                         #{product.display_number}
@@ -441,6 +446,7 @@ export default function Produkter() {
                   <div className="flex flex-wrap gap-2">
                     <Badge variant={product.status === "draft" ? "secondary" : "default"}>{product.status}</Badge>
                     <Badge variant="outline">MVA {product.mva_rate}%</Badge>
+                    {product.pos_display_name?.trim() && <Badge variant="secondary">POS-navn</Badge>}
                   </div>
                 </CardHeader>
               </button>
