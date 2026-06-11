@@ -128,9 +128,8 @@ function ProductImageDialog({ product, activeEntityId, open, onOpenChange }: { p
   const [imageToDelete, setImageToDelete] = useState<ProductImage | null>(null);
   const [posName, setPosName] = useState<string>("");
 
-  useMemo(() => {
+  useEffect(() => {
     setPosName(product?.pos_display_name ?? "");
-    return null;
   }, [product?.id, product?.pos_display_name]);
 
   const { data: images = [], isLoading } = useQuery({
