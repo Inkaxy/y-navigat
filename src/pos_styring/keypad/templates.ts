@@ -1,5 +1,6 @@
 // Maler for hele kassen — definerer theme + customer_screen + sider (m/ ikoner)
 // + eksempel-knapper. "Bruk mal" skriver alt dette; "Bruk tema" rører kun theme.
+// Fargene er lest direkte fra de tre vedlagte design-bildene.
 
 import type { KioskTheme, CustomerScreenConfig } from "@/kiosk/render/kioskTheme";
 
@@ -37,38 +38,39 @@ export interface KeypadTemplate {
 }
 
 // ── Nøtterø Klassisk ─────────────────────────────────────────────────────────
-// Tabs på toppen, 5 br × 4 r, brand-navy shell, cream canvas, bronze aksent.
+// Sidebar venstre, 4 br × 3 r. Navy header + venstre-sidebar, cream canvas,
+// bronze CTA. Matcher Nøtterø Bakeri sin merkevare 1:1.
 const notteroy: KeypadTemplate = {
   key: "notteroy",
   name: "Nøtterø Klassisk",
-  tagline: "Tabs på toppen · 5 × 4 · navy / cream / bronze",
+  tagline: "Sidebar venstre · 4 × 3 · navy / cream / bronze",
   description:
-    "Brand-stilen til Nøtterø Bakeri. Horisontal navigasjon, navy header, papir-cream kasse-canvas, bronze aksenter.",
-  gridCols: 5,
-  gridRows: 4,
+    "Nøtterø Bakeri sin merkevare. Mørk navy topbar og venstre-sidebar, cream papir-canvas, bronze 'Betaling'-CTA.",
+  gridCols: 4,
+  gridRows: 3,
   theme: {
-    layoutKind: "tabs_top",
-    bg: "#F4EEDF",
-    surface: "#FBF6EA",
-    surfaceAlt: "#ECE3CE",
+    layoutKind: "sidebar_left",
+    bg: "#F4ECDC",          // cream papir-canvas
+    surface: "#FFFFFF",
+    surfaceAlt: "#EBE2CC",
     border: "#D9CDB4",
-    ink: "#1F1A13",
-    inkSoft: "#5C4F3F",
-    inkOnAccent: "#F4ECDC",
-    accent: "#A6712E",
-    accentSoft: "rgba(166,113,46,0.14)",
+    ink: "#1B2A44",         // navy tekst
+    inkSoft: "#5C6A82",
+    inkOnAccent: "#FFFFFF",
+    accent: "#B27A3A",      // bronze
+    accentSoft: "rgba(178,122,58,0.14)",
     fontHeading: "Fraunces, Georgia, serif",
     fontBody: "Inter, system-ui, sans-serif",
-    radius: "12px",
-    buttonRadius: "14px",
-    headerBg: "#16243A",
+    radius: "10px",
+    buttonRadius: "12px",
+    headerBg: "#0F1B33",    // mørk navy
     headerInk: "#F4ECDC",
-    cartBg: "#FBF6EA",
-    cartInk: "#1F1A13",
+    cartBg: "#FFFFFF",
+    cartInk: "#1B2A44",
   },
   customerScreen: {
     mode: "logo_and_cart",
-    bg: "#16243A",
+    bg: "#0F1B33",
     ink: "#F4ECDC",
     inkSoft: "rgba(244,236,220,0.65)",
     accent: "#D4A04A",
@@ -81,113 +83,132 @@ const notteroy: KeypadTemplate = {
       icon: "Wheat",
       background_color: null,
       buttons: [
-        { button_type: "category", display_label: "Grovbrød", grid_x: 0, grid_y: 0, grid_width: 1, grid_height: 1 },
-        { button_type: "category", display_label: "Loff", grid_x: 1, grid_y: 0, grid_width: 1, grid_height: 1 },
-        { button_type: "category", display_label: "Surdeig", grid_x: 2, grid_y: 0, grid_width: 1, grid_height: 1 },
-        { button_type: "category", display_label: "Knekkebrød", grid_x: 3, grid_y: 0, grid_width: 1, grid_height: 1 },
-        { button_type: "function", display_label: "Rabatt", function_code: "discount", grid_x: 4, grid_y: 3, grid_width: 1, grid_height: 1, background_color: "#A6712E", text_color: "#F4ECDC" },
+        { button_type: "category", display_label: "Landbrød", grid_x: 0, grid_y: 0, grid_width: 1, grid_height: 1 },
+        { button_type: "category", display_label: "Surdeigsbrød", grid_x: 1, grid_y: 0, grid_width: 1, grid_height: 1 },
+        { button_type: "category", display_label: "Kanelbolle", grid_x: 2, grid_y: 0, grid_width: 1, grid_height: 1 },
+        { button_type: "category", display_label: "Skolebolle", grid_x: 3, grid_y: 0, grid_width: 1, grid_height: 1 },
+        { button_type: "category", display_label: "Croissant", grid_x: 0, grid_y: 1, grid_width: 1, grid_height: 1 },
+        { button_type: "category", display_label: "Pain au chocolat", grid_x: 1, grid_y: 1, grid_width: 1, grid_height: 1 },
+        { button_type: "category", display_label: "Cappuccino", grid_x: 2, grid_y: 1, grid_width: 1, grid_height: 1 },
+        { button_type: "category", display_label: "Caffè latte", grid_x: 3, grid_y: 1, grid_width: 1, grid_height: 1 },
       ],
     },
-    { page_name: "Rundstykker", icon: "Cookie", background_color: null, buttons: [] },
+    { page_name: "Boller", icon: "Cookie", background_color: null, buttons: [] },
     { page_name: "Kaker", icon: "Cake", background_color: null, buttons: [] },
-    { page_name: "Drikke", icon: "Coffee", background_color: null, buttons: [] },
-    { page_name: "Annet", icon: "Package", background_color: null, buttons: [] },
+    { page_name: "Påsmurt", icon: "Sandwich", background_color: null, buttons: [] },
+    { page_name: "Kaffe", icon: "Coffee", background_color: null, buttons: [] },
+    { page_name: "Drikke", icon: "CupSoda", background_color: null, buttons: [] },
+    { page_name: "Frokost", icon: "Croissant", background_color: null, buttons: [] },
+    { page_name: "Favoritter", icon: "Star", background_color: null, buttons: [] },
   ],
 };
 
-// ── Hvasser Kyst ─────────────────────────────────────────────────────────────
-// Sidebar venstre, 5 br × 4 r, lys sand + sage/olive aksent. Lett, kystnær.
+// ── Hvasser Isbar ────────────────────────────────────────────────────────────
+// Sidebar venstre, 5 br × 2 r. Cream canvas, navy ink, pastell tab-tints
+// (blå/peach/sand). Lekent, kystpreget. 'Betal' CTA = soft blå.
 const hvasser: KeypadTemplate = {
   key: "hvasser",
-  name: "Hvasser Kyst",
-  tagline: "Sidebar venstre · 5 × 4 · sand / sage",
+  name: "Hvasser Isbar",
+  tagline: "Sidebar venstre · 5 × 2 · cream / navy / pastell",
   description:
-    "Lys og luftig kasse-design med vertikal sidebar. Sandig canvas, sage/olive aksent, runde knapper.",
+    "Lekent kystdesign for isbar. Cream canvas, navy tekst, pastell dining-tabs (blå/peach), soft blå Betal-CTA, illustrasjons-stil.",
   gridCols: 5,
-  gridRows: 4,
+  gridRows: 2,
   theme: {
     layoutKind: "sidebar_left",
-    bg: "#F2EDE2",
-    surface: "#FFFFFF",
-    surfaceAlt: "#E8E2D2",
-    border: "#D6CFBE",
-    ink: "#27241D",
-    inkSoft: "#6B6557",
+    bg: "#F5EFE0",          // varm cream
+    surface: "#FBF6EA",
+    surfaceAlt: "#E8E0CC",
+    border: "#D9CFB6",
+    ink: "#1B2A44",         // navy
+    inkSoft: "#6A7587",
     inkOnAccent: "#FFFFFF",
-    accent: "#5F7A4F",
-    accentSoft: "rgba(95,122,79,0.14)",
-    fontHeading: "Inter, system-ui, sans-serif",
+    accent: "#A9C2D9",      // pastell blå
+    accentSoft: "rgba(169,194,217,0.30)",
+    fontHeading: "Fraunces, Georgia, serif",
     fontBody: "Inter, system-ui, sans-serif",
     radius: "16px",
     buttonRadius: "18px",
-    headerBg: "#2F3A2A",
-    headerInk: "#F2EDE2",
-    cartBg: "#FFFFFF",
-    cartInk: "#27241D",
+    headerBg: "#F5EFE0",    // headerless / samme som canvas
+    headerInk: "#1B2A44",
+    cartBg: "#FBF6EA",
+    cartInk: "#1B2A44",
   },
   customerScreen: {
-    mode: "logo_only",
-    bg: "#F2EDE2",
-    ink: "#2F3A2A",
-    inkSoft: "rgba(47,58,42,0.65)",
-    accent: "#5F7A4F",
-    footerText: "Hvasser Bakeri",
+    mode: "logo_and_cart",
+    bg: "#F5EFE0",
+    ink: "#1B2A44",
+    inkSoft: "rgba(27,42,68,0.60)",
+    accent: "#A9C2D9",
+    footerText: "Hvasser Isbar · Sandefjord 1951",
     logoScale: "large",
   },
   pages: [
     {
-      page_name: "Brød",
-      icon: "Wheat",
+      page_name: "Iskrem",
+      icon: "IceCream",
       background_color: null,
       buttons: [
-        { button_type: "category", display_label: "Grovbrød", grid_x: 0, grid_y: 0, grid_width: 1, grid_height: 1 },
-        { button_type: "category", display_label: "Loff", grid_x: 1, grid_y: 0, grid_width: 1, grid_height: 1 },
-        { button_type: "category", display_label: "Speltbrød", grid_x: 2, grid_y: 0, grid_width: 1, grid_height: 1 },
+        { button_type: "category", display_label: "Sjokolade", grid_x: 0, grid_y: 0, grid_width: 1, grid_height: 1 },
+        { button_type: "category", display_label: "Jordbær", grid_x: 1, grid_y: 0, grid_width: 1, grid_height: 1 },
+        { button_type: "category", display_label: "Vanilje", grid_x: 2, grid_y: 0, grid_width: 1, grid_height: 1 },
+        { button_type: "category", display_label: "Pistasj", grid_x: 3, grid_y: 0, grid_width: 1, grid_height: 1 },
+        { button_type: "category", display_label: "Mango sorbet", grid_x: 4, grid_y: 0, grid_width: 1, grid_height: 1 },
+        { button_type: "category", display_label: "Cookies & cream", grid_x: 0, grid_y: 1, grid_width: 1, grid_height: 1 },
+        { button_type: "category", display_label: "Salt karamell", grid_x: 1, grid_y: 1, grid_width: 1, grid_height: 1 },
+        { button_type: "category", display_label: "Bringebær sorbet", grid_x: 2, grid_y: 1, grid_width: 1, grid_height: 1 },
+        { button_type: "category", display_label: "Kokos", grid_x: 3, grid_y: 1, grid_width: 1, grid_height: 1 },
+        { button_type: "category", display_label: "Kule iskrem", grid_x: 4, grid_y: 1, grid_width: 1, grid_height: 1 },
       ],
     },
-    { page_name: "Konditori", icon: "Cake", background_color: null, buttons: [] },
-    { page_name: "Lunsj", icon: "Sandwich", background_color: null, buttons: [] },
-    { page_name: "Drikke", icon: "Coffee", background_color: null, buttons: [] },
+    { page_name: "Softis", icon: "IceCreamCone", background_color: null, buttons: [] },
+    { page_name: "Milkshake", icon: "CupSoda", background_color: null, buttons: [] },
+    { page_name: "Sundae", icon: "IceCreamBowl", background_color: null, buttons: [] },
+    { page_name: "Iskaffe", icon: "Coffee", background_color: null, buttons: [] },
+    { page_name: "Bakst", icon: "Cookie", background_color: null, buttons: [] },
+    { page_name: "Drikke", icon: "GlassWater", background_color: null, buttons: [] },
+    { page_name: "Annet", icon: "MoreHorizontal", background_color: null, buttons: [] },
   ],
 };
 
-// ── Halvorsen Minimal ────────────────────────────────────────────────────────
-// Sidebar venstre, 4 br × 5 r, hvit canvas, sort aksent, stor typografi.
+// ── Baker Halvorsen ──────────────────────────────────────────────────────────
+// Sidebar venstre, 4 br × 3 r. Cream canvas, sort serif tittel, kobber-brun
+// aksent + 'Betal'-CTA. Editorial, klassisk konditori.
 const halvorsen: KeypadTemplate = {
   key: "halvorsen",
-  name: "Halvorsen Minimal",
-  tagline: "Sidebar venstre · 4 × 5 · sort / hvit",
+  name: "Baker Halvorsen",
+  tagline: "Sidebar venstre · 4 × 3 · cream / kobber / editorial",
   description:
-    "Minimalistisk høy-kontrast design. Hvit canvas, sorte knapper, store fonter. Tett editorial look.",
+    "Klassisk konditori-design. Cream canvas, sort serif logo, kobber-brun aksent og Betal-CTA, ikon-stil 1-px linje.",
   gridCols: 4,
-  gridRows: 5,
+  gridRows: 3,
   theme: {
     layoutKind: "sidebar_left",
-    bg: "#FFFFFF",
-    surface: "#F5F5F5",
-    surfaceAlt: "#EAEAEA",
-    border: "#D8D8D8",
-    ink: "#0A0A0A",
-    inkSoft: "#666666",
+    bg: "#F4ECDC",          // cream
+    surface: "#FFFFFF",
+    surfaceAlt: "#EADFC6",
+    border: "#D8CBAF",
+    ink: "#1A1612",         // nær-sort
+    inkSoft: "#5A4F3F",
     inkOnAccent: "#FFFFFF",
-    accent: "#0A0A0A",
-    accentSoft: "rgba(10,10,10,0.08)",
-    fontHeading: "Inter, system-ui, sans-serif",
+    accent: "#8C5A2B",      // kobber-brun
+    accentSoft: "rgba(140,90,43,0.14)",
+    fontHeading: "Cormorant Garamond, Georgia, serif",
     fontBody: "Inter, system-ui, sans-serif",
-    radius: "4px",
-    buttonRadius: "6px",
-    headerBg: "#0A0A0A",
-    headerInk: "#FFFFFF",
+    radius: "10px",
+    buttonRadius: "12px",
+    headerBg: "#F4ECDC",    // headerless
+    headerInk: "#1A1612",
     cartBg: "#FFFFFF",
-    cartInk: "#0A0A0A",
+    cartInk: "#1A1612",
   },
   customerScreen: {
     mode: "logo_only",
-    bg: "#0A0A0A",
-    ink: "#FFFFFF",
-    inkSoft: "rgba(255,255,255,0.6)",
-    accent: "#FFFFFF",
-    footerText: "Halvorsen",
+    bg: "#F4ECDC",
+    ink: "#1A1612",
+    inkSoft: "rgba(26,22,18,0.60)",
+    accent: "#8C5A2B",
+    footerText: "Baker Halvorsen · Etab. 1879",
     logoScale: "large",
   },
   pages: [
@@ -196,13 +217,26 @@ const halvorsen: KeypadTemplate = {
       icon: "Wheat",
       background_color: null,
       buttons: [
-        { button_type: "category", display_label: "GROVT", grid_x: 0, grid_y: 0, grid_width: 1, grid_height: 1, background_color: "#0A0A0A", text_color: "#FFFFFF" },
-        { button_type: "category", display_label: "LYST", grid_x: 1, grid_y: 0, grid_width: 1, grid_height: 1, background_color: "#0A0A0A", text_color: "#FFFFFF" },
+        { button_type: "category", display_label: "Halvorsenbrød", grid_x: 0, grid_y: 0, grid_width: 1, grid_height: 1 },
+        { button_type: "category", display_label: "Grovt surdeigsbrød", grid_x: 1, grid_y: 0, grid_width: 1, grid_height: 1 },
+        { button_type: "category", display_label: "Speltbrød", grid_x: 2, grid_y: 0, grid_width: 1, grid_height: 1 },
+        { button_type: "category", display_label: "Frokostbrød", grid_x: 3, grid_y: 0, grid_width: 1, grid_height: 1 },
+        { button_type: "category", display_label: "Rundstykke", grid_x: 0, grid_y: 1, grid_width: 1, grid_height: 1 },
+        { button_type: "category", display_label: "Kanelbolle", grid_x: 1, grid_y: 1, grid_width: 1, grid_height: 1 },
+        { button_type: "category", display_label: "Wienerbrød", grid_x: 2, grid_y: 1, grid_width: 1, grid_height: 1 },
+        { button_type: "category", display_label: "Skolebolle", grid_x: 3, grid_y: 1, grid_width: 1, grid_height: 1 },
+        { button_type: "category", display_label: "Croissant", grid_x: 0, grid_y: 2, grid_width: 1, grid_height: 1 },
+        { button_type: "category", display_label: "Knas", grid_x: 1, grid_y: 2, grid_width: 1, grid_height: 1 },
+        { button_type: "category", display_label: "Baguette", grid_x: 2, grid_y: 2, grid_width: 1, grid_height: 1 },
+        { button_type: "category", display_label: "Pågenlimpa", grid_x: 3, grid_y: 2, grid_width: 1, grid_height: 1 },
       ],
     },
     { page_name: "Bakst", icon: "Cookie", background_color: null, buttons: [] },
-    { page_name: "Kaffe", icon: "Coffee", background_color: null, buttons: [] },
-    { page_name: "Annet", icon: "Package", background_color: null, buttons: [] },
+    { page_name: "Kaker", icon: "Cake", background_color: null, buttons: [] },
+    { page_name: "Sandwich", icon: "Sandwich", background_color: null, buttons: [] },
+    { page_name: "Salater", icon: "Salad", background_color: null, buttons: [] },
+    { page_name: "Kaffe & drikke", icon: "Coffee", background_color: null, buttons: [] },
+    { page_name: "Annet", icon: "MoreHorizontal", background_color: null, buttons: [] },
   ],
 };
 
