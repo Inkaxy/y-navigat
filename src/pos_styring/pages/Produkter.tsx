@@ -53,7 +53,7 @@ interface ProductImage {
 interface ProductCardItem {
   id: string;
   display_name: string;
-  display_number: string | null;
+  display_number: number | null;
   image_url: string | null;
   status: string;
   mva_rate: number;
