@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useDraggable, useDroppable, useSensor, useSensors } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, GripVertical, MoreHorizontal, Plus, Search, Trash2 } from "lucide-react";
+import { ArrowLeft, GripVertical, MoreHorizontal, Plus, Search, Sparkles, Trash2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -49,6 +49,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useLegalEntity } from "@/pos_styring/contexts/LegalEntityContext";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
+import { TemplatesDialog } from "@/pos_styring/components/TemplatesDialog";
+import { KioskRender } from "@/kiosk/render/KioskRender";
+import { parseTheme } from "@/kiosk/render/kioskTheme";
 
 interface KeypadLayoutDetail {
   id: string;
@@ -58,6 +61,8 @@ interface KeypadLayoutDetail {
   grid_rows: number;
   terminal_id: string | null;
   is_default: boolean;
+  theme: unknown;
+  customer_screen: unknown;
 }
 
 interface KeypadPage {
@@ -156,11 +161,11 @@ function hasCollision(candidate: { grid_x: number; grid_y: number; grid_width: n
 async function fetchLayout(layoutId: string): Promise<KeypadLayoutDetail> {
   const { data, error } = await supabase
     .from("pos_keypad_layouts")
-    .select("id, legal_entity_id, display_name, grid_cols, grid_rows, terminal_id, is_default")
+    .select("id, legal_entity_id, display_name, grid_cols, grid_rows, terminal_id, is_default, theme, customer_screen")
     .eq("id", layoutId)
     .single();
   if (error) throw error;
-  return data as KeypadLayoutDetail;
+  return data as unknown as KeypadLayoutDetail;
 }
 
 async function fetchPages(layoutId: string): Promise<KeypadPage[]> {
