@@ -218,11 +218,13 @@ export default function ProductList() {
       const trueIds = entries.filter(([, v]) => v).map(([id]) => id);
       const falseIds = entries.filter(([, v]) => !v).map(([id]) => id);
       if (trueIds.length) {
-        const { error } = await supabase.from("products").update({ [editingCol]: true }).in("id", trueIds);
+        const patch: any = { [editingCol]: true };
+        const { error } = await supabase.from("products").update(patch).in("id", trueIds);
         if (error) throw error;
       }
       if (falseIds.length) {
-        const { error } = await supabase.from("products").update({ [editingCol]: false }).in("id", falseIds);
+        const patch: any = { [editingCol]: false };
+        const { error } = await supabase.from("products").update(patch).in("id", falseIds);
         if (error) throw error;
       }
     },
