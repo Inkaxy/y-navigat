@@ -589,6 +589,8 @@ export default function TastaturEditor() {
   const [pageName, setPageName] = useState("");
   const [pageColor, setPageColor] = useState("");
   const [deletePage, setDeletePage] = useState<KeypadPage | null>(null);
+  const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(true);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
