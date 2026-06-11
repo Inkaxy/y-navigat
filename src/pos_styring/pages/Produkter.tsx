@@ -53,6 +53,7 @@ interface ProductImage {
 interface ProductCardItem {
   id: string;
   display_name: string;
+  pos_display_name: string | null;
   display_number: number | null;
   image_url: string | null;
   status: string;
@@ -74,7 +75,7 @@ async function getSignedUrl(storagePath: string | null) {
 async function fetchProductsForPos(activeEntityId: string): Promise<ProductCardItem[]> {
   const { data, error } = await supabase
     .from("products")
-    .select("id, display_name, display_number, image_url, status, mva_rate, in_pos")
+    .select("id, display_name, pos_display_name, display_number, image_url, status, mva_rate, in_pos")
     .eq("legal_entity_id", activeEntityId)
     .eq("in_pos", true)
     .order("display_name", { ascending: true });
