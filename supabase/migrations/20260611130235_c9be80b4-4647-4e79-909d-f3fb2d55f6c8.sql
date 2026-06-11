@@ -1,0 +1,2 @@
+ALTER TABLE public.products ADD COLUMN IF NOT EXISTS pos_display_name text;
+COMMENT ON COLUMN public.products.pos_display_name IS 'Optional POS-specific display name; overrides display_name only in POS/kiosk surfaces. NULL = inherit from display_name.';

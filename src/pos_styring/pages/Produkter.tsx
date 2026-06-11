@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ImageIcon, Loader2, MoreHorizontal, Search, Star, Trash2, Upload } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -53,6 +53,7 @@ interface ProductImage {
 interface ProductCardItem {
   id: string;
   display_name: string;
+  pos_display_name: string | null;
   display_number: number | null;
   image_url: string | null;
   status: string;
@@ -74,7 +75,7 @@ async function getSignedUrl(storagePath: string | null) {
 async function fetchProductsForPos(activeEntityId: string): Promise<ProductCardItem[]> {
   const { data, error } = await supabase
     .from("products")
-    .select("id, display_name, display_number, image_url, status, mva_rate, in_pos")
+    .select("id, display_name, pos_display_name, display_number, image_url, status, mva_rate, in_pos")
     .eq("legal_entity_id", activeEntityId)
     .eq("in_pos", true)
     .order("display_name", { ascending: true });
@@ -125,11 +126,32 @@ function ProductImageDialog({ product, activeEntityId, open, onOpenChange }: { p
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [imageToDelete, setImageToDelete] = useState<ProductImage | null>(null);
+  const [posName, setPosName] = useState<string>("");
+
+  useEffect(() => {
+    setPosName(product?.pos_display_name ?? "");
+  }, [product?.id, product?.pos_display_name]);
 
   const { data: images = [], isLoading } = useQuery({
     queryKey: ["product_images", product?.id],
     queryFn: () => fetchProductImages(product!.id),
     enabled: open && !!product?.id,
+  });
+
+  const savePosNameMutation = useMutation({
+    mutationFn: async (next: string | null) => {
+      if (!product) return;
+      const { error } = await supabase
+        .from("products")
+        .update({ pos_display_name: next })
+        .eq("id", product.id);
+      if (error) throw error;
+    },
+    onSuccess: async () => {
+      toast.success("POS-visningsnavn lagret");
+      await queryClient.invalidateQueries({ queryKey: ["products_for_pos", activeEntityId] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Kunne ikke lagre navn"),
   });
 
   const invalidate = async () => {
@@ -234,6 +256,37 @@ function ProductImageDialog({ product, activeEntityId, open, onOpenChange }: { p
             <DialogDescription>Administrer bildene som vises i POS Kiosk og tastatur-layouts.</DialogDescription>
           </DialogHeader>
 
+          <div className="space-y-2 rounded-lg border bg-muted/30 p-3">
+            <label className="text-sm font-medium">POS-visningsnavn</label>
+            <p className="text-xs text-muted-foreground">
+              Standard er navnet fra Varer-appen ({product?.display_name ?? "—"}). Sett et eget navn her for å overstyre kun i POS/kasse — originalnavnet i Varer endres ikke.
+            </p>
+            <div className="flex gap-2">
+              <Input
+                value={posName}
+                onChange={(e) => setPosName(e.target.value)}
+                placeholder={product?.display_name ?? ""}
+              />
+              <Button
+                variant="outline"
+                disabled={savePosNameMutation.isPending || posName === (product?.pos_display_name ?? "")}
+                onClick={() => savePosNameMutation.mutate(posName.trim() ? posName.trim() : null)}
+              >
+                {savePosNameMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Lagre"}
+              </Button>
+              {product?.pos_display_name && (
+                <Button
+                  variant="ghost"
+                  onClick={() => { setPosName(""); savePosNameMutation.mutate(null); }}
+                  disabled={savePosNameMutation.isPending}
+                >
+                  Tilbakestill
+                </Button>
+              )}
+            </div>
+          </div>
+
+
           {isLoading ? (
             <div className="grid gap-3 sm:grid-cols-3"><Skeleton className="h-40" /><Skeleton className="h-40" /><Skeleton className="h-40" /></div>
           ) : images.length > 0 ? (
@@ -331,6 +384,7 @@ export default function Produkter() {
     return products.filter(
       (product) =>
         product.display_name.toLowerCase().includes(term) ||
+        (product.pos_display_name ?? "").toLowerCase().includes(term) ||
         String(product.display_number ?? "").toLowerCase().includes(term),
     );
   }, [products, search]);
@@ -378,7 +432,12 @@ export default function Produkter() {
                 </div>
                 <CardHeader className="space-y-2">
                   <div className="flex items-start justify-between gap-2">
-                    <CardTitle className="line-clamp-2 text-base">{product.display_name}</CardTitle>
+                    <div className="min-w-0">
+                      <CardTitle className="line-clamp-2 text-base">{product.pos_display_name?.trim() || product.display_name}</CardTitle>
+                      {product.pos_display_name?.trim() && (
+                        <p className="mt-0.5 text-xs text-muted-foreground line-clamp-1">Varer: {product.display_name}</p>
+                      )}
+                    </div>
                     {product.display_number && (
                       <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground">
                         #{product.display_number}
@@ -388,6 +447,7 @@ export default function Produkter() {
                   <div className="flex flex-wrap gap-2">
                     <Badge variant={product.status === "draft" ? "secondary" : "default"}>{product.status}</Badge>
                     <Badge variant="outline">MVA {product.mva_rate}%</Badge>
+                    {product.pos_display_name?.trim() && <Badge variant="secondary">POS-navn</Badge>}
                   </div>
                 </CardHeader>
               </button>
