@@ -256,6 +256,37 @@ function ProductImageDialog({ product, activeEntityId, open, onOpenChange }: { p
             <DialogDescription>Administrer bildene som vises i POS Kiosk og tastatur-layouts.</DialogDescription>
           </DialogHeader>
 
+          <div className="space-y-2 rounded-lg border bg-muted/30 p-3">
+            <label className="text-sm font-medium">POS-visningsnavn</label>
+            <p className="text-xs text-muted-foreground">
+              Standard er navnet fra Varer-appen ({product?.display_name ?? "—"}). Sett et eget navn her for å overstyre kun i POS/kasse — originalnavnet i Varer endres ikke.
+            </p>
+            <div className="flex gap-2">
+              <Input
+                value={posName}
+                onChange={(e) => setPosName(e.target.value)}
+                placeholder={product?.display_name ?? ""}
+              />
+              <Button
+                variant="outline"
+                disabled={savePosNameMutation.isPending || posName === (product?.pos_display_name ?? "")}
+                onClick={() => savePosNameMutation.mutate(posName.trim() ? posName.trim() : null)}
+              >
+                {savePosNameMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Lagre"}
+              </Button>
+              {product?.pos_display_name && (
+                <Button
+                  variant="ghost"
+                  onClick={() => { setPosName(""); savePosNameMutation.mutate(null); }}
+                  disabled={savePosNameMutation.isPending}
+                >
+                  Tilbakestill
+                </Button>
+              )}
+            </div>
+          </div>
+
+
           {isLoading ? (
             <div className="grid gap-3 sm:grid-cols-3"><Skeleton className="h-40" /><Skeleton className="h-40" /><Skeleton className="h-40" /></div>
           ) : images.length > 0 ? (
