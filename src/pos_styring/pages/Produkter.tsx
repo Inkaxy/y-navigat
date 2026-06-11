@@ -384,6 +384,7 @@ export default function Produkter() {
     return products.filter(
       (product) =>
         product.display_name.toLowerCase().includes(term) ||
+        (product.pos_display_name ?? "").toLowerCase().includes(term) ||
         String(product.display_number ?? "").toLowerCase().includes(term),
     );
   }, [products, search]);
