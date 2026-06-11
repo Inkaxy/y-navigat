@@ -1,7 +1,13 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import { useTerminal } from "@/kiosk/context/TerminalContext";
 import { useKioskChannel } from "@/kiosk/context/RealtimeContext";
-import { Logo } from "@/components/brand/Logo";
+import { useKeypadLayout } from "@/kiosk/hooks/useKeypadLayout";
+import { KioskCustomerScreenRender } from "@/kiosk/render/KioskCustomerScreenRender";
+import {
+  parseCustomerScreen,
+  parseTheme,
+  themeToVars,
+} from "@/kiosk/render/kioskTheme";
 import type { CustomerCartPayload } from "@/kiosk/lib/cart";
 import {
   CART_UPDATE_EVENT,
@@ -12,6 +18,11 @@ import {
 export default function CustomerDisplay() {
   const { terminal } = useTerminal();
   const channel = useKioskChannel();
+  const { data: layoutData } = useKeypadLayout(
+    terminal!.id,
+    terminal?.legal_entity_id ?? null,
+  );
+
   const [cart, setCart] = useState<CustomerCartPayload | null>(null);
   const [thanks, setThanks] = useState<SaleCompletePayload | null>(null);
   const thanksTimer = useRef<number | null>(null);
@@ -42,7 +53,6 @@ export default function CustomerDisplay() {
       const payload = (msg as { payload?: unknown }).payload;
       if (payload && typeof payload === "object") {
         setCart(payload as CustomerCartPayload);
-        // Ny cart_update overskriver takke-state.
         if (thanksTimer.current) window.clearTimeout(thanksTimer.current);
         setThanks(null);
       }
@@ -58,107 +68,84 @@ export default function CustomerDisplay() {
     });
   }, [channel]);
 
-  const logoOnly = terminal?.customer_screen_mode === "logo_only";
-  const hasItems = !!cart && cart.items.length > 0;
-  const showThanks = !!thanks;
+  // Customer screen config: prefer layout.customer_screen jsonb;
+  // fall back to terminal.customer_screen_mode for mode.
+  const csConfig = useMemo(() => {
+    const parsed = parseCustomerScreen(layoutData?.layout.customer_screen ?? null);
+    if (terminal?.customer_screen_mode && !layoutData?.layout.customer_screen) {
+      return { ...parsed, mode: terminal.customer_screen_mode };
+    }
+    return parsed;
+  }, [layoutData, terminal]);
+
+  const theme = useMemo(() => parseTheme(layoutData?.layout.theme ?? null), [layoutData]);
+
+  const renderCart = useMemo(
+    () =>
+      (cart?.items ?? []).map((it, i) => ({
+        id: String(i),
+        label: it.label,
+        qty: it.quantity,
+        unit: it.unit ?? null,
+        line_total: it.line_total,
+      })),
+    [cart],
+  );
+  const total = cart?.totals.total_incl_mva ?? 0;
+
+  // Takke-skjerm overlay (bruker theme-vars).
+  if (thanks) {
+    return (
+      <div
+        className="fixed inset-0 flex flex-col items-center justify-center"
+        style={{
+          ...themeToVars(theme),
+          background: "var(--kiosk-bg)",
+          color: "var(--kiosk-ink)",
+          userSelect: "none",
+        }}
+      >
+        <div
+          className="rounded-2xl border p-10 text-center"
+          style={{
+            borderColor: "var(--kiosk-accent)",
+            background: "var(--kiosk-accent-soft)",
+            minWidth: 480,
+          }}
+        >
+          <div className="text-4xl font-bold" style={{ color: "var(--kiosk-accent)" }}>
+            Takk for handelen!
+          </div>
+          <div className="mt-4 text-xl">
+            Sum:{" "}
+            <span className="tabular-nums font-semibold">
+              {thanks.total_incl_mva.toFixed(2)}
+            </span>
+          </div>
+          {thanks.change_given > 0 && (
+            <div className="mt-2 text-lg opacity-80">
+              Veksel:{" "}
+              <span className="tabular-nums font-semibold">
+                {thanks.change_given.toFixed(2)}
+              </span>
+            </div>
+          )}
+          {thanks.receipt_number && (
+            <div className="mt-3 text-sm opacity-50">{thanks.receipt_number}</div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div
-      className="fixed inset-0 flex flex-col bg-[#0F0E0E] text-[#F4ECDC]"
-      style={{ userSelect: "none" }}
-    >
-      <div
-        className={
-          logoOnly
-            ? "flex flex-1 items-center justify-center p-12"
-            : "flex flex-col items-center gap-8 p-12"
-        }
-      >
-        {terminal?.logo_url ? (
-          <img
-            src={terminal.logo_url}
-            alt=""
-            draggable={false}
-            className={
-              logoOnly ? "max-h-[60vh] max-w-[80vw]" : "max-h-40 max-w-md"
-            }
-          />
-        ) : (
-          <div className="text-amber-400">
-            <Logo
-              variant="seal"
-              className={logoOnly ? "h-[40vh] w-auto" : "h-36 w-auto"}
-            />
-          </div>
-        )}
-
-        {!logoOnly && (
-          <div className="mt-8 w-full max-w-3xl flex-1">
-            {showThanks ? (
-              <div className="rounded-2xl border border-amber-400/30 bg-amber-500/10 p-10 text-center">
-                <div className="text-4xl font-bold text-amber-300">
-                  Takk for handelen!
-                </div>
-                <div className="mt-4 text-xl text-[#F4ECDC]/80">
-                  Sum:{" "}
-                  <span className="tabular-nums font-semibold">
-                    {thanks!.total_incl_mva.toFixed(2)}
-                  </span>
-                </div>
-                {thanks!.change_given > 0 && (
-                  <div className="mt-2 text-lg text-[#F4ECDC]/70">
-                    Veksel:{" "}
-                    <span className="tabular-nums font-semibold">
-                      {thanks!.change_given.toFixed(2)}
-                    </span>
-                  </div>
-                )}
-                {thanks!.receipt_number && (
-                  <div className="mt-3 text-sm text-[#F4ECDC]/40">
-                    {thanks!.receipt_number}
-                  </div>
-                )}
-              </div>
-            ) : hasItems ? (
-              <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-6">
-                <div className="space-y-1">
-                  {cart!.items.map((it, i) => (
-                    <div
-                      key={i}
-                      className="flex items-center justify-between border-b border-white/5 py-3 text-lg last:border-0"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate font-medium">{it.label}</div>
-                        <div className="text-sm text-[#F4ECDC]/50">
-                          {it.quantity}
-                          {it.unit ? ` ${it.unit}` : ""}
-                        </div>
-                      </div>
-                      <div className="ml-4 font-semibold tabular-nums">
-                        {it.line_total.toFixed(2)}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-4 flex items-center justify-between border-t border-white/20 pt-4 text-2xl font-bold">
-                  <span>Totalt</span>
-                  <span className="tabular-nums">
-                    {cart!.totals.total_incl_mva.toFixed(2)}
-                  </span>
-                </div>
-              </div>
-            ) : (
-              <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-8 text-center text-[#F4ECDC]/40">
-                Handlekurv vises her når salget starter.
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      <footer className="border-t border-white/5 px-8 py-4 text-center text-sm text-[#F4ECDC]/40">
-        Ønsker du kvittering? Spør betjeningen.
-      </footer>
+    <div className="fixed inset-0" style={{ userSelect: "none" }}>
+      <KioskCustomerScreenRender
+        config={csConfig}
+        cart={renderCart}
+        total={total}
+        logoUrl={terminal?.logo_url ?? null}
+      />
     </div>
   );
 }
