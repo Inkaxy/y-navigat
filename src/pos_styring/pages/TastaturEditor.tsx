@@ -757,6 +757,14 @@ export default function TastaturEditor() {
           <h1 className="text-3xl font-semibold tracking-normal">{layout.display_name}</h1>
           <p className="mt-1 text-sm text-muted-foreground">{layout.grid_cols} × {layout.grid_rows} grid · {activeEntity?.short_code}</p>
         </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => setPreviewOpen((v) => !v)}>
+            {previewOpen ? "Skjul forhåndsvisning" : "Vis forhåndsvisning"}
+          </Button>
+          <Button size="sm" onClick={() => setTemplatesOpen(true)}>
+            <Sparkles className="h-4 w-4" /> Maler & tema
+          </Button>
+        </div>
       </div>
 
       <div className="grid flex-1 gap-4 lg:grid-cols-[240px_1fr]">
