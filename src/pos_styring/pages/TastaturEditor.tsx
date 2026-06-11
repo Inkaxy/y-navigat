@@ -305,12 +305,13 @@ interface ButtonDialogProps {
   pageId: string;
   layout: KeypadLayoutDetail;
   buttons: KeypadButton[];
+  pages: KeypadPage[];
   cell: { x: number; y: number } | null;
   button: KeypadButton | null;
   activeEntityId: string;
 }
 
-function ButtonDialog({ open, onOpenChange, pageId, layout, buttons, cell, button, activeEntityId }: ButtonDialogProps) {
+function ButtonDialog({ open, onOpenChange, pageId, layout, buttons, pages, cell, button, activeEntityId }: ButtonDialogProps) {
   const queryClient = useQueryClient();
   const [productSearch, setProductSearch] = useState("");
   const isEdit = !!button;
