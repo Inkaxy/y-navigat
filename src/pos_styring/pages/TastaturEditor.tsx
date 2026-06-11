@@ -886,11 +886,11 @@ export default function TastaturEditor() {
   );
 }
 
-function DraggableButton({ button, onEdit }: { button: KeypadButton; onEdit: () => void }) {
+function DraggableButton({ button, onEdit, onResize }: { button: KeypadButton; onEdit: () => void; onResize?: (w: number, h: number) => void }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggableCompat(button.id);
   return (
     <div ref={setNodeRef} style={{ transform: CSS.Translate.toString(transform) }} className="h-full min-h-0" {...attributes} {...listeners}>
-      <KeypadButtonTile button={button} onEdit={onEdit} dragging={isDragging} />
+      <KeypadButtonTile button={button} onEdit={onEdit} dragging={isDragging} onResize={onResize} />
     </div>
   );
 }
