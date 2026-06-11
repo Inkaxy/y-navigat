@@ -4,7 +4,7 @@ import type { CSSProperties, ReactNode } from "react";
 
 import { Logo } from "@/components/brand/Logo";
 import { cn } from "@/lib/utils";
-import type { CustomerScreenConfig, RenderCartLine } from "./kioskTheme";
+import type { CustomerScreenConfig } from "./kioskTheme";
 import type { RenderCartLine as Line } from "./KioskRender";
 import { customerScreenToVars } from "./kioskTheme";
 
