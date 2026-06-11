@@ -494,6 +494,30 @@ function ButtonDialog({ open, onOpenChange, pageId, layout, buttons, pages, cell
               )} />
             )}
 
+            {buttonType === "category" && (
+              <FormField control={form.control} name="target_page_id" render={({ field }) => {
+                const selectablePages = pages.filter((p) => p.id !== pageId);
+                return (
+                  <FormItem>
+                    <FormLabel>Underside</FormLabel>
+                    <Select value={field.value || undefined} onValueChange={field.onChange}>
+                      <FormControl><SelectTrigger><SelectValue placeholder={selectablePages.length ? "Velg side å navigere til" : "Ingen andre sider tilgjengelig"} /></SelectTrigger></FormControl>
+                      <SelectContent>
+                        {selectablePages.map((p) => (
+                          <SelectItem key={p.id} value={p.id}>{p.page_name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Kategori-knappen åpner valgt underside i kiosken. Uten valg får operatøren en advarsel.
+                    </p>
+                    <FormMessage />
+                  </FormItem>
+                );
+              }} />
+            )}
+
+
             <div className="grid gap-3 sm:grid-cols-2">
               <FormField control={form.control} name="display_label" render={({ field }) => (
                 <FormItem>
