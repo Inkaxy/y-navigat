@@ -237,28 +237,41 @@ function ProductImageDialog({ product, activeEntityId, open, onOpenChange }: { p
           {isLoading ? (
             <div className="grid gap-3 sm:grid-cols-3"><Skeleton className="h-40" /><Skeleton className="h-40" /><Skeleton className="h-40" /></div>
           ) : images.length > 0 ? (
-            <div className="grid gap-3 sm:grid-cols-3">
-              {images.map((image) => (
-                <div key={image.id} className="overflow-hidden rounded-lg border bg-card">
-                  <div className="relative aspect-[4/3] bg-muted">
-                    {image.signed_url ? <img src={image.signed_url} alt="Produktbilde" className="h-full w-full object-cover" /> : <ImageIcon className="m-auto h-10 w-10 text-muted-foreground" />}
-                    {image.is_primary && <Badge className="absolute left-2 top-2"><Star className="h-3 w-3" /> Primær</Badge>}
+            <div className="space-y-3">
+              <p className="text-xs text-muted-foreground">POS-spesifikke bilder overstyrer Varer-appens hovedbilde i kassen. Primærbildet vises i POS Kiosk.</p>
+              <div className="grid gap-3 sm:grid-cols-3">
+                {images.map((image) => (
+                  <div key={image.id} className="overflow-hidden rounded-lg border bg-card">
+                    <div className="relative aspect-[4/3] bg-muted">
+                      {image.signed_url ? <img src={image.signed_url} alt="Produktbilde" className="h-full w-full object-cover" /> : <ImageIcon className="m-auto h-10 w-10 text-muted-foreground" />}
+                      {image.is_primary && <Badge className="absolute left-2 top-2"><Star className="h-3 w-3" /> Primær</Badge>}
+                    </div>
+                    <div className="flex items-center justify-between p-2">
+                      <span className="truncate text-xs text-muted-foreground">{image.storage_path.split("/").pop()}</span>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem disabled={image.is_primary} onClick={() => primaryMutation.mutate(image)}>Sett som primær</DropdownMenuItem>
+                          <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setImageToDelete(image)}><Trash2 className="h-4 w-4" /> Slett</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between p-2">
-                    <span className="truncate text-xs text-muted-foreground">{image.storage_path.split("/").pop()}</span>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem disabled={image.is_primary} onClick={() => primaryMutation.mutate(image)}>Sett som primær</DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setImageToDelete(image)}><Trash2 className="h-4 w-4" /> Slett</DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
+                ))}
+              </div>
+            </div>
+          ) : product?.image_url ? (
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">Standard: arvet fra Varer-appens hovedbilde. Last opp under for å overstyre kun i POS — Varer-bildet beholdes uendret.</p>
+              <div className="overflow-hidden rounded-lg border bg-card sm:w-1/3">
+                <div className="relative aspect-[4/3] bg-muted">
+                  <img src={product.image_url} alt="Arvet fra Varer" className="h-full w-full object-cover" />
+                  <Badge variant="secondary" className="absolute left-2 top-2">Arvet fra Varer</Badge>
                 </div>
-              ))}
+              </div>
             </div>
           ) : (
-            <div className="flex min-h-40 items-center justify-center rounded-lg border border-dashed text-sm text-muted-foreground">Ingen bilder er lastet opp for dette produktet.</div>
+            <div className="flex min-h-40 items-center justify-center rounded-lg border border-dashed text-sm text-muted-foreground">Ingen bilder — last opp et POS-spesifikt bilde under.</div>
           )}
 
           <div
