@@ -882,6 +882,55 @@ export default function TastaturEditor() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {previewOpen && (
+        <section className="rounded-lg border bg-card p-4 shadow-card">
+          <div className="mb-3 flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Live forhåndsvisning</h2>
+              <p className="text-xs text-muted-foreground">Samme render som kasse-skjermen bruker. Drevet av layoutens tema.</p>
+            </div>
+          </div>
+          <div className="overflow-hidden rounded-md border" style={{ aspectRatio: "16 / 9" }}>
+            <KioskRender
+              theme={parseTheme(layout.theme)}
+              gridCols={layout.grid_cols}
+              gridRows={layout.grid_rows}
+              pages={pages.map((p) => ({
+                id: p.id,
+                page_name: p.page_name,
+                sort_order: p.sort_order,
+                background_color: p.background_color,
+              }))}
+              buttons={buttons.map((b) => ({
+                id: b.id,
+                page_id: b.page_id,
+                button_type: b.button_type,
+                display_label: b.display_label ?? (b.product?.display_name ?? null),
+                image_url: b.image_url,
+                background_color: b.background_color,
+                text_color: b.text_color,
+                grid_x: b.grid_x,
+                grid_y: b.grid_y,
+                grid_width: b.grid_width,
+                grid_height: b.grid_height,
+              }))}
+              currentPageId={activePageId}
+              headerLabel={layout.display_name}
+            />
+          </div>
+        </section>
+      )}
+
+      {layoutId && (
+        <TemplatesDialog
+          open={templatesOpen}
+          onOpenChange={setTemplatesOpen}
+          layoutId={layoutId}
+          currentGridCols={layout.grid_cols}
+          currentGridRows={layout.grid_rows}
+        />
+      )}
     </div>
   );
 }
