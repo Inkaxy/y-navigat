@@ -72,7 +72,7 @@ export function useProductLookup(
           : raw;
         return {
           id: pRes.data.id,
-          display_name: pRes.data.display_name,
+          display_name: (pRes.data as any).pos_display_name?.trim() || pRes.data.display_name,
           display_number: Number(pRes.data.display_number),
           unit_of_sale: pRes.data.unit_of_sale,
           mva_rate: mva,
