@@ -122,6 +122,7 @@ const buttonSchema = z.object({
   button_type: z.enum(["product", "category", "function"]),
   product_id: z.string().optional(),
   function_code: z.string().optional(),
+  target_page_id: z.string().optional(),
   display_label: z.string().trim().optional(),
   image_url: z.string().trim().optional(),
   background_color: z.string().trim().optional(),
