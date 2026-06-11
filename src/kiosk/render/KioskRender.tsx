@@ -81,7 +81,17 @@ function IconByName({ name, className }: { name?: string | null; className?: str
   return <Comp className={className} />;
 }
 
-function KioskHeader({ label }: { label: string }) {
+function KioskHeader({
+  label,
+  terminalCode,
+  operatorName,
+  right,
+}: {
+  label: string;
+  terminalCode?: string | null;
+  operatorName?: string | null;
+  right?: ReactNode;
+}) {
   return (
     <header
       className="flex items-center justify-between px-6 py-3"
@@ -93,10 +103,15 @@ function KioskHeader({ label }: { label: string }) {
       }}
     >
       <div className="flex items-baseline gap-3">
-        <span className="font-mono text-xs uppercase tracking-[0.2em] opacity-60">T-01</span>
+        <span className="font-mono text-xs uppercase tracking-[0.2em] opacity-60">
+          {terminalCode ?? "—"}
+        </span>
         <span className="text-sm opacity-80">{label}</span>
       </div>
-      <span className="text-xs opacity-60">Demo operatør</span>
+      <div className="flex items-center gap-3">
+        {operatorName && <span className="text-xs opacity-70">{operatorName}</span>}
+        {right}
+      </div>
     </header>
   );
 }
