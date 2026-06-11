@@ -1,8 +1,17 @@
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { KioskHeader } from "@/kiosk/components/KioskHeader";
-import { KeypadGrid } from "@/kiosk/components/KeypadGrid";
-import { CartPanel } from "@/kiosk/components/CartPanel";
+import { LogOut, Percent, Pause, Receipt, Tag, Trash2, X } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { CloseSessionModal } from "@/kiosk/components/CloseSessionModal";
 import { PaymentModal } from "@/kiosk/components/PaymentModal";
 import { ReceiptView } from "@/kiosk/components/ReceiptView";
 import { useTerminal } from "@/kiosk/context/TerminalContext";
@@ -14,10 +23,21 @@ import {
   KeypadNavProvider,
   useKeypadNav,
 } from "@/kiosk/context/KeypadNavContext";
-import { useKeypadLayout, type KeypadData } from "@/kiosk/hooks/useKeypadLayout";
+import { useKeypadLayout, type KeypadData, type KeypadButton } from "@/kiosk/hooks/useKeypadLayout";
+import {
+  usePriceListConfig,
+  useProductLookup,
+} from "@/kiosk/hooks/useProductLookup";
 import { kioskSupabase } from "@/kiosk/integrations/supabase/client";
 import { broadcastSaleComplete } from "@/kiosk/lib/realtime";
 import type { CartItem } from "@/kiosk/lib/cart";
+import {
+  KioskRender,
+  type RenderButton,
+  type RenderCartLine,
+  type RenderPage,
+} from "@/kiosk/render/KioskRender";
+import { parseTheme } from "@/kiosk/render/kioskTheme";
 
 // ─── RPC line-payload: eksakt 7-nøkkel-shape RPC-en leser ────────────────────
 type LinePayload = {
@@ -66,10 +86,7 @@ export default function Kasse() {
   return (
     <CartProvider channel={channel}>
       <KeypadNavProvider key={data?.layout.id ?? "none"} rootPageId={rootPageId}>
-        <div className="flex min-h-screen flex-col bg-[#0F0E0E] text-[#F4ECDC]">
-          <KioskHeader />
-          <SaleFlow data={data ?? null} loading={isLoading} loadError={error as Error | null} />
-        </div>
+        <SaleFlow data={data ?? null} loading={isLoading} loadError={error as Error | null} />
       </KeypadNavProvider>
     </CartProvider>
   );
@@ -84,19 +101,108 @@ interface SaleFlowProps {
 function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
   const cart = useCart();
   const { terminal } = useTerminal();
-  const { session } = useSession();
+  const { operator, logout } = useOperator();
+  const { session, status: sessionStatus } = useSession();
   const channel = useKioskChannel();
   const nav = useKeypadNav();
+
+  const priceListId = terminal?.default_price_list_id ?? null;
+  const { data: priceListCfg } = usePriceListConfig(priceListId);
+  const lookupProduct = useProductLookup(
+    priceListId,
+    priceListCfg?.prices_include_mva ?? false,
+  );
 
   const [payOpen, setPayOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [rpcError, setRpcError] = useState<string | null>(null);
+  const [closeSessionOpen, setCloseSessionOpen] = useState(false);
+  const [clearOpen, setClearOpen] = useState(false);
   const [receipt, setReceipt] = useState<{
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     tx: any;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     lines: any[];
   } | null>(null);
+  const [lastReceipt, setLastReceipt] = useState<{
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    tx: any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    lines: any[];
+  } | null>(null);
+
+  const theme = parseTheme(data?.layout.theme ?? null);
+  const sessionOpen = sessionStatus === "open" && !!session;
+
+  const handleProduct = async (b: KeypadButton) => {
+    if (!b.product_id) {
+      toast.error("Produkt-knapp mangler product_id");
+      return;
+    }
+    if (!priceListId) {
+      toast.error("Terminal mangler default_price_list_id");
+      return;
+    }
+    try {
+      const p = await lookupProduct(b.product_id);
+      if (!p) {
+        toast.error(`${b.display_label ?? "Produkt"}: mangler pris i prisliste`);
+        return;
+      }
+      cart.addItem({
+        product_id: p.id,
+        product_snapshot: {
+          display_name: p.display_name,
+          display_number: String(p.display_number),
+          unit: p.unit_of_sale,
+          mva_rate: p.mva_rate,
+        },
+        unit_price_excl_mva: p.unit_price_excl_mva,
+        mva_rate: p.mva_rate,
+        quantity: 1,
+      });
+    } catch (e) {
+      toast.error("Feil ved produkt-oppslag", {
+        description: (e as Error).message,
+      });
+    }
+  };
+
+  const handleCategory = (b: KeypadButton) => {
+    if (!data) return;
+    const label = (b.display_label ?? "").trim().toLowerCase();
+    if (!label) {
+      toast.warning("Kategori-knapp uten etikett");
+      return;
+    }
+    const target = data.pages.find(
+      (p) => p.page_name.trim().toLowerCase() === label,
+    );
+    if (target) {
+      nav.navigateTo(target.id);
+    } else {
+      toast.warning(`${b.display_label}: underside ikke konfigurert`);
+    }
+  };
+
+  const handleButtonClick = (rb: RenderButton) => {
+    if (!data) return;
+    const b = data.buttons.find((x) => x.id === rb.id);
+    if (!b) return;
+    switch (b.button_type) {
+      case "product":
+        void handleProduct(b);
+        return;
+      case "category":
+        handleCategory(b);
+        return;
+      case "function":
+        toast.info(`${b.display_label ?? b.function_code ?? "Funksjon"}: bygges senere`);
+        return;
+      default:
+        toast.info(`Knapp-type "${b.button_type}" ikke støttet ennå`);
+    }
+  };
 
   const handleConfirm = async (summary: {
     payments: { method: string; amount: number; reference?: string; card_brand?: string }[];
@@ -108,7 +214,6 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
       setRpcError("Ingen åpen sesjon.");
       return;
     }
-    // Bekreft mva-satser før kall (RPC avviser annet enn 0/12/15/25).
     const VALID = new Set([0, 12, 15, 25]);
     for (const it of cart.items) {
       if (!VALID.has(it.mva_rate)) {
@@ -154,7 +259,9 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
       if (linesErr) throw linesErr;
       if (!tx) throw new Error("Fant ikke transaksjonen etter insert");
 
-      setReceipt({ tx, lines: lines ?? [] });
+      const r = { tx, lines: lines ?? [] };
+      setReceipt(r);
+      setLastReceipt(r);
       setPayOpen(false);
 
       void broadcastSaleComplete(channel, {
@@ -177,45 +284,165 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
     nav.reset();
   };
 
-  return (
-    <>
-      <div className="flex flex-1 gap-4 p-4">
-        <div className="flex flex-1 flex-col">
-          {loading && (
-            <div className="flex flex-1 items-center justify-center text-[#F4ECDC]/60">
-              Laster tastatur…
-            </div>
-          )}
-          {loadError && (
-            <div className="flex flex-1 items-center justify-center rounded-xl border border-red-500/30 bg-red-500/5 p-8 text-center text-red-300">
-              Feil ved lasting av tastatur: {loadError.message}
-            </div>
-          )}
-          {!loading && !loadError && !data && (
-            <div className="flex flex-1 items-center justify-center rounded-xl border border-dashed border-white/10 p-12 text-center">
-              <div>
-                <p className="text-lg font-medium text-[#F4ECDC]/80">
-                  Ingen tastatur konfigurert
-                </p>
-                <p className="mt-2 max-w-md text-sm text-[#F4ECDC]/50">
-                  Det finnes ingen layout bundet til denne terminalen, og ingen
-                  default-layout for selskapet. Åpne POS Styring → Tastatur for
-                  å sette opp et tastatur.
-                </p>
-              </div>
-            </div>
-          )}
-          {data && <KeypadGrid data={data} />}
-        </div>
+  // ── Map DB → render-types ──
+  const renderPages: RenderPage[] = useMemo(() => {
+    if (!data) return [];
+    return data.pages.map((p) => ({
+      id: p.id,
+      page_name: p.page_name,
+      sort_order: p.sort_order,
+      background_color: p.background_color,
+      icon: p.icon ?? null,
+    }));
+  }, [data]);
 
-        <CartPanel
+  const renderButtons: RenderButton[] = useMemo(() => {
+    if (!data) return [];
+    return data.buttons.map((b) => ({
+      id: b.id,
+      page_id: b.page_id,
+      button_type: (b.button_type as RenderButton["button_type"]) ?? "function",
+      display_label: b.display_label,
+      image_url: b.image_url,
+      background_color: b.background_color,
+      text_color: b.text_color,
+      grid_x: b.grid_x,
+      grid_y: b.grid_y,
+      grid_width: b.grid_width,
+      grid_height: b.grid_height,
+    }));
+  }, [data]);
+
+  const renderCart: RenderCartLine[] = cart.items.map((it) => ({
+    id: it.id,
+    label: it.product_snapshot.display_name,
+    qty: it.quantity,
+    unit: it.product_snapshot.unit ?? null,
+    line_total:
+      Math.round(
+        (it.quantity * it.unit_price_excl_mva - it.line_discount) *
+          (1 + it.mva_rate / 100) *
+          100,
+      ) / 100,
+  }));
+
+  const stubToast = (label: string) =>
+    toast.info(`${label}: bygges senere`);
+
+  const headerRight = (
+    <>
+      {sessionOpen && (
+        <button
+          type="button"
+          onClick={() => setCloseSessionOpen(true)}
+          className="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-medium hover:bg-white/10"
+          style={{ color: "var(--kiosk-header-ink)" }}
+        >
+          <X className="h-3.5 w-3.5" /> Avslutt skift
+        </button>
+      )}
+      {operator && (
+        <button
+          type="button"
+          onClick={logout}
+          className="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-medium hover:bg-white/10"
+          style={{ color: "var(--kiosk-header-ink)" }}
+        >
+          <LogOut className="h-3.5 w-3.5" /> Logg av
+        </button>
+      )}
+    </>
+  );
+
+  const footerActions = (
+    <div className="flex gap-2">
+      <ActionBtn onClick={() => stubToast("Rabatt")} icon={<Percent className="h-4 w-4" />}>
+        Rabatt
+      </ActionBtn>
+      <ActionBtn onClick={() => stubToast("Merket lapp")} icon={<Tag className="h-4 w-4" />}>
+        Merket lapp
+      </ActionBtn>
+      <ActionBtn onClick={() => stubToast("Parker ordre")} icon={<Pause className="h-4 w-4" />}>
+        Parker ordre
+      </ActionBtn>
+      <ActionBtn
+        onClick={() => setClearOpen(true)}
+        icon={<Trash2 className="h-4 w-4" />}
+        disabled={cart.items.length === 0}
+      >
+        Slett ordre
+      </ActionBtn>
+      <ActionBtn
+        onClick={() => lastReceipt && setReceipt(lastReceipt)}
+        icon={<Receipt className="h-4 w-4" />}
+        disabled={!lastReceipt}
+      >
+        Kvittering
+      </ActionBtn>
+    </div>
+  );
+
+  const diningForRender: "takeaway" | "eatin" | "pickup" = cart.diningMode;
+  const handleDiningChange = (m: "takeaway" | "eatin" | "pickup") => {
+    if (m === "pickup") {
+      stubToast("Henteordre");
+      return;
+    }
+    cart.setDiningMode(m);
+  };
+
+  return (
+    <div className="flex h-screen w-screen flex-col">
+      {loading ? (
+        <div className="flex flex-1 items-center justify-center bg-[var(--kiosk-bg)] text-[var(--kiosk-ink)]" style={{ ...({ ["--kiosk-bg" as string]: theme.bg, ["--kiosk-ink" as string]: theme.ink } as React.CSSProperties) }}>
+          Laster tastatur…
+        </div>
+      ) : loadError ? (
+        <div className="flex flex-1 items-center justify-center bg-red-950 p-8 text-red-200">
+          Feil: {loadError.message}
+        </div>
+      ) : (
+        <KioskRender
+          theme={theme}
+          gridCols={data?.layout.grid_cols ?? 5}
+          gridRows={data?.layout.grid_rows ?? 4}
+          pages={renderPages}
+          buttons={renderButtons}
+          currentPageId={nav.currentPageId}
+          onPageChange={(id) => nav.replaceTo(id)}
+          canGoBack={nav.canGoBack}
+          onBack={() => nav.goBack()}
+          cart={renderCart}
+          total={cart.totals.total_incl_mva}
+          headerLabel={terminal?.display_name ?? "Kassen"}
+          headerTerminalCode={terminal?.terminal_code ?? null}
+          headerOperatorName={operator?.display_name ?? null}
+          headerRight={headerRight}
+          interactive
+          onButtonClick={handleButtonClick}
           onPay={() => {
             if (cart.items.length === 0) return;
             setRpcError(null);
             setPayOpen(true);
           }}
+          onClear={() => setClearOpen(true)}
+          diningMode={diningForRender}
+          onDiningChange={handleDiningChange}
+          footerSlot={footerActions}
+          emptyState={
+            <div>
+              <p className="text-lg font-medium" style={{ color: "var(--kiosk-ink)" }}>
+                {data ? "Ingen knapper på denne siden" : "Ingen tastatur konfigurert"}
+              </p>
+              <p className="mt-2 text-sm" style={{ color: "var(--kiosk-ink-soft)" }}>
+                {data
+                  ? "Konfigurer i POS Styring → Tastatur."
+                  : "Bind en layout til terminalen eller sett en default på selskapet."}
+              </p>
+            </div>
+          }
         />
-      </div>
+      )}
 
       <PaymentModal
         open={payOpen}
@@ -234,6 +461,70 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
         terminalName={terminal?.display_name ?? ""}
         onNewSale={handleNewSale}
       />
-    </>
+      {sessionOpen && (
+        <CloseSessionModal
+          open={closeSessionOpen}
+          onOpenChange={setCloseSessionOpen}
+          sessionId={session.id}
+          openingFloat={Number(session.opening_float ?? 0)}
+          onClosed={() => {
+            setCloseSessionOpen(false);
+            logout();
+          }}
+        />
+      )}
+      <AlertDialog open={clearOpen} onOpenChange={setClearOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Slette ordre?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Alle linjer fjernes. Dette kan ikke angres.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Avbryt</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                cart.clear();
+                setClearOpen(false);
+              }}
+            >
+              Slett ordre
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
+function ActionBtn({
+  onClick,
+  icon,
+  children,
+  disabled,
+}: {
+  onClick: () => void;
+  icon: React.ReactNode;
+  children: React.ReactNode;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="flex flex-1 items-center justify-center gap-2 px-4 py-3 text-sm font-semibold transition-opacity disabled:opacity-40"
+      style={{
+        borderRadius: "var(--kiosk-radius)",
+        background: "var(--kiosk-surface)",
+        color: "var(--kiosk-ink)",
+        border: "1px solid var(--kiosk-border)",
+        fontFamily: "var(--kiosk-font-body)",
+      }}
+    >
+      {icon}
+      {children}
+    </button>
   );
 }
