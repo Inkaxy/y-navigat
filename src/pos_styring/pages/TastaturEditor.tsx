@@ -88,6 +88,7 @@ interface KeypadButton {
   grid_y: number;
   grid_width: number;
   grid_height: number;
+  target_page_id: string | null;
   product?: { display_name: string; product_category: string | null; in_pos: boolean } | null;
 }
 
