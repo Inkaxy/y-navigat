@@ -53,11 +53,11 @@ interface ProductImage {
 interface ProductCardItem {
   id: string;
   display_name: string;
+  display_number: number | null;
+  image_url: string | null;
   status: string;
   mva_rate: number;
-  primary_storage_path: string | null;
-  primary_signed_url?: string;
-  image_count: number;
+  in_pos: boolean;
 }
 
 async function getSignedUrl(storagePath: string | null) {
@@ -72,39 +72,14 @@ async function getSignedUrl(storagePath: string | null) {
 }
 
 async function fetchProductsForPos(activeEntityId: string): Promise<ProductCardItem[]> {
-  const { data: products, error: productError } = await supabase
+  const { data, error } = await supabase
     .from("products")
-    .select("id, display_name, status, mva_rate")
+    .select("id, display_name, display_number, image_url, status, mva_rate, in_pos")
     .eq("legal_entity_id", activeEntityId)
-    .in("status", ["active", "published", "draft"])
+    .eq("in_pos", true)
     .order("display_name", { ascending: true });
-  if (productError) throw productError;
-
-  const productIds = (products ?? []).map((product) => product.id);
-  const { data: images, error: imageError } = productIds.length
-    ? await supabase.from("pos_product_images").select("id, product_id, storage_path, is_primary").in("product_id", productIds)
-    : { data: [], error: null };
-  if (imageError) throw imageError;
-
-  const imagesByProduct = new Map<string, ProductImage[]>();
-  for (const image of (images ?? []) as ProductImage[]) {
-    const current = imagesByProduct.get(image.product_id) ?? [];
-    current.push(image);
-    imagesByProduct.set(image.product_id, current);
-  }
-
-  return Promise.all(
-    (products ?? []).map(async (product) => {
-      const productImages = imagesByProduct.get(product.id) ?? [];
-      const primaryPath = productImages.find((image) => image.is_primary)?.storage_path ?? null;
-      return {
-        ...product,
-        primary_storage_path: primaryPath,
-        primary_signed_url: await getSignedUrl(primaryPath),
-        image_count: productImages.length,
-      };
-    }),
-  );
+  if (error) throw error;
+  return (data ?? []) as ProductCardItem[];
 }
 
 async function fetchProductImages(productId: string): Promise<ProductImage[]> {
@@ -340,7 +315,11 @@ export default function Produkter() {
   const filteredProducts = useMemo(() => {
     const term = search.trim().toLowerCase();
     if (!term) return products;
-    return products.filter((product) => product.display_name.toLowerCase().includes(term));
+    return products.filter(
+      (product) =>
+        product.display_name.toLowerCase().includes(term) ||
+        String(product.display_number ?? "").toLowerCase().includes(term),
+    );
   }, [products, search]);
 
   return (
@@ -352,14 +331,14 @@ export default function Produkter() {
         </div>
         <div className="relative w-full lg:w-80">
           <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-          <Input className="pl-9" placeholder="Søk produkt" value={search} onChange={(event) => setSearch(event.target.value)} />
+          <Input className="pl-9" placeholder="Søk navn eller varenummer" value={search} onChange={(event) => setSearch(event.target.value)} />
         </div>
       </div>
 
       <Alert>
         <ImageIcon className="h-4 w-4" />
         <AlertTitle>Bilde-forvaltning</AlertTitle>
-        <AlertDescription>Produkter opprettes i Varer-appen. Her forvaltes bilder som vises i POS Kiosk.</AlertDescription>
+        <AlertDescription>Produkter opprettes i Varer-appen og må ha «Tilgjengelig i kasse» aktivert. Her forvaltes bilder som vises i POS Kiosk.</AlertDescription>
       </Alert>
 
       {isLoading ? <ProductsSkeleton /> : error ? (
@@ -368,8 +347,9 @@ export default function Produkter() {
           <AlertDescription>{error instanceof Error ? error.message : "Ukjent feil"}</AlertDescription>
         </Alert>
       ) : filteredProducts.length === 0 ? (
-        <div className="flex min-h-72 items-center justify-center rounded-lg border border-dashed text-muted-foreground">
-          Ingen produkter for {activeEntity?.short_code ?? "valgt enhet"}. Opprett produkter i Varer-appen først.
+        <div className="flex min-h-72 flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-8 text-center">
+          <p className="text-sm font-medium text-foreground">Ingen produkter er overført til POS ennå</p>
+          <p className="text-xs text-muted-foreground">Huk av «Tilgjengelig i kasse» på varekortet i Varer-appen for å vise produkter her.</p>
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -377,20 +357,26 @@ export default function Produkter() {
             <Card key={product.id} className="overflow-hidden transition-shadow hover:shadow-md">
               <button type="button" className="block w-full text-left" onClick={() => setSelectedProduct(product)}>
                 <div className="flex aspect-[4/3] items-center justify-center bg-muted">
-                  {product.primary_signed_url ? (
-                    <img src={product.primary_signed_url} alt={product.display_name} className="h-full w-full object-cover" />
+                  {product.image_url ? (
+                    <img src={product.image_url} alt={product.display_name} className="h-full w-full object-cover" loading="lazy" />
                   ) : (
                     <ImageIcon className="h-12 w-12 text-muted-foreground" />
                   )}
                 </div>
-                <CardHeader className="space-y-3">
-                  <CardTitle className="line-clamp-2 text-base">{product.display_name}</CardTitle>
+                <CardHeader className="space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <CardTitle className="line-clamp-2 text-base">{product.display_name}</CardTitle>
+                    {product.display_number && (
+                      <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground">
+                        #{product.display_number}
+                      </span>
+                    )}
+                  </div>
                   <div className="flex flex-wrap gap-2">
                     <Badge variant={product.status === "draft" ? "secondary" : "default"}>{product.status}</Badge>
-                    <Badge variant="outline">{product.image_count} bilder</Badge>
+                    <Badge variant="outline">MVA {product.mva_rate}%</Badge>
                   </div>
                 </CardHeader>
-                <CardContent className="pt-0 text-xs text-muted-foreground">MVA {product.mva_rate}%</CardContent>
               </button>
             </Card>
           ))}

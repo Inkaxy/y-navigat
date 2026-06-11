@@ -118,9 +118,10 @@ export default function PosKunder() {
             <TableHeader>
               <TableRow>
                 <TableHead>Navn</TableHead>
-                <TableHead>Telefon</TableHead>
-                <TableHead>E-post</TableHead>
                 <TableHead>Org.nr</TableHead>
+                <TableHead>Kontakt</TableHead>
+                <TableHead className="text-right">Kredittgrense</TableHead>
+                <TableHead>Faktura-metode</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Sist synket</TableHead>
               </TableRow>
@@ -129,9 +130,25 @@ export default function PosKunder() {
               {filtered.map((c) => (
                 <TableRow key={c.id}>
                   <TableCell className="font-medium">{c.display_name}</TableCell>
-                  <TableCell className="text-muted-foreground">{c.phone ?? "—"}</TableCell>
-                  <TableCell className="text-muted-foreground">{c.email ?? "—"}</TableCell>
                   <TableCell className="text-muted-foreground">{c.org_number ?? "—"}</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    <div className="flex flex-col text-xs">
+                      <span>{c.phone ?? "—"}</span>
+                      <span>{c.email ?? "—"}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums text-muted-foreground">
+                    {c.credit_limit != null
+                      ? new Intl.NumberFormat("nb-NO", {
+                          style: "currency",
+                          currency: "NOK",
+                          maximumFractionDigits: 0,
+                        }).format(Number(c.credit_limit))
+                      : "—"}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {c.default_invoice_method ?? "—"}
+                  </TableCell>
                   <TableCell>
                     <Badge variant={c.status === "active" ? "default" : "secondary"}>
                       {c.status === "active" ? "Aktiv" : "Inaktiv"}
