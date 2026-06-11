@@ -879,7 +879,7 @@ export default function TastaturEditor() {
       </div>
 
       {activePageId && (
-        <ButtonDialog open={buttonDialogOpen} onOpenChange={setButtonDialogOpen} pageId={activePageId} layout={layout} buttons={buttons} cell={selectedCell} button={editingButton} activeEntityId={activeEntityId!} />
+        <ButtonDialog open={buttonDialogOpen} onOpenChange={setButtonDialogOpen} pageId={activePageId} layout={layout} buttons={buttons} pages={pages} cell={selectedCell} button={editingButton} activeEntityId={activeEntityId!} />
       )}
 
       <Dialog open={!!pageDialog} onOpenChange={(open) => !open && setPageDialog(null)}>
