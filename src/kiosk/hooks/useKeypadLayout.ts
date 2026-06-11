@@ -23,6 +23,7 @@ export type KeypadPage = {
   page_name: string;
   sort_order: number;
   background_color: string | null;
+  icon: string | null;
 };
 
 export type KeypadLayout = {
@@ -33,6 +34,8 @@ export type KeypadLayout = {
   grid_cols: number;
   grid_rows: number;
   is_default: boolean;
+  theme: unknown | null;
+  customer_screen: unknown | null;
 };
 
 export type KeypadData = {
