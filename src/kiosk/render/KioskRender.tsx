@@ -49,12 +49,27 @@ interface Props {
   buttons: RenderButton[];
   currentPageId: string | null;
   onPageChange?: (pageId: string) => void;
+  onBack?: () => void;
+  canGoBack?: boolean;
   cart?: RenderCartLine[];
   total?: number;
   headerLabel?: string;
+  headerTerminalCode?: string | null;
+  headerOperatorName?: string | null;
+  headerRight?: ReactNode;
   // Interaktivitet for editor-preview: knapper er ikke trykkbare.
   interactive?: boolean;
   onButtonClick?: (b: RenderButton) => void;
+  // Kurv-handlinger
+  onPay?: () => void;
+  onClear?: () => void;
+  payDisabled?: boolean;
+  diningMode?: "takeaway" | "eatin" | "pickup";
+  onDiningChange?: (m: "takeaway" | "eatin" | "pickup") => void;
+  // Handlingslinje (under)
+  footerSlot?: ReactNode;
+  // Tom-tilstand når ingen knapper finnes
+  emptyState?: ReactNode;
   className?: string;
   style?: CSSProperties;
 }
