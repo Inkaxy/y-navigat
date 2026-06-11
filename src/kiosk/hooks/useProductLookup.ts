@@ -47,7 +47,7 @@ export function useProductLookup(
         const [pRes, pliRes] = await Promise.all([
           kioskSupabase
             .from("products")
-            .select("id, display_name, display_number, unit_of_sale, mva_rate")
+            .select("id, display_name, pos_display_name, display_number, unit_of_sale, mva_rate")
             .eq("id", productId)
             .maybeSingle(),
           kioskSupabase
