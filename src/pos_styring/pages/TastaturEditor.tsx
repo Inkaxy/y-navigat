@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useDraggable, useDroppable, useSensor, useSensors } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, GripVertical, MoreHorizontal, Plus, Search, Trash2 } from "lucide-react";
+import { ArrowLeft, GripVertical, MoreHorizontal, Plus, Search, Sparkles, Trash2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -49,6 +49,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useLegalEntity } from "@/pos_styring/contexts/LegalEntityContext";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
+import { TemplatesDialog } from "@/pos_styring/components/TemplatesDialog";
+import { KioskRender } from "@/kiosk/render/KioskRender";
+import { parseTheme } from "@/kiosk/render/kioskTheme";
 
 interface KeypadLayoutDetail {
   id: string;
@@ -58,6 +61,8 @@ interface KeypadLayoutDetail {
   grid_rows: number;
   terminal_id: string | null;
   is_default: boolean;
+  theme: unknown;
+  customer_screen: unknown;
 }
 
 interface KeypadPage {
@@ -156,11 +161,11 @@ function hasCollision(candidate: { grid_x: number; grid_y: number; grid_width: n
 async function fetchLayout(layoutId: string): Promise<KeypadLayoutDetail> {
   const { data, error } = await supabase
     .from("pos_keypad_layouts")
-    .select("id, legal_entity_id, display_name, grid_cols, grid_rows, terminal_id, is_default")
+    .select("id, legal_entity_id, display_name, grid_cols, grid_rows, terminal_id, is_default, theme, customer_screen")
     .eq("id", layoutId)
     .single();
   if (error) throw error;
-  return data as KeypadLayoutDetail;
+  return data as unknown as KeypadLayoutDetail;
 }
 
 async function fetchPages(layoutId: string): Promise<KeypadPage[]> {
@@ -228,7 +233,7 @@ function DroppableCell({ x, y, children }: { x: number; y: number; children?: Re
   );
 }
 
-function KeypadButtonTile({ button, onEdit, dragging }: { button: KeypadButton; onEdit?: () => void; dragging?: boolean }) {
+function KeypadButtonTile({ button, onEdit, dragging, onResize }: { button: KeypadButton; onEdit?: () => void; dragging?: boolean; onResize?: (w: number, h: number) => void }) {
   const notInPos = button.button_type === "product" && button.product && button.product.in_pos === false;
   return (
     <button
@@ -244,7 +249,51 @@ function KeypadButtonTile({ button, onEdit, dragging }: { button: KeypadButton; 
         </span>
       )}
       <span className="relative z-10 line-clamp-3 self-end rounded-sm bg-background/75 px-1.5 py-1 text-foreground">{buttonLabel(button)}</span>
+      {onResize && !dragging && (
+        <ResizeHandle button={button} onResize={onResize} />
+      )}
     </button>
+  );
+}
+
+function ResizeHandle({ button, onResize }: { button: KeypadButton; onResize: (w: number, h: number) => void }) {
+  const stateRef = useRef<{ w: number; h: number } | null>(null);
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const tileEl = (e.currentTarget.parentElement as HTMLElement | null);
+    if (!tileEl) return;
+    const rect = tileEl.getBoundingClientRect();
+    const cellW = rect.width / Math.max(1, button.grid_width);
+    const cellH = rect.height / Math.max(1, button.grid_height);
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const startW = button.grid_width;
+    const startH = button.grid_height;
+    stateRef.current = { w: startW, h: startH };
+    const onMove = (ev: PointerEvent) => {
+      const dw = Math.round((ev.clientX - startX) / cellW);
+      const dh = Math.round((ev.clientY - startY) / cellH);
+      stateRef.current = { w: Math.max(1, startW + dw), h: Math.max(1, startH + dh) };
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      const s = stateRef.current;
+      if (s && (s.w !== startW || s.h !== startH)) onResize(s.w, s.h);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  };
+  return (
+    <div
+      onPointerDown={handlePointerDown}
+      role="presentation"
+      title="Dra for å endre størrelse"
+      className="absolute bottom-0 right-0 z-20 flex h-4 w-4 cursor-se-resize items-end justify-end"
+    >
+      <span className="block h-2.5 w-2.5 rounded-tl-sm bg-primary/70 ring-1 ring-background" />
+    </div>
   );
 }
 
@@ -540,6 +589,8 @@ export default function TastaturEditor() {
   const [pageName, setPageName] = useState("");
   const [pageColor, setPageColor] = useState("");
   const [deletePage, setDeletePage] = useState<KeypadPage | null>(null);
+  const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(true);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
@@ -648,6 +699,22 @@ export default function TastaturEditor() {
     onError: (error) => toast.error(error instanceof Error ? error.message : "Kunne ikke flytte knapp"),
   });
 
+  const resizeButtonMutation = useMutation({
+    mutationFn: async ({ button, w, h }: { button: KeypadButton; w: number; h: number }) => {
+      if (!layout) return;
+      const maxW = layout.grid_cols - button.grid_x;
+      const maxH = layout.grid_rows - button.grid_y;
+      const newW = Math.max(1, Math.min(maxW, w));
+      const newH = Math.max(1, Math.min(maxH, h));
+      const candidate = { grid_x: button.grid_x, grid_y: button.grid_y, grid_width: newW, grid_height: newH };
+      if (hasCollision(candidate, buttons, button.id)) throw new Error("Kollisjon med annen knapp");
+      const { error } = await supabase.from("pos_keypad_buttons").update({ grid_width: newW, grid_height: newH }).eq("id", button.id);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["pos_keypad_buttons", activePageId] }),
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Kunne ikke endre størrelse"),
+  });
+
   function openButtonDialog(x: number, y: number, button?: KeypadButton) {
     setSelectedCell(button ? null : { x, y });
     setEditingButton(button ?? null);
@@ -689,6 +756,14 @@ export default function TastaturEditor() {
           </Button>
           <h1 className="text-3xl font-semibold tracking-normal">{layout.display_name}</h1>
           <p className="mt-1 text-sm text-muted-foreground">{layout.grid_cols} × {layout.grid_rows} grid · {activeEntity?.short_code}</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => setPreviewOpen((v) => !v)}>
+            {previewOpen ? "Skjul forhåndsvisning" : "Vis forhåndsvisning"}
+          </Button>
+          <Button size="sm" onClick={() => setTemplatesOpen(true)}>
+            <Sparkles className="h-4 w-4" /> Maler & tema
+          </Button>
         </div>
       </div>
 
@@ -757,7 +832,7 @@ export default function TastaturEditor() {
                   if (anchoredButton) {
                     return (
                       <div key={`${x}-${y}`} className="min-h-0" style={{ gridColumn: `${x + 1} / span ${anchoredButton.grid_width}`, gridRow: `${y + 1} / span ${anchoredButton.grid_height}` }}>
-                        <DraggableButton button={anchoredButton} onEdit={() => openButtonDialog(x, y, anchoredButton)} />
+                        <DraggableButton button={anchoredButton} onEdit={() => openButtonDialog(x, y, anchoredButton)} onResize={(w, h) => resizeButtonMutation.mutate({ button: anchoredButton, w, h })} />
                       </div>
                     );
                   }
@@ -807,15 +882,64 @@ export default function TastaturEditor() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {previewOpen && (
+        <section className="rounded-lg border bg-card p-4 shadow-card">
+          <div className="mb-3 flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Live forhåndsvisning</h2>
+              <p className="text-xs text-muted-foreground">Samme render som kasse-skjermen bruker. Drevet av layoutens tema.</p>
+            </div>
+          </div>
+          <div className="overflow-hidden rounded-md border" style={{ aspectRatio: "16 / 9" }}>
+            <KioskRender
+              theme={parseTheme(layout.theme)}
+              gridCols={layout.grid_cols}
+              gridRows={layout.grid_rows}
+              pages={pages.map((p) => ({
+                id: p.id,
+                page_name: p.page_name,
+                sort_order: p.sort_order,
+                background_color: p.background_color,
+              }))}
+              buttons={buttons.map((b) => ({
+                id: b.id,
+                page_id: b.page_id,
+                button_type: b.button_type,
+                display_label: b.display_label ?? (b.product?.display_name ?? null),
+                image_url: b.image_url,
+                background_color: b.background_color,
+                text_color: b.text_color,
+                grid_x: b.grid_x,
+                grid_y: b.grid_y,
+                grid_width: b.grid_width,
+                grid_height: b.grid_height,
+              }))}
+              currentPageId={activePageId}
+              headerLabel={layout.display_name}
+            />
+          </div>
+        </section>
+      )}
+
+      {layoutId && (
+        <TemplatesDialog
+          open={templatesOpen}
+          onOpenChange={setTemplatesOpen}
+          layoutId={layoutId}
+          currentGridCols={layout.grid_cols}
+          currentGridRows={layout.grid_rows}
+        />
+      )}
     </div>
   );
 }
 
-function DraggableButton({ button, onEdit }: { button: KeypadButton; onEdit: () => void }) {
+function DraggableButton({ button, onEdit, onResize }: { button: KeypadButton; onEdit: () => void; onResize?: (w: number, h: number) => void }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggableCompat(button.id);
   return (
     <div ref={setNodeRef} style={{ transform: CSS.Translate.toString(transform) }} className="h-full min-h-0" {...attributes} {...listeners}>
-      <KeypadButtonTile button={button} onEdit={onEdit} dragging={isDragging} />
+      <KeypadButtonTile button={button} onEdit={onEdit} dragging={isDragging} onResize={onResize} />
     </div>
   );
 }
