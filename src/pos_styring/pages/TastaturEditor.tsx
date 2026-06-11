@@ -183,7 +183,7 @@ async function fetchPages(layoutId: string): Promise<KeypadPage[]> {
 async function fetchButtons(pageId: string): Promise<KeypadButton[]> {
   const { data, error } = await supabase
     .from("pos_keypad_buttons")
-    .select("id, page_id, button_type, product_id, function_code, display_label, image_url, background_color, text_color, grid_x, grid_y, grid_width, grid_height, product:products!pos_keypad_buttons_product_id_fkey(display_name, product_category, in_pos)")
+    .select("id, page_id, button_type, product_id, function_code, display_label, image_url, background_color, text_color, grid_x, grid_y, grid_width, grid_height, target_page_id, product:products!pos_keypad_buttons_product_id_fkey(display_name, product_category, in_pos)")
     .eq("page_id", pageId);
   if (error) throw error;
   return (data ?? []) as unknown as KeypadButton[];
