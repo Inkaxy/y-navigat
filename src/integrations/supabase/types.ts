@@ -4348,6 +4348,7 @@ export type Database = {
       pos_keypad_layouts: {
         Row: {
           created_at: string
+          customer_screen: Json | null
           display_name: string
           grid_cols: number
           grid_rows: number
@@ -4355,10 +4356,12 @@ export type Database = {
           is_default: boolean
           legal_entity_id: string
           terminal_id: string | null
+          theme: Json | null
           updated_at: string
         }
         Insert: {
           created_at?: string
+          customer_screen?: Json | null
           display_name: string
           grid_cols?: number
           grid_rows?: number
@@ -4366,10 +4369,12 @@ export type Database = {
           is_default?: boolean
           legal_entity_id: string
           terminal_id?: string | null
+          theme?: Json | null
           updated_at?: string
         }
         Update: {
           created_at?: string
+          customer_screen?: Json | null
           display_name?: string
           grid_cols?: number
           grid_rows?: number
@@ -4377,6 +4382,7 @@ export type Database = {
           is_default?: boolean
           legal_entity_id?: string
           terminal_id?: string | null
+          theme?: Json | null
           updated_at?: string
         }
         Relationships: [
@@ -4399,6 +4405,7 @@ export type Database = {
       pos_keypad_pages: {
         Row: {
           background_color: string | null
+          icon: string | null
           id: string
           layout_id: string
           page_name: string
@@ -4406,6 +4413,7 @@ export type Database = {
         }
         Insert: {
           background_color?: string | null
+          icon?: string | null
           id?: string
           layout_id: string
           page_name: string
@@ -4413,6 +4421,7 @@ export type Database = {
         }
         Update: {
           background_color?: string | null
+          icon?: string | null
           id?: string
           layout_id?: string
           page_name?: string
