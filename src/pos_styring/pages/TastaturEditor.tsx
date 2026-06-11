@@ -832,7 +832,7 @@ export default function TastaturEditor() {
                   if (anchoredButton) {
                     return (
                       <div key={`${x}-${y}`} className="min-h-0" style={{ gridColumn: `${x + 1} / span ${anchoredButton.grid_width}`, gridRow: `${y + 1} / span ${anchoredButton.grid_height}` }}>
-                        <DraggableButton button={anchoredButton} onEdit={() => openButtonDialog(x, y, anchoredButton)} />
+                        <DraggableButton button={anchoredButton} onEdit={() => openButtonDialog(x, y, anchoredButton)} onResize={(w, h) => resizeButtonMutation.mutate({ button: anchoredButton, w, h })} />
                       </div>
                     );
                   }
