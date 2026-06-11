@@ -242,12 +242,62 @@ function KeypadArea({
   );
 }
 
+function DiningSwitch({
+  mode,
+  onChange,
+}: {
+  mode: "takeaway" | "eatin" | "pickup";
+  onChange: (m: "takeaway" | "eatin" | "pickup") => void;
+}) {
+  const opts: { id: "eatin" | "takeaway" | "pickup"; label: string }[] = [
+    { id: "eatin", label: "Sitt her" },
+    { id: "takeaway", label: "Ta med" },
+    { id: "pickup", label: "Henteordre" },
+  ];
+  return (
+    <div
+      className="flex gap-1 rounded-md p-0.5 text-xs"
+      style={{ background: "var(--kiosk-surface-alt)" }}
+    >
+      {opts.map((o) => {
+        const active = mode === o.id;
+        return (
+          <button
+            key={o.id}
+            type="button"
+            onClick={() => onChange(o.id)}
+            className="rounded px-2 py-1 transition-colors"
+            style={{
+              background: active ? "var(--kiosk-accent)" : "transparent",
+              color: active ? "var(--kiosk-ink-on-accent)" : "var(--kiosk-ink-soft)",
+              fontFamily: "var(--kiosk-font-body)",
+              fontWeight: active ? 600 : 500,
+            }}
+          >
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function CartPane({
   cart,
   total,
+  onPay,
+  onClear,
+  payDisabled,
+  diningMode,
+  onDiningChange,
 }: {
   cart: RenderCartLine[];
   total: number;
+  onPay?: () => void;
+  onClear?: () => void;
+  payDisabled?: boolean;
+  diningMode?: "takeaway" | "eatin" | "pickup";
+  onDiningChange?: (m: "takeaway" | "eatin" | "pickup") => void;
 }) {
   return (
     <aside
@@ -259,11 +309,14 @@ function CartPane({
         fontFamily: "var(--kiosk-font-body)",
       }}
     >
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider opacity-70">
           <ShoppingCart className="h-4 w-4" />
           Kurv · {cart.length}
         </div>
+        {diningMode && onDiningChange && (
+          <DiningSwitch mode={diningMode} onChange={onDiningChange} />
+        )}
       </div>
       <div className="flex-1 space-y-2 overflow-y-auto">
         {cart.length === 0 ? (
@@ -299,8 +352,9 @@ function CartPane({
       <div className="flex gap-2">
         <button
           type="button"
-          disabled
-          className="flex-1 px-3 py-3 text-sm font-semibold"
+          disabled={!onClear || cart.length === 0}
+          onClick={onClear}
+          className="flex-1 px-3 py-3 text-sm font-semibold disabled:opacity-40"
           style={{
             borderRadius: "var(--kiosk-radius)",
             background: "var(--kiosk-surface-alt)",
@@ -312,8 +366,9 @@ function CartPane({
         </button>
         <button
           type="button"
-          disabled
-          className="flex-[2] px-3 py-3 text-base font-bold"
+          disabled={!onPay || payDisabled || cart.length === 0}
+          onClick={onPay}
+          className="flex-[2] px-3 py-3 text-base font-bold disabled:opacity-40"
           style={{
             borderRadius: "var(--kiosk-radius)",
             background: "var(--kiosk-accent)",
@@ -321,7 +376,7 @@ function CartPane({
             fontFamily: "var(--kiosk-font-heading)",
           }}
         >
-          Betal
+          Betal · {total.toFixed(0)},-
         </button>
       </div>
     </aside>
@@ -336,11 +391,23 @@ export function KioskRender({
   buttons,
   currentPageId,
   onPageChange,
+  onBack,
+  canGoBack,
   cart = [],
   total = 0,
   headerLabel = "Kassen",
+  headerTerminalCode,
+  headerOperatorName,
+  headerRight,
   interactive = false,
   onButtonClick,
+  onPay,
+  onClear,
+  payDisabled,
+  diningMode,
+  onDiningChange,
+  footerSlot,
+  emptyState,
   className,
   style,
 }: Props): ReactNode {
@@ -349,32 +416,73 @@ export function KioskRender({
   const activePage = sortedPages.find((p) => p.id === activePageId) ?? null;
   const pageButtons = buttons.filter((b) => b.page_id === activePageId);
   const isTabs = theme.layoutKind === "tabs_top";
+  const showEmpty = !!emptyState && pageButtons.length === 0;
 
   return (
     <div
       className={cn("flex h-full w-full flex-col overflow-hidden", className)}
       style={{ ...themeToVars(theme), background: "var(--kiosk-bg)", ...style }}
     >
-      <KioskHeader label={headerLabel} />
+      <KioskHeader
+        label={headerLabel}
+        terminalCode={headerTerminalCode}
+        operatorName={headerOperatorName}
+        right={headerRight}
+      />
+      {canGoBack && onBack && (
+        <div
+          className="flex items-center gap-3 border-b px-4 py-2"
+          style={{ borderColor: "var(--kiosk-border)", background: "var(--kiosk-surface)" }}
+        >
+          <KioskBackButton onClick={onBack} />
+          <span className="text-sm" style={{ color: "var(--kiosk-ink-soft)" }}>
+            {activePage?.page_name}
+          </span>
+        </div>
+      )}
       <div className={cn("flex min-h-0 flex-1", isTabs && "flex-col")}>
-        <NavTabs
-          pages={sortedPages}
-          currentPageId={activePageId}
-          onPageChange={onPageChange}
-          variant={isTabs ? "tabs" : "sidebar"}
-        />
-        <div className="flex min-h-0 flex-1">
-          <KeypadArea
-            gridCols={gridCols}
-            gridRows={gridRows}
-            buttons={pageButtons}
-            interactive={interactive}
-            onButtonClick={onButtonClick}
-            pageBg={activePage?.background_color}
+        {!canGoBack && (
+          <NavTabs
+            pages={sortedPages}
+            currentPageId={activePageId}
+            onPageChange={onPageChange}
+            variant={isTabs ? "tabs" : "sidebar"}
           />
-          <CartPane cart={cart} total={total} />
+        )}
+        <div className="flex min-h-0 flex-1">
+          {showEmpty ? (
+            <div className="flex flex-1 items-center justify-center p-8 text-center">
+              {emptyState}
+            </div>
+          ) : (
+            <KeypadArea
+              gridCols={gridCols}
+              gridRows={gridRows}
+              buttons={pageButtons}
+              interactive={interactive}
+              onButtonClick={onButtonClick}
+              pageBg={activePage?.background_color}
+            />
+          )}
+          <CartPane
+            cart={cart}
+            total={total}
+            onPay={onPay}
+            onClear={onClear}
+            payDisabled={payDisabled}
+            diningMode={diningMode}
+            onDiningChange={onDiningChange}
+          />
         </div>
       </div>
+      {footerSlot && (
+        <div
+          className="border-t px-3 py-2"
+          style={{ borderColor: "var(--kiosk-border)", background: "var(--kiosk-surface)" }}
+        >
+          {footerSlot}
+        </div>
+      )}
     </div>
   );
 }
