@@ -233,7 +233,7 @@ function DroppableCell({ x, y, children }: { x: number; y: number; children?: Re
   );
 }
 
-function KeypadButtonTile({ button, onEdit, dragging }: { button: KeypadButton; onEdit?: () => void; dragging?: boolean }) {
+function KeypadButtonTile({ button, onEdit, dragging, onResize }: { button: KeypadButton; onEdit?: () => void; dragging?: boolean; onResize?: (w: number, h: number) => void }) {
   const notInPos = button.button_type === "product" && button.product && button.product.in_pos === false;
   return (
     <button
@@ -249,7 +249,51 @@ function KeypadButtonTile({ button, onEdit, dragging }: { button: KeypadButton; 
         </span>
       )}
       <span className="relative z-10 line-clamp-3 self-end rounded-sm bg-background/75 px-1.5 py-1 text-foreground">{buttonLabel(button)}</span>
+      {onResize && !dragging && (
+        <ResizeHandle button={button} onResize={onResize} />
+      )}
     </button>
+  );
+}
+
+function ResizeHandle({ button, onResize }: { button: KeypadButton; onResize: (w: number, h: number) => void }) {
+  const stateRef = useRef<{ w: number; h: number } | null>(null);
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const tileEl = (e.currentTarget.parentElement as HTMLElement | null);
+    if (!tileEl) return;
+    const rect = tileEl.getBoundingClientRect();
+    const cellW = rect.width / Math.max(1, button.grid_width);
+    const cellH = rect.height / Math.max(1, button.grid_height);
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const startW = button.grid_width;
+    const startH = button.grid_height;
+    stateRef.current = { w: startW, h: startH };
+    const onMove = (ev: PointerEvent) => {
+      const dw = Math.round((ev.clientX - startX) / cellW);
+      const dh = Math.round((ev.clientY - startY) / cellH);
+      stateRef.current = { w: Math.max(1, startW + dw), h: Math.max(1, startH + dh) };
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      const s = stateRef.current;
+      if (s && (s.w !== startW || s.h !== startH)) onResize(s.w, s.h);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  };
+  return (
+    <div
+      onPointerDown={handlePointerDown}
+      role="presentation"
+      title="Dra for å endre størrelse"
+      className="absolute bottom-0 right-0 z-20 flex h-4 w-4 cursor-se-resize items-end justify-end"
+    >
+      <span className="block h-2.5 w-2.5 rounded-tl-sm bg-primary/70 ring-1 ring-background" />
+    </div>
   );
 }
 
