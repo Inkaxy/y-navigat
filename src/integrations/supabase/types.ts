@@ -6000,6 +6000,7 @@ export type Database = {
           pieces_per_liter: number | null
           pieces_per_tray: number | null
           pieces_per_unit: number | null
+          pos_display_name: string | null
           print_declaration_labels: boolean
           product_category: string
           product_page_id: string | null
@@ -6078,6 +6079,7 @@ export type Database = {
           pieces_per_liter?: number | null
           pieces_per_tray?: number | null
           pieces_per_unit?: number | null
+          pos_display_name?: string | null
           print_declaration_labels?: boolean
           product_category: string
           product_page_id?: string | null
@@ -6156,6 +6158,7 @@ export type Database = {
           pieces_per_liter?: number | null
           pieces_per_tray?: number | null
           pieces_per_unit?: number | null
+          pos_display_name?: string | null
           print_declaration_labels?: boolean
           product_category?: string
           product_page_id?: string | null
