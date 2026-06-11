@@ -699,6 +699,22 @@ export default function TastaturEditor() {
     onError: (error) => toast.error(error instanceof Error ? error.message : "Kunne ikke flytte knapp"),
   });
 
+  const resizeButtonMutation = useMutation({
+    mutationFn: async ({ button, w, h }: { button: KeypadButton; w: number; h: number }) => {
+      if (!layout) return;
+      const maxW = layout.grid_cols - button.grid_x;
+      const maxH = layout.grid_rows - button.grid_y;
+      const newW = Math.max(1, Math.min(maxW, w));
+      const newH = Math.max(1, Math.min(maxH, h));
+      const candidate = { grid_x: button.grid_x, grid_y: button.grid_y, grid_width: newW, grid_height: newH };
+      if (hasCollision(candidate, buttons, button.id)) throw new Error("Kollisjon med annen knapp");
+      const { error } = await supabase.from("pos_keypad_buttons").update({ grid_width: newW, grid_height: newH }).eq("id", button.id);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["pos_keypad_buttons", activePageId] }),
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Kunne ikke endre størrelse"),
+  });
+
   function openButtonDialog(x: number, y: number, button?: KeypadButton) {
     setSelectedCell(button ? null : { x, y });
     setEditingButton(button ?? null);
