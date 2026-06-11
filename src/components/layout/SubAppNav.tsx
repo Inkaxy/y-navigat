@@ -44,6 +44,7 @@ import {
   CakeSlice,
   Cookie,
   ListChecks,
+  Printer,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -124,6 +125,7 @@ const STATIC_SUBMENUS: Record<string, { prefix: string; appSlug: string; items: 
       { kind: "link", to: "/pos-styring/sesjoner", label: "Sesjoner", icon: ClipboardList },
       { kind: "link", to: "/pos-styring/transaksjoner", label: "Transaksjoner", icon: Receipt },
       { kind: "link", to: "/pos-styring/rapporter", label: "Rapporter", icon: BarChart3 },
+      { kind: "link", to: "/pos-styring/skrivere", label: "Skrivere", icon: Printer },
       { kind: "link", to: "/pos-styring/innstillinger", label: "Innstillinger", icon: Settings },
     ],
   },
