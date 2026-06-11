@@ -391,6 +391,7 @@ function ButtonDialog({ open, onOpenChange, pageId, layout, buttons, pages, cell
         button_type: values.button_type,
         product_id: values.button_type === "product" ? normalizeOptional(values.product_id) : null,
         function_code: values.button_type === "function" ? normalizeOptional(values.function_code) : null,
+        target_page_id: values.button_type === "category" ? normalizeOptional(values.target_page_id) : null,
         display_label: normalizeOptional(values.display_label),
         image_url: normalizeOptional(values.image_url),
         background_color: normalizeOptional(values.background_color),
