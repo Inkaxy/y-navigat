@@ -59,8 +59,8 @@ export function TemplatesDialog({ open, onOpenChange, layoutId, currentGridCols,
         .update({
           grid_cols: tpl.gridCols,
           grid_rows: tpl.gridRows,
-          theme: tpl.theme as unknown as Record<string, unknown>,
-          customer_screen: tpl.customerScreen as unknown as Record<string, unknown>,
+          theme: tpl.theme as unknown as never,
+          customer_screen: tpl.customerScreen as unknown as never,
           updated_at: new Date().toISOString(),
         })
         .eq("id", layoutId);
@@ -117,8 +117,8 @@ export function TemplatesDialog({ open, onOpenChange, layoutId, currentGridCols,
       const { error } = await supabase
         .from("pos_keypad_layouts")
         .update({
-          theme: tpl.theme as unknown as Record<string, unknown>,
-          customer_screen: tpl.customerScreen as unknown as Record<string, unknown>,
+          theme: tpl.theme as unknown as never,
+          customer_screen: tpl.customerScreen as unknown as never,
           updated_at: new Date().toISOString(),
         })
         .eq("id", layoutId);
