@@ -126,11 +126,33 @@ function ProductImageDialog({ product, activeEntityId, open, onOpenChange }: { p
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [imageToDelete, setImageToDelete] = useState<ProductImage | null>(null);
+  const [posName, setPosName] = useState<string>("");
+
+  useMemo(() => {
+    setPosName(product?.pos_display_name ?? "");
+    return null;
+  }, [product?.id, product?.pos_display_name]);
 
   const { data: images = [], isLoading } = useQuery({
     queryKey: ["product_images", product?.id],
     queryFn: () => fetchProductImages(product!.id),
     enabled: open && !!product?.id,
+  });
+
+  const savePosNameMutation = useMutation({
+    mutationFn: async (next: string | null) => {
+      if (!product) return;
+      const { error } = await supabase
+        .from("products")
+        .update({ pos_display_name: next })
+        .eq("id", product.id);
+      if (error) throw error;
+    },
+    onSuccess: async () => {
+      toast.success("POS-visningsnavn lagret");
+      await queryClient.invalidateQueries({ queryKey: ["products_for_pos", activeEntityId] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Kunne ikke lagre navn"),
   });
 
   const invalidate = async () => {
