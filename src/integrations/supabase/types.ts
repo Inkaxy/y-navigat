@@ -4296,6 +4296,7 @@ export type Database = {
           image_url: string | null
           page_id: string
           product_id: string | null
+          target_page_id: string | null
           text_color: string | null
         }
         Insert: {
@@ -4311,6 +4312,7 @@ export type Database = {
           image_url?: string | null
           page_id: string
           product_id?: string | null
+          target_page_id?: string | null
           text_color?: string | null
         }
         Update: {
@@ -4326,6 +4328,7 @@ export type Database = {
           image_url?: string | null
           page_id?: string
           product_id?: string | null
+          target_page_id?: string | null
           text_color?: string | null
         }
         Relationships: [
@@ -4341,6 +4344,13 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pos_keypad_buttons_target_page_id_fkey"
+            columns: ["target_page_id"]
+            isOneToOne: false
+            referencedRelation: "pos_keypad_pages"
             referencedColumns: ["id"]
           },
         ]
