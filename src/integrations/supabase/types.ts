@@ -4545,6 +4545,59 @@ export type Database = {
           },
         ]
       }
+      pos_printers: {
+        Row: {
+          brand: string
+          created_at: string
+          device_id: string
+          display_name: string
+          enabled: boolean
+          id: string
+          ip: string
+          legal_entity_id: string
+          paper_width: string
+          port: number
+          protocol: string
+          updated_at: string
+        }
+        Insert: {
+          brand?: string
+          created_at?: string
+          device_id?: string
+          display_name: string
+          enabled?: boolean
+          id?: string
+          ip: string
+          legal_entity_id: string
+          paper_width?: string
+          port?: number
+          protocol?: string
+          updated_at?: string
+        }
+        Update: {
+          brand?: string
+          created_at?: string
+          device_id?: string
+          display_name?: string
+          enabled?: boolean
+          id?: string
+          ip?: string
+          legal_entity_id?: string
+          paper_width?: string
+          port?: number
+          protocol?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pos_printers_legal_entity_id_fkey"
+            columns: ["legal_entity_id"]
+            isOneToOne: false
+            referencedRelation: "legal_entities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pos_product_images: {
         Row: {
           id: string
