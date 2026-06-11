@@ -66,7 +66,11 @@ export function TemplatesDialog({ open, onOpenChange, layoutId, currentGridCols,
         .eq("id", layoutId);
       if (layoutErr) throw layoutErr;
 
-      // 3. Sett inn sider én og én så vi får tilbake id-er for knappene.
+      // 3. To-pass insert: (a) opprett alle sider og bygg key→nyUUID-map,
+      //    (b) sett inn knapper med target_page_id slått opp fra map (for
+      //    kategori-knapper som peker på en annen template-side).
+      const pageIdByKey = new Map<string, string>();
+
       for (let i = 0; i < tpl.pages.length; i++) {
         const page = tpl.pages[i];
         const { data: inserted, error: pageErr } = await supabase
@@ -81,22 +85,27 @@ export function TemplatesDialog({ open, onOpenChange, layoutId, currentGridCols,
           .select("id")
           .single();
         if (pageErr) throw pageErr;
-        if (page.buttons.length > 0) {
-          const rows = page.buttons.map((b) => ({
-            page_id: inserted.id,
-            button_type: b.button_type,
-            function_code: b.function_code ?? null,
-            display_label: b.display_label,
-            background_color: b.background_color ?? null,
-            text_color: b.text_color ?? null,
-            grid_x: b.grid_x,
-            grid_y: b.grid_y,
-            grid_width: b.grid_width,
-            grid_height: b.grid_height,
-          }));
-          const { error: btnErr } = await supabase.from("pos_keypad_buttons").insert(rows);
-          if (btnErr) throw btnErr;
-        }
+        pageIdByKey.set(page.page_name, inserted.id);
+      }
+
+      for (const page of tpl.pages) {
+        const newPageId = pageIdByKey.get(page.page_name);
+        if (!newPageId || page.buttons.length === 0) continue;
+        const rows = page.buttons.map((b) => ({
+          page_id: newPageId,
+          button_type: b.button_type,
+          function_code: b.function_code ?? null,
+          display_label: b.display_label,
+          background_color: b.background_color ?? null,
+          text_color: b.text_color ?? null,
+          target_page_id: b.targetPageKey ? pageIdByKey.get(b.targetPageKey) ?? null : null,
+          grid_x: b.grid_x,
+          grid_y: b.grid_y,
+          grid_width: b.grid_width,
+          grid_height: b.grid_height,
+        }));
+        const { error: btnErr } = await supabase.from("pos_keypad_buttons").insert(rows);
+        if (btnErr) throw btnErr;
       }
     },
     onSuccess: async () => {

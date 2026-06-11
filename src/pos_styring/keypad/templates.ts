@@ -10,6 +10,8 @@ export interface TemplateButton {
   button_type: "category" | "function";
   display_label: string;
   function_code?: string;
+  /** For category-knapper: matcher TemplatePage.page_name som blir slått opp til target_page_id ved insert. */
+  targetPageKey?: string;
   background_color?: string | null;
   text_color?: string | null;
   grid_x: number;

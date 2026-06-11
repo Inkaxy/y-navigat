@@ -88,6 +88,7 @@ interface KeypadButton {
   grid_y: number;
   grid_width: number;
   grid_height: number;
+  target_page_id: string | null;
   product?: { display_name: string; product_category: string | null; in_pos: boolean } | null;
 }
 
@@ -121,6 +122,7 @@ const buttonSchema = z.object({
   button_type: z.enum(["product", "category", "function"]),
   product_id: z.string().optional(),
   function_code: z.string().optional(),
+  target_page_id: z.string().optional(),
   display_label: z.string().trim().optional(),
   image_url: z.string().trim().optional(),
   background_color: z.string().trim().optional(),
@@ -181,7 +183,7 @@ async function fetchPages(layoutId: string): Promise<KeypadPage[]> {
 async function fetchButtons(pageId: string): Promise<KeypadButton[]> {
   const { data, error } = await supabase
     .from("pos_keypad_buttons")
-    .select("id, page_id, button_type, product_id, function_code, display_label, image_url, background_color, text_color, grid_x, grid_y, grid_width, grid_height, product:products!pos_keypad_buttons_product_id_fkey(display_name, product_category, in_pos)")
+    .select("id, page_id, button_type, product_id, function_code, display_label, image_url, background_color, text_color, grid_x, grid_y, grid_width, grid_height, target_page_id, product:products!pos_keypad_buttons_product_id_fkey(display_name, product_category, in_pos)")
     .eq("page_id", pageId);
   if (error) throw error;
   return (data ?? []) as unknown as KeypadButton[];
@@ -303,12 +305,13 @@ interface ButtonDialogProps {
   pageId: string;
   layout: KeypadLayoutDetail;
   buttons: KeypadButton[];
+  pages: KeypadPage[];
   cell: { x: number; y: number } | null;
   button: KeypadButton | null;
   activeEntityId: string;
 }
 
-function ButtonDialog({ open, onOpenChange, pageId, layout, buttons, cell, button, activeEntityId }: ButtonDialogProps) {
+function ButtonDialog({ open, onOpenChange, pageId, layout, buttons, pages, cell, button, activeEntityId }: ButtonDialogProps) {
   const queryClient = useQueryClient();
   const [productSearch, setProductSearch] = useState("");
   const isEdit = !!button;
@@ -320,6 +323,7 @@ function ButtonDialog({ open, onOpenChange, pageId, layout, buttons, cell, butto
       button_type: "product",
       product_id: "",
       function_code: "discount",
+      target_page_id: "",
       display_label: "",
       image_url: "",
       background_color: "",
@@ -339,6 +343,7 @@ function ButtonDialog({ open, onOpenChange, pageId, layout, buttons, cell, butto
       button_type: button?.button_type ?? "product",
       product_id: button?.product_id ?? "",
       function_code: button?.function_code ?? "discount",
+      target_page_id: button?.target_page_id ?? "",
       display_label: button?.display_label ?? "",
       image_url: button?.image_url ?? "",
       background_color: button?.background_color ?? "",
@@ -386,6 +391,7 @@ function ButtonDialog({ open, onOpenChange, pageId, layout, buttons, cell, butto
         button_type: values.button_type,
         product_id: values.button_type === "product" ? normalizeOptional(values.product_id) : null,
         function_code: values.button_type === "function" ? normalizeOptional(values.function_code) : null,
+        target_page_id: values.button_type === "category" ? normalizeOptional(values.target_page_id) : null,
         display_label: normalizeOptional(values.display_label),
         image_url: normalizeOptional(values.image_url),
         background_color: normalizeOptional(values.background_color),
@@ -487,6 +493,30 @@ function ButtonDialog({ open, onOpenChange, pageId, layout, buttons, cell, butto
                 </FormItem>
               )} />
             )}
+
+            {buttonType === "category" && (
+              <FormField control={form.control} name="target_page_id" render={({ field }) => {
+                const selectablePages = pages.filter((p) => p.id !== pageId);
+                return (
+                  <FormItem>
+                    <FormLabel>Underside</FormLabel>
+                    <Select value={field.value || undefined} onValueChange={field.onChange}>
+                      <FormControl><SelectTrigger><SelectValue placeholder={selectablePages.length ? "Velg side å navigere til" : "Ingen andre sider tilgjengelig"} /></SelectTrigger></FormControl>
+                      <SelectContent>
+                        {selectablePages.map((p) => (
+                          <SelectItem key={p.id} value={p.id}>{p.page_name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Kategori-knappen åpner valgt underside i kiosken. Uten valg får operatøren en advarsel.
+                    </p>
+                    <FormMessage />
+                  </FormItem>
+                );
+              }} />
+            )}
+
 
             <div className="grid gap-3 sm:grid-cols-2">
               <FormField control={form.control} name="display_label" render={({ field }) => (
@@ -849,7 +879,7 @@ export default function TastaturEditor() {
       </div>
 
       {activePageId && (
-        <ButtonDialog open={buttonDialogOpen} onOpenChange={setButtonDialogOpen} pageId={activePageId} layout={layout} buttons={buttons} cell={selectedCell} button={editingButton} activeEntityId={activeEntityId!} />
+        <ButtonDialog open={buttonDialogOpen} onOpenChange={setButtonDialogOpen} pageId={activePageId} layout={layout} buttons={buttons} pages={pages} cell={selectedCell} button={editingButton} activeEntityId={activeEntityId!} />
       )}
 
       <Dialog open={!!pageDialog} onOpenChange={(open) => !open && setPageDialog(null)}>

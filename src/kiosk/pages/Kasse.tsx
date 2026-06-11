@@ -170,18 +170,15 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
 
   const handleCategory = (b: KeypadButton) => {
     if (!data) return;
-    const label = (b.display_label ?? "").trim().toLowerCase();
-    if (!label) {
-      toast.warning("Kategori-knapp uten etikett");
+    if (!b.target_page_id) {
+      toast.warning(`${b.display_label ?? "Kategori"}: underside ikke konfigurert`);
       return;
     }
-    const target = data.pages.find(
-      (p) => p.page_name.trim().toLowerCase() === label,
-    );
+    const target = data.pages.find((p) => p.id === b.target_page_id);
     if (target) {
       nav.navigateTo(target.id);
     } else {
-      toast.warning(`${b.display_label}: underside ikke konfigurert`);
+      toast.warning(`${b.display_label ?? "Kategori"}: underside finnes ikke i dette layoutet`);
     }
   };
 
