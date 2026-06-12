@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ChevronLeft } from "lucide-react";
 import type {
@@ -12,6 +12,8 @@ import {
   useProductLookup,
 } from "@/kiosk/hooks/useProductLookup";
 import { useTerminal } from "@/kiosk/context/TerminalContext";
+import { useOperator } from "@/kiosk/context/OperatorContext";
+import { KakebyggerModal } from "@/kiosk/components/KakebyggerModal";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -21,8 +23,10 @@ interface Props {
 export function KeypadGrid({ data }: Props) {
   const { layout, pages, buttons } = data;
   const { terminal } = useTerminal();
+  const { operator } = useOperator();
   const nav = useKeypadNav();
   const { addItem } = useCart();
+  const [kakebyggerOpen, setKakebyggerOpen] = useState(false);
   const priceListId = terminal?.default_price_list_id ?? null;
   const { data: priceListCfg } = usePriceListConfig(priceListId);
   const lookupProduct = useProductLookup(
@@ -96,6 +100,10 @@ export function KeypadGrid({ data }: Props) {
   };
 
   const handleFunction = (b: KeypadButton) => {
+    if (b.function_code === "kakebygger") {
+      setKakebyggerOpen(true);
+      return;
+    }
     toast.info(
       `${b.display_label ?? b.function_code ?? "Funksjon"}: bygges senere`,
     );
@@ -118,7 +126,11 @@ export function KeypadGrid({ data }: Props) {
     }
   };
 
+  const kbLegalEntityId =
+    operator?.legal_entity_id ?? terminal?.legal_entity_id ?? null;
+
   return (
+    <>
     <div className="flex h-full flex-col gap-3">
       {nav.canGoBack ? (
         <div className="flex items-center gap-3">
@@ -200,5 +212,12 @@ export function KeypadGrid({ data }: Props) {
         </div>
       )}
     </div>
+    <KakebyggerModal
+      open={kakebyggerOpen}
+      onOpenChange={setKakebyggerOpen}
+      legalEntityId={kbLegalEntityId}
+      priceListId={priceListId}
+    />
+    </>
   );
 }
