@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ChevronLeft } from "lucide-react";
 import type {
@@ -12,6 +12,8 @@ import {
   useProductLookup,
 } from "@/kiosk/hooks/useProductLookup";
 import { useTerminal } from "@/kiosk/context/TerminalContext";
+import { useOperator } from "@/kiosk/context/OperatorContext";
+import { KakebyggerModal } from "@/kiosk/components/KakebyggerModal";
 import { cn } from "@/lib/utils";
 
 interface Props {
