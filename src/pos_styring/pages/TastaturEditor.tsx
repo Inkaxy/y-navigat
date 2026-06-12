@@ -240,6 +240,13 @@ function DroppableCell({ x, y, children }: { x: number; y: number; children?: Re
 
 function KeypadButtonTile({ button, onEdit, dragging, onResize }: { button: KeypadButton; onEdit?: () => void; dragging?: boolean; onResize?: (w: number, h: number) => void }) {
   const notInPos = button.button_type === "product" && button.product && button.product.in_pos === false;
+  const { data: signedFromPath = "" } = useQuery({
+    queryKey: ["pos_keypad_tile_url", button.image_storage_path],
+    queryFn: () => getKeypadSignedUrl(button.image_storage_path),
+    enabled: !!button.image_storage_path,
+    staleTime: 50 * 60 * 1000,
+  });
+  const bgImage = button.image_url || signedFromPath;
   return (
     <button
       type="button"
@@ -247,7 +254,7 @@ function KeypadButtonTile({ button, onEdit, dragging, onResize }: { button: Keyp
       className={cn("relative flex h-full w-full overflow-hidden rounded-md border border-primary/20 bg-primary/15 p-2 text-left text-sm font-semibold shadow-card transition hover:ring-2 hover:ring-ring", dragging && "opacity-60", notInPos && "border-destructive/60 ring-1 ring-destructive/40")}
       style={{ backgroundColor: button.background_color ?? undefined, color: button.text_color ?? undefined }}
     >
-      {button.image_url && <span className="absolute inset-0 bg-cover bg-center opacity-35" style={{ backgroundImage: `url(${button.image_url})` }} />}
+      {bgImage && <span className="absolute inset-0 bg-cover bg-center opacity-60" style={{ backgroundImage: `url(${bgImage})` }} />}
       {notInPos && (
         <span className="absolute left-1 top-1 z-10 rounded-sm bg-destructive px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-destructive-foreground" title="Produktet er ikke aktivert for POS">
           Ikke i POS
