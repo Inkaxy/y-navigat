@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertCircle, Copy, Info, Link2, MoreHorizontal, PenLine, Plus } from "lucide-react";
+import { AlertCircle, Copy, Info, Link2, MoreHorizontal, PenLine, Plus, Printer } from "lucide-react";
+import { TerminalPrintersDialog } from "@/pos_styring/components/TerminalPrintersDialog";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -572,6 +573,7 @@ export default function Terminaler() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedTerminal, setSelectedTerminal] = useState<Terminal | null>(null);
   const [linksTerminal, setLinksTerminal] = useState<Terminal | null>(null);
+  const [printersTerminal, setPrintersTerminal] = useState<Terminal | null>(null);
   const [pendingStatus, setPendingStatus] = useState<{
     terminal: Terminal;
     status: TerminalStatus;
@@ -753,6 +755,10 @@ export default function Terminaler() {
                             <Link2 className="mr-2 h-4 w-4" />
                             Kiosk-lenker
                           </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setPrintersTerminal(terminal)}>
+                            <Printer className="mr-2 h-4 w-4" />
+                            Skrivere
+                          </DropdownMenuItem>
                           <DropdownMenuItem
                             disabled={terminal.status === "active"}
                             onClick={() => requestStatusChange(terminal, "active")}
@@ -817,6 +823,15 @@ export default function Terminaler() {
         terminal={linksTerminal}
         onOpenChange={(open) => !open && setLinksTerminal(null)}
       />
+
+      {activeEntityId && (
+        <TerminalPrintersDialog
+          terminalId={printersTerminal?.id ?? null}
+          terminalName={printersTerminal?.display_name}
+          activeEntityId={activeEntityId}
+          onOpenChange={(open) => !open && setPrintersTerminal(null)}
+        />
+      )}
     </div>
   );
 }

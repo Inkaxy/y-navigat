@@ -32,6 +32,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLegalEntity } from "@/pos_styring/contexts/LegalEntityContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -59,7 +60,16 @@ interface ProductCardItem {
   status: string;
   mva_rate: number;
   in_pos: boolean;
+  pos_print_station_id: string | null;
 }
+
+interface StationOption {
+  id: string;
+  display_name: string;
+  is_active: boolean;
+}
+
+const NO_STATION = "__none__";
 
 async function getSignedUrl(storagePath: string | null) {
   if (!storagePath) return undefined;
@@ -75,12 +85,22 @@ async function getSignedUrl(storagePath: string | null) {
 async function fetchProductsForPos(activeEntityId: string): Promise<ProductCardItem[]> {
   const { data, error } = await supabase
     .from("products")
-    .select("id, display_name, pos_display_name, display_number, image_url, status, mva_rate, in_pos")
+    .select("id, display_name, pos_display_name, display_number, image_url, status, mva_rate, in_pos, pos_print_station_id")
     .eq("legal_entity_id", activeEntityId)
     .eq("in_pos", true)
     .order("display_name", { ascending: true });
   if (error) throw error;
   return (data ?? []) as ProductCardItem[];
+}
+
+async function fetchStations(activeEntityId: string): Promise<StationOption[]> {
+  const { data, error } = await supabase
+    .from("pos_print_stations")
+    .select("id, display_name, is_active")
+    .eq("legal_entity_id", activeEntityId)
+    .order("display_name");
+  if (error) throw error;
+  return (data ?? []) as StationOption[];
 }
 
 async function fetchProductImages(productId: string): Promise<ProductImage[]> {
@@ -138,13 +158,21 @@ function ProductImageDialog({ product, activeEntityId, open, onOpenChange }: { p
     enabled: open && !!product?.id,
   });
 
+  const stationsQuery = useQuery({
+    queryKey: ["pos_print_stations_for_products", activeEntityId],
+    queryFn: () => fetchStations(activeEntityId),
+    enabled: open,
+  });
+
   const savePosNameMutation = useMutation({
     mutationFn: async (next: string | null) => {
       if (!product) return;
-      const { error } = await supabase
-        .from("products")
-        .update({ pos_display_name: next })
-        .eq("id", product.id);
+      // INT.3-fiks: RPC for å unngå Varer-write-RLS-vegg for POS-Styring-brukere
+      // uten varer-skrivetilgang.
+      const { error } = await supabase.rpc("pos_set_product_name", {
+        p_product_id: product.id,
+        p_pos_name: next,
+      });
       if (error) throw error;
     },
     onSuccess: async () => {
@@ -152,6 +180,22 @@ function ProductImageDialog({ product, activeEntityId, open, onOpenChange }: { p
       await queryClient.invalidateQueries({ queryKey: ["products_for_pos", activeEntityId] });
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Kunne ikke lagre navn"),
+  });
+
+  const saveStationMutation = useMutation({
+    mutationFn: async (stationId: string | null) => {
+      if (!product) return;
+      const { error } = await supabase.rpc("pos_set_product_station", {
+        p_product_id: product.id,
+        p_station_id: stationId,
+      });
+      if (error) throw error;
+    },
+    onSuccess: async () => {
+      toast.success("Stasjon lagret");
+      await queryClient.invalidateQueries({ queryKey: ["products_for_pos", activeEntityId] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Kunne ikke lagre stasjon"),
   });
 
   const invalidate = async () => {
@@ -285,6 +329,35 @@ function ProductImageDialog({ product, activeEntityId, open, onOpenChange }: { p
               )}
             </div>
           </div>
+
+          <div className="space-y-2 rounded-lg border bg-muted/30 p-3">
+            <label className="text-sm font-medium">Bong-stasjon</label>
+            <p className="text-xs text-muted-foreground">
+              Stasjon for bong-utskrift ved salg (f.eks. «Kaffe»). Tom = kun kvittering, ingen bong.
+              Stasjoner administreres under «Stasjoner»; per terminal mappes stasjon → fysisk skriver.
+            </p>
+            <Select
+              value={product?.pos_print_station_id ?? NO_STATION}
+              onValueChange={(v) => saveStationMutation.mutate(v === NO_STATION ? null : v)}
+              disabled={saveStationMutation.isPending}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Ingen stasjon" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NO_STATION}>Ingen (kun kvittering)</SelectItem>
+                {(stationsQuery.data ?? [])
+                  .filter((s) => s.is_active)
+                  .map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.display_name}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+
 
 
           {isLoading ? (
