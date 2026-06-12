@@ -36,6 +36,36 @@ export default function CakeBuilderEmbed() {
   const theme = (searchParams.get("theme") as "light" | "dark") || "light";
   const vatToggle = searchParams.get("vat_toggle") !== "false";
   const returnUrl = searchParams.get("return_url");
+  const source = searchParams.get("source");
+  const [authReady, setAuthReady] = useState(source !== "kiosk");
+
+  // Når embeden lastes fra POS-kiosken: hent kiosk-sesjonen fra localStorage
+  // (storageKey `pos-kiosk-auth`) og injiser den i default supabase-klienten
+  // slik at RPC-er som krever `authenticated` virker.
+  useEffect(() => {
+    if (source !== "kiosk") return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const raw = localStorage.getItem("pos-kiosk-auth");
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          const access_token = parsed?.access_token ?? parsed?.currentSession?.access_token;
+          const refresh_token = parsed?.refresh_token ?? parsed?.currentSession?.refresh_token;
+          if (access_token && refresh_token) {
+            await supabase.auth.setSession({ access_token, refresh_token });
+          }
+        }
+      } catch {
+        /* ignore */
+      } finally {
+        if (!cancelled) setAuthReady(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [source]);
 
   // Apply theme to document root
   useEffect(() => {
