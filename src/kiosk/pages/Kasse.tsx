@@ -318,13 +318,17 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
       const company = entity
         ? {
             name: entity.display_name ?? entity.legal_name,
-            legal_name: entity.legal_name,
             org_number: entity.org_number,
-            mva_registered: entity.mva_registered,
-            address_line1: entity.invoice_address_line1,
-            address_line2: entity.invoice_address_line2,
-            postal_code: entity.invoice_postal_code,
-            city: entity.invoice_city,
+            vat_registered: !!entity.mva_registered,
+            address: [
+              entity.invoice_address_line1,
+              entity.invoice_address_line2,
+              [entity.invoice_postal_code, entity.invoice_city]
+                .filter(Boolean)
+                .join(" "),
+            ]
+              .filter((s) => s && String(s).trim().length > 0)
+              .join(", "),
             phone: entity.contact_phone,
             email: entity.contact_email,
           }
