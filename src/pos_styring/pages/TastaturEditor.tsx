@@ -363,6 +363,7 @@ function ButtonDialog({ open, onOpenChange, pageId, layout, buttons, pages, cell
       display_label: "",
       image_url: "",
       image_storage_path: "",
+      show_image: "inherit",
       background_color: "",
       text_color: "",
       grid_width: 1,
