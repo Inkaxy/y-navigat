@@ -412,6 +412,7 @@ function ButtonDialog({ open, onOpenChange, pageId, layout, buttons, pages, cell
         target_page_id: values.button_type === "category" ? normalizeOptional(values.target_page_id) : null,
         display_label: normalizeOptional(values.display_label),
         image_url: normalizeOptional(values.image_url),
+        image_storage_path: normalizeOptional(values.image_storage_path),
         background_color: normalizeOptional(values.background_color),
         text_color: normalizeOptional(values.text_color),
         ...candidate,
