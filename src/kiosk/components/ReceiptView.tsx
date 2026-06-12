@@ -43,6 +43,8 @@ interface Props {
   lines: LineRow[];
   terminalName: string;
   onNewSale: () => void;
+  onPrintReceipt?: () => void;
+  printingReceipt?: boolean;
 }
 
 export function ReceiptView({ open, tx, lines, terminalName, onNewSale }: Props) {
