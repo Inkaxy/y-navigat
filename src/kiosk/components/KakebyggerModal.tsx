@@ -53,7 +53,7 @@ export function KakebyggerModal({ open, onOpenChange, legalEntityId, priceListId
 
   const embedUrl =
     categoryId && priceListId && legalEntityId
-      ? `/embed/kakebygger/${categoryId}?price_list_id=${priceListId}&legal_entity_id=${legalEntityId}&theme=light&vat_toggle=true`
+      ? `/embed/kakebygger/${categoryId}?price_list_id=${priceListId}&legal_entity_id=${legalEntityId}&theme=light&vat_toggle=true&source=kiosk`
       : null;
 
   return (
