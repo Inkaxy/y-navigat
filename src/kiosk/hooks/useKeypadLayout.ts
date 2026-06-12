@@ -9,6 +9,7 @@ export type KeypadButton = {
   function_code: string | null;
   display_label: string | null;
   image_url: string | null;
+  image_storage_path: string | null;
   background_color: string | null;
   text_color: string | null;
   grid_x: number;
@@ -43,7 +44,11 @@ export type KeypadData = {
   layout: KeypadLayout;
   pages: KeypadPage[];
   buttons: KeypadButton[];
+  /** Map fra storage_path → signert URL for produktbilder. */
+  imageUrls: Record<string, string>;
 } | null;
+
+const PRODUCT_IMAGE_BUCKET = "pos-product-images";
 
 async function fetchLayout(
   terminalId: string,
@@ -73,6 +78,22 @@ async function fetchLayout(
   return null;
 }
 
+async function signImageUrls(paths: string[]): Promise<Record<string, string>> {
+  if (paths.length === 0) return {};
+  const { data, error } = await kioskSupabase.storage
+    .from(PRODUCT_IMAGE_BUCKET)
+    .createSignedUrls(paths, 3600);
+  if (error) {
+    console.warn("[keypad] kunne ikke signere produktbilder", error);
+    return {};
+  }
+  const out: Record<string, string> = {};
+  for (const row of data ?? []) {
+    if (row.path && row.signedUrl) out[row.path] = row.signedUrl;
+  }
+  return out;
+}
+
 export function useKeypadLayout(terminalId: string, legalEntityId: string | null) {
   return useQuery<KeypadData>({
     queryKey: ["kiosk-keypad", terminalId, legalEntityId],
@@ -98,12 +119,23 @@ export function useKeypadLayout(terminalId: string, legalEntityId: string | null
         buttons = (btns ?? []) as KeypadButton[];
       }
 
+      const paths = Array.from(
+        new Set(
+          buttons
+            .map((b) => b.image_storage_path)
+            .filter((p): p is string => !!p),
+        ),
+      );
+      const imageUrls = await signImageUrls(paths);
+
       return {
         layout,
         pages: (pages ?? []) as KeypadPage[],
         buttons,
+        imageUrls,
       };
     },
-    staleTime: 60_000,
+    staleTime: 50 * 60 * 1000,
+    refetchInterval: 50 * 60 * 1000,
   });
 }

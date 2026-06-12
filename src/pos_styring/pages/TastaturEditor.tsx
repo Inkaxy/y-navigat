@@ -82,6 +82,7 @@ interface KeypadButton {
   function_code: string | null;
   display_label: string | null;
   image_url: string | null;
+  image_storage_path: string | null;
   background_color: string | null;
   text_color: string | null;
   grid_x: number;
@@ -126,6 +127,7 @@ const buttonSchema = z.object({
   target_page_id: z.string().optional(),
   display_label: z.string().trim().optional(),
   image_url: z.string().trim().optional(),
+  image_storage_path: z.string().trim().optional(),
   background_color: z.string().trim().optional(),
   text_color: z.string().trim().optional(),
   grid_width: z.coerce.number().int().min(1, "Minst 1").max(12, "For stor"),
@@ -184,7 +186,7 @@ async function fetchPages(layoutId: string): Promise<KeypadPage[]> {
 async function fetchButtons(pageId: string): Promise<KeypadButton[]> {
   const { data, error } = await supabase
     .from("pos_keypad_buttons")
-    .select("id, page_id, button_type, product_id, function_code, display_label, image_url, background_color, text_color, grid_x, grid_y, grid_width, grid_height, target_page_id, product:products!pos_keypad_buttons_product_id_fkey(display_name, product_category, in_pos)")
+    .select("id, page_id, button_type, product_id, function_code, display_label, image_url, image_storage_path, background_color, text_color, grid_x, grid_y, grid_width, grid_height, target_page_id, product:products!pos_keypad_buttons_product_id_fkey(display_name, product_category, in_pos)")
     .eq("page_id", pageId);
   if (error) throw error;
   return (data ?? []) as unknown as KeypadButton[];
@@ -216,7 +218,7 @@ async function getKeypadSignedUrl(storagePath: string | null) {
   return data.signedUrl;
 }
 
-async function fetchPrimaryProductImage(productId: string) {
+async function fetchPrimaryProductImagePath(productId: string): Promise<string | null> {
   const { data, error } = await supabase
     .from("pos_product_images")
     .select("storage_path")
@@ -224,7 +226,7 @@ async function fetchPrimaryProductImage(productId: string) {
     .eq("is_primary", true)
     .maybeSingle();
   if (error) throw error;
-  return getKeypadSignedUrl(data?.storage_path ?? null);
+  return data?.storage_path ?? null;
 }
 
 function DroppableCell({ x, y, children }: { x: number; y: number; children?: React.ReactNode }) {
@@ -238,6 +240,13 @@ function DroppableCell({ x, y, children }: { x: number; y: number; children?: Re
 
 function KeypadButtonTile({ button, onEdit, dragging, onResize }: { button: KeypadButton; onEdit?: () => void; dragging?: boolean; onResize?: (w: number, h: number) => void }) {
   const notInPos = button.button_type === "product" && button.product && button.product.in_pos === false;
+  const { data: signedFromPath = "" } = useQuery({
+    queryKey: ["pos_keypad_tile_url", button.image_storage_path],
+    queryFn: () => getKeypadSignedUrl(button.image_storage_path),
+    enabled: !!button.image_storage_path,
+    staleTime: 50 * 60 * 1000,
+  });
+  const bgImage = button.image_url || signedFromPath;
   return (
     <button
       type="button"
@@ -245,7 +254,7 @@ function KeypadButtonTile({ button, onEdit, dragging, onResize }: { button: Keyp
       className={cn("relative flex h-full w-full overflow-hidden rounded-md border border-primary/20 bg-primary/15 p-2 text-left text-sm font-semibold shadow-card transition hover:ring-2 hover:ring-ring", dragging && "opacity-60", notInPos && "border-destructive/60 ring-1 ring-destructive/40")}
       style={{ backgroundColor: button.background_color ?? undefined, color: button.text_color ?? undefined }}
     >
-      {button.image_url && <span className="absolute inset-0 bg-cover bg-center opacity-35" style={{ backgroundImage: `url(${button.image_url})` }} />}
+      {bgImage && <span className="absolute inset-0 bg-cover bg-center opacity-60" style={{ backgroundImage: `url(${bgImage})` }} />}
       {notInPos && (
         <span className="absolute left-1 top-1 z-10 rounded-sm bg-destructive px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-destructive-foreground" title="Produktet er ikke aktivert for POS">
           Ikke i POS
@@ -327,6 +336,7 @@ function ButtonDialog({ open, onOpenChange, pageId, layout, buttons, pages, cell
       target_page_id: "",
       display_label: "",
       image_url: "",
+      image_storage_path: "",
       background_color: "",
       text_color: "",
       grid_width: 1,
@@ -337,6 +347,7 @@ function ButtonDialog({ open, onOpenChange, pageId, layout, buttons, pages, cell
   const buttonType = form.watch("button_type");
   const selectedProductId = form.watch("product_id");
   const imageUrl = form.watch("image_url");
+  const imageStoragePath = form.watch("image_storage_path");
 
   useEffect(() => {
     if (!open) return;
@@ -347,6 +358,7 @@ function ButtonDialog({ open, onOpenChange, pageId, layout, buttons, pages, cell
       target_page_id: button?.target_page_id ?? "",
       display_label: button?.display_label ?? "",
       image_url: button?.image_url ?? "",
+      image_storage_path: button?.image_storage_path ?? "",
       background_color: button?.background_color ?? "",
       text_color: button?.text_color ?? "",
       grid_width: button?.grid_width ?? 1,
@@ -361,16 +373,28 @@ function ButtonDialog({ open, onOpenChange, pageId, layout, buttons, pages, cell
     enabled: open && buttonType === "product" && !!activeEntityId,
   });
 
-  const { data: primaryProductImage = "" } = useQuery({
-    queryKey: ["pos_product_primary_image", selectedProductId],
-    queryFn: () => fetchPrimaryProductImage(selectedProductId!),
-    enabled: open && !isEdit && buttonType === "product" && !!selectedProductId,
+  const { data: primaryImagePath = null } = useQuery({
+    queryKey: ["pos_product_primary_image_path", selectedProductId],
+    queryFn: () => fetchPrimaryProductImagePath(selectedProductId!),
+    enabled: open && buttonType === "product" && !!selectedProductId,
   });
 
   useEffect(() => {
-    if (!open || isEdit || buttonType !== "product" || !primaryProductImage) return;
-    if (!form.getValues("image_url")) form.setValue("image_url", primaryProductImage, { shouldDirty: true });
-  }, [buttonType, form, isEdit, open, primaryProductImage]);
+    if (!open || isEdit || buttonType !== "product" || !primaryImagePath) return;
+    if (!form.getValues("image_storage_path") && !form.getValues("image_url")) {
+      form.setValue("image_storage_path", primaryImagePath, { shouldDirty: true });
+    }
+  }, [buttonType, form, isEdit, open, primaryImagePath]);
+
+  // Sign preview URL for storage_path (own image OR product primary)
+  const previewStoragePath = imageStoragePath || (buttonType === "product" ? primaryImagePath ?? "" : "");
+  const { data: previewSignedUrl = "" } = useQuery({
+    queryKey: ["pos_keypad_preview_url", previewStoragePath],
+    queryFn: () => getKeypadSignedUrl(previewStoragePath),
+    enabled: open && !!previewStoragePath,
+  });
+  const effectivePreviewUrl = imageUrl || previewSignedUrl;
+
 
   const saveMutation = useMutation({
     mutationFn: async (values: ButtonFormValues) => {
@@ -395,6 +419,7 @@ function ButtonDialog({ open, onOpenChange, pageId, layout, buttons, pages, cell
         target_page_id: values.button_type === "category" ? normalizeOptional(values.target_page_id) : null,
         display_label: normalizeOptional(values.display_label),
         image_url: normalizeOptional(values.image_url),
+        image_storage_path: normalizeOptional(values.image_storage_path),
         background_color: normalizeOptional(values.background_color),
         text_color: normalizeOptional(values.text_color),
         ...candidate,
@@ -529,19 +554,45 @@ function ButtonDialog({ open, onOpenChange, pageId, layout, buttons, pages, cell
               )} />
               <FormField control={form.control} name="image_url" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Bilde-URL</FormLabel>
-                  <FormControl><Input {...field} placeholder="https://…" /></FormControl>
+                  <FormLabel>Bilde-URL (overstyring)</FormLabel>
+                  <FormControl><Input {...field} placeholder="https://… (valgfri, overstyrer produktbilde)" /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
             </div>
 
-            {imageUrl && (
+            {buttonType === "product" && (
+              <div className="flex items-center justify-between rounded-md border bg-muted/40 p-3 text-sm">
+                <div>
+                  <div className="font-medium">Produktbilde på knapp</div>
+                  <div className="text-xs text-muted-foreground">
+                    {imageStoragePath
+                      ? "Bruker primærbildet fra produktet."
+                      : primaryImagePath
+                        ? "Tilgjengelig — klikk for å bruke."
+                        : "Ingen primærbilde lastet opp for dette produktet."}
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  {imageStoragePath ? (
+                    <Button type="button" variant="outline" size="sm" onClick={() => form.setValue("image_storage_path", "", { shouldDirty: true })}>
+                      Fjern bilde
+                    </Button>
+                  ) : (
+                    <Button type="button" variant="outline" size="sm" disabled={!primaryImagePath} onClick={() => primaryImagePath && form.setValue("image_storage_path", primaryImagePath, { shouldDirty: true })}>
+                      Bruk produktbilde
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {effectivePreviewUrl && (
               <div className="overflow-hidden rounded-lg border bg-muted">
                 <div className="relative aspect-[5/2]">
-                  <img src={imageUrl} alt="Forhåndsvisning av knappbilde" className="h-full w-full object-cover" />
+                  <img src={effectivePreviewUrl} alt="Forhåndsvisning av knappbilde" className="h-full w-full object-cover" />
                   <div className="absolute inset-x-0 bottom-0 bg-background/80 p-2 text-sm font-medium text-foreground">
-                    Primærbilde som knapp-preview
+                    {imageUrl ? "Egendefinert bilde-URL" : "Primærbilde fra produkt"}
                   </div>
                 </div>
               </div>

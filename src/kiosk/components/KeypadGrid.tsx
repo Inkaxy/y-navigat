@@ -21,7 +21,7 @@ interface Props {
 }
 
 export function KeypadGrid({ data }: Props) {
-  const { layout, pages, buttons } = data;
+  const { layout, pages, buttons, imageUrls } = data;
   const { terminal } = useTerminal();
   const { operator } = useOperator();
   const nav = useKeypadNav();
@@ -184,31 +184,47 @@ export function KeypadGrid({ data }: Props) {
             gridTemplateRows: `repeat(${layout.grid_rows}, minmax(72px, 1fr))`,
           }}
         >
-          {pageButtons.map((b) => (
-            <button
-              key={b.id}
-              onClick={() => handleClick(b)}
-              className="flex flex-col items-center justify-center rounded-xl border border-white/5 p-2 text-center transition-all active:scale-[0.97]"
-              style={{
-                gridColumn: `${b.grid_x + 1} / span ${b.grid_width || 1}`,
-                gridRow: `${b.grid_y + 1} / span ${b.grid_height || 1}`,
-                backgroundColor: b.background_color ?? "rgba(255,255,255,0.06)",
-                color: b.text_color ?? "#F4ECDC",
-              }}
-            >
-              {b.image_url && (
-                <img
-                  src={b.image_url}
-                  alt=""
-                  className="mb-1 max-h-12 max-w-full object-contain"
-                  draggable={false}
-                />
-              )}
-              <span className="text-sm font-semibold leading-tight">
-                {b.display_label ?? "—"}
-              </span>
-            </button>
-          ))}
+          {pageButtons.map((b) => {
+            const resolvedImage =
+              (b.image_storage_path && imageUrls[b.image_storage_path]) ||
+              b.image_url ||
+              null;
+            return (
+              <button
+                key={b.id}
+                onClick={() => handleClick(b)}
+                className="group relative flex flex-col items-stretch justify-end overflow-hidden rounded-xl border border-white/5 text-center transition-all active:scale-[0.97]"
+                style={{
+                  gridColumn: `${b.grid_x + 1} / span ${b.grid_width || 1}`,
+                  gridRow: `${b.grid_y + 1} / span ${b.grid_height || 1}`,
+                  backgroundColor: b.background_color ?? "rgba(255,255,255,0.06)",
+                  color: b.text_color ?? "#F4ECDC",
+                }}
+              >
+                {resolvedImage && (
+                  <>
+                    <span
+                      aria-hidden
+                      className="absolute inset-0 bg-cover bg-center"
+                      style={{ backgroundImage: `url(${resolvedImage})` }}
+                    />
+                    <span
+                      aria-hidden
+                      className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/30 to-transparent"
+                    />
+                  </>
+                )}
+                <span
+                  className={cn(
+                    "relative z-10 px-2 py-2 text-sm font-semibold leading-tight",
+                    resolvedImage && "text-white drop-shadow",
+                  )}
+                >
+                  {b.display_label ?? "—"}
+                </span>
+              </button>
+            );
+          })}
         </div>
       )}
     </div>

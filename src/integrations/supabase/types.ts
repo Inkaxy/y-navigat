@@ -4293,6 +4293,7 @@ export type Database = {
           grid_x: number
           grid_y: number
           id: string
+          image_storage_path: string | null
           image_url: string | null
           page_id: string
           product_id: string | null
@@ -4309,6 +4310,7 @@ export type Database = {
           grid_x: number
           grid_y: number
           id?: string
+          image_storage_path?: string | null
           image_url?: string | null
           page_id: string
           product_id?: string | null
@@ -4325,6 +4327,7 @@ export type Database = {
           grid_x?: number
           grid_y?: number
           id?: string
+          image_storage_path?: string | null
           image_url?: string | null
           page_id?: string
           product_id?: string | null
