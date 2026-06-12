@@ -9580,6 +9580,14 @@ export type Database = {
         Args: { p_new_pin: string; p_operator_id: string }
         Returns: undefined
       }
+      pos_set_product_name: {
+        Args: { p_pos_name: string; p_product_id: string }
+        Returns: undefined
+      }
+      pos_set_product_station: {
+        Args: { p_product_id: string; p_station_id: string }
+        Returns: undefined
+      }
       pos_sync_customer: {
         Args: { p_customer_id: string; p_enabled: boolean }
         Returns: {
