@@ -154,6 +154,15 @@ export default function CakeBuilderEmbed() {
     );
   }
 
+  if (!authReady) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+
   return (
     <div className="h-screen w-screen overflow-hidden bg-background">
       <CakeBuilder
