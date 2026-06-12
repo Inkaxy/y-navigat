@@ -23,8 +23,10 @@ interface Props {
 export function KeypadGrid({ data }: Props) {
   const { layout, pages, buttons } = data;
   const { terminal } = useTerminal();
+  const { operator } = useOperator();
   const nav = useKeypadNav();
   const { addItem } = useCart();
+  const [kakebyggerOpen, setKakebyggerOpen] = useState(false);
   const priceListId = terminal?.default_price_list_id ?? null;
   const { data: priceListCfg } = usePriceListConfig(priceListId);
   const lookupProduct = useProductLookup(
