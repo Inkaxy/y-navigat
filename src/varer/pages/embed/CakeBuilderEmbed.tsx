@@ -1,9 +1,10 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { CakeBuilder } from "@/varer/features/cakeBuilder/CakeBuilder";
 import { listenFromParent, postToParent } from "@/varer/features/cakeBuilder/protocol";
+import { supabase } from "@/integrations/supabase/client";
 import type { CakeResult, PriceBreakdown } from "@/varer/features/cakeBuilder/types";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Loader2 } from "lucide-react";
 
 /**
  * Standalone embed surface for the CakeBuilder.
