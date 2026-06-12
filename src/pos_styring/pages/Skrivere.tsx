@@ -1,12 +1,15 @@
-// POS Styring → Skrivere: register over fysiske kvitterings-/bong-skrivere
-// (Epson TM/ePOS-Print) som kan deles på tvers av kasser. Per skriver kan man
-// kjøre en test-utskrift som POSTer rå ePOS-XML direkte til skriverens IP fra
-// nettleseren. Mixed-content (https → http) gir tydelig forklaring.
+// POS Styring → Skrivere: register over fysiske skrivere. Test-knappen
+// legger en jobb i pos_print_jobs ({job_type:'test'}); en ekstern Node-poller
+// plukker den opp og snakker med skriveren over LAN (mixed-content fra
+// nettleser hindrer direkte fetch). Kø-status under viser nyeste jobber.
+//
+// DEAD CODE: src/pos_styring/lib/eposPrint.ts brukes ikke lenger. Slettes
+// når polleren er bekreftet i produksjon.
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, MoreHorizontal, Plus, Printer, Wifi } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock, MoreHorizontal, Plus, Printer, Wifi, XCircle } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -61,10 +64,10 @@ import {
 } from "@/components/ui/table";
 import { useLegalEntity } from "@/pos_styring/contexts/LegalEntityContext";
 import { supabase } from "@/integrations/supabase/client";
-import { buildTestXml, detectMixedContent, eposPrint, type EposPrintResult } from "@/pos_styring/lib/eposPrint";
 
 type PaperWidth = "80mm" | "58mm";
 type Protocol = "http" | "https";
+type JobStatus = "queued" | "printing" | "done" | "failed";
 
 interface Printer {
   id: string;
@@ -77,6 +80,17 @@ interface Printer {
   brand: string;
   device_id: string;
   enabled: boolean;
+}
+
+interface PrintJob {
+  id: string;
+  printer_id: string;
+  job_type: string;
+  status: JobStatus;
+  attempts: number;
+  last_error: string | null;
+  created_at: string;
+  printed_at: string | null;
 }
 
 const printerSchema = z.object({
@@ -115,36 +129,45 @@ async function fetchPrinters(activeEntityId: string): Promise<Printer[]> {
   return (data ?? []) as Printer[];
 }
 
-function formatResult(r: EposPrintResult): { variant: "success" | "warning" | "error"; title: string; description: string } {
-  switch (r.kind) {
-    case "ok":
-      return { variant: "success", title: "Skriver svarte OK", description: "Sjekk skriveren — testutskriften skal komme ut." };
-    case "printer_error":
-      return {
-        variant: "error",
-        title: "Skriver-feil",
-        description: `Skriveren tok imot men rapporterte feil (success=${r.success ?? "?"}, code=${r.code ?? "?"}, status=${r.status ?? "?"}).`,
-      };
-    case "http_error":
-      return {
-        variant: "error",
-        title: `HTTP ${r.status}`,
-        description: `Skriveren svarte med ${r.status} ${r.statusText}. Sjekk device_id ("local_printer") og at ePOS-Print-tjenesten er på.`,
-      };
-    case "mixed_content":
-      return {
-        variant: "warning",
-        title: "Blokkert av mixed-content",
-        description:
-          `Siden er på ${r.pageProtocol.toUpperCase()}, men skriveren er på ${r.printerProtocol.toUpperCase()}. Nettleseren stopper requesten før den når skriveren. Løsninger: skru på HTTPS på skriveren (krever sertifikat), kjør kiosken via HTTP-domene, eller bruk en print-bro på LAN.`,
-      };
-    case "network_error":
-      return {
-        variant: "error",
-        title: "Nettverksfeil",
-        description: `${r.message}. Vanlige årsaker: feil IP, skriver av, ikke samme nettverk, eller CORS/mixed-content (sjekk DevTools → Console).`,
-      };
+async function fetchRecentJobs(printerIds: string[]): Promise<PrintJob[]> {
+  if (printerIds.length === 0) return [];
+  const { data, error } = await supabase
+    .from("pos_print_jobs")
+    .select("id, printer_id, job_type, status, attempts, last_error, created_at, printed_at")
+    .in("printer_id", printerIds)
+    .order("created_at", { ascending: false })
+    .limit(20);
+  if (error) throw error;
+  return (data ?? []) as PrintJob[];
+}
+
+function StatusPill({ status }: { status: JobStatus }) {
+  if (status === "done") {
+    return (
+      <Badge variant="default" className="gap-1">
+        <CheckCircle2 className="h-3 w-3" /> done
+      </Badge>
+    );
   }
+  if (status === "failed") {
+    return (
+      <Badge variant="destructive" className="gap-1">
+        <XCircle className="h-3 w-3" /> failed
+      </Badge>
+    );
+  }
+  if (status === "printing") {
+    return (
+      <Badge variant="secondary" className="gap-1">
+        <Clock className="h-3 w-3" /> printing
+      </Badge>
+    );
+  }
+  return (
+    <Badge variant="outline" className="gap-1">
+      <Clock className="h-3 w-3" /> queued
+    </Badge>
+  );
 }
 
 export default function Skrivere() {
@@ -161,7 +184,14 @@ export default function Skrivere() {
     enabled: !!activeEntityId,
   });
 
-  const pageProtocol = typeof window !== "undefined" ? window.location.protocol.replace(":", "") : "http";
+  const printerIds = useMemo(() => printers.map((p) => p.id), [printers]);
+
+  const jobsQuery = useQuery({
+    queryKey: ["pos_print_jobs_recent", printerIds.join(",")],
+    queryFn: () => fetchRecentJobs(printerIds),
+    enabled: printerIds.length > 0,
+    refetchInterval: 5000,
+  });
 
   const form = useForm<PrinterForm>({
     resolver: zodResolver(printerSchema),
@@ -243,22 +273,31 @@ export default function Skrivere() {
   const handleTest = async (p: Printer) => {
     setTestingId(p.id);
     try {
-      const result = await eposPrint(
-        { ip: p.ip, port: p.port, protocol: p.protocol, device_id: p.device_id },
-        buildTestXml(),
-      );
-      const info = formatResult(result);
-      if (info.variant === "success") toast.success(info.title, { description: info.description });
-      else if (info.variant === "warning") toast.warning(info.title, { description: info.description, duration: 10000 });
-      else toast.error(info.title, { description: info.description, duration: 10000 });
+      const { error } = await supabase.from("pos_print_jobs").insert({
+        printer_id: p.id,
+        job_type: "test",
+        payload: {
+          kind: "test",
+          message: "NBOS testutskrift",
+          requested_at: new Date().toISOString(),
+        },
+      });
+      if (error) throw error;
+      toast.success("Test-jobb lagt i kø", {
+        description: "Polleren plukker den opp og skriver ut. Se kø-status under.",
+      });
+      await queryClient.invalidateQueries({ queryKey: ["pos_print_jobs_recent", printerIds.join(",")] });
+    } catch (e) {
+      toast.error("Kunne ikke legge i kø", {
+        description: e instanceof Error ? e.message : "Ukjent feil",
+      });
     } finally {
       setTestingId(null);
     }
   };
 
-  const httpsOnHttpsWarning = useMemo(() => {
-    return pageProtocol === "https" && printers.some((p) => p.protocol === "http");
-  }, [pageProtocol, printers]);
+  const printerById = useMemo(() => new Map(printers.map((p) => [p.id, p])), [printers]);
+  const jobs = jobsQuery.data ?? [];
 
   return (
     <div className="space-y-6">
@@ -267,24 +306,13 @@ export default function Skrivere() {
           <h1 className="text-3xl font-semibold tracking-normal">Skrivere</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {activeEntity ? `${activeEntity.short_code} — ${activeEntity.legal_name}` : "Velg aktiv enhet"} ·
-            Fysiske kvitterings-/bong-skrivere som kan deles på tvers av kasser.
+            Fysiske kvitterings-/bong-skrivere. Test og salg går via jobb-kø — en ekstern poller skriver ut.
           </p>
         </div>
         <Button onClick={openCreate}>
           <Plus className="h-4 w-4" /> Ny skriver
         </Button>
       </div>
-
-      {httpsOnHttpsWarning && (
-        <Alert variant="default" className="border-amber-500/40 bg-amber-500/5">
-          <AlertTriangle className="h-4 w-4 text-amber-600" />
-          <AlertTitle>Mixed content kan blokkere utskrift</AlertTitle>
-          <AlertDescription>
-            Denne siden kjører på HTTPS, og minst én skriver er konfigurert med HTTP. Nettleseren blokkerer da
-            test-utskriften før den når skriveren. Bruk «Test»-knappen for å bekrefte før dere går videre.
-          </AlertDescription>
-        </Alert>
-      )}
 
       {isLoading ? (
         <Skeleton className="h-64 w-full" />
@@ -313,62 +341,113 @@ export default function Skrivere() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {printers.map((p) => {
-                const mc = detectMixedContent({ ip: p.ip, port: p.port, protocol: p.protocol, device_id: p.device_id });
-                return (
-                  <TableRow key={p.id}>
-                    <TableCell className="font-medium">
-                      {p.display_name}
-                      <div className="text-xs text-muted-foreground">{p.brand} · device_id «{p.device_id}»</div>
-                    </TableCell>
-                    <TableCell className="font-mono text-xs">
-                      <div>{p.protocol}://{p.ip}:{p.port}</div>
-                      {mc.blocked && (
-                        <div className="mt-0.5 inline-flex items-center gap-1 text-amber-600">
-                          <AlertTriangle className="h-3 w-3" /> mixed-content
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell>{p.paper_width}</TableCell>
-                    <TableCell>
-                      <Badge variant={p.enabled ? "default" : "secondary"}>
-                        {p.enabled ? "Aktiv" : "Av"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={testingId === p.id || !p.enabled}
-                          onClick={() => handleTest(p)}
-                        >
-                          <Wifi className="h-4 w-4" />
-                          {testingId === p.id ? "Tester…" : "Test"}
-                        </Button>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button size="icon" variant="ghost">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => openEdit(p)}>Rediger</DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="text-destructive focus:text-destructive"
-                              onClick={() => setDeleteTarget(p)}
-                            >
-                              Slett
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
+              {printers.map((p) => (
+                <TableRow key={p.id}>
+                  <TableCell className="font-medium">
+                    {p.display_name}
+                    <div className="text-xs text-muted-foreground">{p.brand} · device_id «{p.device_id}»</div>
+                  </TableCell>
+                  <TableCell className="font-mono text-xs">
+                    {p.protocol}://{p.ip}:{p.port}
+                  </TableCell>
+                  <TableCell>{p.paper_width}</TableCell>
+                  <TableCell>
+                    <Badge variant={p.enabled ? "default" : "secondary"}>
+                      {p.enabled ? "Aktiv" : "Av"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-1">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={testingId === p.id || !p.enabled}
+                        onClick={() => handleTest(p)}
+                      >
+                        <Wifi className="h-4 w-4" />
+                        {testingId === p.id ? "Legger i kø…" : "Test"}
+                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button size="icon" variant="ghost">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => openEdit(p)}>Rediger</DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="text-destructive focus:text-destructive"
+                            onClick={() => setDeleteTarget(p)}
+                          >
+                            Slett
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
             </TableBody>
           </Table>
+        </div>
+      )}
+
+      {printers.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+              Kø-status (siste 20 jobber)
+            </h2>
+            <p className="text-xs text-muted-foreground">Oppdateres automatisk hvert 5. sek</p>
+          </div>
+          <div className="overflow-hidden rounded-lg border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Tid</TableHead>
+                  <TableHead>Skriver</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Forsøk</TableHead>
+                  <TableHead>Feil</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {jobs.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center text-xs text-muted-foreground">
+                      Ingen jobber ennå. Test en skriver for å se kø-status.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  jobs.map((j) => (
+                    <TableRow key={j.id}>
+                      <TableCell className="font-mono text-xs">
+                        {new Date(j.created_at).toLocaleTimeString("nb-NO")}
+                      </TableCell>
+                      <TableCell>{printerById.get(j.printer_id)?.display_name ?? "—"}</TableCell>
+                      <TableCell className="font-mono text-xs">{j.job_type}</TableCell>
+                      <TableCell>
+                        <StatusPill status={j.status} />
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">{j.attempts}</TableCell>
+                      <TableCell className="max-w-[280px] truncate text-xs text-destructive">
+                        {j.last_error ?? ""}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+          <Alert>
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Ekstern poller må kjøre</AlertTitle>
+            <AlertDescription>
+              Test-jobben blir hengende på «queued» til Node-polleren plukker den opp. Hvis status ikke endrer
+              seg, sjekk at polleren er oppe og kobler til Supabase med service-role.
+            </AlertDescription>
+          </Alert>
         </div>
       )}
 
@@ -466,7 +545,7 @@ export default function Skrivere() {
           <AlertDialogHeader>
             <AlertDialogTitle>Slette «{deleteTarget?.display_name}»?</AlertDialogTitle>
             <AlertDialogDescription>
-              Skriveren fjernes fra registeret. Kommer du til å koble den til kasser senere må du opprette den på nytt.
+              Skriveren fjernes fra registeret. Terminal-mappinger til denne skriveren blir også fjernet.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
