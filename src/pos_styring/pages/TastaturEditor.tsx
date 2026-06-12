@@ -329,6 +329,7 @@ function ButtonDialog({ open, onOpenChange, pageId, layout, buttons, pages, cell
       target_page_id: "",
       display_label: "",
       image_url: "",
+      image_storage_path: "",
       background_color: "",
       text_color: "",
       grid_width: 1,
