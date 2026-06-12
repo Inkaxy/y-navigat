@@ -330,6 +330,35 @@ function ProductImageDialog({ product, activeEntityId, open, onOpenChange }: { p
             </div>
           </div>
 
+          <div className="space-y-2 rounded-lg border bg-muted/30 p-3">
+            <label className="text-sm font-medium">Bong-stasjon</label>
+            <p className="text-xs text-muted-foreground">
+              Stasjon for bong-utskrift ved salg (f.eks. «Kaffe»). Tom = kun kvittering, ingen bong.
+              Stasjoner administreres under «Stasjoner»; per terminal mappes stasjon → fysisk skriver.
+            </p>
+            <Select
+              value={product?.pos_print_station_id ?? NO_STATION}
+              onValueChange={(v) => saveStationMutation.mutate(v === NO_STATION ? null : v)}
+              disabled={saveStationMutation.isPending}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Ingen stasjon" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NO_STATION}>Ingen (kun kvittering)</SelectItem>
+                {(stationsQuery.data ?? [])
+                  .filter((s) => s.is_active)
+                  .map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.display_name}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+
+
 
           {isLoading ? (
             <div className="grid gap-3 sm:grid-cols-3"><Skeleton className="h-40" /><Skeleton className="h-40" /><Skeleton className="h-40" /></div>
