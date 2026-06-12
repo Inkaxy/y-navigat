@@ -132,9 +132,21 @@ export function ReceiptView({ open, tx, lines, terminalName, onNewSale, onPrintR
             )}
           </div>
 
-          <BigButton className="w-full text-base" onClick={onNewSale}>
-            Nytt salg
-          </BigButton>
+          <div className="flex gap-2">
+            {onPrintReceipt && (
+              <BigButton
+                variant="secondary"
+                className="flex-1 text-base"
+                onClick={onPrintReceipt}
+                disabled={printingReceipt}
+              >
+                {printingReceipt ? "Sender…" : "Skriv ut kvittering"}
+              </BigButton>
+            )}
+            <BigButton className="flex-1 text-base" onClick={onNewSale}>
+              Nytt salg
+            </BigButton>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
