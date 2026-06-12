@@ -218,7 +218,7 @@ async function getKeypadSignedUrl(storagePath: string | null) {
   return data.signedUrl;
 }
 
-async function fetchPrimaryProductImage(productId: string) {
+async function fetchPrimaryProductImagePath(productId: string): Promise<string | null> {
   const { data, error } = await supabase
     .from("pos_product_images")
     .select("storage_path")
@@ -226,7 +226,7 @@ async function fetchPrimaryProductImage(productId: string) {
     .eq("is_primary", true)
     .maybeSingle();
   if (error) throw error;
-  return getKeypadSignedUrl(data?.storage_path ?? null);
+  return data?.storage_path ?? null;
 }
 
 function DroppableCell({ x, y, children }: { x: number; y: number; children?: React.ReactNode }) {
