@@ -181,7 +181,7 @@ function hasCollision(candidate: { grid_x: number; grid_y: number; grid_width: n
 async function fetchLayout(layoutId: string): Promise<KeypadLayoutDetail> {
   const { data, error } = await supabase
     .from("pos_keypad_layouts")
-    .select("id, legal_entity_id, display_name, grid_cols, grid_rows, terminal_id, is_default, theme, customer_screen")
+    .select("id, legal_entity_id, display_name, grid_cols, grid_rows, terminal_id, is_default, show_product_image, theme, customer_screen")
     .eq("id", layoutId)
     .single();
   if (error) throw error;
