@@ -62,6 +62,7 @@ interface KeypadLayoutDetail {
   grid_rows: number;
   terminal_id: string | null;
   is_default: boolean;
+  show_product_image: boolean;
   theme: unknown;
   customer_screen: unknown;
 }
