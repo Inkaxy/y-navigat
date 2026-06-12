@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { CloseSessionModal } from "@/kiosk/components/CloseSessionModal";
 import { PaymentModal } from "@/kiosk/components/PaymentModal";
+import { KakebyggerModal } from "@/kiosk/components/KakebyggerModal";
 import { ReceiptView } from "@/kiosk/components/ReceiptView";
 import { useTerminal } from "@/kiosk/context/TerminalContext";
 import { useOperator } from "@/kiosk/context/OperatorContext";
@@ -118,6 +119,7 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
   const [rpcError, setRpcError] = useState<string | null>(null);
   const [closeSessionOpen, setCloseSessionOpen] = useState(false);
   const [clearOpen, setClearOpen] = useState(false);
+  const [kakebyggerOpen, setKakebyggerOpen] = useState(false);
   const [printingReceipt, setPrintingReceipt] = useState(false);
   const [receipt, setReceipt] = useState<{
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -195,6 +197,10 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
         handleCategory(b);
         return;
       case "function":
+        if (b.function_code === "kakebygger") {
+          setKakebyggerOpen(true);
+          return;
+        }
         toast.info(`${b.display_label ?? b.function_code ?? "Funksjon"}: bygges senere`);
         return;
       default:
@@ -564,6 +570,12 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
           }}
         />
       )}
+      <KakebyggerModal
+        open={kakebyggerOpen}
+        onOpenChange={setKakebyggerOpen}
+        legalEntityId={operator?.legal_entity_id ?? terminal?.legal_entity_id ?? null}
+        priceListId={priceListId}
+      />
       <AlertDialog open={clearOpen} onOpenChange={setClearOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
