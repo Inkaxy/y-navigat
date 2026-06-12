@@ -118,6 +118,7 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
   const [rpcError, setRpcError] = useState<string | null>(null);
   const [closeSessionOpen, setCloseSessionOpen] = useState(false);
   const [clearOpen, setClearOpen] = useState(false);
+  const [printingReceipt, setPrintingReceipt] = useState(false);
   const [receipt, setReceipt] = useState<{
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     tx: any;
