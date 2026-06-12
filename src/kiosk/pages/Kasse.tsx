@@ -196,6 +196,10 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
         handleCategory(b);
         return;
       case "function":
+        if (b.function_code === "kakebygger") {
+          setKakebyggerOpen(true);
+          return;
+        }
         toast.info(`${b.display_label ?? b.function_code ?? "Funksjon"}: bygges senere`);
         return;
       default:
