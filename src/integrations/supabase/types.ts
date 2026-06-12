@@ -4545,6 +4545,124 @@ export type Database = {
           },
         ]
       }
+      pos_print_jobs: {
+        Row: {
+          attempts: number
+          claimed_at: string | null
+          created_at: string
+          id: string
+          job_type: string
+          last_error: string | null
+          payload: Json
+          printed_at: string | null
+          printer_id: string
+          station_id: string | null
+          status: string
+          terminal_id: string | null
+          transaction_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          claimed_at?: string | null
+          created_at?: string
+          id?: string
+          job_type: string
+          last_error?: string | null
+          payload: Json
+          printed_at?: string | null
+          printer_id: string
+          station_id?: string | null
+          status?: string
+          terminal_id?: string | null
+          transaction_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          claimed_at?: string | null
+          created_at?: string
+          id?: string
+          job_type?: string
+          last_error?: string | null
+          payload?: Json
+          printed_at?: string | null
+          printer_id?: string
+          station_id?: string | null
+          status?: string
+          terminal_id?: string | null
+          transaction_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pos_print_jobs_printer_id_fkey"
+            columns: ["printer_id"]
+            isOneToOne: false
+            referencedRelation: "pos_printers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pos_print_jobs_station_id_fkey"
+            columns: ["station_id"]
+            isOneToOne: false
+            referencedRelation: "pos_print_stations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pos_print_jobs_terminal_id_fkey"
+            columns: ["terminal_id"]
+            isOneToOne: false
+            referencedRelation: "pos_terminals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pos_print_jobs_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "pos_transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pos_print_stations: {
+        Row: {
+          created_at: string
+          display_name: string
+          id: string
+          is_active: boolean
+          legal_entity_id: string
+          station_code: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          display_name: string
+          id?: string
+          is_active?: boolean
+          legal_entity_id: string
+          station_code: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string
+          id?: string
+          is_active?: boolean
+          legal_entity_id?: string
+          station_code?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pos_print_stations_legal_entity_id_fkey"
+            columns: ["legal_entity_id"]
+            isOneToOne: false
+            referencedRelation: "legal_entities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pos_printers: {
         Row: {
           brand: string
@@ -4680,6 +4798,58 @@ export type Database = {
           },
           {
             foreignKeyName: "pos_sessions_terminal_id_fkey"
+            columns: ["terminal_id"]
+            isOneToOne: false
+            referencedRelation: "pos_terminals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pos_terminal_printers: {
+        Row: {
+          created_at: string
+          id: string
+          printer_id: string
+          role: string
+          station_id: string | null
+          terminal_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          printer_id: string
+          role: string
+          station_id?: string | null
+          terminal_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          printer_id?: string
+          role?: string
+          station_id?: string | null
+          terminal_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pos_terminal_printers_printer_id_fkey"
+            columns: ["printer_id"]
+            isOneToOne: false
+            referencedRelation: "pos_printers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pos_terminal_printers_station_id_fkey"
+            columns: ["station_id"]
+            isOneToOne: false
+            referencedRelation: "pos_print_stations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pos_terminal_printers_terminal_id_fkey"
             columns: ["terminal_id"]
             isOneToOne: false
             referencedRelation: "pos_terminals"
@@ -6064,6 +6234,7 @@ export type Database = {
           pieces_per_tray: number | null
           pieces_per_unit: number | null
           pos_display_name: string | null
+          pos_print_station_id: string | null
           print_declaration_labels: boolean
           product_category: string
           product_page_id: string | null
@@ -6143,6 +6314,7 @@ export type Database = {
           pieces_per_tray?: number | null
           pieces_per_unit?: number | null
           pos_display_name?: string | null
+          pos_print_station_id?: string | null
           print_declaration_labels?: boolean
           product_category: string
           product_page_id?: string | null
@@ -6222,6 +6394,7 @@ export type Database = {
           pieces_per_tray?: number | null
           pieces_per_unit?: number | null
           pos_display_name?: string | null
+          pos_print_station_id?: string | null
           print_declaration_labels?: boolean
           product_category?: string
           product_page_id?: string | null
@@ -6262,6 +6435,13 @@ export type Database = {
             columns: ["main_category_id"]
             isOneToOne: false
             referencedRelation: "product_main_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "products_pos_print_station_id_fkey"
+            columns: ["pos_print_station_id"]
+            isOneToOne: false
+            referencedRelation: "pos_print_stations"
             referencedColumns: ["id"]
           },
           {
