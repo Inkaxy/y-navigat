@@ -127,6 +127,7 @@ const buttonSchema = z.object({
   target_page_id: z.string().optional(),
   display_label: z.string().trim().optional(),
   image_url: z.string().trim().optional(),
+  image_storage_path: z.string().trim().optional(),
   background_color: z.string().trim().optional(),
   text_color: z.string().trim().optional(),
   grid_width: z.coerce.number().int().min(1, "Minst 1").max(12, "For stor"),
