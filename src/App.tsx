@@ -35,6 +35,7 @@ import StillingDetalj from "./pages/admin/StillingDetalj";
 import Apper from "./pages/admin/Apper";
 import { Navigate } from "react-router-dom";
 import { AppProvider as VarerAppProvider } from "@/varer/context/AppContext";
+import { SelectionProvider } from "@/providers/SelectionProvider";
 import VarerProductList from "@/varer/pages/ProductList";
 import VarerProductDetail from "@/varer/pages/ProductDetail";
 import VarerPriceLists from "@/varer/pages/PriceLists";
@@ -235,8 +236,8 @@ const App = () => (
               <Route path="/admin/helsesenter" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><Helsesenter /></AppAccessGuard></Shell>} />
               <Route path="/admin/audit" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><Audit /></AppAccessGuard></Shell>} />
               {/* Varer embed routes — frosset kontrakt, INGEN AppShell */}
-              <Route path="/embed/v1/kakebygger/:categoryId" element={<VarerAppProvider><VarerCakeBuilderEmbed /></VarerAppProvider>} />
-              <Route path="/embed/kakebygger/:categoryId" element={<VarerAppProvider><VarerCakeBuilderEmbed /></VarerAppProvider>} />
+              <Route path="/embed/v1/kakebygger/:categoryId" element={<SelectionProvider><VarerAppProvider><VarerCakeBuilderEmbed /></VarerAppProvider></SelectionProvider>} />
+              <Route path="/embed/kakebygger/:categoryId" element={<SelectionProvider><VarerAppProvider><VarerCakeBuilderEmbed /></VarerAppProvider></SelectionProvider>} />
               {/* Public supplier RFQ portal — no shell, no auth */}
               <Route path="/tilbud/:token" element={<RavarerSupplierPortal />} />
               <Route path="/bekreftelse/:token" element={<RavarerLiveConfirmationPortal />} />
