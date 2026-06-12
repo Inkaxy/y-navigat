@@ -116,6 +116,7 @@ const FUNCTIONS = [
   { code: "open_drawer", label: "Åpne kasseskuff" },
   { code: "price_override", label: "Overstyr pris" },
   { code: "customer_lookup", label: "Søk kunde" },
+  { code: "kakebygger", label: "Kakebygger" },
 ];
 
 const buttonSchema = z.object({
