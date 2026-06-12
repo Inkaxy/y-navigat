@@ -420,6 +420,9 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
       >
         Kvittering
       </ActionBtn>
+      <ActionBtn onClick={handlePrintLabel} icon={<Printer className="h-4 w-4" />}>
+        Skriv ut etikett
+      </ActionBtn>
     </div>
   );
 
