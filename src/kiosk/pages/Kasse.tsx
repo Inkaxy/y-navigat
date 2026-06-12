@@ -290,26 +290,67 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
     }
     setPrintingReceipt(true);
     try {
-      const { data: mapping, error: mErr } = await kioskSupabase
-        .from("pos_terminal_printers")
-        .select("printer_id")
-        .eq("terminal_id", terminal.id)
-        .eq("role", "receipt")
-        .maybeSingle();
+      const [{ data: mapping, error: mErr }, { data: entity, error: eErr }] =
+        await Promise.all([
+          kioskSupabase
+            .from("pos_terminal_printers")
+            .select("printer_id")
+            .eq("terminal_id", terminal.id)
+            .eq("role", "receipt")
+            .maybeSingle(),
+          kioskSupabase
+            .from("legal_entities")
+            .select(
+              "legal_name, display_name, org_number, mva_registered, invoice_address_line1, invoice_address_line2, invoice_postal_code, invoice_city, contact_phone, contact_email",
+            )
+            .eq("id", terminal.legal_entity_id)
+            .maybeSingle(),
+        ]);
       if (mErr) throw mErr;
+      if (eErr) throw eErr;
       if (!mapping?.printer_id) {
         toast.warning("Ingen kvitteringsskriver er koblet til terminalen", {
           description: "Konfigurer i POS Styring → Terminaler.",
         });
         return;
       }
+
+      const company = entity
+        ? {
+            name: entity.display_name ?? entity.legal_name,
+            legal_name: entity.legal_name,
+            org_number: entity.org_number,
+            mva_registered: entity.mva_registered,
+            address_line1: entity.invoice_address_line1,
+            address_line2: entity.invoice_address_line2,
+            postal_code: entity.invoice_postal_code,
+            city: entity.invoice_city,
+            phone: entity.contact_phone,
+            email: entity.contact_email,
+          }
+        : null;
+
+      const footer_lines = [
+        "Takk for at du handler hos",
+        "den lokale bakeren!",
+        "",
+        "Nøtterø Bakeri",
+      ];
+
       const { error: jErr } = await kioskSupabase
         .from("pos_print_jobs")
         .insert({
           printer_id: mapping.printer_id,
           terminal_id: terminal.id,
           job_type: "receipt",
-          payload: { transaction: r.tx, lines: r.lines, terminal_name: terminal.display_name },
+          payload: {
+            transaction: r.tx,
+            lines: r.lines,
+            terminal_name: terminal.display_name,
+            operator_name: operator?.display_name ?? null,
+            company,
+            footer_lines,
+          },
           status: "queued",
         });
       if (jErr) throw jErr;
