@@ -85,6 +85,7 @@ interface KeypadButton {
   display_label: string | null;
   image_url: string | null;
   image_storage_path: string | null;
+  show_image: boolean | null;
   background_color: string | null;
   text_color: string | null;
   grid_x: number;
