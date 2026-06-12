@@ -569,6 +569,12 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
           }}
         />
       )}
+      <KakebyggerModal
+        open={kakebyggerOpen}
+        onOpenChange={setKakebyggerOpen}
+        legalEntityId={operator?.legal_entity_id ?? terminal?.legal_entity_id ?? null}
+        priceListId={priceListId}
+      />
       <AlertDialog open={clearOpen} onOpenChange={setClearOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
