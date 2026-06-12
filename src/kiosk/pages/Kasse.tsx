@@ -282,6 +282,49 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
     nav.reset();
   };
 
+  const handlePrintReceipt = async () => {
+    const r = receipt ?? lastReceipt;
+    if (!r || !terminal) {
+      toast.error("Ingen kvittering å skrive ut");
+      return;
+    }
+    setPrintingReceipt(true);
+    try {
+      const { data: mapping, error: mErr } = await kioskSupabase
+        .from("pos_terminal_printers")
+        .select("printer_id")
+        .eq("terminal_id", terminal.id)
+        .eq("role", "receipt")
+        .maybeSingle();
+      if (mErr) throw mErr;
+      if (!mapping?.printer_id) {
+        toast.warning("Ingen kvitteringsskriver er koblet til terminalen", {
+          description: "Konfigurer i POS Styring → Terminaler.",
+        });
+        return;
+      }
+      const { error: jErr } = await kioskSupabase
+        .from("pos_print_jobs")
+        .insert({
+          printer_id: mapping.printer_id,
+          terminal_id: terminal.id,
+          job_type: "receipt",
+          payload: { transaction: r.tx, lines: r.lines, terminal_name: terminal.display_name },
+          status: "queued",
+        });
+      if (jErr) throw jErr;
+      toast.success("Kvittering lagt i utskriftskø");
+    } catch (e) {
+      toast.error("Kunne ikke legge i utskriftskø", { description: (e as Error).message });
+    } finally {
+      setPrintingReceipt(false);
+    }
+  };
+
+  const handlePrintLabel = () => {
+    toast.info("Skriv ut etikett: bygges i Steg 4 (etikett-skriver + produktvalg)");
+  };
+
   // ── Map DB → render-types ──
   const renderPages: RenderPage[] = useMemo(() => {
     if (!data) return [];
