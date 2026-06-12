@@ -43,9 +43,11 @@ interface Props {
   lines: LineRow[];
   terminalName: string;
   onNewSale: () => void;
+  onPrintReceipt?: () => void;
+  printingReceipt?: boolean;
 }
 
-export function ReceiptView({ open, tx, lines, terminalName, onNewSale }: Props) {
+export function ReceiptView({ open, tx, lines, terminalName, onNewSale, onPrintReceipt, printingReceipt }: Props) {
   if (!tx) return null;
   const mva = parseMvaBreakdown(tx.mva_breakdown);
   const pay = parsePaymentSummary(tx.payment_summary);
@@ -130,9 +132,21 @@ export function ReceiptView({ open, tx, lines, terminalName, onNewSale }: Props)
             )}
           </div>
 
-          <BigButton className="w-full text-base" onClick={onNewSale}>
-            Nytt salg
-          </BigButton>
+          <div className="flex gap-2">
+            {onPrintReceipt && (
+              <BigButton
+                variant="secondary"
+                className="flex-1 text-base"
+                onClick={onPrintReceipt}
+                disabled={printingReceipt}
+              >
+                {printingReceipt ? "Sender…" : "Skriv ut kvittering"}
+              </BigButton>
+            )}
+            <BigButton className="flex-1 text-base" onClick={onNewSale}>
+              Nytt salg
+            </BigButton>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

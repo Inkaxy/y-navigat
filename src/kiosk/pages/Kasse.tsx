@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { LogOut, Percent, Pause, Receipt, Tag, Trash2, X } from "lucide-react";
+import { LogOut, Percent, Pause, Printer, Receipt, Tag, Trash2, X } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -118,6 +118,7 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
   const [rpcError, setRpcError] = useState<string | null>(null);
   const [closeSessionOpen, setCloseSessionOpen] = useState(false);
   const [clearOpen, setClearOpen] = useState(false);
+  const [printingReceipt, setPrintingReceipt] = useState(false);
   const [receipt, setReceipt] = useState<{
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     tx: any;
@@ -281,6 +282,49 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
     nav.reset();
   };
 
+  const handlePrintReceipt = async () => {
+    const r = receipt ?? lastReceipt;
+    if (!r || !terminal) {
+      toast.error("Ingen kvittering å skrive ut");
+      return;
+    }
+    setPrintingReceipt(true);
+    try {
+      const { data: mapping, error: mErr } = await kioskSupabase
+        .from("pos_terminal_printers")
+        .select("printer_id")
+        .eq("terminal_id", terminal.id)
+        .eq("role", "receipt")
+        .maybeSingle();
+      if (mErr) throw mErr;
+      if (!mapping?.printer_id) {
+        toast.warning("Ingen kvitteringsskriver er koblet til terminalen", {
+          description: "Konfigurer i POS Styring → Terminaler.",
+        });
+        return;
+      }
+      const { error: jErr } = await kioskSupabase
+        .from("pos_print_jobs")
+        .insert({
+          printer_id: mapping.printer_id,
+          terminal_id: terminal.id,
+          job_type: "receipt",
+          payload: { transaction: r.tx, lines: r.lines, terminal_name: terminal.display_name },
+          status: "queued",
+        });
+      if (jErr) throw jErr;
+      toast.success("Kvittering lagt i utskriftskø");
+    } catch (e) {
+      toast.error("Kunne ikke legge i utskriftskø", { description: (e as Error).message });
+    } finally {
+      setPrintingReceipt(false);
+    }
+  };
+
+  const handlePrintLabel = () => {
+    toast.info("Skriv ut etikett: bygges i Steg 4 (etikett-skriver + produktvalg)");
+  };
+
   // ── Map DB → render-types ──
   const renderPages: RenderPage[] = useMemo(() => {
     if (!data) return [];
@@ -376,6 +420,9 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
       >
         Kvittering
       </ActionBtn>
+      <ActionBtn onClick={handlePrintLabel} icon={<Printer className="h-4 w-4" />}>
+        Skriv ut etikett
+      </ActionBtn>
     </div>
   );
 
@@ -457,6 +504,8 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
         lines={receipt?.lines ?? []}
         terminalName={terminal?.display_name ?? ""}
         onNewSale={handleNewSale}
+        onPrintReceipt={handlePrintReceipt}
+        printingReceipt={printingReceipt}
       />
       {sessionOpen && (
         <CloseSessionModal
