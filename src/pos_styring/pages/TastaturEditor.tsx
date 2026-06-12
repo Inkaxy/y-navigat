@@ -253,15 +253,26 @@ function DroppableCell({ x, y, children }: { x: number; y: number; children?: Re
   );
 }
 
-function KeypadButtonTile({ button, onEdit, dragging, onResize }: { button: KeypadButton; onEdit?: () => void; dragging?: boolean; onResize?: (w: number, h: number) => void }) {
+function KeypadButtonTile({ button, layout, onEdit, dragging, onResize }: { button: KeypadButton; layout?: KeypadLayoutDetail; onEdit?: () => void; dragging?: boolean; onResize?: (w: number, h: number) => void }) {
   const notInPos = button.button_type === "product" && button.product && button.product.in_pos === false;
-  const { data: signedFromPath = "" } = useQuery({
-    queryKey: ["pos_keypad_tile_url", button.image_storage_path],
-    queryFn: () => getKeypadSignedUrl(button.image_storage_path),
-    enabled: !!button.image_storage_path,
+  const showImage = button.show_image ?? layout?.show_product_image ?? true;
+
+  const { data: productPrimaryPath = null } = useQuery({
+    queryKey: ["pos_product_primary_image_path", button.product_id],
+    queryFn: () => fetchPrimaryProductImagePath(button.product_id!),
+    enabled: showImage && button.button_type === "product" && !!button.product_id && !button.image_storage_path && !button.image_url,
     staleTime: 50 * 60 * 1000,
   });
-  const bgImage = button.image_url || signedFromPath;
+
+  const effectivePath = button.image_storage_path || productPrimaryPath;
+
+  const { data: signedFromPath = "" } = useQuery({
+    queryKey: ["pos_keypad_tile_url", effectivePath],
+    queryFn: () => getKeypadSignedUrl(effectivePath),
+    enabled: showImage && !!effectivePath,
+    staleTime: 50 * 60 * 1000,
+  });
+  const bgImage = showImage ? (button.image_url || signedFromPath) : "";
   return (
     <button
       type="button"
