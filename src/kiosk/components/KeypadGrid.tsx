@@ -126,7 +126,11 @@ export function KeypadGrid({ data }: Props) {
     }
   };
 
+  const kbLegalEntityId =
+    operator?.legal_entity_id ?? terminal?.legal_entity_id ?? null;
+
   return (
+    <>
     <div className="flex h-full flex-col gap-3">
       {nav.canGoBack ? (
         <div className="flex items-center gap-3">
