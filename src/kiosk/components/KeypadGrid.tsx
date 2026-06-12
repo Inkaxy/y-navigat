@@ -100,6 +100,10 @@ export function KeypadGrid({ data }: Props) {
   };
 
   const handleFunction = (b: KeypadButton) => {
+    if (b.function_code === "kakebygger") {
+      setKakebyggerOpen(true);
+      return;
+    }
     toast.info(
       `${b.display_label ?? b.function_code ?? "Funksjon"}: bygges senere`,
     );
