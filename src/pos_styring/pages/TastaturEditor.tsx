@@ -748,6 +748,23 @@ export default function TastaturEditor() {
     return map;
   }, [buttons]);
 
+  const toggleShowImagesMutation = useMutation({
+    mutationFn: async (next: boolean) => {
+      if (!layoutId) return;
+      const { error } = await supabase
+        .from("pos_keypad_layouts")
+        .update({ show_product_image: next })
+        .eq("id", layoutId);
+      if (error) throw error;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["pos_keypad_layout", layoutId] });
+      toast.success("Layout oppdatert");
+    },
+    onError: (error) => toast.error("Kunne ikke oppdatere layout", { description: error instanceof Error ? error.message : "Ukjent feil" }),
+  });
+
+
   const pageMutation = useMutation({
     mutationFn: async () => {
       if (!layoutId || !pageDialog) return;
