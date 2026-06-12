@@ -1,9 +1,10 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { CakeBuilder } from "@/varer/features/cakeBuilder/CakeBuilder";
 import { listenFromParent, postToParent } from "@/varer/features/cakeBuilder/protocol";
+import { supabase } from "@/integrations/supabase/client";
 import type { CakeResult, PriceBreakdown } from "@/varer/features/cakeBuilder/types";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Loader2 } from "lucide-react";
 
 /**
  * Standalone embed surface for the CakeBuilder.
@@ -35,6 +36,36 @@ export default function CakeBuilderEmbed() {
   const theme = (searchParams.get("theme") as "light" | "dark") || "light";
   const vatToggle = searchParams.get("vat_toggle") !== "false";
   const returnUrl = searchParams.get("return_url");
+  const source = searchParams.get("source");
+  const [authReady, setAuthReady] = useState(source !== "kiosk");
+
+  // Når embeden lastes fra POS-kiosken: hent kiosk-sesjonen fra localStorage
+  // (storageKey `pos-kiosk-auth`) og injiser den i default supabase-klienten
+  // slik at RPC-er som krever `authenticated` virker.
+  useEffect(() => {
+    if (source !== "kiosk") return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const raw = localStorage.getItem("pos-kiosk-auth");
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          const access_token = parsed?.access_token ?? parsed?.currentSession?.access_token;
+          const refresh_token = parsed?.refresh_token ?? parsed?.currentSession?.refresh_token;
+          if (access_token && refresh_token) {
+            await supabase.auth.setSession({ access_token, refresh_token });
+          }
+        }
+      } catch {
+        /* ignore */
+      } finally {
+        if (!cancelled) setAuthReady(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [source]);
 
   // Apply theme to document root
   useEffect(() => {
@@ -122,6 +153,15 @@ export default function CakeBuilderEmbed() {
       </div>
     );
   }
+
+  if (!authReady) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
 
   return (
     <div className="h-screen w-screen overflow-hidden bg-background">
