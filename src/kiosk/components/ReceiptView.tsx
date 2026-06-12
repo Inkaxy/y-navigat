@@ -47,7 +47,7 @@ interface Props {
   printingReceipt?: boolean;
 }
 
-export function ReceiptView({ open, tx, lines, terminalName, onNewSale }: Props) {
+export function ReceiptView({ open, tx, lines, terminalName, onNewSale, onPrintReceipt, printingReceipt }: Props) {
   if (!tx) return null;
   const mva = parseMvaBreakdown(tx.mva_breakdown);
   const pay = parsePaymentSummary(tx.payment_summary);
