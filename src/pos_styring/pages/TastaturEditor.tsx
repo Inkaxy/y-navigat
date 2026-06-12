@@ -547,19 +547,45 @@ function ButtonDialog({ open, onOpenChange, pageId, layout, buttons, pages, cell
               )} />
               <FormField control={form.control} name="image_url" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Bilde-URL</FormLabel>
-                  <FormControl><Input {...field} placeholder="https://…" /></FormControl>
+                  <FormLabel>Bilde-URL (overstyring)</FormLabel>
+                  <FormControl><Input {...field} placeholder="https://… (valgfri, overstyrer produktbilde)" /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
             </div>
 
-            {imageUrl && (
+            {buttonType === "product" && (
+              <div className="flex items-center justify-between rounded-md border bg-muted/40 p-3 text-sm">
+                <div>
+                  <div className="font-medium">Produktbilde på knapp</div>
+                  <div className="text-xs text-muted-foreground">
+                    {imageStoragePath
+                      ? "Bruker primærbildet fra produktet."
+                      : primaryImagePath
+                        ? "Tilgjengelig — klikk for å bruke."
+                        : "Ingen primærbilde lastet opp for dette produktet."}
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  {imageStoragePath ? (
+                    <Button type="button" variant="outline" size="sm" onClick={() => form.setValue("image_storage_path", "", { shouldDirty: true })}>
+                      Fjern bilde
+                    </Button>
+                  ) : (
+                    <Button type="button" variant="outline" size="sm" disabled={!primaryImagePath} onClick={() => primaryImagePath && form.setValue("image_storage_path", primaryImagePath, { shouldDirty: true })}>
+                      Bruk produktbilde
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {effectivePreviewUrl && (
               <div className="overflow-hidden rounded-lg border bg-muted">
                 <div className="relative aspect-[5/2]">
-                  <img src={imageUrl} alt="Forhåndsvisning av knappbilde" className="h-full w-full object-cover" />
+                  <img src={effectivePreviewUrl} alt="Forhåndsvisning av knappbilde" className="h-full w-full object-cover" />
                   <div className="absolute inset-x-0 bottom-0 bg-background/80 p-2 text-sm font-medium text-foreground">
-                    Primærbilde som knapp-preview
+                    {imageUrl ? "Egendefinert bilde-URL" : "Primærbilde fra produkt"}
                   </div>
                 </div>
               </div>
