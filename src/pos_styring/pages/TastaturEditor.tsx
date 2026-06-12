@@ -871,7 +871,15 @@ export default function TastaturEditor() {
           <h1 className="text-3xl font-semibold tracking-normal">{layout.display_name}</h1>
           <p className="mt-1 text-sm text-muted-foreground">{layout.grid_cols} × {layout.grid_rows} grid · {activeEntity?.short_code}</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="flex cursor-pointer items-center gap-2 rounded-md border bg-card px-3 py-2 text-xs">
+            <Switch
+              checked={layout.show_product_image}
+              onCheckedChange={(checked) => toggleShowImagesMutation.mutate(checked)}
+              disabled={toggleShowImagesMutation.isPending}
+            />
+            <span className="font-medium">Vis produktbilder på taster</span>
+          </label>
           <Button variant="outline" size="sm" onClick={() => setPreviewOpen((v) => !v)}>
             {previewOpen ? "Skjul forhåndsvisning" : "Vis forhåndsvisning"}
           </Button>
