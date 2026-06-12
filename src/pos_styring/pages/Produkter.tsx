@@ -158,13 +158,21 @@ function ProductImageDialog({ product, activeEntityId, open, onOpenChange }: { p
     enabled: open && !!product?.id,
   });
 
+  const stationsQuery = useQuery({
+    queryKey: ["pos_print_stations_for_products", activeEntityId],
+    queryFn: () => fetchStations(activeEntityId),
+    enabled: open,
+  });
+
   const savePosNameMutation = useMutation({
     mutationFn: async (next: string | null) => {
       if (!product) return;
-      const { error } = await supabase
-        .from("products")
-        .update({ pos_display_name: next })
-        .eq("id", product.id);
+      // INT.3-fiks: RPC for å unngå Varer-write-RLS-vegg for POS-Styring-brukere
+      // uten varer-skrivetilgang.
+      const { error } = await supabase.rpc("pos_set_product_name", {
+        p_product_id: product.id,
+        p_pos_name: next,
+      });
       if (error) throw error;
     },
     onSuccess: async () => {
@@ -172,6 +180,22 @@ function ProductImageDialog({ product, activeEntityId, open, onOpenChange }: { p
       await queryClient.invalidateQueries({ queryKey: ["products_for_pos", activeEntityId] });
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Kunne ikke lagre navn"),
+  });
+
+  const saveStationMutation = useMutation({
+    mutationFn: async (stationId: string | null) => {
+      if (!product) return;
+      const { error } = await supabase.rpc("pos_set_product_station", {
+        p_product_id: product.id,
+        p_station_id: stationId,
+      });
+      if (error) throw error;
+    },
+    onSuccess: async () => {
+      toast.success("Stasjon lagret");
+      await queryClient.invalidateQueries({ queryKey: ["products_for_pos", activeEntityId] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Kunne ikke lagre stasjon"),
   });
 
   const invalidate = async () => {
