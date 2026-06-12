@@ -131,6 +131,7 @@ const buttonSchema = z.object({
   display_label: z.string().trim().optional(),
   image_url: z.string().trim().optional(),
   image_storage_path: z.string().trim().optional(),
+  show_image: z.enum(["inherit", "on", "off"]),
   background_color: z.string().trim().optional(),
   text_color: z.string().trim().optional(),
   grid_width: z.coerce.number().int().min(1, "Minst 1").max(12, "For stor"),
@@ -148,6 +149,17 @@ const buttonSchema = z.object({
 });
 
 type ButtonFormValues = z.infer<typeof buttonSchema>;
+
+function showImageToBoolNullable(v: "inherit" | "on" | "off"): boolean | null {
+  if (v === "on") return true;
+  if (v === "off") return false;
+  return null;
+}
+function showImageFromDb(v: boolean | null | undefined): "inherit" | "on" | "off" {
+  if (v === true) return "on";
+  if (v === false) return "off";
+  return "inherit";
+}
 
 function normalizeOptional(value?: string | null) {
   const trimmed = value?.trim();
