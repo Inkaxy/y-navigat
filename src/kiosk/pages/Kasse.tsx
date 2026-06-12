@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { CloseSessionModal } from "@/kiosk/components/CloseSessionModal";
 import { PaymentModal } from "@/kiosk/components/PaymentModal";
+import { KakebyggerModal } from "@/kiosk/components/KakebyggerModal";
 import { ReceiptView } from "@/kiosk/components/ReceiptView";
 import { useTerminal } from "@/kiosk/context/TerminalContext";
 import { useOperator } from "@/kiosk/context/OperatorContext";
