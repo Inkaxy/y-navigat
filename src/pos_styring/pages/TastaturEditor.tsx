@@ -590,31 +590,34 @@ function ButtonDialog({ open, onOpenChange, pageId, layout, buttons, pages, cell
               )} />
             </div>
 
-            {buttonType === "product" && (
-              <div className="flex items-center justify-between rounded-md border bg-muted/40 p-3 text-sm">
-                <div>
-                  <div className="font-medium">Produktbilde på knapp</div>
-                  <div className="text-xs text-muted-foreground">
-                    {imageStoragePath
-                      ? "Bruker primærbildet fra produktet."
-                      : primaryImagePath
-                        ? "Tilgjengelig — klikk for å bruke."
-                        : "Ingen primærbilde lastet opp for dette produktet."}
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  {imageStoragePath ? (
-                    <Button type="button" variant="outline" size="sm" onClick={() => form.setValue("image_storage_path", "", { shouldDirty: true })}>
-                      Fjern bilde
-                    </Button>
-                  ) : (
-                    <Button type="button" variant="outline" size="sm" disabled={!primaryImagePath} onClick={() => primaryImagePath && form.setValue("image_storage_path", primaryImagePath, { shouldDirty: true })}>
-                      Bruk produktbilde
-                    </Button>
-                  )}
-                </div>
-              </div>
-            )}
+            <FormField control={form.control} name="show_image" render={({ field }) => (
+              <FormItem className="rounded-md border bg-muted/40 p-3">
+                <FormLabel>Bilde på knappen</FormLabel>
+                <FormControl>
+                  <RadioGroup value={field.value} onValueChange={field.onChange} className="grid grid-cols-3 gap-2">
+                    {[
+                      ["inherit", `Arv fra layout (${layout.show_product_image ? "på" : "av"})`],
+                      ["on", "Alltid vis"],
+                      ["off", "Skjul"],
+                    ].map(([value, label]) => (
+                      <label key={value} className="flex cursor-pointer items-center gap-2 rounded-md border p-2 text-xs">
+                        <RadioGroupItem value={value} /> {label}
+                      </label>
+                    ))}
+                  </RadioGroup>
+                </FormControl>
+                {buttonType === "product" && (
+                  <p className="text-xs text-muted-foreground">
+                    {effectiveShowImage
+                      ? primaryImagePath || imageStoragePath || imageUrl
+                        ? "Knappen vil vise produktets primærbilde (eller egendefinert override)."
+                        : "Ingen primærbilde lastet opp for dette produktet ennå — last opp under Varer (POS)."
+                      : "Bilde er skjult for denne knappen."}
+                  </p>
+                )}
+                <FormMessage />
+              </FormItem>
+            )} />
 
             {effectivePreviewUrl && (
               <div className="overflow-hidden rounded-lg border bg-muted">
