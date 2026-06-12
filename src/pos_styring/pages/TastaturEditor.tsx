@@ -340,6 +340,7 @@ function ButtonDialog({ open, onOpenChange, pageId, layout, buttons, pages, cell
   const buttonType = form.watch("button_type");
   const selectedProductId = form.watch("product_id");
   const imageUrl = form.watch("image_url");
+  const imageStoragePath = form.watch("image_storage_path");
 
   useEffect(() => {
     if (!open) return;
@@ -350,6 +351,7 @@ function ButtonDialog({ open, onOpenChange, pageId, layout, buttons, pages, cell
       target_page_id: button?.target_page_id ?? "",
       display_label: button?.display_label ?? "",
       image_url: button?.image_url ?? "",
+      image_storage_path: button?.image_storage_path ?? "",
       background_color: button?.background_color ?? "",
       text_color: button?.text_color ?? "",
       grid_width: button?.grid_width ?? 1,
@@ -364,16 +366,28 @@ function ButtonDialog({ open, onOpenChange, pageId, layout, buttons, pages, cell
     enabled: open && buttonType === "product" && !!activeEntityId,
   });
 
-  const { data: primaryProductImage = "" } = useQuery({
-    queryKey: ["pos_product_primary_image", selectedProductId],
-    queryFn: () => fetchPrimaryProductImage(selectedProductId!),
-    enabled: open && !isEdit && buttonType === "product" && !!selectedProductId,
+  const { data: primaryImagePath = null } = useQuery({
+    queryKey: ["pos_product_primary_image_path", selectedProductId],
+    queryFn: () => fetchPrimaryProductImagePath(selectedProductId!),
+    enabled: open && buttonType === "product" && !!selectedProductId,
   });
 
   useEffect(() => {
-    if (!open || isEdit || buttonType !== "product" || !primaryProductImage) return;
-    if (!form.getValues("image_url")) form.setValue("image_url", primaryProductImage, { shouldDirty: true });
-  }, [buttonType, form, isEdit, open, primaryProductImage]);
+    if (!open || isEdit || buttonType !== "product" || !primaryImagePath) return;
+    if (!form.getValues("image_storage_path") && !form.getValues("image_url")) {
+      form.setValue("image_storage_path", primaryImagePath, { shouldDirty: true });
+    }
+  }, [buttonType, form, isEdit, open, primaryImagePath]);
+
+  // Sign preview URL for storage_path (own image OR product primary)
+  const previewStoragePath = imageStoragePath || (buttonType === "product" ? primaryImagePath ?? "" : "");
+  const { data: previewSignedUrl = "" } = useQuery({
+    queryKey: ["pos_keypad_preview_url", previewStoragePath],
+    queryFn: () => getKeypadSignedUrl(previewStoragePath),
+    enabled: open && !!previewStoragePath,
+  });
+  const effectivePreviewUrl = imageUrl || previewSignedUrl;
+
 
   const saveMutation = useMutation({
     mutationFn: async (values: ButtonFormValues) => {
