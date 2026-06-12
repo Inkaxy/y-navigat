@@ -448,6 +448,7 @@ function ButtonDialog({ open, onOpenChange, pageId, layout, buttons, pages, cell
         display_label: normalizeOptional(values.display_label),
         image_url: normalizeOptional(values.image_url),
         image_storage_path: normalizeOptional(values.image_storage_path),
+        show_image: showImageToBoolNullable(values.show_image),
         background_color: normalizeOptional(values.background_color),
         text_color: normalizeOptional(values.text_color),
         ...candidate,
