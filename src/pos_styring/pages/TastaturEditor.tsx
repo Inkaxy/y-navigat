@@ -375,6 +375,9 @@ function ButtonDialog({ open, onOpenChange, pageId, layout, buttons, pages, cell
   const selectedProductId = form.watch("product_id");
   const imageUrl = form.watch("image_url");
   const imageStoragePath = form.watch("image_storage_path");
+  const showImageMode = form.watch("show_image");
+  const effectiveShowImage =
+    showImageMode === "on" ? true : showImageMode === "off" ? false : layout.show_product_image;
 
   useEffect(() => {
     if (!open) return;
@@ -386,6 +389,7 @@ function ButtonDialog({ open, onOpenChange, pageId, layout, buttons, pages, cell
       display_label: button?.display_label ?? "",
       image_url: button?.image_url ?? "",
       image_storage_path: button?.image_storage_path ?? "",
+      show_image: showImageFromDb(button?.show_image ?? null),
       background_color: button?.background_color ?? "",
       text_color: button?.text_color ?? "",
       grid_width: button?.grid_width ?? 1,
