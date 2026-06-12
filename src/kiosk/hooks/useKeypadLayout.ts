@@ -10,6 +10,7 @@ export type KeypadButton = {
   display_label: string | null;
   image_url: string | null;
   image_storage_path: string | null;
+  show_image: boolean | null;
   background_color: string | null;
   text_color: string | null;
   grid_x: number;
@@ -36,6 +37,7 @@ export type KeypadLayout = {
   grid_cols: number;
   grid_rows: number;
   is_default: boolean;
+  show_product_image: boolean;
   theme: unknown | null;
   customer_screen: unknown | null;
 };
@@ -46,6 +48,8 @@ export type KeypadData = {
   buttons: KeypadButton[];
   /** Map fra storage_path → signert URL for produktbilder. */
   imageUrls: Record<string, string>;
+  /** Map fra product_id → primær storage_path (fra pos_product_images). */
+  productPrimaryPaths: Record<string, string>;
 } | null;
 
 const PRODUCT_IMAGE_BUCKET = "pos-product-images";
@@ -94,6 +98,26 @@ async function signImageUrls(paths: string[]): Promise<Record<string, string>> {
   return out;
 }
 
+async function fetchProductPrimaryPaths(
+  productIds: string[],
+): Promise<Record<string, string>> {
+  if (productIds.length === 0) return {};
+  const { data, error } = await kioskSupabase
+    .from("pos_product_images")
+    .select("product_id, storage_path, is_primary")
+    .in("product_id", productIds)
+    .eq("is_primary", true);
+  if (error) {
+    console.warn("[keypad] kunne ikke hente produktbilder", error);
+    return {};
+  }
+  const out: Record<string, string> = {};
+  for (const row of data ?? []) {
+    if (row.product_id && row.storage_path) out[row.product_id] = row.storage_path;
+  }
+  return out;
+}
+
 export function useKeypadLayout(terminalId: string, legalEntityId: string | null) {
   return useQuery<KeypadData>({
     queryKey: ["kiosk-keypad", terminalId, legalEntityId],
@@ -119,20 +143,32 @@ export function useKeypadLayout(terminalId: string, legalEntityId: string | null
         buttons = (btns ?? []) as KeypadButton[];
       }
 
-      const paths = Array.from(
+      const productIds = Array.from(
         new Set(
           buttons
-            .map((b) => b.image_storage_path)
+            .filter((b) => b.button_type === "product")
+            .map((b) => b.product_id)
             .filter((p): p is string => !!p),
         ),
+      );
+      const productPrimaryPaths = await fetchProductPrimaryPaths(productIds);
+
+      const paths = Array.from(
+        new Set([
+          ...buttons
+            .map((b) => b.image_storage_path)
+            .filter((p): p is string => !!p),
+          ...Object.values(productPrimaryPaths),
+        ]),
       );
       const imageUrls = await signImageUrls(paths);
 
       return {
-        layout,
+        layout: layout as KeypadLayout,
         pages: (pages ?? []) as KeypadPage[],
         buttons,
         imageUrls,
+        productPrimaryPaths,
       };
     },
     staleTime: 50 * 60 * 1000,

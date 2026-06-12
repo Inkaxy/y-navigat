@@ -4297,6 +4297,7 @@ export type Database = {
           image_url: string | null
           page_id: string
           product_id: string | null
+          show_image: boolean | null
           target_page_id: string | null
           text_color: string | null
         }
@@ -4314,6 +4315,7 @@ export type Database = {
           image_url?: string | null
           page_id: string
           product_id?: string | null
+          show_image?: boolean | null
           target_page_id?: string | null
           text_color?: string | null
         }
@@ -4331,6 +4333,7 @@ export type Database = {
           image_url?: string | null
           page_id?: string
           product_id?: string | null
+          show_image?: boolean | null
           target_page_id?: string | null
           text_color?: string | null
         }
@@ -4368,6 +4371,7 @@ export type Database = {
           id: string
           is_default: boolean
           legal_entity_id: string
+          show_product_image: boolean
           terminal_id: string | null
           theme: Json | null
           updated_at: string
@@ -4381,6 +4385,7 @@ export type Database = {
           id?: string
           is_default?: boolean
           legal_entity_id: string
+          show_product_image?: boolean
           terminal_id?: string | null
           theme?: Json | null
           updated_at?: string
@@ -4394,6 +4399,7 @@ export type Database = {
           id?: string
           is_default?: boolean
           legal_entity_id?: string
+          show_product_image?: boolean
           terminal_id?: string | null
           theme?: Json | null
           updated_at?: string

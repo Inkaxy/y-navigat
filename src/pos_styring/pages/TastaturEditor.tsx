@@ -46,6 +46,7 @@ import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 import { useLegalEntity } from "@/pos_styring/contexts/LegalEntityContext";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
@@ -61,6 +62,7 @@ interface KeypadLayoutDetail {
   grid_rows: number;
   terminal_id: string | null;
   is_default: boolean;
+  show_product_image: boolean;
   theme: unknown;
   customer_screen: unknown;
 }
@@ -83,6 +85,7 @@ interface KeypadButton {
   display_label: string | null;
   image_url: string | null;
   image_storage_path: string | null;
+  show_image: boolean | null;
   background_color: string | null;
   text_color: string | null;
   grid_x: number;
@@ -128,6 +131,7 @@ const buttonSchema = z.object({
   display_label: z.string().trim().optional(),
   image_url: z.string().trim().optional(),
   image_storage_path: z.string().trim().optional(),
+  show_image: z.enum(["inherit", "on", "off"]),
   background_color: z.string().trim().optional(),
   text_color: z.string().trim().optional(),
   grid_width: z.coerce.number().int().min(1, "Minst 1").max(12, "For stor"),
@@ -145,6 +149,17 @@ const buttonSchema = z.object({
 });
 
 type ButtonFormValues = z.infer<typeof buttonSchema>;
+
+function showImageToBoolNullable(v: "inherit" | "on" | "off"): boolean | null {
+  if (v === "on") return true;
+  if (v === "off") return false;
+  return null;
+}
+function showImageFromDb(v: boolean | null | undefined): "inherit" | "on" | "off" {
+  if (v === true) return "on";
+  if (v === false) return "off";
+  return "inherit";
+}
 
 function normalizeOptional(value?: string | null) {
   const trimmed = value?.trim();
@@ -166,7 +181,7 @@ function hasCollision(candidate: { grid_x: number; grid_y: number; grid_width: n
 async function fetchLayout(layoutId: string): Promise<KeypadLayoutDetail> {
   const { data, error } = await supabase
     .from("pos_keypad_layouts")
-    .select("id, legal_entity_id, display_name, grid_cols, grid_rows, terminal_id, is_default, theme, customer_screen")
+    .select("id, legal_entity_id, display_name, grid_cols, grid_rows, terminal_id, is_default, show_product_image, theme, customer_screen")
     .eq("id", layoutId)
     .single();
   if (error) throw error;
@@ -186,7 +201,7 @@ async function fetchPages(layoutId: string): Promise<KeypadPage[]> {
 async function fetchButtons(pageId: string): Promise<KeypadButton[]> {
   const { data, error } = await supabase
     .from("pos_keypad_buttons")
-    .select("id, page_id, button_type, product_id, function_code, display_label, image_url, image_storage_path, background_color, text_color, grid_x, grid_y, grid_width, grid_height, target_page_id, product:products!pos_keypad_buttons_product_id_fkey(display_name, product_category, in_pos)")
+    .select("id, page_id, button_type, product_id, function_code, display_label, image_url, image_storage_path, show_image, background_color, text_color, grid_x, grid_y, grid_width, grid_height, target_page_id, product:products!pos_keypad_buttons_product_id_fkey(display_name, product_category, in_pos)")
     .eq("page_id", pageId);
   if (error) throw error;
   return (data ?? []) as unknown as KeypadButton[];
@@ -238,15 +253,26 @@ function DroppableCell({ x, y, children }: { x: number; y: number; children?: Re
   );
 }
 
-function KeypadButtonTile({ button, onEdit, dragging, onResize }: { button: KeypadButton; onEdit?: () => void; dragging?: boolean; onResize?: (w: number, h: number) => void }) {
+function KeypadButtonTile({ button, layout, onEdit, dragging, onResize }: { button: KeypadButton; layout?: KeypadLayoutDetail; onEdit?: () => void; dragging?: boolean; onResize?: (w: number, h: number) => void }) {
   const notInPos = button.button_type === "product" && button.product && button.product.in_pos === false;
-  const { data: signedFromPath = "" } = useQuery({
-    queryKey: ["pos_keypad_tile_url", button.image_storage_path],
-    queryFn: () => getKeypadSignedUrl(button.image_storage_path),
-    enabled: !!button.image_storage_path,
+  const showImage = button.show_image ?? layout?.show_product_image ?? true;
+
+  const { data: productPrimaryPath = null } = useQuery({
+    queryKey: ["pos_product_primary_image_path", button.product_id],
+    queryFn: () => fetchPrimaryProductImagePath(button.product_id!),
+    enabled: showImage && button.button_type === "product" && !!button.product_id && !button.image_storage_path && !button.image_url,
     staleTime: 50 * 60 * 1000,
   });
-  const bgImage = button.image_url || signedFromPath;
+
+  const effectivePath = button.image_storage_path || productPrimaryPath;
+
+  const { data: signedFromPath = "" } = useQuery({
+    queryKey: ["pos_keypad_tile_url", effectivePath],
+    queryFn: () => getKeypadSignedUrl(effectivePath),
+    enabled: showImage && !!effectivePath,
+    staleTime: 50 * 60 * 1000,
+  });
+  const bgImage = showImage ? (button.image_url || signedFromPath) : "";
   return (
     <button
       type="button"
@@ -337,6 +363,7 @@ function ButtonDialog({ open, onOpenChange, pageId, layout, buttons, pages, cell
       display_label: "",
       image_url: "",
       image_storage_path: "",
+      show_image: "inherit",
       background_color: "",
       text_color: "",
       grid_width: 1,
@@ -348,6 +375,9 @@ function ButtonDialog({ open, onOpenChange, pageId, layout, buttons, pages, cell
   const selectedProductId = form.watch("product_id");
   const imageUrl = form.watch("image_url");
   const imageStoragePath = form.watch("image_storage_path");
+  const showImageMode = form.watch("show_image");
+  const effectiveShowImage =
+    showImageMode === "on" ? true : showImageMode === "off" ? false : layout.show_product_image;
 
   useEffect(() => {
     if (!open) return;
@@ -359,6 +389,7 @@ function ButtonDialog({ open, onOpenChange, pageId, layout, buttons, pages, cell
       display_label: button?.display_label ?? "",
       image_url: button?.image_url ?? "",
       image_storage_path: button?.image_storage_path ?? "",
+      show_image: showImageFromDb(button?.show_image ?? null),
       background_color: button?.background_color ?? "",
       text_color: button?.text_color ?? "",
       grid_width: button?.grid_width ?? 1,
@@ -379,12 +410,9 @@ function ButtonDialog({ open, onOpenChange, pageId, layout, buttons, pages, cell
     enabled: open && buttonType === "product" && !!selectedProductId,
   });
 
-  useEffect(() => {
-    if (!open || isEdit || buttonType !== "product" || !primaryImagePath) return;
-    if (!form.getValues("image_storage_path") && !form.getValues("image_url")) {
-      form.setValue("image_storage_path", primaryImagePath, { shouldDirty: true });
-    }
-  }, [buttonType, form, isEdit, open, primaryImagePath]);
+  // Merk: vi setter IKKE image_storage_path automatisk fra produktets primærbilde lenger.
+  // Kiosken plukker det opp automatisk basert på `pos_product_images.is_primary` så lenge
+  // `show_image` (eller layoutens `show_product_image`) er på.
 
   // Sign preview URL for storage_path (own image OR product primary)
   const previewStoragePath = imageStoragePath || (buttonType === "product" ? primaryImagePath ?? "" : "");
@@ -420,6 +448,7 @@ function ButtonDialog({ open, onOpenChange, pageId, layout, buttons, pages, cell
         display_label: normalizeOptional(values.display_label),
         image_url: normalizeOptional(values.image_url),
         image_storage_path: normalizeOptional(values.image_storage_path),
+        show_image: showImageToBoolNullable(values.show_image),
         background_color: normalizeOptional(values.background_color),
         text_color: normalizeOptional(values.text_color),
         ...candidate,
@@ -561,31 +590,34 @@ function ButtonDialog({ open, onOpenChange, pageId, layout, buttons, pages, cell
               )} />
             </div>
 
-            {buttonType === "product" && (
-              <div className="flex items-center justify-between rounded-md border bg-muted/40 p-3 text-sm">
-                <div>
-                  <div className="font-medium">Produktbilde på knapp</div>
-                  <div className="text-xs text-muted-foreground">
-                    {imageStoragePath
-                      ? "Bruker primærbildet fra produktet."
-                      : primaryImagePath
-                        ? "Tilgjengelig — klikk for å bruke."
-                        : "Ingen primærbilde lastet opp for dette produktet."}
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  {imageStoragePath ? (
-                    <Button type="button" variant="outline" size="sm" onClick={() => form.setValue("image_storage_path", "", { shouldDirty: true })}>
-                      Fjern bilde
-                    </Button>
-                  ) : (
-                    <Button type="button" variant="outline" size="sm" disabled={!primaryImagePath} onClick={() => primaryImagePath && form.setValue("image_storage_path", primaryImagePath, { shouldDirty: true })}>
-                      Bruk produktbilde
-                    </Button>
-                  )}
-                </div>
-              </div>
-            )}
+            <FormField control={form.control} name="show_image" render={({ field }) => (
+              <FormItem className="rounded-md border bg-muted/40 p-3">
+                <FormLabel>Bilde på knappen</FormLabel>
+                <FormControl>
+                  <RadioGroup value={field.value} onValueChange={field.onChange} className="grid grid-cols-3 gap-2">
+                    {[
+                      ["inherit", `Arv fra layout (${layout.show_product_image ? "på" : "av"})`],
+                      ["on", "Alltid vis"],
+                      ["off", "Skjul"],
+                    ].map(([value, label]) => (
+                      <label key={value} className="flex cursor-pointer items-center gap-2 rounded-md border p-2 text-xs">
+                        <RadioGroupItem value={value} /> {label}
+                      </label>
+                    ))}
+                  </RadioGroup>
+                </FormControl>
+                {buttonType === "product" && (
+                  <p className="text-xs text-muted-foreground">
+                    {effectiveShowImage
+                      ? primaryImagePath || imageStoragePath || imageUrl
+                        ? "Knappen vil vise produktets primærbilde (eller egendefinert override)."
+                        : "Ingen primærbilde lastet opp for dette produktet ennå — last opp under Varer (POS)."
+                      : "Bilde er skjult for denne knappen."}
+                  </p>
+                )}
+                <FormMessage />
+              </FormItem>
+            )} />
 
             {effectivePreviewUrl && (
               <div className="overflow-hidden rounded-lg border bg-muted">
@@ -716,6 +748,23 @@ export default function TastaturEditor() {
     return map;
   }, [buttons]);
 
+  const toggleShowImagesMutation = useMutation({
+    mutationFn: async (next: boolean) => {
+      if (!layoutId) return;
+      const { error } = await supabase
+        .from("pos_keypad_layouts")
+        .update({ show_product_image: next })
+        .eq("id", layoutId);
+      if (error) throw error;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["pos_keypad_layout", layoutId] });
+      toast.success("Layout oppdatert");
+    },
+    onError: (error) => toast.error("Kunne ikke oppdatere layout", { description: error instanceof Error ? error.message : "Ukjent feil" }),
+  });
+
+
   const pageMutation = useMutation({
     mutationFn: async () => {
       if (!layoutId || !pageDialog) return;
@@ -839,7 +888,15 @@ export default function TastaturEditor() {
           <h1 className="text-3xl font-semibold tracking-normal">{layout.display_name}</h1>
           <p className="mt-1 text-sm text-muted-foreground">{layout.grid_cols} × {layout.grid_rows} grid · {activeEntity?.short_code}</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="flex cursor-pointer items-center gap-2 rounded-md border bg-card px-3 py-2 text-xs">
+            <Switch
+              checked={layout.show_product_image}
+              onCheckedChange={(checked) => toggleShowImagesMutation.mutate(checked)}
+              disabled={toggleShowImagesMutation.isPending}
+            />
+            <span className="font-medium">Vis produktbilder på taster</span>
+          </label>
           <Button variant="outline" size="sm" onClick={() => setPreviewOpen((v) => !v)}>
             {previewOpen ? "Skjul forhåndsvisning" : "Vis forhåndsvisning"}
           </Button>
@@ -914,7 +971,7 @@ export default function TastaturEditor() {
                   if (anchoredButton) {
                     return (
                       <div key={`${x}-${y}`} className="min-h-0" style={{ gridColumn: `${x + 1} / span ${anchoredButton.grid_width}`, gridRow: `${y + 1} / span ${anchoredButton.grid_height}` }}>
-                        <DraggableButton button={anchoredButton} onEdit={() => openButtonDialog(x, y, anchoredButton)} onResize={(w, h) => resizeButtonMutation.mutate({ button: anchoredButton, w, h })} />
+                        <DraggableButton button={anchoredButton} layout={layout} onEdit={() => openButtonDialog(x, y, anchoredButton)} onResize={(w, h) => resizeButtonMutation.mutate({ button: anchoredButton, w, h })} />
                       </div>
                     );
                   }
@@ -1017,11 +1074,11 @@ export default function TastaturEditor() {
   );
 }
 
-function DraggableButton({ button, onEdit, onResize }: { button: KeypadButton; onEdit: () => void; onResize?: (w: number, h: number) => void }) {
+function DraggableButton({ button, layout, onEdit, onResize }: { button: KeypadButton; layout?: KeypadLayoutDetail; onEdit: () => void; onResize?: (w: number, h: number) => void }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggableCompat(button.id);
   return (
     <div ref={setNodeRef} style={{ transform: CSS.Translate.toString(transform) }} className="h-full min-h-0" {...attributes} {...listeners}>
-      <KeypadButtonTile button={button} onEdit={onEdit} dragging={isDragging} onResize={onResize} />
+      <KeypadButtonTile button={button} layout={layout} onEdit={onEdit} dragging={isDragging} onResize={onResize} />
     </div>
   );
 }
