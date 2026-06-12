@@ -59,7 +59,16 @@ interface ProductCardItem {
   status: string;
   mva_rate: number;
   in_pos: boolean;
+  pos_print_station_id: string | null;
 }
+
+interface StationOption {
+  id: string;
+  display_name: string;
+  is_active: boolean;
+}
+
+const NO_STATION = "__none__";
 
 async function getSignedUrl(storagePath: string | null) {
   if (!storagePath) return undefined;
@@ -75,12 +84,22 @@ async function getSignedUrl(storagePath: string | null) {
 async function fetchProductsForPos(activeEntityId: string): Promise<ProductCardItem[]> {
   const { data, error } = await supabase
     .from("products")
-    .select("id, display_name, pos_display_name, display_number, image_url, status, mva_rate, in_pos")
+    .select("id, display_name, pos_display_name, display_number, image_url, status, mva_rate, in_pos, pos_print_station_id")
     .eq("legal_entity_id", activeEntityId)
     .eq("in_pos", true)
     .order("display_name", { ascending: true });
   if (error) throw error;
   return (data ?? []) as ProductCardItem[];
+}
+
+async function fetchStations(activeEntityId: string): Promise<StationOption[]> {
+  const { data, error } = await supabase
+    .from("pos_print_stations")
+    .select("id, display_name, is_active")
+    .eq("legal_entity_id", activeEntityId)
+    .order("display_name");
+  if (error) throw error;
+  return (data ?? []) as StationOption[];
 }
 
 async function fetchProductImages(productId: string): Promise<ProductImage[]> {
