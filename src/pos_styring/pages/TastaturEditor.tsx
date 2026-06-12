@@ -410,12 +410,9 @@ function ButtonDialog({ open, onOpenChange, pageId, layout, buttons, pages, cell
     enabled: open && buttonType === "product" && !!selectedProductId,
   });
 
-  useEffect(() => {
-    if (!open || isEdit || buttonType !== "product" || !primaryImagePath) return;
-    if (!form.getValues("image_storage_path") && !form.getValues("image_url")) {
-      form.setValue("image_storage_path", primaryImagePath, { shouldDirty: true });
-    }
-  }, [buttonType, form, isEdit, open, primaryImagePath]);
+  // Merk: vi setter IKKE image_storage_path automatisk fra produktets primærbilde lenger.
+  // Kiosken plukker det opp automatisk basert på `pos_product_images.is_primary` så lenge
+  // `show_image` (eller layoutens `show_product_image`) er på.
 
   // Sign preview URL for storage_path (own image OR product primary)
   const previewStoragePath = imageStoragePath || (buttonType === "product" ? primaryImagePath ?? "" : "");
