@@ -1,0 +1,1 @@
+CREATE POLICY cake_cat_kiosk_select ON public.cake_categories FOR SELECT TO authenticated USING (is_kiosk_user() AND status = 'active');
