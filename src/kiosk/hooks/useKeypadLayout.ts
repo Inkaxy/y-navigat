@@ -155,6 +155,21 @@ export function useKeypadLayout(terminalId: string, legalEntityId: string | null
       );
       const productPrimaryPaths = await fetchProductPrimaryPaths(productIds);
 
+      const productFallbackUrls: Record<string, string> = {};
+      const missingFallbackIds = productIds.filter((id) => !productPrimaryPaths[id]);
+      if (missingFallbackIds.length > 0) {
+        const { data: prodRows, error: eProd } = await kioskSupabase
+          .from("products")
+          .select("id, image_url")
+          .in("id", missingFallbackIds);
+        if (eProd) {
+          console.warn("[keypad] kunne ikke hente arvet image_url fra products", eProd);
+        }
+        for (const row of prodRows ?? []) {
+          if (row.id && row.image_url) productFallbackUrls[row.id] = row.image_url;
+        }
+      }
+
       const paths = Array.from(
         new Set([
           ...buttons
@@ -171,6 +186,7 @@ export function useKeypadLayout(terminalId: string, legalEntityId: string | null
         buttons,
         imageUrls,
         productPrimaryPaths,
+        productFallbackUrls,
       };
     },
     staleTime: 50 * 60 * 1000,
