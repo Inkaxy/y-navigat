@@ -52,6 +52,8 @@ export type KeypadData = {
   productPrimaryPaths: Record<string, string>;
   /** Map fra product_id → arvet image_url fra products (public bucket). */
   productFallbackUrls: Record<string, string>;
+  /** Map fra function_code → storage_path for sentralt opplastede funksjonsbilder. */
+  functionImagePaths: Record<string, string>;
 } | null;
 
 const PRODUCT_IMAGE_BUCKET = "pos-product-images";
