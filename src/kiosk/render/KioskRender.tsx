@@ -179,12 +179,16 @@ function KeypadCell({
   interactive: boolean;
   onClick?: () => void;
 }) {
+  const hasImage = !!b.image_url;
   return (
     <button
       type="button"
       disabled={!interactive}
       onClick={onClick}
-      className="flex flex-col items-center justify-center overflow-hidden border p-2 text-center text-sm font-semibold transition-transform active:scale-[0.97]"
+      className={cn(
+        "relative flex flex-col overflow-hidden border text-center text-sm font-semibold transition-transform active:scale-[0.97]",
+        hasImage ? "items-stretch justify-end" : "items-center justify-center p-2",
+      )}
       style={{
         gridColumn: `${b.grid_x + 1} / span ${b.grid_width || 1}`,
         gridRow: `${b.grid_y + 1} / span ${b.grid_height || 1}`,
@@ -196,10 +200,15 @@ function KeypadCell({
         cursor: interactive ? "pointer" : "default",
       }}
     >
-      {b.image_url && (
-        <img src={b.image_url} alt="" className="mb-1 max-h-12 object-contain" draggable={false} />
+      {hasImage && (
+        <img src={b.image_url!} alt="" className="absolute inset-0 h-full w-full object-cover" draggable={false} />
       )}
-      <span className="leading-tight">{b.display_label || "—"}</span>
+      <span
+        className={cn("relative z-10 leading-tight", hasImage && "w-full px-2 py-2")}
+        style={hasImage ? { background: "var(--kiosk-surface)" } : undefined}
+      >
+        {b.display_label || "—"}
+      </span>
     </button>
   );
 }
