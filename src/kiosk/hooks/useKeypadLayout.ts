@@ -52,6 +52,8 @@ export type KeypadData = {
   productPrimaryPaths: Record<string, string>;
   /** Map fra product_id → arvet image_url fra products (public bucket). */
   productFallbackUrls: Record<string, string>;
+  /** Map fra product_id → POS-navn/display_name fra products. */
+  productDisplayNames: Record<string, string>;
   /** Map fra function_code → storage_path for sentralt opplastede funksjonsbilder. */
   functionImagePaths: Record<string, string>;
 } | null;
@@ -158,17 +160,19 @@ export function useKeypadLayout(terminalId: string, legalEntityId: string | null
       const productPrimaryPaths = await fetchProductPrimaryPaths(productIds);
 
       const productFallbackUrls: Record<string, string> = {};
-      const missingFallbackIds = productIds.filter((id) => !productPrimaryPaths[id]);
-      if (missingFallbackIds.length > 0) {
+      const productDisplayNames: Record<string, string> = {};
+      if (productIds.length > 0) {
         const { data: prodRows, error: eProd } = await kioskSupabase
           .from("products")
-          .select("id, image_url")
-          .in("id", missingFallbackIds);
+          .select("id, pos_display_name, display_name, image_url")
+          .in("id", productIds);
         if (eProd) {
-          console.warn("[keypad] kunne ikke hente arvet image_url fra products", eProd);
+          console.warn("[keypad] kunne ikke hente POS-produktdata fra products", eProd);
         }
         for (const row of prodRows ?? []) {
           if (row.id && row.image_url) productFallbackUrls[row.id] = row.image_url;
+          const displayName = (row.pos_display_name || row.display_name || "").trim();
+          if (row.id && displayName) productDisplayNames[row.id] = displayName;
         }
       }
 
@@ -206,6 +210,7 @@ export function useKeypadLayout(terminalId: string, legalEntityId: string | null
         imageUrls,
         productPrimaryPaths,
         productFallbackUrls,
+        productDisplayNames,
         functionImagePaths,
       };
     },
