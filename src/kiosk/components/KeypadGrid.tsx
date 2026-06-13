@@ -21,7 +21,7 @@ interface Props {
 }
 
 export function KeypadGrid({ data }: Props) {
-  const { layout, pages, buttons, imageUrls, productPrimaryPaths, productFallbackUrls } = data;
+  const { layout, pages, buttons, imageUrls, productPrimaryPaths, productFallbackUrls, functionImagePaths } = data;
   const { terminal } = useTerminal();
   const { operator } = useOperator();
   const nav = useKeypadNav();
