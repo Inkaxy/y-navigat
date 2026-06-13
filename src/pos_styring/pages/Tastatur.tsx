@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Copy, Grid3X3, MoreHorizontal, PenLine, Plus, Star, Trash2 } from "lucide-react";
+import { Copy, Grid3X3, ImageIcon, MoreHorizontal, PenLine, Plus, Star, Trash2 } from "lucide-react";
+import { FunctionImagesDialog } from "@/pos_styring/components/FunctionImagesDialog";
 import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
