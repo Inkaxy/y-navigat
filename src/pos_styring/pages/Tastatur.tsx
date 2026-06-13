@@ -492,9 +492,14 @@ export default function Tastatur() {
           <h1 className="text-3xl font-semibold tracking-normal">Tastatur-layouts</h1>
           <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
         </div>
-        <Button onClick={() => { setEditingLayout(null); setDialogOpen(true); }} disabled={!activeEntityId}>
-          <Plus className="h-4 w-4" /> Nytt layout
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => setFunctionImagesOpen(true)} disabled={!activeEntityId}>
+            <ImageIcon className="h-4 w-4" /> Funksjonsbilder
+          </Button>
+          <Button onClick={() => { setEditingLayout(null); setDialogOpen(true); }} disabled={!activeEntityId}>
+            <Plus className="h-4 w-4" /> Nytt layout
+          </Button>
+        </div>
       </div>
 
       {error ? (
