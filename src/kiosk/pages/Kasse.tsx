@@ -390,19 +390,42 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
 
   const renderButtons: RenderButton[] = useMemo(() => {
     if (!data) return [];
-    return data.buttons.map((b) => ({
-      id: b.id,
-      page_id: b.page_id,
-      button_type: (b.button_type as RenderButton["button_type"]) ?? "function",
-      display_label: b.display_label,
-      image_url: b.image_url,
-      background_color: b.background_color,
-      text_color: b.text_color,
-      grid_x: b.grid_x,
-      grid_y: b.grid_y,
-      grid_width: b.grid_width,
-      grid_height: b.grid_height,
-    }));
+    return data.buttons.map((b) => {
+      const showImage = b.show_image ?? data.layout.show_product_image ?? true;
+      const productPath =
+        b.button_type === "product" && b.product_id
+          ? data.productPrimaryPaths[b.product_id] ?? null
+          : null;
+      const productFallback =
+        b.button_type === "product" && b.product_id
+          ? data.productFallbackUrls[b.product_id] ?? null
+          : null;
+      const productName =
+        b.button_type === "product" && b.product_id
+          ? data.productDisplayNames[b.product_id] ?? null
+          : null;
+      const functionPath =
+        (b.button_type === "function" || b.button_type === "function_code") && b.function_code
+          ? data.functionImagePaths[b.function_code] ?? null
+          : null;
+      const resolvedPath = b.image_storage_path || productPath || functionPath;
+
+      return {
+        id: b.id,
+        page_id: b.page_id,
+        button_type: (b.button_type as RenderButton["button_type"]) ?? "function",
+        display_label: b.display_label || productName,
+        image_url: showImage
+          ? (resolvedPath && data.imageUrls[resolvedPath]) || b.image_url || productFallback || null
+          : null,
+        background_color: b.background_color,
+        text_color: b.text_color,
+        grid_x: b.grid_x,
+        grid_y: b.grid_y,
+        grid_width: b.grid_width,
+        grid_height: b.grid_height,
+      };
+    });
   }, [data]);
 
   const renderCart: RenderCartLine[] = cart.items.map((it) => ({
