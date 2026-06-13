@@ -428,6 +428,7 @@ export default function Tastatur() {
   const [editingLayout, setEditingLayout] = useState<KeypadLayout | null>(null);
   const [copyingLayout, setCopyingLayout] = useState<KeypadLayout | null>(null);
   const [deletingLayout, setDeletingLayout] = useState<KeypadLayout | null>(null);
+  const [functionImagesOpen, setFunctionImagesOpen] = useState(false);
 
   const { data: layouts = [], isLoading, error } = useQuery({
     queryKey: ["pos_keypad_layouts", activeEntityId],
