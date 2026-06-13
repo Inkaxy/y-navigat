@@ -600,6 +600,7 @@ export default function Tastatur() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <FunctionImagesDialog open={functionImagesOpen} onOpenChange={setFunctionImagesOpen} legalEntityId={activeEntityId} />
     </div>
   );
 }
