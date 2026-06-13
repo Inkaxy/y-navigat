@@ -4214,6 +4214,44 @@ export type Database = {
           },
         ]
       }
+      pos_function_images: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          function_code: string
+          id: string
+          legal_entity_id: string
+          storage_path: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          function_code: string
+          id?: string
+          legal_entity_id: string
+          storage_path: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          function_code?: string
+          id?: string
+          legal_entity_id?: string
+          storage_path?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pos_function_images_legal_entity_id_fkey"
+            columns: ["legal_entity_id"]
+            isOneToOne: false
+            referencedRelation: "legal_entities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pos_journal_events: {
         Row: {
           event_hash: string

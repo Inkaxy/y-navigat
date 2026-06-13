@@ -264,7 +264,29 @@ function KeypadButtonTile({ button, layout, onEdit, dragging, onResize }: { butt
     staleTime: 50 * 60 * 1000,
   });
 
-  const effectivePath = button.image_storage_path || productPrimaryPath;
+  const { data: functionImagePath = null } = useQuery({
+    queryKey: ["pos_function_image_path", layout?.legal_entity_id, button.function_code],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("pos_function_images")
+        .select("storage_path")
+        .eq("legal_entity_id", layout!.legal_entity_id)
+        .eq("function_code", button.function_code!)
+        .maybeSingle();
+      if (error) return null;
+      return data?.storage_path ?? null;
+    },
+    enabled:
+      showImage &&
+      button.button_type === "function" &&
+      !!button.function_code &&
+      !!layout?.legal_entity_id &&
+      !button.image_storage_path &&
+      !button.image_url,
+    staleTime: 50 * 60 * 1000,
+  });
+
+  const effectivePath = button.image_storage_path || productPrimaryPath || functionImagePath;
 
   const { data: signedFromPath = "" } = useQuery({
     queryKey: ["pos_keypad_tile_url", effectivePath],

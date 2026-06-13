@@ -52,6 +52,8 @@ export type KeypadData = {
   productPrimaryPaths: Record<string, string>;
   /** Map fra product_id → arvet image_url fra products (public bucket). */
   productFallbackUrls: Record<string, string>;
+  /** Map fra function_code → storage_path for sentralt opplastede funksjonsbilder. */
+  functionImagePaths: Record<string, string>;
 } | null;
 
 const PRODUCT_IMAGE_BUCKET = "pos-product-images";
@@ -170,12 +172,29 @@ export function useKeypadLayout(terminalId: string, legalEntityId: string | null
         }
       }
 
+      const functionImagePaths: Record<string, string> = {};
+      if (layout.legal_entity_id) {
+        const { data: fnRows, error: eFn } = await kioskSupabase
+          .from("pos_function_images")
+          .select("function_code, storage_path")
+          .eq("legal_entity_id", layout.legal_entity_id);
+        if (eFn) {
+          console.warn("[keypad] kunne ikke hente funksjonsbilder", eFn);
+        }
+        for (const row of fnRows ?? []) {
+          if (row.function_code && row.storage_path) {
+            functionImagePaths[row.function_code] = row.storage_path;
+          }
+        }
+      }
+
       const paths = Array.from(
         new Set([
           ...buttons
             .map((b) => b.image_storage_path)
             .filter((p): p is string => !!p),
           ...Object.values(productPrimaryPaths),
+          ...Object.values(functionImagePaths),
         ]),
       );
       const imageUrls = await signImageUrls(paths);
@@ -187,6 +206,7 @@ export function useKeypadLayout(terminalId: string, legalEntityId: string | null
         imageUrls,
         productPrimaryPaths,
         productFallbackUrls,
+        functionImagePaths,
       };
     },
     staleTime: 50 * 60 * 1000,

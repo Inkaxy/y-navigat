@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Copy, Grid3X3, MoreHorizontal, PenLine, Plus, Star, Trash2 } from "lucide-react";
+import { Copy, Grid3X3, ImageIcon, MoreHorizontal, PenLine, Plus, Star, Trash2 } from "lucide-react";
+import { FunctionImagesDialog } from "@/pos_styring/components/FunctionImagesDialog";
 import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -427,6 +428,7 @@ export default function Tastatur() {
   const [editingLayout, setEditingLayout] = useState<KeypadLayout | null>(null);
   const [copyingLayout, setCopyingLayout] = useState<KeypadLayout | null>(null);
   const [deletingLayout, setDeletingLayout] = useState<KeypadLayout | null>(null);
+  const [functionImagesOpen, setFunctionImagesOpen] = useState(false);
 
   const { data: layouts = [], isLoading, error } = useQuery({
     queryKey: ["pos_keypad_layouts", activeEntityId],
@@ -490,9 +492,14 @@ export default function Tastatur() {
           <h1 className="text-3xl font-semibold tracking-normal">Tastatur-layouts</h1>
           <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
         </div>
-        <Button onClick={() => { setEditingLayout(null); setDialogOpen(true); }} disabled={!activeEntityId}>
-          <Plus className="h-4 w-4" /> Nytt layout
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => setFunctionImagesOpen(true)} disabled={!activeEntityId}>
+            <ImageIcon className="h-4 w-4" /> Funksjonsbilder
+          </Button>
+          <Button onClick={() => { setEditingLayout(null); setDialogOpen(true); }} disabled={!activeEntityId}>
+            <Plus className="h-4 w-4" /> Nytt layout
+          </Button>
+        </div>
       </div>
 
       {error ? (
@@ -593,6 +600,7 @@ export default function Tastatur() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <FunctionImagesDialog open={functionImagesOpen} onOpenChange={setFunctionImagesOpen} legalEntityId={activeEntityId} />
     </div>
   );
 }

@@ -21,7 +21,7 @@ interface Props {
 }
 
 export function KeypadGrid({ data }: Props) {
-  const { layout, pages, buttons, imageUrls, productPrimaryPaths, productFallbackUrls } = data;
+  const { layout, pages, buttons, imageUrls, productPrimaryPaths, productFallbackUrls, functionImagePaths } = data;
   const { terminal } = useTerminal();
   const { operator } = useOperator();
   const nav = useKeypadNav();
@@ -194,7 +194,11 @@ export function KeypadGrid({ data }: Props) {
               b.button_type === "product" && b.product_id
                 ? productFallbackUrls[b.product_id] ?? null
                 : null;
-            const resolvedPath = b.image_storage_path || productPath;
+            const functionPath =
+              b.button_type === "function" && b.function_code
+                ? functionImagePaths[b.function_code] ?? null
+                : null;
+            const resolvedPath = b.image_storage_path || productPath || functionPath;
             const resolvedImage = showImage
               ? (resolvedPath && imageUrls[resolvedPath]) ||
                 b.image_url ||
