@@ -1,6 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useDraggable, useDroppable, useSensor, useSensors } from "@dnd-kit/core";
-import { CSS } from "@dnd-kit/utilities";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, GripVertical, Minus, MoreHorizontal, Palette, Plus, Search, Sparkles, Trash2 } from "lucide-react";
@@ -247,15 +245,14 @@ async function fetchPrimaryProductImagePath(productId: string): Promise<string |
 }
 
 function DroppableCell({ x, y, children }: { x: number; y: number; children?: React.ReactNode }) {
-  const { setNodeRef, isOver } = useDroppable({ id: `cell-${x}-${y}`, data: { x, y } });
   return (
-    <div ref={setNodeRef} className={cn("rounded-md border border-dashed border-border bg-background/70 transition-colors", isOver && "border-primary bg-primary/10")}>
+    <div data-grid-drop-cell="true" data-grid-x={x} data-grid-y={y} className="rounded-md border border-dashed border-border bg-background/70 transition-colors">
       {children}
     </div>
   );
 }
 
-function KeypadButtonTile({ button, layout, onEdit, dragging, onResize }: { button: KeypadButton; layout?: KeypadLayoutDetail; onEdit?: () => void; dragging?: boolean; onResize?: (w: number, h: number) => void }) {
+function KeypadButtonTile({ button, layout, dragging, onResizePointerDown }: { button: KeypadButton; layout?: KeypadLayoutDetail; dragging?: boolean; onResizePointerDown?: (event: React.PointerEvent<HTMLDivElement>) => void }) {
   const notInPos = button.button_type === "product" && button.product && button.product.in_pos === false;
   const showImage = button.show_image ?? layout?.show_product_image ?? true;
 
@@ -298,9 +295,7 @@ function KeypadButtonTile({ button, layout, onEdit, dragging, onResize }: { butt
   });
   const bgImage = showImage ? (button.image_url || signedFromPath) : "";
   return (
-    <button
-      type="button"
-      onClick={onEdit}
+    <div
       className={cn("relative flex h-full w-full overflow-hidden rounded-md border border-primary/20 bg-primary/15 p-2 text-left text-sm font-semibold shadow-card transition hover:ring-2 hover:ring-ring", dragging && "opacity-60", notInPos && "border-destructive/60 ring-1 ring-destructive/40")}
       style={{ backgroundColor: button.background_color ?? undefined, color: button.text_color ?? undefined }}
     >
@@ -311,54 +306,18 @@ function KeypadButtonTile({ button, layout, onEdit, dragging, onResize }: { butt
         </span>
       )}
       <span className="relative z-10 line-clamp-3 self-end rounded-sm bg-background/75 px-1.5 py-1 text-foreground">{buttonLabel(button)}</span>
-      {onResize && !dragging && (
-        <ResizeHandle button={button} onResize={onResize} />
+      {onResizePointerDown && !dragging && (
+        <ResizeHandle onPointerDown={onResizePointerDown} />
       )}
-    </button>
+    </div>
   );
 }
 
-function ResizeHandle({ button, onResize }: { button: KeypadButton; onResize: (w: number, h: number) => void }) {
-  const stateRef = useRef<{ w: number; h: number } | null>(null);
-  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    e.stopPropagation();
-    e.nativeEvent.stopImmediatePropagation();
-    e.preventDefault();
-    // Walk up to find the actual rendered cell wrapper (the draggable div with absolute positioning)
-    const handleEl = e.currentTarget;
-    const tileEl = (handleEl.closest("[data-keypad-cell]") as HTMLElement | null) ?? handleEl.parentElement;
-    if (!tileEl) return;
-    const rect = tileEl.getBoundingClientRect();
-    const cellW = rect.width / Math.max(1, button.grid_width);
-    const cellH = rect.height / Math.max(1, button.grid_height);
-    const startX = e.clientX;
-    const startY = e.clientY;
-    const startW = button.grid_width;
-    const startH = button.grid_height;
-    stateRef.current = { w: startW, h: startH };
-    try { handleEl.setPointerCapture(e.pointerId); } catch {}
-    const onMove = (ev: PointerEvent) => {
-      ev.preventDefault();
-      const dw = Math.round((ev.clientX - startX) / cellW);
-      const dh = Math.round((ev.clientY - startY) / cellH);
-      stateRef.current = { w: Math.max(1, startW + dw), h: Math.max(1, startH + dh) };
-    };
-    const onUp = (ev: PointerEvent) => {
-      handleEl.removeEventListener("pointermove", onMove);
-      handleEl.removeEventListener("pointerup", onUp);
-      handleEl.removeEventListener("pointercancel", onUp);
-      try { handleEl.releasePointerCapture(ev.pointerId); } catch {}
-      const s = stateRef.current;
-      if (s && (s.w !== startW || s.h !== startH)) onResize(s.w, s.h);
-    };
-    handleEl.addEventListener("pointermove", onMove);
-    handleEl.addEventListener("pointerup", onUp);
-    handleEl.addEventListener("pointercancel", onUp);
-  };
+function ResizeHandle({ onPointerDown }: { onPointerDown: (event: React.PointerEvent<HTMLDivElement>) => void }) {
   return (
     <div
       data-resize-handle="true"
-      onPointerDown={handlePointerDown}
+      onPointerDown={onPointerDown}
       onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}
       role="presentation"
       title="Dra for å endre størrelse"
