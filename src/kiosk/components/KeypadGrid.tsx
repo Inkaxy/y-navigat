@@ -13,7 +13,6 @@ import {
 } from "@/kiosk/hooks/useProductLookup";
 import { useTerminal } from "@/kiosk/context/TerminalContext";
 import { useOperator } from "@/kiosk/context/OperatorContext";
-import { KakebyggerModal } from "@/kiosk/components/KakebyggerModal";
 import { cn } from "@/lib/utils";
 
 interface Props {
