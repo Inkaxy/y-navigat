@@ -80,11 +80,24 @@ export function CakeBuilder({
     }
   }, [showVat]);
 
+  const [phase, setPhase] = useState<"customer" | "step" | "summary" | "payment">(
+    "customer",
+  );
   const [stepIndex, setStepIndex] = useState(0);
-  const [isSummary, setIsSummary] = useState(false);
+  const isSummary = phase === "summary";
+  const isCustomer = phase === "customer";
+  const isPayment = phase === "payment";
   /** Confirmation state shown after the user clicks "Ferdig". Holds the result so we can show ordrebekreftelse. */
   const [confirmedResult, setConfirmedResult] = useState<CakeResult | null>(null);
   const [isFinalizing, setIsFinalizing] = useState(false);
+  const [customerMeta, setCustomerMeta] = useState<CustomerMeta>({
+    pickup_date: null,
+    pickup_location_id: defaultPickupLocationId ?? null,
+    name: "",
+    phone: "",
+    email: "",
+  });
+  const [paymentMode, setPaymentMode] = useState<PaymentMode | null>(null);
   // Per-step selections
   const [singleSelections, setSingleSelections] = useState<Record<string, string>>({});
   const [multiSelections, setMultiSelections] = useState<Record<string, string[]>>({});
