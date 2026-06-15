@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { toast } from "sonner";
 import { ChevronLeft } from "lucide-react";
 import type {
@@ -12,8 +12,7 @@ import {
   useProductLookup,
 } from "@/kiosk/hooks/useProductLookup";
 import { useTerminal } from "@/kiosk/context/TerminalContext";
-import { useOperator } from "@/kiosk/context/OperatorContext";
-import { KakebyggerModal } from "@/kiosk/components/KakebyggerModal";
+
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -23,10 +22,10 @@ interface Props {
 export function KeypadGrid({ data }: Props) {
   const { layout, pages, buttons, imageUrls, productPrimaryPaths, productFallbackUrls, functionImagePaths } = data;
   const { terminal } = useTerminal();
-  const { operator } = useOperator();
+  
   const nav = useKeypadNav();
   const { addItem } = useCart();
-  const [kakebyggerOpen, setKakebyggerOpen] = useState(false);
+  
   const priceListId = terminal?.default_price_list_id ?? null;
   const { data: priceListCfg } = usePriceListConfig(priceListId);
   const lookupProduct = useProductLookup(
@@ -101,7 +100,9 @@ export function KeypadGrid({ data }: Props) {
 
   const handleFunction = (b: KeypadButton) => {
     if (b.function_code === "kakebygger") {
-      setKakebyggerOpen(true);
+      // KeypadGrid kjenner ikke kassens kurv-/ordreflyt. Kakebyggeren MÅ åpnes
+      // fra Kasse.tsx slik at `onCakeComplete` faktisk oppretter henteordren.
+      toast.error("Kakebygger må åpnes fra kassevisningen");
       return;
     }
     toast.info(
@@ -126,8 +127,6 @@ export function KeypadGrid({ data }: Props) {
     }
   };
 
-  const kbLegalEntityId =
-    operator?.legal_entity_id ?? terminal?.legal_entity_id ?? null;
 
   return (
     <>
@@ -244,12 +243,6 @@ export function KeypadGrid({ data }: Props) {
         </div>
       )}
     </div>
-    <KakebyggerModal
-      open={kakebyggerOpen}
-      onOpenChange={setKakebyggerOpen}
-      legalEntityId={kbLegalEntityId}
-      priceListId={priceListId}
-    />
     </>
   );
 }

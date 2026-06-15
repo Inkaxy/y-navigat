@@ -351,7 +351,12 @@ export function CakeBuilder({
       }
     } else if (currentStep.selection_type === "multi") {
       const sel = multiSelections[currentStep.id] ?? [];
-      if (currentStep.required && sel.length === 0) return "Du må velge minst ett alternativ.";
+      // Et steg kan være `required=true` men ha eksplisitt `min_selections=0`
+      // (f.eks. «Pynt 0–4»). Da skal vi IKKE blokkere på 0 valg.
+      const hasExplicitZeroMin = currentStep.min_selections === 0;
+      if (currentStep.required && !hasExplicitZeroMin && sel.length === 0) {
+        return "Du må velge minst ett alternativ.";
+      }
       if (currentStep.min_selections && sel.length < currentStep.min_selections) {
         return `Velg minst ${currentStep.min_selections}.`;
       }
@@ -544,7 +549,15 @@ export function CakeBuilder({
 
   /** Klikk på "Bekreft bestilling" på bekreftelses-skjermen */
   const handleFinalConfirm = () => {
-    if (!confirmedResult) return;
+    if (!confirmedResult) {
+      console.warn("[CakeBuilder] handleFinalConfirm called without confirmedResult");
+      return;
+    }
+    console.info("[CakeBuilder] handleFinalConfirm → onComplete()", {
+      category: confirmedResult.category_name,
+      total_inc_mva: confirmedResult.total_inc_mva,
+      payment_mode: confirmedResult.payment_mode,
+    });
     onComplete(confirmedResult);
   };
 
@@ -775,15 +788,24 @@ export function CakeBuilder({
     );
   }
 
-  // Header step counter: customer = 0, steps 1..N, summary = N+1, payment = N+2
-  const headerTotalSteps = steps.length + 3;
-  const headerStepIndex = isCustomer
-    ? 0
-    : isSummary
+  // Header step counter.
+  // - Uten prefill: customer = 1, steps 2..N+1, summary = N+2, payment = N+3  → total = N + 3
+  // - Med prefill (fra POS-kiosken): customer-fasen vises ikke, så det første
+  //   wizard-steget er "1 / N+2" og summary/payment legges på etterpå.
+  const headerTotalSteps = hasPrefilledCustomer ? steps.length + 2 : steps.length + 3;
+  const headerStepIndex = hasPrefilledCustomer
+    ? isSummary
       ? steps.length + 1
       : isPayment
         ? steps.length + 2
-        : stepIndex + 1;
+        : stepIndex + 1
+    : isCustomer
+      ? 1
+      : isSummary
+        ? steps.length + 2
+        : isPayment
+          ? steps.length + 3
+          : stepIndex + 2;
 
   return (
     <div className="flex flex-col h-full bg-background">

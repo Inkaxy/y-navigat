@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Cake, Loader2, ChevronLeft } from "lucide-react";
+import { toast } from "sonner";
 import { kioskSupabase } from "@/kiosk/integrations/supabase/client";
 import { listenFromParent } from "@/varer/features/cakeBuilder/protocol";
 import type { CakeResult } from "@/varer/features/cakeBuilder/types";
@@ -17,7 +18,7 @@ interface Props {
   legalEntityId: string | null;
   priceListId: string | null;
   defaultPickupLocationId?: string | null;
-  onCakeComplete?: (result: CakeResult) => void;
+  onCakeComplete?: (result: CakeResult) => void | Promise<void>;
 }
 
 type Category = {
@@ -93,15 +94,37 @@ export function KakebyggerModal({
     const unsub = listenFromParent(() => {
       /* parent-receiver no-op */
     });
-    const onMsg = (event: MessageEvent) => {
+    const onMsg = async (event: MessageEvent) => {
       const data = event.data as
         | { source?: string; version?: number; payload?: { type?: string; result?: CakeResult } }
         | undefined;
       if (!data || data.source !== "nbos-cake-builder") return;
       const t = data.payload?.type;
       if (t === "cake-builder/done" && data.payload?.result) {
-        onCakeComplete?.(data.payload.result);
-        onOpenChange(false);
+        console.info("[KakebyggerModal] cake-builder/done mottatt", {
+          hasCallback: Boolean(onCakeComplete),
+          total_inc_mva: data.payload.result.total_inc_mva,
+        });
+        if (!onCakeComplete) {
+          console.error(
+            "[KakebyggerModal] Ingen onCakeComplete-callback registrert — ordren ble droppet.",
+          );
+          toast.error("Kakebygger-resultatet ble ikke håndtert", {
+            description: "Ingen ordre ble opprettet. Lukk og åpne kakebyggeren fra kassevisningen.",
+          });
+          onOpenChange(false);
+          return;
+        }
+        try {
+          await onCakeComplete(data.payload.result);
+        } catch (e) {
+          console.error("[KakebyggerModal] onCakeComplete kastet feil:", e);
+          toast.error("Kunne ikke fullføre kakebestillingen", {
+            description: (e as Error)?.message ?? "Ukjent feil",
+          });
+        } finally {
+          onOpenChange(false);
+        }
       } else if (t === "cake-builder/cancel") {
         // Bring user back to category list instead of fully closing — they
         // already filled in customer info, no need to redo it.
