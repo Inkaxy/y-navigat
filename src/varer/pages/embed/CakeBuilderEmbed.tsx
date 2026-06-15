@@ -33,6 +33,7 @@ export default function CakeBuilderEmbed() {
 
   const priceListId = searchParams.get("price_list_id") ?? "";
   const legalEntityId = searchParams.get("legal_entity_id") ?? "";
+  const defaultPickupLocationId = searchParams.get("default_pickup_location_id");
   const theme = (searchParams.get("theme") as "light" | "dark") || "light";
   const vatToggle = searchParams.get("vat_toggle") !== "false";
   const returnUrl = searchParams.get("return_url");
