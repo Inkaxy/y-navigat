@@ -170,6 +170,7 @@ export default function CakeBuilderEmbed() {
         categoryId={categoryId}
         priceListId={priceListId}
         legalEntityId={legalEntityId}
+        defaultPickupLocationId={defaultPickupLocationId}
         showVatToggle={vatToggle}
         onComplete={handleComplete}
         onCancel={handleCancel}
