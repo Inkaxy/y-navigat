@@ -1236,7 +1236,6 @@ function DraggableButton({
   layout,
   onEdit,
   onMove,
-  onDragStateChange,
   onResize,
 }: {
   button: KeypadButton;
