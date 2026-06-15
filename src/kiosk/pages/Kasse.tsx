@@ -442,18 +442,25 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
     });
   }, [data]);
 
-  const renderCart: RenderCartLine[] = cart.items.map((it) => ({
-    id: it.id,
-    label: it.product_snapshot.display_name,
-    qty: it.quantity,
-    unit: it.product_snapshot.unit ?? null,
-    line_total:
-      Math.round(
-        (it.quantity * it.unit_price_excl_mva - it.line_discount) *
-          (1 + it.mva_rate / 100) *
-          100,
-      ) / 100,
-  }));
+  const renderCart: RenderCartLine[] = cart.items.map((it) => {
+    const productPath = it.product_id ? data?.productPrimaryPaths[it.product_id] ?? null : null;
+    const signed = productPath ? data?.imageUrls[productPath] ?? null : null;
+    const fallback = it.product_id ? data?.productFallbackUrls[it.product_id] ?? null : null;
+    return {
+      id: it.id,
+      label: it.product_snapshot.display_name,
+      qty: it.quantity,
+      unit: it.product_snapshot.unit ?? null,
+      line_total:
+        Math.round(
+          (it.quantity * it.unit_price_excl_mva - it.line_discount) *
+            (1 + it.mva_rate / 100) *
+            100,
+        ) / 100,
+      image_url: signed ?? fallback ?? null,
+    };
+  });
+
 
   const stubToast = (label: string) =>
     toast.info(`${label}: bygges senere`);
