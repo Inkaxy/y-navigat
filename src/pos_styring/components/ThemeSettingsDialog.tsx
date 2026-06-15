@@ -530,6 +530,80 @@ export function ThemeSettingsDialog({
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      <Dialog open={saveOpen} onOpenChange={setSaveOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{overwriteId ? "Oppdater oppsett" : "Lagre som oppsett"}</DialogTitle>
+            <DialogDescription>
+              Lagrer nåværende brand- og layout-innstillinger som et gjenbrukbart oppsett for selskapet.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="preset-name">Navn</Label>
+              <Input
+                id="preset-name"
+                value={saveName}
+                onChange={(e) => setSaveName(e.target.value)}
+                placeholder="F.eks. Nøtterø sommer 2026"
+                autoFocus
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="preset-desc">Beskrivelse (valgfri)</Label>
+              <Textarea
+                id="preset-desc"
+                value={saveDescription}
+                onChange={(e) => setSaveDescription(e.target.value)}
+                rows={3}
+                placeholder="Kort notat om hva som er spesielt"
+              />
+            </div>
+            {!overwriteId && presets.some((p) => p.name.trim().toLowerCase() === saveName.trim().toLowerCase()) && (
+              <p className="text-xs text-amber-600">
+                Et oppsett med dette navnet finnes allerede — velg det først i lista hvis du vil overskrive.
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSaveOpen(false)} disabled={savePreset.isPending}>
+              Avbryt
+            </Button>
+            <Button
+              onClick={() => savePreset.mutate({ id: overwriteId, name: saveName, description: saveDescription })}
+              disabled={!saveName.trim() || savePreset.isPending}
+            >
+              {savePreset.isPending ? "Lagrer…" : overwriteId ? "Oppdater" : "Lagre oppsett"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={!!deleteId} onOpenChange={(v) => !v && setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Slette oppsett?</AlertDialogTitle>
+            <AlertDialogDescription>
+              «{presets.find((p) => p.id === deleteId)?.name}» blir permanent fjernet. Layouts som har
+              fått dette oppsettet anvendt påvirkes ikke.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletePreset.isPending}>Avbryt</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                if (deleteId) deletePreset.mutate(deleteId);
+              }}
+              disabled={deletePreset.isPending}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              {deletePreset.isPending ? "Sletter…" : "Slett"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }
