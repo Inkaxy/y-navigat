@@ -4,12 +4,16 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Cake, Loader2, ChevronLeft } from "lucide-react";
 import { kioskSupabase } from "@/kiosk/integrations/supabase/client";
+import { listenFromParent } from "@/varer/features/cakeBuilder/protocol";
+import type { CakeResult } from "@/varer/features/cakeBuilder/types";
 
 interface Props {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   legalEntityId: string | null;
   priceListId: string | null;
+  defaultPickupLocationId?: string | null;
+  onCakeComplete?: (result: CakeResult) => void;
 }
 
 type Category = {
@@ -19,7 +23,14 @@ type Category = {
   image_url: string | null;
 };
 
-export function KakebyggerModal({ open, onOpenChange, legalEntityId, priceListId }: Props) {
+export function KakebyggerModal({
+  open,
+  onOpenChange,
+  legalEntityId,
+  priceListId,
+  defaultPickupLocationId,
+  onCakeComplete,
+}: Props) {
   const [categories, setCategories] = useState<Category[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -51,9 +62,40 @@ export function KakebyggerModal({ open, onOpenChange, legalEntityId, priceListId
     };
   }, [open, legalEntityId]);
 
+  // Listen for cake-builder/done from embed iframe
+  useEffect(() => {
+    if (!open) return;
+    const unsub = listenFromParent(() => {
+      /* parent-receiver no-op */
+    });
+    // We are the parent — listen via raw postMessage
+    const onMsg = (event: MessageEvent) => {
+      const data = event.data as
+        | { source?: string; version?: number; payload?: { type?: string; result?: CakeResult } }
+        | undefined;
+      if (!data || data.source !== "nbos-cake-builder") return;
+      const t = data.payload?.type;
+      if (t === "cake-builder/done" && data.payload?.result) {
+        onCakeComplete?.(data.payload.result);
+        onOpenChange(false);
+      } else if (t === "cake-builder/cancel") {
+        onOpenChange(false);
+      }
+    };
+    window.addEventListener("message", onMsg);
+    return () => {
+      window.removeEventListener("message", onMsg);
+      unsub();
+    };
+  }, [open, onCakeComplete, onOpenChange]);
+
   const embedUrl =
     categoryId && priceListId && legalEntityId
-      ? `/embed/kakebygger/${categoryId}?price_list_id=${priceListId}&legal_entity_id=${legalEntityId}&theme=light&vat_toggle=true&source=kiosk`
+      ? `/embed/kakebygger/${categoryId}?price_list_id=${priceListId}&legal_entity_id=${legalEntityId}&theme=light&vat_toggle=true&source=kiosk${
+          defaultPickupLocationId
+            ? `&default_pickup_location_id=${defaultPickupLocationId}`
+            : ""
+        }`
       : null;
 
   return (
