@@ -925,6 +925,9 @@ export default function TastaturEditor() {
           <Button variant="outline" size="sm" onClick={() => setPreviewOpen((v) => !v)}>
             {previewOpen ? "Skjul forhåndsvisning" : "Vis forhåndsvisning"}
           </Button>
+          <Button variant="outline" size="sm" onClick={() => setThemeSettingsOpen(true)}>
+            <Palette className="h-4 w-4" /> Brand & layout
+          </Button>
           <Button size="sm" onClick={() => setTemplatesOpen(true)}>
             <Sparkles className="h-4 w-4" /> Maler & tema
           </Button>
