@@ -2,8 +2,8 @@
 // pos_keypad_layouts.theme. Defaults håndteres av parseTheme() ved lesing.
 
 import { useEffect, useMemo, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ArrowDown, ArrowUp, BookmarkPlus, Download, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -25,6 +35,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import {
   DEFAULT_FOOTER_ACTIONS,
@@ -47,11 +58,22 @@ const FOOTER_ACTION_PRESETS: Record<FooterActionCode, { label: string; icon: str
   open_drawer: { label: "Åpne skuff", icon: "Wallet" },
 };
 
+interface ThemePreset {
+  id: string;
+  name: string;
+  description: string | null;
+  theme: unknown;
+  customer_screen: unknown;
+  updated_at: string;
+}
+
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   layoutId: string;
+  legalEntityId: string;
   initialTheme: unknown;
+  initialCustomerScreen: unknown;
 }
 
 export function ThemeSettingsDialog({ open, onOpenChange, layoutId, initialTheme }: Props) {
