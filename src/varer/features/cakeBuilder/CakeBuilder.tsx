@@ -519,8 +519,14 @@ export function CakeBuilder({
         payment_mode: paymentMode ?? "later",
       };
       setConfirmedResult(result);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "Ukjent feil";
+    } catch (e: any) {
+      const msg =
+        e?.message ||
+        e?.details ||
+        e?.hint ||
+        (typeof e === "string" ? e : null) ||
+        (() => { try { return JSON.stringify(e); } catch { return "Ukjent feil"; } })();
+      console.error("[CakeBuilder] build_cake_order_line failed:", e);
       toast.error("Kunne ikke bygge ordrelinje", { description: msg });
     } finally {
       setIsFinalizing(false);
