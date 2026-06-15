@@ -700,8 +700,7 @@ export default function TastaturEditor() {
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [themeSettingsOpen, setThemeSettingsOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(true);
-
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+  const gridRef = useRef<HTMLDivElement>(null);
 
   const { data: layout, isLoading: layoutLoading, error: layoutError } = useQuery({
     queryKey: ["pos_keypad_layout", layoutId],
@@ -890,17 +889,37 @@ export default function TastaturEditor() {
     setButtonDialogOpen(true);
   }
 
-  function onDragStart(event: DragStartEvent) {
-    const button = buttons.find((item) => item.id === event.active.id);
-    setDraggingButton(button ?? null);
-  }
+  const getGridPointFromClient = useCallback((clientX: number, clientY: number) => {
+    if (!layout || !gridRef.current) return null;
+    const gridEl = gridRef.current;
+    const rect = gridEl.getBoundingClientRect();
+    const style = window.getComputedStyle(gridEl);
+    const paddingLeft = Number.parseFloat(style.paddingLeft) || 0;
+    const paddingTop = Number.parseFloat(style.paddingTop) || 0;
+    const paddingRight = Number.parseFloat(style.paddingRight) || 0;
+    const paddingBottom = Number.parseFloat(style.paddingBottom) || 0;
+    const colGap = Number.parseFloat(style.columnGap) || 0;
+    const rowGap = Number.parseFloat(style.rowGap) || 0;
+    const contentWidth = rect.width - paddingLeft - paddingRight;
+    const contentHeight = rect.height - paddingTop - paddingBottom;
+    const cellWidth = (contentWidth - colGap * (layout.grid_cols - 1)) / layout.grid_cols;
+    const cellHeight = (contentHeight - rowGap * (layout.grid_rows - 1)) / layout.grid_rows;
+    const relX = clientX - rect.left - paddingLeft;
+    const relY = clientY - rect.top - paddingTop;
+    if (relX < 0 || relY < 0 || relX > contentWidth || relY > contentHeight) return null;
+    return {
+      x: Math.max(0, Math.min(layout.grid_cols - 1, Math.floor(relX / (cellWidth + colGap)))),
+      y: Math.max(0, Math.min(layout.grid_rows - 1, Math.floor(relY / (cellHeight + rowGap)))),
+      cellWidth,
+      cellHeight,
+    };
+  }, [layout]);
 
-  function onDragEnd(event: DragEndEvent) {
-    const button = draggingButton;
+  function handleMoveButton(button: KeypadButton, clientX: number, clientY: number) {
+    const point = getGridPointFromClient(clientX, clientY);
     setDraggingButton(null);
-    if (!button || !event.over?.data.current) return;
-    const { x, y } = event.over.data.current as { x: number; y: number };
-    moveButtonMutation.mutate({ button, x, y });
+    if (!point || (point.x === button.grid_x && point.y === button.grid_y)) return;
+    moveButtonMutation.mutate({ button, x: point.x, y: point.y });
   }
 
   if (layoutLoading || pagesLoading) {
