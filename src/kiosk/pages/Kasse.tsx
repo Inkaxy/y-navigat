@@ -483,36 +483,49 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
     </>
   );
 
-  const footerActions = (
-    <div className="flex gap-2">
-      <ActionBtn onClick={() => stubToast("Rabatt")} icon={<Percent className="h-4 w-4" />}>
-        Rabatt
-      </ActionBtn>
-      <ActionBtn onClick={() => stubToast("Merket lapp")} icon={<Tag className="h-4 w-4" />}>
-        Merket lapp
-      </ActionBtn>
-      <ActionBtn onClick={() => stubToast("Parker ordre")} icon={<Pause className="h-4 w-4" />}>
-        Parker ordre
-      </ActionBtn>
-      <ActionBtn
-        onClick={() => setClearOpen(true)}
-        icon={<Trash2 className="h-4 w-4" />}
-        disabled={cart.items.length === 0}
-      >
-        Slett ordre
-      </ActionBtn>
-      <ActionBtn
-        onClick={() => lastReceipt && setReceipt(lastReceipt)}
-        icon={<Receipt className="h-4 w-4" />}
-        disabled={!lastReceipt}
-      >
-        Kvittering
-      </ActionBtn>
-      <ActionBtn onClick={handlePrintLabel} icon={<Printer className="h-4 w-4" />}>
-        Skriv ut etikett
-      </ActionBtn>
-    </div>
+  const handleFooterAction = useCallback(
+    (code: string) => {
+      switch (code) {
+        case "discount":
+          stubToast("Rabatt");
+          return;
+        case "label_print":
+          handlePrintLabel();
+          return;
+        case "park_order":
+          stubToast("Parker ordre");
+          return;
+        case "clear_order":
+          setClearOpen(true);
+          return;
+        case "receipt":
+          if (lastReceipt) setReceipt(lastReceipt);
+          else toast.info("Ingen siste kvittering");
+          return;
+        case "customer":
+          stubToast("Kunde");
+          return;
+        case "pickup_orders":
+          setHenteordreOpen(true);
+          return;
+        case "kakebygger":
+          setKakebyggerOpen(true);
+          return;
+        case "open_drawer":
+          stubToast("Åpne kasseskuff");
+          return;
+        default:
+          toast.info(`${code}: ikke koblet`);
+      }
+    },
+    [lastReceipt],
   );
+
+  const footerDisabled: Record<string, boolean> = {
+    clear_order: cart.items.length === 0,
+    receipt: !lastReceipt,
+  };
+
 
   const diningForRender: "takeaway" | "eatin" | "pickup" = cart.diningMode;
   const handleDiningChange = (m: "takeaway" | "eatin" | "pickup") => {
