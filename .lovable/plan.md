@@ -1,65 +1,44 @@
-## Problem
+## Mål
+Få kakebygger-bestillingen fra kassen til å gå hele veien fra "Brød → Kakebygger → kategori → wizard → Bekreft bestilling" og opprette en faktisk henteordre. I tillegg rette to UX-feil som blokkerer flyten.
 
-Etiketten leses fra utskriftsprofilen (`label_print_profiles.fields`), som vet hvor hvert felt (`varenr`, `varenavn`, `fyll`, `tekst`, `pynt`, `bestilt_av`, `kundenavn`, `tur`, `hentested`, `kommentar` …) skal plasseres. Verdiene hentes i `labelPdf.tsx` fra to kilder:
+## Funn fra koden
 
-1. `LabelProductRow` (varenavn, varenr, etikett_nr, antall)
-2. `order_lines.merknad` (JSONB med `bestilt_av`, `fyll`, `tekst`, `pynt`, `fritekst_1`, `telefon`, `tid`, `sukkerbilde` …) + sidekanaler (kundenavn, hentested, tur, leveringsadresse, dato).
+1. **Silent submit-fail på «Bekreft bestilling»**
+   - `KakebyggerModal.tsx` lytter på `cake-builder/done`, kaller `onCakeComplete?.(result)` synkront og lukker så modalen. `Kasse.tsx` håndterer dette med en `async` callback som kaller `pos_create_cake_order` og viser toast ved feil.
+   - Problemet: callbacken kjører som en uventet `Promise` etter at modalen er lukket. Hvis RPC-en kaster, kommer `toast.error`-meldingen ofte ikke opp (eller forsvinner umiddelbart fordi `kioskSupabase`-klienten har en feil), og det er ingen logg igjen for å diagnostisere.
+   - I tillegg har `pos_create_cake_order` (migrasjon `20260615110509…`) flere strenge `RAISE EXCEPTION`-paths (mangler `pickup_date`, mangler `category_id`/`price_list_id`, manglende basis-produkt osv.) som blir helt usynlige for operatøren.
 
-I dag fyller `pos_create_cake_order` kun `product_snapshot` på ordrelinjen — `order_lines.merknad` står tom. Resultat: alle de "interessante" feltene på etiketten (fyll, tekst, pynt, bestilt_av, kommentar) blir tomme, selv om kakebyggeren har samlet inn dataene i `label_payload`.
+2. **Motstridende validering på 0-min steg («Pynt», «Allergi»)**
+   - `stepValidation` i `CakeBuilder.tsx` (linje 352–360) returnerer `"Du må velge minst ett alternativ."` så snart `required=true` og `sel.length===0`, selv om steget er konfigurert med `min_selections=0, max_selections=4`. UI viser "Velg 0–4" men footer blokkerer «Neste».
 
-Varenr/varenavn er allerede riktig etter forrige fix.
+3. **«Starter på Steg 2/8»**
+   - I `CakeBuilder.tsx` (linje 778–786) er `headerTotalSteps = steps.length + 3` (customer + N + summary + payment) og `headerStepIndex = stepIndex + 1` på første wizard-steg. Når kiosken sender kunden inn med prefilled customer-meta hoppes "customer"-fasen over, men telleren tar fortsatt med customer-fasen → første reelle steg vises som «2 / N+3».
 
-## Løsning — full mapping, server-side
+## Endringer
 
-Bygg `merknad`-JSONB i `pos_create_cake_order` fra `v_label_payload` + komponentene, og skriv den til ordrelinjen samtidig som linjen opprettes. Profilen i `label_print_profiles` får da fylte verdier å plassere.
+### A. `src/varer/features/cakeBuilder/CakeBuilder.tsx`
+- **Validering (fix 2):** I `stepValidation` for `multi`-steg: skill mellom `required` og effektiv minste-grense. Hvis `currentStep.min_selections === 0` (eksplisitt 0), ikke kast «minst ett alternativ»-feil. Behandle bare `required && (min_selections == null || min_selections > 0)` som «minst 1»-krav.
+- **Steg-teller (fix 3):** Når `hasPrefilledCustomer === true`, regn telleren uten customer-fase:
+  - `headerTotalSteps = steps.length + 2` (N + summary + payment)
+  - `headerStepIndex = isSummary ? steps.length+1 : isPayment ? steps.length+2 : stepIndex+1`-mapping justeres tilsvarende slik at første steg blir «1 / N+2».
+- **Diagnostikk (fix 1, klient-side):** Legg til `console.info`-logger ved `handleConfirmStep` og `handleFinalConfirm` for å bekrefte hvilken vei flyten tar når noe feiler.
 
-### Mapping (kakebygger → merknad/etikettfelt)
+### B. `src/kiosk/components/KakebyggerModal.tsx`
+- **Hardere feilhåndtering (fix 1):** Pakk `onCakeComplete?.(result)`-kallet i en `try { await … } catch (e) { toast.error(…); console.error(…) }` og utsett `onOpenChange(false)` til etter at callbacken faktisk har returnert. Dette gjør at:
+  - En kastet RPC-feil blir alltid logget i konsollen og vist som toast.
+  - Modalen lukkes ikke før ordren er bekreftet — operatøren kan se feilmeldingen i kontekst.
+- **«No-op»-vakt:** Hvis `onCakeComplete` ikke er definert (som i `KeypadGrid`-instansen som ikke videresender callbacken), vis `toast.error("Kakebygger-resultatet ble ikke håndtert — ingen ordre opprettet")` i stedet for stilltielse.
 
-| Etikettfelt (FieldType) | Kilde i kakebygger |
-|---|---|
-| `varenr` / `varenavn` | `v_main_product` (allerede ok) |
-| `kundenavn` | `label_payload.customer_name` → også brukt direkte i `PrintLabelDialog` |
-| `bestilt_av` | `label_payload.customer_name` (eller `recipient` hvis satt) → `merknad.bestilt_av` |
-| `telefon` | kunde-lookup (`pos_customers.phone`) → `merknad.telefon` |
-| `hentested` | `label_payload.pickup_location` → ordrelinjens hentested-kobling |
-| `tur` | `label_payload.pickup_tour` → ordrelinjens tur-kobling |
-| `leveringsdato` | `label_payload.pickup_date` |
-| `hentetidspunkt` | `label_payload.pickup_time` → `merknad.tid` |
-| `tekst` (kakeskrift) | `label_payload.cake_text` → `merknad.tekst` |
-| `fyll` | komponenter med `cake_role in ('fyll','filling')` joinet → `merknad.fyll` |
-| `pynt` | komponenter med `cake_role in ('pynt','dekor','topping')` joinet → `merknad.pynt` |
-| `sukkerbilde` | true hvis komponent med `cake_role='sukkerbilde'` valgt |
-| `kommentar` | `label_payload.note` → `merknad.fritekst_1` |
-| `antall` | line.quantity (allerede ok) |
-| `etikett_nr` | runtime label sequence (allerede ok) |
+### C. `src/kiosk/components/KeypadGrid.tsx`
+- **Fjerne duplikat-modal:** `KeypadGrid` har sin egen `<KakebyggerModal>` uten `onCakeComplete`. Den brukes ikke fra `Kasse.tsx` (Kasse bruker `KeypadArea`/`KioskRender`), men hvis komponenten en dag mountes andre steder vil den droppe ordren stille. Fjern den interne modal-instansen og `kakebyggerOpen`-staten, og endre `handleFunction("kakebygger")` til å vise `toast.error("Kakebygger må åpnes fra kassevisningen")` — eller løft handlingen til en prop-callback `onOpenKakebygger?: () => void`.
 
-### Endringer
+### D. Verifisering
+Etter endring kjører jeg gjennom flyten i preview: Brød → Kakebygger-tile → Kundeopplysninger → Bløtkake → wizard → Oppsummering → Betaling → Bekreft. Sjekker at:
+- Toast «Henteordre #… opprettet» vises.
+- Ny rad i `orders` med `source='pos_kakebygger'` (verifiseres via `supabase--read_query`).
+- Hvis RPC feiler: konsollen logger feilen og en toast vises før modalen lukkes.
 
-1. **Migration: utvid `build_cake_order_line`**
-   - Bygg `v_merknad jsonb` i tillegg til `v_label_payload`, basert på label-feltene + komponentenes `cake_role` (aggregert med `string_agg` per rolle).
-   - Inkluder `v_merknad` i return-objektet (`'merknad', v_merknad`).
-   - `cake_steps.label_field_key` aksepterer nye nøkler: `fyll`, `pynt`, `sukkerbilde`, `telefon` (slik at man eventuelt kan overstyre via egne steg). Komponent-basert mapping er fallback.
-
-2. **Migration: oppdater `pos_create_cake_order`**
-   - Les `v_merknad := v_cake_result->'merknad'`.
-   - Sett `merknad = v_merknad` på `INSERT INTO order_lines` for hovedlinjen (kun hovedproduktet — tilbehørslinjer får ingen merknad).
-   - Skriv også `pickup_location_id`, `delivery_tour_id`, `delivery_date` på `orders`/`order_lines` der disse er resolved fra payload (allerede gjort i dag for orders, men dobbeltsjekk at felt på ordrelinjen er konsistente).
-
-3. **`LabelProductsTable`/`PrintLabelDialog`** (frontend)
-   - Ingen kode-endring nødvendig — `useOrderLineMerknads` plukker opp `order_lines.merknad` automatisk og sender inn til `labelPdf.tsx` via eksisterende `merknad`-prop.
-
-4. **Verifisering**
-   - Opprett en testordre fra kakebyggeren med fyll/pynt/tekst valgt. Sjekk i Supabase at `order_lines.merknad` er fylt.
-   - Åpne etiketten fra Produksjon → Etiketter og bekreft at alle felt i profilen viser data.
-
-### Det dette IKKE endrer
-
-- Layout/posisjoner på etiketten — fortsatt 100 % styrt av `label_print_profiles.fields` (per profil, slik du valgte).
-- Frontend label-rendering (`labelPdf.tsx`) — den har allerede alle nødvendige `case`-grener i `valueFor`.
-- Andre apper enn kakebyggeren.
-
-### Filer
-
-- `supabase/migrations/<ny>.sql` (oppdaterer `build_cake_order_line` + `pos_create_cake_order`)
-
-Ingen frontend-kodeendringer i denne runden.
+## Tekniske detaljer
+- Ingen DB-migrasjon nødvendig — alle feil ligger i frontend-koden og hvordan callback-kjeden håndterer asynkrone feil.
+- `pos_create_cake_order` (SECURITY DEFINER) endres ikke i denne PR-en; vi bare gjør feilene synlige slik at vi kan rette neste-steg hvis det viser seg at RPC-en selv kaster.
+- Skill mellom «required» og «min_selections» påvirker også summary-stegets `canProceed`-logikk; ingen ny logikk der, bare at `stepValidation` slipper gjennom 0-min-steg.

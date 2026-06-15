@@ -351,7 +351,12 @@ export function CakeBuilder({
       }
     } else if (currentStep.selection_type === "multi") {
       const sel = multiSelections[currentStep.id] ?? [];
-      if (currentStep.required && sel.length === 0) return "Du må velge minst ett alternativ.";
+      // Et steg kan være `required=true` men ha eksplisitt `min_selections=0`
+      // (f.eks. «Pynt 0–4»). Da skal vi IKKE blokkere på 0 valg.
+      const hasExplicitZeroMin = currentStep.min_selections === 0;
+      if (currentStep.required && !hasExplicitZeroMin && sel.length === 0) {
+        return "Du må velge minst ett alternativ.";
+      }
       if (currentStep.min_selections && sel.length < currentStep.min_selections) {
         return `Velg minst ${currentStep.min_selections}.`;
       }
