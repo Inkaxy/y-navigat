@@ -101,7 +101,9 @@ export function KeypadGrid({ data }: Props) {
 
   const handleFunction = (b: KeypadButton) => {
     if (b.function_code === "kakebygger") {
-      setKakebyggerOpen(true);
+      // KeypadGrid kjenner ikke kassens kurv-/ordreflyt. Kakebyggeren MÅ åpnes
+      // fra Kasse.tsx slik at `onCakeComplete` faktisk oppretter henteordren.
+      toast.error("Kakebygger må åpnes fra kassevisningen");
       return;
     }
     toast.info(
