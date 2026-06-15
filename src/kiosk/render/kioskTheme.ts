@@ -1,10 +1,40 @@
 // Felles theme-modell for kiosken. Lever som jsonb på pos_keypad_layouts.theme
 // og pos_keypad_layouts.customer_screen. Brukes av preview (TastaturEditor) OG
-// (i Steg 4) av selve kiosk-rendringen.
+// av selve kiosk-rendringen.
+//
+// Alle nye felter er valgfrie i jsonb — parseTheme fyller dem fra DEFAULT_THEME
+// så gamle layouts fortsatt rendrer identisk som før.
 
 import type { CSSProperties } from "react";
 
 export type KioskLayoutKind = "tabs_top" | "sidebar_left";
+
+export type HeaderStyle = "minimal" | "branded_left" | "branded_centered";
+export type DiningPlacement = "cart_chip" | "top_hero" | "header_pills";
+export type DiningPillStyle = "soft" | "outlined" | "solid";
+export type CartStyle = "compact" | "rich";
+export type FooterStyle = "pill_grid" | "icon_card" | "compact_row";
+
+// Tilgjengelige footer-handlinger. Kasse.tsx mapper code → handler.
+export const FOOTER_ACTION_CODES = [
+  "discount",
+  "label_print",
+  "park_order",
+  "clear_order",
+  "receipt",
+  "customer",
+  "pickup_orders",
+  "kakebygger",
+  "open_drawer",
+] as const;
+export type FooterActionCode = (typeof FOOTER_ACTION_CODES)[number];
+
+export interface FooterAction {
+  code: FooterActionCode;
+  label: string;
+  icon: string; // lucide-react ikon-navn
+  variant?: "default" | "danger";
+}
 
 export interface KioskTheme {
   layoutKind: KioskLayoutKind;
@@ -32,6 +62,20 @@ export interface KioskTheme {
   // Cart
   cartBg: string;
   cartInk: string;
+  // ── Brand (alle valgfrie) ──────────────────────────────────────────────
+  brandName: string | null;
+  brandTagline: string | null;     // "ETAB. 1879", "Sandefjord 1951"
+  brandLogoUrl: string | null;
+  brandMonogramUrl: string | null; // valgfri sekundær mark (mascot/seal)
+  // ── Layout-varianter ───────────────────────────────────────────────────
+  headerStyle: HeaderStyle;
+  diningPlacement: DiningPlacement;
+  diningPillStyle: DiningPillStyle;
+  cartStyle: CartStyle;
+  cartShowImages: boolean;
+  cartShowStepper: boolean;
+  footerStyle: FooterStyle;
+  footerActions: FooterAction[];
 }
 
 export interface CustomerScreenConfig {
@@ -44,6 +88,14 @@ export interface CustomerScreenConfig {
   // Brukes når mode=logo_only — logo størrelse
   logoScale: "small" | "medium" | "large";
 }
+
+export const DEFAULT_FOOTER_ACTIONS: FooterAction[] = [
+  { code: "discount", label: "Rabatt", icon: "Percent" },
+  { code: "label_print", label: "Merket lapp", icon: "Tag" },
+  { code: "park_order", label: "Parker ordre", icon: "Pause" },
+  { code: "clear_order", label: "Slett ordre", icon: "Trash2", variant: "danger" },
+  { code: "receipt", label: "Kvittering", icon: "Receipt" },
+];
 
 export const DEFAULT_THEME: KioskTheme = {
   layoutKind: "tabs_top",
@@ -64,6 +116,18 @@ export const DEFAULT_THEME: KioskTheme = {
   headerInk: "#F4ECDC",
   cartBg: "rgba(255,255,255,0.02)",
   cartInk: "#F4ECDC",
+  brandName: null,
+  brandTagline: null,
+  brandLogoUrl: null,
+  brandMonogramUrl: null,
+  headerStyle: "minimal",
+  diningPlacement: "cart_chip",
+  diningPillStyle: "soft",
+  cartStyle: "compact",
+  cartShowImages: false,
+  cartShowStepper: false,
+  footerStyle: "pill_grid",
+  footerActions: DEFAULT_FOOTER_ACTIONS,
 };
 
 export const DEFAULT_CUSTOMER_SCREEN: CustomerScreenConfig = {
@@ -107,10 +171,25 @@ export function customerScreenToVars(c: CustomerScreenConfig): CSSProperties {
   };
 }
 
-// Parser fra jsonb. Mangler felt → fyll fra defaults.
+// Parser fra jsonb. Mangler felt → fyll fra defaults. Validerer arrays.
 export function parseTheme(value: unknown): KioskTheme {
   if (!value || typeof value !== "object") return DEFAULT_THEME;
-  return { ...DEFAULT_THEME, ...(value as Partial<KioskTheme>) };
+  const v = value as Partial<KioskTheme>;
+  const merged: KioskTheme = { ...DEFAULT_THEME, ...v };
+  // Normaliser footerActions: må være array, hver post må ha code/label/icon
+  if (!Array.isArray(merged.footerActions) || merged.footerActions.length === 0) {
+    merged.footerActions = DEFAULT_FOOTER_ACTIONS;
+  } else {
+    merged.footerActions = merged.footerActions
+      .filter((a): a is FooterAction =>
+        !!a && typeof a === "object" &&
+        typeof (a as FooterAction).code === "string" &&
+        typeof (a as FooterAction).label === "string" &&
+        typeof (a as FooterAction).icon === "string",
+      );
+    if (merged.footerActions.length === 0) merged.footerActions = DEFAULT_FOOTER_ACTIONS;
+  }
+  return merged;
 }
 
 export function parseCustomerScreen(value: unknown): CustomerScreenConfig {
