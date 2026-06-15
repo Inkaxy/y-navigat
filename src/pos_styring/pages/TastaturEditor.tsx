@@ -1250,8 +1250,20 @@ export default function TastaturEditor() {
 
 function DraggableButton({ button, layout, onEdit, onResize }: { button: KeypadButton; layout?: KeypadLayoutDetail; onEdit: () => void; onResize?: (w: number, h: number) => void }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggableCompat(button.id);
+  const filteredListeners = useMemo(() => {
+    if (!listeners) return {} as Record<string, (e: any) => void>;
+    const out: Record<string, (e: any) => void> = {};
+    for (const [key, handler] of Object.entries(listeners)) {
+      out[key] = (e: any) => {
+        const tgt = e?.target as HTMLElement | undefined;
+        if (tgt && tgt.closest && tgt.closest('[data-resize-handle="true"]')) return;
+        (handler as (e: any) => void)(e);
+      };
+    }
+    return out;
+  }, [listeners]);
   return (
-    <div ref={setNodeRef} style={{ transform: CSS.Translate.toString(transform) }} className="h-full min-h-0" {...attributes} {...listeners}>
+    <div ref={setNodeRef} data-keypad-cell="true" style={{ transform: CSS.Translate.toString(transform) }} className="h-full min-h-0" {...attributes} {...filteredListeners}>
       <KeypadButtonTile button={button} layout={layout} onEdit={onEdit} dragging={isDragging} onResize={onResize} />
     </div>
   );
