@@ -916,7 +916,6 @@ export default function TastaturEditor() {
 
   function handleMoveButton(button: KeypadButton, clientX: number, clientY: number) {
     const point = getGridPointFromClient(clientX, clientY);
-    setDraggingButton(null);
     if (!point || (point.x === button.grid_x && point.y === button.grid_y)) return;
     moveButtonMutation.mutate({ button, x: point.x, y: point.y });
   }
