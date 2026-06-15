@@ -14,6 +14,7 @@ import {
 import { CloseSessionModal } from "@/kiosk/components/CloseSessionModal";
 import { PaymentModal } from "@/kiosk/components/PaymentModal";
 import { KakebyggerModal } from "@/kiosk/components/KakebyggerModal";
+import { HenteordreModal, type PickupOrderRow, type PickupOrderLine } from "@/kiosk/components/HenteordreModal";
 import { ReceiptView } from "@/kiosk/components/ReceiptView";
 import { useTerminal } from "@/kiosk/context/TerminalContext";
 import { useOperator } from "@/kiosk/context/OperatorContext";
@@ -120,6 +121,8 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
   const [closeSessionOpen, setCloseSessionOpen] = useState(false);
   const [clearOpen, setClearOpen] = useState(false);
   const [kakebyggerOpen, setKakebyggerOpen] = useState(false);
+  const [henteordreOpen, setHenteordreOpen] = useState(false);
+  const [activePickupOrderId, setActivePickupOrderId] = useState<string | null>(null);
   const [printingReceipt, setPrintingReceipt] = useState(false);
   const [receipt, setReceipt] = useState<{
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -199,6 +202,10 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
       case "function":
         if (b.function_code === "kakebygger") {
           setKakebyggerOpen(true);
+          return;
+        }
+        if (b.function_code === "henteordre") {
+          setHenteordreOpen(true);
           return;
         }
         toast.info(`${b.display_label ?? b.function_code ?? "Funksjon"}: bygges senere`);
