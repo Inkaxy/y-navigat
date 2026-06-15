@@ -18,7 +18,7 @@ interface Props {
   legalEntityId: string | null;
   priceListId: string | null;
   defaultPickupLocationId?: string | null;
-  onCakeComplete?: (result: CakeResult) => void;
+  onCakeComplete?: (result: CakeResult) => void | Promise<void>;
 }
 
 type Category = {
