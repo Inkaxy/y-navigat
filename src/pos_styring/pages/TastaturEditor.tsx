@@ -121,6 +121,7 @@ const FUNCTIONS = [
   { code: "price_override", label: "Overstyr pris" },
   { code: "customer_lookup", label: "Søk kunde" },
   { code: "kakebygger", label: "Kakebygger" },
+  { code: "henteordre", label: "Henteordre" },
 ];
 
 const buttonSchema = z.object({
