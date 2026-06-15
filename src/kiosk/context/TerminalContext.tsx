@@ -8,6 +8,7 @@ export interface KioskTerminal {
   display_name: string;
   legal_entity_id: string;
   default_price_list_id: string | null;
+  outlet_id: string | null;
   logo_url: string | null;
   customer_screen_mode: "logo_only" | "logo_and_cart";
 }
@@ -38,7 +39,7 @@ export function TerminalProvider({
     (async () => {
       const { data, error } = await kioskSupabase
         .from("pos_terminals")
-        .select("id, terminal_code, display_name, legal_entity_id, default_price_list_id, logo_url, customer_screen_mode")
+        .select("id, terminal_code, display_name, legal_entity_id, default_price_list_id, outlet_id, logo_url, customer_screen_mode")
         .eq("id", terminalId)
         .maybeSingle();
       if (cancelled) return;
