@@ -1,6 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useDraggable, useDroppable, useSensor, useSensors } from "@dnd-kit/core";
-import { CSS } from "@dnd-kit/utilities";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, GripVertical, Minus, MoreHorizontal, Palette, Plus, Search, Sparkles, Trash2 } from "lucide-react";
@@ -247,15 +245,14 @@ async function fetchPrimaryProductImagePath(productId: string): Promise<string |
 }
 
 function DroppableCell({ x, y, children }: { x: number; y: number; children?: React.ReactNode }) {
-  const { setNodeRef, isOver } = useDroppable({ id: `cell-${x}-${y}`, data: { x, y } });
   return (
-    <div ref={setNodeRef} className={cn("rounded-md border border-dashed border-border bg-background/70 transition-colors", isOver && "border-primary bg-primary/10")}>
+    <div data-grid-drop-cell="true" data-grid-x={x} data-grid-y={y} className="rounded-md border border-dashed border-border bg-background/70 transition-colors">
       {children}
     </div>
   );
 }
 
-function KeypadButtonTile({ button, layout, onEdit, dragging, onResize }: { button: KeypadButton; layout?: KeypadLayoutDetail; onEdit?: () => void; dragging?: boolean; onResize?: (w: number, h: number) => void }) {
+function KeypadButtonTile({ button, layout, dragging, onResizePointerDown }: { button: KeypadButton; layout?: KeypadLayoutDetail; dragging?: boolean; onResizePointerDown?: (event: React.PointerEvent<HTMLDivElement>) => void }) {
   const notInPos = button.button_type === "product" && button.product && button.product.in_pos === false;
   const showImage = button.show_image ?? layout?.show_product_image ?? true;
 
@@ -298,9 +295,7 @@ function KeypadButtonTile({ button, layout, onEdit, dragging, onResize }: { butt
   });
   const bgImage = showImage ? (button.image_url || signedFromPath) : "";
   return (
-    <button
-      type="button"
-      onClick={onEdit}
+    <div
       className={cn("relative flex h-full w-full overflow-hidden rounded-md border border-primary/20 bg-primary/15 p-2 text-left text-sm font-semibold shadow-card transition hover:ring-2 hover:ring-ring", dragging && "opacity-60", notInPos && "border-destructive/60 ring-1 ring-destructive/40")}
       style={{ backgroundColor: button.background_color ?? undefined, color: button.text_color ?? undefined }}
     >
@@ -311,54 +306,18 @@ function KeypadButtonTile({ button, layout, onEdit, dragging, onResize }: { butt
         </span>
       )}
       <span className="relative z-10 line-clamp-3 self-end rounded-sm bg-background/75 px-1.5 py-1 text-foreground">{buttonLabel(button)}</span>
-      {onResize && !dragging && (
-        <ResizeHandle button={button} onResize={onResize} />
+      {onResizePointerDown && !dragging && (
+        <ResizeHandle onPointerDown={onResizePointerDown} />
       )}
-    </button>
+    </div>
   );
 }
 
-function ResizeHandle({ button, onResize }: { button: KeypadButton; onResize: (w: number, h: number) => void }) {
-  const stateRef = useRef<{ w: number; h: number } | null>(null);
-  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    e.stopPropagation();
-    e.nativeEvent.stopImmediatePropagation();
-    e.preventDefault();
-    // Walk up to find the actual rendered cell wrapper (the draggable div with absolute positioning)
-    const handleEl = e.currentTarget;
-    const tileEl = (handleEl.closest("[data-keypad-cell]") as HTMLElement | null) ?? handleEl.parentElement;
-    if (!tileEl) return;
-    const rect = tileEl.getBoundingClientRect();
-    const cellW = rect.width / Math.max(1, button.grid_width);
-    const cellH = rect.height / Math.max(1, button.grid_height);
-    const startX = e.clientX;
-    const startY = e.clientY;
-    const startW = button.grid_width;
-    const startH = button.grid_height;
-    stateRef.current = { w: startW, h: startH };
-    try { handleEl.setPointerCapture(e.pointerId); } catch {}
-    const onMove = (ev: PointerEvent) => {
-      ev.preventDefault();
-      const dw = Math.round((ev.clientX - startX) / cellW);
-      const dh = Math.round((ev.clientY - startY) / cellH);
-      stateRef.current = { w: Math.max(1, startW + dw), h: Math.max(1, startH + dh) };
-    };
-    const onUp = (ev: PointerEvent) => {
-      handleEl.removeEventListener("pointermove", onMove);
-      handleEl.removeEventListener("pointerup", onUp);
-      handleEl.removeEventListener("pointercancel", onUp);
-      try { handleEl.releasePointerCapture(ev.pointerId); } catch {}
-      const s = stateRef.current;
-      if (s && (s.w !== startW || s.h !== startH)) onResize(s.w, s.h);
-    };
-    handleEl.addEventListener("pointermove", onMove);
-    handleEl.addEventListener("pointerup", onUp);
-    handleEl.addEventListener("pointercancel", onUp);
-  };
+function ResizeHandle({ onPointerDown }: { onPointerDown: (event: React.PointerEvent<HTMLDivElement>) => void }) {
   return (
     <div
       data-resize-handle="true"
-      onPointerDown={handlePointerDown}
+      onPointerDown={onPointerDown}
       onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}
       role="presentation"
       title="Dra for å endre størrelse"
@@ -733,7 +692,6 @@ export default function TastaturEditor() {
   const [buttonDialogOpen, setButtonDialogOpen] = useState(false);
   const [selectedCell, setSelectedCell] = useState<{ x: number; y: number } | null>(null);
   const [editingButton, setEditingButton] = useState<KeypadButton | null>(null);
-  const [draggingButton, setDraggingButton] = useState<KeypadButton | null>(null);
   const [pageDialog, setPageDialog] = useState<{ mode: "create" | "rename" | "color"; page?: KeypadPage } | null>(null);
   const [pageName, setPageName] = useState("");
   const [pageColor, setPageColor] = useState("");
@@ -741,8 +699,7 @@ export default function TastaturEditor() {
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [themeSettingsOpen, setThemeSettingsOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(true);
-
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+  const gridRef = useRef<HTMLDivElement>(null);
 
   const { data: layout, isLoading: layoutLoading, error: layoutError } = useQuery({
     queryKey: ["pos_keypad_layout", layoutId],
@@ -931,17 +888,36 @@ export default function TastaturEditor() {
     setButtonDialogOpen(true);
   }
 
-  function onDragStart(event: DragStartEvent) {
-    const button = buttons.find((item) => item.id === event.active.id);
-    setDraggingButton(button ?? null);
-  }
+  const getGridPointFromClient = useCallback((clientX: number, clientY: number) => {
+    if (!layout || !gridRef.current) return null;
+    const gridEl = gridRef.current;
+    const rect = gridEl.getBoundingClientRect();
+    const style = window.getComputedStyle(gridEl);
+    const paddingLeft = Number.parseFloat(style.paddingLeft) || 0;
+    const paddingTop = Number.parseFloat(style.paddingTop) || 0;
+    const paddingRight = Number.parseFloat(style.paddingRight) || 0;
+    const paddingBottom = Number.parseFloat(style.paddingBottom) || 0;
+    const colGap = Number.parseFloat(style.columnGap) || 0;
+    const rowGap = Number.parseFloat(style.rowGap) || 0;
+    const contentWidth = rect.width - paddingLeft - paddingRight;
+    const contentHeight = rect.height - paddingTop - paddingBottom;
+    const cellWidth = (contentWidth - colGap * (layout.grid_cols - 1)) / layout.grid_cols;
+    const cellHeight = (contentHeight - rowGap * (layout.grid_rows - 1)) / layout.grid_rows;
+    const relX = clientX - rect.left - paddingLeft;
+    const relY = clientY - rect.top - paddingTop;
+    if (relX < 0 || relY < 0 || relX > contentWidth || relY > contentHeight) return null;
+    return {
+      x: Math.max(0, Math.min(layout.grid_cols - 1, Math.floor(relX / (cellWidth + colGap)))),
+      y: Math.max(0, Math.min(layout.grid_rows - 1, Math.floor(relY / (cellHeight + rowGap)))),
+      cellWidth,
+      cellHeight,
+    };
+  }, [layout]);
 
-  function onDragEnd(event: DragEndEvent) {
-    const button = draggingButton;
-    setDraggingButton(null);
-    if (!button || !event.over?.data.current) return;
-    const { x, y } = event.over.data.current as { x: number; y: number };
-    moveButtonMutation.mutate({ button, x, y });
+  function handleMoveButton(button: KeypadButton, clientX: number, clientY: number) {
+    const point = getGridPointFromClient(clientX, clientY);
+    if (!point || (point.x === button.grid_x && point.y === button.grid_y)) return;
+    moveButtonMutation.mutate({ button, x: point.x, y: point.y });
   }
 
   if (layoutLoading || pagesLoading) {
@@ -1117,8 +1093,10 @@ export default function TastaturEditor() {
             <span className="text-xs text-muted-foreground">Klikk tom celle for ny knapp · dra knapp for å flytte</span>
           </div>
           {buttonsLoading ? <Skeleton className="h-[560px] w-full" /> : activePage ? (
-            <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
+            <>
               <div
+                ref={gridRef}
+                data-keypad-grid="true"
                 className="grid h-[min(64vh,680px)] min-h-[480px] gap-2 rounded-lg border bg-muted/30 p-3"
                 style={{
                   gridTemplateColumns: `repeat(${layout.grid_cols}, minmax(0, 1fr))`,
@@ -1134,7 +1112,13 @@ export default function TastaturEditor() {
                   if (anchoredButton) {
                     return (
                       <div key={`${x}-${y}`} className="min-h-0" style={{ gridColumn: `${x + 1} / span ${anchoredButton.grid_width}`, gridRow: `${y + 1} / span ${anchoredButton.grid_height}` }}>
-                        <DraggableButton button={anchoredButton} layout={layout} onEdit={() => openButtonDialog(x, y, anchoredButton)} onResize={(w, h) => resizeButtonMutation.mutate({ button: anchoredButton, w, h })} />
+                        <DraggableButton
+                          button={anchoredButton}
+                          layout={layout}
+                          onEdit={() => openButtonDialog(x, y, anchoredButton)}
+                          onMove={(clientX, clientY) => handleMoveButton(anchoredButton, clientX, clientY)}
+                          onResize={(w, h) => resizeButtonMutation.mutate({ button: anchoredButton, w, h })}
+                        />
                       </div>
                     );
                   }
@@ -1142,8 +1126,7 @@ export default function TastaturEditor() {
                   return <DroppableCell key={`${x}-${y}`} x={x} y={y}><button className="h-full w-full rounded-md" aria-label={`Ny knapp ${x + 1}, ${y + 1}`} onClick={() => openButtonDialog(x, y)} /></DroppableCell>;
                 })}
               </div>
-              <DragOverlay>{draggingButton ? <div className="h-24 w-32"><KeypadButtonTile button={draggingButton} dragging /></div> : null}</DragOverlay>
-            </DndContext>
+            </>
           ) : (
             <div className="flex h-96 items-center justify-center text-muted-foreground">Opprett en page for å starte.</div>
           )}
@@ -1248,27 +1231,130 @@ export default function TastaturEditor() {
   );
 }
 
-function DraggableButton({ button, layout, onEdit, onResize }: { button: KeypadButton; layout?: KeypadLayoutDetail; onEdit: () => void; onResize?: (w: number, h: number) => void }) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggableCompat(button.id);
-  const filteredListeners = useMemo(() => {
-    if (!listeners) return {} as Record<string, (e: any) => void>;
-    const out: Record<string, (e: any) => void> = {};
-    for (const [key, handler] of Object.entries(listeners)) {
-      out[key] = (e: any) => {
-        const tgt = e?.target as HTMLElement | undefined;
-        if (tgt && tgt.closest && tgt.closest('[data-resize-handle="true"]')) return;
-        (handler as (e: any) => void)(e);
-      };
-    }
-    return out;
-  }, [listeners]);
+function DraggableButton({
+  button,
+  layout,
+  onEdit,
+  onMove,
+  onResize,
+}: {
+  button: KeypadButton;
+  layout?: KeypadLayoutDetail;
+  onEdit: () => void;
+  onMove: (clientX: number, clientY: number) => void;
+  onResize?: (w: number, h: number) => void;
+}) {
+  const tileRef = useRef<HTMLDivElement>(null);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+
+  const startTileDrag = (event: React.PointerEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement | null;
+    if (target?.closest('[data-resize-handle="true"]')) return;
+    const tileEl = event.currentTarget;
+    const startX = event.clientX;
+    const startY = event.clientY;
+    let didDrag = false;
+    let latestX = startX;
+    let latestY = startY;
+
+    event.preventDefault();
+    try { tileEl.setPointerCapture(event.pointerId); } catch {}
+
+    const onPointerMove = (moveEvent: PointerEvent) => {
+      moveEvent.preventDefault();
+      latestX = moveEvent.clientX;
+      latestY = moveEvent.clientY;
+      const dx = latestX - startX;
+      const dy = latestY - startY;
+      if (!didDrag && Math.hypot(dx, dy) >= 6) {
+        didDrag = true;
+        setIsDragging(true);
+      }
+      if (didDrag) setDragOffset({ x: dx, y: dy });
+    };
+
+    const onPointerUp = (upEvent: PointerEvent) => {
+      tileEl.removeEventListener("pointermove", onPointerMove);
+      tileEl.removeEventListener("pointerup", onPointerUp);
+      tileEl.removeEventListener("pointercancel", onPointerUp);
+      try { tileEl.releasePointerCapture(upEvent.pointerId); } catch {}
+      setDragOffset({ x: 0, y: 0 });
+      setIsDragging(false);
+      if (didDrag) {
+        onMove(latestX, latestY);
+      } else {
+        onEdit();
+      }
+    };
+
+    tileEl.addEventListener("pointermove", onPointerMove);
+    tileEl.addEventListener("pointerup", onPointerUp);
+    tileEl.addEventListener("pointercancel", onPointerUp);
+  };
+
+  const startResize = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!onResize || !tileRef.current) return;
+    event.stopPropagation();
+    event.nativeEvent.stopImmediatePropagation();
+    event.preventDefault();
+
+    const handleEl = event.currentTarget;
+    const tileRect = tileRef.current.getBoundingClientRect();
+    const gridEl = tileRef.current.closest("[data-keypad-grid]") as HTMLElement | null;
+    const gridStyle = gridEl ? window.getComputedStyle(gridEl) : null;
+    const colGap = gridStyle ? Number.parseFloat(gridStyle.columnGap) || 0 : 0;
+    const rowGap = gridStyle ? Number.parseFloat(gridStyle.rowGap) || 0 : 0;
+    const cellW = (tileRect.width - colGap * (button.grid_width - 1)) / Math.max(1, button.grid_width);
+    const cellH = (tileRect.height - rowGap * (button.grid_height - 1)) / Math.max(1, button.grid_height);
+    const startX = event.clientX;
+    const startY = event.clientY;
+    const startW = button.grid_width;
+    const startH = button.grid_height;
+    let nextW = startW;
+    let nextH = startH;
+
+    try { handleEl.setPointerCapture(event.pointerId); } catch {}
+
+    const onPointerMove = (moveEvent: PointerEvent) => {
+      moveEvent.preventDefault();
+      const dx = moveEvent.clientX - startX;
+      const dy = moveEvent.clientY - startY;
+      nextW = Math.max(1, startW + Math.round(dx / Math.max(1, cellW + colGap)));
+      nextH = Math.max(1, startH + Math.round(dy / Math.max(1, cellH + rowGap)));
+      setDragOffset({ x: 0, y: 0 });
+    };
+
+    const onPointerUp = (upEvent: PointerEvent) => {
+      handleEl.removeEventListener("pointermove", onPointerMove);
+      handleEl.removeEventListener("pointerup", onPointerUp);
+      handleEl.removeEventListener("pointercancel", onPointerUp);
+      try { handleEl.releasePointerCapture(upEvent.pointerId); } catch {}
+      if (nextW !== startW || nextH !== startH) onResize(nextW, nextH);
+    };
+
+    handleEl.addEventListener("pointermove", onPointerMove);
+    handleEl.addEventListener("pointerup", onPointerUp);
+    handleEl.addEventListener("pointercancel", onPointerUp);
+  };
+
   return (
-    <div ref={setNodeRef} data-keypad-cell="true" style={{ transform: CSS.Translate.toString(transform) }} className="h-full min-h-0" {...attributes} {...filteredListeners}>
-      <KeypadButtonTile button={button} layout={layout} onEdit={onEdit} dragging={isDragging} onResize={onResize} />
+    <div
+      ref={tileRef}
+      data-keypad-cell="true"
+      role="button"
+      tabIndex={0}
+      onPointerDown={startTileDrag}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onEdit();
+        }
+      }}
+      style={{ transform: `translate3d(${dragOffset.x}px, ${dragOffset.y}px, 0)`, zIndex: isDragging ? 20 : undefined }}
+      className="h-full min-h-0 cursor-grab touch-none select-none active:cursor-grabbing"
+    >
+      <KeypadButtonTile button={button} layout={layout} dragging={isDragging} onResizePointerDown={onResize ? startResize : undefined} />
     </div>
   );
-}
-
-function useDraggableCompat(id: string) {
-  return useDraggable({ id });
 }
