@@ -372,7 +372,30 @@ export function CakeBuilder({
     return null;
   }, [currentStep, singleSelections, multiSelections, textInputs]);
 
-  const canProceed = !stepValidation && !blockingRule;
+  // Customer-meta validering
+  const customerValidation = useMemo(() => {
+    if (!isCustomer) return null;
+    if (!customerMeta.pickup_date) return "Velg hentedato.";
+    if (!customerMeta.pickup_location_id) return "Velg hentested.";
+    if (!customerMeta.name.trim()) return "Skriv inn navn.";
+    if (!customerMeta.phone.trim()) return "Skriv inn telefonnummer.";
+    if (customerMeta.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerMeta.email.trim())) {
+      return "Ugyldig e-postadresse.";
+    }
+    return null;
+  }, [isCustomer, customerMeta]);
+
+  const paymentValidation = useMemo(() => {
+    if (!isPayment) return null;
+    if (!paymentMode) return "Velg om kunden betaler nå eller ved henting.";
+    return null;
+  }, [isPayment, paymentMode]);
+
+  const canProceed = isCustomer
+    ? !customerValidation
+    : isPayment
+      ? !paymentValidation
+      : !stepValidation && !blockingRule;
 
   // ─── Render states ─────────────────────────────────────────────────────────
 
