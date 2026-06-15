@@ -515,6 +515,8 @@ export function CakeBuilder({
         order_line: payload.order_line,
         accessory_lines: payload.accessory_lines ?? [],
         label_payload: payload.label_payload,
+        customer_meta: { ...customerMeta },
+        payment_mode: paymentMode ?? "later",
       };
       setConfirmedResult(result);
     } catch (e) {
