@@ -549,7 +549,15 @@ export function CakeBuilder({
 
   /** Klikk på "Bekreft bestilling" på bekreftelses-skjermen */
   const handleFinalConfirm = () => {
-    if (!confirmedResult) return;
+    if (!confirmedResult) {
+      console.warn("[CakeBuilder] handleFinalConfirm called without confirmedResult");
+      return;
+    }
+    console.info("[CakeBuilder] handleFinalConfirm → onComplete()", {
+      category: confirmedResult.category_name,
+      total_inc_mva: confirmedResult.total_inc_mva,
+      payment_mode: confirmedResult.payment_mode,
+    });
     onComplete(confirmedResult);
   };
 
