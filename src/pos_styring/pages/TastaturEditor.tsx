@@ -1243,7 +1243,6 @@ function DraggableButton({
   layout?: KeypadLayoutDetail;
   onEdit: () => void;
   onMove: (clientX: number, clientY: number) => void;
-  onDragStateChange: (dragging: boolean) => void;
   onResize?: (w: number, h: number) => void;
 }) {
   const tileRef = useRef<HTMLDivElement>(null);
@@ -1272,7 +1271,6 @@ function DraggableButton({
       if (!didDrag && Math.hypot(dx, dy) >= 6) {
         didDrag = true;
         setIsDragging(true);
-        onDragStateChange(true);
       }
       if (didDrag) setDragOffset({ x: dx, y: dy });
     };
@@ -1286,7 +1284,6 @@ function DraggableButton({
       setIsDragging(false);
       if (didDrag) {
         onMove(latestX, latestY);
-        onDragStateChange(false);
       } else {
         onEdit();
       }
