@@ -692,7 +692,6 @@ export default function TastaturEditor() {
   const [buttonDialogOpen, setButtonDialogOpen] = useState(false);
   const [selectedCell, setSelectedCell] = useState<{ x: number; y: number } | null>(null);
   const [editingButton, setEditingButton] = useState<KeypadButton | null>(null);
-  const [draggingButton, setDraggingButton] = useState<KeypadButton | null>(null);
   const [pageDialog, setPageDialog] = useState<{ mode: "create" | "rename" | "color"; page?: KeypadPage } | null>(null);
   const [pageName, setPageName] = useState("");
   const [pageColor, setPageColor] = useState("");
@@ -1098,6 +1097,7 @@ export default function TastaturEditor() {
             <>
               <div
                 ref={gridRef}
+                data-keypad-grid="true"
                 className="grid h-[min(64vh,680px)] min-h-[480px] gap-2 rounded-lg border bg-muted/30 p-3"
                 style={{
                   gridTemplateColumns: `repeat(${layout.grid_cols}, minmax(0, 1fr))`,
@@ -1118,7 +1118,6 @@ export default function TastaturEditor() {
                           layout={layout}
                           onEdit={() => openButtonDialog(x, y, anchoredButton)}
                           onMove={(clientX, clientY) => handleMoveButton(anchoredButton, clientX, clientY)}
-                          onDragStateChange={(dragging) => setDraggingButton(dragging ? anchoredButton : null)}
                           onResize={(w, h) => resizeButtonMutation.mutate({ button: anchoredButton, w, h })}
                         />
                       </div>
