@@ -207,6 +207,7 @@ export function KakebyggerModal({
                   defaultPickupLocationId={defaultPickupLocationId}
                   value={customerMeta}
                   onChange={setCustomerMeta}
+                  client={kioskSupabase}
                 />
               </div>
               <div className="border-t px-6 py-3 flex items-center justify-between gap-3 shrink-0">
