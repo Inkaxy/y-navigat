@@ -32,6 +32,7 @@ export interface CakeBuilderProps {
   categoryId: string;
   priceListId: string;
   legalEntityId: string;
+  defaultPickupLocationId?: string | null;
   /** F1.3: pre-fill from existing config. Skeleton only — not implemented in F1.2. */
   initialConfig?: CakeConfig;
   showVatToggle?: boolean;
