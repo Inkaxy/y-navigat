@@ -922,7 +922,7 @@ export function CakeBuilder({
       </div>
 
       <StepNav
-        isFirst={isCustomer}
+        isFirst={isCustomer || (hasPrefilledCustomer && phase === "step" && stepIndex === 0)}
         isLast={isPayment}
         canProceed={
           isCustomer
@@ -936,8 +936,10 @@ export function CakeBuilder({
         onBack={() => {
           if (isPayment) setPhase("summary");
           else if (isSummary) setPhase("step");
-          else if (phase === "step" && stepIndex === 0) setPhase("customer");
-          else setStepIndex((i) => Math.max(0, i - 1));
+          else if (phase === "step" && stepIndex === 0) {
+            if (hasPrefilledCustomer) onCancel();
+            else setPhase("customer");
+          } else setStepIndex((i) => Math.max(0, i - 1));
         }}
         onNext={() => {
           if (isCustomer) {
