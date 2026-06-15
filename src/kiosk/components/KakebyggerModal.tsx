@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Cake, Loader2, ChevronLeft } from "lucide-react";
+import { toast } from "sonner";
 import { kioskSupabase } from "@/kiosk/integrations/supabase/client";
 import { listenFromParent } from "@/varer/features/cakeBuilder/protocol";
 import type { CakeResult } from "@/varer/features/cakeBuilder/types";
