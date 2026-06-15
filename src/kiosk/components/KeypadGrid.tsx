@@ -127,8 +127,6 @@ export function KeypadGrid({ data }: Props) {
     }
   };
 
-  const kbLegalEntityId =
-    operator?.legal_entity_id ?? terminal?.legal_entity_id ?? null;
 
   return (
     <>
