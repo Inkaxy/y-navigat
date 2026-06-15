@@ -35,6 +35,9 @@ export interface CakeBuilderProps {
   defaultPickupLocationId?: string | null;
   /** F1.3: pre-fill from existing config. Skeleton only — not implemented in F1.2. */
   initialConfig?: CakeConfig;
+  /** Pre-fill customer info and skip the built-in "customer"-phase. Brukes når
+   *  vert-appen (f.eks. POS-kiosken) allerede har samlet inn kundedata først. */
+  initialCustomerMeta?: CustomerMeta;
   showVatToggle?: boolean;
   onPriceChange?: (price: PriceBreakdown) => void;
   onComplete: (result: CakeResult) => void;
