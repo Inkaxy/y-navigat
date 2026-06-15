@@ -322,8 +322,11 @@ function ResizeHandle({ button, onResize }: { button: KeypadButton; onResize: (w
   const stateRef = useRef<{ w: number; h: number } | null>(null);
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     e.stopPropagation();
+    e.nativeEvent.stopImmediatePropagation();
     e.preventDefault();
-    const tileEl = (e.currentTarget.parentElement as HTMLElement | null);
+    // Walk up to find the actual rendered cell wrapper (the draggable div with absolute positioning)
+    const handleEl = e.currentTarget;
+    const tileEl = (handleEl.closest("[data-keypad-cell]") as HTMLElement | null) ?? handleEl.parentElement;
     if (!tileEl) return;
     const rect = tileEl.getBoundingClientRect();
     const cellW = rect.width / Math.max(1, button.grid_width);
@@ -333,28 +336,36 @@ function ResizeHandle({ button, onResize }: { button: KeypadButton; onResize: (w
     const startW = button.grid_width;
     const startH = button.grid_height;
     stateRef.current = { w: startW, h: startH };
+    try { handleEl.setPointerCapture(e.pointerId); } catch {}
     const onMove = (ev: PointerEvent) => {
+      ev.preventDefault();
       const dw = Math.round((ev.clientX - startX) / cellW);
       const dh = Math.round((ev.clientY - startY) / cellH);
       stateRef.current = { w: Math.max(1, startW + dw), h: Math.max(1, startH + dh) };
     };
-    const onUp = () => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
+    const onUp = (ev: PointerEvent) => {
+      handleEl.removeEventListener("pointermove", onMove);
+      handleEl.removeEventListener("pointerup", onUp);
+      handleEl.removeEventListener("pointercancel", onUp);
+      try { handleEl.releasePointerCapture(ev.pointerId); } catch {}
       const s = stateRef.current;
       if (s && (s.w !== startW || s.h !== startH)) onResize(s.w, s.h);
     };
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
+    handleEl.addEventListener("pointermove", onMove);
+    handleEl.addEventListener("pointerup", onUp);
+    handleEl.addEventListener("pointercancel", onUp);
   };
   return (
     <div
+      data-resize-handle="true"
       onPointerDown={handlePointerDown}
+      onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}
       role="presentation"
       title="Dra for å endre størrelse"
-      className="absolute bottom-0 right-0 z-20 flex h-4 w-4 cursor-se-resize items-end justify-end"
+      className="absolute bottom-0 right-0 z-30 flex h-5 w-5 cursor-se-resize items-end justify-end touch-none select-none"
+      style={{ touchAction: "none" }}
     >
-      <span className="block h-2.5 w-2.5 rounded-tl-sm bg-primary/70 ring-1 ring-background" />
+      <span className="pointer-events-none block h-3 w-3 rounded-tl-sm bg-primary/80 ring-1 ring-background" />
     </div>
   );
 }
@@ -1239,8 +1250,20 @@ export default function TastaturEditor() {
 
 function DraggableButton({ button, layout, onEdit, onResize }: { button: KeypadButton; layout?: KeypadLayoutDetail; onEdit: () => void; onResize?: (w: number, h: number) => void }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggableCompat(button.id);
+  const filteredListeners = useMemo(() => {
+    if (!listeners) return {} as Record<string, (e: any) => void>;
+    const out: Record<string, (e: any) => void> = {};
+    for (const [key, handler] of Object.entries(listeners)) {
+      out[key] = (e: any) => {
+        const tgt = e?.target as HTMLElement | undefined;
+        if (tgt && tgt.closest && tgt.closest('[data-resize-handle="true"]')) return;
+        (handler as (e: any) => void)(e);
+      };
+    }
+    return out;
+  }, [listeners]);
   return (
-    <div ref={setNodeRef} style={{ transform: CSS.Translate.toString(transform) }} className="h-full min-h-0" {...attributes} {...listeners}>
+    <div ref={setNodeRef} data-keypad-cell="true" style={{ transform: CSS.Translate.toString(transform) }} className="h-full min-h-0" {...attributes} {...filteredListeners}>
       <KeypadButtonTile button={button} layout={layout} onEdit={onEdit} dragging={isDragging} onResize={onResize} />
     </div>
   );
