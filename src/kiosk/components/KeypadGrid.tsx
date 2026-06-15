@@ -245,12 +245,6 @@ export function KeypadGrid({ data }: Props) {
         </div>
       )}
     </div>
-    <KakebyggerModal
-      open={kakebyggerOpen}
-      onOpenChange={setKakebyggerOpen}
-      legalEntityId={kbLegalEntityId}
-      priceListId={priceListId}
-    />
     </>
   );
 }
