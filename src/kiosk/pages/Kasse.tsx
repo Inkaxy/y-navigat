@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { LogOut, Percent, Pause, Printer, Receipt, Tag, Trash2, X } from "lucide-react";
+import { LogOut, X } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -442,18 +442,25 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
     });
   }, [data]);
 
-  const renderCart: RenderCartLine[] = cart.items.map((it) => ({
-    id: it.id,
-    label: it.product_snapshot.display_name,
-    qty: it.quantity,
-    unit: it.product_snapshot.unit ?? null,
-    line_total:
-      Math.round(
-        (it.quantity * it.unit_price_excl_mva - it.line_discount) *
-          (1 + it.mva_rate / 100) *
-          100,
-      ) / 100,
-  }));
+  const renderCart: RenderCartLine[] = cart.items.map((it) => {
+    const productPath = it.product_id ? data?.productPrimaryPaths[it.product_id] ?? null : null;
+    const signed = productPath ? data?.imageUrls[productPath] ?? null : null;
+    const fallback = it.product_id ? data?.productFallbackUrls[it.product_id] ?? null : null;
+    return {
+      id: it.id,
+      label: it.product_snapshot.display_name,
+      qty: it.quantity,
+      unit: it.product_snapshot.unit ?? null,
+      line_total:
+        Math.round(
+          (it.quantity * it.unit_price_excl_mva - it.line_discount) *
+            (1 + it.mva_rate / 100) *
+            100,
+        ) / 100,
+      image_url: signed ?? fallback ?? null,
+    };
+  });
+
 
   const stubToast = (label: string) =>
     toast.info(`${label}: bygges senere`);
@@ -483,36 +490,49 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
     </>
   );
 
-  const footerActions = (
-    <div className="flex gap-2">
-      <ActionBtn onClick={() => stubToast("Rabatt")} icon={<Percent className="h-4 w-4" />}>
-        Rabatt
-      </ActionBtn>
-      <ActionBtn onClick={() => stubToast("Merket lapp")} icon={<Tag className="h-4 w-4" />}>
-        Merket lapp
-      </ActionBtn>
-      <ActionBtn onClick={() => stubToast("Parker ordre")} icon={<Pause className="h-4 w-4" />}>
-        Parker ordre
-      </ActionBtn>
-      <ActionBtn
-        onClick={() => setClearOpen(true)}
-        icon={<Trash2 className="h-4 w-4" />}
-        disabled={cart.items.length === 0}
-      >
-        Slett ordre
-      </ActionBtn>
-      <ActionBtn
-        onClick={() => lastReceipt && setReceipt(lastReceipt)}
-        icon={<Receipt className="h-4 w-4" />}
-        disabled={!lastReceipt}
-      >
-        Kvittering
-      </ActionBtn>
-      <ActionBtn onClick={handlePrintLabel} icon={<Printer className="h-4 w-4" />}>
-        Skriv ut etikett
-      </ActionBtn>
-    </div>
+  const handleFooterAction = useCallback(
+    (code: string) => {
+      switch (code) {
+        case "discount":
+          stubToast("Rabatt");
+          return;
+        case "label_print":
+          handlePrintLabel();
+          return;
+        case "park_order":
+          stubToast("Parker ordre");
+          return;
+        case "clear_order":
+          setClearOpen(true);
+          return;
+        case "receipt":
+          if (lastReceipt) setReceipt(lastReceipt);
+          else toast.info("Ingen siste kvittering");
+          return;
+        case "customer":
+          stubToast("Kunde");
+          return;
+        case "pickup_orders":
+          setHenteordreOpen(true);
+          return;
+        case "kakebygger":
+          setKakebyggerOpen(true);
+          return;
+        case "open_drawer":
+          stubToast("Åpne kasseskuff");
+          return;
+        default:
+          toast.info(`${code}: ikke koblet`);
+      }
+    },
+    [lastReceipt],
   );
+
+  const footerDisabled: Record<string, boolean> = {
+    clear_order: cart.items.length === 0,
+    receipt: !lastReceipt,
+  };
+
 
   const diningForRender: "takeaway" | "eatin" | "pickup" = cart.diningMode;
   const handleDiningChange = (m: "takeaway" | "eatin" | "pickup") => {
@@ -558,9 +578,18 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
             setPayOpen(true);
           }}
           onClear={() => setClearOpen(true)}
+          onCartLineQtyChange={(id, delta) => {
+            const it = cart.items.find((x) => x.id === id);
+            if (!it) return;
+            const next = it.quantity + delta;
+            if (next <= 0) cart.removeItem(id);
+            else cart.updateQuantity(id, next);
+          }}
+          onCartLineRemove={(id) => cart.removeItem(id)}
           diningMode={diningForRender}
           onDiningChange={handleDiningChange}
-          footerSlot={footerActions}
+          onFooterAction={handleFooterAction}
+          footerActionDisabled={footerDisabled}
           emptyState={
             <div>
               <p className="text-lg font-medium" style={{ color: "var(--kiosk-ink)" }}>
@@ -728,33 +757,4 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
   );
 }
 
-function ActionBtn({
-  onClick,
-  icon,
-  children,
-  disabled,
-}: {
-  onClick: () => void;
-  icon: React.ReactNode;
-  children: React.ReactNode;
-  disabled?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className="flex flex-1 items-center justify-center gap-2 px-4 py-3 text-sm font-semibold transition-opacity disabled:opacity-40"
-      style={{
-        borderRadius: "var(--kiosk-radius)",
-        background: "var(--kiosk-surface)",
-        color: "var(--kiosk-ink)",
-        border: "1px solid var(--kiosk-border)",
-        fontFamily: "var(--kiosk-font-body)",
-      }}
-    >
-      {icon}
-      {children}
-    </button>
-  );
-}
+

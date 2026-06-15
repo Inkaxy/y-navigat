@@ -3,7 +3,7 @@ import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, u
 import { CSS } from "@dnd-kit/utilities";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, GripVertical, MoreHorizontal, Plus, Search, Sparkles, Trash2 } from "lucide-react";
+import { ArrowLeft, GripVertical, MoreHorizontal, Palette, Plus, Search, Sparkles, Trash2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -51,6 +51,7 @@ import { useLegalEntity } from "@/pos_styring/contexts/LegalEntityContext";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { TemplatesDialog } from "@/pos_styring/components/TemplatesDialog";
+import { ThemeSettingsDialog } from "@/pos_styring/components/ThemeSettingsDialog";
 import { KioskRender } from "@/kiosk/render/KioskRender";
 import { parseTheme } from "@/kiosk/render/kioskTheme";
 
@@ -727,6 +728,7 @@ export default function TastaturEditor() {
   const [pageColor, setPageColor] = useState("");
   const [deletePage, setDeletePage] = useState<KeypadPage | null>(null);
   const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [themeSettingsOpen, setThemeSettingsOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(true);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
@@ -923,6 +925,9 @@ export default function TastaturEditor() {
           <Button variant="outline" size="sm" onClick={() => setPreviewOpen((v) => !v)}>
             {previewOpen ? "Skjul forhåndsvisning" : "Vis forhåndsvisning"}
           </Button>
+          <Button variant="outline" size="sm" onClick={() => setThemeSettingsOpen(true)}>
+            <Palette className="h-4 w-4" /> Brand & layout
+          </Button>
           <Button size="sm" onClick={() => setTemplatesOpen(true)}>
             <Sparkles className="h-4 w-4" /> Maler & tema
           </Button>
@@ -1091,6 +1096,15 @@ export default function TastaturEditor() {
           layoutId={layoutId}
           currentGridCols={layout.grid_cols}
           currentGridRows={layout.grid_rows}
+        />
+      )}
+
+      {layoutId && (
+        <ThemeSettingsDialog
+          open={themeSettingsOpen}
+          onOpenChange={setThemeSettingsOpen}
+          layoutId={layoutId}
+          initialTheme={layout.theme}
         />
       )}
     </div>

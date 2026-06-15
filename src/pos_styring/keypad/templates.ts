@@ -40,35 +40,53 @@ export interface KeypadTemplate {
 }
 
 // ── Nøtterø Klassisk ─────────────────────────────────────────────────────────
-// Sidebar venstre, 4 br × 3 r. Navy header + venstre-sidebar, cream canvas,
-// bronze CTA. Matcher Nøtterø Bakeri sin merkevare 1:1.
+// Sidebar venstre, 4 br × 3 r. Navy header med brand-blokk + ur/operatør,
+// hero-pills for dining, rich kurv m/ thumbnails+steppers, compact_row footer.
 const notteroy: KeypadTemplate = {
   key: "notteroy",
   name: "Nøtterø Klassisk",
-  tagline: "Sidebar venstre · 4 × 3 · navy / cream / bronze",
+  tagline: "Branded header · hero dining · rich kurv · navy/cream/bronze",
   description:
-    "Nøtterø Bakeri sin merkevare. Mørk navy topbar og venstre-sidebar, cream papir-canvas, bronze 'Betaling'-CTA.",
+    "Nøtterø Bakeri sin merkevare. Mørk navy topbar med logo+navn, venstre-sidebar, cream papir-canvas, bronze 'Betaling'-CTA. Rich kurv med produktbilder og +/- steppers.",
   gridCols: 4,
   gridRows: 3,
   theme: {
     layoutKind: "sidebar_left",
-    bg: "#F4ECDC",          // cream papir-canvas
+    bg: "#F4ECDC",
     surface: "#FFFFFF",
     surfaceAlt: "#EBE2CC",
     border: "#D9CDB4",
-    ink: "#1B2A44",         // navy tekst
+    ink: "#1B2A44",
     inkSoft: "#5C6A82",
     inkOnAccent: "#FFFFFF",
-    accent: "#B27A3A",      // bronze
+    accent: "#B27A3A",
     accentSoft: "rgba(178,122,58,0.14)",
     fontHeading: "Fraunces, Georgia, serif",
     fontBody: "Inter, system-ui, sans-serif",
     radius: "10px",
     buttonRadius: "12px",
-    headerBg: "#0F1B33",    // mørk navy
+    headerBg: "#0F1B33",
     headerInk: "#F4ECDC",
     cartBg: "#FFFFFF",
     cartInk: "#1B2A44",
+    brandName: "NØTTERØ BAKERI",
+    brandTagline: "1898 · Vestfolds eldste",
+    brandLogoUrl: null,
+    brandMonogramUrl: null,
+    headerStyle: "branded_left",
+    diningPlacement: "top_hero",
+    diningPillStyle: "soft",
+    cartStyle: "rich",
+    cartShowImages: true,
+    cartShowStepper: true,
+    footerStyle: "compact_row",
+    footerActions: [
+      { code: "customer", label: "Kunde", icon: "User" },
+      { code: "discount", label: "Rabatt", icon: "Percent" },
+      { code: "receipt", label: "Kvittering", icon: "Receipt" },
+      { code: "park_order", label: "Parker", icon: "Pause" },
+      { code: "clear_order", label: "Slett", icon: "Trash2", variant: "danger" },
+    ],
   },
   customerScreen: {
     mode: "logo_and_cart",
@@ -106,35 +124,52 @@ const notteroy: KeypadTemplate = {
 };
 
 // ── Hvasser Isbar ────────────────────────────────────────────────────────────
-// Sidebar venstre, 5 br × 2 r. Cream canvas, navy ink, pastell tab-tints
-// (blå/peach/sand). Lekent, kystpreget. 'Betal' CTA = soft blå.
+// Sidebar venstre, 5 br × 2 r. Cream canvas, navy ink, pastell hero-pills,
+// branded_centered header, icon_card footer.
 const hvasser: KeypadTemplate = {
   key: "hvasser",
   name: "Hvasser Isbar",
-  tagline: "Sidebar venstre · 5 × 2 · cream / navy / pastell",
+  tagline: "Branded centered · hero pastell-pills · icon-card footer",
   description:
-    "Lekent kystdesign for isbar. Cream canvas, navy tekst, pastell dining-tabs (blå/peach), soft blå Betal-CTA, illustrasjons-stil.",
+    "Lekent kystdesign for isbar. Cream canvas, navy tekst, store pastell dining-pills (blå/peach/sand), soft blå Betal-CTA, illustrasjons-stil.",
   gridCols: 5,
   gridRows: 2,
   theme: {
     layoutKind: "sidebar_left",
-    bg: "#F5EFE0",          // varm cream
+    bg: "#F5EFE0",
     surface: "#FBF6EA",
     surfaceAlt: "#E8E0CC",
     border: "#D9CFB6",
-    ink: "#1B2A44",         // navy
+    ink: "#1B2A44",
     inkSoft: "#6A7587",
     inkOnAccent: "#FFFFFF",
-    accent: "#A9C2D9",      // pastell blå
+    accent: "#A9C2D9",
     accentSoft: "rgba(169,194,217,0.30)",
     fontHeading: "Fraunces, Georgia, serif",
     fontBody: "Inter, system-ui, sans-serif",
     radius: "16px",
     buttonRadius: "18px",
-    headerBg: "#F5EFE0",    // headerless / samme som canvas
+    headerBg: "#F5EFE0",
     headerInk: "#1B2A44",
     cartBg: "#FBF6EA",
     cartInk: "#1B2A44",
+    brandName: "HVASSER ISBAR",
+    brandTagline: "Sandefjord 1951",
+    brandLogoUrl: null,
+    brandMonogramUrl: null,
+    headerStyle: "branded_centered",
+    diningPlacement: "top_hero",
+    diningPillStyle: "soft",
+    cartStyle: "compact",
+    cartShowImages: false,
+    cartShowStepper: false,
+    footerStyle: "pill_grid",
+    footerActions: [
+      { code: "discount", label: "Rabatt", icon: "Percent" },
+      { code: "label_print", label: "Merket lapp", icon: "Tag" },
+      { code: "park_order", label: "Parker ordre", icon: "Pause" },
+      { code: "clear_order", label: "Slett ordre", icon: "Trash2", variant: "danger" },
+    ],
   },
   customerScreen: {
     mode: "logo_and_cart",
@@ -175,34 +210,52 @@ const hvasser: KeypadTemplate = {
 
 // ── Baker Halvorsen ──────────────────────────────────────────────────────────
 // Sidebar venstre, 4 br × 3 r. Cream canvas, sort serif tittel, kobber-brun
-// aksent + 'Betal'-CTA. Editorial, klassisk konditori.
+// aksent, branded_centered header, top_hero pills, icon_card footer.
 const halvorsen: KeypadTemplate = {
   key: "halvorsen",
   name: "Baker Halvorsen",
-  tagline: "Sidebar venstre · 4 × 3 · cream / kobber / editorial",
+  tagline: "Editorial · branded centered · icon-card footer",
   description:
     "Klassisk konditori-design. Cream canvas, sort serif logo, kobber-brun aksent og Betal-CTA, ikon-stil 1-px linje.",
   gridCols: 4,
   gridRows: 3,
   theme: {
     layoutKind: "sidebar_left",
-    bg: "#F4ECDC",          // cream
+    bg: "#F4ECDC",
     surface: "#FFFFFF",
     surfaceAlt: "#EADFC6",
     border: "#D8CBAF",
-    ink: "#1A1612",         // nær-sort
+    ink: "#1A1612",
     inkSoft: "#5A4F3F",
     inkOnAccent: "#FFFFFF",
-    accent: "#8C5A2B",      // kobber-brun
+    accent: "#8C5A2B",
     accentSoft: "rgba(140,90,43,0.14)",
     fontHeading: "Cormorant Garamond, Georgia, serif",
     fontBody: "Inter, system-ui, sans-serif",
     radius: "10px",
     buttonRadius: "12px",
-    headerBg: "#F4ECDC",    // headerless
+    headerBg: "#F4ECDC",
     headerInk: "#1A1612",
     cartBg: "#FFFFFF",
     cartInk: "#1A1612",
+    brandName: "BAKER HALVORSEN",
+    brandTagline: "ETAB. 1879",
+    brandLogoUrl: null,
+    brandMonogramUrl: null,
+    headerStyle: "branded_centered",
+    diningPlacement: "top_hero",
+    diningPillStyle: "outlined",
+    cartStyle: "compact",
+    cartShowImages: false,
+    cartShowStepper: false,
+    footerStyle: "icon_card",
+    footerActions: [
+      { code: "discount", label: "Rabatt", icon: "Percent" },
+      { code: "label_print", label: "Merket lapp", icon: "Tag" },
+      { code: "park_order", label: "Parker ordre", icon: "Pause" },
+      { code: "clear_order", label: "Slett ordre", icon: "Trash2", variant: "danger" },
+      { code: "receipt", label: "Kvittering", icon: "Receipt" },
+    ],
   },
   customerScreen: {
     mode: "logo_only",
