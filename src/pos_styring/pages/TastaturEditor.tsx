@@ -1095,8 +1095,9 @@ export default function TastaturEditor() {
             <span className="text-xs text-muted-foreground">Klikk tom celle for ny knapp · dra knapp for å flytte</span>
           </div>
           {buttonsLoading ? <Skeleton className="h-[560px] w-full" /> : activePage ? (
-            <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
+            <>
               <div
+                ref={gridRef}
                 className="grid h-[min(64vh,680px)] min-h-[480px] gap-2 rounded-lg border bg-muted/30 p-3"
                 style={{
                   gridTemplateColumns: `repeat(${layout.grid_cols}, minmax(0, 1fr))`,
@@ -1112,7 +1113,14 @@ export default function TastaturEditor() {
                   if (anchoredButton) {
                     return (
                       <div key={`${x}-${y}`} className="min-h-0" style={{ gridColumn: `${x + 1} / span ${anchoredButton.grid_width}`, gridRow: `${y + 1} / span ${anchoredButton.grid_height}` }}>
-                        <DraggableButton button={anchoredButton} layout={layout} onEdit={() => openButtonDialog(x, y, anchoredButton)} onResize={(w, h) => resizeButtonMutation.mutate({ button: anchoredButton, w, h })} />
+                        <DraggableButton
+                          button={anchoredButton}
+                          layout={layout}
+                          onEdit={() => openButtonDialog(x, y, anchoredButton)}
+                          onMove={(clientX, clientY) => handleMoveButton(anchoredButton, clientX, clientY)}
+                          onDragStateChange={(dragging) => setDraggingButton(dragging ? anchoredButton : null)}
+                          onResize={(w, h) => resizeButtonMutation.mutate({ button: anchoredButton, w, h })}
+                        />
                       </div>
                     );
                   }
@@ -1120,8 +1128,7 @@ export default function TastaturEditor() {
                   return <DroppableCell key={`${x}-${y}`} x={x} y={y}><button className="h-full w-full rounded-md" aria-label={`Ny knapp ${x + 1}, ${y + 1}`} onClick={() => openButtonDialog(x, y)} /></DroppableCell>;
                 })}
               </div>
-              <DragOverlay>{draggingButton ? <div className="h-24 w-32"><KeypadButtonTile button={draggingButton} dragging /></div> : null}</DragOverlay>
-            </DndContext>
+            </>
           ) : (
             <div className="flex h-96 items-center justify-center text-muted-foreground">Opprett en page for å starte.</div>
           )}
