@@ -1233,27 +1233,134 @@ export default function TastaturEditor() {
   );
 }
 
-function DraggableButton({ button, layout, onEdit, onResize }: { button: KeypadButton; layout?: KeypadLayoutDetail; onEdit: () => void; onResize?: (w: number, h: number) => void }) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggableCompat(button.id);
-  const filteredListeners = useMemo(() => {
-    if (!listeners) return {} as Record<string, (e: any) => void>;
-    const out: Record<string, (e: any) => void> = {};
-    for (const [key, handler] of Object.entries(listeners)) {
-      out[key] = (e: any) => {
-        const tgt = e?.target as HTMLElement | undefined;
-        if (tgt && tgt.closest && tgt.closest('[data-resize-handle="true"]')) return;
-        (handler as (e: any) => void)(e);
-      };
-    }
-    return out;
-  }, [listeners]);
+function DraggableButton({
+  button,
+  layout,
+  onEdit,
+  onMove,
+  onDragStateChange,
+  onResize,
+}: {
+  button: KeypadButton;
+  layout?: KeypadLayoutDetail;
+  onEdit: () => void;
+  onMove: (clientX: number, clientY: number) => void;
+  onDragStateChange: (dragging: boolean) => void;
+  onResize?: (w: number, h: number) => void;
+}) {
+  const tileRef = useRef<HTMLDivElement>(null);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+
+  const startTileDrag = (event: React.PointerEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement | null;
+    if (target?.closest('[data-resize-handle="true"]')) return;
+    const tileEl = event.currentTarget;
+    const startX = event.clientX;
+    const startY = event.clientY;
+    let didDrag = false;
+    let latestX = startX;
+    let latestY = startY;
+
+    event.preventDefault();
+    try { tileEl.setPointerCapture(event.pointerId); } catch {}
+
+    const onPointerMove = (moveEvent: PointerEvent) => {
+      moveEvent.preventDefault();
+      latestX = moveEvent.clientX;
+      latestY = moveEvent.clientY;
+      const dx = latestX - startX;
+      const dy = latestY - startY;
+      if (!didDrag && Math.hypot(dx, dy) >= 6) {
+        didDrag = true;
+        setIsDragging(true);
+        onDragStateChange(true);
+      }
+      if (didDrag) setDragOffset({ x: dx, y: dy });
+    };
+
+    const onPointerUp = (upEvent: PointerEvent) => {
+      tileEl.removeEventListener("pointermove", onPointerMove);
+      tileEl.removeEventListener("pointerup", onPointerUp);
+      tileEl.removeEventListener("pointercancel", onPointerUp);
+      try { tileEl.releasePointerCapture(upEvent.pointerId); } catch {}
+      setDragOffset({ x: 0, y: 0 });
+      setIsDragging(false);
+      if (didDrag) {
+        onMove(latestX, latestY);
+        onDragStateChange(false);
+      } else {
+        onEdit();
+      }
+    };
+
+    tileEl.addEventListener("pointermove", onPointerMove);
+    tileEl.addEventListener("pointerup", onPointerUp);
+    tileEl.addEventListener("pointercancel", onPointerUp);
+  };
+
+  const startResize = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!onResize || !tileRef.current) return;
+    event.stopPropagation();
+    event.nativeEvent.stopImmediatePropagation();
+    event.preventDefault();
+
+    const handleEl = event.currentTarget;
+    const tileRect = tileRef.current.getBoundingClientRect();
+    const gridEl = tileRef.current.closest("[data-keypad-grid]") as HTMLElement | null;
+    const gridStyle = gridEl ? window.getComputedStyle(gridEl) : null;
+    const colGap = gridStyle ? Number.parseFloat(gridStyle.columnGap) || 0 : 0;
+    const rowGap = gridStyle ? Number.parseFloat(gridStyle.rowGap) || 0 : 0;
+    const cellW = (tileRect.width - colGap * (button.grid_width - 1)) / Math.max(1, button.grid_width);
+    const cellH = (tileRect.height - rowGap * (button.grid_height - 1)) / Math.max(1, button.grid_height);
+    const startX = event.clientX;
+    const startY = event.clientY;
+    const startW = button.grid_width;
+    const startH = button.grid_height;
+    let nextW = startW;
+    let nextH = startH;
+
+    try { handleEl.setPointerCapture(event.pointerId); } catch {}
+
+    const onPointerMove = (moveEvent: PointerEvent) => {
+      moveEvent.preventDefault();
+      const dx = moveEvent.clientX - startX;
+      const dy = moveEvent.clientY - startY;
+      nextW = Math.max(1, startW + Math.round(dx / Math.max(1, cellW + colGap)));
+      nextH = Math.max(1, startH + Math.round(dy / Math.max(1, cellH + rowGap)));
+      setDragOffset({ x: 0, y: 0 });
+    };
+
+    const onPointerUp = (upEvent: PointerEvent) => {
+      handleEl.removeEventListener("pointermove", onPointerMove);
+      handleEl.removeEventListener("pointerup", onPointerUp);
+      handleEl.removeEventListener("pointercancel", onPointerUp);
+      try { handleEl.releasePointerCapture(upEvent.pointerId); } catch {}
+      if (nextW !== startW || nextH !== startH) onResize(nextW, nextH);
+    };
+
+    handleEl.addEventListener("pointermove", onPointerMove);
+    handleEl.addEventListener("pointerup", onPointerUp);
+    handleEl.addEventListener("pointercancel", onPointerUp);
+  };
+
   return (
-    <div ref={setNodeRef} data-keypad-cell="true" style={{ transform: CSS.Translate.toString(transform) }} className="h-full min-h-0" {...attributes} {...filteredListeners}>
-      <KeypadButtonTile button={button} layout={layout} onEdit={onEdit} dragging={isDragging} onResize={onResize} />
+    <div
+      ref={tileRef}
+      data-keypad-cell="true"
+      role="button"
+      tabIndex={0}
+      onPointerDown={startTileDrag}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onEdit();
+        }
+      }}
+      style={{ transform: `translate3d(${dragOffset.x}px, ${dragOffset.y}px, 0)`, zIndex: isDragging ? 20 : undefined }}
+      className="h-full min-h-0 cursor-grab touch-none select-none active:cursor-grabbing"
+    >
+      <KeypadButtonTile button={button} layout={layout} dragging={isDragging} onResizePointerDown={onResize ? startResize : undefined} />
     </div>
   );
-}
-
-function useDraggableCompat(id: string) {
-  return useDraggable({ id });
 }
