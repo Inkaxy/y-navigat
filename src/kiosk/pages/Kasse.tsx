@@ -637,23 +637,28 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
               } as never,
             );
             if (error) throw error;
-            const created = data as unknown as { order_number: string; order_id: string };
+            const created = data as unknown as {
+              order_number: string;
+              order_id: string;
+              cake_result?: typeof result;
+            };
+            const serverResult = created.cake_result ?? result;
             toast.success(`Henteordre #${created.order_number} opprettet`);
             if (result.payment_mode === "now") {
               setActivePickupOrderId(created.order_id);
               cart.addItem({
-                product_id: result.order_line.product_id,
+                product_id: serverResult.order_line.product_id,
                 product_snapshot: {
-                  display_name: result.order_line.display_name,
-                  display_number: String(result.order_line.display_number ?? ""),
+                  display_name: serverResult.order_line.display_name,
+                  display_number: String(serverResult.order_line.display_number ?? ""),
                   unit: "stk",
-                  mva_rate: result.order_line.vat_rate,
+                  mva_rate: serverResult.order_line.vat_rate,
                 },
-                quantity: result.order_line.quantity,
-                unit_price_excl_mva: result.order_line.unit_price_excl_vat,
-                mva_rate: result.order_line.vat_rate,
+                quantity: serverResult.order_line.quantity,
+                unit_price_excl_mva: serverResult.order_line.unit_price_excl_vat,
+                mva_rate: serverResult.order_line.vat_rate,
               });
-              for (const acc of result.accessory_lines) {
+              for (const acc of serverResult.accessory_lines) {
                 cart.addItem({
                   product_id: acc.product_id,
                   product_snapshot: {
