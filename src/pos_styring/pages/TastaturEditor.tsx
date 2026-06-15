@@ -3,7 +3,7 @@ import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, u
 import { CSS } from "@dnd-kit/utilities";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, GripVertical, MoreHorizontal, Palette, Plus, Search, Sparkles, Trash2 } from "lucide-react";
+import { ArrowLeft, GripVertical, Minus, MoreHorizontal, Palette, Plus, Search, Sparkles, Trash2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
