@@ -3,7 +3,7 @@ import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, u
 import { CSS } from "@dnd-kit/utilities";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, GripVertical, MoreHorizontal, Palette, Plus, Search, Sparkles, Trash2 } from "lucide-react";
+import { ArrowLeft, GripVertical, Minus, MoreHorizontal, Palette, Plus, Search, Sparkles, Trash2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -871,6 +871,49 @@ export default function TastaturEditor() {
     onError: (error) => toast.error(error instanceof Error ? error.message : "Kunne ikke endre størrelse"),
   });
 
+  const resizeGridMutation = useMutation({
+    mutationFn: async ({ cols, rows }: { cols: number; rows: number }) => {
+      if (!layout) return;
+      const newCols = Math.max(1, Math.min(12, Math.round(cols)));
+      const newRows = Math.max(1, Math.min(12, Math.round(rows)));
+      if (newCols === layout.grid_cols && newRows === layout.grid_rows) return;
+      // Sjekk at ingen knapp på noen side går utenfor det nye gridet.
+      const { data: pageRows, error: pErr } = await supabase
+        .from("pos_keypad_pages")
+        .select("id")
+        .eq("layout_id", layout.id);
+      if (pErr) throw pErr;
+      const pageIds = (pageRows ?? []).map((p) => p.id);
+      if (pageIds.length > 0) {
+        const { data: allButtons, error: bErr } = await supabase
+          .from("pos_keypad_buttons")
+          .select("grid_x, grid_y, grid_width, grid_height")
+          .in("page_id", pageIds);
+        if (bErr) throw bErr;
+        const offending = (allButtons ?? []).find(
+          (b) => b.grid_x + b.grid_width > newCols || b.grid_y + b.grid_height > newRows,
+        );
+        if (offending) {
+          throw new Error(
+            `Minst én knapp ligger utenfor ${newCols} × ${newRows}. Flytt eller skaler den ned først.`,
+          );
+        }
+      }
+      const { error } = await supabase
+        .from("pos_keypad_layouts")
+        .update({ grid_cols: newCols, grid_rows: newRows, updated_at: new Date().toISOString() })
+        .eq("id", layout.id);
+      if (error) throw error;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["pos_keypad_layout", layoutId] });
+      toast.success("Grid-størrelse oppdatert");
+    },
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : "Kunne ikke endre grid"),
+  });
+
+
   function openButtonDialog(x: number, y: number, button?: KeypadButton) {
     setSelectedCell(button ? null : { x, y });
     setEditingButton(button ?? null);
@@ -911,7 +954,88 @@ export default function TastaturEditor() {
             <Link to="/pos-styring/tastatur"><ArrowLeft className="h-4 w-4" /> Tilbake til layouts</Link>
           </Button>
           <h1 className="text-3xl font-semibold tracking-normal">{layout.display_name}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{layout.grid_cols} × {layout.grid_rows} grid · {activeEntity?.short_code}</p>
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+            <span>Grid</span>
+            <div className="inline-flex items-center gap-1 rounded-md border bg-card px-1 py-0.5">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                disabled={resizeGridMutation.isPending || layout.grid_cols <= 1}
+                onClick={() => resizeGridMutation.mutate({ cols: layout.grid_cols - 1, rows: layout.grid_rows })}
+                aria-label="Færre kolonner"
+              >
+                <Minus className="h-3.5 w-3.5" />
+              </Button>
+              <Input
+                type="number"
+                min={1}
+                max={12}
+                value={layout.grid_cols}
+                onChange={(e) => {
+                  const v = Number(e.target.value);
+                  if (Number.isFinite(v) && v >= 1 && v <= 12 && v !== layout.grid_cols) {
+                    resizeGridMutation.mutate({ cols: v, rows: layout.grid_rows });
+                  }
+                }}
+                className="h-6 w-12 border-0 px-1 text-center text-sm focus-visible:ring-0"
+                aria-label="Kolonner"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                disabled={resizeGridMutation.isPending || layout.grid_cols >= 12}
+                onClick={() => resizeGridMutation.mutate({ cols: layout.grid_cols + 1, rows: layout.grid_rows })}
+                aria-label="Flere kolonner"
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+            <span>×</span>
+            <div className="inline-flex items-center gap-1 rounded-md border bg-card px-1 py-0.5">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                disabled={resizeGridMutation.isPending || layout.grid_rows <= 1}
+                onClick={() => resizeGridMutation.mutate({ cols: layout.grid_cols, rows: layout.grid_rows - 1 })}
+                aria-label="Færre rader"
+              >
+                <Minus className="h-3.5 w-3.5" />
+              </Button>
+              <Input
+                type="number"
+                min={1}
+                max={12}
+                value={layout.grid_rows}
+                onChange={(e) => {
+                  const v = Number(e.target.value);
+                  if (Number.isFinite(v) && v >= 1 && v <= 12 && v !== layout.grid_rows) {
+                    resizeGridMutation.mutate({ cols: layout.grid_cols, rows: v });
+                  }
+                }}
+                className="h-6 w-12 border-0 px-1 text-center text-sm focus-visible:ring-0"
+                aria-label="Rader"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                disabled={resizeGridMutation.isPending || layout.grid_rows >= 12}
+                onClick={() => resizeGridMutation.mutate({ cols: layout.grid_cols, rows: layout.grid_rows + 1 })}
+                aria-label="Flere rader"
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+            <span>·</span>
+            <span>{activeEntity?.short_code}</span>
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <label className="flex cursor-pointer items-center gap-2 rounded-md border bg-card px-3 py-2 text-xs">
