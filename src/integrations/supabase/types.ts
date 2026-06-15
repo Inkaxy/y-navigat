@@ -4510,6 +4510,50 @@ export type Database = {
           },
         ]
       }
+      pos_keypad_theme_presets: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          customer_screen: Json | null
+          description: string | null
+          id: string
+          legal_entity_id: string
+          name: string
+          theme: Json
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          customer_screen?: Json | null
+          description?: string | null
+          id?: string
+          legal_entity_id: string
+          name: string
+          theme?: Json
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          customer_screen?: Json | null
+          description?: string | null
+          id?: string
+          legal_entity_id?: string
+          name?: string
+          theme?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pos_keypad_theme_presets_legal_entity_id_fkey"
+            columns: ["legal_entity_id"]
+            isOneToOne: false
+            referencedRelation: "legal_entities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pos_kiosk_users: {
         Row: {
           created_at: string

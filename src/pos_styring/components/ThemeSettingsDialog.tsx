@@ -2,8 +2,8 @@
 // pos_keypad_layouts.theme. Defaults håndteres av parseTheme() ved lesing.
 
 import { useEffect, useMemo, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ArrowDown, ArrowUp, BookmarkPlus, Download, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -25,6 +35,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import {
   DEFAULT_FOOTER_ACTIONS,
@@ -47,21 +58,64 @@ const FOOTER_ACTION_PRESETS: Record<FooterActionCode, { label: string; icon: str
   open_drawer: { label: "Åpne skuff", icon: "Wallet" },
 };
 
+interface ThemePreset {
+  id: string;
+  name: string;
+  description: string | null;
+  theme: unknown;
+  customer_screen: unknown;
+  updated_at: string;
+}
+
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   layoutId: string;
+  legalEntityId: string;
   initialTheme: unknown;
+  initialCustomerScreen: unknown;
 }
 
-export function ThemeSettingsDialog({ open, onOpenChange, layoutId, initialTheme }: Props) {
+export function ThemeSettingsDialog({
+  open,
+  onOpenChange,
+  layoutId,
+  legalEntityId,
+  initialTheme,
+  initialCustomerScreen,
+}: Props) {
   const queryClient = useQueryClient();
   const baseTheme = useMemo(() => parseTheme(initialTheme), [initialTheme]);
   const [theme, setTheme] = useState<KioskTheme>(baseTheme);
+  const [selectedPresetId, setSelectedPresetId] = useState<string>("");
+  const [saveOpen, setSaveOpen] = useState(false);
+  const [saveName, setSaveName] = useState("");
+  const [saveDescription, setSaveDescription] = useState("");
+  const [overwriteId, setOverwriteId] = useState<string | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (open) setTheme(baseTheme);
+    if (open) {
+      setTheme(baseTheme);
+      setSelectedPresetId("");
+    }
   }, [open, baseTheme]);
+
+  const presetsQuery = useQuery({
+    queryKey: ["pos_keypad_theme_presets", legalEntityId],
+    enabled: open && !!legalEntityId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("pos_keypad_theme_presets")
+        .select("id, name, description, theme, customer_screen, updated_at")
+        .eq("legal_entity_id", legalEntityId)
+        .order("name", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as ThemePreset[];
+    },
+  });
+
+  const presets = presetsQuery.data ?? [];
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -79,6 +133,75 @@ export function ThemeSettingsDialog({ open, onOpenChange, layoutId, initialTheme
     onError: (e) =>
       toast.error("Kunne ikke lagre", { description: e instanceof Error ? e.message : "" }),
   });
+
+  const savePreset = useMutation({
+    mutationFn: async ({ id, name, description }: { id: string | null; name: string; description: string }) => {
+      const payload = {
+        legal_entity_id: legalEntityId,
+        name: name.trim(),
+        description: description.trim() || null,
+        theme: theme as unknown as never,
+        customer_screen: initialCustomerScreen as unknown as never,
+      };
+      if (id) {
+        const { error } = await supabase
+          .from("pos_keypad_theme_presets")
+          .update(payload)
+          .eq("id", id);
+        if (error) throw error;
+        return id;
+      }
+      const { data: user } = await supabase.auth.getUser();
+      const { data, error } = await supabase
+        .from("pos_keypad_theme_presets")
+        .insert({ ...payload, created_by: user?.user?.id ?? null })
+        .select("id")
+        .single();
+      if (error) throw error;
+      return data.id;
+    },
+    onSuccess: async (id) => {
+      await queryClient.invalidateQueries({ queryKey: ["pos_keypad_theme_presets", legalEntityId] });
+      toast.success("Oppsett lagret");
+      setSaveOpen(false);
+      setOverwriteId(null);
+      setSaveName("");
+      setSaveDescription("");
+      setSelectedPresetId(id);
+    },
+    onError: (e) =>
+      toast.error("Kunne ikke lagre oppsett", { description: e instanceof Error ? e.message : "" }),
+  });
+
+  const deletePreset = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("pos_keypad_theme_presets").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["pos_keypad_theme_presets", legalEntityId] });
+      toast.success("Oppsett slettet");
+      setDeleteId(null);
+      setSelectedPresetId("");
+    },
+    onError: (e) => toast.error("Kunne ikke slette", { description: e instanceof Error ? e.message : "" }),
+  });
+
+  const loadPreset = (id: string) => {
+    const p = presets.find((x) => x.id === id);
+    if (!p) return;
+    setTheme(parseTheme(p.theme));
+    setSelectedPresetId(id);
+    toast.info(`«${p.name}» lastet inn — trykk Lagre for å skrive til layoutet`);
+  };
+
+  const openSaveDialog = () => {
+    const existing = presets.find((p) => p.id === selectedPresetId);
+    setSaveName(existing?.name ?? "");
+    setSaveDescription(existing?.description ?? "");
+    setOverwriteId(existing?.id ?? null);
+    setSaveOpen(true);
+  };
 
   const set = <K extends keyof KioskTheme>(key: K, value: KioskTheme[K]) =>
     setTheme((t) => ({ ...t, [key]: value }));
@@ -122,6 +245,63 @@ export function ThemeSettingsDialog({ open, onOpenChange, layoutId, initialTheme
             i layoutens tema (jsonb).
           </DialogDescription>
         </DialogHeader>
+
+        <section className="rounded-lg border bg-muted/30 p-3 space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+              Lagrede oppsett
+            </h3>
+            <span className="text-xs text-muted-foreground">
+              {presets.length} {presets.length === 1 ? "oppsett" : "oppsett"}
+            </span>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Select
+              value={selectedPresetId}
+              onValueChange={(v) => loadPreset(v)}
+              disabled={presets.length === 0}
+            >
+              <SelectTrigger className="min-w-[240px] flex-1">
+                <SelectValue placeholder={presets.length === 0 ? "Ingen lagrede oppsett ennå" : "Velg oppsett å laste"} />
+              </SelectTrigger>
+              <SelectContent>
+                {presets.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={!selectedPresetId}
+              onClick={() => loadPreset(selectedPresetId)}
+            >
+              <Download className="mr-1 h-4 w-4" /> Last inn
+            </Button>
+            <Button type="button" variant="outline" size="sm" onClick={openSaveDialog}>
+              <BookmarkPlus className="mr-1 h-4 w-4" />
+              {selectedPresetId ? "Lagre / oppdater…" : "Lagre som oppsett…"}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              disabled={!selectedPresetId}
+              onClick={() => setDeleteId(selectedPresetId)}
+              aria-label="Slett oppsett"
+            >
+              <Trash2 className="h-4 w-4 text-destructive" />
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Lagrede oppsett deler brand + layout-tema mellom kasser i samme selskap. «Last inn» fyller
+            skjemaet — trykk deretter «Lagre» nederst for å bruke det på dette layoutet.
+          </p>
+        </section>
+
 
         <div className="space-y-6 py-2">
           <section className="space-y-3">
@@ -350,6 +530,80 @@ export function ThemeSettingsDialog({ open, onOpenChange, layoutId, initialTheme
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      <Dialog open={saveOpen} onOpenChange={setSaveOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{overwriteId ? "Oppdater oppsett" : "Lagre som oppsett"}</DialogTitle>
+            <DialogDescription>
+              Lagrer nåværende brand- og layout-innstillinger som et gjenbrukbart oppsett for selskapet.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="preset-name">Navn</Label>
+              <Input
+                id="preset-name"
+                value={saveName}
+                onChange={(e) => setSaveName(e.target.value)}
+                placeholder="F.eks. Nøtterø sommer 2026"
+                autoFocus
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="preset-desc">Beskrivelse (valgfri)</Label>
+              <Textarea
+                id="preset-desc"
+                value={saveDescription}
+                onChange={(e) => setSaveDescription(e.target.value)}
+                rows={3}
+                placeholder="Kort notat om hva som er spesielt"
+              />
+            </div>
+            {!overwriteId && presets.some((p) => p.name.trim().toLowerCase() === saveName.trim().toLowerCase()) && (
+              <p className="text-xs text-amber-600">
+                Et oppsett med dette navnet finnes allerede — velg det først i lista hvis du vil overskrive.
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSaveOpen(false)} disabled={savePreset.isPending}>
+              Avbryt
+            </Button>
+            <Button
+              onClick={() => savePreset.mutate({ id: overwriteId, name: saveName, description: saveDescription })}
+              disabled={!saveName.trim() || savePreset.isPending}
+            >
+              {savePreset.isPending ? "Lagrer…" : overwriteId ? "Oppdater" : "Lagre oppsett"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={!!deleteId} onOpenChange={(v) => !v && setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Slette oppsett?</AlertDialogTitle>
+            <AlertDialogDescription>
+              «{presets.find((p) => p.id === deleteId)?.name}» blir permanent fjernet. Layouts som har
+              fått dette oppsettet anvendt påvirkes ikke.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletePreset.isPending}>Avbryt</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                if (deleteId) deletePreset.mutate(deleteId);
+              }}
+              disabled={deletePreset.isPending}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              {deletePreset.isPending ? "Sletter…" : "Slett"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }
