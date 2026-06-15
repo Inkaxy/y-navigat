@@ -871,6 +871,49 @@ export default function TastaturEditor() {
     onError: (error) => toast.error(error instanceof Error ? error.message : "Kunne ikke endre størrelse"),
   });
 
+  const resizeGridMutation = useMutation({
+    mutationFn: async ({ cols, rows }: { cols: number; rows: number }) => {
+      if (!layout) return;
+      const newCols = Math.max(1, Math.min(12, Math.round(cols)));
+      const newRows = Math.max(1, Math.min(12, Math.round(rows)));
+      if (newCols === layout.grid_cols && newRows === layout.grid_rows) return;
+      // Sjekk at ingen knapp på noen side går utenfor det nye gridet.
+      const { data: pageRows, error: pErr } = await supabase
+        .from("pos_keypad_pages")
+        .select("id")
+        .eq("layout_id", layout.id);
+      if (pErr) throw pErr;
+      const pageIds = (pageRows ?? []).map((p) => p.id);
+      if (pageIds.length > 0) {
+        const { data: allButtons, error: bErr } = await supabase
+          .from("pos_keypad_buttons")
+          .select("grid_x, grid_y, grid_width, grid_height")
+          .in("page_id", pageIds);
+        if (bErr) throw bErr;
+        const offending = (allButtons ?? []).find(
+          (b) => b.grid_x + b.grid_width > newCols || b.grid_y + b.grid_height > newRows,
+        );
+        if (offending) {
+          throw new Error(
+            `Minst én knapp ligger utenfor ${newCols} × ${newRows}. Flytt eller skaler den ned først.`,
+          );
+        }
+      }
+      const { error } = await supabase
+        .from("pos_keypad_layouts")
+        .update({ grid_cols: newCols, grid_rows: newRows, updated_at: new Date().toISOString() })
+        .eq("id", layout.id);
+      if (error) throw error;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["pos_keypad_layout", layoutId] });
+      toast.success("Grid-størrelse oppdatert");
+    },
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : "Kunne ikke endre grid"),
+  });
+
+
   function openButtonDialog(x: number, y: number, button?: KeypadButton) {
     setSelectedCell(button ? null : { x, y });
     setEditingButton(button ?? null);
