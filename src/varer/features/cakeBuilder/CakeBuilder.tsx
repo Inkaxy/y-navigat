@@ -20,6 +20,8 @@ import { SingleSelectStep } from "./steps/SingleSelectStep";
 import { MultiSelectStep } from "./steps/MultiSelectStep";
 import { TextInputStep } from "./steps/TextInputStep";
 import { NumberInputStep } from "./steps/NumberInputStep";
+import { CustomerStartStep, type CustomerMeta } from "./components/CustomerStartStep";
+import { PaymentChoiceStep, type PaymentMode } from "./components/PaymentChoiceStep";
 import type { CakeAccessoryLine, CakeConfig, CakeLabelPayload, CakeOrderLine, CakeResult, PriceBreakdown, WizardRule, WizardStep } from "./types";
 import { evaluateRule } from "./ruleEvaluation";
 import { supabase } from "@/integrations/supabase/client";
