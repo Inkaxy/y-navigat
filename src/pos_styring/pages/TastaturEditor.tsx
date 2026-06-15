@@ -1098,6 +1098,15 @@ export default function TastaturEditor() {
           currentGridRows={layout.grid_rows}
         />
       )}
+
+      {layoutId && (
+        <ThemeSettingsDialog
+          open={themeSettingsOpen}
+          onOpenChange={setThemeSettingsOpen}
+          layoutId={layoutId}
+          initialTheme={layout.theme}
+        />
+      )}
     </div>
   );
 }
