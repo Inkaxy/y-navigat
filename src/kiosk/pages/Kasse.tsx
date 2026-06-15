@@ -578,9 +578,18 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
             setPayOpen(true);
           }}
           onClear={() => setClearOpen(true)}
+          onCartLineQtyChange={(id, delta) => {
+            const it = cart.items.find((x) => x.id === id);
+            if (!it) return;
+            const next = it.quantity + delta;
+            if (next <= 0) cart.removeItem(id);
+            else cart.updateQuantity(id, next);
+          }}
+          onCartLineRemove={(id) => cart.removeItem(id)}
           diningMode={diningForRender}
           onDiningChange={handleDiningChange}
-          footerSlot={footerActions}
+          onFooterAction={handleFooterAction}
+          footerActionDisabled={footerDisabled}
           emptyState={
             <div>
               <p className="text-lg font-medium" style={{ color: "var(--kiosk-ink)" }}>
