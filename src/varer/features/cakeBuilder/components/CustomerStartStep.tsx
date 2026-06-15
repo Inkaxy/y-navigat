@@ -52,7 +52,7 @@ export function CustomerStartStep({
         .eq("status" as never, "active" as never)
         .order("pickup_number" as never, { ascending: true });
       if (cancel) return;
-      setLocations(((data ?? []) as unknown as PickupLocOpt[]) ?? []);
+      setLocations((data ?? []) as unknown as PickupLocOpt[]);
     })();
     return () => {
       cancel = true;
