@@ -274,6 +274,13 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
       setReceipt(r);
       setLastReceipt(r);
       setPayOpen(false);
+      if (activePickupOrderId) {
+        await kioskSupabase.rpc("pos_complete_pickup_order" as never, {
+          p_order_id: activePickupOrderId,
+          p_pos_transaction_id: id,
+        } as never);
+        setActivePickupOrderId(null);
+      }
 
       void broadcastSaleComplete(channel, {
         receipt_number: (tx as { receipt_number: string | null }).receipt_number ?? null,
