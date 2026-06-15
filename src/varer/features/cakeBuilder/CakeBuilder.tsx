@@ -35,6 +35,9 @@ export interface CakeBuilderProps {
   defaultPickupLocationId?: string | null;
   /** F1.3: pre-fill from existing config. Skeleton only — not implemented in F1.2. */
   initialConfig?: CakeConfig;
+  /** Pre-fill customer info and skip the built-in "customer"-phase. Brukes når
+   *  vert-appen (f.eks. POS-kiosken) allerede har samlet inn kundedata først. */
+  initialCustomerMeta?: CustomerMeta;
   showVatToggle?: boolean;
   onPriceChange?: (price: PriceBreakdown) => void;
   onComplete: (result: CakeResult) => void;
@@ -54,6 +57,7 @@ export function CakeBuilder({
   legalEntityId,
   defaultPickupLocationId,
   initialConfig: _initialConfig,
+  initialCustomerMeta,
   showVatToggle = true,
   onPriceChange,
   onComplete,
@@ -80,8 +84,11 @@ export function CakeBuilder({
     }
   }, [showVat]);
 
+  // Når kundeopplysningene allerede er prefilled (f.eks. fra POS-kiosken)
+  // hopper vi rett til wizard-stegene.
+  const hasPrefilledCustomer = Boolean(initialCustomerMeta);
   const [phase, setPhase] = useState<"customer" | "step" | "summary" | "payment">(
-    "customer",
+    hasPrefilledCustomer ? "step" : "customer",
   );
   const [stepIndex, setStepIndex] = useState(0);
   const isSummary = phase === "summary";
@@ -90,13 +97,15 @@ export function CakeBuilder({
   /** Confirmation state shown after the user clicks "Ferdig". Holds the result so we can show ordrebekreftelse. */
   const [confirmedResult, setConfirmedResult] = useState<CakeResult | null>(null);
   const [isFinalizing, setIsFinalizing] = useState(false);
-  const [customerMeta, setCustomerMeta] = useState<CustomerMeta>({
-    pickup_date: null,
-    pickup_location_id: defaultPickupLocationId ?? null,
-    name: "",
-    phone: "",
-    email: "",
-  });
+  const [customerMeta, setCustomerMeta] = useState<CustomerMeta>(
+    initialCustomerMeta ?? {
+      pickup_date: null,
+      pickup_location_id: defaultPickupLocationId ?? null,
+      name: "",
+      phone: "",
+      email: "",
+    },
+  );
   const [paymentMode, setPaymentMode] = useState<PaymentMode | null>(null);
   // Per-step selections
   const [singleSelections, setSingleSelections] = useState<Record<string, string>>({});
@@ -913,7 +922,7 @@ export function CakeBuilder({
       </div>
 
       <StepNav
-        isFirst={isCustomer}
+        isFirst={isCustomer || (hasPrefilledCustomer && phase === "step" && stepIndex === 0)}
         isLast={isPayment}
         canProceed={
           isCustomer
@@ -927,8 +936,10 @@ export function CakeBuilder({
         onBack={() => {
           if (isPayment) setPhase("summary");
           else if (isSummary) setPhase("step");
-          else if (phase === "step" && stepIndex === 0) setPhase("customer");
-          else setStepIndex((i) => Math.max(0, i - 1));
+          else if (phase === "step" && stepIndex === 0) {
+            if (hasPrefilledCustomer) onCancel();
+            else setPhase("customer");
+          } else setStepIndex((i) => Math.max(0, i - 1));
         }}
         onNext={() => {
           if (isCustomer) {

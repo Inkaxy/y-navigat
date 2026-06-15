@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -6,6 +6,10 @@ import { Cake, Loader2, ChevronLeft } from "lucide-react";
 import { kioskSupabase } from "@/kiosk/integrations/supabase/client";
 import { listenFromParent } from "@/varer/features/cakeBuilder/protocol";
 import type { CakeResult } from "@/varer/features/cakeBuilder/types";
+import {
+  CustomerStartStep,
+  type CustomerMeta,
+} from "@/varer/features/cakeBuilder/components/CustomerStartStep";
 
 interface Props {
   open: boolean;
@@ -23,6 +27,16 @@ type Category = {
   image_url: string | null;
 };
 
+type Phase = "customer" | "category" | "embed";
+
+const EMPTY_META: CustomerMeta = {
+  pickup_date: null,
+  pickup_location_id: null,
+  name: "",
+  phone: "",
+  email: "",
+};
+
 export function KakebyggerModal({
   open,
   onOpenChange,
@@ -35,10 +49,21 @@ export function KakebyggerModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [categoryId, setCategoryId] = useState<string | null>(null);
+  const [phase, setPhase] = useState<Phase>("customer");
+  const [customerMeta, setCustomerMeta] = useState<CustomerMeta>({
+    ...EMPTY_META,
+    pickup_location_id: defaultPickupLocationId ?? null,
+  });
 
+  // Reset all state when the modal closes
   useEffect(() => {
     if (!open) {
       setCategoryId(null);
+      setPhase("customer");
+      setCustomerMeta({
+        ...EMPTY_META,
+        pickup_location_id: defaultPickupLocationId ?? null,
+      });
       return;
     }
     if (!legalEntityId) return;
@@ -60,7 +85,7 @@ export function KakebyggerModal({
     return () => {
       cancel = true;
     };
-  }, [open, legalEntityId]);
+  }, [open, legalEntityId, defaultPickupLocationId]);
 
   // Listen for cake-builder/done from embed iframe
   useEffect(() => {
@@ -68,7 +93,6 @@ export function KakebyggerModal({
     const unsub = listenFromParent(() => {
       /* parent-receiver no-op */
     });
-    // We are the parent — listen via raw postMessage
     const onMsg = (event: MessageEvent) => {
       const data = event.data as
         | { source?: string; version?: number; payload?: { type?: string; result?: CakeResult } }
@@ -79,7 +103,10 @@ export function KakebyggerModal({
         onCakeComplete?.(data.payload.result);
         onOpenChange(false);
       } else if (t === "cake-builder/cancel") {
-        onOpenChange(false);
+        // Bring user back to category list instead of fully closing — they
+        // already filled in customer info, no need to redo it.
+        setCategoryId(null);
+        setPhase("category");
       }
     };
     window.addEventListener("message", onMsg);
@@ -89,32 +116,77 @@ export function KakebyggerModal({
     };
   }, [open, onCakeComplete, onOpenChange]);
 
-  const embedUrl =
-    categoryId && priceListId && legalEntityId
-      ? `/embed/kakebygger/${categoryId}?price_list_id=${priceListId}&legal_entity_id=${legalEntityId}&theme=light&vat_toggle=true&source=kiosk${
-          defaultPickupLocationId
-            ? `&default_pickup_location_id=${defaultPickupLocationId}`
-            : ""
-        }`
-      : null;
+  const customerValidation = useMemo(() => {
+    if (!customerMeta.pickup_date) return "Velg hentedato.";
+    if (!customerMeta.pickup_location_id) return "Velg hentested.";
+    if (!customerMeta.name.trim()) return "Skriv inn navn.";
+    if (!customerMeta.phone.trim()) return "Skriv inn telefonnummer.";
+    if (
+      customerMeta.email &&
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerMeta.email.trim())
+    ) {
+      return "Ugyldig e-postadresse.";
+    }
+    return null;
+  }, [customerMeta]);
+
+  const embedUrl = useMemo(() => {
+    if (!categoryId || !priceListId || !legalEntityId) return null;
+    const params = new URLSearchParams({
+      price_list_id: priceListId,
+      legal_entity_id: legalEntityId,
+      theme: "light",
+      vat_toggle: "true",
+      source: "kiosk",
+    });
+    if (customerMeta.pickup_location_id) {
+      params.set("default_pickup_location_id", customerMeta.pickup_location_id);
+      params.set("pickup_location_id", customerMeta.pickup_location_id);
+    }
+    if (customerMeta.pickup_date) params.set("pickup_date", customerMeta.pickup_date);
+    if (customerMeta.name) params.set("customer_name", customerMeta.name);
+    if (customerMeta.phone) params.set("customer_phone", customerMeta.phone);
+    if (customerMeta.email) params.set("customer_email", customerMeta.email);
+    return `/embed/kakebygger/${categoryId}?${params.toString()}`;
+  }, [categoryId, priceListId, legalEntityId, customerMeta]);
+
+  const headerTitle =
+    phase === "customer"
+      ? "Kundeopplysninger"
+      : phase === "category"
+        ? "Velg kake-kategori"
+        : "Kakebygger";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-6xl w-[95vw] h-[92vh] p-0 gap-0 flex flex-col overflow-hidden">
         <DialogHeader className="px-6 py-3 border-b shrink-0 flex-row items-center justify-between space-y-0">
           <DialogTitle className="flex items-center gap-2">
-            {categoryId && (
+            {phase === "category" && (
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setCategoryId(null)}
+                onClick={() => setPhase("customer")}
+                className="-ml-2"
+              >
+                <ChevronLeft className="h-4 w-4 mr-1" /> Tilbake
+              </Button>
+            )}
+            {phase === "embed" && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setCategoryId(null);
+                  setPhase("category");
+                }}
                 className="-ml-2"
               >
                 <ChevronLeft className="h-4 w-4 mr-1" /> Bytt kategori
               </Button>
             )}
             <Cake className="h-4 w-4 text-app" />
-            Kakebygger
+            {headerTitle}
           </DialogTitle>
         </DialogHeader>
 
@@ -127,7 +199,34 @@ export function KakebyggerModal({
                 Terminalen mangler {!legalEntityId ? "entitet" : "default prisliste"}.
               </p>
             </div>
-          ) : embedUrl ? (
+          ) : phase === "customer" ? (
+            <div className="h-full flex flex-col">
+              <div className="flex-1 overflow-y-auto p-6">
+                <CustomerStartStep
+                  legalEntityId={legalEntityId}
+                  defaultPickupLocationId={defaultPickupLocationId}
+                  value={customerMeta}
+                  onChange={setCustomerMeta}
+                />
+              </div>
+              <div className="border-t px-6 py-3 flex items-center justify-between gap-3 shrink-0">
+                <div className="text-xs text-destructive min-h-[1rem]">
+                  {customerValidation ?? ""}
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={() => onOpenChange(false)}>
+                    Avbryt
+                  </Button>
+                  <Button
+                    disabled={Boolean(customerValidation)}
+                    onClick={() => setPhase("category")}
+                  >
+                    Videre
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ) : phase === "embed" && embedUrl ? (
             <iframe
               src={embedUrl}
               title="Kakebygger"
@@ -159,7 +258,10 @@ export function KakebyggerModal({
                   <Card
                     key={c.id}
                     className="cursor-pointer hover:border-app transition-colors overflow-hidden"
-                    onClick={() => setCategoryId(c.id)}
+                    onClick={() => {
+                      setCategoryId(c.id);
+                      setPhase("embed");
+                    }}
                   >
                     {c.image_url ? (
                       <img

@@ -40,6 +40,26 @@ export default function CakeBuilderEmbed() {
   const source = searchParams.get("source");
   const [authReady, setAuthReady] = useState(source !== "kiosk");
 
+  // Optional prefilled customer meta (e.g. when launched from POS-kiosken som
+  // allerede har samlet inn kundeopplysningene først). Når disse er satt skal
+  // CakeBuilder hoppe over sin egen "customer"-fase.
+  const prefillCustomerMeta = (() => {
+    const pickup_date = searchParams.get("pickup_date");
+    const pickup_location_id =
+      searchParams.get("pickup_location_id") ?? defaultPickupLocationId;
+    const name = searchParams.get("customer_name");
+    const phone = searchParams.get("customer_phone");
+    const email = searchParams.get("customer_email");
+    if (!pickup_date && !name && !phone) return undefined;
+    return {
+      pickup_date: pickup_date ?? null,
+      pickup_location_id: pickup_location_id ?? null,
+      name: name ?? "",
+      phone: phone ?? "",
+      email: email ?? "",
+    };
+  })();
+
   // Når embeden lastes fra POS-kiosken: hent kiosk-sesjonen fra localStorage
   // (storageKey `pos-kiosk-auth`) og injiser den i default supabase-klienten
   // slik at RPC-er som krever `authenticated` virker.
@@ -171,6 +191,7 @@ export default function CakeBuilderEmbed() {
         priceListId={priceListId}
         legalEntityId={legalEntityId}
         defaultPickupLocationId={defaultPickupLocationId}
+        initialCustomerMeta={prefillCustomerMeta}
         showVatToggle={vatToggle}
         onComplete={handleComplete}
         onCancel={handleCancel}
