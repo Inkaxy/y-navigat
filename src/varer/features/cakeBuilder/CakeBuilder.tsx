@@ -780,15 +780,24 @@ export function CakeBuilder({
     );
   }
 
-  // Header step counter: customer = 0, steps 1..N, summary = N+1, payment = N+2
-  const headerTotalSteps = steps.length + 3;
-  const headerStepIndex = isCustomer
-    ? 0
-    : isSummary
+  // Header step counter.
+  // - Uten prefill: customer = 1, steps 2..N+1, summary = N+2, payment = N+3  → total = N + 3
+  // - Med prefill (fra POS-kiosken): customer-fasen vises ikke, så det første
+  //   wizard-steget er "1 / N+2" og summary/payment legges på etterpå.
+  const headerTotalSteps = hasPrefilledCustomer ? steps.length + 2 : steps.length + 3;
+  const headerStepIndex = hasPrefilledCustomer
+    ? isSummary
       ? steps.length + 1
       : isPayment
         ? steps.length + 2
-        : stepIndex + 1;
+        : stepIndex + 1
+    : isCustomer
+      ? 1
+      : isSummary
+        ? steps.length + 2
+        : isPayment
+          ? steps.length + 3
+          : stepIndex + 2;
 
   return (
     <div className="flex flex-col h-full bg-background">
