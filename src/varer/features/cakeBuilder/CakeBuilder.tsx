@@ -57,6 +57,7 @@ export function CakeBuilder({
   legalEntityId,
   defaultPickupLocationId,
   initialConfig: _initialConfig,
+  initialCustomerMeta,
   showVatToggle = true,
   onPriceChange,
   onComplete,
@@ -83,8 +84,11 @@ export function CakeBuilder({
     }
   }, [showVat]);
 
+  // Når kundeopplysningene allerede er prefilled (f.eks. fra POS-kiosken)
+  // hopper vi rett til wizard-stegene.
+  const hasPrefilledCustomer = Boolean(initialCustomerMeta);
   const [phase, setPhase] = useState<"customer" | "step" | "summary" | "payment">(
-    "customer",
+    hasPrefilledCustomer ? "step" : "customer",
   );
   const [stepIndex, setStepIndex] = useState(0);
   const isSummary = phase === "summary";
@@ -93,13 +97,15 @@ export function CakeBuilder({
   /** Confirmation state shown after the user clicks "Ferdig". Holds the result so we can show ordrebekreftelse. */
   const [confirmedResult, setConfirmedResult] = useState<CakeResult | null>(null);
   const [isFinalizing, setIsFinalizing] = useState(false);
-  const [customerMeta, setCustomerMeta] = useState<CustomerMeta>({
-    pickup_date: null,
-    pickup_location_id: defaultPickupLocationId ?? null,
-    name: "",
-    phone: "",
-    email: "",
-  });
+  const [customerMeta, setCustomerMeta] = useState<CustomerMeta>(
+    initialCustomerMeta ?? {
+      pickup_date: null,
+      pickup_location_id: defaultPickupLocationId ?? null,
+      name: "",
+      phone: "",
+      email: "",
+    },
+  );
   const [paymentMode, setPaymentMode] = useState<PaymentMode | null>(null);
   // Per-step selections
   const [singleSelections, setSingleSelections] = useState<Record<string, string>>({});
