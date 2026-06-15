@@ -51,8 +51,9 @@ export interface CakeBuilderProps {
 export function CakeBuilder({
   categoryId,
   priceListId,
-  legalEntityId: _legalEntityId,
-  initialConfig: _initialConfig, // TODO F1.3: pre-fill state from initialConfig (single/multi/text/number selections) + hopp til siste steg / summary-view
+  legalEntityId,
+  defaultPickupLocationId,
+  initialConfig: _initialConfig,
   showVatToggle = true,
   onPriceChange,
   onComplete,
