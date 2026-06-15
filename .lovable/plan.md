@@ -1,46 +1,75 @@
 ## Mål
-Produktknappene på POS-kiosken viser produktets primærbilde (fra `pos_product_images`) som bakgrunn på knappen, automatisk og uten at admin må lime inn URL. Bildene må fortsette å virke etter 1 time (dagens implementasjon lagrer en signed URL i `pos_keypad_buttons.image_url` som utløper).
+Gjøre kakebyggeren komplett ved å innramme den med to nye steg, og deretter koble resultatet til en faktisk henteordre som POS kan plukke opp på hentedagen.
 
-## Hva vi har i dag
-- `pos_keypad_buttons.image_url` (tekst) brukes både i editor-preview og kiosk-render.
-- Editor (`TastaturEditor.tsx`) henter primærbildet fra `pos_product_images` ved opprettelse, signerer en URL (1t TTL) og lagrer signed URL direkte i `image_url`. Etter ~1 time blir bildet borte i kiosken.
-- Kiosk (`KeypadGrid.tsx`) viser `b.image_url` som `<img>` med `max-h-12` — lite synlig.
-- Storage-bucket `pos-product-images` har SELECT-policy som krever `has_position_in_entity(...)`. Kiosk-brukere har ingen `user_positions`-rader, så de kan ikke signere/lese objekter direkte fra kiosk-sesjonen.
+## Steg 1 — Førsteside i kakebyggeren (før vanlige steg)
 
-## Endringer
+Nytt obligatorisk start-steg i `src/varer/features/cakeBuilder/CakeBuilder.tsx` (rendret før `steps[0]`, samme `StepHeader`/`StepNav`-rytme). Felter:
 
-### 1. Skjema: skill mellom "manuell URL" og "produktbilde"
-Migrering på `public.pos_keypad_buttons`:
-- Ny kolonne `image_storage_path text null` (peker inn i bucket `pos-product-images`).
-- Behold `image_url` for eksterne URL-er / overstyringer.
-- GRANTs/RLS uendret (samme tabell, ingen nye policies).
+- **Hentedato** — datepicker, min = i dag + X (X = `category.lead_time_days` hvis satt, ellers 1). Påkrevd.
+- **Hentested** — select over `pickup_locations` for gjeldende `legal_entity_id`. Default = utsalget terminalen er koblet til (kommer inn via ny prop `defaultPickupLocationId`). Kunden kan endre. Påkrevd.
+- **Navn** — tekst, påkrevd.
+- **Telefon** — tekst (norsk format-validering, ikke streng). Påkrevd.
+- **E-post** — tekst, valgfri.
 
-### 2. Storage-policy: la kiosk-sesjoner lese pos-product-images
-Ny SELECT-policy på `storage.objects` for `pos-product-images`:
-- Tillat lesing til `authenticated` når brukeren er en aktiv kiosk-bruker på en terminal i samme `legal_entity_id` som filens path-prefix (samme `extract_legal_entity_id_from_path(name)`-konvensjon).
-- Definert via en ny SECURITY DEFINER `has_kiosk_access_to_entity(uuid)` som matcher `pos_kiosk_users` ↔ `pos_terminals.legal_entity_id`.
-- Eksisterende admin-policy (`has_position_in_entity`) beholdes, ny policy er additiv.
+State lagres i en ny `customerInputs`-struct sidestilt med `singleSelections`/`multiSelections`. Inngår i `CakeResult` som `customer_meta = { pickup_date, pickup_location_id, name, phone, email }` (utvider `types.ts`).
 
-### 3. Editor (`src/pos_styring/pages/TastaturEditor.tsx`)
-- Lagre `image_storage_path` (ikke signed URL) når brukeren velger "bruk produktets primærbilde".
-- Vis preview ved å signere `image_storage_path` on demand (samme `getKeypadSignedUrl`).
-- UI: i knapp-dialogen, erstatte "Bilde-URL"-feltet med to valg:
-  - **Produktbilde** (default for produktknapper) — leser primærbildet fra `pos_product_images`. Knapp "Bytt bilde" → liste over alle bilder for produktet, velg én.
-  - **Egendefinert URL** — fritt tekstfelt (`image_url`), brukes fortsatt for funksjons-/kategori-knapper.
-- Auto-fyll ved opprettelse: sett `image_storage_path` til primærbildets path (i stedet for signed URL i `image_url`).
+`StepHeader` får totalsteg = `steps.length + 2` (start + slutt). Navigasjon: start → eksisterende steg → oppsummering → ny betalings-side → bekreftelse.
 
-### 4. Kiosk-runtime (`src/kiosk/hooks/useKeypadLayout.ts` + `KeypadGrid.tsx`)
-- Utvid `KeypadButton`-typen med `image_storage_path`.
-- I `useKeypadLayout`: etter at knappene er hentet, samle unike `image_storage_path` og kall `kioskSupabase.storage.from('pos-product-images').createSignedUrls(paths, 3600)` i batch. Returner et `Map<path, signedUrl>` i query-resultatet.
-- I `KeypadGrid`: render-prioritet `signedUrl(image_storage_path) ?? image_url`. Vis bildet som **bakgrunn på hele knappen** (cover) med en mørk gradient nederst og label over — i tråd med brand-design (ingen hardkodede farger, bruk `--brand-ink`/`--brand-cream` overlay-tokens). Behold gjeldende layout når ingen bilde finnes.
-- Re-signering: react-query med `staleTime: 50 min` matcher TTL på 60 min.
+## Steg 2 — Sisteside «Betaling»
 
-### 5. Migrering av eksisterende data
-Engangs-SQL i samme migrasjon:
-- For hver `pos_keypad_buttons`-rad med `button_type='product'` og `image_storage_path IS NULL`: sett `image_storage_path` = `(SELECT storage_path FROM pos_product_images WHERE product_id = b.product_id AND is_primary LIMIT 1)`.
-- Nullstill `image_url` der den inneholder en utløpt signed URL (heuristikk: inneholder `/storage/v1/object/sign/pos-product-images/` og `token=`).
+Etter `summary` (før dagens `confirmedResult`-skjerm) legges et nytt valg-steg med to store kort:
 
-## Out of scope
-- Beskjæring/cropping av produktbilder i editor.
-- Opplasting av nye produktbilder fra tastatur-editoren (gjøres i Produkter-modulen).
-- Caching i Service Worker for offline-kiosk.
+- **Betal nå** — fortsetter dagens flyt, men `payment_mode = "now"`.
+- **Betal ved henting** — `payment_mode = "later"`.
+
+Valget lagres på `CakeResult.payment_mode`. `handleConfirmStep` kalles først når brukeren har valgt.
+
+## Steg 3 — POS mottar resultat og oppretter henteordre
+
+`KakebyggerModal` byttes fra ren visning til å lytte på `cake-builder/done`-meldingen fra iframen (via `protocol.ts`/`window.message`). I `src/kiosk/pages/Kasse.tsx`:
+
+1. **Match/opprett kunde** — ny RPC `pos_upsert_customer_order_customer(legal_entity_id, name, phone, email)`: slår opp `customers` på (legal_entity_id, phone), oppretter ellers en minimal "POS-bestilling"-kunde (samme felter brukes som `customer_snapshot`).
+2. **Opprett ordre** — ny RPC `pos_create_cake_order(payload)` som:
+   - Lager `orders`-rad: `distribution='pickup'`, `delivery_date=pickup_date`, `pickup_location_id`, `final_customer_*` fra inputs, `is_customer_order=true`, `source='pos_kakebygger'`, `status='confirmed'`, `is_paid` settes etter betalingsmodus.
+   - Lager `order_lines` for kake-hovedlinje + tilbehør-linjer fra `cake_result`.
+   - Lager label-jobb i `label_print_jobs` (samme rutine som dagens kakebygger-bekreftelse — ingen ny utskriftslogikk, går i ordinær kø).
+   - Returnerer `order_id` + linjer.
+3. **Betal nå** — etter ordre er opprettet, pushes linjene inn i dagens POS-kurv (`cart.add(...)`) med `linked_order_id`-meta. Kassereren tar betalt som vanlig. Ved POS-finalisering markeres ordren `is_paid=true`, og hver linje senere (på hentedagen) får pris 0 (se neste steg).
+4. **Betal ved henting** — modal lukkes, toast «Henteordre #N opprettet», ingenting puttes i kurven nå.
+
+## Steg 4 — «Henteordre»-knapp i POS
+
+Eksisterende `function_code`-system har allerede `kakebygger`. Legg til ny funksjon `henteordre` (i `src/pos_styring/keypad/functions.ts` + `KeypadGrid.tsx`/`Kasse.tsx`-switch) som åpner ny komponent `HenteordreModal`:
+
+- Henter `orders` med `delivery_date <= i dag`, `pickup_location_id = terminalens utsalg`, `status in ('confirmed','in_production','ready')`, `picked_up_at is null`.
+- Liste: ordrenummer, kundenavn, telefon, dato, betalt/ubetalt-badge.
+- Klikk på rad → laster ordrens `order_lines` inn i POS-kurv:
+  - Hvis `is_paid=true`: alle linjer settes til pris **0 kr** (kunden kan legge til ekstra varer), og ordren markeres med `picked_up_at=now()` når salget fullføres.
+  - Hvis `is_paid=false`: linjene legges inn til full pris. Kunden kan legge til/justere, og betaling skjer normalt. Ordren får `is_paid=true` + `picked_up_at=now()` ved fullføring.
+
+Kurv-modellen utvides med valgfri `pickup_order_id` slik at finalisering kan oppdatere riktig `orders`-rad. RPC `pos_finalize_sale` (eller wrapper) tar imot dette og oppdaterer ordrestatus.
+
+## Tekniske detaljer (utviklerseksjon)
+
+**Frontend-filer som endres:**
+- `src/varer/features/cakeBuilder/CakeBuilder.tsx` — nye start/slutt-steg, customer/payment-state, utvidet validering, `StepNav`-flyt.
+- `src/varer/features/cakeBuilder/types.ts` — `CakeResult` får `customer_meta`, `payment_mode: 'now' | 'later'`.
+- `src/varer/features/cakeBuilder/components/` — to nye små steg-komponenter (`CustomerStartStep.tsx`, `PaymentChoiceStep.tsx`).
+- `src/varer/pages/embed/CakeBuilderEmbed.tsx` — ta imot `default_pickup_location_id` query-param, sende videre.
+- `src/kiosk/components/KakebyggerModal.tsx` — lytt på `postMessage 'cake-builder/done'`, send terminalens pickup_location som default i embed-URL.
+- `src/kiosk/pages/Kasse.tsx` — wire `KakebyggerModal`-resultat til ny `handleCakeResult(result)` som kaller RPC og evt. pusher i kurv. Ny `HenteordreModal` integreres på keypad-funksjon `henteordre`.
+- `src/kiosk/components/HenteordreModal.tsx` — ny.
+- `src/pos_styring/keypad/functions.ts` — legg `henteordre` i funksjonskatalogen.
+
+**Backend (én migrasjon):**
+- RPC `pos_create_cake_order(p_payload jsonb)` — security definer, validerer terminal/operator, oppretter customer (om nødvendig), order, order_lines, label-jobb.
+- RPC `pos_list_pickup_orders(p_pickup_location_id uuid, p_date date)` — returnerer åpne henteordrer for utsalg/dato.
+- RPC `pos_load_pickup_order(p_order_id uuid)` — returnerer linjer m/ riktig prising (0 kr hvis `is_paid`).
+- RPC `pos_complete_pickup_order(p_order_id uuid, p_pos_transaction_id uuid)` — setter `picked_up_at`, `is_paid=true` ved behov, status.
+- GRANTs til `authenticated`/`service_role` per konvensjon.
+- Ingen schema-endringer på `orders` nødvendig — alle nødvendige kolonner finnes (`distribution`, `delivery_date`, `pickup_location_id` via `customer_snapshot` evt. ny kolonne hvis denne ikke finnes på orders — sjekkes i implementasjon, evt. legges til som `pickup_location_id uuid references pickup_locations` i samme migrasjon).
+
+**Ikke i scope nå:**
+- Endringer i eksisterende cake-RPC (`build_cake_order_line`) — den brukes som før til å bygge linje-payload.
+- Faktisk e-post/SMS-bekreftelse til kunde (kan kobles på senere via `email_outbox`).
+- Reprint av etikett fra henteordre-listen (kan legges til etter behov).
