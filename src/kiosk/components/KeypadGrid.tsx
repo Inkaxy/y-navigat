@@ -12,7 +12,7 @@ import {
   useProductLookup,
 } from "@/kiosk/hooks/useProductLookup";
 import { useTerminal } from "@/kiosk/context/TerminalContext";
-import { useOperator } from "@/kiosk/context/OperatorContext";
+
 import { cn } from "@/lib/utils";
 
 interface Props {
