@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { LogOut, Percent, Pause, Printer, Receipt, Tag, Trash2, X } from "lucide-react";
+import { LogOut, X } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
