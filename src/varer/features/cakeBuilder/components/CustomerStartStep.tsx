@@ -32,6 +32,7 @@ interface Props {
   defaultPickupLocationId?: string | null;
   value: CustomerMeta;
   onChange: (v: CustomerMeta) => void;
+  client?: SupabaseClient<any, any, any>;
 }
 
 export function CustomerStartStep({
@@ -39,14 +40,16 @@ export function CustomerStartStep({
   defaultPickupLocationId,
   value,
   onChange,
+  client,
 }: Props) {
+  const sb = client ?? defaultSupabase;
   const [locations, setLocations] = useState<PickupLocOpt[]>([]);
   const [datePopoverOpen, setDatePopoverOpen] = useState(false);
 
   useEffect(() => {
     let cancel = false;
     (async () => {
-      const { data } = await supabase
+      const { data } = await sb
         .from("pickup_locations" as never)
         .select("id, pickup_number, display_name, status")
         .eq("legal_entity_id" as never, legalEntityId as never)
@@ -58,7 +61,7 @@ export function CustomerStartStep({
     return () => {
       cancel = true;
     };
-  }, [legalEntityId]);
+  }, [legalEntityId, sb]);
 
   // Apply default pickup location once we have locations + no value yet
   useEffect(() => {
