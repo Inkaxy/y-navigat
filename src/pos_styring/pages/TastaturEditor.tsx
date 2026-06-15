@@ -954,8 +954,88 @@ export default function TastaturEditor() {
             <Link to="/pos-styring/tastatur"><ArrowLeft className="h-4 w-4" /> Tilbake til layouts</Link>
           </Button>
           <h1 className="text-3xl font-semibold tracking-normal">{layout.display_name}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{layout.grid_cols} × {layout.grid_rows} grid · {activeEntity?.short_code}</p>
-        </div>
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+            <span>Grid</span>
+            <div className="inline-flex items-center gap-1 rounded-md border bg-card px-1 py-0.5">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                disabled={resizeGridMutation.isPending || layout.grid_cols <= 1}
+                onClick={() => resizeGridMutation.mutate({ cols: layout.grid_cols - 1, rows: layout.grid_rows })}
+                aria-label="Færre kolonner"
+              >
+                <Minus className="h-3.5 w-3.5" />
+              </Button>
+              <Input
+                type="number"
+                min={1}
+                max={12}
+                value={layout.grid_cols}
+                onChange={(e) => {
+                  const v = Number(e.target.value);
+                  if (Number.isFinite(v) && v >= 1 && v <= 12 && v !== layout.grid_cols) {
+                    resizeGridMutation.mutate({ cols: v, rows: layout.grid_rows });
+                  }
+                }}
+                className="h-6 w-12 border-0 px-1 text-center text-sm focus-visible:ring-0"
+                aria-label="Kolonner"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                disabled={resizeGridMutation.isPending || layout.grid_cols >= 12}
+                onClick={() => resizeGridMutation.mutate({ cols: layout.grid_cols + 1, rows: layout.grid_rows })}
+                aria-label="Flere kolonner"
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+            <span>×</span>
+            <div className="inline-flex items-center gap-1 rounded-md border bg-card px-1 py-0.5">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                disabled={resizeGridMutation.isPending || layout.grid_rows <= 1}
+                onClick={() => resizeGridMutation.mutate({ cols: layout.grid_cols, rows: layout.grid_rows - 1 })}
+                aria-label="Færre rader"
+              >
+                <Minus className="h-3.5 w-3.5" />
+              </Button>
+              <Input
+                type="number"
+                min={1}
+                max={12}
+                value={layout.grid_rows}
+                onChange={(e) => {
+                  const v = Number(e.target.value);
+                  if (Number.isFinite(v) && v >= 1 && v <= 12 && v !== layout.grid_rows) {
+                    resizeGridMutation.mutate({ cols: layout.grid_cols, rows: v });
+                  }
+                }}
+                className="h-6 w-12 border-0 px-1 text-center text-sm focus-visible:ring-0"
+                aria-label="Rader"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                disabled={resizeGridMutation.isPending || layout.grid_rows >= 12}
+                onClick={() => resizeGridMutation.mutate({ cols: layout.grid_cols, rows: layout.grid_rows + 1 })}
+                aria-label="Flere rader"
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+            <span>·</span>
+            <span>{activeEntity?.short_code}</span>
+          </div>
         <div className="flex flex-wrap items-center gap-3">
           <label className="flex cursor-pointer items-center gap-2 rounded-md border bg-card px-3 py-2 text-xs">
             <Switch
