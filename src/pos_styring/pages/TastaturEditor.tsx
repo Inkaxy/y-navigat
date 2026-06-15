@@ -1104,7 +1104,9 @@ export default function TastaturEditor() {
           open={themeSettingsOpen}
           onOpenChange={setThemeSettingsOpen}
           layoutId={layoutId}
+          legalEntityId={layout.legal_entity_id}
           initialTheme={layout.theme}
+          initialCustomerScreen={layout.customer_screen}
         />
       )}
     </div>
