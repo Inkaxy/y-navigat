@@ -184,6 +184,16 @@ export interface CakeResult {
   accessory_lines: CakeAccessoryLine[];
   /** Komplett etikett-payload til Produksjon-appen */
   label_payload: CakeLabelPayload;
+  /** Kunde/leveranseinfo fra første side */
+  customer_meta?: {
+    pickup_date: string | null;
+    pickup_location_id: string | null;
+    name: string;
+    phone: string;
+    email: string;
+  };
+  /** Betalingsmodus valgt på siste side */
+  payment_mode?: "now" | "later";
 }
 
 /**
