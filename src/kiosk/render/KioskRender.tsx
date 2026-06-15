@@ -1,13 +1,21 @@
-// Felles presentasjonslag for kiosk-rendringen. Lever av theme-CSS-variabler
-// satt av themeToVars. Brukes av live-preview i TastaturEditor nå, og (Steg 4)
+// Felles presentasjonslag for kiosken. Lever av theme-CSS-variabler
+// satt av themeToVars. Brukes av live-preview i TastaturEditor og
 // av selve kasse-skjermen. INGEN hardkodede farger her — kun var(--kiosk-*).
 
-import { ChevronLeft, ShoppingCart } from "lucide-react";
+import {
+  ChevronLeft,
+  Minus,
+  Plus as PlusIcon,
+  ShoppingBag,
+  ShoppingCart,
+  Utensils,
+  X as XIcon,
+} from "lucide-react";
 import { icons as LucideIcons } from "lucide-react";
 import type { CSSProperties, ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
-import type { KioskTheme } from "./kioskTheme";
+import type { FooterAction, KioskTheme } from "./kioskTheme";
 import { themeToVars } from "./kioskTheme";
 
 // ── Types som matcher dB-strukturen, men er ren-data (ikke koblet til Supabase)
@@ -39,7 +47,10 @@ export interface RenderCartLine {
   qty: number;
   unit?: string | null;
   line_total: number;
+  image_url?: string | null;
 }
+
+type DiningMode = "takeaway" | "eatin" | "pickup";
 
 interface Props {
   theme: KioskTheme;
@@ -64,9 +75,14 @@ interface Props {
   onPay?: () => void;
   onClear?: () => void;
   payDisabled?: boolean;
-  diningMode?: "takeaway" | "eatin" | "pickup";
-  onDiningChange?: (m: "takeaway" | "eatin" | "pickup") => void;
-  // Handlingslinje (under)
+  onCartLineQtyChange?: (id: string, delta: number) => void;
+  onCartLineRemove?: (id: string) => void;
+  diningMode?: DiningMode;
+  onDiningChange?: (m: DiningMode) => void;
+  // Handlingslinje: code → handler. Hvis ikke gitt, brukes ingen footer.
+  onFooterAction?: (code: string) => void;
+  footerActionDisabled?: Partial<Record<string, boolean>>;
+  // Bakoverkompat: hvis satt, overstyrer dette footerActions fra temaet
   footerSlot?: ReactNode;
   // Tom-tilstand når ingen knapper finnes
   emptyState?: ReactNode;
@@ -81,7 +97,38 @@ function IconByName({ name, className }: { name?: string | null; className?: str
   return <Comp className={className} />;
 }
 
-function KioskHeader({
+// ── Brand-header ─────────────────────────────────────────────────────────────
+function BrandMark({ url, fallbackLetter, size = 44 }: { url: string | null; fallbackLetter: string; size?: number }) {
+  if (url) {
+    return (
+      <img
+        src={url}
+        alt=""
+        className="object-contain"
+        style={{ width: size, height: size }}
+        draggable={false}
+      />
+    );
+  }
+  return (
+    <div
+      className="flex items-center justify-center rounded-full font-bold"
+      style={{
+        width: size,
+        height: size,
+        background: "var(--kiosk-accent-soft)",
+        color: "var(--kiosk-accent)",
+        fontFamily: "var(--kiosk-font-heading)",
+        fontSize: size * 0.42,
+        letterSpacing: "0.02em",
+      }}
+    >
+      {fallbackLetter}
+    </div>
+  );
+}
+
+function MinimalHeader({
   label,
   terminalCode,
   operatorName,
@@ -114,6 +161,157 @@ function KioskHeader({
       </div>
     </header>
   );
+}
+
+function BrandedLeftHeader({
+  theme,
+  operatorName,
+  terminalCode,
+  right,
+}: {
+  theme: KioskTheme;
+  operatorName?: string | null;
+  terminalCode?: string | null;
+  right?: ReactNode;
+}) {
+  const letter = (theme.brandName?.trim()[0] ?? "B").toUpperCase();
+  return (
+    <header
+      className="flex items-center justify-between gap-6 px-6 py-4"
+      style={{
+        background: "var(--kiosk-header-bg)",
+        color: "var(--kiosk-header-ink)",
+        borderBottom: "1px solid var(--kiosk-border)",
+        fontFamily: "var(--kiosk-font-heading)",
+      }}
+    >
+      <div className="flex min-w-0 items-center gap-4">
+        <BrandMark url={theme.brandLogoUrl} fallbackLetter={letter} size={52} />
+        <div className="min-w-0">
+          <div
+            className="truncate text-xl font-semibold uppercase"
+            style={{ letterSpacing: "0.08em" }}
+          >
+            {theme.brandName ?? "Kassen"}
+          </div>
+          {theme.brandTagline && (
+            <div className="truncate text-[11px] uppercase opacity-70" style={{ letterSpacing: "0.18em" }}>
+              {theme.brandTagline}
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="flex items-center gap-4 text-sm">
+        {operatorName && (
+          <div className="hidden flex-col items-end leading-tight sm:flex">
+            <span className="opacity-60 text-[10px] uppercase tracking-widest">Kassør</span>
+            <span className="font-semibold">{operatorName}</span>
+          </div>
+        )}
+        {terminalCode && (
+          <span className="font-mono text-[10px] uppercase tracking-[0.2em] opacity-60">
+            {terminalCode}
+          </span>
+        )}
+        {right}
+      </div>
+    </header>
+  );
+}
+
+function BrandedCenteredHeader({
+  theme,
+  operatorName,
+  right,
+}: {
+  theme: KioskTheme;
+  operatorName?: string | null;
+  right?: ReactNode;
+}) {
+  const letter = (theme.brandName?.trim()[0] ?? "B").toUpperCase();
+  return (
+    <header
+      className="flex items-center justify-between gap-6 px-8 py-5"
+      style={{
+        background: "var(--kiosk-header-bg)",
+        color: "var(--kiosk-header-ink)",
+        borderBottom: "1px solid var(--kiosk-border)",
+        fontFamily: "var(--kiosk-font-heading)",
+      }}
+    >
+      <div className="flex min-w-0 items-center gap-4">
+        <BrandMark url={theme.brandLogoUrl} fallbackLetter={letter} size={56} />
+        <div className="min-w-0">
+          <div
+            className="truncate text-2xl font-semibold uppercase leading-none"
+            style={{ letterSpacing: "0.1em" }}
+          >
+            {theme.brandName ?? "Kassen"}
+          </div>
+          {theme.brandTagline && (
+            <div
+              className="mt-1 truncate text-[11px] uppercase opacity-70"
+              style={{ letterSpacing: "0.28em" }}
+            >
+              {theme.brandTagline}
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="flex items-center gap-4 text-sm">
+        {operatorName && (
+          <span className="hidden text-xs opacity-70 sm:inline">{operatorName}</span>
+        )}
+        {theme.brandMonogramUrl ? (
+          <img
+            src={theme.brandMonogramUrl}
+            alt=""
+            className="hidden h-10 w-10 object-contain opacity-90 sm:block"
+            draggable={false}
+          />
+        ) : null}
+        {right}
+      </div>
+    </header>
+  );
+}
+
+function KioskHeader({
+  theme,
+  label,
+  terminalCode,
+  operatorName,
+  right,
+}: {
+  theme: KioskTheme;
+  label: string;
+  terminalCode?: string | null;
+  operatorName?: string | null;
+  right?: ReactNode;
+}) {
+  switch (theme.headerStyle) {
+    case "branded_left":
+      return (
+        <BrandedLeftHeader
+          theme={theme}
+          terminalCode={terminalCode}
+          operatorName={operatorName}
+          right={right}
+        />
+      );
+    case "branded_centered":
+      return <BrandedCenteredHeader theme={theme} operatorName={operatorName} right={right} />;
+    case "minimal":
+    default:
+      return (
+        <MinimalHeader
+          label={label}
+          terminalCode={terminalCode}
+          operatorName={operatorName}
+          right={right}
+        />
+      );
+  }
 }
 
 function NavTabs({
@@ -170,6 +368,115 @@ function NavTabs({
   );
 }
 
+// ── Dining pills ─────────────────────────────────────────────────────────────
+const DINING_META: Record<DiningMode, { label: string; sub: string; icon: ReactNode }> = {
+  eatin: { label: "Sitt her", sub: "Spis hos oss", icon: <Utensils className="h-5 w-5" /> },
+  takeaway: { label: "Ta med", sub: "Take away", icon: <ShoppingBag className="h-5 w-5" /> },
+  pickup: { label: "Henteordre", sub: "Forhåndsbestilt", icon: <ShoppingCart className="h-5 w-5" /> },
+};
+
+function HeroDiningPills({
+  mode,
+  onChange,
+  style,
+}: {
+  mode: DiningMode;
+  onChange: (m: DiningMode) => void;
+  style: "soft" | "outlined" | "solid";
+}) {
+  const opts: DiningMode[] = ["eatin", "takeaway", "pickup"];
+  return (
+    <div
+      className="grid gap-3 px-3 pt-3"
+      style={{ gridTemplateColumns: `repeat(${opts.length}, minmax(0, 1fr))` }}
+    >
+      {opts.map((id) => {
+        const meta = DINING_META[id];
+        const active = mode === id;
+        const bg = active
+          ? style === "solid"
+            ? "var(--kiosk-accent)"
+            : "var(--kiosk-accent-soft)"
+          : "var(--kiosk-surface)";
+        const fg = active && style === "solid" ? "var(--kiosk-ink-on-accent)" : "var(--kiosk-ink)";
+        const borderColor = active ? "var(--kiosk-accent)" : "var(--kiosk-border)";
+        return (
+          <button
+            key={id}
+            type="button"
+            onClick={() => onChange(id)}
+            className="flex items-center gap-3 border px-5 py-3 text-left transition-all active:scale-[0.98]"
+            style={{
+              borderRadius: "var(--kiosk-radius)",
+              background: bg,
+              color: fg,
+              borderColor,
+              borderWidth: style === "outlined" || active ? 2 : 1,
+              fontFamily: "var(--kiosk-font-body)",
+            }}
+          >
+            <span
+              className="flex h-10 w-10 items-center justify-center rounded-full"
+              style={{
+                background: active && style !== "solid" ? "var(--kiosk-surface)" : "transparent",
+                color: active && style === "solid" ? "var(--kiosk-ink-on-accent)" : "var(--kiosk-accent)",
+              }}
+            >
+              {meta.icon}
+            </span>
+            <span className="flex flex-col leading-tight">
+              <span
+                className="text-base font-semibold uppercase"
+                style={{ letterSpacing: "0.05em" }}
+              >
+                {meta.label}
+              </span>
+              <span className="text-xs opacity-70">{meta.sub}</span>
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function DiningChip({
+  mode,
+  onChange,
+}: {
+  mode: DiningMode;
+  onChange: (m: DiningMode) => void;
+}) {
+  const opts: DiningMode[] = ["eatin", "takeaway", "pickup"];
+  return (
+    <div
+      className="flex gap-1 rounded-md p-0.5 text-xs"
+      style={{ background: "var(--kiosk-surface-alt)" }}
+    >
+      {opts.map((id) => {
+        const active = mode === id;
+        return (
+          <button
+            key={id}
+            type="button"
+            onClick={() => onChange(id)}
+            className="rounded px-2 py-1 transition-colors"
+            style={{
+              background: active ? "var(--kiosk-accent)" : "transparent",
+              color: active ? "var(--kiosk-ink-on-accent)" : "var(--kiosk-ink-soft)",
+              fontFamily: "var(--kiosk-font-body)",
+              fontWeight: active ? 600 : 500,
+            }}
+          >
+            {DINING_META[id].label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Keypad ───────────────────────────────────────────────────────────────────
 function KeypadCell({
   b,
   interactive,
@@ -251,47 +558,105 @@ function KeypadArea({
   );
 }
 
-function DiningSwitch({
-  mode,
-  onChange,
-}: {
-  mode: "takeaway" | "eatin" | "pickup";
-  onChange: (m: "takeaway" | "eatin" | "pickup") => void;
-}) {
-  const opts: { id: "eatin" | "takeaway" | "pickup"; label: string }[] = [
-    { id: "eatin", label: "Sitt her" },
-    { id: "takeaway", label: "Ta med" },
-    { id: "pickup", label: "Henteordre" },
-  ];
+// ── Cart ─────────────────────────────────────────────────────────────────────
+function CartLineCompact({ line }: { line: RenderCartLine }) {
   return (
     <div
-      className="flex gap-1 rounded-md p-0.5 text-xs"
-      style={{ background: "var(--kiosk-surface-alt)" }}
+      className="flex items-center justify-between border-b py-2 text-sm last:border-0"
+      style={{ borderColor: "var(--kiosk-border)" }}
     >
-      {opts.map((o) => {
-        const active = mode === o.id;
-        return (
-          <button
-            key={o.id}
-            type="button"
-            onClick={() => onChange(o.id)}
-            className="rounded px-2 py-1 transition-colors"
-            style={{
-              background: active ? "var(--kiosk-accent)" : "transparent",
-              color: active ? "var(--kiosk-ink-on-accent)" : "var(--kiosk-ink-soft)",
-              fontFamily: "var(--kiosk-font-body)",
-              fontWeight: active ? 600 : 500,
-            }}
-          >
-            {o.label}
-          </button>
-        );
-      })}
+      <div className="min-w-0 flex-1">
+        <div className="truncate font-semibold">{line.label}</div>
+        <div className="text-xs opacity-60">
+          {line.qty}
+          {line.unit ? ` ${line.unit}` : ""}
+        </div>
+      </div>
+      <div className="ml-3 tabular-nums font-semibold">{line.line_total.toFixed(2)}</div>
+    </div>
+  );
+}
+
+function CartLineRich({
+  line,
+  showImage,
+  showStepper,
+  onQtyChange,
+  onRemove,
+}: {
+  line: RenderCartLine;
+  showImage: boolean;
+  showStepper: boolean;
+  onQtyChange?: (id: string, delta: number) => void;
+  onRemove?: (id: string) => void;
+}) {
+  return (
+    <div
+      className="flex items-center gap-3 border-b py-2 last:border-0"
+      style={{ borderColor: "var(--kiosk-border)" }}
+    >
+      {showImage && (
+        <div
+          className="h-12 w-12 shrink-0 overflow-hidden"
+          style={{ borderRadius: "calc(var(--kiosk-radius) - 2px)", background: "var(--kiosk-surface-alt)" }}
+        >
+          {line.image_url ? (
+            <img src={line.image_url} alt="" className="h-full w-full object-cover" draggable={false} />
+          ) : null}
+        </div>
+      )}
+      <div className="min-w-0 flex-1">
+        <div className="flex items-baseline justify-between gap-2">
+          <span className="truncate text-sm font-semibold">{line.label}</span>
+          <span className="tabular-nums text-sm font-semibold">{line.line_total.toFixed(0)},-</span>
+        </div>
+        {showStepper ? (
+          <div className="mt-1 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => onQtyChange?.(line.id, -1)}
+              className="flex h-7 w-7 items-center justify-center border transition-colors hover:bg-[color:var(--kiosk-surface-alt)]"
+              style={{ borderRadius: "calc(var(--kiosk-radius) - 4px)", borderColor: "var(--kiosk-border)" }}
+              aria-label="Reduser"
+            >
+              <Minus className="h-3.5 w-3.5" />
+            </button>
+            <span className="min-w-[1.5rem] text-center tabular-nums text-sm font-semibold">
+              {line.qty}
+            </span>
+            <button
+              type="button"
+              onClick={() => onQtyChange?.(line.id, 1)}
+              className="flex h-7 w-7 items-center justify-center border transition-colors hover:bg-[color:var(--kiosk-surface-alt)]"
+              style={{ borderRadius: "calc(var(--kiosk-radius) - 4px)", borderColor: "var(--kiosk-border)" }}
+              aria-label="Øk"
+            >
+              <PlusIcon className="h-3.5 w-3.5" />
+            </button>
+            {onRemove && (
+              <button
+                type="button"
+                onClick={() => onRemove(line.id)}
+                className="ml-auto flex h-7 w-7 items-center justify-center opacity-50 hover:opacity-100"
+                aria-label="Fjern"
+              >
+                <XIcon className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="text-xs opacity-60">
+            {line.qty}
+            {line.unit ? ` ${line.unit}` : ""}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
 function CartPane({
+  theme,
   cart,
   total,
   onPay,
@@ -299,15 +664,21 @@ function CartPane({
   payDisabled,
   diningMode,
   onDiningChange,
+  onCartLineQtyChange,
+  onCartLineRemove,
 }: {
+  theme: KioskTheme;
   cart: RenderCartLine[];
   total: number;
   onPay?: () => void;
   onClear?: () => void;
   payDisabled?: boolean;
-  diningMode?: "takeaway" | "eatin" | "pickup";
-  onDiningChange?: (m: "takeaway" | "eatin" | "pickup") => void;
+  diningMode?: DiningMode;
+  onDiningChange?: (m: DiningMode) => void;
+  onCartLineQtyChange?: (id: string, delta: number) => void;
+  onCartLineRemove?: (id: string) => void;
 }) {
+  const rich = theme.cartStyle === "rich";
   return (
     <aside
       className="flex w-80 flex-col gap-3 border-l p-4"
@@ -323,32 +694,28 @@ function CartPane({
           <ShoppingCart className="h-4 w-4" />
           Kurv · {cart.length}
         </div>
-        {diningMode && onDiningChange && (
-          <DiningSwitch mode={diningMode} onChange={onDiningChange} />
+        {diningMode && onDiningChange && theme.diningPlacement === "cart_chip" && (
+          <DiningChip mode={diningMode} onChange={onDiningChange} />
         )}
       </div>
-      <div className="flex-1 space-y-2 overflow-y-auto">
+      <div className="flex-1 space-y-1 overflow-y-auto">
         {cart.length === 0 ? (
           <div className="flex h-full items-center justify-center text-center text-sm opacity-50">
             Trykk på et produkt for å legge til
           </div>
-        ) : (
+        ) : rich ? (
           cart.map((l) => (
-            <div
+            <CartLineRich
               key={l.id}
-              className="flex items-center justify-between border-b py-2 text-sm last:border-0"
-              style={{ borderColor: "var(--kiosk-border)" }}
-            >
-              <div className="min-w-0 flex-1">
-                <div className="truncate font-semibold">{l.label}</div>
-                <div className="text-xs opacity-60">
-                  {l.qty}
-                  {l.unit ? ` ${l.unit}` : ""}
-                </div>
-              </div>
-              <div className="ml-3 tabular-nums font-semibold">{l.line_total.toFixed(2)}</div>
-            </div>
+              line={l}
+              showImage={theme.cartShowImages}
+              showStepper={theme.cartShowStepper}
+              onQtyChange={onCartLineQtyChange}
+              onRemove={onCartLineRemove}
+            />
           ))
+        ) : (
+          cart.map((l) => <CartLineCompact key={l.id} line={l} />)
         )}
       </div>
       <div
@@ -392,6 +759,132 @@ function CartPane({
   );
 }
 
+// ── Footer action bar ────────────────────────────────────────────────────────
+function FooterActionBar({
+  actions,
+  style,
+  onAction,
+  disabled,
+}: {
+  actions: FooterAction[];
+  style: "pill_grid" | "icon_card" | "compact_row";
+  onAction: (code: string) => void;
+  disabled?: Partial<Record<string, boolean>>;
+}) {
+  if (!actions.length) return null;
+  if (style === "icon_card") {
+    return (
+      <div
+        className="grid gap-2 px-3 py-3"
+        style={{
+          gridTemplateColumns: `repeat(${actions.length}, minmax(0, 1fr))`,
+          background: "var(--kiosk-surface)",
+          borderTop: "1px solid var(--kiosk-border)",
+        }}
+      >
+        {actions.map((a) => {
+          const isDanger = a.variant === "danger";
+          const isDisabled = !!disabled?.[a.code];
+          return (
+            <button
+              key={a.code}
+              type="button"
+              disabled={isDisabled}
+              onClick={() => onAction(a.code)}
+              className="flex items-center gap-3 border px-4 py-3 transition-colors disabled:opacity-40 active:scale-[0.98]"
+              style={{
+                borderRadius: "var(--kiosk-radius)",
+                borderColor: "var(--kiosk-border)",
+                background: "var(--kiosk-surface)",
+                color: isDanger ? "#B23A48" : "var(--kiosk-ink)",
+                fontFamily: "var(--kiosk-font-body)",
+              }}
+            >
+              <IconByName name={a.icon} className="h-4 w-4 shrink-0" />
+              <span
+                className="truncate text-xs font-semibold uppercase"
+                style={{ letterSpacing: "0.06em" }}
+              >
+                {a.label}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
+  if (style === "compact_row") {
+    return (
+      <div
+        className="flex items-center gap-2 overflow-x-auto px-3 py-2"
+        style={{
+          background: "var(--kiosk-surface)",
+          borderTop: "1px solid var(--kiosk-border)",
+        }}
+      >
+        {actions.map((a) => {
+          const isDanger = a.variant === "danger";
+          const isDisabled = !!disabled?.[a.code];
+          return (
+            <button
+              key={a.code}
+              type="button"
+              disabled={isDisabled}
+              onClick={() => onAction(a.code)}
+              className="inline-flex items-center gap-1.5 whitespace-nowrap border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-40"
+              style={{
+                borderRadius: "calc(var(--kiosk-radius) - 2px)",
+                borderColor: "var(--kiosk-border)",
+                background: "var(--kiosk-surface)",
+                color: isDanger ? "#B23A48" : "var(--kiosk-ink)",
+                fontFamily: "var(--kiosk-font-body)",
+              }}
+            >
+              <IconByName name={a.icon} className="h-3.5 w-3.5" />
+              {a.label}
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
+  // pill_grid (default)
+  return (
+    <div
+      className="flex flex-wrap items-center gap-2 px-3 py-3"
+      style={{
+        background: "var(--kiosk-surface)",
+        borderTop: "1px solid var(--kiosk-border)",
+      }}
+    >
+      {actions.map((a) => {
+        const isDanger = a.variant === "danger";
+        const isDisabled = !!disabled?.[a.code];
+        return (
+          <button
+            key={a.code}
+            type="button"
+            disabled={isDisabled}
+            onClick={() => onAction(a.code)}
+            className="inline-flex flex-1 items-center justify-center gap-2 border px-4 py-2.5 text-sm font-semibold transition-colors disabled:opacity-40 active:scale-[0.98]"
+            style={{
+              borderRadius: "var(--kiosk-radius)",
+              borderColor: "var(--kiosk-border)",
+              background: "var(--kiosk-surface)",
+              color: isDanger ? "#B23A48" : "var(--kiosk-ink)",
+              fontFamily: "var(--kiosk-font-body)",
+              minWidth: "8rem",
+            }}
+          >
+            <IconByName name={a.icon} className="h-4 w-4" />
+            {a.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export function KioskRender({
   theme,
   gridCols,
@@ -413,8 +906,12 @@ export function KioskRender({
   onPay,
   onClear,
   payDisabled,
+  onCartLineQtyChange,
+  onCartLineRemove,
   diningMode,
   onDiningChange,
+  onFooterAction,
+  footerActionDisabled,
   footerSlot,
   emptyState,
   className,
@@ -426,6 +923,19 @@ export function KioskRender({
   const pageButtons = buttons.filter((b) => b.page_id === activePageId);
   const isTabs = theme.layoutKind === "tabs_top";
   const showEmpty = !!emptyState && pageButtons.length === 0;
+  const showHeroDining =
+    theme.diningPlacement === "top_hero" && !!diningMode && !!onDiningChange;
+  const showHeaderPills =
+    theme.diningPlacement === "header_pills" && !!diningMode && !!onDiningChange;
+
+  const headerRightCombined = (
+    <>
+      {showHeaderPills && diningMode && onDiningChange && (
+        <DiningChip mode={diningMode} onChange={onDiningChange} />
+      )}
+      {headerRight}
+    </>
+  );
 
   return (
     <div
@@ -433,10 +943,11 @@ export function KioskRender({
       style={{ ...themeToVars(theme), background: "var(--kiosk-bg)", ...style }}
     >
       <KioskHeader
+        theme={theme}
         label={headerLabel}
         terminalCode={headerTerminalCode}
         operatorName={headerOperatorName}
-        right={headerRight}
+        right={headerRightCombined}
       />
       {canGoBack && onBack && (
         <div
@@ -459,21 +970,31 @@ export function KioskRender({
           />
         )}
         <div className="flex min-h-0 flex-1">
-          {showEmpty ? (
-            <div className="flex flex-1 items-center justify-center p-8 text-center">
-              {emptyState}
-            </div>
-          ) : (
-            <KeypadArea
-              gridCols={gridCols}
-              gridRows={gridRows}
-              buttons={pageButtons}
-              interactive={interactive}
-              onButtonClick={onButtonClick}
-              pageBg={activePage?.background_color}
-            />
-          )}
+          <div className="flex min-w-0 flex-1 flex-col">
+            {showHeroDining && diningMode && onDiningChange && (
+              <HeroDiningPills
+                mode={diningMode}
+                onChange={onDiningChange}
+                style={theme.diningPillStyle}
+              />
+            )}
+            {showEmpty ? (
+              <div className="flex flex-1 items-center justify-center p-8 text-center">
+                {emptyState}
+              </div>
+            ) : (
+              <KeypadArea
+                gridCols={gridCols}
+                gridRows={gridRows}
+                buttons={pageButtons}
+                interactive={interactive}
+                onButtonClick={onButtonClick}
+                pageBg={activePage?.background_color}
+              />
+            )}
+          </div>
           <CartPane
+            theme={theme}
             cart={cart}
             total={total}
             onPay={onPay}
@@ -481,17 +1002,26 @@ export function KioskRender({
             payDisabled={payDisabled}
             diningMode={diningMode}
             onDiningChange={onDiningChange}
+            onCartLineQtyChange={onCartLineQtyChange}
+            onCartLineRemove={onCartLineRemove}
           />
         </div>
       </div>
-      {footerSlot && (
+      {footerSlot ? (
         <div
           className="border-t px-3 py-2"
           style={{ borderColor: "var(--kiosk-border)", background: "var(--kiosk-surface)" }}
         >
           {footerSlot}
         </div>
-      )}
+      ) : onFooterAction ? (
+        <FooterActionBar
+          actions={theme.footerActions}
+          style={theme.footerStyle}
+          onAction={onFooterAction}
+          disabled={footerActionDisabled}
+        />
+      ) : null}
     </div>
   );
 }
