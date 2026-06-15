@@ -14,6 +14,7 @@ import {
 import { CloseSessionModal } from "@/kiosk/components/CloseSessionModal";
 import { PaymentModal } from "@/kiosk/components/PaymentModal";
 import { KakebyggerModal } from "@/kiosk/components/KakebyggerModal";
+import { HenteordreModal, type PickupOrderRow, type PickupOrderLine } from "@/kiosk/components/HenteordreModal";
 import { ReceiptView } from "@/kiosk/components/ReceiptView";
 import { useTerminal } from "@/kiosk/context/TerminalContext";
 import { useOperator } from "@/kiosk/context/OperatorContext";
@@ -120,6 +121,8 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
   const [closeSessionOpen, setCloseSessionOpen] = useState(false);
   const [clearOpen, setClearOpen] = useState(false);
   const [kakebyggerOpen, setKakebyggerOpen] = useState(false);
+  const [henteordreOpen, setHenteordreOpen] = useState(false);
+  const [activePickupOrderId, setActivePickupOrderId] = useState<string | null>(null);
   const [printingReceipt, setPrintingReceipt] = useState(false);
   const [receipt, setReceipt] = useState<{
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -201,6 +204,10 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
           setKakebyggerOpen(true);
           return;
         }
+        if (b.function_code === "henteordre") {
+          setHenteordreOpen(true);
+          return;
+        }
         toast.info(`${b.display_label ?? b.function_code ?? "Funksjon"}: bygges senere`);
         return;
       default:
@@ -267,6 +274,13 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
       setReceipt(r);
       setLastReceipt(r);
       setPayOpen(false);
+      if (activePickupOrderId) {
+        await kioskSupabase.rpc("pos_complete_pickup_order" as never, {
+          p_order_id: activePickupOrderId,
+          p_pos_transaction_id: id,
+        } as never);
+        setActivePickupOrderId(null);
+      }
 
       void broadcastSaleComplete(channel, {
         receipt_number: (tx as { receipt_number: string | null }).receipt_number ?? null,
@@ -598,7 +612,92 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
         onOpenChange={setKakebyggerOpen}
         legalEntityId={operator?.legal_entity_id ?? terminal?.legal_entity_id ?? null}
         priceListId={priceListId}
+        defaultPickupLocationId={terminal?.outlet_id ?? null}
+        onCakeComplete={async (result) => {
+          const leId = operator?.legal_entity_id ?? terminal?.legal_entity_id ?? null;
+          if (!leId) {
+            toast.error("Mangler legal entity for terminalen");
+            return;
+          }
+          try {
+            const { data, error } = await kioskSupabase.rpc(
+              "pos_create_cake_order" as never,
+              {
+                p_payload: {
+                  legal_entity_id: leId,
+                  pickup_location_id:
+                    result.customer_meta?.pickup_location_id ?? terminal?.outlet_id ?? null,
+                  pickup_date: result.customer_meta?.pickup_date,
+                  customer_name: result.customer_meta?.name,
+                  customer_phone: result.customer_meta?.phone,
+                  customer_email: result.customer_meta?.email,
+                  payment_mode: result.payment_mode ?? "later",
+                  cake_result: result,
+                },
+              } as never,
+            );
+            if (error) throw error;
+            const created = data as unknown as { order_number: string; order_id: string };
+            toast.success(`Henteordre #${created.order_number} opprettet`);
+            if (result.payment_mode === "now") {
+              setActivePickupOrderId(created.order_id);
+              cart.addItem({
+                product_id: result.order_line.product_id,
+                product_snapshot: {
+                  display_name: result.order_line.display_name,
+                  display_number: String(result.order_line.display_number ?? ""),
+                  unit: "stk",
+                  mva_rate: result.order_line.vat_rate,
+                },
+                quantity: result.order_line.quantity,
+                unit_price_excl_mva: result.order_line.unit_price_excl_vat,
+                mva_rate: result.order_line.vat_rate,
+              });
+              for (const acc of result.accessory_lines) {
+                cart.addItem({
+                  product_id: acc.product_id,
+                  product_snapshot: {
+                    display_name: acc.display_name,
+                    display_number: String(acc.display_number ?? ""),
+                    unit: "stk",
+                    mva_rate: acc.vat_rate,
+                  },
+                  quantity: acc.quantity,
+                  unit_price_excl_mva: acc.unit_price_excl_vat,
+                  mva_rate: acc.vat_rate,
+                });
+              }
+            }
+          } catch (e) {
+            toast.error("Kunne ikke opprette henteordre", { description: (e as Error).message });
+          }
+        }}
       />
+      <HenteordreModal
+        open={henteordreOpen}
+        onOpenChange={setHenteordreOpen}
+        legalEntityId={operator?.legal_entity_id ?? terminal?.legal_entity_id ?? null}
+        pickupLocationId={terminal?.outlet_id ?? null}
+        onLoadOrder={(order, lines) => {
+          setActivePickupOrderId(order.id);
+          for (const l of lines) {
+            cart.addItem({
+              product_id: l.product_id,
+              product_snapshot: {
+                display_name: l.product_snapshot?.display_name ?? "Henteordre-linje",
+                display_number: "",
+                unit: l.product_snapshot?.unit ?? "stk",
+                mva_rate: l.mva_rate,
+              },
+              quantity: l.quantity,
+              unit_price_excl_mva: l.unit_price_excl_mva,
+              mva_rate: l.mva_rate,
+            });
+          }
+          toast.success(`Henteordre #${order.order_number} lastet inn i kurv`);
+        }}
+      />
+
       <AlertDialog open={clearOpen} onOpenChange={setClearOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>

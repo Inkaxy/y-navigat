@@ -3618,6 +3618,7 @@ export type Database = {
       }
       orders: {
         Row: {
+          cake_payload: Json | null
           cancelled_at: string | null
           cancelled_by: string | null
           cancelled_reason: string | null
@@ -3654,8 +3655,10 @@ export type Database = {
           order_sequence: number
           order_year: number
           ordered_at: string
+          payment_mode: string | null
           picked_up_at: string | null
           picked_up_by: string | null
+          pickup_location_id: string | null
           previous_status_before_hold: string | null
           production_notes: string | null
           recurring_schedule_id: string | null
@@ -3676,6 +3679,7 @@ export type Database = {
           use_customer_default_address: boolean
         }
         Insert: {
+          cake_payload?: Json | null
           cancelled_at?: string | null
           cancelled_by?: string | null
           cancelled_reason?: string | null
@@ -3712,8 +3716,10 @@ export type Database = {
           order_sequence: number
           order_year: number
           ordered_at?: string
+          payment_mode?: string | null
           picked_up_at?: string | null
           picked_up_by?: string | null
+          pickup_location_id?: string | null
           previous_status_before_hold?: string | null
           production_notes?: string | null
           recurring_schedule_id?: string | null
@@ -3734,6 +3740,7 @@ export type Database = {
           use_customer_default_address?: boolean
         }
         Update: {
+          cake_payload?: Json | null
           cancelled_at?: string | null
           cancelled_by?: string | null
           cancelled_reason?: string | null
@@ -3770,8 +3777,10 @@ export type Database = {
           order_sequence?: number
           order_year?: number
           ordered_at?: string
+          payment_mode?: string | null
           picked_up_at?: string | null
           picked_up_by?: string | null
+          pickup_location_id?: string | null
           previous_status_before_hold?: string | null
           production_notes?: string | null
           recurring_schedule_id?: string | null
@@ -3860,6 +3869,13 @@ export type Database = {
             columns: ["legal_entity_id"]
             isOneToOne: false
             referencedRelation: "legal_entities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_pickup_location_id_fkey"
+            columns: ["pickup_location_id"]
+            isOneToOne: false
+            referencedRelation: "pickup_locations"
             referencedColumns: ["id"]
           },
           {
@@ -9567,6 +9583,11 @@ export type Database = {
         }
         Returns: undefined
       }
+      pos_complete_pickup_order: {
+        Args: { p_order_id: string; p_pos_transaction_id?: string }
+        Returns: undefined
+      }
+      pos_create_cake_order: { Args: { p_payload: Json }; Returns: Json }
       pos_create_operator: {
         Args: {
           p_display_name: string
@@ -9586,6 +9607,26 @@ export type Database = {
         }
         Returns: string
       }
+      pos_list_pickup_orders: {
+        Args: {
+          p_date: string
+          p_legal_entity_id: string
+          p_pickup_location_id: string
+        }
+        Returns: {
+          delivery_date: string
+          final_customer_name: string
+          final_customer_phone: string
+          id: string
+          is_paid: boolean
+          order_number: string
+          payment_mode: string
+          picked_up_at: string
+          status: string
+          total_incl_vat: number
+        }[]
+      }
+      pos_load_pickup_order: { Args: { p_order_id: string }; Returns: Json }
       pos_next_receipt_number: {
         Args: { p_terminal_id: string }
         Returns: {

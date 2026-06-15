@@ -10,6 +10,7 @@ export const KEYPAD_FUNCTIONS: KeypadFunctionDef[] = [
   { code: "price_override", label: "Overstyr pris" },
   { code: "customer_lookup", label: "Søk kunde" },
   { code: "kakebygger", label: "Kakebygger" },
+  { code: "henteordre", label: "Henteordre" },
 ];
 
 export function functionLabel(code: string | null | undefined): string | null {

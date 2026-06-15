@@ -20,6 +20,8 @@ import { SingleSelectStep } from "./steps/SingleSelectStep";
 import { MultiSelectStep } from "./steps/MultiSelectStep";
 import { TextInputStep } from "./steps/TextInputStep";
 import { NumberInputStep } from "./steps/NumberInputStep";
+import { CustomerStartStep, type CustomerMeta } from "./components/CustomerStartStep";
+import { PaymentChoiceStep, type PaymentMode } from "./components/PaymentChoiceStep";
 import type { CakeAccessoryLine, CakeConfig, CakeLabelPayload, CakeOrderLine, CakeResult, PriceBreakdown, WizardRule, WizardStep } from "./types";
 import { evaluateRule } from "./ruleEvaluation";
 import { supabase } from "@/integrations/supabase/client";
@@ -30,6 +32,7 @@ export interface CakeBuilderProps {
   categoryId: string;
   priceListId: string;
   legalEntityId: string;
+  defaultPickupLocationId?: string | null;
   /** F1.3: pre-fill from existing config. Skeleton only — not implemented in F1.2. */
   initialConfig?: CakeConfig;
   showVatToggle?: boolean;
@@ -48,8 +51,9 @@ export interface CakeBuilderProps {
 export function CakeBuilder({
   categoryId,
   priceListId,
-  legalEntityId: _legalEntityId,
-  initialConfig: _initialConfig, // TODO F1.3: pre-fill state from initialConfig (single/multi/text/number selections) + hopp til siste steg / summary-view
+  legalEntityId,
+  defaultPickupLocationId,
+  initialConfig: _initialConfig,
   showVatToggle = true,
   onPriceChange,
   onComplete,
@@ -76,11 +80,24 @@ export function CakeBuilder({
     }
   }, [showVat]);
 
+  const [phase, setPhase] = useState<"customer" | "step" | "summary" | "payment">(
+    "customer",
+  );
   const [stepIndex, setStepIndex] = useState(0);
-  const [isSummary, setIsSummary] = useState(false);
+  const isSummary = phase === "summary";
+  const isCustomer = phase === "customer";
+  const isPayment = phase === "payment";
   /** Confirmation state shown after the user clicks "Ferdig". Holds the result so we can show ordrebekreftelse. */
   const [confirmedResult, setConfirmedResult] = useState<CakeResult | null>(null);
   const [isFinalizing, setIsFinalizing] = useState(false);
+  const [customerMeta, setCustomerMeta] = useState<CustomerMeta>({
+    pickup_date: null,
+    pickup_location_id: defaultPickupLocationId ?? null,
+    name: "",
+    phone: "",
+    email: "",
+  });
+  const [paymentMode, setPaymentMode] = useState<PaymentMode | null>(null);
   // Per-step selections
   const [singleSelections, setSingleSelections] = useState<Record<string, string>>({});
   const [multiSelections, setMultiSelections] = useState<Record<string, string[]>>({});
@@ -355,7 +372,30 @@ export function CakeBuilder({
     return null;
   }, [currentStep, singleSelections, multiSelections, textInputs]);
 
-  const canProceed = !stepValidation && !blockingRule;
+  // Customer-meta validering
+  const customerValidation = useMemo(() => {
+    if (!isCustomer) return null;
+    if (!customerMeta.pickup_date) return "Velg hentedato.";
+    if (!customerMeta.pickup_location_id) return "Velg hentested.";
+    if (!customerMeta.name.trim()) return "Skriv inn navn.";
+    if (!customerMeta.phone.trim()) return "Skriv inn telefonnummer.";
+    if (customerMeta.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerMeta.email.trim())) {
+      return "Ugyldig e-postadresse.";
+    }
+    return null;
+  }, [isCustomer, customerMeta]);
+
+  const paymentValidation = useMemo(() => {
+    if (!isPayment) return null;
+    if (!paymentMode) return "Velg om kunden betaler nå eller ved henting.";
+    return null;
+  }, [isPayment, paymentMode]);
+
+  const canProceed = isCustomer
+    ? !customerValidation
+    : isPayment
+      ? !paymentValidation
+      : !stepValidation && !blockingRule;
 
   // ─── Render states ─────────────────────────────────────────────────────────
 
@@ -475,6 +515,8 @@ export function CakeBuilder({
         order_line: payload.order_line,
         accessory_lines: payload.accessory_lines ?? [],
         label_payload: payload.label_payload,
+        customer_meta: { ...customerMeta },
+        payment_mode: paymentMode ?? "later",
       };
       setConfirmedResult(result);
     } catch (e) {
@@ -718,12 +760,22 @@ export function CakeBuilder({
     );
   }
 
+  // Header step counter: customer = 0, steps 1..N, summary = N+1, payment = N+2
+  const headerTotalSteps = steps.length + 3;
+  const headerStepIndex = isCustomer
+    ? 0
+    : isSummary
+      ? steps.length + 1
+      : isPayment
+        ? steps.length + 2
+        : stepIndex + 1;
+
   return (
     <div className="flex flex-col h-full bg-background">
       <StepHeader
         categoryName={wizard.category.name}
-        stepIndex={isSummary ? steps.length : stepIndex}
-        totalSteps={steps.length}
+        stepIndex={headerStepIndex}
+        totalSteps={headerTotalSteps}
         totalExMva={price?.total_ex_mva ?? wizard.category.base_price ?? 0}
         totalIncMva={price?.total_inc_mva ?? wizard.category.base_price ?? 0}
         showVat={showVat}
@@ -733,18 +785,48 @@ export function CakeBuilder({
       />
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {isSummary ? (
+        {isCustomer ? (
+          <CustomerStartStep
+            legalEntityId={legalEntityId}
+            defaultPickupLocationId={defaultPickupLocationId}
+            value={customerMeta}
+            onChange={setCustomerMeta}
+          />
+        ) : isPayment ? (
+          <PaymentChoiceStep
+            value={paymentMode}
+            onChange={setPaymentMode}
+            totalIncMva={price?.total_inc_mva ?? 0}
+          />
+        ) : isSummary ? (
           <div className="space-y-4">
             <div>
               <h2 className="text-xl font-semibold">Oppsummering</h2>
               <p className="text-sm text-muted-foreground mt-1">
-                Sjekk at alt stemmer før du bekrefter bestillingen.
+                Sjekk at alt stemmer før du velger betaling.
               </p>
             </div>
 
             {activeRules.length > 0 && (
               <RuleList rules={activeRules} onAction={handleRuleAction} />
             )}
+
+            <div className="rounded-md border bg-card divide-y">
+              <div className="px-4 py-3 grid grid-cols-[140px_1fr] gap-x-4 gap-y-1 text-sm">
+                <div className="text-muted-foreground">Hentedato</div>
+                <div>{customerMeta.pickup_date ?? "—"}</div>
+                <div className="text-muted-foreground">Kunde</div>
+                <div>{customerMeta.name || "—"}</div>
+                <div className="text-muted-foreground">Telefon</div>
+                <div>{customerMeta.phone || "—"}</div>
+                {customerMeta.email && (
+                  <>
+                    <div className="text-muted-foreground">E-post</div>
+                    <div>{customerMeta.email}</div>
+                  </>
+                )}
+              </div>
+            </div>
 
             <div className="rounded-md border divide-y bg-card">
               {summaryLines.map((line, i) => (
@@ -825,28 +907,51 @@ export function CakeBuilder({
       </div>
 
       <StepNav
-        isFirst={!isSummary && stepIndex === 0}
-        isLast={isSummary}
-        canProceed={isSummary ? Boolean(price) && !blockingRule : canProceed}
+        isFirst={isCustomer}
+        isLast={isPayment}
+        canProceed={
+          isCustomer
+            ? !customerValidation
+            : isPayment
+              ? !paymentValidation
+              : isSummary
+                ? Boolean(price) && !blockingRule
+                : canProceed
+        }
         onBack={() => {
-          if (isSummary) setIsSummary(false);
+          if (isPayment) setPhase("summary");
+          else if (isSummary) setPhase("step");
+          else if (phase === "step" && stepIndex === 0) setPhase("customer");
           else setStepIndex((i) => Math.max(0, i - 1));
         }}
         onNext={() => {
-          if (stepIndex === steps.length - 1) setIsSummary(true);
-          else setStepIndex((i) => Math.min(steps.length - 1, i + 1));
+          if (isCustomer) {
+            setPhase("step");
+            setStepIndex(0);
+          } else if (isSummary) {
+            setPhase("payment");
+          } else if (stepIndex === steps.length - 1) {
+            setPhase("summary");
+          } else {
+            setStepIndex((i) => Math.min(steps.length - 1, i + 1));
+          }
         }}
         onComplete={handleConfirmStep}
         onCancel={onCancel}
         isCompleting={isFinalizing}
         validationMessage={
-          isSummary
-            ? blockingRule
-              ? blockingRule.message
-              : null
-            : (stepValidation ?? (blockingRule ? blockingRule.message : null))
+          isCustomer
+            ? customerValidation
+            : isPayment
+              ? paymentValidation
+              : isSummary
+                ? blockingRule
+                  ? blockingRule.message
+                  : null
+                : (stepValidation ?? (blockingRule ? blockingRule.message : null))
         }
       />
+
 
       {/* Popup-dialog for høyest-prioritet aktive varsel/blokk-regel */}
       <Dialog
