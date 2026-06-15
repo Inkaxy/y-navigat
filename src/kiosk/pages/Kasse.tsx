@@ -757,33 +757,4 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
   );
 }
 
-function ActionBtn({
-  onClick,
-  icon,
-  children,
-  disabled,
-}: {
-  onClick: () => void;
-  icon: React.ReactNode;
-  children: React.ReactNode;
-  disabled?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className="flex flex-1 items-center justify-center gap-2 px-4 py-3 text-sm font-semibold transition-opacity disabled:opacity-40"
-      style={{
-        borderRadius: "var(--kiosk-radius)",
-        background: "var(--kiosk-surface)",
-        color: "var(--kiosk-ink)",
-        border: "1px solid var(--kiosk-border)",
-        fontFamily: "var(--kiosk-font-body)",
-      }}
-    >
-      {icon}
-      {children}
-    </button>
-  );
-}
+
