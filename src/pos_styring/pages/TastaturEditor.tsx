@@ -252,7 +252,7 @@ function DroppableCell({ x, y, children }: { x: number; y: number; children?: Re
   );
 }
 
-function KeypadButtonTile({ button, layout, dragging, onResizePointerDown }: { button: KeypadButton; layout?: KeypadLayoutDetail; dragging?: boolean; onResizePointerDown?: (event: React.PointerEvent<HTMLDivElement>) => void }) {
+function KeypadButtonTile({ button, layout, dragging, resizing, resizePreview, onResizePointerDown }: { button: KeypadButton; layout?: KeypadLayoutDetail; dragging?: boolean; resizing?: boolean; resizePreview?: { width: number; height: number } | null; onResizePointerDown?: (event: React.PointerEvent<HTMLDivElement>) => void }) {
   const notInPos = button.button_type === "product" && button.product && button.product.in_pos === false;
   const showImage = button.show_image ?? layout?.show_product_image ?? true;
 
@@ -296,8 +296,13 @@ function KeypadButtonTile({ button, layout, dragging, onResizePointerDown }: { b
   const bgImage = showImage ? (button.image_url || signedFromPath) : "";
   return (
     <div
-      className={cn("relative flex h-full w-full overflow-hidden rounded-md border border-primary/20 bg-primary/15 p-2 text-left text-sm font-semibold shadow-card transition hover:ring-2 hover:ring-ring", dragging && "opacity-60", notInPos && "border-destructive/60 ring-1 ring-destructive/40")}
-      style={{ backgroundColor: button.background_color ?? undefined, color: button.text_color ?? undefined }}
+      className={cn("relative flex h-full w-full overflow-hidden rounded-md border border-primary/20 bg-primary/15 p-2 text-left text-sm font-semibold shadow-card transition hover:ring-2 hover:ring-ring", dragging && "opacity-60", resizing && "ring-2 ring-ring", notInPos && "border-destructive/60 ring-1 ring-destructive/40")}
+      style={{
+        backgroundColor: button.background_color ?? undefined,
+        color: button.text_color ?? undefined,
+        width: resizePreview?.width,
+        height: resizePreview?.height,
+      }}
     >
       {bgImage && <span className="absolute inset-0 bg-cover bg-center opacity-60" style={{ backgroundImage: `url(${bgImage})` }} />}
       {notInPos && (
@@ -306,7 +311,7 @@ function KeypadButtonTile({ button, layout, dragging, onResizePointerDown }: { b
         </span>
       )}
       <span className="relative z-10 line-clamp-3 self-end rounded-sm bg-background/75 px-1.5 py-1 text-foreground">{buttonLabel(button)}</span>
-      {onResizePointerDown && !dragging && (
+      {onResizePointerDown && !dragging && !resizing && (
         <ResizeHandle onPointerDown={onResizePointerDown} />
       )}
     </div>
