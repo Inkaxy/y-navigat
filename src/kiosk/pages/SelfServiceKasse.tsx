@@ -416,7 +416,12 @@ function SelfServiceFlow({ data, loading, loadError }: FlowProps) {
         tx={receipt?.tx ?? null}
         lines={receipt?.lines ?? []}
         terminalName={terminal?.display_name ?? ""}
+        terminalId={terminal?.id ?? null}
+        operatorCode={operator?.code ?? null}
+        company={receiptHeader.company}
+        outlet={receiptHeader.outlet}
         onNewSale={handleNewSale}
+
         // Selvbetjent: ingen kvitterings-print her, antas autoprint senere
         onPrintReceipt={async () => {
           toast.info("Kvittering sendes automatisk i selvbetjent modus");
