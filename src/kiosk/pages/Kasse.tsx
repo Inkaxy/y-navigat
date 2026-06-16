@@ -388,12 +388,16 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
             transaction: r.tx,
             lines: r.lines,
             terminal_name: terminal.display_name,
+            terminal_id: terminal.id,
             operator_name: operator?.display_name ?? null,
+            operator_code: operator?.code ?? null,
             company,
+            outlet: receiptHeader.outlet,
             footer_lines,
           },
           status: "queued",
         });
+
       if (jErr) throw jErr;
       toast.success("Kvittering lagt i utskriftskø");
     } catch (e) {
