@@ -274,6 +274,34 @@ export function NavnOgNummerTab({ product, canWrite, hasGs1Prefix }: Props) {
             />
           </div>
 
+          <div>
+            <Label>Sitt her-MVA (matvare)</Label>
+            <Controller
+              control={control}
+              name="eatin_mva_rate"
+              render={({ field }) => (
+                <Select
+                  value={field.value == null ? "none" : String(field.value)}
+                  onValueChange={(v) =>
+                    field.onChange(v === "none" ? null : Number(v))
+                  }
+                  disabled={!canWrite}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Ikke matvare (samme sats)</SelectItem>
+                    {MVA_RATES.map((r) => (
+                      <SelectItem key={r.value} value={String(r.value)}>{r.label} ved sitt her</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Settes for mat/drikke. Da brukes denne satsen når kunden velger «Sitt her», og ordinær sats over ved «Ta med».
+            </p>
+          </div>
+
           <Controller
             control={control}
             name="mva_always_included"

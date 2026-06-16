@@ -209,6 +209,7 @@ export const FIELD_TO_TAB: Record<keyof ProductFormValues, string> = {
   gtin: "navn",
   epd_number: "navn",
   mva_rate: "navn",
+  eatin_mva_rate: "navn",
   mva_always_included: "navn",
   account_reference: "navn",
 
