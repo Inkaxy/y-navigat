@@ -172,7 +172,8 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
           mva_rate: p.mva_rate,
         },
         unit_price_excl_mva: p.unit_price_excl_mva,
-        mva_rate: p.mva_rate,
+        base_mva_rate: p.mva_rate,
+        eatin_mva_rate: p.eatin_mva_rate,
         quantity: 1,
       });
     } catch (e) {
@@ -235,8 +236,9 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
     }
     const VALID = new Set([0, 12, 15, 25]);
     for (const it of cart.items) {
-      if (!VALID.has(it.mva_rate)) {
-        setRpcError(`Ugyldig mva-sats ${it.mva_rate}% på «${it.product_snapshot.display_name}»`);
+      const eff = cart.effectiveMvaRate(it);
+      if (!VALID.has(eff)) {
+        setRpcError(`Ugyldig mva-sats ${eff}% på «${it.product_snapshot.display_name}»`);
         return;
       }
     }
@@ -244,7 +246,7 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
     setSubmitting(true);
     setRpcError(null);
     try {
-      const linesPayload = cart.items.map(toLinePayload);
+      const linesPayload = cart.items.map((it) => toLinePayload(it, cart.diningMode));
       const { data: txId, error } = await kioskSupabase.rpc(
         "pos_record_sale" as never,
         {
