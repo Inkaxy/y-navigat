@@ -16,7 +16,9 @@ import { PaymentModal } from "@/kiosk/components/PaymentModal";
 import { KakebyggerModal } from "@/kiosk/components/KakebyggerModal";
 import { HenteordreModal, type PickupOrderRow, type PickupOrderLine } from "@/kiosk/components/HenteordreModal";
 import { ReceiptView } from "@/kiosk/components/ReceiptView";
+import { useReceiptHeader } from "@/kiosk/hooks/useReceiptHeader";
 import { useTerminal } from "@/kiosk/context/TerminalContext";
+
 import { useOperator } from "@/kiosk/context/OperatorContext";
 import { useKioskChannel } from "@/kiosk/context/RealtimeContext";
 import { useSession } from "@/kiosk/context/SessionContext";
@@ -118,6 +120,11 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
 
   const priceListId = terminal?.default_price_list_id ?? null;
   const { data: priceListCfg } = usePriceListConfig(priceListId);
+  const receiptHeader = useReceiptHeader(
+    operator?.legal_entity_id ?? terminal?.legal_entity_id ?? null,
+    terminal?.outlet_id ?? null,
+  );
+
   const lookupProduct = useProductLookup(
     priceListId,
     priceListCfg?.prices_include_mva ?? false,
@@ -381,12 +388,17 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
             transaction: r.tx,
             lines: r.lines,
             terminal_name: terminal.display_name,
+            terminal_id: terminal.id,
             operator_name: operator?.display_name ?? null,
+            operator_code: operator?.code ?? null,
             company,
+            outlet: receiptHeader.outlet,
             footer_lines,
-          },
+          } as unknown as never,
+
           status: "queued",
         });
+
       if (jErr) throw jErr;
       toast.success("Kvittering lagt i utskriftskø");
     } catch (e) {
@@ -643,10 +655,15 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
         tx={receipt?.tx ?? null}
         lines={receipt?.lines ?? []}
         terminalName={terminal?.display_name ?? ""}
+        terminalId={terminal?.id ?? null}
+        operatorCode={operator?.code ?? null}
+        company={receiptHeader.company}
+        outlet={receiptHeader.outlet}
         onNewSale={handleNewSale}
         onPrintReceipt={handlePrintReceipt}
         printingReceipt={printingReceipt}
       />
+
       {sessionOpen && (
         <CloseSessionModal
           open={closeSessionOpen}

@@ -12,6 +12,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { ReceiptView } from "@/kiosk/components/ReceiptView";
+import { useReceiptHeader } from "@/kiosk/hooks/useReceiptHeader";
+
 import { useTerminal } from "@/kiosk/context/TerminalContext";
 import { useOperator } from "@/kiosk/context/OperatorContext";
 import { useKioskChannel } from "@/kiosk/context/RealtimeContext";
@@ -99,6 +101,11 @@ function SelfServiceFlow({ data, loading, loadError }: FlowProps) {
 
   const priceListId = terminal?.default_price_list_id ?? null;
   const { data: priceListCfg } = usePriceListConfig(priceListId);
+  const receiptHeader = useReceiptHeader(
+    operator?.legal_entity_id ?? terminal?.legal_entity_id ?? null,
+    terminal?.outlet_id ?? null,
+  );
+
   const lookupProduct = useProductLookup(
     priceListId,
     priceListCfg?.prices_include_mva ?? false,
@@ -409,7 +416,12 @@ function SelfServiceFlow({ data, loading, loadError }: FlowProps) {
         tx={receipt?.tx ?? null}
         lines={receipt?.lines ?? []}
         terminalName={terminal?.display_name ?? ""}
+        terminalId={terminal?.id ?? null}
+        operatorCode={operator?.code ?? null}
+        company={receiptHeader.company}
+        outlet={receiptHeader.outlet}
         onNewSale={handleNewSale}
+
         // Selvbetjent: ingen kvitterings-print her, antas autoprint senere
         onPrintReceipt={async () => {
           toast.info("Kvittering sendes automatisk i selvbetjent modus");
