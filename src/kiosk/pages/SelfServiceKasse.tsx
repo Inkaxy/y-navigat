@@ -12,6 +12,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { ReceiptView } from "@/kiosk/components/ReceiptView";
+import { useReceiptHeader } from "@/kiosk/hooks/useReceiptHeader";
+
 import { useTerminal } from "@/kiosk/context/TerminalContext";
 import { useOperator } from "@/kiosk/context/OperatorContext";
 import { useKioskChannel } from "@/kiosk/context/RealtimeContext";
