@@ -369,6 +369,7 @@ function ButtonDialog({ open, onOpenChange, pageId, layout, buttons, pages, cell
       text_color: "",
       grid_width: 1,
       grid_height: 1,
+      hidden_in_self_service: false,
     },
   });
 
@@ -395,6 +396,7 @@ function ButtonDialog({ open, onOpenChange, pageId, layout, buttons, pages, cell
       text_color: button?.text_color ?? "",
       grid_width: button?.grid_width ?? 1,
       grid_height: button?.grid_height ?? 1,
+      hidden_in_self_service: button?.hidden_in_self_service ?? false,
     });
     setProductSearch("");
   }, [button, form, open]);
