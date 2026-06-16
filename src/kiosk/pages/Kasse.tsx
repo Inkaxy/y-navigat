@@ -464,7 +464,7 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
       line_total:
         Math.round(
           (it.quantity * it.unit_price_excl_mva - it.line_discount) *
-            (1 + it.mva_rate / 100) *
+            (1 + cart.effectiveMvaRate(it) / 100) *
             100,
         ) / 100,
       image_url: signed ?? fallback ?? null,
