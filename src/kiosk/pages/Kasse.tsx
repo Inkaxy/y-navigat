@@ -16,7 +16,9 @@ import { PaymentModal } from "@/kiosk/components/PaymentModal";
 import { KakebyggerModal } from "@/kiosk/components/KakebyggerModal";
 import { HenteordreModal, type PickupOrderRow, type PickupOrderLine } from "@/kiosk/components/HenteordreModal";
 import { ReceiptView } from "@/kiosk/components/ReceiptView";
+import { useReceiptHeader } from "@/kiosk/hooks/useReceiptHeader";
 import { useTerminal } from "@/kiosk/context/TerminalContext";
+
 import { useOperator } from "@/kiosk/context/OperatorContext";
 import { useKioskChannel } from "@/kiosk/context/RealtimeContext";
 import { useSession } from "@/kiosk/context/SessionContext";
