@@ -679,6 +679,22 @@ function ButtonDialog({ open, onOpenChange, pageId, layout, buttons, pages, cell
               )} />
             </div>
 
+            <FormField control={form.control} name="hidden_in_self_service" render={({ field }) => (
+              <FormItem className="flex flex-row items-center justify-between rounded-md border bg-muted/40 p-3">
+                <div className="space-y-1">
+                  <FormLabel>Skjul i selvbetjent kasse</FormLabel>
+                  <p className="text-xs text-muted-foreground">
+                    Funksjonsknapper (rabatt, parker ordre, åpne skuff, etc.) er som standard alltid skjult i selvbetjent. Bruk denne for å skjule produkt- eller kategori-knapper kunder ikke skal se.
+                  </p>
+                </div>
+                <FormControl>
+                  <Switch checked={!!field.value} onCheckedChange={field.onChange} />
+                </FormControl>
+              </FormItem>
+            )} />
+
+
+
             <DialogFooter className="gap-2 sm:justify-between">
               {isEdit ? <Button type="button" variant="destructive" onClick={() => deleteMutation.mutate()}><Trash2 className="h-4 w-4" /> Slett</Button> : <span />}
               <div className="flex gap-2">
