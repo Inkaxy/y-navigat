@@ -18,6 +18,7 @@ export type KeypadButton = {
   grid_width: number;
   grid_height: number;
   target_page_id: string | null;
+  hidden_in_self_service: boolean | null;
 };
 
 export type KeypadPage = {
