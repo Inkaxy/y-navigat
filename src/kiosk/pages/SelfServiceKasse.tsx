@@ -101,6 +101,11 @@ function SelfServiceFlow({ data, loading, loadError }: FlowProps) {
 
   const priceListId = terminal?.default_price_list_id ?? null;
   const { data: priceListCfg } = usePriceListConfig(priceListId);
+  const receiptHeader = useReceiptHeader(
+    operator?.legal_entity_id ?? terminal?.legal_entity_id ?? null,
+    terminal?.outlet_id ?? null,
+  );
+
   const lookupProduct = useProductLookup(
     priceListId,
     priceListCfg?.prices_include_mva ?? false,
