@@ -287,6 +287,7 @@ function SelfServiceFlow({ data, loading, loadError }: FlowProps) {
     const productPath = it.product_id ? data?.productPrimaryPaths[it.product_id] ?? null : null;
     const signed = productPath ? data?.imageUrls[productPath] ?? null : null;
     const fallback = it.product_id ? data?.productFallbackUrls[it.product_id] ?? null : null;
+    const effRate = cart.effectiveMvaRate(it);
     return {
       id: it.id,
       label: it.product_snapshot.display_name,
@@ -295,10 +296,14 @@ function SelfServiceFlow({ data, loading, loadError }: FlowProps) {
       line_total:
         Math.round(
           (it.quantity * it.unit_price_excl_mva - it.line_discount) *
-            (1 + cart.effectiveMvaRate(it) / 100) *
+            (1 + effRate / 100) *
             100,
         ) / 100,
       image_url: signed ?? fallback ?? null,
+      dining_mode: (it.dining_mode_override ?? cart.diningMode) as "takeaway" | "eatin",
+      is_food: it.eatin_mva_rate != null,
+      dining_overridden: it.dining_mode_override != null,
+      mva_rate: effRate,
     };
   });
 
