@@ -643,10 +643,15 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
         tx={receipt?.tx ?? null}
         lines={receipt?.lines ?? []}
         terminalName={terminal?.display_name ?? ""}
+        terminalId={terminal?.id ?? null}
+        operatorCode={operator?.code ?? null}
+        company={receiptHeader.company}
+        outlet={receiptHeader.outlet}
         onNewSale={handleNewSale}
         onPrintReceipt={handlePrintReceipt}
         printingReceipt={printingReceipt}
       />
+
       {sessionOpen && (
         <CloseSessionModal
           open={closeSessionOpen}
