@@ -81,6 +81,8 @@ interface Terminal {
   default_price_list_id: string | null;
   logo_url: string | null;
   customer_screen_mode: CustomerScreenMode;
+  terminal_mode: "cashier" | "self_service";
+  self_service_operator_id: string | null;
   updated_at: string;
   outlet?: {
     display_name: string;
@@ -129,7 +131,11 @@ const terminalSchema = z.object({
     .optional()
     .or(z.literal("")),
   customer_screen_mode: z.enum(["logo_only", "logo_and_cart"]),
+  terminal_mode: z.enum(["cashier", "self_service"]),
+  self_service_operator_id: z.string(),
 });
+
+const NO_OPERATOR = "__none__";
 
 type TerminalFormValues = z.infer<typeof terminalSchema>;
 
@@ -185,7 +191,7 @@ async function fetchTerminals(activeEntityId: string): Promise<Terminal[]> {
   const { data, error } = await supabase
     .from("pos_terminals")
     .select(
-      "id, terminal_code, display_name, receipt_prefix, status, next_receipt_number, next_session_number, next_z_number, outlet_id, default_price_list_id, logo_url, customer_screen_mode, updated_at, outlet:pickup_locations!pos_terminals_outlet_id_fkey(display_name, pos_display_name), price_list:price_lists!pos_terminals_default_price_list_id_fkey(display_name)",
+      "id, terminal_code, display_name, receipt_prefix, status, next_receipt_number, next_session_number, next_z_number, outlet_id, default_price_list_id, logo_url, customer_screen_mode, terminal_mode, self_service_operator_id, updated_at, outlet:pickup_locations!pos_terminals_outlet_id_fkey(display_name, pos_display_name), price_list:price_lists!pos_terminals_default_price_list_id_fkey(display_name)",
     )
     .eq("legal_entity_id", activeEntityId)
     .order("terminal_code", { ascending: true });
