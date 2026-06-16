@@ -48,6 +48,14 @@ export interface RenderCartLine {
   unit?: string | null;
   line_total: number;
   image_url?: string | null;
+  /** Effektiv serveringsmodus for linjen (etter override). */
+  dining_mode?: "takeaway" | "eatin";
+  /** Sant hvis dining-mode kan veksles (matvare). */
+  is_food?: boolean;
+  /** Sant hvis modus er eksplisitt overstyrt (avviker fra kurv-default). */
+  dining_overridden?: boolean;
+  /** Effektiv MVA-sats for visning. */
+  mva_rate?: number;
 }
 
 type DiningMode = "takeaway" | "eatin" | "pickup";
@@ -77,6 +85,7 @@ interface Props {
   payDisabled?: boolean;
   onCartLineQtyChange?: (id: string, delta: number) => void;
   onCartLineRemove?: (id: string) => void;
+  onCartLineDiningCycle?: (id: string) => void;
   diningMode?: DiningMode;
   onDiningChange?: (m: DiningMode) => void;
   // Handlingslinje: code → handler. Hvis ikke gitt, brukes ingen footer.
