@@ -32,7 +32,7 @@ import {
 } from "@/kiosk/hooks/useProductLookup";
 import { kioskSupabase } from "@/kiosk/integrations/supabase/client";
 import { broadcastSaleComplete } from "@/kiosk/lib/realtime";
-import type { CartItem } from "@/kiosk/lib/cart";
+import { effectiveDining, isFoodItem, type CartItem } from "@/kiosk/lib/cart";
 import {
   KioskRender,
   type RenderButton,
@@ -456,6 +456,7 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
     const productPath = it.product_id ? data?.productPrimaryPaths[it.product_id] ?? null : null;
     const signed = productPath ? data?.imageUrls[productPath] ?? null : null;
     const fallback = it.product_id ? data?.productFallbackUrls[it.product_id] ?? null : null;
+    const effRate = cart.effectiveMvaRate(it);
     return {
       id: it.id,
       label: it.product_snapshot.display_name,
@@ -464,10 +465,14 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
       line_total:
         Math.round(
           (it.quantity * it.unit_price_excl_mva - it.line_discount) *
-            (1 + cart.effectiveMvaRate(it) / 100) *
+            (1 + effRate / 100) *
             100,
         ) / 100,
       image_url: signed ?? fallback ?? null,
+      dining_mode: effectiveDining(it, cart.diningMode),
+      is_food: isFoodItem(it),
+      dining_overridden: it.dining_mode_override != null,
+      mva_rate: effRate,
     };
   });
 
