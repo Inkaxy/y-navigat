@@ -21,19 +21,49 @@ const Ctx = createContext<State | null>(null);
 
 export function OperatorProvider({
   terminalId,
+  autoOperatorId,
   children,
 }: {
   terminalId: string;
+  autoOperatorId?: string | null;
   children: ReactNode;
 }) {
   const storageKey = operatorStorageKey(terminalId);
   const [operator, setOperator] = useState<Operator | null>(null);
 
-  // Hydrate from localStorage on mount
+  // Hydrate from localStorage on mount (only when no auto-operator)
   useEffect(() => {
+    if (autoOperatorId) return;
     const stored = readJSON<Operator>(storageKey);
     if (stored) setOperator(stored);
-  }, [storageKey]);
+  }, [storageKey, autoOperatorId]);
+
+  // Self-service: auto-load configured operator (no PIN)
+  useEffect(() => {
+    if (!autoOperatorId) return;
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await kioskSupabase
+        .from("pos_operators")
+        .select("id, operator_code, display_name, legal_entity_id, status")
+        .eq("id", autoOperatorId)
+        .maybeSingle();
+      if (cancelled) return;
+      if (error || !data || data.status !== "active") {
+        setOperator(null);
+        return;
+      }
+      setOperator({
+        id: data.id,
+        code: data.operator_code,
+        display_name: data.display_name ?? data.operator_code,
+        legal_entity_id: data.legal_entity_id,
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [autoOperatorId]);
 
   const login = useCallback<State["login"]>(
     async (code, pin) => {
