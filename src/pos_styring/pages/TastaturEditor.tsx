@@ -92,6 +92,7 @@ interface KeypadButton {
   grid_width: number;
   grid_height: number;
   target_page_id: string | null;
+  hidden_in_self_service: boolean | null;
   product?: { display_name: string; product_category: string | null; in_pos: boolean } | null;
 }
 
@@ -136,6 +137,7 @@ const buttonSchema = z.object({
   text_color: z.string().trim().optional(),
   grid_width: z.coerce.number().int().min(1, "Minst 1").max(12, "For stor"),
   grid_height: z.coerce.number().int().min(1, "Minst 1").max(10, "For stor"),
+  hidden_in_self_service: z.boolean().default(false),
 }).superRefine((values, ctx) => {
   if (values.button_type === "product" && !values.product_id) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["product_id"], message: "Velg produkt" });
@@ -201,7 +203,7 @@ async function fetchPages(layoutId: string): Promise<KeypadPage[]> {
 async function fetchButtons(pageId: string): Promise<KeypadButton[]> {
   const { data, error } = await supabase
     .from("pos_keypad_buttons")
-    .select("id, page_id, button_type, product_id, function_code, display_label, image_url, image_storage_path, show_image, background_color, text_color, grid_x, grid_y, grid_width, grid_height, target_page_id, product:products!pos_keypad_buttons_product_id_fkey(display_name, product_category, in_pos)")
+    .select("id, page_id, button_type, product_id, function_code, display_label, image_url, image_storage_path, show_image, background_color, text_color, grid_x, grid_y, grid_width, grid_height, target_page_id, hidden_in_self_service, product:products!pos_keypad_buttons_product_id_fkey(display_name, product_category, in_pos)")
     .eq("page_id", pageId);
   if (error) throw error;
   return (data ?? []) as unknown as KeypadButton[];
