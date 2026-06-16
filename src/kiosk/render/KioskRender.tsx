@@ -969,6 +969,7 @@ export function KioskRender({
   payDisabled,
   onCartLineQtyChange,
   onCartLineRemove,
+  onCartLineDiningCycle,
   diningMode,
   onDiningChange,
   onFooterAction,
@@ -1065,6 +1066,7 @@ export function KioskRender({
             onDiningChange={onDiningChange}
             onCartLineQtyChange={onCartLineQtyChange}
             onCartLineRemove={onCartLineRemove}
+            onCartLineDiningCycle={onCartLineDiningCycle}
           />
         </div>
       </div>
