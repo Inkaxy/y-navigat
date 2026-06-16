@@ -93,7 +93,7 @@ interface KeypadButton {
   grid_height: number;
   target_page_id: string | null;
   hidden_in_self_service: boolean | null;
-  product?: { display_name: string; product_category: string | null; in_pos: boolean } | null;
+  product?: { display_name: string; product_category: string | null; in_pos: boolean; image_url: string | null } | null;
 }
 
 interface ProductOption {
@@ -203,7 +203,7 @@ async function fetchPages(layoutId: string): Promise<KeypadPage[]> {
 async function fetchButtons(pageId: string): Promise<KeypadButton[]> {
   const { data, error } = await supabase
     .from("pos_keypad_buttons")
-    .select("id, page_id, button_type, product_id, function_code, display_label, image_url, image_storage_path, show_image, background_color, text_color, grid_x, grid_y, grid_width, grid_height, target_page_id, hidden_in_self_service, product:products!pos_keypad_buttons_product_id_fkey(display_name, product_category, in_pos)")
+    .select("id, page_id, button_type, product_id, function_code, display_label, image_url, image_storage_path, show_image, background_color, text_color, grid_x, grid_y, grid_width, grid_height, target_page_id, hidden_in_self_service, product:products!pos_keypad_buttons_product_id_fkey(display_name, product_category, in_pos, image_url)")
     .eq("page_id", pageId);
   if (error) throw error;
   return (data ?? []) as unknown as KeypadButton[];
@@ -295,7 +295,10 @@ function KeypadButtonTile({ button, layout, dragging, resizing, resizePreview, o
     enabled: showImage && !!effectivePath,
     staleTime: 50 * 60 * 1000,
   });
-  const bgImage = showImage ? (button.image_url || signedFromPath) : "";
+  // Fallback til products.image_url (public bucket) hvis ingen primær pos_product_image finnes
+  const productFallback =
+    button.button_type === "product" ? button.product?.image_url ?? "" : "";
+  const bgImage = showImage ? (button.image_url || signedFromPath || productFallback) : "";
   return (
     <div
       className={cn("relative flex h-full w-full overflow-hidden rounded-md border border-primary/20 bg-primary/15 p-2 text-left text-sm font-semibold shadow-card transition hover:ring-2 hover:ring-ring", dragging && "opacity-60", resizing && "ring-2 ring-ring", notInPos && "border-destructive/60 ring-1 ring-destructive/40")}
@@ -756,6 +759,120 @@ export default function TastaturEditor() {
     queryFn: () => fetchButtons(activePageId!),
     enabled: !!activePageId,
   });
+
+  // Resolverte bilder for live forhåndsvisning (samme kilder som kiosk-renderen bruker)
+  const productIdsOnPage = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          buttons
+            .filter((b) => b.button_type === "product" && b.product_id)
+            .map((b) => b.product_id as string),
+        ),
+      ),
+    [buttons],
+  );
+  const functionCodesOnPage = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          buttons
+            .filter((b) => b.button_type === "function" && b.function_code)
+            .map((b) => b.function_code as string),
+        ),
+      ),
+    [buttons],
+  );
+
+  const { data: productPrimaryMap = {} } = useQuery({
+    queryKey: ["preview_product_primary_paths", productIdsOnPage],
+    queryFn: async () => {
+      if (productIdsOnPage.length === 0) return {} as Record<string, string>;
+      const { data, error } = await supabase
+        .from("pos_product_images")
+        .select("product_id, storage_path")
+        .in("product_id", productIdsOnPage)
+        .eq("is_primary", true);
+      if (error) return {} as Record<string, string>;
+      const out: Record<string, string> = {};
+      for (const row of data ?? []) {
+        if (row.product_id && row.storage_path) out[row.product_id] = row.storage_path;
+      }
+      return out;
+    },
+    enabled: productIdsOnPage.length > 0,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: functionPathMap = {} } = useQuery({
+    queryKey: ["preview_function_paths", layout?.legal_entity_id, functionCodesOnPage],
+    queryFn: async () => {
+      if (!layout?.legal_entity_id || functionCodesOnPage.length === 0)
+        return {} as Record<string, string>;
+      const { data, error } = await supabase
+        .from("pos_function_images")
+        .select("function_code, storage_path")
+        .eq("legal_entity_id", layout.legal_entity_id)
+        .in("function_code", functionCodesOnPage);
+      if (error) return {} as Record<string, string>;
+      const out: Record<string, string> = {};
+      for (const row of data ?? []) {
+        if (row.function_code && row.storage_path) out[row.function_code] = row.storage_path;
+      }
+      return out;
+    },
+    enabled: !!layout?.legal_entity_id && functionCodesOnPage.length > 0,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const allStoragePaths = useMemo(() => {
+    const set = new Set<string>();
+    for (const b of buttons) if (b.image_storage_path) set.add(b.image_storage_path);
+    for (const p of Object.values(productPrimaryMap)) set.add(p);
+    for (const p of Object.values(functionPathMap)) set.add(p);
+    return Array.from(set);
+  }, [buttons, productPrimaryMap, functionPathMap]);
+
+  const { data: signedUrlMap = {} } = useQuery({
+    queryKey: ["preview_signed_urls", allStoragePaths],
+    queryFn: async () => {
+      if (allStoragePaths.length === 0) return {} as Record<string, string>;
+      const { data, error } = await supabase.storage
+        .from(PRODUCT_IMAGE_BUCKET)
+        .createSignedUrls(allStoragePaths, 3600);
+      if (error) return {} as Record<string, string>;
+      const out: Record<string, string> = {};
+      for (const row of data ?? []) {
+        if (row.path && row.signedUrl) out[row.path] = row.signedUrl;
+      }
+      return out;
+    },
+    enabled: allStoragePaths.length > 0,
+    staleTime: 50 * 60 * 1000,
+  });
+
+  const resolveButtonImageUrl = useCallback(
+    (b: KeypadButton): string | null => {
+      const showImage = b.show_image ?? layout?.show_product_image ?? true;
+      if (!showImage) return null;
+      if (b.image_url) return b.image_url;
+      const ownPath = b.image_storage_path;
+      if (ownPath && signedUrlMap[ownPath]) return signedUrlMap[ownPath];
+      if (b.button_type === "product" && b.product_id) {
+        const primary = productPrimaryMap[b.product_id];
+        if (primary && signedUrlMap[primary]) return signedUrlMap[primary];
+        if (b.product?.image_url) return b.product.image_url;
+      }
+      if (b.button_type === "function" && b.function_code) {
+        const fp = functionPathMap[b.function_code];
+        if (fp && signedUrlMap[fp]) return signedUrlMap[fp];
+      }
+      return null;
+    },
+    [layout?.show_product_image, signedUrlMap, productPrimaryMap, functionPathMap],
+  );
+
+
 
   const activePage = pages.find((page) => page.id === activePageId) ?? null;
 
@@ -1218,7 +1335,7 @@ export default function TastaturEditor() {
                 page_id: b.page_id,
                 button_type: b.button_type,
                 display_label: b.display_label ?? (b.product?.display_name ?? null),
-                image_url: b.image_url,
+                image_url: resolveButtonImageUrl(b),
                 background_color: b.background_color,
                 text_color: b.text_color,
                 grid_x: b.grid_x,
