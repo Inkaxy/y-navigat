@@ -154,7 +154,8 @@ function SelfServiceFlow({ data, loading, loadError }: FlowProps) {
           mva_rate: p.mva_rate,
         },
         unit_price_excl_mva: p.unit_price_excl_mva,
-        mva_rate: p.mva_rate,
+        base_mva_rate: p.mva_rate,
+        eatin_mva_rate: p.eatin_mva_rate,
         quantity: 1,
       });
     } catch (e) {
@@ -179,7 +180,7 @@ function SelfServiceFlow({ data, loading, loadError }: FlowProps) {
         method: "card",
         totalIncl: cart.totals.total_incl_mva,
       });
-      const linesPayload = cart.items.map(toLinePayload);
+      const linesPayload = cart.items.map((it) => toLinePayload(it, cart.diningMode));
       const { data: txId, error } = await kioskSupabase.rpc(
         "pos_record_sale" as never,
         {

@@ -695,7 +695,8 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
                 },
                 quantity: serverResult.order_line.quantity,
                 unit_price_excl_mva: serverResult.order_line.unit_price_excl_vat,
-                mva_rate: serverResult.order_line.vat_rate,
+                base_mva_rate: serverResult.order_line.vat_rate,
+                eatin_mva_rate: null,
               });
               for (const acc of serverResult.accessory_lines) {
                 cart.addItem({
@@ -708,7 +709,8 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
                   },
                   quantity: acc.quantity,
                   unit_price_excl_mva: acc.unit_price_excl_vat,
-                  mva_rate: acc.vat_rate,
+                  base_mva_rate: acc.vat_rate,
+                  eatin_mva_rate: null,
                 });
               }
             }
@@ -735,7 +737,8 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
               },
               quantity: l.quantity,
               unit_price_excl_mva: l.unit_price_excl_mva,
-              mva_rate: l.mva_rate,
+              base_mva_rate: l.mva_rate,
+              eatin_mva_rate: null,
             });
           }
           toast.success(`Henteordre #${order.order_number} lastet inn i kurv`);
