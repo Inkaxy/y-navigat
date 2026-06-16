@@ -450,8 +450,11 @@ function DiningChip({
   const opts: DiningMode[] = ["eatin", "takeaway", "pickup"];
   return (
     <div
-      className="flex gap-1 rounded-md p-0.5 text-xs"
-      style={{ background: "var(--kiosk-surface-alt)" }}
+      className="flex gap-1 rounded-md p-1 text-xs"
+      style={{
+        background: "var(--kiosk-surface-alt)",
+        border: "1px solid var(--kiosk-border)",
+      }}
     >
       {opts.map((id) => {
         const active = mode === id;
@@ -460,12 +463,14 @@ function DiningChip({
             key={id}
             type="button"
             onClick={() => onChange(id)}
-            className="rounded px-2 py-1 transition-colors"
+            className="rounded px-3 py-1.5 text-xs transition-colors"
             style={{
               background: active ? "var(--kiosk-accent)" : "transparent",
               color: active ? "var(--kiosk-ink-on-accent)" : "var(--kiosk-ink-soft)",
               fontFamily: "var(--kiosk-font-body)",
-              fontWeight: active ? 600 : 500,
+              fontWeight: active ? 700 : 500,
+              boxShadow: active ? "0 1px 2px rgba(0,0,0,0.18)" : undefined,
+              minHeight: 32,
             }}
           >
             {DINING_META[id].label}
