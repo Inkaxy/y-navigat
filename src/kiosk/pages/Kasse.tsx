@@ -601,6 +601,14 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
             else cart.updateQuantity(id, next);
           }}
           onCartLineRemove={(id) => cart.removeItem(id)}
+          onCartLineDiningCycle={(id) => {
+            const it = cart.items.find((x) => x.id === id);
+            if (!it) return;
+            const cur = it.dining_mode_override;
+            const next =
+              cur == null ? "eatin" : cur === "eatin" ? "takeaway" : null;
+            cart.setLineDiningOverride(id, next);
+          }}
           diningMode={diningForRender}
           onDiningChange={handleDiningChange}
           onFooterAction={handleFooterAction}
