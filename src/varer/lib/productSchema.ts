@@ -46,6 +46,7 @@ export const productSchema = z.object({
   ),
   epd_number: textOrNull,
   mva_rate: z.coerce.number(),
+  eatin_mva_rate: numOrNull,
   mva_always_included: z.boolean(),
   account_reference: textOrNull,
 
@@ -131,6 +132,10 @@ export function productToFormValues(p: any): ProductFormValues {
     gtin: p.gtin ?? null,
     epd_number: p.epd_number ?? null,
     mva_rate: Number(p.mva_rate ?? 15),
+    eatin_mva_rate:
+      p.eatin_mva_rate == null || p.eatin_mva_rate === undefined
+        ? null
+        : Number(p.eatin_mva_rate),
     mva_always_included: !!p.mva_always_included,
     account_reference: p.account_reference ?? null,
 
@@ -204,6 +209,7 @@ export const FIELD_TO_TAB: Record<keyof ProductFormValues, string> = {
   gtin: "navn",
   epd_number: "navn",
   mva_rate: "navn",
+  eatin_mva_rate: "navn",
   mva_always_included: "navn",
   account_reference: "navn",
 

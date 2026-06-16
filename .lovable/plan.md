@@ -1,134 +1,67 @@
+# Per-linje serveringsmodus + korrekt MVA
 
-# Kasse-gjennomgang og forbedringer
+I dag har kurven én felles "Sitt her / Ta med"-bryter, og MVA tas rett fra produktets `mva_rate` (uten å reagere på serveringsmodus). Det matcher ikke virkeligheten der en kunde kan kjøpe kaffe (sitt her) og brød (ta med) i samme handel, og hvor norsk MVA-regel er:
 
-## Dagens oppsett (kort)
+- **Sitt her / servering på stedet → 25 % MVA**
+- **Ta med / matvare → 15 % MVA**
+- Ikke-mat (f.eks. servise, gavekort, klær) skal beholde sin egen sats uansett.
 
-Kassen i `src/kiosk/pages/Kasse.tsx` rendres via `KioskRender` med:
+## Hva som endres
 
-- Topbar (terminal + operatør + "Avslutt skift" / "Logg av")
-- Konfigurert tastatur-grid (produkt-, kategori-, funksjons-knapper)
-- Kurv-panel med linjer, +/- og slett
-- Dining-toggle (takeaway / eat-in / pickup)
-- Footer-actions (rabatt, parker, kasseskuff, kvittering, kunde, henteordre, kakebygger, etikett)
-- Betalingsmodal, kvittering, kakebygger, henteordre
+### 1. Datamodell (`products`)
+Legg til `eatin_mva_rate numeric(5,2)` (nullable):
+- `NULL` ⇒ produktet er ikke matvare → samme MVA i begge moduser (`products.mva_rate`).
+- `25` ⇒ produktet er matvare → `15` ved takeaway (fra `mva_rate`), `25` ved eatin (fra `eatin_mva_rate`).
 
-Alt er styrt av tema-tokens (`--kiosk-*`) — ingen hardkodede farger. Hardware-mål: touch ≥15".
+Backfill: alle produkter som i dag har `mva_rate = 15` settes til `eatin_mva_rate = 25` (typisk mat/drikke). De andre lar vi være `NULL`. Brukeren kan justere enkeltprodukter i Produkter-skjermen.
 
----
+I `pos_record_sale` RPC utvides validering: tillatte satser pr linje er fortsatt `(0, 12, 15, 25)`; ingen endring i signatur. Klienten sender allerede `mva_rate` pr linje, så serveren stoler på den.
 
-## Del A — Forbedringer i dagens (operatør-)kasse
+### 2. Klient — produkt-oppslag (`useProductLookup`)
+Henter også `eatin_mva_rate`. Returnerer både `mva_rate` (base/takeaway) og `eatin_mva_rate` (kan være `null`).
 
-Mål: redusere klikk, gjøre touch-targets tydeligere, korte ned betalingstid.
+### 3. Klient — kurv-logikk (`CartContext` + `cart.ts`)
+`CartItem` utvides:
+- `base_mva_rate` (takeaway-sats, fra produkt)
+- `eatin_mva_rate: number | null`
+- `mva_rate` blir **derivert** fra `dining_mode_override` (eller cart-default) + de to over.
 
-1. **Hurtig produkt-søk (overlay)**
-    - Ny knapp i header: "Søk" (eller dedikert footer-action) som åpner et stort søkefelt med fokus
-    - Søker mot `pos_keypad_buttons.display_label` + `products.display_number`/`display_name` for terminalens prisliste
-    - Resultater som store touch-rader (≥56 px) — Enter eller tap = legg i kurv
-    - Brukes når operatør ikke vil bla i kategorier
+Helper `effectiveMva(item, cartDefault)`:
+```
+mode = item.dining_mode_override ?? cartDefault
+if mode === 'eatin' && eatin_mva_rate != null → eatin_mva_rate
+else → base_mva_rate
+```
 
-2. **Antall-justering uten dialog**
-    - Long-press eller +N på kurvlinje åpner en numerisk overlay (0-9 + komma) for å sette eksakt antall/vekt
-    - Reduserer +/+/+/+ klikk for løs vekt
+`calcLine` / `calcTotals` tar `cartDefault` som ekstra arg slik at MVA-bøttene blir riktige. `serializeForCustomer` likeså. Alle eksisterende callere oppdateres.
 
-3. **Kurv-tydelighet**
-    - Sticky totalsum nederst i kurv (alltid synlig — også når kurv scrolles)
-    - Større "Betal"-CTA med beløp inni knappen ("Betal kr 248,00")
-    - Tydeligere dining-mode pill (aktiv state mer kontrastert)
+Sammenslåing av like produkt-linjer i `addItem` slutter å slå sammen når `dining_mode_override` er satt eksplisitt (allerede halvveis sånn i dag), og linjer med ulik effektiv MVA holdes adskilt.
 
-4. **Footer-rydding**
-    - Gruppe-ikoner: salg (rabatt, kunde, parker) | utskrift (kvittering, etikett, skuff) | spesial (henteordre, kakebygger)
-    - Skjul disabled-actions istedenfor grå (mindre støy) — eller fjern hvis ikke konfigurert i tema
-    - Tooltip + label under (ikke bare ikon) — operatører husker raskere
+### 4. Klient — UI på kurv-linje (`CartLine.tsx`)
+Hver linje får en liten pille-knapp («Sitt her» / «Ta med») som overstyrer cart-default. Tre tilstander: arve fra kurv, eksplisitt eatin, eksplisitt takeaway. Vises kun for matvare-produkter (de med `eatin_mva_rate != null`) — for ikke-mat har det ingen effekt og vi skjuler knappen for å unngå støy.
 
-5. **Betalingsmodal**
-    - Forhåndsvalgt vanligste metode (kort) når modal åpnes
-    - "Eksakt"-knapp + raske beløp (200, 500, 1000, neste runde 50) for kontant
-    - Vis vekslepenger med stor tall-typografi
-    - Enter på tastatur = bekreft når beløp dekker totalen
+Linje-undertekst viser også effektiv MVA, f.eks. `15 % · Ta med` eller `25 % · Sitt her`.
 
-6. **Skift-flow**
-    - "Avslutt skift" flyttes ut av topbar (lett å trykke ved uhell) til en "Skift"-meny med skift-status, åpningsfloat og kort-knapper
-    - Vis skift-tid + antall salg i header som passiv info
+### 5. Klient — øverste «kurv-default»-chip
+Beholdes som i dag (`DiningChip`), men virker nå bare som standard for nye linjer (eksisterende linjer endres ikke automatisk når brukeren bytter cart-default — det matcher kassø-flow bedre). Vi kan vise en liten knapp «Bruk på alle» dersom ønsket — droppes i første runde.
 
-7. **Visuell hierarki**
-    - Definere stort/medium/lite knapp-preset i tastatur-editor (allerede mulig via grid_w/h, men foreslå mal: "favoritter 2×2, vanlige 1×1")
-    - Auto-skaler etikett-tekst etter knapp-størrelse (ikke kuttet på 1×1)
+### 6. Kasse → RPC payload
+`toLinePayload` setter `mva_rate` = effektiv MVA (etter mode), og fortsetter å sende `dining_mode_override` for sporbarhet. Server lagrer som før.
 
-## Del B — Egen selvbetjent kunde-modus
+### 7. Produkt-admin
+I `Produkter.tsx` legges et lite felt for `eatin_mva_rate` (vises som «Sitt her-MVA»; tomt = ikke matvare). Detaljvisning, ikke obligatorisk i listen.
 
-Mål: kunde betjener selv → uten operatør-login, forenklet flyt, store mål.
+## Tekniske detaljer
 
-### Ny route + entry-flag
+- Migrasjon: `ALTER TABLE public.products ADD COLUMN eatin_mva_rate numeric(5,2) NULL`, pluss `UPDATE products SET eatin_mva_rate = 25 WHERE mva_rate = 15`. Ingen policy-endringer (eksisterende RLS dekker kolonnen).
+- `pos_record_sale` trenger ikke endres (godtar 15 og 25 allerede).
+- Realtime customer-display: `serializeForCustomer` får mode pr linje, så kunde-skjermen kan vise «Sitt her»-merke pr linje senere. Første runde sender vi kun `line_total` (uendret), men vi inkluderer `dining_mode` pr linje for fremtidig bruk.
+- Selvbetjent kasse (`SelfServiceKasse`): samme UI på kurv-linjer; sender effektiv MVA på samme måte. Cart-default i selvbetjent forblir takeaway.
 
-- Ny rute `/kiosk/:terminalId/selvbetjent` (eller flagg på terminal: `pos_terminals.self_service_enabled`)
-- Egen `SelfServiceKasse.tsx` som gjenbruker `CartProvider`, `useKeypadLayout`, `KioskRender`
-- Skipper `OperatorLogin` og bruker en system-/terminal-operatør (eller null) for sesjons-RPC
+## Akseptansekriterier
 
-### UI-forskjeller fra operatør-kassen
-
-1. **Velkomst-skjerm**
-    - Fullskjerm "Trykk for å starte" med brand-logo + språkvalg (NO/EN evt.)
-    - Inaktivitets-reset: 60 s tilbake til velkomst hvis ingen interaksjon (med "Er du der?"-bekreftelse på 45 s)
-
-2. **Forenklet header**
-    - Kun brand + "Avbryt ordre" (rød, høyre)
-    - Ingen terminalkode, ingen operatør, ingen "Logg av" / "Avslutt skift"
-
-3. **Forenklet footer (kun kunde-actions)**
-    - Kun: "Dining mode" toggle (takeaway / spise her), "Kvittering på e-post" toggle
-    - Fjerner: rabatt, parker ordre, kasseskuff, kunde-søk, etikett-print, henteordre, kakebygger
-
-4. **Tydelig kurv**
-    - Større linjer (80–96 px høyde), produktbilde tvunget synlig
-    - Store +/- knapper (≥56 px), "Fjern"-knapp med bekreftelse (ett uhell-tap = bekreft)
-    - Sticky "Til betaling" CTA med totalsum
-
-5. **Betaling**
-    - Kun kort (BankAxept/Visa) — ingen kontant, ingen faktura, ingen split
-    - Stor "Sett inn / tap kort"-instruksjon med animasjon
-    - Auto-print kvittering (eller spør: "Trenger du kvittering?" → skriv ut / e-post / nei)
-
-6. **Tilgjengelighet**
-    - Stor font (min 18 px body, 24 px knapper)
-    - Høy kontrast-tema preset
-    - Touch-target min 56×56 px enforced i CSS
-
-7. **Sikkerhet / misbruk**
-    - Funksjons-knapper som "rabatt", "åpne skuff", "parker" er ikke tilgjengelig
-    - "Avbryt"-knapp krever to-trinns bekreftelse hvis kurv > 0
-
-### Tastatur-deling
-
-- Selvbetjent bruker SAMME `pos_keypad_layouts` som operatør-terminalen, men:
-    - Filtrerer ut knapper med `button_type='function'` der `function_code` ∈ {`discount`, `park_order`, `open_drawer`, `customer`, `label_print`} på render-tid
-    - Eller (bedre): nytt felt `pos_keypad_buttons.self_service_visible boolean default true` så styring kan velge per knapp
-
-### Konfigurasjon i POS Styring
-
-- Ny tab i Terminaler: "Selvbetjent"
-    - On/off toggle
-    - Inaktivitets-timeout (sekunder)
-    - Tillatte betalingsmåter (default: kort)
-    - Auto-print kvittering: ja/nei/spør
-- Ny tab i Tastatur-editor: "Skjul i selvbetjent" pr knapp
-
----
-
-## Teknisk oppsummering
-
-- **Front:** ny `src/kiosk/pages/SelfServiceKasse.tsx`, ny route i `src/kiosk/routes.tsx`, ny `IdleResetProvider`-hook, utvidelse av `KioskRender`-props (`mode: "operator" | "self_service"`) for å skjule/forstørre elementer
-- **DB:** valgfri migrasjon for `pos_terminals.self_service_enabled` + `pos_terminals.self_service_config jsonb` + `pos_keypad_buttons.self_service_visible boolean`
-- **RPC:** `pos_record_sale` må kunne kjøre uten operator_id (eller med en system-operatør tilknyttet terminalen) — sjekkes
-- **Styring-UI:** Terminaler-detalj + TastaturEditor får nye felt
-
----
-
-## Foreslått leveranse-rekkefølge
-
-1. Del A pkt. 3 + 5 (kurv-tydelighet + betalingsmodal-forbedringer) — størst effekt, lite arbeid
-2. Del A pkt. 1 (hurtig produkt-søk) — store gevinster for operatør
-3. Del B grunnstruktur: ny route + `SelfServiceKasse` med filtrert UI og inaktivitets-reset
-4. Del B konfigurasjon i POS Styring
-5. Del A resten + polish
-
-Si fra hvilke deler du vil prioritere først, så starter jeg der.
+1. Kaffe (matvare, takeaway 15) + sjokoladekake (matvare, takeaway 15) lagt i kurv med cart-default «Sitt her» beregner 25 % på begge.
+2. Bytte enkelt-linje (kaffen) til «Sitt her» mens kurv-default er «Ta med»: bare kaffen får 25 %, brødet beholder 15 %.
+3. Ikke-mat-produkt (mva 25, `eatin_mva_rate=NULL`): MVA er alltid 25 %, og dining-pille vises ikke.
+4. MVA-breakdown i totals og kvittering reflekterer per-linje-satsene; `pos_record_sale` lagrer korrekt sats pr linje.
+5. Eksisterende kvitteringer/rapporter er bakoverkompatible.

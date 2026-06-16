@@ -32,7 +32,7 @@ import {
 } from "@/kiosk/hooks/useProductLookup";
 import { kioskSupabase } from "@/kiosk/integrations/supabase/client";
 import { broadcastSaleComplete } from "@/kiosk/lib/realtime";
-import type { CartItem } from "@/kiosk/lib/cart";
+import { effectiveDining, isFoodItem, type CartItem } from "@/kiosk/lib/cart";
 import {
   KioskRender,
   type RenderButton,
@@ -52,14 +52,22 @@ type LinePayload = {
   dining_mode_override: "takeaway" | "eatin" | null;
 };
 
-export function toLinePayload(item: CartItem): LinePayload {
+export function toLinePayload(
+  item: CartItem,
+  cartDining: "takeaway" | "eatin",
+): LinePayload {
+  const mode = item.dining_mode_override ?? cartDining;
+  const effectiveRate =
+    mode === "eatin" && item.eatin_mva_rate != null
+      ? item.eatin_mva_rate
+      : item.base_mva_rate;
   return {
     product_id: item.product_id,
     product_snapshot: item.product_snapshot,
     quantity: item.quantity,
     unit_price_excl_mva: item.unit_price_excl_mva,
     line_discount: item.line_discount ?? 0,
-    mva_rate: item.mva_rate,
+    mva_rate: effectiveRate,
     dining_mode_override: item.dining_mode_override ?? null,
   };
 }
@@ -164,7 +172,8 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
           mva_rate: p.mva_rate,
         },
         unit_price_excl_mva: p.unit_price_excl_mva,
-        mva_rate: p.mva_rate,
+        base_mva_rate: p.mva_rate,
+        eatin_mva_rate: p.eatin_mva_rate,
         quantity: 1,
       });
     } catch (e) {
@@ -227,8 +236,9 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
     }
     const VALID = new Set([0, 12, 15, 25]);
     for (const it of cart.items) {
-      if (!VALID.has(it.mva_rate)) {
-        setRpcError(`Ugyldig mva-sats ${it.mva_rate}% på «${it.product_snapshot.display_name}»`);
+      const eff = cart.effectiveMvaRate(it);
+      if (!VALID.has(eff)) {
+        setRpcError(`Ugyldig mva-sats ${eff}% på «${it.product_snapshot.display_name}»`);
         return;
       }
     }
@@ -236,7 +246,7 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
     setSubmitting(true);
     setRpcError(null);
     try {
-      const linesPayload = cart.items.map(toLinePayload);
+      const linesPayload = cart.items.map((it) => toLinePayload(it, cart.diningMode));
       const { data: txId, error } = await kioskSupabase.rpc(
         "pos_record_sale" as never,
         {
@@ -446,6 +456,7 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
     const productPath = it.product_id ? data?.productPrimaryPaths[it.product_id] ?? null : null;
     const signed = productPath ? data?.imageUrls[productPath] ?? null : null;
     const fallback = it.product_id ? data?.productFallbackUrls[it.product_id] ?? null : null;
+    const effRate = cart.effectiveMvaRate(it);
     return {
       id: it.id,
       label: it.product_snapshot.display_name,
@@ -454,10 +465,14 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
       line_total:
         Math.round(
           (it.quantity * it.unit_price_excl_mva - it.line_discount) *
-            (1 + it.mva_rate / 100) *
+            (1 + effRate / 100) *
             100,
         ) / 100,
       image_url: signed ?? fallback ?? null,
+      dining_mode: effectiveDining(it, cart.diningMode),
+      is_food: isFoodItem(it),
+      dining_overridden: it.dining_mode_override != null,
+      mva_rate: effRate,
     };
   });
 
@@ -586,6 +601,14 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
             else cart.updateQuantity(id, next);
           }}
           onCartLineRemove={(id) => cart.removeItem(id)}
+          onCartLineDiningCycle={(id) => {
+            const it = cart.items.find((x) => x.id === id);
+            if (!it) return;
+            const cur = it.dining_mode_override;
+            const next =
+              cur == null ? "eatin" : cur === "eatin" ? "takeaway" : null;
+            cart.setLineDiningOverride(id, next);
+          }}
           diningMode={diningForRender}
           onDiningChange={handleDiningChange}
           onFooterAction={handleFooterAction}
@@ -685,7 +708,8 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
                 },
                 quantity: serverResult.order_line.quantity,
                 unit_price_excl_mva: serverResult.order_line.unit_price_excl_vat,
-                mva_rate: serverResult.order_line.vat_rate,
+                base_mva_rate: serverResult.order_line.vat_rate,
+                eatin_mva_rate: null,
               });
               for (const acc of serverResult.accessory_lines) {
                 cart.addItem({
@@ -698,7 +722,8 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
                   },
                   quantity: acc.quantity,
                   unit_price_excl_mva: acc.unit_price_excl_vat,
-                  mva_rate: acc.vat_rate,
+                  base_mva_rate: acc.vat_rate,
+                  eatin_mva_rate: null,
                 });
               }
             }
@@ -725,7 +750,8 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
               },
               quantity: l.quantity,
               unit_price_excl_mva: l.unit_price_excl_mva,
-              mva_rate: l.mva_rate,
+              base_mva_rate: l.mva_rate,
+              eatin_mva_rate: null,
             });
           }
           toast.success(`Henteordre #${order.order_number} lastet inn i kurv`);

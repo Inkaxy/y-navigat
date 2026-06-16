@@ -1,11 +1,23 @@
 import { Minus, Plus, X } from "lucide-react";
-import { calcLine, type CartItem } from "@/kiosk/lib/cart";
+import { calcLine, effectiveDining, isFoodItem, type CartItem } from "@/kiosk/lib/cart";
 import { useCart } from "@/kiosk/context/CartContext";
 
 export function CartLine({ item }: { item: CartItem }) {
-  const { updateQuantity, removeItem } = useCart();
-  const { gross } = calcLine(item);
+  const { updateQuantity, removeItem, setLineDiningOverride, diningMode } = useCart();
+  const { gross, mva_rate } = calcLine(item, diningMode);
   const snap = item.product_snapshot;
+  const effMode = effectiveDining(item, diningMode);
+  const food = isFoodItem(item);
+  const overridden = item.dining_mode_override != null;
+
+  const cycleDining = () => {
+    // null -> override "eatin" -> override "takeaway" -> null
+    if (!overridden) setLineDiningOverride(item.id, "eatin");
+    else if (item.dining_mode_override === "eatin")
+      setLineDiningOverride(item.id, "takeaway");
+    else setLineDiningOverride(item.id, null);
+  };
+
   return (
     <div className="flex items-center gap-2 rounded-lg border border-white/5 bg-white/[0.03] p-2">
       <div className="min-w-0 flex-1">
@@ -15,10 +27,25 @@ export function CartLine({ item }: { item: CartItem }) {
           {item.unit_price_excl_mva.toFixed(2)} × {item.quantity}
           {snap.unit ? ` ${snap.unit}` : ""}
           {item.line_discount > 0 ? ` · −${item.line_discount.toFixed(2)}` : ""}
-          {item.dining_mode_override
-            ? ` · ${item.dining_mode_override === "eatin" ? "Spise her" : "Take away"}`
-            : ""}
+          {" · "}
+          {mva_rate}% {effMode === "eatin" ? "Sitt her" : "Ta med"}
         </div>
+        {food && (
+          <button
+            type="button"
+            onClick={cycleDining}
+            className={
+              "mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide transition-colors " +
+              (overridden
+                ? "bg-amber-500/20 text-amber-200 ring-1 ring-amber-500/40"
+                : "bg-white/5 text-[#F4ECDC]/50 hover:bg-white/10")
+            }
+            aria-label="Bytt serveringsmodus for linjen"
+          >
+            {effMode === "eatin" ? "Sitt her" : "Ta med"}
+            {overridden ? " ✱" : ""}
+          </button>
+        )}
       </div>
       <div className="flex items-center gap-1">
         <button
