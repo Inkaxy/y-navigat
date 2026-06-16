@@ -4,11 +4,13 @@ import OperatorLogin from "@/kiosk/pages/OperatorLogin";
 import OperatorHome from "@/kiosk/pages/OperatorHome";
 import OpenSessionView from "@/kiosk/pages/OpenSessionView";
 import Kasse from "@/kiosk/pages/Kasse";
+import SelfServiceKasse from "@/kiosk/pages/SelfServiceKasse";
 import CustomerDisplay from "@/kiosk/pages/CustomerDisplay";
 import OperatorBoot from "@/kiosk/pages/OperatorBoot";
 import KioskError from "@/kiosk/pages/KioskError";
-import { useOperator } from "@/kiosk/context/OperatorContext";
+import { useOperator, OperatorProvider } from "@/kiosk/context/OperatorContext";
 import { SessionProvider, useSession } from "@/kiosk/context/SessionContext";
+import { useTerminal } from "@/kiosk/context/TerminalContext";
 
 function SessionSwitch() {
   const { status } = useSession();
@@ -39,6 +41,38 @@ export function KioskOperatorRoute() {
   );
 }
 
+function SelfServiceInner({ terminalId }: { terminalId: string }) {
+  const { terminal } = useTerminal();
+  if (!terminal) return <OperatorBoot label="Henter terminal…" />;
+  if (terminal.terminal_mode !== "self_service") {
+    return (
+      <KioskError reason="Denne terminalen er ikke satt opp som selvbetjent kasse. Endre modus i POS Styring → Terminaler." />
+    );
+  }
+  if (!terminal.self_service_operator_id) {
+    return (
+      <KioskError reason="Selvbetjent modus mangler tildelt operatør. Sett 'Selvbetjent operatør' i POS Styring → Terminaler." />
+    );
+  }
+  return (
+    <OperatorProvider terminalId={terminalId} autoOperatorId={terminal.self_service_operator_id}>
+      <SessionProvider terminalId={terminalId}>
+        <SelfServiceKasse />
+      </SessionProvider>
+    </OperatorProvider>
+  );
+}
+
+export function KioskSelfServiceRoute() {
+  const { terminalId } = useParams();
+  if (!terminalId) return <KioskError reason="Mangler terminal-ID i URL." />;
+  return (
+    <KioskShell terminalId={terminalId} withOperator={false}>
+      <SelfServiceInner terminalId={terminalId} />
+    </KioskShell>
+  );
+}
+
 export function KioskCustomerRoute() {
   const { terminalId } = useParams();
   if (!terminalId) return <KioskError reason="Mangler terminal-ID i URL." />;
@@ -51,3 +85,4 @@ export function KioskCustomerRoute() {
 
 // Keep export for potential external imports
 export { OperatorHome };
+
