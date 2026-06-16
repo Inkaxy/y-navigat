@@ -6,7 +6,10 @@ export type ProductLookup = {
   display_name: string;
   display_number: number;
   unit_of_sale: string;
+  /** Standardsats / takeaway-sats. */
   mva_rate: number;
+  /** Sitt her-sats. NULL = ikke matvare, samme sats uansett. */
+  eatin_mva_rate: number | null;
   unit_price_excl_mva: number;
 };
 
@@ -47,7 +50,7 @@ export function useProductLookup(
         const [pRes, pliRes] = await Promise.all([
           kioskSupabase
             .from("products")
-            .select("id, display_name, pos_display_name, display_number, unit_of_sale, mva_rate")
+            .select("id, display_name, pos_display_name, display_number, unit_of_sale, mva_rate, eatin_mva_rate")
             .eq("id", productId)
             .maybeSingle(),
           kioskSupabase
@@ -67,6 +70,12 @@ export function useProductLookup(
         if (!priceRow) return null;
         const raw = Number(priceRow.price);
         const mva = Number(pRes.data.mva_rate) || 0;
+        const eatinRaw = (pRes.data as { eatin_mva_rate?: number | null })
+          .eatin_mva_rate;
+        const eatin_mva_rate =
+          eatinRaw == null || eatinRaw === undefined ? null : Number(eatinRaw);
+        // For pricelister med mva inkludert: bruk takeaway-sats (mva) som basis
+        // — sitt her-tillegget bokføres separat på linje-MVA, ikke i pris.
         const unit_price_excl_mva = pricesIncludeMva
           ? raw / (1 + mva / 100)
           : raw;
@@ -76,6 +85,7 @@ export function useProductLookup(
           display_number: Number(pRes.data.display_number),
           unit_of_sale: pRes.data.unit_of_sale,
           mva_rate: mva,
+          eatin_mva_rate,
           unit_price_excl_mva,
         };
       },
