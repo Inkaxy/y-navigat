@@ -8,7 +8,10 @@ export type CartItem = {
   product_snapshot: ProductSnapshot;
   quantity: number;
   unit_price_excl_mva: number;
-  mva_rate: number;
+  /** Sats ved takeaway (matvarer typisk 15, ikke-mat typisk 25). */
+  base_mva_rate: number;
+  /** Sats ved sitt her. NULL = ikke matvare, sats er lik uansett mode. */
+  eatin_mva_rate: number | null;
   line_discount: number;
   dining_mode_override?: DiningMode | null;
   merknad?: string;
@@ -23,26 +26,52 @@ export type CartTotals = {
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
-export function calcLine(item: CartItem) {
-  const net = round2(item.quantity * item.unit_price_excl_mva - item.line_discount);
-  const vat = round2((net * item.mva_rate) / 100);
-  const gross = round2(net + vat);
-  return { net, vat, gross };
+/** Effektiv serveringsmodus for en linje, gitt cart-default. */
+export function effectiveDining(
+  item: CartItem,
+  cartDefault: DiningMode,
+): DiningMode {
+  return item.dining_mode_override ?? cartDefault;
 }
 
-export function calcTotals(items: CartItem[]): CartTotals {
+/** Effektiv MVA-sats for en linje. */
+export function effectiveMvaRate(
+  item: CartItem,
+  cartDefault: DiningMode,
+): number {
+  const mode = effectiveDining(item, cartDefault);
+  if (mode === "eatin" && item.eatin_mva_rate != null) {
+    return item.eatin_mva_rate;
+  }
+  return item.base_mva_rate;
+}
+
+/** Sant hvis produktet er en matvare (har egen sitt her-sats). */
+export function isFoodItem(item: CartItem): boolean {
+  return item.eatin_mva_rate != null;
+}
+
+export function calcLine(item: CartItem, cartDefault: DiningMode) {
+  const rate = effectiveMvaRate(item, cartDefault);
+  const net = round2(item.quantity * item.unit_price_excl_mva - item.line_discount);
+  const vat = round2((net * rate) / 100);
+  const gross = round2(net + vat);
+  return { net, vat, gross, mva_rate: rate };
+}
+
+export function calcTotals(items: CartItem[], cartDefault: DiningMode): CartTotals {
   const buckets = new Map<number, { net: number; vat: number; gross: number }>();
   let subtotal = 0;
   let totalVat = 0;
   for (const it of items) {
-    const { net, vat, gross } = calcLine(it);
+    const { net, vat, gross, mva_rate } = calcLine(it, cartDefault);
     subtotal += net;
     totalVat += vat;
-    const b = buckets.get(it.mva_rate) ?? { net: 0, vat: 0, gross: 0 };
+    const b = buckets.get(mva_rate) ?? { net: 0, vat: 0, gross: 0 };
     b.net += net;
     b.vat += vat;
     b.gross += gross;
-    buckets.set(it.mva_rate, b);
+    buckets.set(mva_rate, b);
   }
   const mva_breakdown: MvaBreakdown = [...buckets.entries()]
     .sort(([a], [b]) => a - b)
@@ -67,6 +96,7 @@ export type CustomerCartPayload = {
     quantity: number;
     unit: string | null;
     line_total: number;
+    dining_mode: DiningMode;
   }>;
   totals: CartTotals;
   dining_mode: DiningMode;
@@ -84,7 +114,8 @@ export function serializeForCustomer(
       display_number: it.product_snapshot.display_number,
       quantity: it.quantity,
       unit: it.product_snapshot.unit,
-      line_total: calcLine(it).gross,
+      line_total: calcLine(it, dining_mode).gross,
+      dining_mode: effectiveDining(it, dining_mode),
     })),
     totals,
     dining_mode,
