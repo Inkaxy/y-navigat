@@ -1252,18 +1252,28 @@ function DraggableButton({
   const tileRef = useRef<HTMLDivElement>(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
+  const [isResizing, setIsResizing] = useState(false);
+  const [resizePreview, setResizePreview] = useState<{ width: number; height: number } | null>(null);
 
   const startTileDrag = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
     const target = event.target as HTMLElement | null;
     if (target?.closest('[data-resize-handle="true"]')) return;
     const tileEl = event.currentTarget;
+    const tileRect = tileEl.getBoundingClientRect();
+    const grabOffsetX = event.clientX - tileRect.left;
+    const grabOffsetY = event.clientY - tileRect.top;
     const startX = event.clientX;
     const startY = event.clientY;
     let didDrag = false;
     let latestX = startX;
     let latestY = startY;
+    const previousUserSelect = document.body.style.userSelect;
+    const previousCursor = document.body.style.cursor;
 
     event.preventDefault();
+    document.body.style.userSelect = "none";
+    document.body.style.cursor = "grabbing";
     try { tileEl.setPointerCapture(event.pointerId); } catch {}
 
     const onPointerMove = (moveEvent: PointerEvent) => {
@@ -1280,22 +1290,24 @@ function DraggableButton({
     };
 
     const onPointerUp = (upEvent: PointerEvent) => {
-      tileEl.removeEventListener("pointermove", onPointerMove);
-      tileEl.removeEventListener("pointerup", onPointerUp);
-      tileEl.removeEventListener("pointercancel", onPointerUp);
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
+      window.removeEventListener("pointercancel", onPointerUp);
+      document.body.style.userSelect = previousUserSelect;
+      document.body.style.cursor = previousCursor;
       try { tileEl.releasePointerCapture(upEvent.pointerId); } catch {}
       setDragOffset({ x: 0, y: 0 });
       setIsDragging(false);
       if (didDrag) {
-        onMove(latestX, latestY);
+        onMove(latestX - grabOffsetX, latestY - grabOffsetY);
       } else {
         onEdit();
       }
     };
 
-    tileEl.addEventListener("pointermove", onPointerMove);
-    tileEl.addEventListener("pointerup", onPointerUp);
-    tileEl.addEventListener("pointercancel", onPointerUp);
+    window.addEventListener("pointermove", onPointerMove, { passive: false });
+    window.addEventListener("pointerup", onPointerUp);
+    window.addEventListener("pointercancel", onPointerUp);
   };
 
   const startResize = (event: React.PointerEvent<HTMLDivElement>) => {
