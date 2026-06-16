@@ -1311,6 +1311,7 @@ function DraggableButton({
   };
 
   const startResize = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
     if (!onResize || !tileRef.current) return;
     event.stopPropagation();
     event.nativeEvent.stopImmediatePropagation();
@@ -1330,7 +1331,12 @@ function DraggableButton({
     const startH = button.grid_height;
     let nextW = startW;
     let nextH = startH;
+    const previousUserSelect = document.body.style.userSelect;
+    const previousCursor = document.body.style.cursor;
 
+    document.body.style.userSelect = "none";
+    document.body.style.cursor = "se-resize";
+    setIsResizing(true);
     try { handleEl.setPointerCapture(event.pointerId); } catch {}
 
     const onPointerMove = (moveEvent: PointerEvent) => {
@@ -1339,20 +1345,27 @@ function DraggableButton({
       const dy = moveEvent.clientY - startY;
       nextW = Math.max(1, startW + Math.round(dx / Math.max(1, cellW + colGap)));
       nextH = Math.max(1, startH + Math.round(dy / Math.max(1, cellH + rowGap)));
-      setDragOffset({ x: 0, y: 0 });
+      setResizePreview({
+        width: nextW * cellW + Math.max(0, nextW - 1) * colGap,
+        height: nextH * cellH + Math.max(0, nextH - 1) * rowGap,
+      });
     };
 
     const onPointerUp = (upEvent: PointerEvent) => {
-      handleEl.removeEventListener("pointermove", onPointerMove);
-      handleEl.removeEventListener("pointerup", onPointerUp);
-      handleEl.removeEventListener("pointercancel", onPointerUp);
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
+      window.removeEventListener("pointercancel", onPointerUp);
+      document.body.style.userSelect = previousUserSelect;
+      document.body.style.cursor = previousCursor;
       try { handleEl.releasePointerCapture(upEvent.pointerId); } catch {}
+      setIsResizing(false);
+      setResizePreview(null);
       if (nextW !== startW || nextH !== startH) onResize(nextW, nextH);
     };
 
-    handleEl.addEventListener("pointermove", onPointerMove);
-    handleEl.addEventListener("pointerup", onPointerUp);
-    handleEl.addEventListener("pointercancel", onPointerUp);
+    window.addEventListener("pointermove", onPointerMove, { passive: false });
+    window.addEventListener("pointerup", onPointerUp);
+    window.addEventListener("pointercancel", onPointerUp);
   };
 
   return (
@@ -1368,10 +1381,10 @@ function DraggableButton({
           onEdit();
         }
       }}
-      style={{ transform: `translate3d(${dragOffset.x}px, ${dragOffset.y}px, 0)`, zIndex: isDragging ? 20 : undefined }}
+      style={{ transform: `translate3d(${dragOffset.x}px, ${dragOffset.y}px, 0)`, zIndex: isDragging || isResizing ? 20 : undefined }}
       className="h-full min-h-0 cursor-grab touch-none select-none active:cursor-grabbing"
     >
-      <KeypadButtonTile button={button} layout={layout} dragging={isDragging} onResizePointerDown={onResize ? startResize : undefined} />
+      <KeypadButtonTile button={button} layout={layout} dragging={isDragging} resizing={isResizing} resizePreview={resizePreview} onResizePointerDown={onResize ? startResize : undefined} />
     </div>
   );
 }
