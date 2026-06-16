@@ -6317,6 +6317,7 @@ export type Database = {
           display_number: number
           dough_type: string | null
           ean_code: string | null
+          eatin_mva_rate: number | null
           energy_cost_per_unit: number
           epd_number: string | null
           gtin: string | null
@@ -6397,6 +6398,7 @@ export type Database = {
           display_number: number
           dough_type?: string | null
           ean_code?: string | null
+          eatin_mva_rate?: number | null
           energy_cost_per_unit?: number
           epd_number?: string | null
           gtin?: string | null
@@ -6477,6 +6479,7 @@ export type Database = {
           display_number?: number
           dough_type?: string | null
           ean_code?: string | null
+          eatin_mva_rate?: number | null
           energy_cost_per_unit?: number
           epd_number?: string | null
           gtin?: string | null
