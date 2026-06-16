@@ -93,7 +93,7 @@ interface KeypadButton {
   grid_height: number;
   target_page_id: string | null;
   hidden_in_self_service: boolean | null;
-  product?: { display_name: string; product_category: string | null; in_pos: boolean } | null;
+  product?: { display_name: string; product_category: string | null; in_pos: boolean; image_url: string | null } | null;
 }
 
 interface ProductOption {
@@ -203,7 +203,7 @@ async function fetchPages(layoutId: string): Promise<KeypadPage[]> {
 async function fetchButtons(pageId: string): Promise<KeypadButton[]> {
   const { data, error } = await supabase
     .from("pos_keypad_buttons")
-    .select("id, page_id, button_type, product_id, function_code, display_label, image_url, image_storage_path, show_image, background_color, text_color, grid_x, grid_y, grid_width, grid_height, target_page_id, hidden_in_self_service, product:products!pos_keypad_buttons_product_id_fkey(display_name, product_category, in_pos)")
+    .select("id, page_id, button_type, product_id, function_code, display_label, image_url, image_storage_path, show_image, background_color, text_color, grid_x, grid_y, grid_width, grid_height, target_page_id, hidden_in_self_service, product:products!pos_keypad_buttons_product_id_fkey(display_name, product_category, in_pos, image_url)")
     .eq("page_id", pageId);
   if (error) throw error;
   return (data ?? []) as unknown as KeypadButton[];
@@ -295,7 +295,10 @@ function KeypadButtonTile({ button, layout, dragging, resizing, resizePreview, o
     enabled: showImage && !!effectivePath,
     staleTime: 50 * 60 * 1000,
   });
-  const bgImage = showImage ? (button.image_url || signedFromPath) : "";
+  // Fallback til products.image_url (public bucket) hvis ingen primær pos_product_image finnes
+  const productFallback =
+    button.button_type === "product" ? button.product?.image_url ?? "" : "";
+  const bgImage = showImage ? (button.image_url || signedFromPath || productFallback) : "";
   return (
     <div
       className={cn("relative flex h-full w-full overflow-hidden rounded-md border border-primary/20 bg-primary/15 p-2 text-left text-sm font-semibold shadow-card transition hover:ring-2 hover:ring-ring", dragging && "opacity-60", resizing && "ring-2 ring-ring", notInPos && "border-destructive/60 ring-1 ring-destructive/40")}
