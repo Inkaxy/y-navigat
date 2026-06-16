@@ -25,6 +25,11 @@ interface Props {
 
 const QUICK_CASH = [200, 500, 1000];
 
+// Avrunder OPP til neste 50-multippel (eks. 248 -> 250, 263 -> 300).
+function nextRound50(amount: number): number {
+  return Math.ceil(amount / 50) * 50;
+}
+
 export function PaymentModal({
   open,
   onOpenChange,
@@ -37,12 +42,14 @@ export function PaymentModal({
   const [cashReceived, setCashReceived] = useState<string>("");
   const [localError, setLocalError] = useState<string | null>(null);
 
-  // Reset state hver gang modal lukkes/åpnes på ny kurv.
+  // Reset state hver gang modal lukkes; pre-velg kort hver gang den åpnes.
   useEffect(() => {
     if (!open) {
       setMethod(null);
       setCashReceived("");
       setLocalError(null);
+    } else {
+      setMethod("card");
     }
   }, [open]);
 
@@ -76,6 +83,29 @@ export function PaymentModal({
       setLocalError((e as Error).message);
     }
   };
+
+  // Enter = bekreft hvis gyldig
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Enter" && canConfirm) {
+        e.preventDefault();
+        void handleConfirm();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, canConfirm, method, cashReceived]);
+
+  // Hurtigbeløp for kontant: eksakt + neste 50 + faste 200/500/1000 (filtrert)
+  const quickCashValues = useMemo(() => {
+    const next50 = nextRound50(cashRounded);
+    const set = new Set<number>();
+    if (next50 > cashRounded) set.add(next50);
+    for (const v of QUICK_CASH) if (v >= cashRounded) set.add(v);
+    return [...set].sort((a, b) => a - b).slice(0, 4);
+  }, [cashRounded]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -131,27 +161,29 @@ export function PaymentModal({
                 />
               </div>
 
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <button
                   onClick={() => setCashReceived(String(cashRounded))}
-                  className="flex-1 rounded-lg bg-white/10 py-2 text-sm font-medium hover:bg-white/15"
+                  className="flex-1 min-w-[80px] rounded-lg bg-white/10 py-3 text-base font-semibold hover:bg-white/15"
                 >
                   Eksakt
                 </button>
-                {QUICK_CASH.filter((v) => v >= cashRounded).map((v) => (
+                {quickCashValues.map((v) => (
                   <button
                     key={v}
                     onClick={() => setCashReceived(String(v))}
-                    className="flex-1 rounded-lg bg-white/10 py-2 text-sm font-medium hover:bg-white/15"
+                    className="flex-1 min-w-[80px] rounded-lg bg-white/10 py-3 text-base font-semibold tabular-nums hover:bg-white/15"
                   >
                     {v}
                   </button>
                 ))}
               </div>
 
-              <div className="flex items-center justify-between border-t border-white/10 pt-3 text-lg">
-                <span className="text-[#F4ECDC]/70">Veksel</span>
-                <span className="text-2xl font-bold tabular-nums text-amber-400">
+              <div className="flex items-center justify-between border-t border-white/10 pt-3">
+                <span className="text-sm uppercase tracking-wider text-[#F4ECDC]/70">
+                  Veksel
+                </span>
+                <span className="text-4xl font-bold tabular-nums text-amber-400">
                   {change.toFixed(2)}
                 </span>
               </div>
@@ -184,7 +216,7 @@ export function PaymentModal({
               disabled={!canConfirm}
               onClick={handleConfirm}
             >
-              {submitting ? "Lagrer…" : "Fullfør salg"}
+              {submitting ? "Lagrer…" : `Fullfør salg · ${totalIncl.toFixed(2)}`}
             </BigButton>
           </div>
         </div>

@@ -450,8 +450,11 @@ function DiningChip({
   const opts: DiningMode[] = ["eatin", "takeaway", "pickup"];
   return (
     <div
-      className="flex gap-1 rounded-md p-0.5 text-xs"
-      style={{ background: "var(--kiosk-surface-alt)" }}
+      className="flex gap-1 rounded-md p-1 text-xs"
+      style={{
+        background: "var(--kiosk-surface-alt)",
+        border: "1px solid var(--kiosk-border)",
+      }}
     >
       {opts.map((id) => {
         const active = mode === id;
@@ -460,12 +463,14 @@ function DiningChip({
             key={id}
             type="button"
             onClick={() => onChange(id)}
-            className="rounded px-2 py-1 transition-colors"
+            className="rounded px-3 py-1.5 text-xs transition-colors"
             style={{
               background: active ? "var(--kiosk-accent)" : "transparent",
               color: active ? "var(--kiosk-ink-on-accent)" : "var(--kiosk-ink-soft)",
               fontFamily: "var(--kiosk-font-body)",
-              fontWeight: active ? 600 : 500,
+              fontWeight: active ? 700 : 500,
+              boxShadow: active ? "0 1px 2px rgba(0,0,0,0.18)" : undefined,
+              minHeight: 32,
             }}
           >
             {DINING_META[id].label}
@@ -719,23 +724,36 @@ function CartPane({
         )}
       </div>
       <div
-        className="flex items-center justify-between border-t pt-3 text-lg font-bold"
+        className="border-t pt-3"
         style={{ borderColor: "var(--kiosk-border)" }}
       >
-        <span>Totalt</span>
-        <span className="tabular-nums">{total.toFixed(2)}</span>
+        <div className="flex items-baseline justify-between">
+          <span
+            className="text-xs font-semibold uppercase tracking-[0.18em] opacity-70"
+            style={{ fontFamily: "var(--kiosk-font-heading)" }}
+          >
+            Totalt
+          </span>
+          <span
+            className="tabular-nums text-3xl font-bold leading-none"
+            style={{ fontFamily: "var(--kiosk-font-heading)" }}
+          >
+            {total.toFixed(2)}
+          </span>
+        </div>
       </div>
       <div className="flex gap-2">
         <button
           type="button"
           disabled={!onClear || cart.length === 0}
           onClick={onClear}
-          className="flex-1 px-3 py-3 text-sm font-semibold disabled:opacity-40"
+          className="flex-1 px-3 py-4 text-sm font-semibold disabled:opacity-40"
           style={{
             borderRadius: "var(--kiosk-radius)",
             background: "var(--kiosk-surface-alt)",
             color: "var(--kiosk-ink-soft)",
             fontFamily: "var(--kiosk-font-body)",
+            minHeight: 56,
           }}
         >
           Tøm
@@ -744,15 +762,21 @@ function CartPane({
           type="button"
           disabled={!onPay || payDisabled || cart.length === 0}
           onClick={onPay}
-          className="flex-[2] px-3 py-3 text-base font-bold disabled:opacity-40"
+          className="flex flex-[2] flex-col items-center justify-center px-3 py-4 transition-transform active:scale-[0.98] disabled:opacity-40"
           style={{
             borderRadius: "var(--kiosk-radius)",
             background: "var(--kiosk-accent)",
             color: "var(--kiosk-ink-on-accent)",
             fontFamily: "var(--kiosk-font-heading)",
+            minHeight: 64,
           }}
         >
-          Betal · {total.toFixed(0)},-
+          <span className="text-xs font-semibold uppercase tracking-[0.18em] opacity-80 leading-none">
+            Betal
+          </span>
+          <span className="mt-1 text-2xl font-bold leading-none tabular-nums">
+            kr {total.toFixed(2)}
+          </span>
         </button>
       </div>
     </aside>
