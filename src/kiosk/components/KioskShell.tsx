@@ -9,7 +9,6 @@ import OperatorBoot from "@/kiosk/pages/OperatorBoot";
 interface Props {
   terminalId: string;
   withOperator: boolean;
-  autoOperatorId?: string | null;
   children: ReactNode;
 }
 
@@ -21,7 +20,7 @@ interface Props {
  * - Setter OperatorProvider kun for operatør-rute
  * - Disable text-selection, drag og context-menu globalt
  */
-export function KioskShell({ terminalId, withOperator, autoOperatorId, children }: Props) {
+export function KioskShell({ terminalId, withOperator, children }: Props) {
   useEffect(() => {
     const prevHtmlBg = document.documentElement.style.backgroundColor;
     const prevBodyBg = document.body.style.backgroundColor;
@@ -57,9 +56,7 @@ export function KioskShell({ terminalId, withOperator, autoOperatorId, children 
           <TerminalGate>
             <RealtimeProvider terminalId={terminalId}>
               {withOperator ? (
-                <OperatorProvider terminalId={terminalId} autoOperatorId={autoOperatorId ?? null}>
-                  {children}
-                </OperatorProvider>
+                <OperatorProvider terminalId={terminalId}>{children}</OperatorProvider>
               ) : (
                 children
               )}
