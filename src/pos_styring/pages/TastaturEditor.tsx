@@ -454,6 +454,7 @@ function ButtonDialog({ open, onOpenChange, pageId, layout, buttons, pages, cell
         show_image: showImageToBoolNullable(values.show_image),
         background_color: normalizeOptional(values.background_color),
         text_color: normalizeOptional(values.text_color),
+        hidden_in_self_service: values.hidden_in_self_service,
         ...candidate,
       };
 
