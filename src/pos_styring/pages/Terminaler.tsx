@@ -256,7 +256,25 @@ function TerminalDialog({
       status: "active",
       logo_url: "",
       customer_screen_mode: "logo_and_cart",
+      terminal_mode: "cashier",
+      self_service_operator_id: NO_OPERATOR,
     },
+  });
+
+  // Operatører for selvbetjent-modus
+  const operatorsQuery = useQuery({
+    queryKey: ["pos_operators_for_terminal", activeEntityId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("pos_operators")
+        .select("id, operator_code, display_name, status")
+        .eq("legal_entity_id", activeEntityId)
+        .eq("status", "active")
+        .order("display_name");
+      if (error) throw error;
+      return (data ?? []) as { id: string; operator_code: string; display_name: string; status: string }[];
+    },
+    enabled: open && !!activeEntityId,
   });
 
   useEffect(() => {
@@ -270,11 +288,16 @@ function TerminalDialog({
       status: terminal?.status ?? "active",
       logo_url: terminal?.logo_url ?? "",
       customer_screen_mode: terminal?.customer_screen_mode ?? "logo_and_cart",
+      terminal_mode: terminal?.terminal_mode ?? "cashier",
+      self_service_operator_id: terminal?.self_service_operator_id ?? NO_OPERATOR,
     });
   }, [form, open, terminal]);
 
   const saveMutation = useMutation({
     mutationFn: async (values: TerminalFormValues) => {
+      if (values.terminal_mode === "self_service" && values.self_service_operator_id === NO_OPERATOR) {
+        throw new Error("Velg en selvbetjent operatør når modus er selvbetjent.");
+      }
       const payload = {
         outlet_id: values.outlet_id,
         terminal_code: values.terminal_code.trim().toUpperCase(),
@@ -285,6 +308,9 @@ function TerminalDialog({
         status: values.status,
         logo_url: values.logo_url?.trim() ? values.logo_url.trim() : null,
         customer_screen_mode: values.customer_screen_mode,
+        terminal_mode: values.terminal_mode,
+        self_service_operator_id:
+          values.self_service_operator_id === NO_OPERATOR ? null : values.self_service_operator_id,
       };
 
       if (isEdit) {
