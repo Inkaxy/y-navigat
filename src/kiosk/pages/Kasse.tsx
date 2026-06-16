@@ -392,9 +392,10 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
             operator_name: operator?.display_name ?? null,
             operator_code: operator?.code ?? null,
             company,
-            outlet: receiptHeader.outlet as unknown as Record<string, unknown> | null,
+            outlet: receiptHeader.outlet,
             footer_lines,
-          },
+          } as unknown as never,
+
           status: "queued",
         });
 
