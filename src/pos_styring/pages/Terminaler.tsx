@@ -81,6 +81,8 @@ interface Terminal {
   default_price_list_id: string | null;
   logo_url: string | null;
   customer_screen_mode: CustomerScreenMode;
+  terminal_mode: "cashier" | "self_service";
+  self_service_operator_id: string | null;
   updated_at: string;
   outlet?: {
     display_name: string;
@@ -129,7 +131,11 @@ const terminalSchema = z.object({
     .optional()
     .or(z.literal("")),
   customer_screen_mode: z.enum(["logo_only", "logo_and_cart"]),
+  terminal_mode: z.enum(["cashier", "self_service"]),
+  self_service_operator_id: z.string(),
 });
+
+const NO_OPERATOR = "__none__";
 
 type TerminalFormValues = z.infer<typeof terminalSchema>;
 
@@ -185,7 +191,7 @@ async function fetchTerminals(activeEntityId: string): Promise<Terminal[]> {
   const { data, error } = await supabase
     .from("pos_terminals")
     .select(
-      "id, terminal_code, display_name, receipt_prefix, status, next_receipt_number, next_session_number, next_z_number, outlet_id, default_price_list_id, logo_url, customer_screen_mode, updated_at, outlet:pickup_locations!pos_terminals_outlet_id_fkey(display_name, pos_display_name), price_list:price_lists!pos_terminals_default_price_list_id_fkey(display_name)",
+      "id, terminal_code, display_name, receipt_prefix, status, next_receipt_number, next_session_number, next_z_number, outlet_id, default_price_list_id, logo_url, customer_screen_mode, terminal_mode, self_service_operator_id, updated_at, outlet:pickup_locations!pos_terminals_outlet_id_fkey(display_name, pos_display_name), price_list:price_lists!pos_terminals_default_price_list_id_fkey(display_name)",
     )
     .eq("legal_entity_id", activeEntityId)
     .order("terminal_code", { ascending: true });
@@ -250,7 +256,25 @@ function TerminalDialog({
       status: "active",
       logo_url: "",
       customer_screen_mode: "logo_and_cart",
+      terminal_mode: "cashier",
+      self_service_operator_id: NO_OPERATOR,
     },
+  });
+
+  // Operatører for selvbetjent-modus
+  const operatorsQuery = useQuery({
+    queryKey: ["pos_operators_for_terminal", activeEntityId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("pos_operators")
+        .select("id, operator_code, display_name, status")
+        .eq("legal_entity_id", activeEntityId)
+        .eq("status", "active")
+        .order("display_name");
+      if (error) throw error;
+      return (data ?? []) as { id: string; operator_code: string; display_name: string; status: string }[];
+    },
+    enabled: open && !!activeEntityId,
   });
 
   useEffect(() => {
@@ -264,11 +288,16 @@ function TerminalDialog({
       status: terminal?.status ?? "active",
       logo_url: terminal?.logo_url ?? "",
       customer_screen_mode: terminal?.customer_screen_mode ?? "logo_and_cart",
+      terminal_mode: terminal?.terminal_mode ?? "cashier",
+      self_service_operator_id: terminal?.self_service_operator_id ?? NO_OPERATOR,
     });
   }, [form, open, terminal]);
 
   const saveMutation = useMutation({
     mutationFn: async (values: TerminalFormValues) => {
+      if (values.terminal_mode === "self_service" && values.self_service_operator_id === NO_OPERATOR) {
+        throw new Error("Velg en selvbetjent operatør når modus er selvbetjent.");
+      }
       const payload = {
         outlet_id: values.outlet_id,
         terminal_code: values.terminal_code.trim().toUpperCase(),
@@ -279,6 +308,9 @@ function TerminalDialog({
         status: values.status,
         logo_url: values.logo_url?.trim() ? values.logo_url.trim() : null,
         customer_screen_mode: values.customer_screen_mode,
+        terminal_mode: values.terminal_mode,
+        self_service_operator_id:
+          values.self_service_operator_id === NO_OPERATOR ? null : values.self_service_operator_id,
       };
 
       if (isEdit) {
@@ -519,6 +551,66 @@ function TerminalDialog({
                 )}
               />
             </div>
+
+            <div className="rounded-lg border bg-muted/20 p-4 space-y-4">
+              <div className="text-sm font-medium">Kassemodus</div>
+              <FormField
+                control={form.control}
+                name="terminal_mode"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Modus</FormLabel>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="cashier">Vanlig kasse (operatør med PIN)</SelectItem>
+                        <SelectItem value="self_service">Selvbetjent (kunde-modus, ingen login)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>
+                      Vanlig kasse: <code>/kiosk/o/&lt;terminal-id&gt;</code>. Selvbetjent: <code>/kiosk/s/&lt;terminal-id&gt;</code>.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              {form.watch("terminal_mode") === "self_service" && (
+                <FormField
+                  control={form.control}
+                  name="self_service_operator_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Selvbetjent operatør</FormLabel>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Velg operatør" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value={NO_OPERATOR}>— Ingen valgt —</SelectItem>
+                          {(operatorsQuery.data ?? []).map((op) => (
+                            <SelectItem key={op.id} value={op.id}>
+                              {op.operator_code} · {op.display_name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>
+                        Brukes til å åpne sesjon og bokføre salg i selvbetjent modus. Opprett gjerne en egen "SELV"-operatør.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+            </div>
+
+
 
 
 

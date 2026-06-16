@@ -11,6 +11,8 @@ export interface KioskTerminal {
   outlet_id: string | null;
   logo_url: string | null;
   customer_screen_mode: "logo_only" | "logo_and_cart";
+  terminal_mode: "cashier" | "self_service";
+  self_service_operator_id: string | null;
 }
 
 type Status = "loading" | "ready" | "not_found" | "error";
@@ -39,7 +41,7 @@ export function TerminalProvider({
     (async () => {
       const { data, error } = await kioskSupabase
         .from("pos_terminals")
-        .select("id, terminal_code, display_name, legal_entity_id, default_price_list_id, outlet_id, logo_url, customer_screen_mode")
+        .select("id, terminal_code, display_name, legal_entity_id, default_price_list_id, outlet_id, logo_url, customer_screen_mode, terminal_mode, self_service_operator_id")
         .eq("id", terminalId)
         .maybeSingle();
       if (cancelled) return;
