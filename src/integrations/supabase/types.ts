@@ -4346,6 +4346,7 @@ export type Database = {
           grid_width: number
           grid_x: number
           grid_y: number
+          hidden_in_self_service: boolean
           id: string
           image_storage_path: string | null
           image_url: string | null
@@ -4364,6 +4365,7 @@ export type Database = {
           grid_width?: number
           grid_x: number
           grid_y: number
+          hidden_in_self_service?: boolean
           id?: string
           image_storage_path?: string | null
           image_url?: string | null
@@ -4382,6 +4384,7 @@ export type Database = {
           grid_width?: number
           grid_x?: number
           grid_y?: number
+          hidden_in_self_service?: boolean
           id?: string
           image_storage_path?: string | null
           image_url?: string | null
@@ -4979,8 +4982,10 @@ export type Database = {
           outlet_id: string
           printer_config: Json
           receipt_prefix: string
+          self_service_operator_id: string | null
           status: string
           terminal_code: string
+          terminal_mode: string
           updated_at: string
         }
         Insert: {
@@ -4997,8 +5002,10 @@ export type Database = {
           outlet_id: string
           printer_config?: Json
           receipt_prefix: string
+          self_service_operator_id?: string | null
           status?: string
           terminal_code: string
+          terminal_mode?: string
           updated_at?: string
         }
         Update: {
@@ -5015,8 +5022,10 @@ export type Database = {
           outlet_id?: string
           printer_config?: Json
           receipt_prefix?: string
+          self_service_operator_id?: string | null
           status?: string
           terminal_code?: string
+          terminal_mode?: string
           updated_at?: string
         }
         Relationships: [
@@ -5039,6 +5048,13 @@ export type Database = {
             columns: ["outlet_id"]
             isOneToOne: false
             referencedRelation: "pickup_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pos_terminals_self_service_operator_id_fkey"
+            columns: ["self_service_operator_id"]
+            isOneToOne: false
+            referencedRelation: "pos_operators"
             referencedColumns: ["id"]
           },
         ]
