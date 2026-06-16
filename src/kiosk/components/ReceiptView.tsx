@@ -10,6 +10,10 @@ import {
   parsePaymentSummary,
   parseProductSnapshot,
 } from "@/pos_styring/lib/pos-types";
+import type {
+  ReceiptCompany,
+  ReceiptOutlet,
+} from "@/kiosk/hooks/useReceiptHeader";
 
 interface TxRow {
   id: string;
@@ -42,138 +46,239 @@ interface Props {
   tx: TxRow | null;
   lines: LineRow[];
   terminalName: string;
+  terminalId?: string | null;
+  operatorCode?: string | null;
+  company?: ReceiptCompany | null;
+  outlet?: ReceiptOutlet | null;
   onNewSale: () => void;
   onPrintReceipt?: () => void;
   printingReceipt?: boolean;
 }
 
-export function ReceiptView({ open, tx, lines, terminalName, onNewSale, onPrintReceipt, printingReceipt }: Props) {
+const PAY_METHOD_LABEL: Record<string, string> = {
+  cash: "Kontant",
+  card: "Kort",
+  vipps: "Vipps",
+  invoice: "Faktura",
+  gift_card: "Gavekort",
+  other: "Annet",
+};
+
+function fmt(n: number) {
+  return n.toFixed(2).replace(".", ",");
+}
+
+function short(id: string | null | undefined) {
+  if (!id) return "";
+  return id.replace(/-/g, "").slice(0, 14);
+}
+
+export function ReceiptView({
+  open,
+  tx,
+  lines,
+  terminalName,
+  terminalId,
+  operatorCode,
+  company,
+  outlet,
+  onNewSale,
+  onPrintReceipt,
+  printingReceipt,
+}: Props) {
   if (!tx) return null;
   const mva = parseMvaBreakdown(tx.mva_breakdown);
   const pay = parsePaymentSummary(tx.payment_summary);
   const change = pay.change_given ?? 0;
   const ts = new Date(tx.created_at);
+  const dateStr = ts.toLocaleDateString("nb-NO");
+  const timeStr = ts.toLocaleTimeString("nb-NO", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+
+  const headerTitle =
+    outlet?.full_name ??
+    [company?.name, outlet?.short_name].filter(Boolean).join(" avd. ") ??
+    company?.name ??
+    terminalName;
+
+  const butikkLine = outlet
+    ? `Butikk: ${outlet.display_number ?? ""} ${
+        outlet.full_name ?? outlet.short_name ?? ""
+      }`.trim()
+    : null;
+
+  const tlf = outlet?.phone ?? company?.phone ?? null;
+  const orgLine = company?.org_number
+    ? `${company.org_number}${company.vat_registered ? "MVA" : ""}`
+    : null;
 
   return (
     <Dialog open={open}>
       <DialogContent
-        className="max-w-lg border-white/10 bg-[#1B1410] text-[#F4ECDC]"
+        className="max-w-md border-white/10 bg-[#1B1410] p-0 text-[#F4ECDC]"
         onPointerDownOutside={(e) => e.preventDefault()}
         onEscapeKeyDown={(e) => e.preventDefault()}
       >
-        <DialogHeader>
+        <DialogHeader className="px-6 pt-6">
           <DialogTitle className="text-xl">Kvittering</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 font-mono text-sm">
-          <div className="text-center">
-            <div className="text-base font-semibold">{terminalName}</div>
-            <div className="mt-1 text-[#F4ECDC]/60">
-              {tx.receipt_number ?? `#${tx.receipt_sequence ?? "?"}`}
+        <div className="max-h-[70vh] overflow-y-auto px-6 pb-2">
+          <div className="space-y-3 font-mono text-[13px] leading-snug">
+            {/* ── Topphode ────────────────────────────────────── */}
+            <div className="text-center">
+              <div className="text-base font-semibold">{headerTitle}</div>
+              <div className="mt-2 font-semibold tracking-wider">
+                SALGSKVITTERING
+              </div>
             </div>
-            <div className="text-xs text-[#F4ECDC]/50">
-              {ts.toLocaleString("nb-NO")}
-            </div>
-            <div className="mt-1 text-xs uppercase tracking-wider text-[#F4ECDC]/40">
-              {tx.dining_mode === "eatin" ? "Spise her" : "Take away"}
-            </div>
-          </div>
 
-          <div className="space-y-1 border-y border-white/10 py-3">
-            {lines.map((l) => {
-              const snap = parseProductSnapshot(l.product_snapshot);
-              return (
-                <div key={l.id} className="flex justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate">{snap.display_name}</div>
-                    <div className="text-xs text-[#F4ECDC]/50">
-                      {l.quantity} × {l.unit_price_excl_mva.toFixed(2)}
-                      {l.line_discount > 0 && ` − ${l.line_discount.toFixed(2)}`}
+            {/* ── Metadata ───────────────────────────────────── */}
+            <div className="space-y-0.5 text-[12px]">
+              <div className="flex justify-between gap-4">
+                <span>Dato: {dateStr}</span>
+                <span>Tid: {timeStr}</span>
+              </div>
+              {butikkLine && <div>{butikkLine}</div>}
+              <div className="flex justify-between gap-4">
+                {tlf && <span>Tlf: {tlf}</span>}
+                {operatorCode && <span>Selger: {operatorCode}</span>}
+              </div>
+              <div className="flex justify-between gap-4">
+                <span>
+                  No: {tx.receipt_number ?? tx.receipt_sequence ?? "—"}
+                </span>
+                {orgLine && <span>Org: {orgLine}</span>}
+              </div>
+              {terminalId && <div>Enhet: {short(terminalId)}</div>}
+              <div className="text-[11px] uppercase tracking-wider text-[#F4ECDC]/50">
+                {tx.dining_mode === "eatin" ? "Spise her" : "Take away"}
+              </div>
+            </div>
+
+            {/* ── Varelinjer ─────────────────────────────────── */}
+            <div className="space-y-1 border-y border-dashed border-white/20 py-3">
+              {lines.map((l) => {
+                const snap = parseProductSnapshot(l.product_snapshot);
+                return (
+                  <div key={l.id} className="flex justify-between gap-3">
+                    <div className="flex min-w-0 flex-1 gap-2">
+                      <span className="tabular-nums">
+                        {Number(l.quantity).toFixed(2)}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate">{snap.display_name}</div>
+                        {l.line_discount > 0 && (
+                          <div className="text-[11px] text-[#F4ECDC]/60">
+                            Rabatt: −{fmt(Number(l.line_discount))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="tabular-nums">
+                      {fmt(Number(l.line_total_incl_mva))}
                     </div>
                   </div>
-                  <div className="tabular-nums">
-                    {Number(l.line_total_incl_mva).toFixed(2)}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
 
-          <div className="space-y-1">
-            <Row label="Sum eks. mva" value={Number(tx.subtotal_excl_mva).toFixed(2)} />
-            {mva.map((m) => (
-              <Row
-                key={m.rate}
-                label={`Mva ${m.rate}%`}
-                value={m.vat.toFixed(2)}
-                muted
-              />
-            ))}
-            <Row label="Sum mva" value={Number(tx.total_mva).toFixed(2)} muted />
-            <div className="mt-2 flex justify-between border-t border-white/20 pt-2 text-lg font-bold">
-              <span>Totalt</span>
+            {/* ── Totalt ─────────────────────────────────────── */}
+            <div className="flex justify-between border-b border-white/20 pb-2 text-base font-bold">
+              <span>Total:</span>
               <span className="tabular-nums">
-                {Number(tx.total_incl_mva).toFixed(2)}
+                {fmt(Number(tx.total_incl_mva))}
               </span>
             </div>
-          </div>
 
-          <div className="space-y-1 border-t border-white/10 pt-3">
-            {pay.payments.map((p, i) => (
-              <Row
-                key={i}
-                label={p.method}
-                value={p.amount.toFixed(2)}
-              />
-            ))}
-            <Row label="Betalt" value={pay.total_paid.toFixed(2)} />
-            {change > 0 && (
-              <Row label="Veksel" value={change.toFixed(2)} bold />
-            )}
-          </div>
+            {/* ── Betaling ───────────────────────────────────── */}
+            <div className="space-y-0.5">
+              {pay.payments.map((p, i) => (
+                <div key={i} className="flex justify-between">
+                  <span>{PAY_METHOD_LABEL[p.method] ?? p.method}</span>
+                  <span className="tabular-nums">{fmt(p.amount)}</span>
+                </div>
+              ))}
+              {change > 0 && (
+                <div className="flex justify-between font-semibold text-amber-300">
+                  <span>Veksel</span>
+                  <span className="tabular-nums">{fmt(change)}</span>
+                </div>
+              )}
+            </div>
 
-          <div className="flex gap-2">
-            {onPrintReceipt && (
-              <BigButton
-                variant="secondary"
-                className="flex-1 text-base"
-                onClick={onPrintReceipt}
-                disabled={printingReceipt}
-              >
-                {printingReceipt ? "Sender…" : "Skriv ut kvittering"}
-              </BigButton>
-            )}
-            <BigButton className="flex-1 text-base" onClick={onNewSale}>
-              Nytt salg
+            {/* ── Spesifisert MVA ────────────────────────────── */}
+            <div className="border-t border-dashed border-white/20 pt-2">
+              <div className="font-semibold">SPESIFISERT MVA</div>
+              <div className="mt-1 grid grid-cols-[1fr_1fr_1fr] gap-2 text-[12px]">
+                <div className="text-[#F4ECDC]/60">Sats</div>
+                <div className="text-right text-[#F4ECDC]/60">Varekjøp</div>
+                <div className="text-right text-[#F4ECDC]/60">MVA</div>
+                {mva.map((m) => (
+                  <FragmentRow
+                    key={m.rate}
+                    rate={`${Number(m.rate).toFixed(1)}%`}
+                    net={fmt(Number(m.net))}
+                    vat={fmt(Number(m.vat))}
+                  />
+                ))}
+                <div className="col-span-3 border-t border-dashed border-white/20" />
+                <div>Total MVA</div>
+                <div className="text-right tabular-nums">
+                  {fmt(Number(tx.subtotal_excl_mva))}
+                </div>
+                <div className="text-right tabular-nums">
+                  {fmt(Number(tx.total_mva))}
+                </div>
+              </div>
+            </div>
+
+            {/* ── Footer ─────────────────────────────────────── */}
+            <div className="border-t border-dashed border-white/20 pt-3 text-center text-[11px] text-[#F4ECDC]/60">
+              Takk for at du handler hos
+              <br />
+              den lokale bakeren!
+            </div>
+          </div>
+        </div>
+
+        <div className="flex gap-2 border-t border-white/10 bg-[#1B1410] p-4">
+          {onPrintReceipt && (
+            <BigButton
+              variant="secondary"
+              className="flex-1 text-base"
+              onClick={onPrintReceipt}
+              disabled={printingReceipt}
+            >
+              {printingReceipt ? "Sender…" : "Skriv ut kvittering"}
             </BigButton>
-          </div>
+          )}
+          <BigButton className="flex-1 text-base" onClick={onNewSale}>
+            Nytt salg
+          </BigButton>
         </div>
       </DialogContent>
     </Dialog>
   );
 }
 
-function Row({
-  label,
-  value,
-  muted,
-  bold,
+function FragmentRow({
+  rate,
+  net,
+  vat,
 }: {
-  label: string;
-  value: string;
-  muted?: boolean;
-  bold?: boolean;
+  rate: string;
+  net: string;
+  vat: string;
 }) {
   return (
-    <div
-      className={
-        "flex justify-between " +
-        (muted ? "text-[#F4ECDC]/60 " : "") +
-        (bold ? "font-bold text-amber-400" : "")
-      }
-    >
-      <span className="capitalize">{label}</span>
-      <span className="tabular-nums">{value}</span>
-    </div>
+    <>
+      <div>{rate}</div>
+      <div className="text-right tabular-nums">{net}</div>
+      <div className="text-right tabular-nums">{vat}</div>
+    </>
   );
 }
