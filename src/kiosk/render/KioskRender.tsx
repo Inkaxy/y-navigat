@@ -597,13 +597,17 @@ function CartLineRich({
   showStepper,
   onQtyChange,
   onRemove,
+  onDiningCycle,
 }: {
   line: RenderCartLine;
   showImage: boolean;
   showStepper: boolean;
   onQtyChange?: (id: string, delta: number) => void;
   onRemove?: (id: string) => void;
+  onDiningCycle?: (id: string) => void;
 }) {
+  const showDiningPill = line.is_food && onDiningCycle;
+  const modeLabel = line.dining_mode === "eatin" ? "Sitt her" : "Ta med";
   return (
     <div
       className="flex items-center gap-3 border-b py-2 last:border-0"
@@ -624,8 +628,13 @@ function CartLineRich({
           <span className="truncate text-sm font-semibold">{line.label}</span>
           <span className="tabular-nums text-sm font-semibold">{line.line_total.toFixed(0)},-</span>
         </div>
+        <div className="mt-0.5 flex items-center gap-2 text-[11px] opacity-60">
+          {line.mva_rate != null && <span>{line.mva_rate}%</span>}
+          {line.dining_mode && <span>· {modeLabel}</span>}
+          {line.dining_overridden && <span className="text-amber-500">✱</span>}
+        </div>
         {showStepper ? (
-          <div className="mt-1 flex items-center gap-2">
+          <div className="mt-1 flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={() => onQtyChange?.(line.id, -1)}
@@ -647,6 +656,22 @@ function CartLineRich({
             >
               <PlusIcon className="h-3.5 w-3.5" />
             </button>
+            {showDiningPill && (
+              <button
+                type="button"
+                onClick={() => onDiningCycle(line.id)}
+                className={
+                  "ml-1 inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide transition-colors " +
+                  (line.dining_overridden
+                    ? "border-amber-500/60 bg-amber-500/15 text-amber-600 dark:text-amber-200"
+                    : "border-transparent bg-[color:var(--kiosk-surface-alt)] opacity-70 hover:opacity-100")
+                }
+                aria-label="Bytt serveringsmodus for linjen"
+                title="Bytt mellom Sitt her / Ta med for denne varen"
+              >
+                {modeLabel}
+              </button>
+            )}
             {onRemove && (
               <button
                 type="button"
@@ -680,6 +705,7 @@ function CartPane({
   onDiningChange,
   onCartLineQtyChange,
   onCartLineRemove,
+  onCartLineDiningCycle,
 }: {
   theme: KioskTheme;
   cart: RenderCartLine[];
@@ -691,6 +717,7 @@ function CartPane({
   onDiningChange?: (m: DiningMode) => void;
   onCartLineQtyChange?: (id: string, delta: number) => void;
   onCartLineRemove?: (id: string) => void;
+  onCartLineDiningCycle?: (id: string) => void;
 }) {
   const rich = theme.cartStyle === "rich";
   return (
@@ -726,6 +753,7 @@ function CartPane({
               showStepper={theme.cartShowStepper}
               onQtyChange={onCartLineQtyChange}
               onRemove={onCartLineRemove}
+              onDiningCycle={onCartLineDiningCycle}
             />
           ))
         ) : (
