@@ -552,6 +552,66 @@ function TerminalDialog({
               />
             </div>
 
+            <div className="rounded-lg border bg-muted/20 p-4 space-y-4">
+              <div className="text-sm font-medium">Kassemodus</div>
+              <FormField
+                control={form.control}
+                name="terminal_mode"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Modus</FormLabel>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="cashier">Vanlig kasse (operatør med PIN)</SelectItem>
+                        <SelectItem value="self_service">Selvbetjent (kunde-modus, ingen login)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>
+                      Vanlig kasse: <code>/kiosk/o/&lt;terminal-id&gt;</code>. Selvbetjent: <code>/kiosk/s/&lt;terminal-id&gt;</code>.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              {form.watch("terminal_mode") === "self_service" && (
+                <FormField
+                  control={form.control}
+                  name="self_service_operator_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Selvbetjent operatør</FormLabel>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Velg operatør" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value={NO_OPERATOR}>— Ingen valgt —</SelectItem>
+                          {(operatorsQuery.data ?? []).map((op) => (
+                            <SelectItem key={op.id} value={op.id}>
+                              {op.operator_code} · {op.display_name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>
+                        Brukes til å åpne sesjon og bokføre salg i selvbetjent modus. Opprett gjerne en egen "SELV"-operatør.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+            </div>
+
+
+
 
 
             {terminal && (
