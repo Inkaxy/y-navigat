@@ -70,7 +70,8 @@ export function KeypadGrid({ data }: Props) {
           mva_rate: p.mva_rate,
         },
         unit_price_excl_mva: p.unit_price_excl_mva,
-        mva_rate: p.mva_rate,
+        base_mva_rate: p.mva_rate,
+        eatin_mva_rate: p.eatin_mva_rate,
         quantity: 1,
       });
     } catch (e) {

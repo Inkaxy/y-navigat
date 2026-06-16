@@ -52,14 +52,22 @@ type LinePayload = {
   dining_mode_override: "takeaway" | "eatin" | null;
 };
 
-export function toLinePayload(item: CartItem): LinePayload {
+export function toLinePayload(
+  item: CartItem,
+  cartDining: "takeaway" | "eatin",
+): LinePayload {
+  const mode = item.dining_mode_override ?? cartDining;
+  const effectiveRate =
+    mode === "eatin" && item.eatin_mva_rate != null
+      ? item.eatin_mva_rate
+      : item.base_mva_rate;
   return {
     product_id: item.product_id,
     product_snapshot: item.product_snapshot,
     quantity: item.quantity,
     unit_price_excl_mva: item.unit_price_excl_mva,
     line_discount: item.line_discount ?? 0,
-    mva_rate: item.mva_rate,
+    mva_rate: effectiveRate,
     dining_mode_override: item.dining_mode_override ?? null,
   };
 }
