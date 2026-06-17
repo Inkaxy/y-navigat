@@ -15,6 +15,8 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { todayISO, formatDate } from "@/ordre/lib/format";
 import { relativeDateLabel, shiftIsoDate } from "@/ordre/lib/relativeDate";
+import { useCakeImageCounts } from "@/ordre/hooks/useCakeImages";
+import { UploadButton } from "@/ordre/components/cake-images/UploadButton";
 
 /**
  * Kakebilder — dashboard.
