@@ -1,67 +1,115 @@
-# Per-linje serveringsmodus + korrekt MVA
+## Mål
+Bygg en arbeidsflyt for kakebilder: opplasting/demo → kø-liste med thumbnails → klikk → avansert editor → lagre → marker "ferdig redigert" → skriv ut enkelt eller flere samtidig (browser-print eller PDF).
 
-I dag har kurven én felles "Sitt her / Ta med"-bryter, og MVA tas rett fra produktets `mva_rate` (uten å reagere på serveringsmodus). Det matcher ikke virkeligheten der en kunde kan kjøpe kaffe (sitt her) og brød (ta med) i samme handel, og hvor norsk MVA-regel er:
+## Datamodell (Lovable Cloud / Supabase)
 
-- **Sitt her / servering på stedet → 25 % MVA**
-- **Ta med / matvare → 15 % MVA**
-- Ikke-mat (f.eks. servise, gavekort, klær) skal beholde sin egen sats uansett.
+Storage-bucket: `cake-images` (privat).
 
-## Hva som endres
+Tabell `public.cake_images`:
+- `id uuid pk`
+- `legal_entity_id uuid` (eier, fra brukerens aktive selskap)
+- `delivery_date date` (knytter bildet til en dato i køen)
+- `title text` (default filnavn)
+- `customer_name text null`, `order_ref text null`, `notes text null`
+- `source text` ('upload' | 'demo' | 'email' | 'ticket') default 'upload'
+- `original_path text` (storage-key til opplastet bilde)
+- `edited_path text null` (storage-key til redigert PNG fra editor)
+- `editor_state jsonb null` (lerret-tilstand: lag, tekst, transform, brightness/contrast, crop, rotation, flip)
+- `status text` ('venter' | 'ferdig_redigert' | 'skrevet_ut') default 'venter'
+- `printed_at timestamptz null`, `print_count int default 0`
+- `created_by uuid`, `created_at`, `updated_at`
 
-### 1. Datamodell (`products`)
-Legg til `eatin_mva_rate numeric(5,2)` (nullable):
-- `NULL` ⇒ produktet er ikke matvare → samme MVA i begge moduser (`products.mva_rate`).
-- `25` ⇒ produktet er matvare → `15` ved takeaway (fra `mva_rate`), `25` ved eatin (fra `eatin_mva_rate`).
+RLS: alle authenticated brukere i samme `legal_entity_id` kan lese/skrive (følger eksisterende mønster i prosjektet). Service_role full tilgang. GRANTs som spec krever.
 
-Backfill: alle produkter som i dag har `mva_rate = 15` settes til `eatin_mva_rate = 25` (typisk mat/drikke). De andre lar vi være `NULL`. Brukeren kan justere enkeltprodukter i Produkter-skjermen.
+Storage-policies: authenticated kan lese/laste opp/slette objekter i `cake-images` der path starter med deres `legal_entity_id/...`.
 
-I `pos_record_sale` RPC utvides validering: tillatte satser pr linje er fortsatt `(0, 12, 15, 25)`; ingen endring i signatur. Klienten sender allerede `mva_rate` pr linje, så serveren stoler på den.
+Realtime aktiveres på `cake_images` slik at køen oppdateres når noen redigerer.
 
-### 2. Klient — produkt-oppslag (`useProductLookup`)
-Henter også `eatin_mva_rate`. Returnerer både `mva_rate` (base/takeaway) og `eatin_mva_rate` (kan være `null`).
+## Sider / komponenter
 
-### 3. Klient — kurv-logikk (`CartContext` + `cart.ts`)
-`CartItem` utvides:
-- `base_mva_rate` (takeaway-sats, fra produkt)
-- `eatin_mva_rate: number | null`
-- `mva_rate` blir **derivert** fra `dining_mode_override` (eller cart-default) + de to over.
+### 1. Dashboard (`/ordre/kakebilder`) — eksisterer
+Oppdater til å hente live tellinger:
+- `for_utskrift` = status in ('venter','ferdig_redigert') for valgt dato
+- `skrevet_ut` = status='skrevet_ut' for valgt dato
+Legg til knapp "Last opp bilde" og "+ Demo-bilder" (seeds 3 plassholder-bilder).
 
-Helper `effectiveMva(item, cartDefault)`:
+### 2. Liste (`/ordre/kakebilder/liste?date&status`)
+Erstatt nåværende tom-tilstand med:
+- Toolbar: Tilbake, dato, status-tabs (For utskrift / Skrevet ut), "Last opp", søk
+- Bulk-bar (vises når noe er valgt): antall valgt, "Skriv ut valgte (browser)", "Last ned PDF", "Marker som skrevet ut", "Marker som ferdig redigert", "Slett"
+- Grid av kort: thumbnail (edited_path hvis finnes, ellers original), checkbox, tittel, kunde, status-badge ("Venter" gul / "Ferdig redigert" grønn / "Skrevet ut" grå), liten knapp "Åpne editor". Klikk på kortet = åpne editor.
+- Empty-state med "Last opp ditt første kakebilde".
+
+### 3. Editor (`/ordre/kakebilder/editor/:id`)
+Kopykake-inspirert layout, 3 kolonner:
+
+```text
++--------+----------------------------+-----------+
+| Venstre| Lerret (Fabric.js)         | Høyre     |
+| panel  |                            | panel     |
+|        |                            |           |
+| Maler  |  [bilde + lag + tekst]     | Detaljer  |
+| Bilder |                            | Lag       |
+| Tekst  |                            | Justering |
+| Cliprt |                            |           |
++--------+----------------------------+-----------+
+| Bunn: Lagre · Lagre & marker ferdig · Skriv ut · Last ned PDF · Tilbake |
 ```
-mode = item.dining_mode_override ?? cartDefault
-if mode === 'eatin' && eatin_mva_rate != null → eatin_mva_rate
-else → base_mva_rate
-```
 
-`calcLine` / `calcTotals` tar `cartDefault` som ekstra arg slik at MVA-bøttene blir riktige. `serializeForCustomer` likeså. Alle eksisterende callere oppdateres.
+Topp-verktøylinje: Undo/Redo · Grid · Ruler · Større · Mindre · Roter · Speilvend · Slett valgt · Zoom-slider.
 
-Sammenslåing av like produkt-linjer i `addItem` slutter å slå sammen når `dining_mode_override` er satt eksplisitt (allerede halvveis sånn i dag), og linjer med ulik effektiv MVA holdes adskilt.
+Venstre faner (Accordion):
+- **Maler**: 1/4 ark landskap (10×7,5"), 1/4 ark portrett (7,5×10"), 8" rund, business cards 10-up. Bytt lerret-størrelse uten å miste lag.
+- **Bilder**: Last opp nytt bilde-lag (storage), eller dra nåværende original inn.
+- **Tekst**: dropdown forhåndsdefinerte stiler (Tittel/Undertittel/Etikett), tekst-input, "Legg til tekst". Når tekst er valgt: font, størrelse, farge, fet, kursiv, justering.
+- **Clipart**: enkelt sett SVG-ikoner (brød, kake, pose, hjerte).
 
-### 4. Klient — UI på kurv-linje (`CartLine.tsx`)
-Hver linje får en liten pille-knapp («Sitt her» / «Ta med») som overstyrer cart-default. Tre tilstander: arve fra kurv, eksplisitt eatin, eksplisitt takeaway. Vises kun for matvare-produkter (de med `eatin_mva_rate != null`) — for ikke-mat har det ingen effekt og vi skjuler knappen for å unngå støy.
+Høyre panel:
+- Maldetaljer (ark/logo-størrelse)
+- Lag-liste (drag-rekkefølge, vis/skjul, slett)
+- Farge & lysstyrke (brightness/contrast/grayscale slider — Fabric image-filtre)
+- Crop / rotate / flip (knapper)
 
-Linje-undertekst viser også effektiv MVA, f.eks. `15 % · Ta med` eller `25 % · Sitt her`.
+Persistens:
+- "Lagre" → serialiser `canvas.toJSON()` til `editor_state` + render PNG og last opp som `edited_path` (overskriver forrige).
+- "Lagre & marker ferdig" → samme + sett `status='ferdig_redigert'`.
+- Ved åpning: hvis `editor_state` finnes, lastes den; ellers initialiseres lerretet med original-bildet.
 
-### 5. Klient — øverste «kurv-default»-chip
-Beholdes som i dag (`DiningChip`), men virker nå bare som standard for nye linjer (eksisterende linjer endres ikke automatisk når brukeren bytter cart-default — det matcher kassø-flow bedre). Vi kan vise en liten knapp «Bruk på alle» dersom ønsket — droppes i første runde.
+Utskrift:
+- "Skriv ut" → åpner browserens print-dialog med kun lerretet (1 side, korrekt mm-størrelse via @page).
+- "Last ned PDF" → genererer A4-PDF med lerretet sentrert (jsPDF + dataURL).
 
-### 6. Kasse → RPC payload
-`toLinePayload` setter `mva_rate` = effektiv MVA (etter mode), og fortsetter å sende `dining_mode_override` for sporbarhet. Server lagrer som før.
-
-### 7. Produkt-admin
-I `Produkter.tsx` legges et lite felt for `eatin_mva_rate` (vises som «Sitt her-MVA»; tomt = ikke matvare). Detaljvisning, ikke obligatorisk i listen.
+### 4. Bulk-utskrift fra listen
+- "Skriv ut valgte" → ny rute `/ordre/kakebilder/print?ids=...` som rendrer hvert valgt bilde som egen side med `page-break-after`, kaller `window.print()` ved load.
+- "Last ned PDF" → jsPDF, én side pr bilde, last ned `kakebilder-YYYY-MM-DD.pdf`.
+- Begge oppdaterer `status='skrevet_ut'`, `printed_at=now()`, `print_count+1` etterpå.
 
 ## Tekniske detaljer
 
-- Migrasjon: `ALTER TABLE public.products ADD COLUMN eatin_mva_rate numeric(5,2) NULL`, pluss `UPDATE products SET eatin_mva_rate = 25 WHERE mva_rate = 15`. Ingen policy-endringer (eksisterende RLS dekker kolonnen).
-- `pos_record_sale` trenger ikke endres (godtar 15 og 25 allerede).
-- Realtime customer-display: `serializeForCustomer` får mode pr linje, så kunde-skjermen kan vise «Sitt her»-merke pr linje senere. Første runde sender vi kun `line_total` (uendret), men vi inkluderer `dining_mode` pr linje for fremtidig bruk.
-- Selvbetjent kasse (`SelfServiceKasse`): samme UI på kurv-linjer; sender effektiv MVA på samme måte. Cart-default i selvbetjent forblir takeaway.
+- Lerret: `fabric` (`bun add fabric@6` + `@types/fabric`). Velkjent API for lag, tekst, bilde-filtre, undo/redo via `canvas.toJSON()`-snapshots.
+- PDF: `jspdf` (allerede installert? sjekkes — ellers `bun add jspdf`).
+- Thumbnails: signed URL fra `cake-images` (privat bucket), 60s TTL, cached i query.
+- Realtime: subscribe i listen så nye opplastinger / status-endringer vises live.
+- Demo-seed: 3 statiske JPG-er pakkes som lovable-assets og kopieres inn i bucket ved "Legg til demo-bilder".
 
-## Akseptansekriterier
+## Filer som lages/endres
 
-1. Kaffe (matvare, takeaway 15) + sjokoladekake (matvare, takeaway 15) lagt i kurv med cart-default «Sitt her» beregner 25 % på begge.
-2. Bytte enkelt-linje (kaffen) til «Sitt her» mens kurv-default er «Ta med»: bare kaffen får 25 %, brødet beholder 15 %.
-3. Ikke-mat-produkt (mva 25, `eatin_mva_rate=NULL`): MVA er alltid 25 %, og dining-pille vises ikke.
-4. MVA-breakdown i totals og kvittering reflekterer per-linje-satsene; `pos_record_sale` lagrer korrekt sats pr linje.
-5. Eksisterende kvitteringer/rapporter er bakoverkompatible.
+Nye:
+- `supabase/migrations/<ts>_cake_images.sql` — tabell, RLS, GRANTs, storage-policies, realtime
+- `src/ordre/lib/cakeImages.ts` — typer, queries, mutations, signed URLs
+- `src/ordre/hooks/useCakeImages.ts` + `useCakeImage.ts`
+- `src/ordre/pages/CakeImageEditor.tsx`
+- `src/ordre/pages/CakeImagesPrint.tsx` (bulk print-rute)
+- `src/ordre/components/cake-images/CakeImageCard.tsx`
+- `src/ordre/components/cake-images/UploadButton.tsx`
+- `src/ordre/components/cake-images/editor/{Toolbar,LeftPanel,RightPanel,CanvasStage,LayersList}.tsx`
+- `src/ordre/components/cake-images/editor/templates.ts`
+
+Endres:
+- `src/ordre/pages/CakeImagesDashboard.tsx` (live tellinger + opplasting)
+- `src/ordre/pages/CakeImagesList.tsx` (grid + bulk + opplasting)
+- `src/ordre/lib/routes.ts` (legg til `kakebilderEditor`, `kakebilderPrint`)
+- `src/App.tsx` (to nye ruter)
+
+## Leveranseplan (denne meldingen)
+Implementer alt i én runde: migrering + bucket, datalag, dashboard live, liste m/ bulk, editor (Fabric.js) med lagring, browser-print og PDF (enkel + bulk), demo-seed-knapp.
