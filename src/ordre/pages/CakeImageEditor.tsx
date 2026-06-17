@@ -88,7 +88,10 @@ const CANVAS_JSON_PROPS = ["cakeStoragePath"];
 type CakeFabricImage = fabric.FabricImage & { cakeStoragePath?: string };
 
 function canvasSnapshot(canvas: fabric.Canvas) {
-  return JSON.stringify(canvas.toJSON(CANVAS_JSON_PROPS));
+  const toJSON = (canvas as unknown as {
+    toJSON: (propertiesToInclude?: string[]) => unknown;
+  }).toJSON;
+  return JSON.stringify(toJSON.call(canvas, CANVAS_JSON_PROPS));
 }
 
 function extractCakePathFromUrl(src: unknown) {
