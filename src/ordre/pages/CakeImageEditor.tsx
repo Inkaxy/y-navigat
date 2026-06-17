@@ -83,6 +83,75 @@ const CLIPART: { id: string; label: string; Icon: typeof Cake }[] = [
   { id: "bag", label: "Pose", Icon: ShoppingBag },
 ];
 
+const CANVAS_JSON_PROPS = ["cakeStoragePath"];
+
+type CakeFabricImage = fabric.FabricImage & { cakeStoragePath?: string };
+
+function canvasSnapshot(canvas: fabric.Canvas) {
+  const toJSON = (canvas as unknown as {
+    toJSON: (propertiesToInclude?: string[]) => unknown;
+  }).toJSON;
+  return JSON.stringify(toJSON.call(canvas, CANVAS_JSON_PROPS));
+}
+
+function extractCakePathFromUrl(src: unknown) {
+  if (typeof src !== "string" || src.startsWith("data:")) return null;
+  try {
+    const url = new URL(src, window.location.origin);
+    const marker = `/${CAKE_BUCKET}/`;
+    const idx = url.pathname.indexOf(marker);
+    if (idx === -1) return null;
+    return decodeURIComponent(url.pathname.slice(idx + marker.length));
+  } catch {
+    return null;
+  }
+}
+
+async function prepareEditorStateForLoad(state: unknown) {
+  const cloned = JSON.parse(JSON.stringify(state)) as unknown;
+  const cache = new Map<string, string | null>();
+
+  const resolve = async (path: string) => {
+    if (!cache.has(path)) cache.set(path, await cakeObjectUrl(path));
+    return cache.get(path) ?? null;
+  };
+
+  const walk = async (node: unknown): Promise<void> => {
+    if (!node || typeof node !== "object") return;
+    if (Array.isArray(node)) {
+      await Promise.all(node.map(walk));
+      return;
+    }
+
+    const obj = node as Record<string, unknown>;
+    const path =
+      typeof obj.cakeStoragePath === "string"
+        ? obj.cakeStoragePath
+        : extractCakePathFromUrl(obj.src);
+
+    if (path && typeof obj.src === "string") {
+      const refreshed = await resolve(path);
+      if (refreshed) {
+        obj.src = refreshed;
+        obj.crossOrigin = "anonymous";
+        obj.cakeStoragePath = path;
+      }
+    }
+
+    await Promise.all(Object.values(obj).map(walk));
+  };
+
+  await walk(cloned);
+  return cloned;
+}
+
+async function cakeObjectUrl(path: string | null | undefined) {
+  if (!path) return null;
+  const { data, error } = await supabase.storage.from(CAKE_BUCKET).download(path);
+  if (!error && data) return URL.createObjectURL(data);
+  return signedUrl(path);
+}
+
 function iconSvg(id: string): string {
   // Enkle SVG-er (samme set som lucide ville rendret). Bredde/høyde settes via Fabric.
   switch (id) {
@@ -150,7 +219,7 @@ export default function CakeImageEditor() {
     const bumpSel = () => setSelVersion((v) => v + 1);
     const snapshot = () => {
       if (skipSnapshotRef.current) return;
-      undoStack.current.push(JSON.stringify(c.toJSON()));
+      undoStack.current.push(canvasSnapshot(c));
       if (undoStack.current.length > 50) undoStack.current.shift();
       redoStack.current = [];
     };
@@ -207,24 +276,29 @@ export default function CakeImageEditor() {
     const load = async () => {
       if (image.editor_state) {
         try {
-          await c.loadFromJSON(image.editor_state as never);
-          c.renderAll();
-          setLayers([...c.getObjects()]);
-          undoStack.current = [JSON.stringify(c.toJSON())];
-          redoStack.current = [];
-          skipSnapshotRef.current = false;
-          return;
+          await c.loadFromJSON((await prepareEditorStateForLoad(image.editor_state)) as never);
+          if (c.getObjects().length > 0) {
+            c.renderAll();
+            setLayers([...c.getObjects()]);
+            undoStack.current = [canvasSnapshot(c)];
+            redoStack.current = [];
+            skipSnapshotRef.current = false;
+            return;
+          }
         } catch (e) {
           console.warn("editor_state load failed", e);
         }
+        c.clear();
+        c.backgroundColor = "#ffffff";
       }
       // Init med original-bilde sentrert
-      const url = await signedUrl(image.original_path);
+      const url = await cakeObjectUrl(image.original_path);
       if (!url) {
         skipSnapshotRef.current = false;
         return;
       }
       const img = await fabric.FabricImage.fromURL(url, { crossOrigin: "anonymous" });
+      (img as CakeFabricImage).cakeStoragePath = image.original_path;
       const cw = c.getWidth();
       const ch = c.getHeight();
       const scale = Math.min(cw / img.width!, ch / img.height!) * 0.95;
@@ -233,7 +307,7 @@ export default function CakeImageEditor() {
       c.add(img);
       c.renderAll();
       setLayers([...c.getObjects()]);
-      undoStack.current = [JSON.stringify(c.toJSON())];
+      undoStack.current = [canvasSnapshot(c)];
       redoStack.current = [];
       skipSnapshotRef.current = false;
     };
@@ -401,7 +475,7 @@ export default function CakeImageEditor() {
       const prevEdited = image.edited_path;
       await updateCakeImage(image.id, {
         edited_path: editedPath,
-        editor_state: fabRef.current.toJSON() as never,
+        editor_state: JSON.parse(canvasSnapshot(fabRef.current)) as never,
         status: markFerdig
           ? "ferdig_redigert"
           : image.status === "skrevet_ut"
