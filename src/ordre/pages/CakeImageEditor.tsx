@@ -464,7 +464,7 @@ export default function CakeImageEditor() {
       const prevEdited = image.edited_path;
       await updateCakeImage(image.id, {
         edited_path: editedPath,
-        editor_state: fabRef.current.toJSON() as never,
+        editor_state: JSON.parse(canvasSnapshot(fabRef.current)) as never,
         status: markFerdig
           ? "ferdig_redigert"
           : image.status === "skrevet_ut"
