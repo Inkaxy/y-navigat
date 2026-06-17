@@ -23,6 +23,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { RichTextEditor, type RichTextEditorHandle } from "@/ordre/components/shell/RichTextEditor";
 import { AiSettingsCard } from "@/ordre/components/shell/AiSettingsCard";
+import { CakeImagesSettingsCard } from "@/ordre/components/shell/CakeImagesSettingsCard";
 
 import { useToast } from "@/components/ui/use-toast";
 
@@ -192,8 +193,12 @@ export default function OrdreInnstillingerPage() {
       {/* Kort 4: AI-analyse */}
       <AiSettingsCard />
 
-      {/* Kort 5: Mal-editor */}
+      {/* Kort 5: Kakebilder */}
+      <CakeImagesSettingsCard />
+
+      {/* Kort 6: Mal-editor */}
       <TemplateEditorCard />
+
 
       <SendTestEmailDialog
         open={testDialogOpen}

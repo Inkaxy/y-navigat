@@ -9149,6 +9149,13 @@ export type Database = {
           rule_name: string
         }[]
       }
+      cleanup_old_printed_cake_images: {
+        Args: never
+        Returns: {
+          deleted_objects: number
+          deleted_rows: number
+        }[]
+      }
       current_portal_customer_id: { Args: never; Returns: string }
       current_user_entity_ids: { Args: never; Returns: string[] }
       current_user_id: { Args: never; Returns: string }
