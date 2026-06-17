@@ -342,7 +342,7 @@ function NavBar({ appSlug, items }: { appSlug: string; items: NavItem[] }) {
         boxShadow: "inset 0 1px 0 0 hsl(var(--brand-cream) / 0.12)",
       }}
     >
-      <ul className="no-scrollbar mx-auto flex max-w-[1280px] items-stretch gap-0.5 overflow-x-auto">
+      <ul className="no-scrollbar mx-auto flex w-full max-w-[1600px] items-stretch justify-center gap-0.5 overflow-x-auto xl:flex-wrap xl:justify-center xl:overflow-visible">
         {items.map((item) => {
           const Icon = item.icon;
           if (item.kind === "link") {
