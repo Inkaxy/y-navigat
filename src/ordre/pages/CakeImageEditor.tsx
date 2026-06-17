@@ -388,27 +388,47 @@ export default function CakeImageEditor() {
     return await res.blob();
   };
 
-  const doSave = async (markFerdig = false): Promise<boolean> => {
+  const doSave = async (
+    markFerdig = false,
+    opts: { navigateBack?: boolean } = {},
+  ): Promise<boolean> => {
     if (!image || !fabRef.current) return false;
     setSaving(true);
     try {
       const blob = await renderPng();
       const editedPath = await uploadEditedPng(blob, image.delivery_date);
       // Slett tidligere edited-fil for å unngå opphopning
-      if (image.edited_path) {
-        await supabase.storage.from(CAKE_BUCKET).remove([image.edited_path]);
-      }
+      const prevEdited = image.edited_path;
       await updateCakeImage(image.id, {
         edited_path: editedPath,
         editor_state: fabRef.current.toJSON() as never,
-        status: markFerdig ? "ferdig_redigert" : image.status === "skrevet_ut" ? image.status : "venter",
+        status: markFerdig
+          ? "ferdig_redigert"
+          : image.status === "skrevet_ut"
+            ? image.status
+            : "venter",
       });
-      qc.invalidateQueries({ queryKey: ["cake-images"] });
-      qc.invalidateQueries({ queryKey: ["cake-image", image.id] });
-      toast.success(markFerdig ? "Lagret og markert som ferdig redigert" : "Lagret");
+      if (prevEdited && prevEdited !== editedPath) {
+        await supabase.storage.from(CAKE_BUCKET).remove([prevEdited]);
+      }
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["cake-images"] }),
+        qc.invalidateQueries({ queryKey: ["cake-image", image.id] }),
+      ]);
+      toast.success(
+        markFerdig ? "Lagret og markert som ferdig redigert" : "Lagret",
+      );
+      if (opts.navigateBack) {
+        navigate(
+          `/ordre/kakebilder/liste?date=${image.delivery_date}&status=for-utskrift`,
+        );
+      }
       return true;
     } catch (e) {
-      toast.error("Kunne ikke lagre", { description: String((e as Error).message) });
+      console.error("[CakeImageEditor] save failed", e);
+      toast.error("Kunne ikke lagre", {
+        description: String((e as Error).message ?? e),
+      });
       return false;
     } finally {
       setSaving(false);
@@ -819,11 +839,11 @@ img { max-width:100%; max-height:100vh; }
         <Button variant="ghost" onClick={() => navigate(-1)}>
           Avbryt
         </Button>
-        <Button variant="outline" onClick={() => doSave(false)} disabled={saving}>
+        <Button variant="outline" onClick={() => doSave(false, { navigateBack: true })} disabled={saving}>
           {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
           Lagre
         </Button>
-        <Button variant="default" onClick={() => doSave(true)} disabled={saving}>
+        <Button variant="default" onClick={() => doSave(true, { navigateBack: true })} disabled={saving}>
           <CheckCircle2 className="mr-2 h-4 w-4" />
           Lagre & marker ferdig
         </Button>
