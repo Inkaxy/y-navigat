@@ -624,6 +624,66 @@ export type Database = {
           },
         ]
       }
+      cake_images: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          customer_name: string | null
+          delivery_date: string
+          edited_path: string | null
+          editor_state: Json | null
+          id: string
+          legal_entity_id: string
+          notes: string | null
+          order_ref: string | null
+          original_path: string
+          print_count: number
+          printed_at: string | null
+          source: string
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          customer_name?: string | null
+          delivery_date?: string
+          edited_path?: string | null
+          editor_state?: Json | null
+          id?: string
+          legal_entity_id: string
+          notes?: string | null
+          order_ref?: string | null
+          original_path: string
+          print_count?: number
+          printed_at?: string | null
+          source?: string
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          customer_name?: string | null
+          delivery_date?: string
+          edited_path?: string | null
+          editor_state?: Json | null
+          id?: string
+          legal_entity_id?: string
+          notes?: string | null
+          order_ref?: string | null
+          original_path?: string
+          print_count?: number
+          printed_at?: string | null
+          source?: string
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       cake_step_products: {
         Row: {
           cake_step_id: string

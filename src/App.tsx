@@ -117,6 +117,8 @@ import OrdreDeliveryNoteCorrections from "@/ordre/pages/DeliveryNoteCorrections"
 import OrdreDeliveryNoteSettings from "@/ordre/pages/DeliveryNoteSettings";
 import OrdreCakeImagesDashboard from "@/ordre/pages/CakeImagesDashboard";
 import OrdreCakeImagesList from "@/ordre/pages/CakeImagesList";
+import OrdreCakeImageEditor from "@/ordre/pages/CakeImageEditor";
+import OrdreCakeImagesPrint from "@/ordre/pages/CakeImagesPrint";
 import OrdrePlaceholder from "@/ordre/pages/Placeholder";
 import OrdreInnstillinger from "@/ordre/pages/Innstillinger";
 import M365Callback from "@/ordre/pages/M365Callback";

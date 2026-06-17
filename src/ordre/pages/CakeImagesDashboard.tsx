@@ -15,6 +15,8 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { todayISO, formatDate } from "@/ordre/lib/format";
 import { relativeDateLabel, shiftIsoDate } from "@/ordre/lib/relativeDate";
+import { useCakeImageCounts } from "@/ordre/hooks/useCakeImages";
+import { UploadButton } from "@/ordre/components/cake-images/UploadButton";
 
 /**
  * Kakebilder — dashboard.
@@ -47,8 +49,7 @@ export default function CakeImagesDashboard() {
 
   const rel = useMemo(() => relativeDateLabel(date), [date]);
 
-  // Placeholder-tall — byttes ut med live data når koblingen mot tickets er på plass.
-  const counts = { forUtskrift: 0, skrevetUt: 0 };
+  const { data: counts = { forUtskrift: 0, skrevetUt: 0 } } = useCakeImageCounts(date);
 
   const widgets = [
     {
@@ -191,6 +192,9 @@ export default function CakeImagesDashboard() {
         })}
       </div>
 
+      <div className="flex justify-center">
+        <UploadButton date={date} />
+      </div>
       <p className="text-center text-xs text-muted-foreground">
         Kobling mot tickets, etikett og ordre kommer i neste fase.
       </p>
