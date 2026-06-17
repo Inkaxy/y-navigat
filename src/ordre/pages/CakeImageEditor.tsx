@@ -277,15 +277,19 @@ export default function CakeImageEditor() {
       if (image.editor_state) {
         try {
           await c.loadFromJSON((await prepareEditorStateForLoad(image.editor_state)) as never);
-          c.renderAll();
-          setLayers([...c.getObjects()]);
-          undoStack.current = [canvasSnapshot(c)];
-          redoStack.current = [];
-          skipSnapshotRef.current = false;
-          return;
+          if (c.getObjects().length > 0) {
+            c.renderAll();
+            setLayers([...c.getObjects()]);
+            undoStack.current = [canvasSnapshot(c)];
+            redoStack.current = [];
+            skipSnapshotRef.current = false;
+            return;
+          }
         } catch (e) {
           console.warn("editor_state load failed", e);
         }
+        c.clear();
+        c.backgroundColor = "#ffffff";
       }
       // Init med original-bilde sentrert
       const url = await cakeObjectUrl(image.original_path);
