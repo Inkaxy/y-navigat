@@ -20,6 +20,10 @@ export const ordreRoutes = {
   pakksedlerInnstillinger: `${ORDRE_BASE}/pakksedler/innstillinger`,
   pakkseddelDetalj: (id: string) => `${ORDRE_BASE}/pakksedler/${id}`,
 
+  // Kakebilder
+  kakebilder: `${ORDRE_BASE}/kakebilder`,
+  kakebilderListe: `${ORDRE_BASE}/kakebilder/liste`,
+
   // Øvrige toppnivå
   turer: `${ORDRE_BASE}/turer`,
   leveringsregler: `${ORDRE_BASE}/leveringsregler`,
