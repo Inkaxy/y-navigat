@@ -839,11 +839,11 @@ img { max-width:100%; max-height:100vh; }
         <Button variant="ghost" onClick={() => navigate(-1)}>
           Avbryt
         </Button>
-        <Button variant="outline" onClick={() => doSave(false)} disabled={saving}>
+        <Button variant="outline" onClick={() => doSave(false, { navigateBack: true })} disabled={saving}>
           {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
           Lagre
         </Button>
-        <Button variant="default" onClick={() => doSave(true)} disabled={saving}>
+        <Button variant="default" onClick={() => doSave(true, { navigateBack: true })} disabled={saving}>
           <CheckCircle2 className="mr-2 h-4 w-4" />
           Lagre & marker ferdig
         </Button>
