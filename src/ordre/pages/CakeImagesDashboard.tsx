@@ -47,8 +47,7 @@ export default function CakeImagesDashboard() {
 
   const rel = useMemo(() => relativeDateLabel(date), [date]);
 
-  // Placeholder-tall — byttes ut med live data når koblingen mot tickets er på plass.
-  const counts = { forUtskrift: 0, skrevetUt: 0 };
+  const { data: counts = { forUtskrift: 0, skrevetUt: 0 } } = useCakeImageCounts(date);
 
   const widgets = [
     {
