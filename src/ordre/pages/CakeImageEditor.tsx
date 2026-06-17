@@ -112,7 +112,7 @@ async function prepareEditorStateForLoad(state: unknown) {
   const cache = new Map<string, string | null>();
 
   const resolve = async (path: string) => {
-    if (!cache.has(path)) cache.set(path, await signedUrl(path));
+    if (!cache.has(path)) cache.set(path, await cakeObjectUrl(path));
     return cache.get(path) ?? null;
   };
 
@@ -143,6 +143,13 @@ async function prepareEditorStateForLoad(state: unknown) {
 
   await walk(cloned);
   return cloned;
+}
+
+async function cakeObjectUrl(path: string | null | undefined) {
+  if (!path) return null;
+  const { data, error } = await supabase.storage.from(CAKE_BUCKET).download(path);
+  if (!error && data) return URL.createObjectURL(data);
+  return signedUrl(path);
 }
 
 function iconSvg(id: string): string {
