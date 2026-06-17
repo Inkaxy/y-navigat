@@ -115,6 +115,8 @@ import OrdreDeliveryNotesList from "@/ordre/pages/DeliveryNotesList";
 import OrdreDeliveryNoteDetail from "@/ordre/pages/DeliveryNoteDetail";
 import OrdreDeliveryNoteCorrections from "@/ordre/pages/DeliveryNoteCorrections";
 import OrdreDeliveryNoteSettings from "@/ordre/pages/DeliveryNoteSettings";
+import OrdreCakeImagesDashboard from "@/ordre/pages/CakeImagesDashboard";
+import OrdreCakeImagesList from "@/ordre/pages/CakeImagesList";
 import OrdrePlaceholder from "@/ordre/pages/Placeholder";
 import OrdreInnstillinger from "@/ordre/pages/Innstillinger";
 import M365Callback from "@/ordre/pages/M365Callback";
@@ -329,6 +331,8 @@ const App = () => (
               <Route path="/ordre/pakksedler/korrigeringer" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreDeliveryNoteCorrections /></AppAccessGuard></Shell>} />
               <Route path="/ordre/pakksedler/innstillinger" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreDeliveryNoteSettings /></AppAccessGuard></Shell>} />
               <Route path="/ordre/pakksedler/:id" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreDeliveryNoteDetail /></AppAccessGuard></Shell>} />
+              <Route path="/ordre/kakebilder" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreCakeImagesDashboard /></AppAccessGuard></Shell>} />
+              <Route path="/ordre/kakebilder/liste" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreCakeImagesList /></AppAccessGuard></Shell>} />
               <Route path="/ordre/leveringskalender" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreLeveringskalender /></AppAccessGuard></Shell>} />
               <Route path="/ordre/ticket" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreTicketsList /></AppAccessGuard></Shell>} />
               <Route path="/ordre/ticket/:id" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreTicketDetail /></AppAccessGuard></Shell>} />

@@ -88,6 +88,7 @@ const STATIC_SUBMENUS: Record<string, { prefix: string; appSlug: string; items: 
       { kind: "link", to: "/ordre/kundeordrer", label: "Kundeordrer", icon: ShoppingBag },
       { kind: "link", to: "/ordre/ordrer", label: "Bestillinger", icon: ClipboardList },
       { kind: "link", to: "/ordre/pakksedler", label: "Pakksedler", icon: Package },
+      { kind: "link", to: "/ordre/kakebilder", label: "Kakebilder", icon: CakeSlice },
       { kind: "link", to: "/ordre/turer", label: "Turer", icon: Truck },
       { kind: "link", to: "/ordre/leveringsregler", label: "Leveringsregler", icon: Route },
       { kind: "link", to: "/ordre/faste-rutiner", label: "Fastordre", icon: Repeat },
