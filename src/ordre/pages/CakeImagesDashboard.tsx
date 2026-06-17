@@ -192,6 +192,9 @@ export default function CakeImagesDashboard() {
         })}
       </div>
 
+      <div className="flex justify-center">
+        <UploadButton date={date} />
+      </div>
       <p className="text-center text-xs text-muted-foreground">
         Kobling mot tickets, etikett og ordre kommer i neste fase.
       </p>
