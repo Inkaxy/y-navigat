@@ -314,7 +314,7 @@ function NavBar({ appSlug, items }: { appSlug: string; items: NavItem[] }) {
 
   const itemClass = (active: boolean) =>
     cn(
-      "group relative flex flex-col items-center justify-center gap-1.5 rounded-xl px-4 py-2 min-w-[88px] text-[13px] leading-tight transition-all",
+      "group relative flex flex-col items-center justify-center gap-1 rounded-xl px-3 py-1.5 min-w-[72px] text-[12.5px] leading-tight transition-all",
       active
         ? "font-semibold text-brand-cream"
         : "font-medium text-brand-cream/75 hover:bg-brand-cream/[0.06] hover:text-brand-cream",
@@ -342,7 +342,7 @@ function NavBar({ appSlug, items }: { appSlug: string; items: NavItem[] }) {
         boxShadow: "inset 0 1px 0 0 hsl(var(--brand-cream) / 0.12)",
       }}
     >
-      <ul className="no-scrollbar mx-auto flex max-w-[1280px] items-stretch gap-0.5 overflow-x-auto">
+      <ul className="no-scrollbar mx-auto flex w-full max-w-[1600px] items-stretch justify-center gap-0.5 overflow-x-auto xl:flex-wrap xl:justify-center xl:overflow-visible">
         {items.map((item) => {
           const Icon = item.icon;
           if (item.kind === "link") {
@@ -351,7 +351,8 @@ function NavBar({ appSlug, items }: { appSlug: string; items: NavItem[] }) {
               <li key={item.to} className="shrink-0">
                 <NavLink to={item.to} className={itemClass(active)} style={itemStyle(active)}>
                   <span className="relative">
-                    <Icon className="h-6 w-6" strokeWidth={active ? 2.25 : 1.75} />
+                  <Icon className="h-5 w-5" strokeWidth={active ? 2.25 : 1.75} />
+
                     {item.badge != null && item.badge > 0 && (
                       <span className="absolute -right-2 -top-1.5"><CountBadge value={item.badge} /></span>
                     )}
@@ -367,7 +368,7 @@ function NavBar({ appSlug, items }: { appSlug: string; items: NavItem[] }) {
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button className={itemClass(active)} style={itemStyle(active)}>
-                    <Icon className="h-6 w-6" strokeWidth={active ? 2.25 : 1.75} />
+                    <Icon className="h-5 w-5" strokeWidth={active ? 2.25 : 1.75} />
                     <span className="flex items-center gap-0.5 whitespace-nowrap">
                       {item.label}
                       <ChevronDown className="h-3.5 w-3.5" />
