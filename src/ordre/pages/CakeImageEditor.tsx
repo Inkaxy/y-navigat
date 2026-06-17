@@ -83,6 +83,65 @@ const CLIPART: { id: string; label: string; Icon: typeof Cake }[] = [
   { id: "bag", label: "Pose", Icon: ShoppingBag },
 ];
 
+const CANVAS_JSON_PROPS = ["cakeStoragePath"];
+
+type CakeFabricImage = fabric.FabricImage & { cakeStoragePath?: string };
+
+function canvasSnapshot(canvas: fabric.Canvas) {
+  return JSON.stringify(canvas.toJSON(CANVAS_JSON_PROPS));
+}
+
+function extractCakePathFromUrl(src: unknown) {
+  if (typeof src !== "string" || src.startsWith("data:")) return null;
+  try {
+    const url = new URL(src, window.location.origin);
+    const marker = `/${CAKE_BUCKET}/`;
+    const idx = url.pathname.indexOf(marker);
+    if (idx === -1) return null;
+    return decodeURIComponent(url.pathname.slice(idx + marker.length));
+  } catch {
+    return null;
+  }
+}
+
+async function prepareEditorStateForLoad(state: unknown) {
+  const cloned = JSON.parse(JSON.stringify(state)) as unknown;
+  const cache = new Map<string, string | null>();
+
+  const resolve = async (path: string) => {
+    if (!cache.has(path)) cache.set(path, await signedUrl(path));
+    return cache.get(path) ?? null;
+  };
+
+  const walk = async (node: unknown): Promise<void> => {
+    if (!node || typeof node !== "object") return;
+    if (Array.isArray(node)) {
+      await Promise.all(node.map(walk));
+      return;
+    }
+
+    const obj = node as Record<string, unknown>;
+    const path =
+      typeof obj.cakeStoragePath === "string"
+        ? obj.cakeStoragePath
+        : extractCakePathFromUrl(obj.src);
+
+    if (path && typeof obj.src === "string") {
+      const refreshed = await resolve(path);
+      if (refreshed) {
+        obj.src = refreshed;
+        obj.crossOrigin = "anonymous";
+        obj.cakeStoragePath = path;
+      }
+    }
+
+    await Promise.all(Object.values(obj).map(walk));
+  };
+
+  await walk(cloned);
+  return cloned;
+}
+
 function iconSvg(id: string): string {
   // Enkle SVG-er (samme set som lucide ville rendret). Bredde/høyde settes via Fabric.
   switch (id) {
