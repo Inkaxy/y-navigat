@@ -212,7 +212,7 @@ export default function CakeImageEditor() {
     const bumpSel = () => setSelVersion((v) => v + 1);
     const snapshot = () => {
       if (skipSnapshotRef.current) return;
-      undoStack.current.push(JSON.stringify(c.toJSON()));
+      undoStack.current.push(canvasSnapshot(c));
       if (undoStack.current.length > 50) undoStack.current.shift();
       redoStack.current = [];
     };
@@ -269,10 +269,10 @@ export default function CakeImageEditor() {
     const load = async () => {
       if (image.editor_state) {
         try {
-          await c.loadFromJSON(image.editor_state as never);
+          await c.loadFromJSON((await prepareEditorStateForLoad(image.editor_state)) as never);
           c.renderAll();
           setLayers([...c.getObjects()]);
-          undoStack.current = [JSON.stringify(c.toJSON())];
+          undoStack.current = [canvasSnapshot(c)];
           redoStack.current = [];
           skipSnapshotRef.current = false;
           return;
@@ -287,6 +287,7 @@ export default function CakeImageEditor() {
         return;
       }
       const img = await fabric.FabricImage.fromURL(url, { crossOrigin: "anonymous" });
+      (img as CakeFabricImage).cakeStoragePath = image.original_path;
       const cw = c.getWidth();
       const ch = c.getHeight();
       const scale = Math.min(cw / img.width!, ch / img.height!) * 0.95;
@@ -295,7 +296,7 @@ export default function CakeImageEditor() {
       c.add(img);
       c.renderAll();
       setLayers([...c.getObjects()]);
-      undoStack.current = [JSON.stringify(c.toJSON())];
+      undoStack.current = [canvasSnapshot(c)];
       redoStack.current = [];
       skipSnapshotRef.current = false;
     };
