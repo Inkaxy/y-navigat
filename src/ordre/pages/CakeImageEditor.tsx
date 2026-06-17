@@ -339,7 +339,7 @@ export default function CakeImageEditor() {
     const obj = c?.getActiveObject();
     if (!obj || !c) return;
     if (!(obj instanceof fabric.FabricImage)) return;
-    const filters: fabric.filters.BaseFilter[] = [];
+    const filters: fabric.filters.BaseFilter<string>[] = [];
     if (brightness !== 0)
       filters.push(new fabric.filters.Brightness({ brightness: brightness / 100 }));
     if (contrast !== 0)
