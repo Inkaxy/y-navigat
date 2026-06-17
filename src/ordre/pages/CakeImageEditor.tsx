@@ -288,7 +288,7 @@ export default function CakeImageEditor() {
         }
       }
       // Init med original-bilde sentrert
-      const url = await signedUrl(image.original_path);
+      const url = await cakeObjectUrl(image.original_path);
       if (!url) {
         skipSnapshotRef.current = false;
         return;
