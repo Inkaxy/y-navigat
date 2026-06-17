@@ -193,8 +193,12 @@ export default function OrdreInnstillingerPage() {
       {/* Kort 4: AI-analyse */}
       <AiSettingsCard />
 
-      {/* Kort 5: Mal-editor */}
+      {/* Kort 5: Kakebilder */}
+      <CakeImagesSettingsCard />
+
+      {/* Kort 6: Mal-editor */}
       <TemplateEditorCard />
+
 
       <SendTestEmailDialog
         open={testDialogOpen}
