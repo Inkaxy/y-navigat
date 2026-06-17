@@ -1,15 +1,51 @@
-import { useNavigate } from "react-router-dom";
-import { CakeSlice, Printer, CheckCircle2 } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import {
+  CakeSlice,
+  Printer,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
+import { format as fmt } from "date-fns";
+import { nb } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { todayISO, formatDate } from "@/ordre/lib/format";
+import { relativeDateLabel, shiftIsoDate } from "@/ordre/lib/relativeDate";
 
 /**
  * Kakebilder — dashboard.
  * Foreløpig statisk forhåndsvisning av menyen. Kobling mot tickets/eposter
  * og lagring kommer i senere fase. Layouten følger samme mønster som
- * pakksedler-dashbordet (store widget-kort med antall).
+ * pakksedler-dashbordet (dato-velger øverst + store widget-kort).
  */
 export default function CakeImagesDashboard() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const date = searchParams.get("date") || todayISO();
+  const [pickerOpen, setPickerOpen] = useState(false);
+
+  const setDate = useCallback(
+    (next: string | ((prev: string) => string)) => {
+      setSearchParams(
+        (prev) => {
+          const cur = prev.get("date") || todayISO();
+          const value =
+            typeof next === "function" ? (next as (p: string) => string)(cur) : next;
+          const np = new URLSearchParams(prev);
+          np.set("date", value);
+          return np;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
+
+  const rel = useMemo(() => relativeDateLabel(date), [date]);
 
   // Placeholder-tall — byttes ut med live data når koblingen mot tickets er på plass.
   const counts = { forUtskrift: 0, skrevetUt: 0 };
@@ -22,7 +58,8 @@ export default function CakeImagesDashboard() {
       icon: Printer,
       classes:
         "bg-brand-ink text-brand-cream hover:bg-brand-ink-deep ring-1 ring-brand-ink/40",
-      onClick: () => navigate("/ordre/kakebilder/liste?status=for-utskrift"),
+      onClick: () =>
+        navigate(`/ordre/kakebilder/liste?date=${date}&status=for-utskrift`),
     },
     {
       key: "skrevet-ut",
@@ -31,13 +68,14 @@ export default function CakeImagesDashboard() {
       icon: CheckCircle2,
       classes:
         "bg-background border border-border text-foreground hover:bg-muted",
-      onClick: () => navigate("/ordre/kakebilder/liste?status=skrevet-ut"),
+      onClick: () =>
+        navigate(`/ordre/kakebilder/liste?date=${date}&status=skrevet-ut`),
     },
   ];
 
   return (
     <div className="mx-auto w-full max-w-5xl px-4 py-8 space-y-8">
-      {/* Topp */}
+      {/* Topp — tittel */}
       <div className="flex flex-col items-center gap-2 text-center">
         <div className="flex items-center gap-3">
           <CakeSlice className="h-8 w-8 text-brand-bronze" />
@@ -47,6 +85,83 @@ export default function CakeImagesDashboard() {
           Bilder som skal printes ut til kakeproduksjon. Bildene kommer typisk
           fra ticket-systemet og e-post, og legges her klare for utskrift.
         </p>
+      </div>
+
+      {/* Dato-velger — samme mønster som pakksedler */}
+      <div className="flex flex-col items-center gap-1">
+        <div className="font-semibold uppercase tracking-wide text-muted-foreground text-xl">
+          Leveransedato
+        </div>
+        <div className="mt-1 flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Forrige dag"
+            onClick={() => setDate((d) => shiftIsoDate(d, -1))}
+            className="h-12 w-12"
+          >
+            <ChevronLeft className="h-7 w-7" />
+          </Button>
+
+          <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="ghost"
+                className="h-auto min-w-[300px] py-2 text-5xl font-bold tracking-tight hover:bg-transparent hover:text-primary"
+              >
+                {formatDate(date)}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="center">
+              <div className="flex items-center justify-between border-b px-3 py-2">
+                <span className="text-sm text-muted-foreground">Velg dato</span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setDate(todayISO());
+                    setPickerOpen(false);
+                  }}
+                >
+                  I dag
+                </Button>
+              </div>
+              <Calendar
+                mode="single"
+                locale={nb}
+                selected={new Date(date + "T12:00:00")}
+                onSelect={(d) => {
+                  if (d) {
+                    setDate(fmt(d, "yyyy-MM-dd"));
+                    setPickerOpen(false);
+                  }
+                }}
+                initialFocus
+                className={cn("p-3 pointer-events-auto")}
+              />
+            </PopoverContent>
+          </Popover>
+
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Neste dag"
+            onClick={() => setDate((d) => shiftIsoDate(d, 1))}
+            className="h-12 w-12"
+          >
+            <ChevronRight className="h-7 w-7" />
+          </Button>
+        </div>
+        <div
+          className={cn(
+            "mt-0.5 text-sm font-medium",
+            rel.tone === "past" && "text-orange-600",
+            rel.tone === "today" && "text-emerald-600",
+            rel.tone === "future" && "text-emerald-600",
+          )}
+        >
+          {rel.label}
+        </div>
       </div>
 
       {/* Widget-grid */}
