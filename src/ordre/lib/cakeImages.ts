@@ -1,0 +1,221 @@
+import { supabase } from "@/integrations/supabase/client";
+import { NB_LEGAL_ENTITY_ID } from "./constants";
+
+export type CakeImageStatus = "venter" | "ferdig_redigert" | "skrevet_ut";
+export type CakeImageSource = "upload" | "demo" | "email" | "ticket";
+
+export type CakeImage = {
+  id: string;
+  legal_entity_id: string;
+  delivery_date: string;
+  title: string;
+  customer_name: string | null;
+  order_ref: string | null;
+  notes: string | null;
+  source: CakeImageSource;
+  original_path: string;
+  edited_path: string | null;
+  editor_state: unknown | null;
+  status: CakeImageStatus;
+  printed_at: string | null;
+  print_count: number;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export const CAKE_BUCKET = "cake-images";
+
+/** Stier organiseres som <legal_entity_id>/<dato>/<filnavn> for å matche storage-RLS. */
+function buildPath(date: string, suffix: string) {
+  const safe = suffix.replace(/[^a-zA-Z0-9._-]/g, "_");
+  return `${NB_LEGAL_ENTITY_ID}/${date}/${crypto.randomUUID()}-${safe}`;
+}
+
+export async function signedUrl(path: string | null | undefined, expires = 60 * 10) {
+  if (!path) return null;
+  const { data, error } = await supabase.storage
+    .from(CAKE_BUCKET)
+    .createSignedUrl(path, expires);
+  if (error) return null;
+  return data?.signedUrl ?? null;
+}
+
+export async function uploadOriginal(
+  file: File,
+  date: string,
+): Promise<{ path: string; title: string }> {
+  const path = buildPath(date, file.name);
+  const { error } = await supabase.storage
+    .from(CAKE_BUCKET)
+    .upload(path, file, { contentType: file.type, upsert: false });
+  if (error) throw error;
+  return { path, title: file.name.replace(/\.[^.]+$/, "") };
+}
+
+export async function uploadEditedPng(
+  blob: Blob,
+  date: string,
+  baseName = "edited.png",
+): Promise<string> {
+  const path = buildPath(date, baseName);
+  const { error } = await supabase.storage
+    .from(CAKE_BUCKET)
+    .upload(path, blob, { contentType: "image/png", upsert: false });
+  if (error) throw error;
+  return path;
+}
+
+export async function createCakeImage(input: {
+  delivery_date: string;
+  title: string;
+  original_path: string;
+  source?: CakeImageSource;
+  customer_name?: string | null;
+}): Promise<CakeImage> {
+  const { data: u } = await supabase.auth.getUser();
+  const { data, error } = await supabase
+    .from("cake_images")
+    .insert({
+      legal_entity_id: NB_LEGAL_ENTITY_ID,
+      delivery_date: input.delivery_date,
+      title: input.title,
+      original_path: input.original_path,
+      source: input.source ?? "upload",
+      customer_name: input.customer_name ?? null,
+      created_by: u.user?.id,
+    })
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data as CakeImage;
+}
+
+export async function updateCakeImage(
+  id: string,
+  patch: Partial<
+    Pick<
+      CakeImage,
+      | "title"
+      | "customer_name"
+      | "order_ref"
+      | "notes"
+      | "edited_path"
+      | "editor_state"
+      | "status"
+      | "delivery_date"
+    >
+  >,
+) {
+  const { error } = await supabase
+    .from("cake_images")
+    .update(patch as never)
+    .eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteCakeImage(image: CakeImage) {
+  const paths = [image.original_path, image.edited_path].filter(
+    Boolean,
+  ) as string[];
+  if (paths.length) {
+    await supabase.storage.from(CAKE_BUCKET).remove(paths);
+  }
+  const { error } = await supabase.from("cake_images").delete().eq("id", image.id);
+  if (error) throw error;
+}
+
+export async function markPrinted(ids: string[]) {
+  if (ids.length === 0) return;
+  // Hent gjeldende print_count for å øke ett pr rad
+  const { data } = await supabase
+    .from("cake_images")
+    .select("id, print_count")
+    .in("id", ids);
+  const now = new Date().toISOString();
+  await Promise.all(
+    (data ?? []).map((row) =>
+      supabase
+        .from("cake_images")
+        .update({
+          status: "skrevet_ut",
+          printed_at: now,
+          print_count: (row.print_count ?? 0) + 1,
+        })
+        .eq("id", row.id),
+    ),
+  );
+}
+
+const DEMO_SOURCES = [
+  {
+    title: "Bursdagskake — Emma 5 år",
+    customer_name: "Familien Hansen",
+    color: "#f9c5d1",
+    label: "EMMA 5 ÅR",
+  },
+  {
+    title: "Brudekake — Sundby/Lie",
+    customer_name: "Anne Sundby",
+    color: "#cbe7d1",
+    label: "♥ Anne & Per ♥",
+  },
+  {
+    title: "Konfirmasjon — Marius",
+    customer_name: "Familien Olsen",
+    color: "#d6e4ff",
+    label: "GRATULERER MARIUS",
+  },
+];
+
+async function svgToPng(svg: string): Promise<Blob> {
+  const url = "data:image/svg+xml;utf8," + encodeURIComponent(svg);
+  const img = new Image();
+  img.crossOrigin = "anonymous";
+  await new Promise<void>((res, rej) => {
+    img.onload = () => res();
+    img.onerror = () => rej(new Error("img load"));
+    img.src = url;
+  });
+  const canvas = document.createElement("canvas");
+  canvas.width = 1000;
+  canvas.height = 750;
+  const ctx = canvas.getContext("2d")!;
+  ctx.drawImage(img, 0, 0, 1000, 750);
+  return await new Promise<Blob>((res) =>
+    canvas.toBlob((b) => res(b!), "image/png"),
+  );
+}
+
+export async function seedDemoImages(date: string) {
+  for (const d of DEMO_SOURCES) {
+    const svg = `
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1000 750'>
+  <rect width='1000' height='750' fill='${d.color}'/>
+  <circle cx='500' cy='340' r='200' fill='#fff' stroke='#1f1b16' stroke-width='6'/>
+  <text x='500' y='360' text-anchor='middle' font-family='Inter,Arial' font-size='62' font-weight='800' fill='#1f1b16'>${d.label}</text>
+  <text x='500' y='660' text-anchor='middle' font-family='Inter,Arial' font-size='28' fill='#4a3f33'>Demo kakebilde</text>
+</svg>`.trim();
+    const blob = await svgToPng(svg);
+    const file = new File([blob], `${d.title}.png`, { type: "image/png" });
+    const up = await uploadOriginal(file, date);
+    await createCakeImage({
+      delivery_date: date,
+      title: d.title,
+      original_path: up.path,
+      source: "demo",
+      customer_name: d.customer_name,
+    });
+  }
+}
+
+export function statusLabel(s: CakeImageStatus) {
+  switch (s) {
+    case "venter":
+      return "Venter";
+    case "ferdig_redigert":
+      return "Ferdig redigert";
+    case "skrevet_ut":
+      return "Skrevet ut";
+  }
+}

@@ -23,6 +23,8 @@ export const ordreRoutes = {
   // Kakebilder
   kakebilder: `${ORDRE_BASE}/kakebilder`,
   kakebilderListe: `${ORDRE_BASE}/kakebilder/liste`,
+  kakebilderEditor: (id: string) => `${ORDRE_BASE}/kakebilder/editor/${id}`,
+  kakebilderPrint: `${ORDRE_BASE}/kakebilder/print`,
 
   // Øvrige toppnivå
   turer: `${ORDRE_BASE}/turer`,
