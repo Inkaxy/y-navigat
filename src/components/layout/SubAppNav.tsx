@@ -368,7 +368,7 @@ function NavBar({ appSlug, items }: { appSlug: string; items: NavItem[] }) {
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button className={itemClass(active)} style={itemStyle(active)}>
-                    <Icon className="h-6 w-6" strokeWidth={active ? 2.25 : 1.75} />
+                    <Icon className="h-5 w-5" strokeWidth={active ? 2.25 : 1.75} />
                     <span className="flex items-center gap-0.5 whitespace-nowrap">
                       {item.label}
                       <ChevronDown className="h-3.5 w-3.5" />
