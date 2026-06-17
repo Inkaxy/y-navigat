@@ -335,6 +335,8 @@ const App = () => (
               <Route path="/ordre/pakksedler/:id" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreDeliveryNoteDetail /></AppAccessGuard></Shell>} />
               <Route path="/ordre/kakebilder" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreCakeImagesDashboard /></AppAccessGuard></Shell>} />
               <Route path="/ordre/kakebilder/liste" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreCakeImagesList /></AppAccessGuard></Shell>} />
+              <Route path="/ordre/kakebilder/editor/:id" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreCakeImageEditor /></AppAccessGuard></Shell>} />
+              <Route path="/ordre/kakebilder/print" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreCakeImagesPrint /></AppAccessGuard></Shell>} />
               <Route path="/ordre/leveringskalender" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreLeveringskalender /></AppAccessGuard></Shell>} />
               <Route path="/ordre/ticket" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreTicketsList /></AppAccessGuard></Shell>} />
               <Route path="/ordre/ticket/:id" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreTicketDetail /></AppAccessGuard></Shell>} />
