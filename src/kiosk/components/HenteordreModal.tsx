@@ -218,11 +218,12 @@ export function HenteordreModal({
             </div>
           )}
         </div>
-        <div className="flex justify-end pt-2">
+        <div className="flex justify-end px-6 py-3 shrink-0 border-t bg-background">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Lukk
           </Button>
         </div>
+
       </DialogContent>
     </Dialog>
   );
