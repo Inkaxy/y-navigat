@@ -126,7 +126,7 @@ export function HenteordreModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl w-[95vw] max-h-[85vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-3xl w-[95vw] max-h-[80vh] overflow-hidden flex flex-col top-4 translate-y-0 sm:top-6 data-[state=open]:slide-in-from-top-4 data-[state=closed]:slide-out-to-top-4">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Package className="h-5 w-5" /> Henteordre
