@@ -54,21 +54,37 @@ export function HenteordreModal({
     let cancel = false;
     setLoading(true);
     setSearch("");
-    const today = new Date().toISOString().slice(0, 10);
-    kioskSupabase
-      .rpc("pos_list_pickup_orders" as never, {
-        p_legal_entity_id: legalEntityId,
-        p_pickup_location_id: pickupLocationId,
-        p_date: today,
-      } as never)
-      .then(({ data, error }) => {
-        if (cancel) return;
-        if (error) toast.error("Kunne ikke laste henteordrer", { description: error.message });
-        else setRows((data ?? []) as unknown as PickupOrderRow[]);
-        setLoading(false);
-      });
+
+    const fetchRows = async (showSpinner: boolean) => {
+      if (showSpinner) setLoading(true);
+      const today = new Date().toISOString().slice(0, 10);
+      const { data, error } = await kioskSupabase.rpc(
+        "pos_list_pickup_orders" as never,
+        {
+          p_legal_entity_id: legalEntityId,
+          p_pickup_location_id: pickupLocationId,
+          p_date: today,
+        } as never,
+      );
+      if (cancel) return;
+      if (error) {
+        if (showSpinner) {
+          toast.error("Kunne ikke laste henteordrer", { description: error.message });
+        }
+      } else {
+        setRows((data ?? []) as unknown as PickupOrderRow[]);
+      }
+      if (showSpinner) setLoading(false);
+    };
+
+    void fetchRows(true);
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") void fetchRows(false);
+    }, 10_000);
+
     return () => {
       cancel = true;
+      window.clearInterval(interval);
     };
   }, [open, legalEntityId, pickupLocationId]);
 
