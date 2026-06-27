@@ -366,13 +366,14 @@ export function RecurringScheduleDialog({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="rec-name">Navn</Label>
+              <Label htmlFor="rec-name">Navn på mal</Label>
               <Input
                 id="rec-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Fastordre"
+                placeholder="F.eks. «Sommer», «Helg», «Standard» …"
               />
+              <p className="text-xs text-muted-foreground">Gi malen et beskrivende navn så det er enkelt å skille flere maler.</p>
             </div>
 
             <div className="space-y-2">
