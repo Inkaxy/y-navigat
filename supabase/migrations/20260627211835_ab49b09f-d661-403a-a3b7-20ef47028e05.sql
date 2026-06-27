@@ -1,0 +1,1 @@
+DROP INDEX IF EXISTS public.recurring_order_schedules_one_active_per_customer;
