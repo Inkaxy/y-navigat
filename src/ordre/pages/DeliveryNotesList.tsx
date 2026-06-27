@@ -20,6 +20,7 @@ import {
 import { formatDate, formatNOK, todayISO } from "@/ordre/lib/format";
 import { cn } from "@/lib/utils";
 import { BulkPakkseddelPDFButton } from "@/ordre/components/pakksedler/BulkPakkseddelPDFButton";
+import { PendingOrderRowActions } from "@/ordre/components/pakksedler/PendingOrderRowActions";
 import { NULL_TOUR_KEY } from "@/ordre/hooks/useTourRunStatus";
 
 type ListType = "pakksedler" | PendingOrderType;
@@ -350,6 +351,9 @@ export default function DeliveryNotesList() {
                   >
                     {p.kind === "schedule" ? "Ikke generert" : "Klar for pakkseddel"}
                   </Badge>
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <PendingOrderRowActions row={p} />
+                  </div>
                 </li>
               ))}
 
