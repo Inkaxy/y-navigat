@@ -376,22 +376,46 @@ export function RecurringScheduleDialog({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="rec-from">Gyldig fra</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="rec-from">Gyldig fra</Label>
+                {validFrom && (
+                  <button
+                    type="button"
+                    onClick={() => setValidFrom("")}
+                    className="text-xs text-muted-foreground hover:text-brand-bronze"
+                  >
+                    Fjern
+                  </button>
+                )}
+              </div>
               <Input
                 id="rec-from"
                 type="date"
                 value={validFrom}
                 onChange={(e) => setValidFrom(e.target.value)}
               />
+              <p className="text-xs text-muted-foreground">Tom = ingen startdato (gjelder fra alltid)</p>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="rec-to">Gyldig til</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="rec-to">Gyldig til</Label>
+                {validTo && (
+                  <button
+                    type="button"
+                    onClick={() => setValidTo("")}
+                    className="text-xs text-muted-foreground hover:text-brand-bronze"
+                  >
+                    Fjern
+                  </button>
+                )}
+              </div>
               <Input
                 id="rec-to"
                 type="date"
                 value={validTo}
                 onChange={(e) => setValidTo(e.target.value)}
               />
+              <p className="text-xs text-muted-foreground">Tom = ruller videre uten sluttdato</p>
             </div>
 
             <div className="md:col-span-2 space-y-2">
@@ -415,9 +439,10 @@ export function RecurringScheduleDialog({
                 Aktiv
               </Label>
               <span className="text-xs text-muted-foreground">
-                Kun én aktiv fastordre per kunde.
+                Du kan ha flere maler per kunde — alle aktive maler summeres i matrisen.
               </span>
             </div>
+
           </div>
 
           {/* Ukesvisning */}
