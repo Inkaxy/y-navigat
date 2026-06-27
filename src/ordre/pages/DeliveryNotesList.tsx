@@ -351,6 +351,9 @@ export default function DeliveryNotesList() {
                   >
                     {p.kind === "schedule" ? "Ikke generert" : "Klar for pakkseddel"}
                   </Badge>
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <PendingOrderRowActions row={p} />
+                  </div>
                 </li>
               ))}
 
