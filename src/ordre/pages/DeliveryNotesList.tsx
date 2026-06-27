@@ -422,23 +422,25 @@ export default function DeliveryNotesList() {
                         {sv.label}
                       </Badge>
 
-                      <div data-stop-row onClick={(e) => e.stopPropagation()}>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <div>
-                              <BulkPakkseddelPDFButton
-                                scope={{ kind: "ids", date, ids: [r.id] }}
-                                label=""
-                                variant="ghost"
-                                size="icon"
-                                icon={<Printer className="h-4 w-4" />}
-                                ariaLabel={`Skriv ut pakkseddel ${r.display_number}`}
-                              />
-                            </div>
-                          </TooltipTrigger>
-                          <TooltipContent>Skriv ut</TooltipContent>
-                        </Tooltip>
-                      </div>
+                      {r.status !== "draft" && (
+                        <div data-stop-row onClick={(e) => e.stopPropagation()}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div>
+                                <BulkPakkseddelPDFButton
+                                  scope={{ kind: "ids", date, ids: [r.id] }}
+                                  label=""
+                                  variant="ghost"
+                                  size="icon"
+                                  icon={<Printer className="h-4 w-4" />}
+                                  ariaLabel={`Skriv ut pakkseddel ${r.display_number}`}
+                                />
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent>Skriv ut</TooltipContent>
+                          </Tooltip>
+                        </div>
+                      )}
                     </div>
 
                     {showNotes && r.notes && (
