@@ -239,21 +239,27 @@ export default function DeliveryNotesList() {
                 Generer pakksedler ({totalCount})
               </Button>
             )}
-            {!isPending && (
-              <>
-                <BulkPakkseddelPDFButton
-                  scope={{ kind: "date_tour", date, tourId: tourParam }}
-                  label="Skriv ut alle"
-                  disabled={rows.length === 0}
-                />
-                <BulkPakkseddelPDFButton
-                  scope={{ kind: "ids", date, ids: Array.from(selected) }}
-                  label={`Skriv ut valgte${selected.size ? ` (${selected.size})` : ""}`}
-                  variant="default"
-                  disabled={selected.size === 0}
-                />
-              </>
-            )}
+            {!isPending && (() => {
+              const printableRows = rows.filter((r) => r.status !== "draft");
+              const printableSelected = Array.from(selected).filter((id) =>
+                printableRows.some((r) => r.id === id),
+              );
+              return (
+                <>
+                  <BulkPakkseddelPDFButton
+                    scope={{ kind: "ids", date, ids: printableRows.map((r) => r.id) }}
+                    label="Skriv ut alle ferdige"
+                    disabled={printableRows.length === 0}
+                  />
+                  <BulkPakkseddelPDFButton
+                    scope={{ kind: "ids", date, ids: printableSelected }}
+                    label={`Skriv ut valgte${printableSelected.length ? ` (${printableSelected.length})` : ""}`}
+                    variant="default"
+                    disabled={printableSelected.length === 0}
+                  />
+                </>
+              );
+            })()}
           </div>
         </div>
 
