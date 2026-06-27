@@ -285,9 +285,7 @@ export function RecurringScheduleDialog({
       onOpenChange(false);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Kunne ikke lagre fastordre";
-      if (msg.includes("recurring_order_schedules_one_active_per_customer")) {
-        toast.error("Kunden har allerede en aktiv fastordre. Deaktiver den først.");
-      } else if (msg.includes("recurring_order_items_unique")) {
+      if (msg.includes("recurring_order_items_unique")) {
         toast.error(
           "To linjer har samme produkt + ukedag + tur. Slå sammen eller endre tur.",
         );
