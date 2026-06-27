@@ -158,14 +158,11 @@ export default function OrdreInnstillingerPage() {
           <CardDescription>Brukes nederst i alle utgående e-poster (HTML støttet).</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          <Label htmlFor="signature">HTML-signatur</Label>
-          <Textarea
-            id="signature"
+          <Label>Signatur</Label>
+          <RichTextEditor
             value={sigDraft}
-            onChange={(e) => setSigDraft(e.target.value)}
-            rows={6}
-            placeholder='<p>Med vennlig hilsen,<br/>Nøtterø Bakeri<br/><a href="https://nbhub.no">nbhub.no</a></p>'
-            className="font-mono text-sm"
+            onChange={setSigDraft}
+            placeholder="Med vennlig hilsen, Nøtterø Bakeri…"
           />
           <div className="flex gap-2">
             <Button
@@ -181,7 +178,10 @@ export default function OrdreInnstillingerPage() {
           {sigDraft && (
             <div className="rounded-md border bg-muted/40 p-3">
               <div className="text-xs text-muted-foreground mb-2">Forhåndsvisning</div>
-              <div className="text-sm" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(sigDraft, { USE_PROFILES: { html: true } }) }} />
+              <div
+                className="prose prose-sm max-w-none text-sm"
+                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(sigDraft, { USE_PROFILES: { html: true } }) }}
+              />
             </div>
           )}
         </CardContent>
