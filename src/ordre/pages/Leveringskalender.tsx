@@ -1202,7 +1202,7 @@ export default function MatrixPage() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {Array.from({ length: 31 }, (_, i) => i + 1).map((n) => (
+                {Array.from({ length: 14 }, (_, i) => i + 1).map((n) => (
                   <SelectItem key={n} value={String(n)}>{n}</SelectItem>
                 ))}
               </SelectContent>
