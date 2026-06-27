@@ -160,7 +160,7 @@ export function RecurringScheduleDialog({
     } else {
       setCustomerId(lockedCustomer?.id ?? null);
       setCustomerLabel(lockedCustomer?.label ?? "");
-      setName("Fastordre");
+      setName("");
       setIsActive(true);
       setValidFrom("");
       setValidTo("");
