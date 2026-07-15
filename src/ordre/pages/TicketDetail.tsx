@@ -47,7 +47,6 @@ import { CakeImageStatusCard } from "@/ordre/components/orders/CakeImageStatusCa
 import { useInboundMessages, type InboundMessage } from "@/ordre/hooks/useInboundMessages";
 import CreateRefundDialog from "@/ordre/components/tickets/CreateRefundDialog";
 import RefundStatusCard from "@/ordre/components/tickets/RefundStatusCard";
-import { Wallet } from "lucide-react";
 
 // ────────────────────────── helpers
 
