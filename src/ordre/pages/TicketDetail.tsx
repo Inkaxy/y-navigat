@@ -616,6 +616,16 @@ export default function TicketDetail() {
                     ))}
                   </div>
                 )}
+                {intent === "new_order" && !linked?.order && id && (
+                  <CreateOrderFromTicketButton
+                    ticket={ticket}
+                    ai={ai}
+                    onCreated={() => {
+                      qc.invalidateQueries({ queryKey: ["ticket", id] });
+                      qc.invalidateQueries({ queryKey: ["ticket-events", id] });
+                    }}
+                  />
+                )}
               </div>
             </SideCard>
           )}
