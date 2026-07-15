@@ -343,6 +343,17 @@ export default function TicketsInbox() {
               count={counts.team[team] ?? 0}
             />
           ))}
+
+          <SectionLabel>Oppgaver</SectionLabel>
+          <Link
+            to="/ordre/tilbakebetalinger"
+            className="flex w-full items-center justify-between gap-2 rounded-md px-3 py-2 text-left text-sm text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+          >
+            <span className="flex items-center gap-2 truncate">
+              <span className="text-base leading-none">💸</span>
+              <span className="truncate">Tilbakebetalinger</span>
+            </span>
+          </Link>
         </aside>
 
         {/* Liste */}
