@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import { nb } from "date-fns/locale";
-import { Paperclip, Package } from "lucide-react";
+import { Paperclip, Package, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
@@ -14,6 +14,8 @@ import {
   type RequestType,
 } from "@/ordre/lib/aiSuggestion";
 import { TEAMS, TEAM_LABEL, type TicketTeam } from "@/ordre/lib/teams";
+import { useSlaSettings } from "@/ordre/hooks/useSlaSettings";
+import { computeDeadline, formatCountdown } from "@/ordre/lib/sla";
 
 type TicketRow = {
   id: string;
