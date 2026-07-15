@@ -42,7 +42,7 @@ export function InvitePortalUserDialog({ open, onOpenChange, onInvited, defaultC
     queryFn: async () => {
       const { data, error } = await supabase
         .from("customers")
-        .select("id, customer_number, name")
+        .select("id, customer_number, display_name")
         .order("name")
         .limit(2000);
       if (error) throw error;
@@ -61,7 +61,7 @@ export function InvitePortalUserDialog({ open, onOpenChange, onInvited, defaultC
     const base = customers.filter((c) => !customerIds.includes(c.id));
     if (!q) return base.slice(0, 100);
     return base.filter((c) =>
-      c.name.toLowerCase().includes(q) || String(c.customer_number ?? "").includes(q),
+      c.display_name.toLowerCase().includes(q) || String(c.customer_number ?? "").includes(q),
     ).slice(0, 100);
   }, [customers, customerIds, customerSearch]);
 
@@ -128,7 +128,7 @@ export function InvitePortalUserDialog({ open, onOpenChange, onInvited, defaultC
               )}
               {selectedCustomers.map((c) => (
                 <Badge key={c.id} variant="secondary" className="gap-1">
-                  {c.name}{c.customer_number ? ` (${c.customer_number})` : ""}
+                  {c.display_name}{c.customer_number ? ` (${c.customer_number})` : ""}
                   <button
                     type="button"
                     onClick={() => setCustomerIds((prev) => prev.filter((id) => id !== c.id))}
@@ -156,7 +156,7 @@ export function InvitePortalUserDialog({ open, onOpenChange, onInvited, defaultC
                     onClick={() => setCustomerIds((prev) => [...prev, c.id])}
                     className="flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-sm hover:bg-surface-raised"
                   >
-                    <span>{c.name}</span>
+                    <span>{c.display_name}</span>
                     <span className="text-muted-foreground">{c.customer_number ?? ""}</span>
                   </button>
                 ))}

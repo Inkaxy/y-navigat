@@ -20,7 +20,7 @@ type PortalRow = {
   role: string;
   status: string;
   last_login_at: string | null;
-  customers: { id: string; customer_number: number | null; name: string }[];
+  customers: { id: string; customer_number: number | null; display_name: string }[];
 };
 
 export default function PortalUsers() {
@@ -35,11 +35,11 @@ export default function PortalUsers() {
     queryFn: async (): Promise<PortalRow[]> => {
       const [{ data: profiles, error: pe }, { data: links, error: le }] = await Promise.all([
         supabase.from("portal_user_profiles").select("*").order("display_name"),
-        supabase.from("customer_portal_accounts").select("user_id, customer_id, customers(id, customer_number, name)"),
+        supabase.from("customer_portal_accounts").select("user_id, customer_id, customers(id, customer_number, display_name)"),
       ]);
       if (pe) throw pe;
       if (le) throw le;
-      const byUser = new Map<string, { id: string; customer_number: number | null; name: string }[]>();
+      const byUser = new Map<string, { id: string; customer_number: number | null; display_name: string }[]>();
       for (const l of (links ?? []) as any[]) {
         if (!l.customers) continue;
         const arr = byUser.get(l.user_id) ?? [];
