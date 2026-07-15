@@ -54,6 +54,7 @@ import { OrderTimeline } from "@/ordre/components/orders/OrderTimeline";
 import { OrderDetailsTab } from "@/ordre/components/orders/OrderDetailsTab";
 import { OriginalEmailCard } from "@/ordre/components/orders/OriginalEmailCard";
 import { OrderAttachmentsCard } from "@/ordre/components/orders/OrderAttachmentsCard";
+import { CakeImageStatusCard } from "@/ordre/components/orders/CakeImageStatusCard";
 import { TimelineCard } from "@/ordre/components/orders/TimelineCard";
 import {
   canCancel,
