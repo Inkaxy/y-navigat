@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { KeyRound, UserPlus, Send, Ban, CheckCircle2, Trash2, Search, Loader2, X } from "lucide-react";
+import { KeyRound, UserPlus, Send, Mail, Ban, CheckCircle2, Trash2, Search, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
 import { AppBanner } from "@/kunder/components/shell/AppBanner";
 import { supabase } from "@/integrations/supabase/client";
@@ -101,7 +101,7 @@ export default function PortalUsers() {
     setCustomerFilter("all");
   };
 
-  const runAction = async (row: PortalRow, action: "recovery" | "disable" | "enable") => {
+  const runAction = async (row: PortalRow, action: "recovery" | "disable" | "enable" | "resend_invite") => {
     setBusy(`${action}:${row.user_id}`);
     const { data: res, error } = await supabase.functions.invoke("portal-manage-user", {
       body: { action, user_id: row.user_id },
@@ -113,6 +113,7 @@ export default function PortalUsers() {
     }
     toast.success(
       action === "recovery" ? `Passord-recovery sendt til ${row.email}` :
+      action === "resend_invite" ? `Ny invitasjon sendt til ${row.email}` :
       action === "disable" ? `${row.display_name} deaktivert` :
       `${row.display_name} aktivert`,
     );
@@ -225,6 +226,10 @@ export default function PortalUsers() {
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+                    <Button size="sm" variant="ghost" disabled={!!busy}
+                      onClick={() => runAction(u, "resend_invite")} title="Send ny invitasjon (magic link)">
+                      <Mail className="h-3.5 w-3.5" />
+                    </Button>
                     <Button size="sm" variant="ghost" disabled={!!busy}
                       onClick={() => runAction(u, "recovery")} title="Send passord-recovery">
                       <Send className="h-3.5 w-3.5" />
