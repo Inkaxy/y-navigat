@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { Plus, Loader2, Truck, ShoppingBag, Check, ArrowDownRight } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Plus, Loader2, Truck, ShoppingBag, Check, ArrowDownRight, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,6 +10,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { StatusBadge } from "@/ordre/components/orders/StatusBadge";
 import { CustomerOrderModal } from "@/ordre/components/orders/CustomerOrderModal";
 import { useCustomerOrders } from "@/ordre/hooks/useCustomerOrders";
+import { useOrderConversationCounts } from "@/ordre/hooks/useOrderConversations";
 import type { CustomerOption } from "@/ordre/hooks/useNBCustomers";
 import { todayISO, formatDate } from "@/ordre/lib/format";
 import { isoWeekMonday, addDays } from "@/ordre/hooks/useMatrix";
@@ -40,6 +42,7 @@ const SOURCE_LABELS: Record<string, string> = {
 };
 
 export function CustomerOrdersTab({ customer }: { customer: CustomerOption }) {
+  const navigate = useNavigate();
   const [quick, setQuick] = useState<QuickRange>("this_week");
   const initial = useMemo(() => rangeFor("this_week"), []);
   const [fromDate, setFromDate] = useState(initial.from);
@@ -54,6 +57,9 @@ export function CustomerOrdersTab({ customer }: { customer: CustomerOption }) {
     toDate,
     hidePickedUp,
   });
+
+  const orderIds = useMemo(() => (orders ?? []).map((o) => o.id), [orders]);
+  const { data: conversationCounts = {} } = useOrderConversationCounts(orderIds);
 
   function applyQuick(kind: Exclude<QuickRange, null>) {
     setQuick(kind);
@@ -170,6 +176,7 @@ export function CustomerOrdersTab({ customer }: { customer: CustomerOption }) {
                   <th className="px-3 py-2 text-left font-medium">Distribusjon</th>
                   <th className="px-3 py-2 text-right font-medium">Linjer</th>
                   <th className="px-3 py-2 text-left font-medium">Status</th>
+                  <th className="px-3 py-2 text-center font-medium">Samtaler</th>
                   <th className="px-3 py-2 text-left font-medium">Opphav</th>
                 </tr>
               </thead>
@@ -212,6 +219,24 @@ export function CustomerOrdersTab({ customer }: { customer: CustomerOption }) {
                         </span>
                       ) : (
                         <StatusBadge status={o.status} />
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-center">
+                      {(conversationCounts[o.id] ?? 0) > 0 ? (
+                        <button
+                          type="button"
+                          className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/40 px-2 py-0.5 text-xs font-medium text-foreground hover:bg-accent"
+                          title="Vis samtaler koblet til denne ordren"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/ordre/ordrer/${o.id}?tab=samtaler`);
+                          }}
+                        >
+                          <MessageSquare className="h-3 w-3" />
+                          {conversationCounts[o.id]}
+                        </button>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
                       )}
                     </td>
                     <td className="px-3 py-2 text-xs text-muted-foreground">
