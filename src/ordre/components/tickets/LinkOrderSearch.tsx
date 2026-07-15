@@ -34,34 +34,49 @@ export default function LinkOrderSearch({ ticketId, onLinked }: Props) {
       try {
         const term = q.trim();
         // search by order_number OR customer display_name
-        const orNumbers = supabase
-          .from("orders")
-          .select("id, order_number, status, delivery_date, customers:customer_id(display_name)")
-          .ilike("order_number", `%${term}%`)
-          .order("delivery_date", { ascending: false })
-          .limit(8);
-        const orCustomer = supabase
-          .from("orders")
-          .select("id, order_number, status, delivery_date, customers:customer_id(display_name)")
-          .ilike("customers.display_name", `%${term}%`)
-          .order("delivery_date", { ascending: false })
-          .limit(8);
-        const [a, b] = await Promise.all([orNumbers, orCustomer]);
-        const merge = new Map<string, OrderHit>();
-        for (const row of [...(a.data ?? []), ...(b.data ?? [])] as unknown as Array<{
+        const [a, b] = await Promise.all([
+          supabase
+            .from("orders")
+            .select("id, order_number, status, delivery_date, customer_id")
+            .ilike("order_number", `%${term}%`)
+            .order("delivery_date", { ascending: false })
+            .limit(8),
+          supabase
+            .from("customers")
+            .select("id, display_name")
+            .ilike("display_name", `%${term}%`)
+            .limit(5),
+        ]);
+        const rows: Array<{
           id: string;
           order_number: string;
           status: string;
           delivery_date: string | null;
-          customers: { display_name: string | null } | null;
-        }>) {
-          if (!merge.has(row.id)) {
-            merge.set(row.id, {
-              id: row.id,
-              order_number: row.order_number,
-              status: row.status,
-              delivery_date: row.delivery_date,
-              customer_name: row.customers?.display_name ?? null,
+          customer_id: string | null;
+        }> = (a.data ?? []) as never;
+        const customerIds = (b.data ?? []).map((c) => (c as { id: string }).id);
+        if (customerIds.length > 0) {
+          const c = await supabase
+            .from("orders")
+            .select("id, order_number, status, delivery_date, customer_id")
+            .in("customer_id", customerIds)
+            .order("delivery_date", { ascending: false })
+            .limit(8);
+          rows.push(...(((c.data ?? []) as never) as typeof rows));
+        }
+        const customerMap = new Map<string, string>();
+        for (const c of (b.data ?? []) as Array<{ id: string; display_name: string | null }>) {
+          customerMap.set(c.id, c.display_name ?? "");
+        }
+        const merge = new Map<string, OrderHit>();
+        for (const r of rows) {
+          if (!merge.has(r.id)) {
+            merge.set(r.id, {
+              id: r.id,
+              order_number: r.order_number,
+              status: r.status,
+              delivery_date: r.delivery_date,
+              customer_name: r.customer_id ? customerMap.get(r.customer_id) ?? null : null,
             });
           }
         }
