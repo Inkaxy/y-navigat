@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { KeyRound, UserPlus, Send, Ban, CheckCircle2, Trash2, Search, Loader2, X } from "lucide-react";
+import { KeyRound, UserPlus, Send, Mail, Ban, CheckCircle2, Trash2, Search, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
 import { AppBanner } from "@/kunder/components/shell/AppBanner";
 import { supabase } from "@/integrations/supabase/client";
