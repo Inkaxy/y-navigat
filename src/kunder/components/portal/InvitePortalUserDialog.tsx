@@ -43,10 +43,10 @@ export function InvitePortalUserDialog({ open, onOpenChange, onInvited, defaultC
       const { data, error } = await supabase
         .from("customers")
         .select("id, customer_number, display_name")
-        .order("name")
+        .order("display_name")
         .limit(2000);
       if (error) throw error;
-      return data as { id: string; customer_number: number | null; name: string }[];
+      return (data ?? []) as unknown as { id: string; customer_number: string | number | null; display_name: string }[];
     },
     enabled: open,
   });
