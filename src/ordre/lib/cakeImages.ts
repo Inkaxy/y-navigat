@@ -184,23 +184,58 @@ export async function deleteCakeImage(image: CakeImage) {
 
 export async function markPrinted(ids: string[]) {
   if (ids.length === 0) return;
-  // Hent gjeldende print_count for å øke ett pr rad
-  const { data } = await supabase
+  // Hent gjeldende rader for å øke print_count og finne ticket-koblinger
+  const { data: rows } = await supabase
     .from("cake_images")
-    .select("id, print_count")
+    .select("id, print_count, title, ticket_id, order_id")
     .in("id", ids);
   const now = new Date().toISOString();
+  const { data: u } = await supabase.auth.getUser();
+  const userId = u.user?.id ?? null;
+  const userLabel = u.user?.email ?? null;
+
   await Promise.all(
-    (data ?? []).map((row) =>
-      supabase
+    (rows ?? []).map(async (row) => {
+      const nextCount = (row.print_count ?? 0) + 1;
+      await supabase
         .from("cake_images")
         .update({
           status: "skrevet_ut",
           printed_at: now,
-          print_count: (row.print_count ?? 0) + 1,
-        })
-        .eq("id", row.id),
-    ),
+          print_count: nextCount,
+        } as never)
+        .eq("id", row.id);
+
+      // Skriv ticket-hendelse + systeminnslag i tråden hvis raden er koblet til en ticket
+      if (row.ticket_id) {
+        const summary = `Kakebildet er skrevet ut (${nextCount}×) — klart for produksjon`;
+        try {
+          await supabase.from("ticket_events").insert({
+            ticket_id: row.ticket_id,
+            order_id: row.order_id ?? null,
+            event_type: "cake_image.printed",
+            actor_type: "staff",
+            actor_user_id: userId,
+            actor_label: userLabel,
+            summary,
+            payload: {
+              cake_image_id: row.id,
+              title: row.title,
+              print_count: nextCount,
+            } as never,
+          } as never);
+          await supabase.from("ticket_internal_comments").insert({
+            ticket_id: row.ticket_id,
+            body: `🖨️ ${summary}${row.title ? ` — «${row.title}»` : ""}`,
+            mentioned_teams: [],
+            author_id: userId,
+            author_name: userLabel,
+          } as never);
+        } catch (err) {
+          console.warn("[cake_images] Kunne ikke logge ticket-hendelse", err);
+        }
+      }
+    }),
   );
 }
 
