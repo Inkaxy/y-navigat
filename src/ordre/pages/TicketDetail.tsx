@@ -313,6 +313,14 @@ export default function TicketDetail() {
         { event: "*", schema: "public", table: "ticket_events", filter: `ticket_id=eq.${id}` },
         () => qc.invalidateQueries({ queryKey: ["ticket-events", id] }),
       )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "ticket_inbound_messages", filter: `ticket_id=eq.${id}` },
+        () => {
+          qc.invalidateQueries({ queryKey: ["ticket-inbound-messages", id] });
+          qc.invalidateQueries({ queryKey: ["ticket", id] });
+        },
+      )
       .subscribe();
     return () => {
       supabase.removeChannel(ch);
