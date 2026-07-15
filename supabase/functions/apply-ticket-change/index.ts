@@ -71,7 +71,7 @@ Deno.serve(async (req) => {
 
     const parsed = InputSchema.safeParse(await req.json().catch(() => ({})));
     if (!parsed.success) return jsonErr("Ugyldig input", 400, { details: parsed.error.flatten() });
-    const { ticket_id, order_id, action, changes, cancellation_reason, mark_resolved } = parsed.data;
+    const { ticket_id, order_id, action, changes, line_changes, cancellation_reason, mark_resolved } = parsed.data;
 
     const { data: ticket } = await admin.from("tickets").select("id,subject,internal_notes,related_order_id").eq("id", ticket_id).maybeSingle();
     if (!ticket) return jsonErr("Ticket ikke funnet", 404);
