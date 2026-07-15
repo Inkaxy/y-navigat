@@ -46,6 +46,16 @@ Deno.serve(async (req) => {
         if (error) return json(500, { error: error.message });
         return json(200, { success: true });
       }
+      case "resend_invite": {
+        const { data: u } = await admin.auth.admin.getUserById(user_id);
+        if (!u?.user?.email) return json(404, { error: "Bruker ikke funnet" });
+        const { error } = await admin.auth.admin.inviteUserByEmail(u.user.email, {
+          redirectTo: `${portalUrl}/velg-passord`,
+        });
+        if (error) return json(500, { error: error.message });
+        await admin.from("portal_user_profiles").update({ status: "invited" }).eq("user_id", user_id);
+        return json(200, { success: true, email: u.user.email });
+      }
       case "disable": {
         const { error: aerr } = await admin.auth.admin.updateUserById(user_id, {
           ban_duration: "876000h", // 100 år
