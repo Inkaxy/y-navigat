@@ -175,6 +175,34 @@ export function InvitePortalUserDialog({ open, onOpenChange, onInvited, defaultC
             </div>
           </div>
 
+          {suggestedEmails.length > 0 && (
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">
+                E-poster fra valgte kundekort — klikk for å bruke
+              </Label>
+              <div className="flex flex-wrap gap-1 rounded-md border border-line bg-surface-canvas p-2">
+                {suggestedEmails.slice(0, 20).map((s) => (
+                  <button
+                    key={`${s.email}-${s.source}`}
+                    type="button"
+                    onClick={() => applySuggested(s)}
+                    className={
+                      "rounded border border-line px-2 py-1 text-left text-xs hover:bg-surface-raised " +
+                      (email.toLowerCase() === s.email ? "border-primary bg-primary/10" : "")
+                    }
+                    title={s.source}
+                  >
+                    <div className="font-medium">{s.email}</div>
+                    <div className="text-[10px] text-muted-foreground">
+                      {s.name ? `${s.name} · ` : ""}{s.source}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+
           <div className="space-y-1.5">
             <Label>Kunder ({selectedCustomers.length} valgt)</Label>
             <div className="flex flex-wrap gap-1 min-h-8 rounded-md border border-line p-2 bg-surface-canvas">
