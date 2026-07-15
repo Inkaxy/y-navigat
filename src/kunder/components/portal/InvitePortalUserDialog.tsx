@@ -42,14 +42,69 @@ export function InvitePortalUserDialog({ open, onOpenChange, onInvited, defaultC
     queryFn: async () => {
       const { data, error } = await supabase
         .from("customers")
-        .select("id, customer_number, display_name")
+        .select("id, customer_number, display_name, primary_contact_name, primary_contact_email, invoice_email")
         .order("display_name")
         .limit(2000);
       if (error) throw error;
-      return (data ?? []) as unknown as { id: string; customer_number: string | number | null; display_name: string }[];
+      return (data ?? []) as unknown as {
+        id: string;
+        customer_number: string | number | null;
+        display_name: string;
+        primary_contact_name: string | null;
+        primary_contact_email: string | null;
+        invoice_email: string | null;
+      }[];
     },
     enabled: open,
   });
+
+  const { data: contacts = [] } = useQuery({
+    queryKey: ["portal-invite-contacts", customerIds],
+    queryFn: async () => {
+      if (customerIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from("customer_contacts")
+        .select("id, customer_id, name, email")
+        .in("customer_id", customerIds)
+        .not("email", "is", null);
+      if (error) throw error;
+      return (data ?? []) as unknown as {
+        id: string; customer_id: string; name: string | null; email: string | null;
+      }[];
+    },
+    enabled: open && customerIds.length > 0,
+  });
+
+  const suggestedEmails = useMemo(() => {
+    const seen = new Set<string>();
+    const out: { email: string; name: string | null; source: string }[] = [];
+    const push = (email: string | null | undefined, name: string | null | undefined, source: string) => {
+      if (!email) return;
+      const key = email.trim().toLowerCase();
+      if (!key || seen.has(key)) return;
+      seen.add(key);
+      out.push({ email: key, name: name?.trim() || null, source });
+    };
+    for (const c of customers.filter((c) => customerIds.includes(c.id))) {
+      const label = c.display_name;
+      push(c.primary_contact_email, c.primary_contact_name, `${label} · hovedkontakt`);
+      push(c.invoice_email, null, `${label} · faktura`);
+    }
+    for (const k of contacts) {
+      const cust = customers.find((c) => c.id === k.customer_id);
+      push(k.email, k.name, `${cust?.display_name ?? "Kunde"} · kontakt`);
+    }
+    return out;
+  }, [customers, contacts, customerIds]);
+
+  const applySuggested = (s: { email: string; name: string | null }) => {
+    setEmail(s.email);
+    if (s.name && !firstName && !lastName) {
+      const parts = s.name.split(/\s+/);
+      setFirstName(parts[0] ?? "");
+      setLastName(parts.slice(1).join(" ") || parts[0] || "");
+    }
+  };
 
   const selectedCustomers = useMemo(
     () => customers.filter((c) => customerIds.includes(c.id)),
@@ -119,6 +174,34 @@ export function InvitePortalUserDialog({ open, onOpenChange, onInvited, defaultC
               </Select>
             </div>
           </div>
+
+          {suggestedEmails.length > 0 && (
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">
+                E-poster fra valgte kundekort — klikk for å bruke
+              </Label>
+              <div className="flex flex-wrap gap-1 rounded-md border border-line bg-surface-canvas p-2">
+                {suggestedEmails.slice(0, 20).map((s) => (
+                  <button
+                    key={`${s.email}-${s.source}`}
+                    type="button"
+                    onClick={() => applySuggested(s)}
+                    className={
+                      "rounded border border-line px-2 py-1 text-left text-xs hover:bg-surface-raised " +
+                      (email.toLowerCase() === s.email ? "border-primary bg-primary/10" : "")
+                    }
+                    title={s.source}
+                  >
+                    <div className="font-medium">{s.email}</div>
+                    <div className="text-[10px] text-muted-foreground">
+                      {s.name ? `${s.name} · ` : ""}{s.source}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
 
           <div className="space-y-1.5">
             <Label>Kunder ({selectedCustomers.length} valgt)</Label>
