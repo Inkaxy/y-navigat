@@ -44,6 +44,7 @@ import {
   CakeSlice,
   Cookie,
   ListChecks,
+  KeyRound,
   Printer,
   type LucideIcon,
 } from "lucide-react";
