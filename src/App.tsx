@@ -65,6 +65,7 @@ import KunderInnstillinger from "@/kunder/pages/Innstillinger";
 import KunderCustomerGroups from "@/kunder/pages/CustomerGroups";
 import KunderCustomerHistory from "@/kunder/pages/CustomerHistory";
 import KunderPlaceholder from "@/kunder/pages/Placeholder";
+import KunderPortalUsers from "@/kunder/pages/PortalUsers";
 import { useUserAccess as useKunderUserAccess } from "@/kunder/hooks/useUserAccess";
 import { useAuth as useNbhubAuth } from "@/hooks/useAuth";
 import ProduksjonOversikt from "@/produksjon/pages/OversiktPage";
