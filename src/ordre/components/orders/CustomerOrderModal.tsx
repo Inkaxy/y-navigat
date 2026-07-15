@@ -974,6 +974,12 @@ export function CustomerOrderModal({
                     <SelectItem value="manual">Manuelt</SelectItem>
                   </SelectContent>
                 </Select>
+                {sourceTicketId && (
+                  <p className="text-xs text-muted-foreground">
+                    Settes automatisk til <strong>E-post</strong> · koblet til ticket{" "}
+                    <strong>{sourceTicketNumber ?? sourceTicketId.slice(0, 8)}</strong>
+                  </p>
+                )}
               </fieldset>
 
               {/* Bekreftelse */}
