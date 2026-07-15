@@ -12,6 +12,7 @@ import {
   Send,
   Sparkles,
   StickyNote,
+  Wallet,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
