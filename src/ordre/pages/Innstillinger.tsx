@@ -23,6 +23,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { RichTextEditor, type RichTextEditorHandle } from "@/ordre/components/shell/RichTextEditor";
 import { AiSettingsCard } from "@/ordre/components/shell/AiSettingsCard";
+import { SlaSettingsCard } from "@/ordre/components/shell/SlaSettingsCard";
 import { CakeImagesSettingsCard } from "@/ordre/components/shell/CakeImagesSettingsCard";
 
 import { useToast } from "@/components/ui/use-toast";
@@ -192,6 +193,10 @@ export default function OrdreInnstillingerPage() {
 
       {/* Kort 4: AI-analyse */}
       <AiSettingsCard />
+
+      {/* Kort 4b: SLA-frister */}
+      <SlaSettingsCard />
+
 
       {/* Kort 5: Kakebilder */}
       <CakeImagesSettingsCard />
