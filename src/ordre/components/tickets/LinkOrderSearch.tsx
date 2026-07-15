@@ -48,21 +48,20 @@ export default function LinkOrderSearch({ ticketId, onLinked }: Props) {
           .limit(8);
         const [a, b] = await Promise.all([orNumbers, orCustomer]);
         const merge = new Map<string, OrderHit>();
-        for (const row of [...(a.data ?? []), ...(b.data ?? [])]) {
-          const r = row as {
-            id: string;
-            order_number: string;
-            status: string;
-            delivery_date: string | null;
-            customers: { display_name: string | null } | null;
-          };
-          if (!merge.has(r.id)) {
-            merge.set(r.id, {
-              id: r.id,
-              order_number: r.order_number,
-              status: r.status,
-              delivery_date: r.delivery_date,
-              customer_name: r.customers?.display_name ?? null,
+        for (const row of [...(a.data ?? []), ...(b.data ?? [])] as unknown as Array<{
+          id: string;
+          order_number: string;
+          status: string;
+          delivery_date: string | null;
+          customers: { display_name: string | null } | null;
+        }>) {
+          if (!merge.has(row.id)) {
+            merge.set(row.id, {
+              id: row.id,
+              order_number: row.order_number,
+              status: row.status,
+              delivery_date: row.delivery_date,
+              customer_name: row.customers?.display_name ?? null,
             });
           }
         }
