@@ -124,11 +124,11 @@ async function processMessage(
   const bodyText = msg.body?.contentType === "text" ? msg.body?.content : stripHtml(msg.body?.content ?? "");
 
   // Check if this belongs to an existing conversation → thread onto existing ticket
-  let parentTicket: { id: string; awaiting_external: boolean; awaiting_external_email: string | null } | null = null;
+  let parentTicket: { id: string; awaiting_external: boolean; awaiting_external_email: string | null; assigned_to: string | null; subject: string | null; related_order_id: string | null } | null = null;
   if (msg.conversationId) {
     const { data: prior } = await admin
       .from("tickets")
-      .select("id, awaiting_external, awaiting_external_email")
+      .select("id, awaiting_external, awaiting_external_email, assigned_to, subject, related_order_id")
       .eq("conversation_id", msg.conversationId)
       .order("received_at", { ascending: true })
       .limit(1)
@@ -182,6 +182,19 @@ async function processMessage(
         inbound_message_id: msg.id,
       },
     });
+
+    // Varsel til tildelt bruker om kundesvar
+    if (!isFromExternalForward && parentTicket.assigned_to) {
+      await admin.from("notifications").insert({
+        user_id: parentTicket.assigned_to,
+        type: "ticket.customer_reply",
+        title: `Nytt svar fra ${senderName ?? senderEmail}`,
+        body: parentTicket.subject ?? msg.subject ?? null,
+        link: `/ordre/ticket/${parentTicket.id}`,
+        ticket_id: parentTicket.id,
+        order_id: parentTicket.related_order_id,
+      });
+    }
     return;
   }
 

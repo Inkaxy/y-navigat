@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import { nb } from "date-fns/locale";
-import { Paperclip, Package } from "lucide-react";
+import { Paperclip, Package, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
@@ -14,6 +14,8 @@ import {
   type RequestType,
 } from "@/ordre/lib/aiSuggestion";
 import { TEAMS, TEAM_LABEL, type TicketTeam } from "@/ordre/lib/teams";
+import { useSlaSettings } from "@/ordre/hooks/useSlaSettings";
+import { computeDeadline, formatCountdown } from "@/ordre/lib/sla";
 
 type TicketRow = {
   id: string;
@@ -207,17 +209,33 @@ export default function TicketsInbox() {
     staleTime: 30_000,
   });
 
+  const { data: sla } = useSlaSettings();
+
   type Row = TicketRow & {
     intent: RequestType | null;
+    deadline: Date | null;
+    overdue: boolean;
+    countdown: string | null;
   };
 
   const rows: Row[] = useMemo(
-    () =>
-      tickets.map((t) => {
+    () => {
+      const now = new Date();
+      return tickets.map((t) => {
         const ai = normalizeAiSuggestion(t.ai_suggestion);
-        return { ...t, intent: ai?.request_type ?? null };
-      }),
-    [tickets],
+        const intent = ai?.request_type ?? null;
+        const deadline = sla && intent ? computeDeadline(t.received_at, intent, sla.sla, sla.bh) : null;
+        const cd = deadline ? formatCountdown(deadline, now) : null;
+        return {
+          ...t,
+          intent,
+          deadline,
+          overdue: cd?.overdue ?? false,
+          countdown: cd?.text ?? null,
+        };
+      });
+    },
+    [tickets, sla],
   );
 
   const isOpen = (t: Row) => t.status === "new" || t.status === "in_progress";
@@ -243,10 +261,7 @@ export default function TicketsInbox() {
 
   const kpis = useMemo(() => {
     const open = rows.filter(isOpen);
-    const nowMs = Date.now();
-    const overFrist = open.filter(
-      (r) => nowMs - new Date(r.received_at).getTime() > 4 * 60 * 60 * 1000,
-    ).length;
+    const overFrist = open.filter((r) => r.overdue).length;
     const withoutOrder = open.filter(
       (r) => !r.related_order_id && r.intent !== "question",
     ).length;
@@ -259,22 +274,32 @@ export default function TicketsInbox() {
     };
   }, [rows, counts.awaiting_customer, openRefundsCount]);
 
+  const sortByDeadline = (a: Row, b: Row) => {
+    // Overdue først, deretter tidligste deadline, deretter received_at
+    if (a.overdue && !b.overdue) return -1;
+    if (!a.overdue && b.overdue) return 1;
+    const ad = a.deadline?.getTime() ?? Infinity;
+    const bd = b.deadline?.getTime() ?? Infinity;
+    if (ad !== bd) return ad - bd;
+    return new Date(a.received_at).getTime() - new Date(b.received_at).getTime();
+  };
+
   const filtered = useMemo(() => {
-    if (queue === "all") return rows.filter(isOpen);
-    if (queue === "mine")
-      return rows.filter((r) => r.assigned_to === user?.id && isOpen(r));
-    if (queue === "awaiting_customer")
-      return rows.filter((r) => r.awaiting_internal && isOpen(r));
-    if (queue === "resolved") return rows.filter((r) => r.status === "resolved");
-    if (queue.startsWith("intent:")) {
+    let out: Row[];
+    if (queue === "all") out = rows.filter(isOpen);
+    else if (queue === "mine")
+      out = rows.filter((r) => r.assigned_to === user?.id && isOpen(r));
+    else if (queue === "awaiting_customer")
+      out = rows.filter((r) => r.awaiting_internal && isOpen(r));
+    else if (queue === "resolved") out = rows.filter((r) => r.status === "resolved");
+    else if (queue.startsWith("intent:")) {
       const k = queue.slice("intent:".length) as RequestType;
-      return rows.filter((r) => r.intent === k && isOpen(r));
-    }
-    if (queue.startsWith("team:")) {
+      out = rows.filter((r) => r.intent === k && isOpen(r));
+    } else if (queue.startsWith("team:")) {
       const k = queue.slice("team:".length) as TicketTeam;
-      return rows.filter((r) => r.assigned_team === k && isOpen(r));
-    }
-    return rows;
+      out = rows.filter((r) => r.assigned_team === k && isOpen(r));
+    } else out = rows;
+    return queue === "resolved" ? out : [...out].sort(sortByDeadline);
   }, [rows, queue, user?.id]);
 
   return (
@@ -443,6 +468,20 @@ export default function TicketsInbox() {
                     </span>
                   )}
                   <ConfidenceChip score={t.ai_confidence_score} />
+                  {t.countdown && (
+                    <span
+                      className={cn(
+                        "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium",
+                        t.overdue
+                          ? "border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-300"
+                          : "border-border bg-muted text-muted-foreground",
+                      )}
+                      title={t.deadline ? `Frist: ${t.deadline.toLocaleString("nb-NO")}` : ""}
+                    >
+                      {t.overdue && <AlertTriangle className="h-3 w-3" />}
+                      {t.countdown}
+                    </span>
+                  )}
                   <span className="w-24 text-right text-xs text-muted-foreground">
                     {formatDistanceToNow(new Date(t.received_at), {
                       locale: nb,

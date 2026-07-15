@@ -9,6 +9,7 @@ import { PositionCard } from "@/components/PositionCard";
 import { AppCard } from "@/components/AppCard";
 import { Logo } from "@/components/brand/Logo";
 import { Sparkles } from "lucide-react";
+import { TicketQueueWidget } from "@/ordre/components/widgets/TicketQueueWidget";
 
 export default function Hjem() {
   const { data: profile } = useCurrentUser();
@@ -22,6 +23,7 @@ export default function Hjem() {
   const firstName = profile?.first_name || profile?.display_name?.split(" ")[0] || "";
   const greeting = getTimeGreeting();
   const accessibleApps = (apps ?? []).filter((a) => a.access_level !== "none");
+  const hasOrdreAccess = accessibleApps.some((a) => a.code === "ordre");
   const today = new Date().toLocaleDateString("nb-NO", {
     weekday: "long",
     day: "numeric",
@@ -66,6 +68,13 @@ export default function Hjem() {
         </div>
       </section>
 
+      {/* Widgets */}
+      {hasOrdreAccess && (
+        <div className="grid gap-4 md:grid-cols-2">
+          <TicketQueueWidget />
+        </div>
+      )}
+
       {/* Velkomst-kort */}
       <Card className="overflow-hidden border-line-subtle shadow-card">
         <CardContent className="flex items-start gap-4 p-6">
@@ -81,12 +90,12 @@ export default function Hjem() {
           <div className="min-w-0">
             <h2 className="font-semibold text-foreground">Ditt dashbord</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Widgets dukker opp her etter hvert som appene bygges. I mellomtiden kan du
-              navigere til andre apper via app-velgeren øverst.
+              Flere widgets dukker opp her etter hvert som appene bygges.
             </p>
           </div>
         </CardContent>
       </Card>
+
 
     </div>
   );
