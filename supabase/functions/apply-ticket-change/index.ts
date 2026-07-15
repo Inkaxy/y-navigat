@@ -126,7 +126,7 @@ Deno.serve(async (req) => {
           }
           const { data: prod, error: pErr } = await admin
             .from("products")
-            .select("id, name, sales_unit, price_excl_vat, vat_rate")
+            .select("id, display_name, unit_of_sale, mva_rate")
             .eq("id", lc.product_id)
             .maybeSingle();
           if (pErr || !prod) return jsonErr(`Produkt ikke funnet: ${lc.product_id}`, 404);
@@ -138,25 +138,25 @@ Deno.serve(async (req) => {
             .limit(1)
             .maybeSingle();
           const nextLineNo = ((maxRow?.line_number as number | undefined) ?? 0) + 1;
-          const unitPrice = Number((prod as any).price_excl_vat ?? 0);
-          const vatRate = Number((prod as any).vat_rate ?? 0);
-          const subtotal = unitPrice * lc.new_quantity;
+          const vatRate = Number((prod as any).mva_rate ?? 0);
+          // Pris settes til 0 her; ordreredigering fastsetter riktig pris via prislister.
           const { error: iErr } = await admin.from("order_lines").insert({
             order_id,
             line_number: nextLineNo,
             product_id: prod.id,
-            product_snapshot: { name: (prod as any).name } as never,
+            product_snapshot: { name: (prod as any).display_name } as never,
             quantity: lc.new_quantity,
-            sales_unit: (prod as any).sales_unit ?? "stk",
-            unit_price: unitPrice,
-            unit_price_source: "product",
-            line_subtotal_excl_vat: subtotal,
+            sales_unit: (prod as any).unit_of_sale ?? "stk",
+            unit_price: 0,
+            unit_price_source: "ticket_apply",
+            line_subtotal_excl_vat: 0,
             vat_rate: vatRate,
-            line_vat: subtotal * (vatRate / 100),
-            line_total_incl_vat: subtotal * (1 + vatRate / 100),
+            line_vat: 0,
+            line_total_incl_vat: 0,
+            notes: "Lagt til via ticket — pris må bekreftes",
           } as never);
           if (iErr) return jsonErr(`Kunne ikke legge til linje: ${iErr.message}`, 500);
-          lineChangesLog.push({ op: "add", product_id: prod.id, quantity: lc.new_quantity });
+          lineChangesLog.push({ op: "add", product_id: prod.id, product_name: (prod as any).display_name, quantity: lc.new_quantity });
         } else {
           if (!lc.order_line_id || lc.new_quantity == null) {
             return jsonErr("Endring krever order_line_id og new_quantity", 400);
