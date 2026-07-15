@@ -176,6 +176,7 @@ export function CustomerOrdersTab({ customer }: { customer: CustomerOption }) {
                   <th className="px-3 py-2 text-left font-medium">Distribusjon</th>
                   <th className="px-3 py-2 text-right font-medium">Linjer</th>
                   <th className="px-3 py-2 text-left font-medium">Status</th>
+                  <th className="px-3 py-2 text-center font-medium">Samtaler</th>
                   <th className="px-3 py-2 text-left font-medium">Opphav</th>
                 </tr>
               </thead>
