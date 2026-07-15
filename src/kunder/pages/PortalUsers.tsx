@@ -101,7 +101,7 @@ export default function PortalUsers() {
     setCustomerFilter("all");
   };
 
-  const runAction = async (row: PortalRow, action: "recovery" | "disable" | "enable") => {
+  const runAction = async (row: PortalRow, action: "recovery" | "disable" | "enable" | "resend_invite") => {
     setBusy(`${action}:${row.user_id}`);
     const { data: res, error } = await supabase.functions.invoke("portal-manage-user", {
       body: { action, user_id: row.user_id },
@@ -113,6 +113,7 @@ export default function PortalUsers() {
     }
     toast.success(
       action === "recovery" ? `Passord-recovery sendt til ${row.email}` :
+      action === "resend_invite" ? `Ny invitasjon sendt til ${row.email}` :
       action === "disable" ? `${row.display_name} deaktivert` :
       `${row.display_name} aktivert`,
     );
