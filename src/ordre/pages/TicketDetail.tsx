@@ -165,12 +165,10 @@ function useLinkedOrder(orderId: string | null) {
       // Also count lines
       const { data: lines } = await supabase
         .from("order_lines")
-        .select("quantity, description")
+        .select("quantity, product_snapshot, notes")
         .eq("order_id", orderId!)
         .limit(6);
-      return { order: data, lines: lines ?? [] };
-    },
-  });
+      return { order: data, lines: (lines ?? []) as Array<{ quantity: number; product_snapshot: { name?: string } | null; notes: string | null }> };
 }
 
 // ────────────────────────── attachment thumbnail
