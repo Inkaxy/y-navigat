@@ -747,8 +747,29 @@ export default function TicketDetail() {
           )}
 
           {id && <CakeImageStatusCard ticketId={id} />}
+          {id && <RefundStatusCard ticketId={id} />}
         </div>
       </div>
+
+      {id && linked?.order && (
+        <CreateRefundDialog
+          open={refundOpen}
+          onOpenChange={setRefundOpen}
+          ticketId={id}
+          orderId={linked.order.id}
+          legalEntityId={(linked.order as unknown as { legal_entity_id: string }).legal_entity_id}
+          orderNumber={linked.order.order_number}
+          suggestedAmount={
+            (linked.order as unknown as { total_incl_vat?: number | null }).total_incl_vat ??
+            linked.order.subtotal_excl_vat ??
+            null
+          }
+          suggestedReason={ai?.summary ?? null}
+          onCreated={() => {
+            qc.invalidateQueries({ queryKey: ["refunds", "ticket", id] });
+          }}
+        />
+      )}
 
       {/* Lightbox */}
       {lightbox && (
