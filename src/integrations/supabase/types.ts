@@ -4221,6 +4221,39 @@ export type Database = {
         }
         Relationships: []
       }
+      portal_user_profiles: {
+        Row: {
+          created_at: string
+          display_name: string
+          email: string
+          last_login_at: string | null
+          role: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          display_name: string
+          email: string
+          last_login_at?: string | null
+          role?: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string
+          email?: string
+          last_login_at?: string | null
+          role?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       pos_customers: {
         Row: {
           created_at: string
