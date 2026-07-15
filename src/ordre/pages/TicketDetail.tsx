@@ -693,6 +693,8 @@ export default function TicketDetail() {
               </SideCard>
             )
           )}
+
+          {id && <CakeImageStatusCard ticketId={id} />}
         </div>
       </div>
 
