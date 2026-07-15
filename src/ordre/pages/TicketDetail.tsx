@@ -875,6 +875,22 @@ function InternalNoteBubble({
 }
 
 function EventBubble({ e }: { e: TicketEvent }) {
+  const isForward = e.event_type === "ticket.forwarded_external";
+  if (isForward) {
+    return (
+      <div className="rounded-lg border border-l-4 border-l-purple-500 bg-purple-50/60 p-3 text-sm shadow-sm dark:bg-purple-950/20">
+        <div className="flex items-center gap-2 font-semibold text-purple-900 dark:text-purple-200">
+          ✉️ Videresendt til {e.actor_label ?? "ekstern"}
+          <span className="ml-auto text-xs font-normal text-muted-foreground">
+            {formatDistanceToNow(new Date(e.occurred_at), { locale: nb, addSuffix: true })}
+          </span>
+        </div>
+        {e.summary && (
+          <div className="mt-1 text-xs text-muted-foreground">{e.summary}</div>
+        )}
+      </div>
+    );
+  }
   return (
     <div className="flex items-center gap-2 rounded-md border-l-2 border-l-muted-foreground/30 bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground">
       <span className="font-medium text-foreground">{e.event_type}</span>
@@ -883,6 +899,41 @@ function EventBubble({ e }: { e: TicketEvent }) {
       <span className="ml-auto">
         {formatDistanceToNow(new Date(e.occurred_at), { locale: nb, addSuffix: true })}
       </span>
+    </div>
+  );
+}
+
+function InboundMessageBubble({ m }: { m: InboundMessage }) {
+  const html = m.body_html ? sanitize(m.body_html) : null;
+  return (
+    <div className="rounded-lg border border-l-4 border-l-blue-500 bg-[hsl(var(--brand-cream))] p-4 shadow-sm">
+      <div className="mb-2 flex items-center gap-2 text-sm">
+        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-500/10 text-xs font-semibold text-blue-700 dark:text-blue-300">
+          {initials(m.sender_name, m.sender_email)}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="truncate font-semibold text-foreground">
+            {m.sender_name ?? m.sender_email}
+            <span className="ml-1 font-normal text-muted-foreground">· {m.sender_email}</span>
+            {m.is_from_external_forward && (
+              <span className="ml-2 inline-flex items-center rounded border border-purple-500/40 bg-purple-500/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-purple-700 dark:text-purple-300">
+                svar fra ekstern
+              </span>
+            )}
+          </div>
+        </div>
+        <div className="text-xs text-muted-foreground">{fmtTime(m.received_at)}</div>
+      </div>
+      {html ? (
+        <div
+          className="prose prose-sm max-w-none text-sm text-foreground [&_a]:text-primary"
+          dangerouslySetInnerHTML={{ __html: html }}
+        />
+      ) : (
+        <p className="whitespace-pre-wrap text-sm text-foreground">
+          {m.body_text ?? m.body_preview ?? ""}
+        </p>
+      )}
     </div>
   );
 }
