@@ -209,17 +209,33 @@ export default function TicketsInbox() {
     staleTime: 30_000,
   });
 
+  const { data: sla } = useSlaSettings();
+
   type Row = TicketRow & {
     intent: RequestType | null;
+    deadline: Date | null;
+    overdue: boolean;
+    countdown: string | null;
   };
 
   const rows: Row[] = useMemo(
-    () =>
-      tickets.map((t) => {
+    () => {
+      const now = new Date();
+      return tickets.map((t) => {
         const ai = normalizeAiSuggestion(t.ai_suggestion);
-        return { ...t, intent: ai?.request_type ?? null };
-      }),
-    [tickets],
+        const intent = ai?.request_type ?? null;
+        const deadline = sla && intent ? computeDeadline(t.received_at, intent, sla.sla, sla.bh) : null;
+        const cd = deadline ? formatCountdown(deadline, now) : null;
+        return {
+          ...t,
+          intent,
+          deadline,
+          overdue: cd?.overdue ?? false,
+          countdown: cd?.text ?? null,
+        };
+      });
+    },
+    [tickets, sla],
   );
 
   const isOpen = (t: Row) => t.status === "new" || t.status === "in_progress";
