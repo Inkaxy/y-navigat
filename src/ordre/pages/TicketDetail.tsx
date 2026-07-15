@@ -41,6 +41,7 @@ import type { TicketAttachment } from "@/ordre/hooks/useTickets";
 import ChangeIntentCard from "@/ordre/components/tickets/ChangeIntentCard";
 import LinkOrderSearch from "@/ordre/components/tickets/LinkOrderSearch";
 import CreateOrderFromTicketButton from "@/ordre/components/tickets/CreateOrderFromTicketButton";
+import { CakeImageStatusCard } from "@/ordre/components/orders/CakeImageStatusCard";
 
 // ────────────────────────── helpers
 
