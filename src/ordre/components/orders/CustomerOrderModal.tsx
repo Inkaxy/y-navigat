@@ -258,23 +258,98 @@ export function CustomerOrderModal({
       );
       setDirty(false);
     } else if (!isEdit) {
-      setName("");
-      setEmail("");
-      setPhone("");
-      setDeliveryDate(tomorrow());
-      setHour("--");
-      setMinute("00");
+      const iv = initialValues ?? null;
+      setName(iv?.finalCustomerName ?? "");
+      setEmail(iv?.finalCustomerEmail ?? "");
+      setPhone(iv?.finalCustomerPhone ?? "");
+      setDeliveryDate(iv?.deliveryDate ?? tomorrow());
+      if (iv?.deliveryTime) {
+        const t = iv.deliveryTime.slice(0, 5); // HH:mm
+        setHour(t.slice(0, 2));
+        // Snap to allowed minutes if AI gives odd value
+        const rawMin = t.slice(3, 5);
+        setMinute(MINUTES.includes(rawMin) ? rawMin : "00");
+      } else {
+        setHour("--");
+        setMinute("00");
+      }
       setTourId("none");
-      setDistribution("delivery");
-      setSource("phone");
-      setSendSms(false);
-      setSendEmail(false);
-      setIsPaid(false);
+      setDistribution(iv?.distribution ?? "delivery");
+      setSource(iv?.source ?? "phone");
+      setSendSms(iv?.sendSms ?? false);
+      setSendEmail(iv?.sendEmail ?? false);
+      setIsPaid(iv?.isPaid ?? false);
 
       setLines([newLine()]);
       setDirty(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, isEdit, existing]);
+
+  // Prefill produkter fra initialValues.lines (kun i create-modus, når modal åpnes)
+  const initialLinesRef = useRef<string>("");
+  useEffect(() => {
+    if (!open || isEdit) return;
+    const lineSpecs = initialValues?.lines ?? [];
+    const key = JSON.stringify(lineSpecs);
+    if (key === initialLinesRef.current) return;
+    initialLinesRef.current = key;
+    if (lineSpecs.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      const ids = Array.from(new Set(lineSpecs.map((l) => l.product_id)));
+      const { data } = await supabase
+        .from("products")
+        .select(
+          "id, display_number, code, display_name, unit_of_sale, mva_rate, status, is_for_sale, is_divisible",
+        )
+        .in("id", ids);
+      if (cancelled) return;
+      const byId = new Map<string, ProductOption>();
+      for (const p of (data ?? []) as any[]) {
+        byId.set(p.id, {
+          id: p.id,
+          display_number: Number(p.display_number),
+          code: p.code,
+          display_name: p.display_name,
+          unit_of_sale: p.unit_of_sale,
+          mva_rate: Number(p.mva_rate ?? 0),
+          status: p.status,
+          is_for_sale: p.is_for_sale,
+          is_divisible: p.is_divisible,
+        });
+      }
+      const drafts: LineDraft[] = [];
+      for (const spec of lineSpecs) {
+        const p = byId.get(spec.product_id);
+        if (!p) continue;
+        const ep = await fetchEffectivePrice({
+          productId: p.id,
+          customerId: customer.id,
+          date: initialValues?.deliveryDate ?? tomorrow(),
+          caller: "customer_order_create",
+        }).catch(() => null);
+        drafts.push({
+          uid: crypto.randomUUID(),
+          product: p,
+          product_display_name: p.display_name,
+          product_display_number: p.display_number,
+          product_unit_of_sale: p.unit_of_sale,
+          product_mva_rate: p.mva_rate,
+          quantity: String(spec.quantity),
+          unit_price: ep ? String(ep.price) : "0",
+          is_fallback: !ep || ep.is_fallback,
+          merknad: null,
+        });
+      }
+      if (cancelled || drafts.length === 0) return;
+      setLines(drafts);
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, isEdit, initialValues, customer.id]);
 
   // Mark dirty on any field change after init
   useEffect(() => {
