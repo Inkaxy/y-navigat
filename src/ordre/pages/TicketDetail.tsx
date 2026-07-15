@@ -40,6 +40,7 @@ import {
 import type { TicketAttachment } from "@/ordre/hooks/useTickets";
 import ChangeIntentCard from "@/ordre/components/tickets/ChangeIntentCard";
 import LinkOrderSearch from "@/ordre/components/tickets/LinkOrderSearch";
+import CreateOrderFromTicketButton from "@/ordre/components/tickets/CreateOrderFromTicketButton";
 
 // ────────────────────────── helpers
 
