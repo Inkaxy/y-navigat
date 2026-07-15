@@ -12,9 +12,10 @@ import { useNBCustomers, useCustomerById } from "@/ordre/hooks/useNBCustomers";
 import {
   CustomerOrderModal,
   type CustomerOrderInitialValues,
+  type TicketAttachmentForOrder,
 } from "@/ordre/components/orders/CustomerOrderModal";
 import type { AiSuggestion } from "@/ordre/lib/aiSuggestion";
-import type { Ticket } from "@/ordre/hooks/useTickets";
+import type { Ticket, TicketAttachment } from "@/ordre/hooks/useTickets";
 
 interface Props {
   ticket: Ticket;
