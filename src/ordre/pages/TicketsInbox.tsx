@@ -257,7 +257,7 @@ export default function TicketsInbox() {
       withoutOrder,
       toPayout: openRefundsCount,
     };
-  }, [rows, counts.awaiting_customer]);
+  }, [rows, counts.awaiting_customer, openRefundsCount]);
 
   const filtered = useMemo(() => {
     if (queue === "all") return rows.filter(isOpen);
