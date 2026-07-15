@@ -28,6 +28,13 @@ const ALLOWED_FIELDS = new Set([
   "delivery_city",
 ]);
 
+const LineChangeSchema = z.object({
+  order_line_id: z.string().uuid().optional(),
+  product_id: z.string().uuid().optional(),
+  new_quantity: z.number().positive().optional(),
+  add: z.boolean().optional(),
+});
+
 const InputSchema = z.object({
   ticket_id: z.string().uuid(),
   order_id: z.string().uuid(),
@@ -36,6 +43,7 @@ const InputSchema = z.object({
     field: z.string(),
     new_value: z.string().nullable(),
   })).default([]),
+  line_changes: z.array(LineChangeSchema).default([]),
   cancellation_reason: z.string().nullable().optional(),
   mark_resolved: z.boolean().optional(),
 });
