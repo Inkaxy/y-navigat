@@ -110,16 +110,82 @@ async function processMessage(
   }
   const msg = await msgRes.json();
 
-  // Skip if already exists (idempotency)
-  const { data: existing } = await admin.from("tickets")
+  // Idempotency across both tables
+  const { data: existingTicket } = await admin.from("tickets")
     .select("id").eq("microsoft_message_id", msg.id).maybeSingle();
-  if (existing) return;
+  if (existingTicket) return;
+  const { data: existingInbound } = await admin.from("ticket_inbound_messages")
+    .select("id").eq("microsoft_message_id", msg.id).maybeSingle();
+  if (existingInbound) return;
 
   const senderEmail = msg.from?.emailAddress?.address ?? "ukjent@ukjent";
   const senderName = msg.from?.emailAddress?.name ?? null;
   const bodyHtml = msg.body?.contentType === "html" ? msg.body?.content : null;
   const bodyText = msg.body?.contentType === "text" ? msg.body?.content : stripHtml(msg.body?.content ?? "");
 
+  // Check if this belongs to an existing conversation → thread onto existing ticket
+  let parentTicket: { id: string; awaiting_external: boolean; awaiting_external_email: string | null } | null = null;
+  if (msg.conversationId) {
+    const { data: prior } = await admin
+      .from("tickets")
+      .select("id, awaiting_external, awaiting_external_email")
+      .eq("conversation_id", msg.conversationId)
+      .order("received_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    if (prior) parentTicket = prior as typeof parentTicket;
+  }
+
+  if (parentTicket) {
+    // Detect if this is a reply from the external we forwarded to
+    const isFromExternalForward =
+      parentTicket.awaiting_external &&
+      parentTicket.awaiting_external_email != null &&
+      senderEmail.toLowerCase() === parentTicket.awaiting_external_email.toLowerCase();
+
+    const { error: insErr } = await admin.from("ticket_inbound_messages").insert({
+      ticket_id: parentTicket.id,
+      microsoft_message_id: msg.id,
+      microsoft_internet_message_id: msg.internetMessageId ?? null,
+      conversation_id: msg.conversationId ?? null,
+      sender_email: senderEmail,
+      sender_name: senderName,
+      subject: msg.subject ?? null,
+      body_html: bodyHtml,
+      body_text: bodyText,
+      body_preview: msg.bodyPreview ?? null,
+      has_attachments: !!msg.hasAttachments,
+      received_at: msg.receivedDateTime,
+      is_from_external_forward: isFromExternalForward,
+    });
+    if (insErr) {
+      console.error("Insert inbound message failed", insErr);
+      return;
+    }
+
+    // Reopen ticket + clear the correct waiting flag
+    const patch: Record<string, unknown> = { status: "in_progress" };
+    if (isFromExternalForward) {
+      patch.awaiting_external = false;
+      patch.awaiting_external_email = null;
+    }
+    await admin.from("tickets").update(patch).eq("id", parentTicket.id);
+
+    await admin.from("ticket_events").insert({
+      ticket_id: parentTicket.id,
+      event_type: isFromExternalForward ? "external.replied" : "customer.replied",
+      actor_type: "customer",
+      actor_label: senderEmail,
+      summary: msg.subject ?? null,
+      payload: {
+        conversation_id: msg.conversationId ?? null,
+        inbound_message_id: msg.id,
+      },
+    });
+    return;
+  }
+
+  // No existing conversation → create new ticket
   const { data: ticketRow, error: insErr } = await admin.from("tickets").insert({
     microsoft_message_id: msg.id,
     microsoft_internet_message_id: msg.internetMessageId ?? null,
@@ -142,31 +208,14 @@ async function processMessage(
     return;
   }
 
-  // Tidslinje-hendelse: ticket mottatt (eller kunde svarte hvis del av eksisterende tråd)
-  let isReply = false;
-  let parentTicketId: string | null = null;
-  if (msg.conversationId) {
-    const { data: prior } = await admin
-      .from("tickets")
-      .select("id, related_order_id")
-      .eq("conversation_id", msg.conversationId)
-      .neq("id", ticketRow.id)
-      .order("received_at", { ascending: true })
-      .limit(1)
-      .maybeSingle();
-    if (prior) { isReply = true; parentTicketId = prior.id; }
-  }
   await admin.from("ticket_events").insert({
     ticket_id: ticketRow.id,
     order_id: null,
-    event_type: isReply ? "customer.replied" : "ticket.received",
+    event_type: "ticket.received",
     actor_type: "customer",
     actor_label: senderEmail,
     summary: msg.subject ?? null,
-    payload: {
-      conversation_id: msg.conversationId ?? null,
-      parent_ticket_id: parentTicketId,
-    },
+    payload: { conversation_id: msg.conversationId ?? null },
   }).then(() => {}, () => {});
 
   // Process attachments
