@@ -1156,11 +1156,13 @@ function NameField({
   value,
   onChange,
   onPickSuggestion,
+  labelSuffix,
 }: {
   customerId: string;
   value: string;
   onChange: (v: string) => void;
   onPickSuggestion: (s: { name: string; email: string | null; phone: string | null }) => void;
+  labelSuffix?: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const debounced = useDebouncedValue(value, 200);
@@ -1171,6 +1173,7 @@ function NameField({
     <div className="space-y-1.5">
       <Label htmlFor="cf-name">
         Navn <span className="text-destructive">*</span>
+        {labelSuffix}
       </Label>
       <div className="relative">
         <Input
