@@ -146,6 +146,33 @@ export default function TicketComposerActions({
         summary: `Overført til ${label}`,
         payload: { target: transferTarget },
       } as never);
+
+      // Varsler: tildelt person eller team-medlemmer
+      const recipientIds = new Set<string>();
+      if (transferTarget.startsWith("user:")) {
+        recipientIds.add(transferTarget.slice(5));
+      } else if (transferTarget.startsWith("team:")) {
+        const t = transferTarget.slice(5) as TicketTeam;
+        const { data: members } = await supabase
+          .from("user_team_memberships")
+          .select("user_id")
+          .eq("team", t);
+        for (const m of members ?? []) if (m.user_id) recipientIds.add(m.user_id as string);
+      }
+      if (me?.id) recipientIds.delete(me.id);
+      await createNotifications(
+        Array.from(recipientIds).map((user_id) => ({
+          user_id,
+          type: "ticket.assigned",
+          title: `Ny samtale tildelt: ${ticket.subject ?? "(uten emne)"}`,
+          body: `Overført til ${label}`,
+          link: `/ordre/ticket/${ticket.id}`,
+          ticket_id: ticket.id,
+          refund_id: null,
+          order_id: ticket.related_order_id ?? null,
+        })),
+      );
+
       setTransferOpen(false);
       setTransferTarget("");
       toast.success(`Samtalen overført til ${label} — du følger den nå`);
