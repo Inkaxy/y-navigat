@@ -1,5 +1,10 @@
 import { useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { MessageSquare } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { OrderConversationsTab } from "@/ordre/components/orders/OrderConversationsTab";
+import { useOrderConversations } from "@/ordre/hooks/useOrderConversations";
 import {
   ArrowLeft,
   Loader2,
