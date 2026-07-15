@@ -252,6 +252,24 @@ async function processMessage(
       }
     }
   }
+
+  // Trigger AI-analyse asynkront (intern service-invokasjon)
+  try {
+    const analyzeUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/analyze-email-with-ai`;
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    // fire-and-forget; ikke await for å ikke blokkere webhook-svaret
+    fetch(analyzeUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-internal-service": serviceKey,
+        "apikey": serviceKey,
+      },
+      body: JSON.stringify({ ticket_id: ticketRow.id }),
+    }).catch((err) => console.error("analyze-email-with-ai invoke failed", err));
+  } catch (err) {
+    console.error("failed to enqueue AI analysis", err);
+  }
 }
 
 function base64ToBytes(b64: string): Uint8Array {
