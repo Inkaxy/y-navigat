@@ -29,6 +29,9 @@ type PortalRow = {
 export default function PortalUsers() {
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [customerFilter, setCustomerFilter] = useState<string>("all");
   const [inviteOpen, setInviteOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<PortalRow | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
