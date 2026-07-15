@@ -42,6 +42,7 @@ const SOURCE_LABELS: Record<string, string> = {
 };
 
 export function CustomerOrdersTab({ customer }: { customer: CustomerOption }) {
+  const navigate = useNavigate();
   const [quick, setQuick] = useState<QuickRange>("this_week");
   const initial = useMemo(() => rangeFor("this_week"), []);
   const [fromDate, setFromDate] = useState(initial.from);
@@ -56,6 +57,9 @@ export function CustomerOrdersTab({ customer }: { customer: CustomerOption }) {
     toDate,
     hidePickedUp,
   });
+
+  const orderIds = useMemo(() => (orders ?? []).map((o) => o.id), [orders]);
+  const { data: conversationCounts = {} } = useOrderConversationCounts(orderIds);
 
   function applyQuick(kind: Exclude<QuickRange, null>) {
     setQuick(kind);
