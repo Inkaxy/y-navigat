@@ -132,8 +132,8 @@ export default function PortalUsers() {
         }
       />
 
-      <div className="flex items-center gap-2">
-        <div className="relative max-w-sm flex-1">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative min-w-[220px] max-w-sm flex-1">
           <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Søk navn, e-post eller kunde…"
@@ -142,7 +142,41 @@ export default function PortalUsers() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <span className="text-sm text-muted-foreground">{filtered.length} brukere</span>
+        <Select value={roleFilter} onValueChange={setRoleFilter}>
+          <SelectTrigger className="w-[150px]"><SelectValue placeholder="Alle roller" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Alle roller</SelectItem>
+            {roleOptions.map((r) => (
+              <SelectItem key={r} value={r}>{r}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-[160px]"><SelectValue placeholder="Alle statuser" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Alle statuser</SelectItem>
+            {statusOptions.map((s) => (
+              <SelectItem key={s} value={s}>{s}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={customerFilter} onValueChange={setCustomerFilter}>
+          <SelectTrigger className="w-[240px]"><SelectValue placeholder="Alle kunder" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Alle kunder</SelectItem>
+            {customerOptions.map((c) => (
+              <SelectItem key={c.id} value={c.id}>
+                {c.label}{c.num ? ` (${c.num})` : ""}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {hasActiveFilters && (
+          <Button variant="ghost" size="sm" onClick={clearFilters}>
+            <X className="h-4 w-4" /> Nullstill
+          </Button>
+        )}
+        <span className="ml-auto text-sm text-muted-foreground">{filtered.length} brukere</span>
       </div>
 
       <div className="rounded-md border border-line bg-surface-canvas">
