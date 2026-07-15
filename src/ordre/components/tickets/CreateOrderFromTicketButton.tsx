@@ -71,6 +71,16 @@ function buildInitialValues(
     };
   }
 
+  const ticketAttachments: TicketAttachmentForOrder[] = (attachments ?? []).map(
+    (a) => ({
+      id: a.id,
+      file_name: a.file_name,
+      content_type: a.content_type,
+      size_bytes: a.size_bytes,
+      edible_suggested: edibleHint(a, ai),
+    }),
+  );
+
   return {
     finalCustomerName: name,
     finalCustomerEmail: ticket.sender_email ?? null,
@@ -84,10 +94,17 @@ function buildInitialValues(
     isPaid: false,
     lines,
     fieldConfidence,
+    cakeText: of.cake_text ?? null,
+    ticketAttachments,
   };
 }
 
-export default function CreateOrderFromTicketButton({ ticket, ai, onCreated }: Props) {
+export default function CreateOrderFromTicketButton({
+  ticket,
+  ai,
+  attachments,
+  onCreated,
+}: Props) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [chosenId, setChosenId] = useState<string | null>(null);
@@ -96,7 +113,10 @@ export default function CreateOrderFromTicketButton({ ticket, ai, onCreated }: P
   const { data: results, isLoading } = useNBCustomers(search);
   const { data: chosen, isLoading: loadingChosen } = useCustomerById(chosenId);
 
-  const initialValues = useMemo(() => buildInitialValues(ticket, ai), [ticket, ai]);
+  const initialValues = useMemo(
+    () => buildInitialValues(ticket, ai, attachments ?? []),
+    [ticket, ai, attachments],
+  );
 
   const pick = (id: string) => {
     setChosenId(id);
