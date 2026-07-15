@@ -468,6 +468,20 @@ export default function TicketsInbox() {
                     </span>
                   )}
                   <ConfidenceChip score={t.ai_confidence_score} />
+                  {t.countdown && (
+                    <span
+                      className={cn(
+                        "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium",
+                        t.overdue
+                          ? "border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-300"
+                          : "border-border bg-muted text-muted-foreground",
+                      )}
+                      title={t.deadline ? `Frist: ${t.deadline.toLocaleString("nb-NO")}` : ""}
+                    >
+                      {t.overdue && <AlertTriangle className="h-3 w-3" />}
+                      {t.countdown}
+                    </span>
+                  )}
                   <span className="w-24 text-right text-xs text-muted-foreground">
                     {formatDistanceToNow(new Date(t.received_at), {
                       locale: nb,
