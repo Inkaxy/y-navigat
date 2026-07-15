@@ -8355,6 +8355,68 @@ export type Database = {
           },
         ]
       }
+      ticket_inbound_messages: {
+        Row: {
+          body_html: string | null
+          body_preview: string | null
+          body_text: string | null
+          conversation_id: string | null
+          created_at: string
+          has_attachments: boolean
+          id: string
+          is_from_external_forward: boolean
+          microsoft_internet_message_id: string | null
+          microsoft_message_id: string
+          received_at: string
+          sender_email: string
+          sender_name: string | null
+          subject: string | null
+          ticket_id: string
+        }
+        Insert: {
+          body_html?: string | null
+          body_preview?: string | null
+          body_text?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          has_attachments?: boolean
+          id?: string
+          is_from_external_forward?: boolean
+          microsoft_internet_message_id?: string | null
+          microsoft_message_id: string
+          received_at: string
+          sender_email: string
+          sender_name?: string | null
+          subject?: string | null
+          ticket_id: string
+        }
+        Update: {
+          body_html?: string | null
+          body_preview?: string | null
+          body_text?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          has_attachments?: boolean
+          id?: string
+          is_from_external_forward?: boolean
+          microsoft_internet_message_id?: string | null
+          microsoft_message_id?: string
+          received_at?: string
+          sender_email?: string
+          sender_name?: string | null
+          subject?: string | null
+          ticket_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_inbound_messages_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ticket_internal_comment_reads: {
         Row: {
           comment_id: string
@@ -8553,6 +8615,8 @@ export type Database = {
           ai_suggestion: Json | null
           assigned_team: Database["public"]["Enums"]["ticket_team"] | null
           assigned_to: string | null
+          awaiting_external: boolean
+          awaiting_external_email: string | null
           awaiting_internal: boolean
           body_html: string | null
           body_preview: string | null
@@ -8560,6 +8624,7 @@ export type Database = {
           cc_recipients: Json
           conversation_id: string | null
           created_at: string
+          followers: string[]
           has_attachments: boolean
           id: string
           importance: string | null
@@ -8588,6 +8653,8 @@ export type Database = {
           ai_suggestion?: Json | null
           assigned_team?: Database["public"]["Enums"]["ticket_team"] | null
           assigned_to?: string | null
+          awaiting_external?: boolean
+          awaiting_external_email?: string | null
           awaiting_internal?: boolean
           body_html?: string | null
           body_preview?: string | null
@@ -8595,6 +8662,7 @@ export type Database = {
           cc_recipients?: Json
           conversation_id?: string | null
           created_at?: string
+          followers?: string[]
           has_attachments?: boolean
           id?: string
           importance?: string | null
@@ -8623,6 +8691,8 @@ export type Database = {
           ai_suggestion?: Json | null
           assigned_team?: Database["public"]["Enums"]["ticket_team"] | null
           assigned_to?: string | null
+          awaiting_external?: boolean
+          awaiting_external_email?: string | null
           awaiting_internal?: boolean
           body_html?: string | null
           body_preview?: string | null
@@ -8630,6 +8700,7 @@ export type Database = {
           cc_recipients?: Json
           conversation_id?: string | null
           created_at?: string
+          followers?: string[]
           has_attachments?: boolean
           id?: string
           importance?: string | null

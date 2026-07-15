@@ -30,6 +30,9 @@ export interface Ticket {
   ai_confidence_score: number | null;
   assigned_team: import("@/ordre/lib/teams").TicketTeam | null;
   awaiting_internal: boolean;
+  awaiting_external: boolean;
+  awaiting_external_email: string | null;
+  followers: string[];
   created_at: string;
   updated_at: string;
 }
