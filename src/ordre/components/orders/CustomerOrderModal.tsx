@@ -638,6 +638,41 @@ export function CustomerOrderModal({
             console.error("Kunne ikke koble ticket til ordre", linkErr);
             toast.warning("Ordre opprettet, men kunne ikke koble til ticket automatisk");
           }
+
+          // Send valgte «spiselig print»-vedlegg til Kakebilder-køen
+          const edibleAttachments = (initialValues?.ticketAttachments ?? []).filter(
+            (a) => attachmentChoice[a.id] === "edible_print",
+          );
+          if (edibleAttachments.length > 0) {
+            const cakeTitle =
+              (initialValues?.cakeText ?? "").trim() ||
+              (sourceTicketSubject ?? "").trim() ||
+              `Kakebilde — ${row.order_number}`;
+            for (const a of edibleAttachments) {
+              try {
+                await createCakeImageFromTicketAttachment({
+                  attachment_id: a.id,
+                  file_name: a.file_name,
+                  ticket_id: sourceTicketId,
+                  order_id: row.id,
+                  delivery_date: input.deliveryDate,
+                  title: cakeTitle,
+                  customer_name: input.finalCustomerName,
+                  order_ref: row.order_number,
+                });
+              } catch (cakeErr) {
+                console.error("Kunne ikke sende vedlegg til Kakebilder", cakeErr);
+                toast.warning(
+                  `Vedlegget «${a.file_name}» kunne ikke legges i Kakebilder-køen`,
+                );
+              }
+            }
+            toast.success(
+              `${edibleAttachments.length} kakebilde${
+                edibleAttachments.length === 1 ? "" : "r"
+              } lagt i Kakebilder-køen for ${input.deliveryDate}`,
+            );
+          }
         }
       }
       if (fallbackCount > 0) {
