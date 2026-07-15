@@ -13,10 +13,11 @@ const corsHeaders = {
 };
 
 interface Body {
-  template_key: string;
+  template_key?: string;
   recipient_email: string;
   variables?: Record<string, string>;
   subject_override?: string;
+  raw_html_body?: string;
 }
 
 Deno.serve(async (req) => {
@@ -38,21 +39,14 @@ Deno.serve(async (req) => {
     }
 
     const body = (await req.json()) as Body;
-    if (!body?.template_key || !body?.recipient_email) {
-      return json({ error: "template_key og recipient_email er påkrevd" }, 400);
+    if (!body?.recipient_email) {
+      return json({ error: "recipient_email er påkrevd" }, 400);
+    }
+    if (!body.template_key && !body.raw_html_body) {
+      return json({ error: "template_key eller raw_html_body er påkrevd" }, 400);
     }
 
     const admin = createClient(Deno.env.get("SUPABASE_URL")!, serviceKey);
-
-    // 1) Hent template
-    const { data: tpl, error: tplErr } = await admin
-      .from("email_templates")
-      .select("subject_template, body_html_template, body_text_template, is_active")
-      .eq("template_key", body.template_key)
-      .maybeSingle();
-    if (tplErr) throw new Error(`Kunne ikke laste mal: ${tplErr.message}`);
-    if (!tpl) return json({ error: `Mal ikke funnet: ${body.template_key}` }, 404);
-    if (!tpl.is_active) return json({ error: `Mal er deaktivert: ${body.template_key}` }, 400);
 
     // 2) Hent signatur (best-effort)
     const { data: sigRow } = await admin
@@ -63,13 +57,32 @@ Deno.serve(async (req) => {
       .maybeSingle();
     const signatureHtml = (sigRow?.value as { html?: string } | null)?.html ?? "";
 
-    const vars = body.variables ?? {};
-    const subject = body.subject_override ?? renderTemplate(tpl.subject_template ?? "", vars);
-    const htmlBody = renderTemplate(tpl.body_html_template ?? "", vars) +
-      (signatureHtml ? `<br/><br/>${signatureHtml}` : "");
-    const textBody = tpl.body_text_template
-      ? renderTemplate(tpl.body_text_template, vars)
-      : null;
+    let subject: string;
+    let htmlBody: string;
+    let textBody: string | null = null;
+
+    if (body.raw_html_body) {
+      subject = body.subject_override ?? "(uten emne)";
+      htmlBody = body.raw_html_body + (signatureHtml ? `<br/><br/>${signatureHtml}` : "");
+    } else {
+      // 1) Hent template
+      const { data: tpl, error: tplErr } = await admin
+        .from("email_templates")
+        .select("subject_template, body_html_template, body_text_template, is_active")
+        .eq("template_key", body.template_key!)
+        .maybeSingle();
+      if (tplErr) throw new Error(`Kunne ikke laste mal: ${tplErr.message}`);
+      if (!tpl) return json({ error: `Mal ikke funnet: ${body.template_key}` }, 404);
+      if (!tpl.is_active) return json({ error: `Mal er deaktivert: ${body.template_key}` }, 400);
+
+      const vars = body.variables ?? {};
+      subject = body.subject_override ?? renderTemplate(tpl.subject_template ?? "", vars);
+      htmlBody = renderTemplate(tpl.body_html_template ?? "", vars) +
+        (signatureHtml ? `<br/><br/>${signatureHtml}` : "");
+      textBody = tpl.body_text_template
+        ? renderTemplate(tpl.body_text_template, vars)
+        : null;
+    }
 
     // 3) Hent + refresh token for delt postboks
     const tenantId = Deno.env.get("MICROSOFT_GRAPH_TENANT_ID");
