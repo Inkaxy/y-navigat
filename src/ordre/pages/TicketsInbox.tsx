@@ -195,6 +195,17 @@ export default function TicketsInbox() {
   const { user } = useAuth();
   const { data: tickets = [], isLoading } = useInboxTickets();
   const [queue, setQueue] = useState<QueueKey>("all");
+  const { data: openRefundsCount = 0 } = useQuery({
+    queryKey: ["refunds", "open-count"],
+    queryFn: async () => {
+      const { count } = await supabase
+        .from("refunds")
+        .select("id", { count: "exact", head: true })
+        .in("status", ["pending", "approved"]);
+      return count ?? 0;
+    },
+    staleTime: 30_000,
+  });
 
   type Row = TicketRow & {
     intent: RequestType | null;
