@@ -185,6 +185,7 @@ export function CustomerOrderModal({
   initialValues,
   sourceTicketId,
   sourceTicketNumber,
+  sourceTicketSubject,
 }: Props) {
   const isEdit = !!orderId;
   const { data: existing, isLoading: loadingExisting } = useCustomerOrderDetail(orderId ?? null);
