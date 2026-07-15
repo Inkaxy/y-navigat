@@ -27,7 +27,9 @@ export type TicketEventType =
   | "confirmation.sent"
   | "customer.replied"
   // Notater
-  | "note.added";
+  | "note.added"
+  // Kakebilder
+  | "cake_image.printed";
 
 export type ActorType = "customer" | "staff" | "ai" | "system";
 
