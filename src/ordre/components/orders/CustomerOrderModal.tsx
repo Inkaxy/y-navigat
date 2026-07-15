@@ -579,6 +579,36 @@ export function CustomerOrderModal({
           },
         });
         toast.success(`Kundeordre ${row.order_number} opprettet`);
+
+        // Koble ticket → ordre + logg hendelse hvis opprettet fra ticket
+        if (sourceTicketId) {
+          try {
+            const { data: u } = await supabase.auth.getUser();
+            const userId = u.user?.id ?? null;
+            await supabase
+              .from("tickets")
+              .update({ related_order_id: row.id } as never)
+              .eq("id", sourceTicketId);
+            await supabase.from("ticket_order_links").insert({
+              ticket_id: sourceTicketId,
+              order_id: row.id,
+              created_by: userId,
+            } as never);
+            await supabase.from("ticket_events").insert({
+              ticket_id: sourceTicketId,
+              order_id: row.id,
+              event_type: "order.created_from_ticket",
+              actor_type: "staff",
+              actor_user_id: userId,
+              actor_label: u.user?.email ?? null,
+              summary: `Opprettet ordre ${row.order_number}`,
+              payload: { order_id: row.id, order_number: row.order_number } as never,
+            } as never);
+          } catch (linkErr) {
+            console.error("Kunne ikke koble ticket til ordre", linkErr);
+            toast.warning("Ordre opprettet, men kunne ikke koble til ticket automatisk");
+          }
+        }
       }
       if (fallbackCount > 0) {
         toast.warning(
