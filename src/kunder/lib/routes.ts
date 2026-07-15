@@ -12,6 +12,7 @@ export const kunderRoutes = {
   profilDetalj: (id: string) => `${KUNDER_BASE}/profiler/${id}`,
   kundegrupper: `${KUNDER_BASE}/kundegrupper`,
   historikk: `${KUNDER_BASE}/historikk`,
+  portaltilgang: `${KUNDER_BASE}/portaltilgang`,
   innstillinger: `${KUNDER_BASE}/innstillinger`,
   hentesteder: `${KUNDER_BASE}/innstillinger/hentesteder`,
 } as const;
