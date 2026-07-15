@@ -74,10 +74,14 @@ export default function OrderDetail() {
   const { user } = useAuth();
   const { data: access } = useUserAccess(user);
 
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get("tab") === "samtaler" ? "samtaler" : "detaljer";
+
   const { data: order, isLoading, error } = useOrderDetail(id);
   const { data: lines = [] } = useOrderLines(id);
   const { data: events = [] } = useOrderEvents(id);
   const { remoteUpdated, acknowledge } = useOrderRealtime(id);
+  const { data: conversations = [] } = useOrderConversations(id);
 
   const userIds = useMemo(
     () => [
