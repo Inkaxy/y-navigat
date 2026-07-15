@@ -1,0 +1,446 @@
+import { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { formatDistanceToNow } from "date-fns";
+import { nb } from "date-fns/locale";
+import { Paperclip, Package } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { cn } from "@/lib/utils";
+import {
+  normalizeAiSuggestion,
+  REQUEST_TYPE_LABEL,
+  REQUEST_TYPE_BADGE,
+  type RequestType,
+} from "@/ordre/lib/aiSuggestion";
+import { TEAMS, TEAM_LABEL, type TicketTeam } from "@/ordre/lib/teams";
+
+type TicketRow = {
+  id: string;
+  subject: string | null;
+  body_preview: string | null;
+  sender_name: string | null;
+  sender_email: string;
+  received_at: string;
+  status: "new" | "in_progress" | "resolved" | "closed" | "spam";
+  assigned_to: string | null;
+  assigned_team: TicketTeam | null;
+  awaiting_internal: boolean;
+  has_attachments: boolean;
+  related_order_id: string | null;
+  ai_confidence_score: number | null;
+  ai_suggestion: unknown;
+  orders?: { order_number: string | null } | null;
+};
+
+type QueueKey =
+  | "all"
+  | `intent:${RequestType}`
+  | "mine"
+  | "awaiting_customer"
+  | "resolved"
+  | `team:${TicketTeam}`;
+
+const INTENT_QUEUES: { key: RequestType; label: string; icon: string }[] = [
+  { key: "new_order", label: "Nye bestillinger", icon: "🛒" },
+  { key: "change", label: "Endringer", icon: "✏️" },
+  { key: "cancellation", label: "Avbestillinger", icon: "🚫" },
+  { key: "complaint", label: "Klager", icon: "⚠️" },
+  { key: "question", label: "Spørsmål", icon: "❓" },
+];
+
+function initials(name: string | null, email: string): string {
+  const src = (name ?? email).trim();
+  const parts = src.split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return src.slice(0, 2).toUpperCase();
+}
+
+function ConfidenceChip({ score }: { score: number | null }) {
+  if (score == null) return null;
+  const pct = Math.round(score * (score > 1 ? 1 : 100));
+  const tone =
+    pct >= 90
+      ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30"
+      : pct >= 60
+        ? "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30"
+        : "bg-red-500/10 text-red-700 dark:text-red-300 border-red-500/30";
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium",
+        tone,
+      )}
+    >
+      AI {pct}%
+    </span>
+  );
+}
+
+function useInboxTickets() {
+  const qc = useQueryClient();
+  const query = useQuery({
+    queryKey: ["tickets", "inbox"],
+    queryFn: async (): Promise<TicketRow[]> => {
+      const { data, error } = await supabase
+        .from("tickets")
+        .select(
+          "id, subject, body_preview, sender_name, sender_email, received_at, status, assigned_to, assigned_team, awaiting_internal, has_attachments, related_order_id, ai_confidence_score, ai_suggestion, orders:related_order_id(order_number)",
+        )
+        .order("received_at", { ascending: false })
+        .limit(500);
+      if (error) throw error;
+      return (data ?? []) as unknown as TicketRow[];
+    },
+  });
+
+  useEffect(() => {
+    const ch = supabase
+      .channel("tickets-inbox")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "tickets" },
+        () => qc.invalidateQueries({ queryKey: ["tickets", "inbox"] }),
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(ch);
+    };
+  }, [qc]);
+
+  return query;
+}
+
+function KpiCard({
+  value,
+  label,
+  tone,
+}: {
+  value: number | string;
+  label: string;
+  tone?: "default" | "danger" | "warn" | "success";
+}) {
+  const valueTone =
+    tone === "danger"
+      ? "text-red-600 dark:text-red-400"
+      : tone === "warn"
+        ? "text-amber-600 dark:text-amber-400"
+        : tone === "success"
+          ? "text-emerald-700 dark:text-emerald-300"
+          : "text-foreground";
+  return (
+    <div className="rounded-lg border bg-[hsl(var(--brand-cream))] px-5 py-4 shadow-sm">
+      <div className={cn("text-3xl font-semibold tracking-tight", valueTone)}>
+        {value}
+      </div>
+      <div className="mt-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+        {label}
+      </div>
+    </div>
+  );
+}
+
+function QueueButton({
+  active,
+  onClick,
+  icon,
+  label,
+  count,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon?: string;
+  label: string;
+  count: number;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "flex w-full items-center justify-between gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors",
+        active
+          ? "bg-[hsl(var(--brand-bronze)/0.14)] text-foreground font-semibold"
+          : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+      )}
+    >
+      <span className="flex items-center gap-2 truncate">
+        {icon && <span className="text-base leading-none">{icon}</span>}
+        <span className="truncate">{label}</span>
+      </span>
+      <span
+        className={cn(
+          "shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums",
+          active
+            ? "bg-[hsl(var(--brand-bronze))] text-white"
+            : "bg-muted text-muted-foreground",
+        )}
+      >
+        {count}
+      </span>
+    </button>
+  );
+}
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="mt-4 mb-1 px-3 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+      {children}
+    </div>
+  );
+}
+
+export default function TicketsInbox() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { data: tickets = [], isLoading } = useInboxTickets();
+  const [queue, setQueue] = useState<QueueKey>("all");
+
+  type Row = TicketRow & {
+    intent: RequestType | null;
+  };
+
+  const rows: Row[] = useMemo(
+    () =>
+      tickets.map((t) => {
+        const ai = normalizeAiSuggestion(t.ai_suggestion);
+        return { ...t, intent: ai?.request_type ?? null };
+      }),
+    [tickets],
+  );
+
+  const isOpen = (t: Row) => t.status === "new" || t.status === "in_progress";
+
+  const counts = useMemo(() => {
+    const open = rows.filter(isOpen);
+    const c = {
+      all: open.length,
+      awaiting_customer: rows.filter((r) => r.awaiting_internal && isOpen(r)).length,
+      resolved: rows.filter((r) => r.status === "resolved").length,
+      mine: rows.filter((r) => r.assigned_to === user?.id && isOpen(r)).length,
+      intent: {} as Record<RequestType, number>,
+      team: {} as Record<TicketTeam, number>,
+    };
+    for (const it of INTENT_QUEUES) {
+      c.intent[it.key] = open.filter((r) => r.intent === it.key).length;
+    }
+    for (const team of TEAMS) {
+      c.team[team] = open.filter((r) => r.assigned_team === team).length;
+    }
+    return c;
+  }, [rows, user?.id]);
+
+  const kpis = useMemo(() => {
+    const open = rows.filter(isOpen);
+    const nowMs = Date.now();
+    const overFrist = open.filter(
+      (r) => nowMs - new Date(r.received_at).getTime() > 4 * 60 * 60 * 1000,
+    ).length;
+    const withoutOrder = open.filter(
+      (r) => !r.related_order_id && r.intent !== "question",
+    ).length;
+    return {
+      open: open.length,
+      awaitingCustomer: counts.awaiting_customer,
+      overFrist,
+      withoutOrder,
+      toPayout: 0,
+    };
+  }, [rows, counts.awaiting_customer]);
+
+  const filtered = useMemo(() => {
+    if (queue === "all") return rows.filter(isOpen);
+    if (queue === "mine")
+      return rows.filter((r) => r.assigned_to === user?.id && isOpen(r));
+    if (queue === "awaiting_customer")
+      return rows.filter((r) => r.awaiting_internal && isOpen(r));
+    if (queue === "resolved") return rows.filter((r) => r.status === "resolved");
+    if (queue.startsWith("intent:")) {
+      const k = queue.slice("intent:".length) as RequestType;
+      return rows.filter((r) => r.intent === k && isOpen(r));
+    }
+    if (queue.startsWith("team:")) {
+      const k = queue.slice("team:".length) as TicketTeam;
+      return rows.filter((r) => r.assigned_team === k && isOpen(r));
+    }
+    return rows;
+  }, [rows, queue, user?.id]);
+
+  return (
+    <div className="mx-auto max-w-[1400px] px-4 py-6 md:px-6">
+      {/* Header */}
+      <div className="mb-5 flex items-start gap-3">
+        <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-[hsl(var(--brand-cream))] text-xl">
+          ✉️
+        </div>
+        <div className="flex-1">
+          <h1 className="text-2xl font-semibold tracking-tight">
+            Ticket · Ordresamtaler
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            E-post til ordrekontoret — koblet til kunder og ordrer
+          </p>
+        </div>
+      </div>
+
+      {/* KPI-rad */}
+      <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
+        <KpiCard value={kpis.open} label="Åpne" />
+        <KpiCard value={kpis.awaitingCustomer} label="Venter på kunde" />
+        <KpiCard value={kpis.overFrist} label="Over frist" tone="danger" />
+        <KpiCard value={kpis.withoutOrder} label="Uten ordre-kobling" />
+        <KpiCard value={kpis.toPayout} label="Til utbetaling" tone="success" />
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-[240px_1fr]">
+        {/* Køer */}
+        <aside className="rounded-lg border bg-[hsl(var(--brand-cream))] p-2">
+          <SectionLabel>Køer</SectionLabel>
+          <QueueButton
+            active={queue === "all"}
+            onClick={() => setQueue("all")}
+            label="Alle åpne"
+            count={counts.all}
+          />
+          {INTENT_QUEUES.map((q) => (
+            <QueueButton
+              key={q.key}
+              active={queue === `intent:${q.key}`}
+              onClick={() => setQueue(`intent:${q.key}`)}
+              icon={q.icon}
+              label={q.label}
+              count={counts.intent[q.key] ?? 0}
+            />
+          ))}
+
+          <SectionLabel>Mine</SectionLabel>
+          <QueueButton
+            active={queue === "mine"}
+            onClick={() => setQueue("mine")}
+            label="Tildelt meg"
+            count={counts.mine}
+          />
+          <QueueButton
+            active={queue === "awaiting_customer"}
+            onClick={() => setQueue("awaiting_customer")}
+            label="Venter på kunde"
+            count={counts.awaiting_customer}
+          />
+          <QueueButton
+            active={queue === "resolved"}
+            onClick={() => setQueue("resolved")}
+            label="Løste"
+            count={counts.resolved}
+          />
+
+          <SectionLabel>Team-køer</SectionLabel>
+          {TEAMS.map((team) => (
+            <QueueButton
+              key={team}
+              active={queue === `team:${team}`}
+              onClick={() => setQueue(`team:${team}`)}
+              label={TEAM_LABEL[team]}
+              count={counts.team[team] ?? 0}
+            />
+          ))}
+        </aside>
+
+        {/* Liste */}
+        <div className="space-y-2">
+          {isLoading && (
+            <div className="rounded-lg border bg-[hsl(var(--brand-cream))] p-8 text-center text-sm text-muted-foreground">
+              Laster tickets…
+            </div>
+          )}
+          {!isLoading && filtered.length === 0 && (
+            <div className="rounded-lg border bg-[hsl(var(--brand-cream))] p-8 text-center text-sm text-muted-foreground">
+              Ingen tickets i denne køen.
+            </div>
+          )}
+          {filtered.map((t) => {
+            const unread = t.status === "new";
+            const badgeCls = t.intent
+              ? REQUEST_TYPE_BADGE[t.intent]
+              : "bg-muted text-muted-foreground border-border";
+            const badgeLabel = t.intent
+              ? REQUEST_TYPE_LABEL[t.intent].toUpperCase()
+              : "UKATEGORISERT";
+            return (
+              <div
+                key={t.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => navigate(`/ordre/ticket/${t.id}`)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    navigate(`/ordre/ticket/${t.id}`);
+                  }
+                }}
+                className={cn(
+                  "group relative flex cursor-pointer items-center gap-3 rounded-lg border bg-[hsl(var(--brand-cream))] px-4 py-3 shadow-sm transition-colors hover:bg-[hsl(var(--brand-cream-deep))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--brand-bronze))]",
+                  unread && "border-l-4 border-l-orange-500",
+                )}
+              >
+                <div
+                  className={cn(
+                    "inline-flex shrink-0 items-center rounded border px-2 py-1 text-[10px] font-bold tracking-wide",
+                    badgeCls,
+                  )}
+                >
+                  {badgeLabel}
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="truncate text-sm font-semibold text-foreground">
+                      {t.subject || "(uten emne)"}
+                    </span>
+                    {t.has_attachments && (
+                      <Paperclip className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                    )}
+                  </div>
+                  <div className="mt-0.5 truncate text-xs text-muted-foreground">
+                    {t.body_preview || t.sender_email}
+                  </div>
+                </div>
+
+                <div className="flex shrink-0 items-center gap-2">
+                  {t.related_order_id && t.orders?.order_number ? (
+                    <Link
+                      to={`/ordre/${t.related_order_id}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="inline-flex items-center gap-1 rounded-md border bg-background px-2 py-1 text-xs font-medium text-foreground hover:bg-muted"
+                    >
+                      <Package className="h-3 w-3" />
+                      #{t.orders.order_number}
+                    </Link>
+                  ) : (
+                    <span className="rounded-md border border-dashed px-2 py-1 text-xs text-muted-foreground">
+                      Ingen ordre ennå
+                    </span>
+                  )}
+                  <ConfidenceChip score={t.ai_confidence_score} />
+                  <span className="w-24 text-right text-xs text-muted-foreground">
+                    {formatDistanceToNow(new Date(t.received_at), {
+                      locale: nb,
+                      addSuffix: true,
+                    })}
+                  </span>
+                  <span
+                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-semibold text-muted-foreground"
+                    title={t.assigned_to ? "Tildelt" : "Ikke tildelt"}
+                  >
+                    {t.assigned_to
+                      ? initials(t.sender_name, t.sender_email)
+                      : "—"}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
