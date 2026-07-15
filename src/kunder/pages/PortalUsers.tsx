@@ -59,15 +59,47 @@ export default function PortalUsers() {
     },
   });
 
+  const roleOptions = useMemo(
+    () => Array.from(new Set(data.map((r) => r.role).filter(Boolean))).sort(),
+    [data],
+  );
+  const statusOptions = useMemo(
+    () => Array.from(new Set(data.map((r) => r.status).filter(Boolean))).sort(),
+    [data],
+  );
+  const customerOptions = useMemo(() => {
+    const map = new Map<string, { id: string; label: string; num: string | number | null }>();
+    for (const r of data) {
+      for (const c of r.customers) {
+        if (!map.has(c.id)) map.set(c.id, { id: c.id, label: c.display_name, num: c.customer_number });
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label, "nb"));
+  }, [data]);
+
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
-    if (!q) return data;
-    return data.filter((r) =>
-      r.display_name.toLowerCase().includes(q) ||
-      r.email.toLowerCase().includes(q) ||
-      r.customers.some((c) => c.display_name.toLowerCase().includes(q) || String(c.customer_number ?? "").includes(q)),
-    );
-  }, [data, search]);
+    return data.filter((r) => {
+      if (roleFilter !== "all" && r.role !== roleFilter) return false;
+      if (statusFilter !== "all" && r.status !== statusFilter) return false;
+      if (customerFilter !== "all" && !r.customers.some((c) => c.id === customerFilter)) return false;
+      if (!q) return true;
+      return (
+        r.display_name.toLowerCase().includes(q) ||
+        r.email.toLowerCase().includes(q) ||
+        r.customers.some((c) => c.display_name.toLowerCase().includes(q) || String(c.customer_number ?? "").includes(q))
+      );
+    });
+  }, [data, search, roleFilter, statusFilter, customerFilter]);
+
+  const hasActiveFilters =
+    search !== "" || roleFilter !== "all" || statusFilter !== "all" || customerFilter !== "all";
+  const clearFilters = () => {
+    setSearch("");
+    setRoleFilter("all");
+    setStatusFilter("all");
+    setCustomerFilter("all");
+  };
 
   const runAction = async (row: PortalRow, action: "recovery" | "disable" | "enable") => {
     setBusy(`${action}:${row.user_id}`);
