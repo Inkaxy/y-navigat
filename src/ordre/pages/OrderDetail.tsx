@@ -474,6 +474,11 @@ export default function OrderDetail() {
             {/* Vedlegg knyttet til ordren (bilder, logoer, dokumenter) */}
             <OrderAttachmentsCard orderId={order.id} />
 
+            {/* Kakebilde-status for denne ordren */}
+            <CakeImageStatusCard orderId={order.id} />
+
+
+
             {/* Ticket-sporbarhet: original epost + tidslinje av kommunikasjon/AI/koblinger */}
             <div className="grid gap-4 lg:grid-cols-2">
               <OriginalEmailCard orderId={order.id} />
