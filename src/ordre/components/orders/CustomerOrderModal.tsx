@@ -59,12 +59,42 @@ import { useProductLabelProfiles } from "@/produksjon/features/etiketter/hooks/u
 import { useLabelPrintProfiles } from "@/produksjon/features/utskriftsprofiler/hooks/useLabelPrintProfiles";
 
 
+export type FieldConfidenceHint =
+  | number
+  | { label: string; tone: "green" | "amber" | "red" };
+
+export type CustomerOrderInitialValues = {
+  finalCustomerName?: string | null;
+  finalCustomerEmail?: string | null;
+  finalCustomerPhone?: string | null;
+  deliveryDate?: string | null;
+  deliveryTime?: string | null; // "HH:mm"
+  distribution?: "delivery" | "pickup" | null;
+  source?: "phone" | "email" | "in_store" | "manual" | null;
+  sendSms?: boolean | null;
+  sendEmail?: boolean | null;
+  isPaid?: boolean | null;
+  lines?: Array<{ product_id: string; quantity: number }> | null;
+  fieldConfidence?: Partial<
+    Record<
+      "name" | "email" | "phone" | "delivery_date" | "delivery_time" | "distribution",
+      FieldConfidenceHint
+    >
+  >;
+};
+
 type Props = {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   customer: CustomerOption;
   /** If set, modal opens in edit-mode for this order. */
   orderId?: string | null;
+  /** Prefill values for create-mode (e.g. from AI-analyse på ticket). */
+  initialValues?: CustomerOrderInitialValues | null;
+  /** Ticket-id som ordren opprettes fra — kobles automatisk ved lagring. */
+  sourceTicketId?: string | null;
+  /** Ticketnummer (T-…) vist under Opphav-feltet. */
+  sourceTicketNumber?: string | null;
 };
 
 type LineDraft = {
@@ -90,6 +120,32 @@ function newLine(): LineDraft {
     is_fallback: false,
     merknad: null,
   };
+}
+
+function ConfidenceChip({ hint }: { hint: FieldConfidenceHint | undefined }) {
+  if (hint == null) return null;
+  let tone: "green" | "amber" | "red";
+  let label: string;
+  if (typeof hint === "number") {
+    tone = hint >= 0.9 ? "green" : hint >= 0.6 ? "amber" : "red";
+    label = `AI ${Math.round(hint * 100)}%`;
+  } else {
+    tone = hint.tone;
+    label = hint.label;
+  }
+  const cls =
+    tone === "green"
+      ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+      : tone === "amber"
+        ? "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+        : "border-rose-500/40 bg-rose-500/10 text-rose-700 dark:text-rose-300";
+  return (
+    <span
+      className={`ml-1.5 inline-flex items-center rounded-full border px-1.5 py-0 text-[10px] font-semibold uppercase tracking-wide ${cls}`}
+    >
+      {label}
+    </span>
+  );
 }
 
 
