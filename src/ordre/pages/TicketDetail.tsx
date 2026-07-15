@@ -274,6 +274,7 @@ export default function TicketDetail() {
   const { data: replies = [] } = useTicketReplies(id);
   const { data: comments = [] } = useInternalComments(id);
   const { data: events = [] } = useTicketEvents(id);
+  const { data: inboundMessages = [] } = useInboundMessages(id);
   const { data: customerCard } = useCustomerCard(ticket?.sender_email);
   const { data: linked } = useLinkedOrder(ticket?.related_order_id ?? null);
 
