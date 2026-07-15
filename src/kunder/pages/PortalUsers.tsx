@@ -227,6 +227,10 @@ export default function PortalUsers() {
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-1" onClick={(e) => e.stopPropagation()}>
                     <Button size="sm" variant="ghost" disabled={!!busy}
+                      onClick={() => runAction(u, "resend_invite")} title="Send ny invitasjon (magic link)">
+                      <Mail className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button size="sm" variant="ghost" disabled={!!busy}
                       onClick={() => runAction(u, "recovery")} title="Send passord-recovery">
                       <Send className="h-3.5 w-3.5" />
                     </Button>
