@@ -255,7 +255,7 @@ export default function TicketsInbox() {
       awaitingCustomer: counts.awaiting_customer,
       overFrist,
       withoutOrder,
-      toPayout: 0,
+      toPayout: openRefundsCount,
     };
   }, [rows, counts.awaiting_customer]);
 
