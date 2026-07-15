@@ -304,6 +304,13 @@ export function CustomerOrderModal({
       setSendEmail(iv?.sendEmail ?? false);
       setIsPaid(iv?.isPaid ?? false);
 
+      // Standardvalg for vedlegg fra e-posten
+      const initialChoice: Record<string, "edible_print" | "reference_only"> = {};
+      for (const a of iv?.ticketAttachments ?? []) {
+        initialChoice[a.id] = a.edible_suggested ? "edible_print" : "reference_only";
+      }
+      setAttachmentChoice(initialChoice);
+
       setLines([newLine()]);
       setDirty(false);
     }
