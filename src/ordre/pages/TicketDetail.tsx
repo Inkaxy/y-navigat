@@ -41,6 +41,7 @@ import type { TicketAttachment } from "@/ordre/hooks/useTickets";
 import ChangeIntentCard from "@/ordre/components/tickets/ChangeIntentCard";
 import LinkOrderSearch from "@/ordre/components/tickets/LinkOrderSearch";
 import CreateOrderFromTicketButton from "@/ordre/components/tickets/CreateOrderFromTicketButton";
+import { CakeImageStatusCard } from "@/ordre/components/orders/CakeImageStatusCard";
 
 // ────────────────────────── helpers
 
@@ -621,9 +622,11 @@ export default function TicketDetail() {
                   <CreateOrderFromTicketButton
                     ticket={ticket}
                     ai={ai}
+                    attachments={attachments}
                     onCreated={() => {
                       qc.invalidateQueries({ queryKey: ["ticket", id] });
                       qc.invalidateQueries({ queryKey: ["ticket-events", id] });
+                      qc.invalidateQueries({ queryKey: ["cake-images-for", id] });
                     }}
                   />
                 )}
@@ -691,6 +694,8 @@ export default function TicketDetail() {
               </SideCard>
             )
           )}
+
+          {id && <CakeImageStatusCard ticketId={id} />}
         </div>
       </div>
 

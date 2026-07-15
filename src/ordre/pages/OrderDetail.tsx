@@ -54,6 +54,7 @@ import { OrderTimeline } from "@/ordre/components/orders/OrderTimeline";
 import { OrderDetailsTab } from "@/ordre/components/orders/OrderDetailsTab";
 import { OriginalEmailCard } from "@/ordre/components/orders/OriginalEmailCard";
 import { OrderAttachmentsCard } from "@/ordre/components/orders/OrderAttachmentsCard";
+import { CakeImageStatusCard } from "@/ordre/components/orders/CakeImageStatusCard";
 import { TimelineCard } from "@/ordre/components/orders/TimelineCard";
 import {
   canCancel,
@@ -473,6 +474,11 @@ export default function OrderDetail() {
 
             {/* Vedlegg knyttet til ordren (bilder, logoer, dokumenter) */}
             <OrderAttachmentsCard orderId={order.id} />
+
+            {/* Kakebilde-status for denne ordren */}
+            <CakeImageStatusCard orderId={order.id} />
+
+
 
             {/* Ticket-sporbarhet: original epost + tidslinje av kommunikasjon/AI/koblinger */}
             <div className="grid gap-4 lg:grid-cols-2">

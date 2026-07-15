@@ -12,19 +12,30 @@ import { useNBCustomers, useCustomerById } from "@/ordre/hooks/useNBCustomers";
 import {
   CustomerOrderModal,
   type CustomerOrderInitialValues,
+  type TicketAttachmentForOrder,
 } from "@/ordre/components/orders/CustomerOrderModal";
 import type { AiSuggestion } from "@/ordre/lib/aiSuggestion";
-import type { Ticket } from "@/ordre/hooks/useTickets";
+import type { Ticket, TicketAttachment } from "@/ordre/hooks/useTickets";
 
 interface Props {
   ticket: Ticket;
   ai: AiSuggestion;
+  attachments?: TicketAttachment[];
   onCreated: () => void;
+}
+
+function edibleHint(a: TicketAttachment, ai: AiSuggestion): boolean {
+  if (!(a.content_type ?? "").startsWith("image/")) return false;
+  const summary = (a.ai_summary ?? "").toLowerCase();
+  if (/print|spiselig|trykk|sukkerpapir|kake/.test(summary)) return true;
+  if ((ai.order_fields?.cake_text ?? "").trim().length > 0) return true;
+  return false;
 }
 
 function buildInitialValues(
   ticket: Ticket,
   ai: AiSuggestion,
+  attachments: TicketAttachment[],
 ): CustomerOrderInitialValues {
   const of = ai.order_fields ?? {};
   const phone = of.contact_phone ?? null;
@@ -60,6 +71,16 @@ function buildInitialValues(
     };
   }
 
+  const ticketAttachments: TicketAttachmentForOrder[] = (attachments ?? []).map(
+    (a) => ({
+      id: a.id,
+      file_name: a.file_name,
+      content_type: a.content_type,
+      size_bytes: a.size_bytes,
+      edible_suggested: edibleHint(a, ai),
+    }),
+  );
+
   return {
     finalCustomerName: name,
     finalCustomerEmail: ticket.sender_email ?? null,
@@ -73,10 +94,17 @@ function buildInitialValues(
     isPaid: false,
     lines,
     fieldConfidence,
+    cakeText: of.cake_text ?? null,
+    ticketAttachments,
   };
 }
 
-export default function CreateOrderFromTicketButton({ ticket, ai, onCreated }: Props) {
+export default function CreateOrderFromTicketButton({
+  ticket,
+  ai,
+  attachments,
+  onCreated,
+}: Props) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [chosenId, setChosenId] = useState<string | null>(null);
@@ -85,7 +113,10 @@ export default function CreateOrderFromTicketButton({ ticket, ai, onCreated }: P
   const { data: results, isLoading } = useNBCustomers(search);
   const { data: chosen, isLoading: loadingChosen } = useCustomerById(chosenId);
 
-  const initialValues = useMemo(() => buildInitialValues(ticket, ai), [ticket, ai]);
+  const initialValues = useMemo(
+    () => buildInitialValues(ticket, ai, attachments ?? []),
+    [ticket, ai, attachments],
+  );
 
   const pick = (id: string) => {
     setChosenId(id);
@@ -169,6 +200,7 @@ export default function CreateOrderFromTicketButton({ ticket, ai, onCreated }: P
           initialValues={initialValues}
           sourceTicketId={ticket.id}
           sourceTicketNumber={ticket.id.slice(0, 8).toUpperCase()}
+          sourceTicketSubject={ticket.subject}
         />
       )}
 

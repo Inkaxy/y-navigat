@@ -58,11 +58,21 @@ import { type Merknad, isMerknadEmpty } from "@/ordre/lib/merknad";
 import { useProductLabelProfiles } from "@/produksjon/features/etiketter/hooks/useProductLabelProfiles";
 import { useLabelPrintProfiles } from "@/produksjon/features/utskriftsprofiler/hooks/useLabelPrintProfiles";
 import { supabase } from "@/integrations/supabase/client";
+import { createCakeImageFromTicketAttachment } from "@/ordre/lib/cakeImages";
 
 
 export type FieldConfidenceHint =
   | number
   | { label: string; tone: "green" | "amber" | "red" };
+
+export type TicketAttachmentForOrder = {
+  id: string;
+  file_name: string;
+  content_type: string | null;
+  size_bytes: number | null;
+  /** true = forhåndsvelger «spiselig print» i modalen */
+  edible_suggested?: boolean;
+};
 
 export type CustomerOrderInitialValues = {
   finalCustomerName?: string | null;
@@ -76,6 +86,10 @@ export type CustomerOrderInitialValues = {
   sendEmail?: boolean | null;
   isPaid?: boolean | null;
   lines?: Array<{ product_id: string; quantity: number }> | null;
+  /** Tekst som skal på kaken — brukes som tittel på cake_images-raden. */
+  cakeText?: string | null;
+  /** Vedlegg fra ticket-e-posten som vises i «Vedlegg fra e-posten»-seksjonen. */
+  ticketAttachments?: TicketAttachmentForOrder[];
   fieldConfidence?: Partial<
     Record<
       "name" | "email" | "phone" | "delivery_date" | "delivery_time" | "distribution",
@@ -96,6 +110,8 @@ type Props = {
   sourceTicketId?: string | null;
   /** Ticketnummer (T-…) vist under Opphav-feltet. */
   sourceTicketNumber?: string | null;
+  /** Emne fra ticket-e-posten — brukes som fallback-tittel på kakebilder. */
+  sourceTicketSubject?: string | null;
 };
 
 type LineDraft = {
@@ -149,6 +165,90 @@ function ConfidenceChip({ hint }: { hint: FieldConfidenceHint | undefined }) {
   );
 }
 
+function TicketAttachmentRow({
+  attachment,
+  value,
+  onChange,
+}: {
+  attachment: TicketAttachmentForOrder;
+  value: "edible_print" | "reference_only";
+  onChange: (v: "edible_print" | "reference_only") => void;
+}) {
+  const [thumbUrl, setThumbUrl] = useState<string | null>(null);
+  const isImage = (attachment.content_type ?? "").startsWith("image/");
+
+  useEffect(() => {
+    if (!isImage) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke(
+          "ticket-attachment-signed-url",
+          { body: { attachment_id: attachment.id, inline: true } },
+        );
+        if (error) return;
+        const url = (data as { signed_url?: string } | null)?.signed_url ?? null;
+        if (!cancelled) setThumbUrl(url);
+      } catch {
+        /* stille */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [attachment.id, isImage]);
+
+  return (
+    <div className="flex flex-col gap-3 rounded-md border border-border bg-card p-3 sm:flex-row sm:items-start">
+      <div className="flex-shrink-0">
+        {thumbUrl && isImage ? (
+          <img
+            src={thumbUrl}
+            alt={attachment.file_name}
+            className="h-24 w-24 rounded-md border object-cover"
+          />
+        ) : (
+          <div className="grid h-24 w-24 place-items-center rounded-md border bg-muted text-xs text-muted-foreground">
+            {attachment.file_name.split(".").pop()?.toUpperCase() ?? "FIL"}
+          </div>
+        )}
+        <div className="mt-1 max-w-[6rem] truncate text-[11px] text-muted-foreground">
+          {attachment.file_name}
+        </div>
+      </div>
+
+      <RadioGroup
+        value={value}
+        onValueChange={(v) => onChange(v as "edible_print" | "reference_only")}
+        className="flex-1 space-y-2"
+      >
+        <label className="flex cursor-pointer items-start gap-2 text-sm">
+          <RadioGroupItem
+            value="edible_print"
+            id={`att-${attachment.id}-print`}
+            className="mt-0.5"
+          />
+          <span>
+            <span className="font-semibold">🖨️ Spiselig print</span> — legg i
+            Kakebilder-køen for leveringsdatoen
+          </span>
+        </label>
+        <label className="flex cursor-pointer items-start gap-2 text-sm">
+          <RadioGroupItem
+            value="reference_only"
+            id={`att-${attachment.id}-ref`}
+            className="mt-0.5"
+          />
+          <span>Kun dekorreferanse på ordren</span>
+        </label>
+      </RadioGroup>
+    </div>
+  );
+}
+
+
+
+
 
 
 const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
@@ -170,6 +270,7 @@ export function CustomerOrderModal({
   initialValues,
   sourceTicketId,
   sourceTicketNumber,
+  sourceTicketSubject,
 }: Props) {
   const isEdit = !!orderId;
   const { data: existing, isLoading: loadingExisting } = useCustomerOrderDetail(orderId ?? null);
@@ -197,6 +298,13 @@ export function CustomerOrderModal({
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [merknadFor, setMerknadFor] = useState<string | null>(null);
+
+  // Vedlegg fra e-posten (ticket) — brukerens valg per vedlegg
+  const [attachmentChoice, setAttachmentChoice] = useState<
+    Record<string, "edible_print" | "reference_only">
+  >({});
+
+
 
 
   // Re-init when modal opens (or order loads)
@@ -280,6 +388,13 @@ export function CustomerOrderModal({
       setSendSms(iv?.sendSms ?? false);
       setSendEmail(iv?.sendEmail ?? false);
       setIsPaid(iv?.isPaid ?? false);
+
+      // Standardvalg for vedlegg fra e-posten
+      const initialChoice: Record<string, "edible_print" | "reference_only"> = {};
+      for (const a of iv?.ticketAttachments ?? []) {
+        initialChoice[a.id] = a.edible_suggested ? "edible_print" : "reference_only";
+      }
+      setAttachmentChoice(initialChoice);
 
       setLines([newLine()]);
       setDirty(false);
@@ -607,6 +722,41 @@ export function CustomerOrderModal({
           } catch (linkErr) {
             console.error("Kunne ikke koble ticket til ordre", linkErr);
             toast.warning("Ordre opprettet, men kunne ikke koble til ticket automatisk");
+          }
+
+          // Send valgte «spiselig print»-vedlegg til Kakebilder-køen
+          const edibleAttachments = (initialValues?.ticketAttachments ?? []).filter(
+            (a) => attachmentChoice[a.id] === "edible_print",
+          );
+          if (edibleAttachments.length > 0) {
+            const cakeTitle =
+              (initialValues?.cakeText ?? "").trim() ||
+              (sourceTicketSubject ?? "").trim() ||
+              `Kakebilde — ${row.order_number}`;
+            for (const a of edibleAttachments) {
+              try {
+                await createCakeImageFromTicketAttachment({
+                  attachment_id: a.id,
+                  file_name: a.file_name,
+                  ticket_id: sourceTicketId,
+                  order_id: row.id,
+                  delivery_date: input.deliveryDate,
+                  title: cakeTitle,
+                  customer_name: input.finalCustomerName,
+                  order_ref: row.order_number,
+                });
+              } catch (cakeErr) {
+                console.error("Kunne ikke sende vedlegg til Kakebilder", cakeErr);
+                toast.warning(
+                  `Vedlegget «${a.file_name}» kunne ikke legges i Kakebilder-køen`,
+                );
+              }
+            }
+            toast.success(
+              `${edibleAttachments.length} kakebilde${
+                edibleAttachments.length === 1 ? "" : "r"
+              } lagt i Kakebilder-køen for ${input.deliveryDate}`,
+            );
           }
         }
       }
@@ -968,6 +1118,25 @@ export function CustomerOrderModal({
                   </div>
                 )}
               </fieldset>
+
+              {/* Vedlegg fra e-posten (kun ved opprettelse fra ticket) */}
+              {!isEdit && (initialValues?.ticketAttachments ?? []).length > 0 && (
+                <fieldset className="space-y-3">
+                  <legend className="text-sm font-semibold">Vedlegg fra e-posten</legend>
+                  <div className="space-y-3">
+                    {(initialValues?.ticketAttachments ?? []).map((a) => (
+                      <TicketAttachmentRow
+                        key={a.id}
+                        attachment={a}
+                        value={attachmentChoice[a.id] ?? "reference_only"}
+                        onChange={(v) =>
+                          setAttachmentChoice((prev) => ({ ...prev, [a.id]: v }))
+                        }
+                      />
+                    ))}
+                  </div>
+                </fieldset>
+              )}
 
               {/* Opphav */}
               <fieldset className="space-y-3">
