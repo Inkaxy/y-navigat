@@ -40,6 +40,7 @@ import {
 import type { TicketAttachment } from "@/ordre/hooks/useTickets";
 import ChangeIntentCard from "@/ordre/components/tickets/ChangeIntentCard";
 import LinkOrderSearch from "@/ordre/components/tickets/LinkOrderSearch";
+import CreateOrderFromTicketButton from "@/ordre/components/tickets/CreateOrderFromTicketButton";
 
 // ────────────────────────── helpers
 
@@ -615,6 +616,16 @@ export default function TicketDetail() {
                       </div>
                     ))}
                   </div>
+                )}
+                {intent === "new_order" && !linked?.order && id && (
+                  <CreateOrderFromTicketButton
+                    ticket={ticket}
+                    ai={ai}
+                    onCreated={() => {
+                      qc.invalidateQueries({ queryKey: ["ticket", id] });
+                      qc.invalidateQueries({ queryKey: ["ticket-events", id] });
+                    }}
+                  />
                 )}
               </div>
             </SideCard>

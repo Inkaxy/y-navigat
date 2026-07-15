@@ -57,7 +57,32 @@ import { MerknadDialog } from "@/ordre/components/orders/MerknadDialog";
 import { type Merknad, isMerknadEmpty } from "@/ordre/lib/merknad";
 import { useProductLabelProfiles } from "@/produksjon/features/etiketter/hooks/useProductLabelProfiles";
 import { useLabelPrintProfiles } from "@/produksjon/features/utskriftsprofiler/hooks/useLabelPrintProfiles";
+import { supabase } from "@/integrations/supabase/client";
 
+
+export type FieldConfidenceHint =
+  | number
+  | { label: string; tone: "green" | "amber" | "red" };
+
+export type CustomerOrderInitialValues = {
+  finalCustomerName?: string | null;
+  finalCustomerEmail?: string | null;
+  finalCustomerPhone?: string | null;
+  deliveryDate?: string | null;
+  deliveryTime?: string | null; // "HH:mm"
+  distribution?: "delivery" | "pickup" | null;
+  source?: "phone" | "email" | "in_store" | "manual" | null;
+  sendSms?: boolean | null;
+  sendEmail?: boolean | null;
+  isPaid?: boolean | null;
+  lines?: Array<{ product_id: string; quantity: number }> | null;
+  fieldConfidence?: Partial<
+    Record<
+      "name" | "email" | "phone" | "delivery_date" | "delivery_time" | "distribution",
+      FieldConfidenceHint
+    >
+  >;
+};
 
 type Props = {
   open: boolean;
@@ -65,6 +90,12 @@ type Props = {
   customer: CustomerOption;
   /** If set, modal opens in edit-mode for this order. */
   orderId?: string | null;
+  /** Prefill values for create-mode (e.g. from AI-analyse på ticket). */
+  initialValues?: CustomerOrderInitialValues | null;
+  /** Ticket-id som ordren opprettes fra — kobles automatisk ved lagring. */
+  sourceTicketId?: string | null;
+  /** Ticketnummer (T-…) vist under Opphav-feltet. */
+  sourceTicketNumber?: string | null;
 };
 
 type LineDraft = {
@@ -92,6 +123,32 @@ function newLine(): LineDraft {
   };
 }
 
+function ConfidenceChip({ hint }: { hint: FieldConfidenceHint | undefined }) {
+  if (hint == null) return null;
+  let tone: "green" | "amber" | "red";
+  let label: string;
+  if (typeof hint === "number") {
+    tone = hint >= 0.9 ? "green" : hint >= 0.6 ? "amber" : "red";
+    label = `AI ${Math.round(hint * 100)}%`;
+  } else {
+    tone = hint.tone;
+    label = hint.label;
+  }
+  const cls =
+    tone === "green"
+      ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+      : tone === "amber"
+        ? "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+        : "border-rose-500/40 bg-rose-500/10 text-rose-700 dark:text-rose-300";
+  return (
+    <span
+      className={`ml-1.5 inline-flex items-center rounded-full border px-1.5 py-0 text-[10px] font-semibold uppercase tracking-wide ${cls}`}
+    >
+      {label}
+    </span>
+  );
+}
+
 
 
 const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
@@ -105,7 +162,15 @@ const NameSchema = z
 const EmailSchema = z.string().trim().email("Ugyldig e-post").max(255).optional().or(z.literal(""));
 const PhoneSchema = z.string().trim().max(40).optional().or(z.literal(""));
 
-export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Props) {
+export function CustomerOrderModal({
+  open,
+  onOpenChange,
+  customer,
+  orderId,
+  initialValues,
+  sourceTicketId,
+  sourceTicketNumber,
+}: Props) {
   const isEdit = !!orderId;
   const { data: existing, isLoading: loadingExisting } = useCustomerOrderDetail(orderId ?? null);
   const createMut = useCreateCustomerOrder();
@@ -194,23 +259,98 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
       );
       setDirty(false);
     } else if (!isEdit) {
-      setName("");
-      setEmail("");
-      setPhone("");
-      setDeliveryDate(tomorrow());
-      setHour("--");
-      setMinute("00");
+      const iv = initialValues ?? null;
+      setName(iv?.finalCustomerName ?? "");
+      setEmail(iv?.finalCustomerEmail ?? "");
+      setPhone(iv?.finalCustomerPhone ?? "");
+      setDeliveryDate(iv?.deliveryDate ?? tomorrow());
+      if (iv?.deliveryTime) {
+        const t = iv.deliveryTime.slice(0, 5); // HH:mm
+        setHour(t.slice(0, 2));
+        // Snap to allowed minutes if AI gives odd value
+        const rawMin = t.slice(3, 5);
+        setMinute(MINUTES.includes(rawMin) ? rawMin : "00");
+      } else {
+        setHour("--");
+        setMinute("00");
+      }
       setTourId("none");
-      setDistribution("delivery");
-      setSource("phone");
-      setSendSms(false);
-      setSendEmail(false);
-      setIsPaid(false);
+      setDistribution(iv?.distribution ?? "delivery");
+      setSource(iv?.source ?? "phone");
+      setSendSms(iv?.sendSms ?? false);
+      setSendEmail(iv?.sendEmail ?? false);
+      setIsPaid(iv?.isPaid ?? false);
 
       setLines([newLine()]);
       setDirty(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, isEdit, existing]);
+
+  // Prefill produkter fra initialValues.lines (kun i create-modus, når modal åpnes)
+  const initialLinesRef = useRef<string>("");
+  useEffect(() => {
+    if (!open || isEdit) return;
+    const lineSpecs = initialValues?.lines ?? [];
+    const key = JSON.stringify(lineSpecs);
+    if (key === initialLinesRef.current) return;
+    initialLinesRef.current = key;
+    if (lineSpecs.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      const ids = Array.from(new Set(lineSpecs.map((l) => l.product_id)));
+      const { data } = await supabase
+        .from("products")
+        .select(
+          "id, display_number, code, display_name, unit_of_sale, mva_rate, status, is_for_sale, is_divisible",
+        )
+        .in("id", ids);
+      if (cancelled) return;
+      const byId = new Map<string, ProductOption>();
+      for (const p of (data ?? []) as any[]) {
+        byId.set(p.id, {
+          id: p.id,
+          display_number: Number(p.display_number),
+          code: p.code,
+          display_name: p.display_name,
+          unit_of_sale: p.unit_of_sale,
+          mva_rate: Number(p.mva_rate ?? 0),
+          status: p.status,
+          is_for_sale: p.is_for_sale,
+          is_divisible: p.is_divisible,
+        });
+      }
+      const drafts: LineDraft[] = [];
+      for (const spec of lineSpecs) {
+        const p = byId.get(spec.product_id);
+        if (!p) continue;
+        const ep = await fetchEffectivePrice({
+          productId: p.id,
+          customerId: customer.id,
+          date: initialValues?.deliveryDate ?? tomorrow(),
+          caller: "customer_order_create",
+        }).catch(() => null);
+        drafts.push({
+          uid: crypto.randomUUID(),
+          product: p,
+          product_display_name: p.display_name,
+          product_display_number: p.display_number,
+          product_unit_of_sale: p.unit_of_sale,
+          product_mva_rate: p.mva_rate,
+          quantity: String(spec.quantity),
+          unit_price: ep ? String(ep.price) : "0",
+          is_fallback: !ep || ep.is_fallback,
+          merknad: null,
+        });
+      }
+      if (cancelled || drafts.length === 0) return;
+      setLines(drafts);
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, isEdit, initialValues, customer.id]);
 
   // Mark dirty on any field change after init
   useEffect(() => {
@@ -439,6 +579,36 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
           },
         });
         toast.success(`Kundeordre ${row.order_number} opprettet`);
+
+        // Koble ticket → ordre + logg hendelse hvis opprettet fra ticket
+        if (sourceTicketId) {
+          try {
+            const { data: u } = await supabase.auth.getUser();
+            const userId = u.user?.id ?? null;
+            await supabase
+              .from("tickets")
+              .update({ related_order_id: row.id } as never)
+              .eq("id", sourceTicketId);
+            await supabase.from("ticket_order_links").insert({
+              ticket_id: sourceTicketId,
+              order_id: row.id,
+              created_by: userId,
+            } as never);
+            await supabase.from("ticket_events").insert({
+              ticket_id: sourceTicketId,
+              order_id: row.id,
+              event_type: "order.created_from_ticket",
+              actor_type: "staff",
+              actor_user_id: userId,
+              actor_label: u.user?.email ?? null,
+              summary: `Opprettet ordre ${row.order_number}`,
+              payload: { order_id: row.id, order_number: row.order_number } as never,
+            } as never);
+          } catch (linkErr) {
+            console.error("Kunne ikke koble ticket til ordre", linkErr);
+            toast.warning("Ordre opprettet, men kunne ikke koble til ticket automatisk");
+          }
+        }
       }
       if (fallbackCount > 0) {
         toast.warning(
@@ -503,6 +673,15 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
             </DialogTitle>
             <DialogDescription>
               {customer.display_name} ({customer.customer_number})
+              {sourceTicketId && !isEdit && (
+                <>
+                  {" · "}
+                  <span className="text-primary">
+                    forhåndsutfylt fra samtale {sourceTicketNumber ?? sourceTicketId.slice(0, 8)}
+                  </span>{" "}
+                  — kontroller og juster fritt
+                </>
+              )}
             </DialogDescription>
           </DialogHeader>
 
@@ -525,9 +704,13 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
                       if (s.email) setEmail(s.email);
                       if (s.phone) setPhone(s.phone);
                     }}
+                    labelSuffix={<ConfidenceChip hint={initialValues?.fieldConfidence?.name} />}
                   />
                   <div className="space-y-1.5">
-                    <Label htmlFor="cf-email">E-post</Label>
+                    <Label htmlFor="cf-email">
+                      E-post
+                      <ConfidenceChip hint={initialValues?.fieldConfidence?.email} />
+                    </Label>
                     <Input
                       id="cf-email"
                       type="email"
@@ -537,7 +720,10 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
                     />
                   </div>
                   <div className="space-y-1.5 sm:col-span-2">
-                    <Label htmlFor="cf-phone">Telefon</Label>
+                    <Label htmlFor="cf-phone">
+                      Telefon
+                      <ConfidenceChip hint={initialValues?.fieldConfidence?.phone} />
+                    </Label>
                     <Input
                       id="cf-phone"
                       type="tel"
@@ -554,7 +740,10 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
                 <legend className="text-sm font-semibold">Leveranse</legend>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div className="space-y-1.5">
-                    <Label htmlFor="cf-date">Leveringsdato</Label>
+                    <Label htmlFor="cf-date">
+                      Leveringsdato
+                      <ConfidenceChip hint={initialValues?.fieldConfidence?.delivery_date} />
+                    </Label>
                     <Input
                       id="cf-date"
                       type="date"
@@ -565,7 +754,10 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Tid (valgfri)</Label>
+                    <Label>
+                      Tid (valgfri)
+                      <ConfidenceChip hint={initialValues?.fieldConfidence?.delivery_time} />
+                    </Label>
                     <div className="flex items-center gap-2">
                       <Select value={hour} onValueChange={setHour}>
                         <SelectTrigger className="w-24">
@@ -612,7 +804,10 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
                     </Select>
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Distribusjon</Label>
+                    <Label>
+                      Distribusjon
+                      <ConfidenceChip hint={initialValues?.fieldConfidence?.distribution} />
+                    </Label>
                     <RadioGroup
                       value={distribution}
                       onValueChange={(v) => setDistribution(v as "delivery" | "pickup")}
@@ -788,6 +983,12 @@ export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Pr
                     <SelectItem value="manual">Manuelt</SelectItem>
                   </SelectContent>
                 </Select>
+                {sourceTicketId && (
+                  <p className="text-xs text-muted-foreground">
+                    Settes automatisk til <strong>E-post</strong> · koblet til ticket{" "}
+                    <strong>{sourceTicketNumber ?? sourceTicketId.slice(0, 8)}</strong>
+                  </p>
+                )}
               </fieldset>
 
               {/* Bekreftelse */}
@@ -986,11 +1187,13 @@ function NameField({
   value,
   onChange,
   onPickSuggestion,
+  labelSuffix,
 }: {
   customerId: string;
   value: string;
   onChange: (v: string) => void;
   onPickSuggestion: (s: { name: string; email: string | null; phone: string | null }) => void;
+  labelSuffix?: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const debounced = useDebouncedValue(value, 200);
@@ -1001,6 +1204,7 @@ function NameField({
     <div className="space-y-1.5">
       <Label htmlFor="cf-name">
         Navn <span className="text-destructive">*</span>
+        {labelSuffix}
       </Label>
       <div className="relative">
         <Input
