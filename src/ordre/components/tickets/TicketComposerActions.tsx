@@ -83,6 +83,33 @@ export default function TicketComposerActions({
         summary: `Spurt internt ${mentionLabel}`,
         payload: { mention },
       } as never);
+
+      // Varsler: send til alle brukere i taggede team, eller til nevnt person
+      const recipientIds = new Set<string>();
+      if (mention.startsWith("team:")) {
+        const t = mention.slice(5) as TicketTeam;
+        const { data: members } = await supabase
+          .from("user_team_memberships")
+          .select("user_id")
+          .eq("team", t);
+        for (const m of members ?? []) if (m.user_id) recipientIds.add(m.user_id as string);
+      } else if (mention.startsWith("user:")) {
+        recipientIds.add(mention.slice(5));
+      }
+      const me = (await supabase.auth.getUser()).data.user;
+      if (me?.id) recipientIds.delete(me.id);
+      await createNotifications(
+        Array.from(recipientIds).map((user_id) => ({
+          user_id,
+          type: "ticket.team_mention",
+          title: `${mentionLabel} spurte om saken`,
+          body: ticket.subject ?? null,
+          link: `/ordre/ticket/${ticket.id}`,
+          ticket_id: ticket.id,
+          refund_id: null,
+          order_id: ticket.related_order_id ?? null,
+        })),
+      );
       onConsumeReplyText();
       setMention("");
       toast.success(`Sendt internt til ${mentionLabel}`);
