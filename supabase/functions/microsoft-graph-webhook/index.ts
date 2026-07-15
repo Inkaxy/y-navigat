@@ -182,6 +182,19 @@ async function processMessage(
         inbound_message_id: msg.id,
       },
     });
+
+    // Varsel til tildelt bruker om kundesvar
+    if (!isFromExternalForward && parentTicket.assigned_to) {
+      await admin.from("notifications").insert({
+        user_id: parentTicket.assigned_to,
+        type: "ticket.customer_reply",
+        title: `Nytt svar fra ${senderName ?? senderEmail}`,
+        body: parentTicket.subject ?? msg.subject ?? null,
+        link: `/ordre/ticket/${parentTicket.id}`,
+        ticket_id: parentTicket.id,
+        order_id: parentTicket.related_order_id,
+      });
+    }
     return;
   }
 
