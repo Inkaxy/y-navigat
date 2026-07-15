@@ -1035,6 +1035,25 @@ export function CustomerOrderModal({
                 )}
               </fieldset>
 
+              {/* Vedlegg fra e-posten (kun ved opprettelse fra ticket) */}
+              {!isEdit && (initialValues?.ticketAttachments ?? []).length > 0 && (
+                <fieldset className="space-y-3">
+                  <legend className="text-sm font-semibold">Vedlegg fra e-posten</legend>
+                  <div className="space-y-3">
+                    {(initialValues?.ticketAttachments ?? []).map((a) => (
+                      <TicketAttachmentRow
+                        key={a.id}
+                        attachment={a}
+                        value={attachmentChoice[a.id] ?? "reference_only"}
+                        onChange={(v) =>
+                          setAttachmentChoice((prev) => ({ ...prev, [a.id]: v }))
+                        }
+                      />
+                    ))}
+                  </div>
+                </fieldset>
+              )}
+
               {/* Opphav */}
               <fieldset className="space-y-3">
                 <legend className="text-sm font-semibold">Opphav</legend>
