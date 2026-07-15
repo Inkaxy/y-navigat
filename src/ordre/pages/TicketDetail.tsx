@@ -44,6 +44,9 @@ import CreateOrderFromTicketButton from "@/ordre/components/tickets/CreateOrderF
 import TicketComposerActions from "@/ordre/components/tickets/TicketComposerActions";
 import { CakeImageStatusCard } from "@/ordre/components/orders/CakeImageStatusCard";
 import { useInboundMessages, type InboundMessage } from "@/ordre/hooks/useInboundMessages";
+import CreateRefundDialog from "@/ordre/components/tickets/CreateRefundDialog";
+import RefundStatusCard from "@/ordre/components/tickets/RefundStatusCard";
+import { Wallet } from "lucide-react";
 
 // ────────────────────────── helpers
 
