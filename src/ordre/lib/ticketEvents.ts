@@ -54,6 +54,7 @@ export const EVENT_LABEL: Record<TicketEventType, string> = {
   "confirmation.sent": "Bekreftelse sendt",
   "customer.replied": "Kunde svarte",
   "note.added": "Notat lagt til",
+  "cake_image.printed": "Kakebilde skrevet ut",
 };
 
 export type LogTicketEventInput = {
