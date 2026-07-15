@@ -1,5 +1,6 @@
 // Analyserer en ticket-epost med valgt AI-provider, returnerer strukturert ordre-forslag (v2).
 // Lagrer på tickets.ai_suggestion + ai_call_log.
+// Støtter både frontend-kall (bruker-JWT) og interne service-kall (fra andre edge-funksjoner).
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { z } from "npm:zod@3.23.8";
@@ -8,10 +9,15 @@ import { callAi, estimateCostUsd } from "../_shared/ai-providers.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version, x-internal-service",
 };
 
-const NB_LEGAL_ENTITY_ID = "751709bc-04b3-4449-867d-b97faa9ab373";
+const FALLBACK_LEGAL_ENTITY_ID = "751709bc-04b3-4449-867d-b97faa9ab373";
+const GENERIC_EMAIL_DOMAINS = new Set([
+  "gmail.com","hotmail.com","hotmail.no","outlook.com","outlook.no",
+  "yahoo.com","yahoo.no","live.com","live.no","icloud.com","me.com",
+  "online.no","start.no","broadpark.no","getmail.no",
+]);
 
 function jsonErr(msg: string, status: number, extra: Record<string, unknown> = {}) {
   return new Response(JSON.stringify({ error: msg, ...extra }), {
@@ -25,14 +31,7 @@ const InputSchema = z.object({
 });
 
 const REQUEST_TYPES = [
-  "new_order",
-  "change",
-  "cancellation",
-  "question",
-  "complaint",
-  "internal",
-  "unclear",
-  "spam",
+  "new_order","change","cancellation","question","complaint","internal","unclear","spam",
 ] as const;
 
 const SuggestionSchema = z.object({
@@ -72,23 +71,13 @@ const SuggestionSchema = z.object({
     decoration: z.string().nullable().optional(),
     match_confidence: z.coerce.number().min(0).max(1).nullable().optional().default(0.5).transform((v) => (v == null || Number.isNaN(v) ? 0.5 : v)),
   })).default([]),
-  missing_info: z.array(z.object({
-    code: z.string(),
-    label: z.string(),
-  })).default([]),
+  missing_info: z.array(z.object({ code: z.string(), label: z.string() })).default([]),
   risks: z.array(z.object({
-    severity: z.enum(["red", "yellow", "green"]),
-    code: z.string(),
-    message: z.string(),
+    severity: z.enum(["red","yellow","green"]), code: z.string(), message: z.string(),
   })).default([]),
   field_confidence: z.record(z.number().min(0).max(1)).default({}),
   reasoning_per_field: z.record(z.string()).default({}),
-  // tour beholdes for bakoverkomp
-  tour: z.object({
-    tour_id: z.string().uuid().nullable(),
-    tour_name: z.string().nullable(),
-  }).nullable().optional(),
-  // Runde 2: kandidat-ordre + endringer
+  tour: z.object({ tour_id: z.string().uuid().nullable(), tour_name: z.string().nullable() }).nullable().optional(),
   candidate_orders: z.array(z.object({
     order_id: z.string().uuid(),
     order_number: z.string().nullable(),
@@ -118,7 +107,7 @@ const SuggestionSchema = z.object({
     })).default([]),
     cancellation_reason: z.string().nullable().optional(),
   }).nullable().optional(),
-  delivery_date: z.string().nullable().optional(), // bakoverkomp
+  delivery_date: z.string().nullable().optional(),
   confidence_score: z.number().min(0).max(1),
   reasoning: z.string(),
 });
@@ -140,22 +129,28 @@ Deno.serve(async (req) => {
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
   try {
-    const auth = req.headers.get("Authorization");
-    if (!auth) return jsonErr("Missing Authorization", 401);
+    // Tilgangssjekk: internt service-kall ELLER bruker-JWT med app-tilgang
+    const internalHeader = req.headers.get("x-internal-service") ?? "";
+    const isInternal = internalHeader && internalHeader === serviceKey;
 
-    const userClient = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: auth } },
-    });
+    let userId: string | null = null;
     const admin = createClient(supabaseUrl, serviceKey);
 
-    const { data: userRes } = await userClient.auth.getUser();
-    if (!userRes?.user) return jsonErr("Not authenticated", 401);
-    const userId = userRes.user.id;
+    if (!isInternal) {
+      const auth = req.headers.get("Authorization");
+      if (!auth) return jsonErr("Missing Authorization", 401);
+      const userClient = createClient(supabaseUrl, anonKey, {
+        global: { headers: { Authorization: auth } },
+      });
+      const { data: userRes } = await userClient.auth.getUser();
+      if (!userRes?.user) return jsonErr("Not authenticated", 401);
+      userId = userRes.user.id;
 
-    const { data: hasAccess } = await userClient.rpc("has_ordre_settings_access");
-    if (!hasAccess) {
-      const { data: hasWrite } = await userClient.rpc("has_app_write_access", { p_app_code: "ordre" });
-      if (!hasWrite) return jsonErr("Forbidden", 403);
+      const { data: hasAccess } = await userClient.rpc("has_ordre_settings_access");
+      if (!hasAccess) {
+        const { data: hasWrite } = await userClient.rpc("has_app_write_access", { p_app_code: "ordre" });
+        if (!hasWrite) return jsonErr("Forbidden", 403);
+      }
     }
 
     const parsed = InputSchema.safeParse(await req.json().catch(() => ({})));
@@ -168,59 +163,112 @@ Deno.serve(async (req) => {
     if (!ticket) return jsonErr("Ticket ikke funnet", 404);
 
     if (ticket.ai_analyzed_at && ticket.ai_suggestion && !ticket.ai_error && !force) {
-      return new Response(JSON.stringify({
-        ok: true, cached: true, analysis: ticket.ai_suggestion,
-      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ ok: true, cached: true, analysis: ticket.ai_suggestion }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const { data: settingsRows } = await admin
-      .from("platform_settings")
-      .select("key,value")
-      .eq("category", "ordre_ai");
+      .from("platform_settings").select("key,value").eq("category", "ordre_ai");
     const settings = Object.fromEntries((settingsRows ?? []).map((r: any) => [r.key, r.value]));
-    const provider = (settings.ai_provider?.provider ?? "anthropic") as "anthropic" | "openai";
+    const provider = (settings.ai_provider?.provider ?? "openai") as "anthropic" | "openai";
     const models = settings.ai_models ?? {};
     const model = (models.main ?? (provider === "anthropic" ? "claude-sonnet-4-5" : "gpt-4o")) as string;
+    const screeningModel = (models.screening ?? (provider === "anthropic" ? "claude-3-5-haiku-20241022" : "gpt-4o-mini")) as string;
     const pricing = settings.ai_pricing ?? {};
+
+    // Resolve legal_entity_id fra source_mailbox via platform_settings-mapping
+    const mailboxMap = (settings.mailbox_legal_entity_map ?? {}) as Record<string, string>;
+    const sourceMailbox = (ticket.source_mailbox ?? "").toLowerCase().trim();
+    const legalEntityId = mailboxMap[sourceMailbox] ?? FALLBACK_LEGAL_ENTITY_ID;
 
     const apiKey = (Deno.env.get(provider === "anthropic" ? "ANTHROPIC_API_KEY" : "OPENAI_API_KEY") ?? "").trim();
     if (!apiKey) {
       return jsonErr(`Provider ${provider} er ikke konfigurert (mangler API-nøkkel-secret)`, 503);
     }
 
-    const [{ data: customers }, { data: products }, { data: pickups }] = await Promise.all([
-      admin.from("customers")
+    // === STEG 1: Kundematch i flere lag ===
+    const senderEmail = (ticket.sender_email ?? "").toLowerCase().trim();
+    const senderDomain = senderEmail.includes("@") ? senderEmail.split("@")[1] : "";
+    const rawBody = (ticket.body_text ?? ticket.body_preview ?? "").slice(0, 8000);
+    const bodyPlusSubject = `${ticket.subject ?? ""}\n${rawBody}`;
+
+    const orderNumberMatches = Array.from(
+      bodyPlusSubject.matchAll(/(?:ordre\w*\s*(?:nr|nummer)?\s*[:#]?\s*|#)\s*(\d{2,4}[-\s]?\d{3,6})/gi),
+    ).map((m) => m[1].replace(/\s/g, "").replace(/^(\d{2,4})(\d{3,6})$/, "$1-$2"));
+
+    const matchedCustomerIds = new Set<string>();
+    const matchReasons: string[] = [];
+
+    // Lag 1: eksakt e-post mot customers.primary_contact_email
+    if (senderEmail) {
+      const { data: byEmail } = await admin.from("customers")
         .select("id,display_name,customer_number,primary_contact_email,primary_contact_phone,mobile_phone")
-        .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
+        .eq("legal_entity_id", legalEntityId)
         .eq("status", "active")
-        .limit(200),
-      admin.from("products")
-        .select("id,display_name,display_number,unit_of_sale")
-        .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
+        .eq("primary_contact_email", senderEmail)
+        .limit(5);
+      for (const c of byEmail ?? []) { matchedCustomerIds.add(c.id); matchReasons.push(`email→${c.display_name}`); }
+    }
+
+    // Lag 2: customer_contacts.email
+    if (senderEmail) {
+      const { data: byContact } = await admin.from("customer_contacts")
+        .select("customer_id,email")
+        .ilike("email", senderEmail)
+        .limit(10);
+      for (const c of byContact ?? []) if (c.customer_id) { matchedCustomerIds.add(c.customer_id); matchReasons.push(`kontakt-email`); }
+    }
+
+    // Lag 3: domene-match (kun ikke-generiske domener)
+    if (senderDomain && !GENERIC_EMAIL_DOMAINS.has(senderDomain) && matchedCustomerIds.size === 0) {
+      const { data: byDomain } = await admin.from("customers")
+        .select("id,display_name,primary_contact_email")
+        .eq("legal_entity_id", legalEntityId)
         .eq("status", "active")
-        .eq("is_for_sale", true)
-        .limit(200),
+        .ilike("primary_contact_email", `%@${senderDomain}`)
+        .limit(10);
+      for (const c of byDomain ?? []) { matchedCustomerIds.add(c.id); matchReasons.push(`domene→${c.display_name}`); }
+    }
+
+    // Lag 4: ordrenummer-regex → resolve customer_id
+    if (orderNumberMatches.length > 0) {
+      const { data: byOrderNr } = await admin.from("orders")
+        .select("customer_id,order_number")
+        .eq("legal_entity_id", legalEntityId)
+        .in("order_number", orderNumberMatches);
+      for (const o of byOrderNr ?? []) if (o.customer_id) {
+        matchedCustomerIds.add(o.customer_id); matchReasons.push(`ordrenr ${o.order_number}`);
+      }
+    }
+
+    // Hent full kandidat-kundeliste for AI-en
+    let candidateCustomers: any[] = [];
+    if (matchedCustomerIds.size > 0) {
+      const { data: rows } = await admin.from("customers")
+        .select("id,display_name,customer_number,primary_contact_email,primary_contact_phone,mobile_phone")
+        .in("id", Array.from(matchedCustomerIds));
+      candidateCustomers = rows ?? [];
+    }
+    // Hvis ingen treff: gi AI-en en liten fallback-liste basert på navnesøk fra ticket
+    if (candidateCustomers.length === 0) {
+      const { data: fallback } = await admin.from("customers")
+        .select("id,display_name,customer_number,primary_contact_email,primary_contact_phone,mobile_phone")
+        .eq("legal_entity_id", legalEntityId)
+        .eq("status", "active")
+        .limit(50);
+      candidateCustomers = fallback ?? [];
+    }
+
+    const [{ data: pickups }] = await Promise.all([
       admin.from("pickup_locations")
         .select("id,display_name,city")
-        .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
+        .eq("legal_entity_id", legalEntityId)
         .eq("status", "active")
         .limit(50),
     ]);
 
-    // --- Runde 2: hent kandidat-ordre ---
-    // Strategi: (1) match sender_email mot kundens primary_contact_email,
-    // (2) regex etter ordrenr i bodyen (f.eks. 2025-1234 eller #1234),
-    // (3) hent aktive/fremtidige ordrer for de matchede kundene + eventuelle eksplisitte ordrenr.
-    const senderEmail = (ticket.sender_email ?? "").toLowerCase().trim();
-    const matchedCustomerIds = new Set<string>();
-    for (const c of customers ?? []) {
-      const e1 = (c.primary_contact_email ?? "").toLowerCase().trim();
-      if (senderEmail && e1 && e1 === senderEmail) matchedCustomerIds.add(c.id);
-    }
-    const rawBody = (ticket.body_text ?? ticket.body_preview ?? "").slice(0, 8000);
-    const orderNumberMatches = Array.from(
-      rawBody.matchAll(/(?:ordre\w*\s*(?:nr|nummer)?\s*[:#]?\s*|#)\s*(\d{2,4}[-\s]?\d{3,6})/gi),
-    ).map((m) => m[1].replace(/\s/g, "").replace(/^(\d{2,4})(\d{3,6})$/, "$1-$2"));
+    // === STEG 2: Kandidat-ordre ===
     const today = new Date(); today.setHours(0,0,0,0);
     const cutoff = new Date(today); cutoff.setDate(cutoff.getDate() - 60);
     const cutoffISO = cutoff.toISOString().slice(0,10);
@@ -229,48 +277,80 @@ Deno.serve(async (req) => {
     if (matchedCustomerIds.size > 0 || orderNumberMatches.length > 0) {
       let q = admin.from("orders")
         .select("id,order_number,status,delivery_date,delivery_time,customer_id,customer_snapshot,delivery_address_line1,delivery_postal_code,delivery_city,customer_notes,internal_notes")
-        .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
+        .eq("legal_entity_id", legalEntityId)
         .gte("delivery_date", cutoffISO)
         .in("status", activeStatuses)
         .order("delivery_date", { ascending: true })
         .limit(20);
       const orFilters: string[] = [];
-      if (matchedCustomerIds.size > 0) {
-        orFilters.push(`customer_id.in.(${Array.from(matchedCustomerIds).join(",")})`);
-      }
-      for (const onr of orderNumberMatches) {
-        orFilters.push(`order_number.eq.${onr}`);
-      }
+      if (matchedCustomerIds.size > 0) orFilters.push(`customer_id.in.(${Array.from(matchedCustomerIds).join(",")})`);
+      for (const onr of orderNumberMatches) orFilters.push(`order_number.eq.${onr}`);
       if (orFilters.length > 0) q = q.or(orFilters.join(","));
       const { data: cand } = await q;
       candidateOrdersRaw = cand ?? [];
     }
-    // Hent linjer for kandidatene for snapshot
     const candIds = candidateOrdersRaw.map((o: any) => o.id);
-    let linesByOrder: Record<string, any[]> = {};
+    const linesByOrder: Record<string, any[]> = {};
     if (candIds.length > 0) {
       const { data: lines } = await admin.from("order_lines")
         .select("order_id,line_number,quantity,product_snapshot,notes")
         .in("order_id", candIds)
         .order("line_number", { ascending: true });
-      for (const l of lines ?? []) {
-        (linesByOrder[l.order_id] = linesByOrder[l.order_id] || []).push(l);
-      }
+      for (const l of lines ?? []) (linesByOrder[l.order_id] = linesByOrder[l.order_id] || []).push(l);
     }
-
 
     const bodyText = trimEmailBody(ticket.body_text ?? ticket.body_preview ?? "");
     const todayISO = new Date().toISOString().slice(0, 10);
 
+    // === STEG 3: PASS 1 – AI-uttrekk av produktnavn ===
+    let extractedProductNames: Array<{ name: string; quantity?: number; note?: string }> = [];
+    let pass1InputTok = 0, pass1OutputTok = 0;
+    try {
+      const extractSystem = `Du får en e-post til et bakeri. Trekk ut alle produkter/varer kunden nevner (kaker, brød, kringler, snitter osv.).
+Returner KUN JSON: { "items": [ { "name": string (norsk vare-navn slik det står), "quantity": number|null, "note": string|null } ] }.
+Ingen forklaringer, ingen markdown.`;
+      const extractUser = `Emne: ${ticket.subject ?? ""}\n\n${bodyText}`;
+      const r = await callAi({
+        provider, apiKey, model: screeningModel, maxTokens: 512, temperature: 0,
+        systemPrompt: extractSystem, userText: extractUser,
+      });
+      pass1InputTok = r.inputTokens ?? 0; pass1OutputTok = r.outputTokens ?? 0;
+      const cleaned = r.rawText.replace(/```(?:json)?\s*/g, "").replace(/```\s*$/, "").trim();
+      const parsedItems = JSON.parse(cleaned);
+      if (Array.isArray(parsedItems?.items)) {
+        extractedProductNames = parsedItems.items
+          .filter((x: any) => x && typeof x.name === "string" && x.name.trim().length > 0)
+          .slice(0, 15);
+      }
+    } catch (e) {
+      console.warn("Pass 1 (produkt-uttrekk) feilet:", (e as Error).message);
+    }
+
+    // === Trgm-søk per uttrekk ===
+    const productCandidatesPerItem: Array<{ query: string; quantity?: number; candidates: any[] }> = [];
+    for (const item of extractedProductNames) {
+      const { data: cands } = await admin.rpc("search_products_trgm", {
+        p_legal_entity_id: legalEntityId,
+        p_query: item.name,
+        p_limit: 10,
+      });
+      productCandidatesPerItem.push({
+        query: item.name,
+        quantity: item.quantity,
+        candidates: (cands ?? []) as any[],
+      });
+    }
+
+    // === STEG 4: PASS 2 – hovedanalyse ===
     const systemPrompt = `Du er en assistent som leser e-post sendt til Nøtterø Bakeri sitt ordrekontor og lager en strukturert analyse for en saksbehandler.
 
 Dagens dato: ${todayISO}.
 
-Returner KUN gyldig JSON som matcher dette schemaet (ingen markdown, ingen tekst rundt):
+Returner KUN gyldig JSON som matcher schemaet (ingen markdown, ingen tekst rundt):
 {
   "request_type": "new_order"|"change"|"cancellation"|"question"|"complaint"|"internal"|"unclear"|"spam",
-  "summary": string (1-3 setninger på norsk),
-  "suggested_action": string (kort handlingsforslag på norsk),
+  "summary": string,
+  "suggested_action": string,
   "customer_match": { "customer_id": uuid|null, "customer_name": string|null, "match_confidence": 0..1 } | null,
   "order_fields": {
     "delivery_date": "YYYY-MM-DD"|null, "delivery_time": "HH:MM"|null,
@@ -278,78 +358,62 @@ Returner KUN gyldig JSON som matcher dette schemaet (ingen markdown, ingen tekst
     "delivery_address_line1": string|null, "delivery_address_line2": string|null,
     "delivery_postal_code": string|null, "delivery_city": string|null,
     "customer_notes": string|null, "internal_notes": string|null,
-    "production_notes": string|null,  // se PRODUCTION_NOTES under
-    "store_notes": string|null,       // se STORE_NOTES under
+    "production_notes": string|null, "store_notes": string|null,
     "cake_text": string|null, "allergies": string|null, "special_requests": string|null,
     "contact_phone": string|null, "contact_email": string|null
   },
-  "products": [{ ... samme som før ... }],
+  "products": [{ "product_id": uuid|null, "product_name": string, "quantity": number, "size_or_servings": string|null, "flavor": string|null, "filling": string|null, "decoration": string|null, "match_confidence": 0..1 }],
   "missing_info": [{ "code": string, "label": string }],
   "risks": [{ "severity": "red"|"yellow"|"green", "code": string, "message": string }],
-  "field_confidence": { ... },
-  "reasoning_per_field": { ... },
-  "candidate_orders": [{
-    "order_id": uuid,            // MÅ være en av order_id-ene i KANDIDAT-ORDRE-lista nedenfor
-    "order_number": string|null,
-    "match_confidence": 0..1,
-    "why_match": string (kort norsk forklaring),
-    "snapshot": { "delivery_date": "YYYY-MM-DD"|null, "delivery_time": string|null, "status": string|null, "customer_name": string|null, "line_summary": string|null }
-  }],
+  "field_confidence": {}, "reasoning_per_field": {},
+  "candidate_orders": [{ "order_id": uuid, "order_number": string|null, "match_confidence": 0..1, "why_match": string, "snapshot": {...} }],
   "referenced_order": { "order_id": uuid, "order_number": string|null, "match_confidence": 0..1 } | null,
-  "change_intent": {
-    "target_order_id": uuid|null,
-    "changes": [{
-      "field": "delivery_date"|"delivery_time"|"customer_notes"|"internal_notes"|"delivery_address_line1"|"delivery_address_line2"|"delivery_postal_code"|"delivery_city",
-      "current_value": string|null,
-      "proposed_value": string|null,
-      "reasoning": string,
-      "confidence": 0..1
-    }],
-    "cancellation_reason": string|null
-  } | null,
-  "confidence_score": 0..1,
-  "reasoning": string
+  "change_intent": { "target_order_id": uuid|null, "changes": [...], "cancellation_reason": string|null } | null,
+  "confidence_score": 0..1, "reasoning": string
 }
 
 Regler:
-- request_type: klassifiser ut fra om kunden bestiller noe nytt, ber om endring, vil avbestille, stiller spørsmål, klager, eller om eposten er intern/uklar/spam.
-- candidate_orders: velg 0-3 fra KANDIDAT-ORDRE-lista som ser ut til å være relevante for denne eposten. Bruk EKSAKTE order_id fra lista. La være tom hvis ingen passer.
-- referenced_order: hvis eposten tydelig handler om EN spesifikk eksisterende ordre (endring/kansellering/spørsmål), sett denne til den mest sannsynlige. Ellers null.
-- change_intent: SETT KUN når request_type = "change" eller "cancellation". target_order_id skal være eksisterende order_id fra kandidatlista (eller referenced_order). Kun feltene i whitelisten over kan endres — for andre endringer (kaketekst, antall, fyll osv.) skal du beskrive dem i "summary" og "suggested_action", men IKKE i changes.
-- cancellation_reason: kort grunn på norsk hvis kunden vil kansellere.
-- current_value: hva som står i ordren nå (slå opp i kandidat-snapshotet). Hvis ukjent, sett null.
-- proposed_value: hva kunden ønsker å endre til. Bruk samme format som lagret (YYYY-MM-DD for dato, HH:MM for tid).
-- customer_match / products / missing_info / risks: som tidligere.
-- Norsk datoformat er DD-MM-YYYY. delivery_date i utdata må være ISO YYYY-MM-DD.
-- Hold sammendrag og reasoning korte og praktiske.
+- products[].product_id MÅ velges fra PRODUKT-KANDIDATER-lista under, eller settes til null hvis ingen kandidat er god nok (< ~0.4 similarity, eller ingen matcher intensjonen).
+- customer_match.customer_id skal være en av id-ene fra KUNDE-KANDIDATER, eller null.
+- candidate_orders / referenced_order / change_intent: bruk EKSAKTE order_id fra KANDIDAT-ORDRE.
+- Norsk datoformat DD-MM-YYYY inn; delivery_date ut skal være ISO YYYY-MM-DD.
+- Kort summary/reasoning på norsk.
 
-PRODUCTION_NOTES (order_fields.production_notes) — tekst til BAKERIET. Skal være kort, strukturert, og inneholde KUN det produksjon trenger. Bruk én linje per punkt med "Felt: verdi"-format. Inkluder alle relevante: Produkt, Antall, Størrelse/personer, Kaketekst, Pynt, Fyll, Smak, Allergier, Spesialønsker, Vedlegg fra kunde (hvis nevnt), "Obs:" for ting produksjon må være ekstra oppmerksom på (kort frist, uvanlig størrelse osv.). Sett null hvis intet relevant.
+PRODUCTION_NOTES: kort tekst til bakeriet med Felt: verdi per linje. STORE_NOTES: kort tekst til utleveringsstedet. Sett null hvis intet relevant.`;
 
-STORE_NOTES (order_fields.store_notes) — tekst til UTLEVERINGSSTEDET/BUTIKKEN. Kort og strukturert, én linje per punkt. Inkluder: Hentetid, Kundenavn, Telefon, Betalingsstatus (hvis nevnt eller utledet), "Kontakt kunde:" hvis noe må avklares før henting, Hentebeskjeder (samme dag, ringer ved ankomst, parkering osv.), "Endret:" hvis ordren er endret etter bekreftelse. Sett null hvis intet relevant.
-
-Begge notatene skal være på norsk, vennlige men telegrafiske. IKKE gjenta hele e-postteksten.`;
+    const productBlock = productCandidatesPerItem.length === 0
+      ? "(AI fant ingen produktnavn i e-posten)"
+      : productCandidatesPerItem.map((it, i) => {
+          const header = `Item ${i+1}: "${it.query}"${it.quantity ? ` (antall ${it.quantity})` : ""}`;
+          const rows = it.candidates.length === 0
+            ? "  (ingen trgm-kandidater)"
+            : it.candidates.map((c: any) =>
+                `  ${c.id} | ${c.display_number ?? ""} | ${c.display_name} | ${c.unit_of_sale ?? ""} | sim=${Number(c.similarity ?? 0).toFixed(2)}`).join("\n");
+          return `${header}\n${rows}`;
+        }).join("\n\n");
 
     const userText = [
       `=== TICKET ===`,
       `Emne: ${ticket.subject ?? ""}`,
       `Avsender: ${ticket.sender_name ?? ""} <${ticket.sender_email ?? ""}>`,
       `Mottatt: ${ticket.received_at ?? ""}`,
+      `Kunde-match-hint: ${matchReasons.join("; ") || "(ingen forhåndsmatch)"}`,
       ``,
       `--- E-post-tekst ---`,
       bodyText,
       ``,
-      `=== KUNDER (id | kundenr | navn | epost | telefon) ===`,
-      (customers ?? []).map((c: any) => `${c.id} | ${c.customer_number ?? ""} | ${c.display_name} | ${c.primary_contact_email ?? ""} | ${c.primary_contact_phone ?? c.mobile_phone ?? ""}`).join("\n"),
+      `=== KUNDE-KANDIDATER (id | kundenr | navn | epost | telefon) ===`,
+      candidateCustomers.map((c: any) => `${c.id} | ${c.customer_number ?? ""} | ${c.display_name} | ${c.primary_contact_email ?? ""} | ${c.primary_contact_phone ?? c.mobile_phone ?? ""}`).join("\n"),
       ``,
-      `=== PRODUKTER (id | nr | navn | enhet) ===`,
-      (products ?? []).map((p: any) => `${p.id} | ${p.display_number ?? ""} | ${p.display_name} | ${p.unit_of_sale ?? ""}`).join("\n"),
+      `=== PRODUKT-KANDIDATER (fra pg_trgm-søk, sortert på similarity) ===`,
+      productBlock,
       ``,
       `=== HENTESTEDER (navn | by) ===`,
       (pickups ?? []).map((p: any) => `${p.display_name} | ${p.city ?? ""}`).join("\n"),
       ``,
       `=== KANDIDAT-ORDRE (order_id | ordrenr | status | hentedato | hentetid | kunde | linjer | kundenotat | adresse) ===`,
       candidateOrdersRaw.length === 0
-        ? "(ingen aktive/fremtidige ordre funnet for denne kunden eller refererte ordrenr)"
+        ? "(ingen aktive/fremtidige ordre funnet)"
         : candidateOrdersRaw.map((o: any) => {
             const cn = o.customer_snapshot?.display_name ?? o.customer_snapshot?.name ?? "";
             const ls = (linesByOrder[o.id] ?? []).slice(0, 5).map((l: any) => {
@@ -361,7 +425,6 @@ Begge notatene skal være på norsk, vennlige men telegrafiske. IKKE gjenta hele
           }).join("\n"),
     ].join("\n");
 
-
     const startTs = Date.now();
     let rawText = "";
     let inputTokens: number | null = null;
@@ -371,17 +434,12 @@ Begge notatene skal være på norsk, vennlige men telegrafiske. IKKE gjenta hele
 
     try {
       const result = await callAi({
-        provider,
-        apiKey,
-        model,
-        maxTokens: 3072,
-        temperature: 0.1,
-        systemPrompt,
-        userText,
+        provider, apiKey, model, maxTokens: 3072, temperature: 0.1,
+        systemPrompt, userText,
       });
       rawText = result.rawText;
-      inputTokens = result.inputTokens;
-      outputTokens = result.outputTokens;
+      inputTokens = (result.inputTokens ?? 0) + pass1InputTok;
+      outputTokens = (result.outputTokens ?? 0) + pass1OutputTok;
     } catch (e) {
       callError = (e as Error).message;
       if (/credit balance|insufficient.?credit|quota|billing/i.test(callError)) {
@@ -401,7 +459,6 @@ Begge notatene skal være på norsk, vennlige men telegrafiske. IKKE gjenta hele
       try {
         const cleaned = rawText.replace(/```(?:json)?\s*/g, "").replace(/```\s*$/, "").trim();
         const json = JSON.parse(cleaned);
-        // Bakoverkomp: hvis modellen returnerte gammelt format uten request_type, oppgrader minimalt
         if (json && typeof json === "object" && !json.request_type) {
           json.request_type = "unclear";
           json.summary = json.summary ?? "";
@@ -412,7 +469,6 @@ Begge notatene skal være på norsk, vennlige men telegrafiske. IKKE gjenta hele
           json.field_confidence = json.field_confidence ?? {};
           json.reasoning_per_field = json.reasoning_per_field ?? {};
         }
-        // Tolerate products entries that are null/non-object or missing required fields
         if (json && Array.isArray(json.products)) {
           json.products = json.products
             .filter((p: unknown) => p && typeof p === "object")
@@ -476,9 +532,11 @@ Begge notatene skal være på norsk, vennlige men telegrafiske. IKKE gjenta hele
         ticket_subject: ticket.subject,
         ticket_sender: ticket.sender_email,
         body_length: bodyText.length,
-        customers_count: customers?.length ?? 0,
-        products_count: products?.length ?? 0,
+        legal_entity_id: legalEntityId,
+        customer_candidates: candidateCustomers.length,
+        product_items_extracted: extractedProductNames.length,
         pickups_count: pickups?.length ?? 0,
+        internal_invoke: isInternal,
       },
       response_payload: suggestion ? {
         request_type: suggestion.request_type,
@@ -490,13 +548,12 @@ Begge notatene skal være på norsk, vennlige men telegrafiske. IKKE gjenta hele
       } : null,
     });
 
-    // Tidslinje-hendelse
     await admin.from("ticket_events").insert({
       ticket_id,
       order_id: ticket.related_order_id ?? null,
       event_type: callStatus === "success" ? "ai.analysis_completed" : "ai.analysis_failed",
       actor_type: "ai",
-      actor_user_id: userId ?? null,
+      actor_user_id: userId,
       actor_label: `${provider}/${model}`,
       summary: callStatus === "success"
         ? `${suggestion?.request_type ?? "?"} · konfidens ${Math.round((suggestion?.confidence_score ?? 0) * 100)}%`
@@ -506,6 +563,7 @@ Begge notatene skal være på norsk, vennlige men telegrafiske. IKKE gjenta hele
         request_type: suggestion?.request_type ?? null,
         cost_usd: costUsd,
         duration_ms: durationMs,
+        internal_invoke: isInternal,
       },
     });
 
