@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { KeyRound, UserPlus, Send, Ban, CheckCircle2, Trash2, Search, Loader2 } from "lucide-react";
+import { KeyRound, UserPlus, Send, Ban, CheckCircle2, Trash2, Search, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
 import { AppBanner } from "@/kunder/components/shell/AppBanner";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,6 +10,9 @@ import { Badge } from "@/components/ui/badge";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { InvitePortalUserDialog } from "@/kunder/components/portal/InvitePortalUserDialog";
 import { PortalUserDrawer } from "@/kunder/components/portal/PortalUserDrawer";
 
@@ -26,6 +29,9 @@ type PortalRow = {
 export default function PortalUsers() {
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [customerFilter, setCustomerFilter] = useState<string>("all");
   const [inviteOpen, setInviteOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<PortalRow | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -53,15 +59,47 @@ export default function PortalUsers() {
     },
   });
 
+  const roleOptions = useMemo(
+    () => Array.from(new Set(data.map((r) => r.role).filter(Boolean))).sort(),
+    [data],
+  );
+  const statusOptions = useMemo(
+    () => Array.from(new Set(data.map((r) => r.status).filter(Boolean))).sort(),
+    [data],
+  );
+  const customerOptions = useMemo(() => {
+    const map = new Map<string, { id: string; label: string; num: string | number | null }>();
+    for (const r of data) {
+      for (const c of r.customers) {
+        if (!map.has(c.id)) map.set(c.id, { id: c.id, label: c.display_name, num: c.customer_number });
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label, "nb"));
+  }, [data]);
+
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
-    if (!q) return data;
-    return data.filter((r) =>
-      r.display_name.toLowerCase().includes(q) ||
-      r.email.toLowerCase().includes(q) ||
-      r.customers.some((c) => c.display_name.toLowerCase().includes(q) || String(c.customer_number ?? "").includes(q)),
-    );
-  }, [data, search]);
+    return data.filter((r) => {
+      if (roleFilter !== "all" && r.role !== roleFilter) return false;
+      if (statusFilter !== "all" && r.status !== statusFilter) return false;
+      if (customerFilter !== "all" && !r.customers.some((c) => c.id === customerFilter)) return false;
+      if (!q) return true;
+      return (
+        r.display_name.toLowerCase().includes(q) ||
+        r.email.toLowerCase().includes(q) ||
+        r.customers.some((c) => c.display_name.toLowerCase().includes(q) || String(c.customer_number ?? "").includes(q))
+      );
+    });
+  }, [data, search, roleFilter, statusFilter, customerFilter]);
+
+  const hasActiveFilters =
+    search !== "" || roleFilter !== "all" || statusFilter !== "all" || customerFilter !== "all";
+  const clearFilters = () => {
+    setSearch("");
+    setRoleFilter("all");
+    setStatusFilter("all");
+    setCustomerFilter("all");
+  };
 
   const runAction = async (row: PortalRow, action: "recovery" | "disable" | "enable") => {
     setBusy(`${action}:${row.user_id}`);
@@ -94,8 +132,8 @@ export default function PortalUsers() {
         }
       />
 
-      <div className="flex items-center gap-2">
-        <div className="relative max-w-sm flex-1">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative min-w-[220px] max-w-sm flex-1">
           <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Søk navn, e-post eller kunde…"
@@ -104,7 +142,41 @@ export default function PortalUsers() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <span className="text-sm text-muted-foreground">{filtered.length} brukere</span>
+        <Select value={roleFilter} onValueChange={setRoleFilter}>
+          <SelectTrigger className="w-[150px]"><SelectValue placeholder="Alle roller" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Alle roller</SelectItem>
+            {roleOptions.map((r) => (
+              <SelectItem key={r} value={r}>{r}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-[160px]"><SelectValue placeholder="Alle statuser" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Alle statuser</SelectItem>
+            {statusOptions.map((s) => (
+              <SelectItem key={s} value={s}>{s}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={customerFilter} onValueChange={setCustomerFilter}>
+          <SelectTrigger className="w-[240px]"><SelectValue placeholder="Alle kunder" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Alle kunder</SelectItem>
+            {customerOptions.map((c) => (
+              <SelectItem key={c.id} value={c.id}>
+                {c.label}{c.num ? ` (${c.num})` : ""}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {hasActiveFilters && (
+          <Button variant="ghost" size="sm" onClick={clearFilters}>
+            <X className="h-4 w-4" /> Nullstill
+          </Button>
+        )}
+        <span className="ml-auto text-sm text-muted-foreground">{filtered.length} brukere</span>
       </div>
 
       <div className="rounded-md border border-line bg-surface-canvas">
