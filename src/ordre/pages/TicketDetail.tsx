@@ -38,6 +38,8 @@ import {
   REQUEST_TYPE_BADGE,
 } from "@/ordre/lib/aiSuggestion";
 import type { TicketAttachment } from "@/ordre/hooks/useTickets";
+import ChangeIntentCard from "@/ordre/components/tickets/ChangeIntentCard";
+import LinkOrderSearch from "@/ordre/components/tickets/LinkOrderSearch";
 
 // ────────────────────────── helpers
 
@@ -618,7 +620,7 @@ export default function TicketDetail() {
             </SideCard>
           )}
 
-          {linked?.order && (
+          {linked?.order ? (
             <SideCard label="Koblet ordre">
               <div className="space-y-2 text-sm">
                 <div className="font-semibold text-foreground">
@@ -650,8 +652,33 @@ export default function TicketDetail() {
                 >
                   Åpne ordren →
                 </Button>
+                {ai?.change_intent && id && (
+                  <ChangeIntentCard
+                    ticketId={id}
+                    orderId={linked.order.id}
+                    orderNumber={linked.order.order_number}
+                    ai={ai}
+                    onApplied={() => {
+                      qc.invalidateQueries({ queryKey: ["ticket-linked-order", linked.order!.id] });
+                      qc.invalidateQueries({ queryKey: ["ticket-events", id] });
+                      qc.invalidateQueries({ queryKey: ["ticket", id] });
+                    }}
+                  />
+                )}
               </div>
             </SideCard>
+          ) : (
+            id && (
+              <SideCard label="Koble til ordre">
+                <LinkOrderSearch
+                  ticketId={id}
+                  onLinked={() => {
+                    qc.invalidateQueries({ queryKey: ["ticket", id] });
+                    qc.invalidateQueries({ queryKey: ["ticket-events", id] });
+                  }}
+                />
+              </SideCard>
+            )
           )}
         </div>
       </div>

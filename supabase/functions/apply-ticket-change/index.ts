@@ -28,6 +28,13 @@ const ALLOWED_FIELDS = new Set([
   "delivery_city",
 ]);
 
+const LineChangeSchema = z.object({
+  order_line_id: z.string().uuid().optional(),
+  product_id: z.string().uuid().optional(),
+  new_quantity: z.number().positive().optional(),
+  add: z.boolean().optional(),
+});
+
 const InputSchema = z.object({
   ticket_id: z.string().uuid(),
   order_id: z.string().uuid(),
@@ -36,6 +43,7 @@ const InputSchema = z.object({
     field: z.string(),
     new_value: z.string().nullable(),
   })).default([]),
+  line_changes: z.array(LineChangeSchema).default([]),
   cancellation_reason: z.string().nullable().optional(),
   mark_resolved: z.boolean().optional(),
 });
@@ -63,7 +71,7 @@ Deno.serve(async (req) => {
 
     const parsed = InputSchema.safeParse(await req.json().catch(() => ({})));
     if (!parsed.success) return jsonErr("Ugyldig input", 400, { details: parsed.error.flatten() });
-    const { ticket_id, order_id, action, changes, cancellation_reason, mark_resolved } = parsed.data;
+    const { ticket_id, order_id, action, changes, line_changes, cancellation_reason, mark_resolved } = parsed.data;
 
     const { data: ticket } = await admin.from("tickets").select("id,subject,internal_notes,related_order_id").eq("id", ticket_id).maybeSingle();
     if (!ticket) return jsonErr("Ticket ikke funnet", 404);
@@ -104,11 +112,89 @@ Deno.serve(async (req) => {
         patch[c.field] = v;
         after[c.field] = v;
       }
-      if (Object.keys(patch).length === 0) {
+      if (Object.keys(patch).length > 0) {
+        const { error: uErr } = await admin.from("orders").update(patch).eq("id", order_id);
+        if (uErr) return jsonErr(`Kunne ikke oppdatere ordre: ${uErr.message}`, 500);
+      }
+
+      // Ordrelinje-endringer
+      const lineChangesLog: Array<Record<string, unknown>> = [];
+      for (const lc of line_changes) {
+        if (lc.add) {
+          if (!lc.product_id || !lc.new_quantity) {
+            return jsonErr("add=true krever product_id og new_quantity", 400);
+          }
+          const { data: prod, error: pErr } = await admin
+            .from("products")
+            .select("id, display_name, unit_of_sale, mva_rate")
+            .eq("id", lc.product_id)
+            .maybeSingle();
+          if (pErr || !prod) return jsonErr(`Produkt ikke funnet: ${lc.product_id}`, 404);
+          const { data: maxRow } = await admin
+            .from("order_lines")
+            .select("line_number")
+            .eq("order_id", order_id)
+            .order("line_number", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          const nextLineNo = ((maxRow?.line_number as number | undefined) ?? 0) + 1;
+          const vatRate = Number((prod as any).mva_rate ?? 0);
+          // Pris settes til 0 her; ordreredigering fastsetter riktig pris via prislister.
+          const { error: iErr } = await admin.from("order_lines").insert({
+            order_id,
+            line_number: nextLineNo,
+            product_id: prod.id,
+            product_snapshot: { name: (prod as any).display_name } as never,
+            quantity: lc.new_quantity,
+            sales_unit: (prod as any).unit_of_sale ?? "stk",
+            unit_price: 0,
+            unit_price_source: "ticket_apply",
+            line_subtotal_excl_vat: 0,
+            vat_rate: vatRate,
+            line_vat: 0,
+            line_total_incl_vat: 0,
+            notes: "Lagt til via ticket — pris må bekreftes",
+          } as never);
+          if (iErr) return jsonErr(`Kunne ikke legge til linje: ${iErr.message}`, 500);
+          lineChangesLog.push({ op: "add", product_id: prod.id, product_name: (prod as any).display_name, quantity: lc.new_quantity });
+        } else {
+          if (!lc.order_line_id || lc.new_quantity == null) {
+            return jsonErr("Endring krever order_line_id og new_quantity", 400);
+          }
+          const { data: existing, error: gErr } = await admin
+            .from("order_lines")
+            .select("id, order_id, quantity, unit_price, vat_rate")
+            .eq("id", lc.order_line_id)
+            .maybeSingle();
+          if (gErr || !existing) return jsonErr("Ordrelinje ikke funnet", 404);
+          if (existing.order_id !== order_id) return jsonErr("Ordrelinje tilhører annen ordre", 400);
+          const unitPrice = Number(existing.unit_price ?? 0);
+          const vatRate = Number(existing.vat_rate ?? 0);
+          const subtotal = unitPrice * lc.new_quantity;
+          const { error: uErr } = await admin
+            .from("order_lines")
+            .update({
+              quantity: lc.new_quantity,
+              line_subtotal_excl_vat: subtotal,
+              line_vat: subtotal * (vatRate / 100),
+              line_total_incl_vat: subtotal * (1 + vatRate / 100),
+            })
+            .eq("id", lc.order_line_id);
+          if (uErr) return jsonErr(`Kunne ikke oppdatere linje: ${uErr.message}`, 500);
+          lineChangesLog.push({
+            op: "update_qty",
+            order_line_id: lc.order_line_id,
+            before_qty: Number(existing.quantity),
+            new_qty: lc.new_quantity,
+          });
+        }
+      }
+      if (lineChangesLog.length > 0) {
+        (after as any).line_changes = lineChangesLog;
+      }
+      if (Object.keys(patch).length === 0 && lineChangesLog.length === 0) {
         return jsonErr("Ingen gyldige endringer å lagre", 400);
       }
-      const { error: uErr } = await admin.from("orders").update(patch).eq("id", order_id);
-      if (uErr) return jsonErr(`Kunne ikke oppdatere ordre: ${uErr.message}`, 500);
     }
 
     // Koble ticket til ordre hvis ikke allerede koblet

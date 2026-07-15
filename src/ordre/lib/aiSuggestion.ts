@@ -119,9 +119,20 @@ export type ProposedChange = {
   confidence: number;
 };
 
+export type ProposedLineChange = {
+  order_line_id?: string | null;
+  product_id?: string | null;
+  product_name?: string | null;
+  current_quantity?: number | null;
+  new_quantity: number;
+  add?: boolean;
+  reasoning?: string;
+};
+
 export type ChangeIntent = {
   target_order_id: string | null;
   changes: ProposedChange[];
+  line_changes?: ProposedLineChange[];
   cancellation_reason?: string | null;
 };
 
