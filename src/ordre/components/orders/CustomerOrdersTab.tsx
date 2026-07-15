@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { Plus, Loader2, Truck, ShoppingBag, Check, ArrowDownRight } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Plus, Loader2, Truck, ShoppingBag, Check, ArrowDownRight, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,6 +10,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { StatusBadge } from "@/ordre/components/orders/StatusBadge";
 import { CustomerOrderModal } from "@/ordre/components/orders/CustomerOrderModal";
 import { useCustomerOrders } from "@/ordre/hooks/useCustomerOrders";
+import { useOrderConversationCounts } from "@/ordre/hooks/useOrderConversations";
 import type { CustomerOption } from "@/ordre/hooks/useNBCustomers";
 import { todayISO, formatDate } from "@/ordre/lib/format";
 import { isoWeekMonday, addDays } from "@/ordre/hooks/useMatrix";
