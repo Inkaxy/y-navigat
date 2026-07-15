@@ -500,6 +500,16 @@ export default function TicketDetail() {
             <span className="inline-flex items-center rounded border border-border bg-muted px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
               {statusLabel[ticket.status] ?? ticket.status}
             </span>
+            {ticket.awaiting_internal && (
+              <span className="inline-flex items-center rounded border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">
+                ⏳ venter på @intern
+              </span>
+            )}
+            {ticket.awaiting_external && (
+              <span className="inline-flex items-center rounded border border-purple-500/40 bg-purple-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-purple-700 dark:text-purple-300">
+                ⏳ venter på ekstern{ticket.awaiting_external_email ? ` · ${ticket.awaiting_external_email}` : ""}
+              </span>
+            )}
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
             {ticket.sender_name ?? ticket.sender_email} · {fmtTime(ticket.received_at)}
