@@ -38,6 +38,8 @@ import {
   REQUEST_TYPE_BADGE,
 } from "@/ordre/lib/aiSuggestion";
 import type { TicketAttachment } from "@/ordre/hooks/useTickets";
+import ChangeIntentCard from "@/ordre/components/tickets/ChangeIntentCard";
+import LinkOrderSearch from "@/ordre/components/tickets/LinkOrderSearch";
 
 // ────────────────────────── helpers
 
