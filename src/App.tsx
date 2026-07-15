@@ -124,7 +124,7 @@ import OrdrePlaceholder from "@/ordre/pages/Placeholder";
 import OrdreInnstillinger from "@/ordre/pages/Innstillinger";
 import M365Callback from "@/ordre/pages/M365Callback";
 import OrdrePortalTest from "@/ordre/pages/PortalTest";
-import OrdreTicketsList from "@/ordre/pages/TicketsList";
+import OrdreTicketsList from "@/ordre/pages/TicketsInbox";
 import OrdreTicketDetail from "@/ordre/pages/TicketDetail";
 import OrdreAiForslag from "@/ordre/pages/AiForslag";
 import OrdreTicketReports from "@/ordre/pages/TicketReports";
