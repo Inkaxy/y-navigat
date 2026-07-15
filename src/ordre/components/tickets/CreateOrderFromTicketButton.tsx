@@ -168,7 +168,7 @@ export default function CreateOrderFromTicketButton({ ticket, ai, onCreated }: P
           customer={chosen}
           initialValues={initialValues}
           sourceTicketId={ticket.id}
-          sourceTicketNumber={ticket.ticket_number ?? null}
+          sourceTicketNumber={ticket.id.slice(0, 8).toUpperCase()}
         />
       )}
 
