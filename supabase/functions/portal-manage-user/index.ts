@@ -49,12 +49,23 @@ Deno.serve(async (req) => {
       case "resend_invite": {
         const { data: u } = await admin.auth.admin.getUserById(user_id);
         if (!u?.user?.email) return json(404, { error: "Bruker ikke funnet" });
-        const { error } = await admin.auth.admin.inviteUserByEmail(u.user.email, {
-          redirectTo: `${portalUrl}/velg-passord`,
-        });
+        const email = u.user.email;
+        const alreadyConfirmed = !!u.user.email_confirmed_at || !!u.user.last_sign_in_at;
+        // Bruker som allerede har bekreftet konto: send magic link. Ellers: re-invite.
+        const { error } = alreadyConfirmed
+          ? await admin.auth.admin.generateLink({
+              type: "magiclink",
+              email,
+              options: { redirectTo: `${portalUrl}/velg-passord` },
+            })
+          : await admin.auth.admin.inviteUserByEmail(email, {
+              redirectTo: `${portalUrl}/velg-passord`,
+            });
         if (error) return json(500, { error: error.message });
-        await admin.from("portal_user_profiles").update({ status: "invited" }).eq("user_id", user_id);
-        return json(200, { success: true, email: u.user.email });
+        if (!alreadyConfirmed) {
+          await admin.from("portal_user_profiles").update({ status: "invited" }).eq("user_id", user_id);
+        }
+        return json(200, { success: true, email, mode: alreadyConfirmed ? "magiclink" : "invite" });
       }
       case "disable": {
         const { error: aerr } = await admin.auth.admin.updateUserById(user_id, {
