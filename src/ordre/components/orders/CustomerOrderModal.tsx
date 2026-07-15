@@ -58,7 +58,6 @@ import { type Merknad, isMerknadEmpty } from "@/ordre/lib/merknad";
 import { useProductLabelProfiles } from "@/produksjon/features/etiketter/hooks/useProductLabelProfiles";
 import { useLabelPrintProfiles } from "@/produksjon/features/utskriftsprofiler/hooks/useLabelPrintProfiles";
 import { supabase } from "@/integrations/supabase/client";
-import { logAudit as _dummyAudit } from "@/ordre/lib/audit"; // (already imported below — keep types happy)
 
 
 export type FieldConfidenceHint =
