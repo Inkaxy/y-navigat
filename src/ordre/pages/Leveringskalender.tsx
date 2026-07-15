@@ -1966,10 +1966,10 @@ function MatrixGrid({
                       {ghost && (
                         <span
                           className={cn(
-                            "pointer-events-none absolute left-0.5 top-0.5 rounded-sm px-1 text-[9px] font-semibold leading-tight tabular-nums",
+                            "pointer-events-none absolute left-0.5 top-0.5 rounded-sm px-1.5 py-0.5 text-xs font-bold leading-none tabular-nums shadow-sm",
                             ghostOverridden
-                              ? "bg-warning/20 text-warning line-through decoration-warning/70"
-                              : "bg-primary/15 text-primary",
+                              ? "bg-warning/25 text-warning line-through decoration-warning/70"
+                              : "bg-primary text-primary-foreground",
                           )}
                           title={
                             ghostOverridden
