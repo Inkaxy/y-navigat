@@ -161,7 +161,15 @@ const NameSchema = z
 const EmailSchema = z.string().trim().email("Ugyldig e-post").max(255).optional().or(z.literal(""));
 const PhoneSchema = z.string().trim().max(40).optional().or(z.literal(""));
 
-export function CustomerOrderModal({ open, onOpenChange, customer, orderId }: Props) {
+export function CustomerOrderModal({
+  open,
+  onOpenChange,
+  customer,
+  orderId,
+  initialValues,
+  sourceTicketId,
+  sourceTicketNumber,
+}: Props) {
   const isEdit = !!orderId;
   const { data: existing, isLoading: loadingExisting } = useCustomerOrderDetail(orderId ?? null);
   const createMut = useCreateCustomerOrder();
