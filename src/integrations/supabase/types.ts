@@ -9715,6 +9715,7 @@ export type Database = {
         Returns: Json
       }
       is_kiosk_user: { Args: never; Returns: boolean }
+      is_ordre_admin: { Args: never; Returns: boolean }
       is_platform_admin: { Args: never; Returns: boolean }
       is_platform_owner: { Args: { _user_id: string }; Returns: boolean }
       is_ravarer_owner: { Args: { _user_id: string }; Returns: boolean }
@@ -10174,6 +10175,7 @@ export type Database = {
       }
       user_has_invoice_access: { Args: never; Returns: boolean }
       user_has_legal_entity_access: { Args: { _le: string }; Returns: boolean }
+      user_outlet_ids: { Args: never; Returns: string[] }
       validate_order_delivery_rules: {
         Args: {
           p_customer_id: string
