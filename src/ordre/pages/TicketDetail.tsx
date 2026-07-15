@@ -453,6 +453,12 @@ export default function TicketDetail() {
         body: replyText.trim(),
         mentioned_teams: [],
       });
+      if (ticket?.awaiting_internal) {
+        await updateTicket.mutateAsync({
+          id,
+          patch: { awaiting_internal: false } as never,
+        });
+      }
       setReplyText("");
       toast.success("Internt notat lagret");
     } catch (e) {
