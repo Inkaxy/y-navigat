@@ -795,7 +795,10 @@ export function CustomerOrderModal({
                     </Select>
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Distribusjon</Label>
+                    <Label>
+                      Distribusjon
+                      <ConfidenceChip hint={initialValues?.fieldConfidence?.distribution} />
+                    </Label>
                     <RadioGroup
                       value={distribution}
                       onValueChange={(v) => setDistribution(v as "delivery" | "pickup")}
