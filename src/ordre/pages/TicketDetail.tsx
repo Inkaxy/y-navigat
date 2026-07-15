@@ -638,7 +638,7 @@ export default function TicketDetail() {
                 {linked.lines.length > 0 && (
                   <div className="text-xs text-muted-foreground">
                     {linked.lines
-                      .map((l) => `${l.quantity} × ${l.description ?? "linje"}`)
+                      .map((l) => `${l.quantity} × ${l.product_snapshot?.name ?? l.notes ?? "linje"}`)
                       .join(" · ")}
                   </div>
                 )}
