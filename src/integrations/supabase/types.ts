@@ -10145,6 +10145,16 @@ export type Database = {
           orders_deleted: number
         }[]
       }
+      search_products_trgm: {
+        Args: { p_legal_entity_id: string; p_limit?: number; p_query: string }
+        Returns: {
+          display_name: string
+          display_number: string
+          id: string
+          similarity: number
+          unit_of_sale: string
+        }[]
+      }
       set_rfq_password: { Args: { p_recipient_id: string }; Returns: string }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
