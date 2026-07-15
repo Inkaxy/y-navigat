@@ -71,11 +71,12 @@ Deno.serve(async (req) => {
       }
       case "set_customers": {
         if (!Array.isArray(customer_ids)) return json(400, { error: "customer_ids kreves" });
-        // Slett de som ikke er i den nye listen, upsert resten
-        await admin.from("customer_portal_accounts").delete().eq("user_id", user_id).not("customer_id", "in", `(${customer_ids.map((c: string) => `"${c}"`).join(",") || '""'})`);
+        // Enkleste sanne synk: slett alt for bruker, sett inn ny liste
+        const { error: delErr } = await admin.from("customer_portal_accounts").delete().eq("user_id", user_id);
+        if (delErr) return json(500, { error: delErr.message });
         if (customer_ids.length > 0) {
           const rows = customer_ids.map((cid: string) => ({ user_id, customer_id: cid, is_active: true }));
-          const { error } = await admin.from("customer_portal_accounts").upsert(rows, { onConflict: "user_id,customer_id" });
+          const { error } = await admin.from("customer_portal_accounts").insert(rows);
           if (error) return json(500, { error: error.message });
         }
         return json(200, { success: true });
