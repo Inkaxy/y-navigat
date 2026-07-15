@@ -72,6 +72,10 @@ export async function createCakeImage(input: {
   original_path: string;
   source?: CakeImageSource;
   customer_name?: string | null;
+  ticket_id?: string | null;
+  order_id?: string | null;
+  order_ref?: string | null;
+  notes?: string | null;
 }): Promise<CakeImage> {
   const { data: u } = await supabase.auth.getUser();
   const { data, error } = await supabase
@@ -83,12 +87,65 @@ export async function createCakeImage(input: {
       original_path: input.original_path,
       source: input.source ?? "upload",
       customer_name: input.customer_name ?? null,
+      ticket_id: input.ticket_id ?? null,
+      order_id: input.order_id ?? null,
+      order_ref: input.order_ref ?? null,
+      notes: input.notes ?? null,
       created_by: u.user?.id,
-    })
+    } as never)
     .select("*")
     .single();
   if (error) throw error;
   return data as CakeImage;
+}
+
+/**
+ * Last ned ticket-vedlegg via signert URL, last opp i cake-images bucket
+ * med samme sti-mønster som uploadOriginal, og opprett cake_images-rad
+ * med source='ticket'. Brukes når en ordre opprettes fra en samtale.
+ */
+export async function createCakeImageFromTicketAttachment(input: {
+  attachment_id: string;
+  file_name: string;
+  ticket_id: string;
+  order_id: string;
+  delivery_date: string;
+  title: string;
+  customer_name?: string | null;
+  order_ref?: string | null;
+  notes?: string | null;
+}): Promise<CakeImage> {
+  // 1) Hent signert URL fra edge-funksjonen
+  const { data: signed, error: sErr } = await supabase.functions.invoke(
+    "ticket-attachment-signed-url",
+    { body: { attachment_id: input.attachment_id, inline: true } },
+  );
+  if (sErr) throw sErr;
+  const url = (signed as { signed_url?: string } | null)?.signed_url;
+  if (!url) throw new Error("Kunne ikke hente signert URL for vedlegg");
+
+  // 2) Last ned filen
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Vedlegg kunne ikke lastes (${res.status})`);
+  const blob = await res.blob();
+  const contentType = blob.type || "application/octet-stream";
+  const file = new File([blob], input.file_name, { type: contentType });
+
+  // 3) Last opp til cake-images bucket
+  const { path } = await uploadOriginal(file, input.delivery_date);
+
+  // 4) Opprett cake_images-rad
+  return await createCakeImage({
+    delivery_date: input.delivery_date,
+    title: input.title,
+    original_path: path,
+    source: "ticket",
+    customer_name: input.customer_name ?? null,
+    ticket_id: input.ticket_id,
+    order_id: input.order_id,
+    order_ref: input.order_ref ?? null,
+    notes: input.notes ?? null,
+  });
 }
 
 export async function updateCakeImage(
