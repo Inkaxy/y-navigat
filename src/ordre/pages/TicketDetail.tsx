@@ -169,6 +169,8 @@ function useLinkedOrder(orderId: string | null) {
         .eq("order_id", orderId!)
         .limit(6);
       return { order: data, lines: (lines ?? []) as Array<{ quantity: number; product_snapshot: { name?: string } | null; notes: string | null }> };
+    },
+  });
 }
 
 // ────────────────────────── attachment thumbnail
