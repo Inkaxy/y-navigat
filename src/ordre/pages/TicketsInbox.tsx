@@ -195,6 +195,17 @@ export default function TicketsInbox() {
   const { user } = useAuth();
   const { data: tickets = [], isLoading } = useInboxTickets();
   const [queue, setQueue] = useState<QueueKey>("all");
+  const { data: openRefundsCount = 0 } = useQuery({
+    queryKey: ["refunds", "open-count"],
+    queryFn: async () => {
+      const { count } = await supabase
+        .from("refunds")
+        .select("id", { count: "exact", head: true })
+        .in("status", ["pending", "approved"]);
+      return count ?? 0;
+    },
+    staleTime: 30_000,
+  });
 
   type Row = TicketRow & {
     intent: RequestType | null;
@@ -244,9 +255,9 @@ export default function TicketsInbox() {
       awaitingCustomer: counts.awaiting_customer,
       overFrist,
       withoutOrder,
-      toPayout: 0,
+      toPayout: openRefundsCount,
     };
-  }, [rows, counts.awaiting_customer]);
+  }, [rows, counts.awaiting_customer, openRefundsCount]);
 
   const filtered = useMemo(() => {
     if (queue === "all") return rows.filter(isOpen);
@@ -343,6 +354,17 @@ export default function TicketsInbox() {
               count={counts.team[team] ?? 0}
             />
           ))}
+
+          <SectionLabel>Oppgaver</SectionLabel>
+          <Link
+            to="/ordre/tilbakebetalinger"
+            className="flex w-full items-center justify-between gap-2 rounded-md px-3 py-2 text-left text-sm text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+          >
+            <span className="flex items-center gap-2 truncate">
+              <span className="text-base leading-none">💸</span>
+              <span className="truncate">Tilbakebetalinger</span>
+            </span>
+          </Link>
         </aside>
 
         {/* Liste */}

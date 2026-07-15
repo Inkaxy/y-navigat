@@ -12,6 +12,7 @@ import {
   Send,
   Sparkles,
   StickyNote,
+  Wallet,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -44,6 +45,8 @@ import CreateOrderFromTicketButton from "@/ordre/components/tickets/CreateOrderF
 import TicketComposerActions from "@/ordre/components/tickets/TicketComposerActions";
 import { CakeImageStatusCard } from "@/ordre/components/orders/CakeImageStatusCard";
 import { useInboundMessages, type InboundMessage } from "@/ordre/hooks/useInboundMessages";
+import CreateRefundDialog from "@/ordre/components/tickets/CreateRefundDialog";
+import RefundStatusCard from "@/ordre/components/tickets/RefundStatusCard";
 
 // ────────────────────────── helpers
 
@@ -163,7 +166,7 @@ function useLinkedOrder(orderId: string | null) {
       const { data, error } = await supabase
         .from("orders")
         .select(
-          "id, order_number, status, delivery_date, delivery_time, subtotal_excl_vat, order_lines:order_lines(quantity, product_name:internal_notes)",
+          "id, order_number, status, delivery_date, delivery_time, subtotal_excl_vat, total_incl_vat, legal_entity_id, order_lines:order_lines(quantity, product_name:internal_notes)",
         )
         .eq("id", orderId!)
         .maybeSingle();
@@ -284,6 +287,7 @@ export default function TicketDetail() {
 
   const [replyText, setReplyText] = useState("");
   const [draftLoading, setDraftLoading] = useState(false);
+  const [refundOpen, setRefundOpen] = useState(false);
   const [lightbox, setLightbox] = useState<{ url: string; name: string } | null>(
     null,
   );
@@ -706,6 +710,13 @@ export default function TicketDetail() {
                 >
                   Åpne ordren →
                 </Button>
+                <Button
+                  size="sm"
+                  className="mt-2 w-full gap-2 bg-emerald-600 text-white hover:bg-emerald-700"
+                  onClick={() => setRefundOpen(true)}
+                >
+                  💸 Opprett tilbakebetaling
+                </Button>
                 {ai?.change_intent && id && (
                   <ChangeIntentCard
                     ticketId={id}
@@ -736,8 +747,29 @@ export default function TicketDetail() {
           )}
 
           {id && <CakeImageStatusCard ticketId={id} />}
+          {id && <RefundStatusCard ticketId={id} />}
         </div>
       </div>
+
+      {id && linked?.order && (
+        <CreateRefundDialog
+          open={refundOpen}
+          onOpenChange={setRefundOpen}
+          ticketId={id}
+          orderId={linked.order.id}
+          legalEntityId={(linked.order as unknown as { legal_entity_id: string }).legal_entity_id}
+          orderNumber={linked.order.order_number}
+          suggestedAmount={
+            (linked.order as unknown as { total_incl_vat?: number | null }).total_incl_vat ??
+            linked.order.subtotal_excl_vat ??
+            null
+          }
+          suggestedReason={ai?.summary ?? null}
+          onCreated={() => {
+            qc.invalidateQueries({ queryKey: ["refunds", "ticket", id] });
+          }}
+        />
+      )}
 
       {/* Lightbox */}
       {lightbox && (
