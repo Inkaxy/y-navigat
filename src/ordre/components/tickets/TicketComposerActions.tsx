@@ -18,6 +18,7 @@ import { TEAM_LABEL, TEAMS, type TicketTeam } from "@/ordre/lib/teams";
 import { useAddInternalComment } from "@/ordre/hooks/useInternalComments";
 import { useUpdateTicket, type Ticket } from "@/ordre/hooks/useTickets";
 import { useActiveUsers } from "@/ordre/hooks/useActiveUsers";
+import { createNotifications } from "@/ordre/hooks/useNotifications";
 
 interface Props {
   ticket: Ticket;
