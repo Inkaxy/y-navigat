@@ -200,6 +200,7 @@ export default function CreateOrderFromTicketButton({
           initialValues={initialValues}
           sourceTicketId={ticket.id}
           sourceTicketNumber={ticket.id.slice(0, 8).toUpperCase()}
+          sourceTicketSubject={ticket.subject}
         />
       )}
 
