@@ -357,6 +357,13 @@ export default function TicketDetail() {
         node: <InternalNoteBubble c={c} />,
       });
     }
+    for (const m of inboundMessages) {
+      items.push({
+        kind: "email",
+        at: m.received_at,
+        node: <InboundMessageBubble m={m} />,
+      });
+    }
     for (const e of events) {
       items.push({
         kind: "event",
@@ -366,7 +373,7 @@ export default function TicketDetail() {
     }
     items.sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
     return items;
-  }, [ticket, attachmentsByCreated, replies, comments, events]);
+  }, [ticket, attachmentsByCreated, replies, comments, events, inboundMessages]);
 
   if (isLoading || !ticket) {
     return (
