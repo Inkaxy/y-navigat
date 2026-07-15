@@ -76,6 +76,7 @@ const STATIC_SUBMENUS: Record<string, { prefix: string; appSlug: string; items: 
       { kind: "link", to: "/kunder/profiler", label: "Profiler", icon: UserCog },
       { kind: "link", to: "/kunder/kundegrupper", label: "Kundegrupper", icon: FolderTree },
       { kind: "link", to: "/kunder/historikk", label: "Historikk", icon: ScrollText },
+      { kind: "link", to: "/kunder/portaltilgang", label: "Portaltilgang", icon: KeyRound },
       { kind: "link", to: "/kunder/innstillinger", label: "Innstillinger", icon: Settings },
     ],
   },
