@@ -635,12 +635,14 @@ export type Database = {
           id: string
           legal_entity_id: string
           notes: string | null
+          order_id: string | null
           order_ref: string | null
           original_path: string
           print_count: number
           printed_at: string | null
           source: string
           status: string
+          ticket_id: string | null
           title: string
           updated_at: string
         }
@@ -654,12 +656,14 @@ export type Database = {
           id?: string
           legal_entity_id: string
           notes?: string | null
+          order_id?: string | null
           order_ref?: string | null
           original_path: string
           print_count?: number
           printed_at?: string | null
           source?: string
           status?: string
+          ticket_id?: string | null
           title?: string
           updated_at?: string
         }
@@ -673,16 +677,33 @@ export type Database = {
           id?: string
           legal_entity_id?: string
           notes?: string | null
+          order_id?: string | null
           order_ref?: string | null
           original_path?: string
           print_count?: number
           printed_at?: string | null
           source?: string
           status?: string
+          ticket_id?: string | null
           title?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "cake_images_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cake_images_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       cake_step_products: {
         Row: {
@@ -7925,6 +7946,95 @@ export type Database = {
           },
         ]
       }
+      refunds: {
+        Row: {
+          amount: number
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          legal_entity_id: string
+          method: string | null
+          order_id: string | null
+          outlet_id: string | null
+          paid_at: string | null
+          paid_by: string | null
+          reason: string | null
+          requires_approval: boolean
+          route: string
+          status: string
+          ticket_id: string | null
+        }
+        Insert: {
+          amount: number
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          legal_entity_id: string
+          method?: string | null
+          order_id?: string | null
+          outlet_id?: string | null
+          paid_at?: string | null
+          paid_by?: string | null
+          reason?: string | null
+          requires_approval?: boolean
+          route: string
+          status?: string
+          ticket_id?: string | null
+        }
+        Update: {
+          amount?: number
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          legal_entity_id?: string
+          method?: string | null
+          order_id?: string | null
+          outlet_id?: string | null
+          paid_at?: string | null
+          paid_by?: string | null
+          reason?: string | null
+          requires_approval?: boolean
+          route?: string
+          status?: string
+          ticket_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "refunds_legal_entity_id_fkey"
+            columns: ["legal_entity_id"]
+            isOneToOne: false
+            referencedRelation: "legal_entities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "refunds_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "refunds_outlet_id_fkey"
+            columns: ["outlet_id"]
+            isOneToOne: false
+            referencedRelation: "outlets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "refunds_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sales_groups: {
         Row: {
           code: string
@@ -8302,6 +8412,45 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "ticket_internal_comments_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ticket_order_links: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          order_id: string
+          ticket_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          order_id: string
+          ticket_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          order_id?: string
+          ticket_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_order_links_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ticket_order_links_ticket_id_fkey"
             columns: ["ticket_id"]
             isOneToOne: false
             referencedRelation: "tickets"
