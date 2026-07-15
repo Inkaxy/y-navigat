@@ -165,6 +165,90 @@ function ConfidenceChip({ hint }: { hint: FieldConfidenceHint | undefined }) {
   );
 }
 
+function TicketAttachmentRow({
+  attachment,
+  value,
+  onChange,
+}: {
+  attachment: TicketAttachmentForOrder;
+  value: "edible_print" | "reference_only";
+  onChange: (v: "edible_print" | "reference_only") => void;
+}) {
+  const [thumbUrl, setThumbUrl] = useState<string | null>(null);
+  const isImage = (attachment.content_type ?? "").startsWith("image/");
+
+  useEffect(() => {
+    if (!isImage) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke(
+          "ticket-attachment-signed-url",
+          { body: { attachment_id: attachment.id, inline: true } },
+        );
+        if (error) return;
+        const url = (data as { signed_url?: string } | null)?.signed_url ?? null;
+        if (!cancelled) setThumbUrl(url);
+      } catch {
+        /* stille */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [attachment.id, isImage]);
+
+  return (
+    <div className="flex flex-col gap-3 rounded-md border border-border bg-card p-3 sm:flex-row sm:items-start">
+      <div className="flex-shrink-0">
+        {thumbUrl && isImage ? (
+          <img
+            src={thumbUrl}
+            alt={attachment.file_name}
+            className="h-24 w-24 rounded-md border object-cover"
+          />
+        ) : (
+          <div className="grid h-24 w-24 place-items-center rounded-md border bg-muted text-xs text-muted-foreground">
+            {attachment.file_name.split(".").pop()?.toUpperCase() ?? "FIL"}
+          </div>
+        )}
+        <div className="mt-1 max-w-[6rem] truncate text-[11px] text-muted-foreground">
+          {attachment.file_name}
+        </div>
+      </div>
+
+      <RadioGroup
+        value={value}
+        onValueChange={(v) => onChange(v as "edible_print" | "reference_only")}
+        className="flex-1 space-y-2"
+      >
+        <label className="flex cursor-pointer items-start gap-2 text-sm">
+          <RadioGroupItem
+            value="edible_print"
+            id={`att-${attachment.id}-print`}
+            className="mt-0.5"
+          />
+          <span>
+            <span className="font-semibold">🖨️ Spiselig print</span> — legg i
+            Kakebilder-køen for leveringsdatoen
+          </span>
+        </label>
+        <label className="flex cursor-pointer items-start gap-2 text-sm">
+          <RadioGroupItem
+            value="reference_only"
+            id={`att-${attachment.id}-ref`}
+            className="mt-0.5"
+          />
+          <span>Kun dekorreferanse på ordren</span>
+        </label>
+      </RadioGroup>
+    </div>
+  );
+}
+
+
+
+
 
 
 const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
