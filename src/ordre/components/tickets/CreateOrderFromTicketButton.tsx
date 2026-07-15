@@ -20,7 +20,16 @@ import type { Ticket, TicketAttachment } from "@/ordre/hooks/useTickets";
 interface Props {
   ticket: Ticket;
   ai: AiSuggestion;
+  attachments?: TicketAttachment[];
   onCreated: () => void;
+}
+
+function edibleHint(a: TicketAttachment, ai: AiSuggestion): boolean {
+  if (!(a.content_type ?? "").startsWith("image/")) return false;
+  const summary = (a.ai_summary ?? "").toLowerCase();
+  if (/print|spiselig|trykk|sukkerpapir|kake/.test(summary)) return true;
+  if ((ai.order_fields?.cake_text ?? "").trim().length > 0) return true;
+  return false;
 }
 
 function buildInitialValues(
