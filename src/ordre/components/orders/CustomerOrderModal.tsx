@@ -695,9 +695,13 @@ export function CustomerOrderModal({
                       if (s.email) setEmail(s.email);
                       if (s.phone) setPhone(s.phone);
                     }}
+                    labelSuffix={<ConfidenceChip hint={initialValues?.fieldConfidence?.name} />}
                   />
                   <div className="space-y-1.5">
-                    <Label htmlFor="cf-email">E-post</Label>
+                    <Label htmlFor="cf-email">
+                      E-post
+                      <ConfidenceChip hint={initialValues?.fieldConfidence?.email} />
+                    </Label>
                     <Input
                       id="cf-email"
                       type="email"
@@ -707,7 +711,10 @@ export function CustomerOrderModal({
                     />
                   </div>
                   <div className="space-y-1.5 sm:col-span-2">
-                    <Label htmlFor="cf-phone">Telefon</Label>
+                    <Label htmlFor="cf-phone">
+                      Telefon
+                      <ConfidenceChip hint={initialValues?.fieldConfidence?.phone} />
+                    </Label>
                     <Input
                       id="cf-phone"
                       type="tel"
