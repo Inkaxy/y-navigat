@@ -731,7 +731,10 @@ export function CustomerOrderModal({
                 <legend className="text-sm font-semibold">Leveranse</legend>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div className="space-y-1.5">
-                    <Label htmlFor="cf-date">Leveringsdato</Label>
+                    <Label htmlFor="cf-date">
+                      Leveringsdato
+                      <ConfidenceChip hint={initialValues?.fieldConfidence?.delivery_date} />
+                    </Label>
                     <Input
                       id="cf-date"
                       type="date"
@@ -742,7 +745,10 @@ export function CustomerOrderModal({
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Tid (valgfri)</Label>
+                    <Label>
+                      Tid (valgfri)
+                      <ConfidenceChip hint={initialValues?.fieldConfidence?.delivery_time} />
+                    </Label>
                     <div className="flex items-center gap-2">
                       <Select value={hour} onValueChange={setHour}>
                         <SelectTrigger className="w-24">
