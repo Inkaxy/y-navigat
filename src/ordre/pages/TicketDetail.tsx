@@ -287,6 +287,7 @@ export default function TicketDetail() {
 
   const [replyText, setReplyText] = useState("");
   const [draftLoading, setDraftLoading] = useState(false);
+  const [refundOpen, setRefundOpen] = useState(false);
   const [lightbox, setLightbox] = useState<{ url: string; name: string } | null>(
     null,
   );
