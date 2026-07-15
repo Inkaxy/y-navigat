@@ -446,17 +446,45 @@ export default function OrderDetail() {
           </Card>
         )}
 
-        {/* Hovedinnhold — uten tabs */}
-        <OrderDetailsTab order={order} lines={lines} />
+        {/* Hovedinnhold med faner */}
+        <Tabs
+          value={activeTab}
+          onValueChange={(v) => {
+            const next = new URLSearchParams(searchParams);
+            if (v === "samtaler") next.set("tab", "samtaler");
+            else next.delete("tab");
+            setSearchParams(next, { replace: true });
+          }}
+          className="w-full"
+        >
+          <TabsList>
+            <TabsTrigger value="detaljer">Detaljer</TabsTrigger>
+            <TabsTrigger value="samtaler" className="gap-2">
+              <MessageSquare className="h-3.5 w-3.5" />
+              Samtaler
+              <Badge variant="secondary" className="ml-1 px-1.5 py-0 text-[10px]">
+                {conversations.length}
+              </Badge>
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Vedlegg knyttet til ordren (bilder, logoer, dokumenter) */}
-        <OrderAttachmentsCard orderId={order.id} />
+          <TabsContent value="detaljer" className="mt-4 space-y-4">
+            <OrderDetailsTab order={order} lines={lines} />
 
-        {/* Ticket-sporbarhet: original epost + tidslinje av kommunikasjon/AI/koblinger */}
-        <div className="grid gap-4 lg:grid-cols-2">
-          <OriginalEmailCard orderId={order.id} />
-          <TimelineCard orderId={order.id} title="Ticket-historikk" />
-        </div>
+            {/* Vedlegg knyttet til ordren (bilder, logoer, dokumenter) */}
+            <OrderAttachmentsCard orderId={order.id} />
+
+            {/* Ticket-sporbarhet: original epost + tidslinje av kommunikasjon/AI/koblinger */}
+            <div className="grid gap-4 lg:grid-cols-2">
+              <OriginalEmailCard orderId={order.id} />
+              <TimelineCard orderId={order.id} title="Ticket-historikk" />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="samtaler" className="mt-4">
+            <OrderConversationsTab orderId={order.id} />
+          </TabsContent>
+        </Tabs>
 
         {actions.length === 0 && !releaseAction && (
           <Card className="p-3 text-center text-caption italic text-muted-foreground">
