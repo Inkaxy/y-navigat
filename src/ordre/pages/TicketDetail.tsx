@@ -569,6 +569,12 @@ export default function TicketDetail() {
                 <StickyNote className="h-4 w-4" /> Lagre som internt notat
               </Button>
             </div>
+            <TicketComposerActions
+              ticket={ticket}
+              replyText={replyText}
+              onConsumeReplyText={() => setReplyText("")}
+              linkedOrderNumber={linked?.order?.order_number ?? null}
+            />
           </div>
         </div>
 
