@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { KeyRound, UserPlus, Send, Ban, CheckCircle2, Trash2, Search, Loader2 } from "lucide-react";
+import { KeyRound, UserPlus, Send, Ban, CheckCircle2, Trash2, Search, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
 import { AppBanner } from "@/kunder/components/shell/AppBanner";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,6 +10,9 @@ import { Badge } from "@/components/ui/badge";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { InvitePortalUserDialog } from "@/kunder/components/portal/InvitePortalUserDialog";
 import { PortalUserDrawer } from "@/kunder/components/portal/PortalUserDrawer";
 
