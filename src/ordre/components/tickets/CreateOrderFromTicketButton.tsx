@@ -35,6 +35,7 @@ function edibleHint(a: TicketAttachment, ai: AiSuggestion): boolean {
 function buildInitialValues(
   ticket: Ticket,
   ai: AiSuggestion,
+  attachments: TicketAttachment[],
 ): CustomerOrderInitialValues {
   const of = ai.order_fields ?? {};
   const phone = of.contact_phone ?? null;
