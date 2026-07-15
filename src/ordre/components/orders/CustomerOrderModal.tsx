@@ -673,6 +673,15 @@ export function CustomerOrderModal({
             </DialogTitle>
             <DialogDescription>
               {customer.display_name} ({customer.customer_number})
+              {sourceTicketId && !isEdit && (
+                <>
+                  {" · "}
+                  <span className="text-primary">
+                    forhåndsutfylt fra samtale {sourceTicketNumber ?? sourceTicketId.slice(0, 8)}
+                  </span>{" "}
+                  — kontroller og juster fritt
+                </>
+              )}
             </DialogDescription>
           </DialogHeader>
 
