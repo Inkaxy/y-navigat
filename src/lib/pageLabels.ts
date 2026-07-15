@@ -47,6 +47,7 @@ const RULES: PageRule[] = [
   { test: (p) => p.startsWith("/kunder/profiler"), label: "Profiler" },
   { test: (p) => p.startsWith("/kunder/kundegrupper"), label: "Kundegrupper" },
   { test: (p) => p.startsWith("/kunder/historikk"), label: "Historikk" },
+  { test: (p) => p.startsWith("/kunder/portaltilgang"), label: "Portaltilgang" },
   { test: (p) => p.startsWith("/kunder/innstillinger/hentesteder"), label: "Hentesteder" },
   { test: (p) => p.startsWith("/kunder/innstillinger"), label: "Innstillinger" },
   { test: (p) => p === "/kunder", label: "Kunder" },
