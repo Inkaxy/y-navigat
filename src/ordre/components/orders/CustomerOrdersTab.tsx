@@ -221,6 +221,24 @@ export function CustomerOrdersTab({ customer }: { customer: CustomerOption }) {
                         <StatusBadge status={o.status} />
                       )}
                     </td>
+                    <td className="px-3 py-2 text-center">
+                      {(conversationCounts[o.id] ?? 0) > 0 ? (
+                        <button
+                          type="button"
+                          className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/40 px-2 py-0.5 text-xs font-medium text-foreground hover:bg-accent"
+                          title="Vis samtaler koblet til denne ordren"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/ordre/ordrer/${o.id}?tab=samtaler`);
+                          }}
+                        >
+                          <MessageSquare className="h-3 w-3" />
+                          {conversationCounts[o.id]}
+                        </button>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </td>
                     <td className="px-3 py-2 text-xs text-muted-foreground">
                       <span className="inline-flex items-center gap-1">
                         <ArrowDownRight className="h-3 w-3" />
