@@ -21,7 +21,7 @@ interface PortalRow {
   email: string;
   role: string;
   status: string;
-  customers: { id: string; customer_number: number | null; display_name: string }[];
+  customers: { id: string; customer_number: string | number | null; display_name: string }[];
 }
 
 interface Props {
@@ -55,7 +55,7 @@ export function PortalUserDrawer({ user, onClose, onChanged }: Props) {
         .order("display_name")
         .limit(2000);
       if (error) throw error;
-      return data as { id: string; customer_number: number | null; display_name: string }[];
+      return (data ?? []) as unknown as { id: string; customer_number: string | number | null; display_name: string }[];
     },
     enabled: !!user,
   });

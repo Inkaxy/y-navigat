@@ -20,7 +20,7 @@ type PortalRow = {
   role: string;
   status: string;
   last_login_at: string | null;
-  customers: { id: string; customer_number: number | null; display_name: string }[];
+  customers: { id: string; customer_number: string | number | null; display_name: string }[];
 };
 
 export default function PortalUsers() {
@@ -39,7 +39,7 @@ export default function PortalUsers() {
       ]);
       if (pe) throw pe;
       if (le) throw le;
-      const byUser = new Map<string, { id: string; customer_number: number | null; display_name: string }[]>();
+      const byUser = new Map<string, { id: string; customer_number: string | number | null; display_name: string }[]>();
       for (const l of (links ?? []) as any[]) {
         if (!l.customers) continue;
         const arr = byUser.get(l.user_id) ?? [];
