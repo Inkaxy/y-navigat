@@ -710,6 +710,13 @@ export default function TicketDetail() {
                 >
                   Åpne ordren →
                 </Button>
+                <Button
+                  size="sm"
+                  className="mt-2 w-full gap-2 bg-emerald-600 text-white hover:bg-emerald-700"
+                  onClick={() => setRefundOpen(true)}
+                >
+                  💸 Opprett tilbakebetaling
+                </Button>
                 {ai?.change_intent && id && (
                   <ChangeIntentCard
                     ticketId={id}
