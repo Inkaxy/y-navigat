@@ -48,7 +48,7 @@ export default function PortalUsers() {
       }
       return (profiles ?? []).map((p: any) => ({
         ...p,
-        customers: (byUser.get(p.user_id) ?? []).sort((a, b) => a.name.localeCompare(b.name, "nb")),
+        customers: (byUser.get(p.user_id) ?? []).sort((a, b) => a.display_name.localeCompare(b.display_name, "nb")),
       }));
     },
   });
@@ -59,7 +59,7 @@ export default function PortalUsers() {
     return data.filter((r) =>
       r.display_name.toLowerCase().includes(q) ||
       r.email.toLowerCase().includes(q) ||
-      r.customers.some((c) => c.name.toLowerCase().includes(q) || String(c.customer_number ?? "").includes(q)),
+      r.customers.some((c) => c.display_name.toLowerCase().includes(q) || String(c.customer_number ?? "").includes(q)),
     );
   }, [data, search]);
 
@@ -144,7 +144,7 @@ export default function PortalUsers() {
                   <div className="flex flex-col gap-0.5 text-sm">
                     {u.customers.length === 0 && <span className="text-muted-foreground">—</span>}
                     {u.customers.slice(0, 6).map((c) => (
-                      <span key={c.id}>{c.name}{c.customer_number ? ` (${c.customer_number})` : ""}</span>
+                      <span key={c.id}>{c.display_name}{c.customer_number ? ` (${c.customer_number})` : ""}</span>
                     ))}
                     {u.customers.length > 6 && (
                       <span className="text-muted-foreground">+{u.customers.length - 6} til</span>
