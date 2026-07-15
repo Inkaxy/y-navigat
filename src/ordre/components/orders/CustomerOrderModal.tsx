@@ -214,6 +214,13 @@ export function CustomerOrderModal({
   const [dirty, setDirty] = useState(false);
   const [merknadFor, setMerknadFor] = useState<string | null>(null);
 
+  // Vedlegg fra e-posten (ticket) — brukerens valg per vedlegg
+  const [attachmentChoice, setAttachmentChoice] = useState<
+    Record<string, "edible_print" | "reference_only">
+  >({});
+
+
+
 
   // Re-init when modal opens (or order loads)
   useEffect(() => {
