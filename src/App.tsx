@@ -65,6 +65,7 @@ import KunderInnstillinger from "@/kunder/pages/Innstillinger";
 import KunderCustomerGroups from "@/kunder/pages/CustomerGroups";
 import KunderCustomerHistory from "@/kunder/pages/CustomerHistory";
 import KunderPlaceholder from "@/kunder/pages/Placeholder";
+import KunderPortalUsers from "@/kunder/pages/PortalUsers";
 import { useUserAccess as useKunderUserAccess } from "@/kunder/hooks/useUserAccess";
 import { useAuth as useNbhubAuth } from "@/hooks/useAuth";
 import ProduksjonOversikt from "@/produksjon/pages/OversiktPage";
@@ -277,6 +278,7 @@ const App = () => (
               <Route path="/kunder/profiler/:id" element={<Shell><AppAccessGuard appCode="kunder" appName="Kunder"><KunderEntityProvider><KunderProfileDetail /></KunderEntityProvider></AppAccessGuard></Shell>} />
               <Route path="/kunder/kundegrupper" element={<Shell><AppAccessGuard appCode="kunder" appName="Kunder"><KunderEntityProvider><KunderCustomerGroups /></KunderEntityProvider></AppAccessGuard></Shell>} />
               <Route path="/kunder/historikk" element={<Shell><AppAccessGuard appCode="kunder" appName="Kunder"><KunderEntityProvider><KunderCustomerHistory /></KunderEntityProvider></AppAccessGuard></Shell>} />
+              <Route path="/kunder/portaltilgang" element={<Shell><AppAccessGuard appCode="kunder" appName="Kunder"><KunderEntityProvider><KunderPortalUsers /></KunderEntityProvider></AppAccessGuard></Shell>} />
               <Route path="/kunder/innstillinger" element={<Shell><AppAccessGuard appCode="kunder" appName="Kunder"><KunderEntityProvider><KunderInnstillinger /></KunderEntityProvider></AppAccessGuard></Shell>} />
               <Route path="/kunder/innstillinger/hentesteder" element={<Shell><AppAccessGuard appCode="kunder" appName="Kunder"><KunderEntityProvider><KunderPickupLocations /></KunderEntityProvider></AppAccessGuard></Shell>} />
               <Route path="/ravarer" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><Navigate to="/ravarer/vareliste" replace /></RavarerProvider></AppAccessGuard></Shell>} />
