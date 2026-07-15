@@ -97,7 +97,7 @@ export default function TicketComposerActions({
       const patch: Partial<Ticket> = {};
       let label = "";
       const me = (await supabase.auth.getUser()).data.user;
-      const followers = new Set<string>(ticket.followers ?? ([] as unknown as string[]));
+      const followers = new Set<string>(ticket.followers ?? []);
       if (me?.id) followers.add(me.id);
       if (transferTarget.startsWith("team:")) {
         const t = transferTarget.slice(5) as TicketTeam;
