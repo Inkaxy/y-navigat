@@ -64,6 +64,15 @@ export type FieldConfidenceHint =
   | number
   | { label: string; tone: "green" | "amber" | "red" };
 
+export type TicketAttachmentForOrder = {
+  id: string;
+  file_name: string;
+  content_type: string | null;
+  size_bytes: number | null;
+  /** true = forhåndsvelger «spiselig print» i modalen */
+  edible_suggested?: boolean;
+};
+
 export type CustomerOrderInitialValues = {
   finalCustomerName?: string | null;
   finalCustomerEmail?: string | null;
@@ -76,6 +85,10 @@ export type CustomerOrderInitialValues = {
   sendEmail?: boolean | null;
   isPaid?: boolean | null;
   lines?: Array<{ product_id: string; quantity: number }> | null;
+  /** Tekst som skal på kaken — brukes som tittel på cake_images-raden. */
+  cakeText?: string | null;
+  /** Vedlegg fra ticket-e-posten som vises i «Vedlegg fra e-posten»-seksjonen. */
+  ticketAttachments?: TicketAttachmentForOrder[];
   fieldConfidence?: Partial<
     Record<
       "name" | "email" | "phone" | "delivery_date" | "delivery_time" | "distribution",
@@ -96,6 +109,8 @@ type Props = {
   sourceTicketId?: string | null;
   /** Ticketnummer (T-…) vist under Opphav-feltet. */
   sourceTicketNumber?: string | null;
+  /** Emne fra ticket-e-posten — brukes som fallback-tittel på kakebilder. */
+  sourceTicketSubject?: string | null;
 };
 
 type LineDraft = {
