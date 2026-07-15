@@ -46,3 +46,9 @@ verify_jwt = false
 [functions.geocode-customer]
 verify_jwt = true
 
+
+[functions.portal-invite-user]
+verify_jwt = true
+
+[functions.portal-manage-user]
+verify_jwt = true
