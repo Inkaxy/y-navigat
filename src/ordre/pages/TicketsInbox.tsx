@@ -261,10 +261,7 @@ export default function TicketsInbox() {
 
   const kpis = useMemo(() => {
     const open = rows.filter(isOpen);
-    const nowMs = Date.now();
-    const overFrist = open.filter(
-      (r) => nowMs - new Date(r.received_at).getTime() > 4 * 60 * 60 * 1000,
-    ).length;
+    const overFrist = open.filter((r) => r.overdue).length;
     const withoutOrder = open.filter(
       (r) => !r.related_order_id && r.intent !== "question",
     ).length;
@@ -277,22 +274,32 @@ export default function TicketsInbox() {
     };
   }, [rows, counts.awaiting_customer, openRefundsCount]);
 
+  const sortByDeadline = (a: Row, b: Row) => {
+    // Overdue først, deretter tidligste deadline, deretter received_at
+    if (a.overdue && !b.overdue) return -1;
+    if (!a.overdue && b.overdue) return 1;
+    const ad = a.deadline?.getTime() ?? Infinity;
+    const bd = b.deadline?.getTime() ?? Infinity;
+    if (ad !== bd) return ad - bd;
+    return new Date(a.received_at).getTime() - new Date(b.received_at).getTime();
+  };
+
   const filtered = useMemo(() => {
-    if (queue === "all") return rows.filter(isOpen);
-    if (queue === "mine")
-      return rows.filter((r) => r.assigned_to === user?.id && isOpen(r));
-    if (queue === "awaiting_customer")
-      return rows.filter((r) => r.awaiting_internal && isOpen(r));
-    if (queue === "resolved") return rows.filter((r) => r.status === "resolved");
-    if (queue.startsWith("intent:")) {
+    let out: Row[];
+    if (queue === "all") out = rows.filter(isOpen);
+    else if (queue === "mine")
+      out = rows.filter((r) => r.assigned_to === user?.id && isOpen(r));
+    else if (queue === "awaiting_customer")
+      out = rows.filter((r) => r.awaiting_internal && isOpen(r));
+    else if (queue === "resolved") out = rows.filter((r) => r.status === "resolved");
+    else if (queue.startsWith("intent:")) {
       const k = queue.slice("intent:".length) as RequestType;
-      return rows.filter((r) => r.intent === k && isOpen(r));
-    }
-    if (queue.startsWith("team:")) {
+      out = rows.filter((r) => r.intent === k && isOpen(r));
+    } else if (queue.startsWith("team:")) {
       const k = queue.slice("team:".length) as TicketTeam;
-      return rows.filter((r) => r.assigned_team === k && isOpen(r));
-    }
-    return rows;
+      out = rows.filter((r) => r.assigned_team === k && isOpen(r));
+    } else out = rows;
+    return queue === "resolved" ? out : [...out].sort(sortByDeadline);
   }, [rows, queue, user?.id]);
 
   return (
