@@ -231,40 +231,9 @@ async function processMessage(
     payload: { conversation_id: msg.conversationId ?? null },
   }).then(() => {}, () => {});
 
-  // Process attachments
-  if (msg.hasAttachments) {
-    const attRes = await fetch(
-      `https://graph.microsoft.com/v1.0/me/messages/${messageId}/attachments`,
-      { headers: { Authorization: `Bearer ${accessToken}` } },
-    );
-    if (attRes.ok) {
-      const atts = (await attRes.json()).value ?? [];
-      for (const a of atts) {
-        if (a["@odata.type"] !== "#microsoft.graph.fileAttachment") continue;
-        const sizeBytes = a.size ?? 0;
-        let storagePath: string | null = null;
-        if (sizeBytes <= MAX_ATTACHMENT_BYTES && a.contentBytes) {
-          const bytes = base64ToBytes(a.contentBytes);
-          const path = `${ticketRow.id}/${a.id}-${sanitizeFilename(a.name ?? "attachment")}`;
-          const up = await admin.storage.from("ticket-attachments").upload(path, bytes, {
-            contentType: a.contentType ?? "application/octet-stream",
-            upsert: true,
-          });
-          if (up.error) console.error("Upload failed", up.error);
-          else storagePath = path;
-        }
-        await admin.from("ticket_attachments").insert({
-          ticket_id: ticketRow.id,
-          microsoft_attachment_id: a.id,
-          file_name: a.name ?? "attachment",
-          content_type: a.contentType ?? null,
-          size_bytes: sizeBytes,
-          storage_path: storagePath,
-          is_inline: !!a.isInline,
-        });
-      }
-    }
-  }
+  // Process attachments — Graph reports hasAttachments=false when only inline
+  // images are present, so we always try to fetch.
+  await fetchAndStoreAttachments(admin, accessToken, messageId, ticketRow.id);
 
   // Trigger AI-analyse asynkront (intern service-invokasjon)
   try {
