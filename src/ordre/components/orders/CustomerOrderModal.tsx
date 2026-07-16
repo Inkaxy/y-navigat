@@ -736,6 +736,8 @@ export function CustomerOrderModal({
               (initialValues?.cakeText ?? "").trim() ||
               (sourceTicketSubject ?? "").trim() ||
               `Kakebilde — ${row.order_number}`;
+            // Finn kake-ordrelinje + produksjonsavdeling for etikett-nummer-reservasjon
+            const cakeLineInfo = await findCakeLineForOrder(row.id).catch(() => null);
             for (const a of edibleAttachments) {
               try {
                 await createCakeImageFromTicketAttachment({
@@ -743,6 +745,8 @@ export function CustomerOrderModal({
                   file_name: a.file_name,
                   ticket_id: sourceTicketId,
                   order_id: row.id,
+                  order_line_id: cakeLineInfo?.order_line_id ?? null,
+                  production_department_id: cakeLineInfo?.production_department_id ?? null,
                   delivery_date: input.deliveryDate,
                   title: cakeTitle,
                   customer_name: input.finalCustomerName,
