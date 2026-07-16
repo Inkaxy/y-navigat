@@ -281,6 +281,13 @@ export default function CakeImageEditor() {
         try {
           await c.loadFromJSON((await prepareEditorStateForLoad(image.editor_state)) as never);
           if (c.getObjects().length > 0) {
+            // Preload alle skrifttyper som brukes i lagret state, og re-render.
+            const families = new Set<string>();
+            c.getObjects().forEach((o) => {
+              const f = (o as fabric.IText).fontFamily;
+              if (typeof f === "string") families.add(f);
+            });
+            await Promise.all([...families].map((f) => loadCakeFont(f)));
             c.renderAll();
             setLayers([...c.getObjects()]);
             undoStack.current = [canvasSnapshot(c)];
