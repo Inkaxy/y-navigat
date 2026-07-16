@@ -966,25 +966,23 @@ function IncomingEmail({
           {fmtTime(ticket.received_at)}
         </div>
       </div>
-      {html ? (
-        <div
-          className="prose prose-sm max-w-none text-sm text-foreground [&_a]:text-primary"
-          dangerouslySetInnerHTML={{ __html: html }}
-        />
-      ) : (
-        <p className="whitespace-pre-wrap text-sm text-foreground">
-          {ticket.body_text ?? ticket.body_preview ?? ""}
-        </p>
-      )}
-      {attachments.length > 0 && (
+      <EmailBody
+        html={html}
+        fallbackText={ticket.body_text ?? ticket.body_preview ?? ""}
+        attachments={attachments}
+        ticketId={ticket.id}
+      />
+      {attachments.filter((a) => !a.is_inline || !a.content_id).length > 0 && (
         <div className="mt-3 flex flex-wrap gap-2 border-t pt-3">
-          {attachments.map((a) => (
-            <AttachmentThumb
-              key={a.id}
-              att={a}
-              onOpen={(url, name) => onOpen({ url, name })}
-            />
-          ))}
+          {attachments
+            .filter((a) => !a.is_inline || !a.content_id)
+            .map((a) => (
+              <AttachmentThumb
+                key={a.id}
+                att={a}
+                onOpen={(url, name) => onOpen({ url, name })}
+              />
+            ))}
         </div>
       )}
     </div>
