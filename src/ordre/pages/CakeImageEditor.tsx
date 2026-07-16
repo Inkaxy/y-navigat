@@ -61,6 +61,8 @@ import {
   uploadOriginal,
 } from "@/ordre/lib/cakeImages";
 import { supabase } from "@/integrations/supabase/client";
+import { CakeFontPicker } from "@/ordre/components/cake-images/CakeFontPicker";
+import { loadCakeFont } from "@/ordre/lib/cakeFonts";
 
 const TEMPLATES = [
   { id: "qland", label: '1/4 ark — landskap (10×7,5")', w: 1000, h: 750 },
@@ -183,6 +185,7 @@ export default function CakeImageEditor() {
   const [zoom, setZoom] = useState(0.6);
   const [textInput, setTextInput] = useState("");
   const [textPreset, setTextPreset] = useState("title");
+  const [fontFamily, setFontFamily] = useState<string>("Inter");
   const [brightness, setBrightness] = useState(0);
   const [contrast, setContrast] = useState(0);
   const [grayscale, setGrayscale] = useState(false);
@@ -278,6 +281,13 @@ export default function CakeImageEditor() {
         try {
           await c.loadFromJSON((await prepareEditorStateForLoad(image.editor_state)) as never);
           if (c.getObjects().length > 0) {
+            // Preload alle skrifttyper som brukes i lagret state, og re-render.
+            const families = new Set<string>();
+            c.getObjects().forEach((o) => {
+              const f = (o as fabric.IText).fontFamily;
+              if (typeof f === "string") families.add(f);
+            });
+            await Promise.all([...families].map((f) => loadCakeFont(f)));
             c.renderAll();
             setLayers([...c.getObjects()]);
             undoStack.current = [canvasSnapshot(c)];
@@ -318,16 +328,17 @@ export default function CakeImageEditor() {
   const active = fabRef.current?.getActiveObject() ?? null;
   const isText = active && (active as fabric.IText).isType?.("i-text");
 
-  const addText = () => {
+  const addText = async () => {
     const c = fabRef.current;
     if (!c) return;
     const preset = TEXT_PRESETS.find((p) => p.id === textPreset)!;
+    await loadCakeFont(fontFamily);
     const txt = new fabric.IText(textInput || "Tekst", {
       left: c.getWidth() / 2,
       top: c.getHeight() / 2,
       originX: "center",
       originY: "center",
-      fontFamily: "Inter",
+      fontFamily,
       fontSize: preset.size,
       fontWeight: preset.weight,
       fill: "#1f1b16",
@@ -681,6 +692,12 @@ img { max-width:100%; max-height:100vh; }
                     ))}
                   </SelectContent>
                 </Select>
+                <div>
+                  <Label className="mb-1 block text-[10px] uppercase tracking-wide text-muted-foreground">
+                    Skrifttype
+                  </Label>
+                  <CakeFontPicker value={fontFamily} onChange={setFontFamily} />
+                </div>
                 <Input
                   value={textInput}
                   onChange={(e) => setTextInput(e.target.value)}
@@ -825,6 +842,22 @@ img { max-width:100%; max-height:100vh; }
                   }}
                   className="h-8"
                 />
+                <div>
+                  <Label className="mb-1 block text-[10px] uppercase tracking-wide text-muted-foreground">
+                    Skrifttype
+                  </Label>
+                  <CakeFontPicker
+                    compact
+                    value={((active as fabric.IText).fontFamily as string) ?? "Inter"}
+                    onChange={(family) => {
+                      loadCakeFont(family).then(() => {
+                        (active as fabric.IText).set("fontFamily", family);
+                        fabRef.current?.renderAll();
+                        setSelVersion((v) => v + 1);
+                      });
+                    }}
+                  />
+                </div>
                 <div className="flex items-center gap-1">
                   <Button
                     variant={(active as fabric.IText).fontWeight === "bold" ? "default" : "outline"}
