@@ -211,7 +211,7 @@ export default function CakeImageEditor() {
   useEffect(() => {
     if (!canvasRef.current) return;
     const c = new fabric.Canvas(canvasRef.current, {
-      backgroundColor: "#ffffff",
+      backgroundColor: "",
       preserveObjectStacking: true,
       width: tpl.w,
       height: tpl.h,
@@ -299,7 +299,7 @@ export default function CakeImageEditor() {
           console.warn("editor_state load failed", e);
         }
         c.clear();
-        c.backgroundColor = "#ffffff";
+        c.backgroundColor = "";
       }
       // Init med original-bilde sentrert
       const url = await cakeObjectUrl(image.original_path);
@@ -738,11 +738,15 @@ img { max-width:100%; max-height:100vh; }
           style={{ backgroundImage: "linear-gradient(45deg,hsl(var(--muted)) 25%,transparent 25%),linear-gradient(-45deg,hsl(var(--muted)) 25%,transparent 25%),linear-gradient(45deg,transparent 75%,hsl(var(--muted)) 75%),linear-gradient(-45deg,transparent 75%,hsl(var(--muted)) 75%)", backgroundSize: "16px 16px", backgroundPosition: "0 0, 0 8px, 8px -8px, -8px 0" }}
         >
           <div
-            className="mx-auto bg-white shadow-lg"
+            className={cn(
+              "mx-auto bg-white shadow-lg",
+              "circle" in tpl && tpl.circle ? "rounded-full" : "",
+            )}
             style={{
               width: tpl.w * zoom,
               height: tpl.h * zoom,
               transform: "translateZ(0)",
+              overflow: "hidden",
             }}
           >
             <div
