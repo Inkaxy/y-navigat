@@ -185,6 +185,7 @@ export default function CakeImageEditor() {
   const [zoom, setZoom] = useState(0.6);
   const [textInput, setTextInput] = useState("");
   const [textPreset, setTextPreset] = useState("title");
+  const [fontFamily, setFontFamily] = useState<string>("Inter");
   const [brightness, setBrightness] = useState(0);
   const [contrast, setContrast] = useState(0);
   const [grayscale, setGrayscale] = useState(false);
