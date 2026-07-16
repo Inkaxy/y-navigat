@@ -1078,7 +1078,13 @@ function EventBubble({ e }: { e: TicketEvent }) {
   );
 }
 
-function InboundMessageBubble({ m }: { m: InboundMessage }) {
+function InboundMessageBubble({
+  m,
+  attachments,
+}: {
+  m: InboundMessage;
+  attachments: TicketAttachment[];
+}) {
   const html = m.body_html ? sanitize(m.body_html) : null;
   return (
     <div className="rounded-lg border border-l-4 border-l-blue-500 bg-[hsl(var(--brand-cream))] p-4 shadow-sm">
@@ -1099,16 +1105,13 @@ function InboundMessageBubble({ m }: { m: InboundMessage }) {
         </div>
         <div className="text-xs text-muted-foreground">{fmtTime(m.received_at)}</div>
       </div>
-      {html ? (
-        <div
-          className="prose prose-sm max-w-none text-sm text-foreground [&_a]:text-primary"
-          dangerouslySetInnerHTML={{ __html: html }}
-        />
-      ) : (
-        <p className="whitespace-pre-wrap text-sm text-foreground">
-          {m.body_text ?? m.body_preview ?? ""}
-        </p>
-      )}
+      <EmailBody
+        html={html}
+        fallbackText={m.body_text ?? m.body_preview ?? ""}
+        attachments={attachments}
+        ticketId={m.ticket_id}
+      />
     </div>
   );
 }
+
