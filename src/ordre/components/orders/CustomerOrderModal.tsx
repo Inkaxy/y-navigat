@@ -58,7 +58,10 @@ import { type Merknad, isMerknadEmpty } from "@/ordre/lib/merknad";
 import { useProductLabelProfiles } from "@/produksjon/features/etiketter/hooks/useProductLabelProfiles";
 import { useLabelPrintProfiles } from "@/produksjon/features/utskriftsprofiler/hooks/useLabelPrintProfiles";
 import { supabase } from "@/integrations/supabase/client";
-import { createCakeImageFromTicketAttachment } from "@/ordre/lib/cakeImages";
+import {
+  createCakeImageFromTicketAttachment,
+  findCakeLineForOrder,
+} from "@/ordre/lib/cakeImages";
 
 
 export type FieldConfidenceHint =
