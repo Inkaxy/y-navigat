@@ -504,7 +504,7 @@ export default function TicketDetail() {
       items.push({
         kind: "email",
         at: m.received_at,
-        node: <InboundMessageBubble m={m} />,
+        node: <InboundMessageBubble m={m} attachments={attachments} />,
       });
     }
     for (const e of events) {
