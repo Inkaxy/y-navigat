@@ -835,6 +835,22 @@ img { max-width:100%; max-height:100vh; }
                   }}
                   className="h-8"
                 />
+                <div>
+                  <Label className="mb-1 block text-[10px] uppercase tracking-wide text-muted-foreground">
+                    Skrifttype
+                  </Label>
+                  <CakeFontPicker
+                    compact
+                    value={((active as fabric.IText).fontFamily as string) ?? "Inter"}
+                    onChange={(family) => {
+                      loadCakeFont(family).then(() => {
+                        (active as fabric.IText).set("fontFamily", family);
+                        fabRef.current?.renderAll();
+                        setSelVersion((v) => v + 1);
+                      });
+                    }}
+                  />
+                </div>
                 <div className="flex items-center gap-1">
                   <Button
                     variant={(active as fabric.IText).fontWeight === "bold" ? "default" : "outline"}
