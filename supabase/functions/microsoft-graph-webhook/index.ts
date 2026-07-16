@@ -195,6 +195,9 @@ async function processMessage(
         order_id: parentTicket.related_order_id,
       });
     }
+
+    // Attachments (inline images inkludert) på svaret lagres også på parent-ticket
+    await fetchAndStoreAttachments(admin, accessToken, messageId, parentTicket.id);
     return;
   }
 
