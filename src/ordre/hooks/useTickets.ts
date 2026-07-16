@@ -53,6 +53,8 @@ export interface TicketAttachment {
   ai_summarized_at: string | null;
   attached_by: string | null;
   attached_at: string | null;
+  content_id: string | null;
+  microsoft_attachment_id?: string | null;
 }
 
 export interface TicketsFilter {
