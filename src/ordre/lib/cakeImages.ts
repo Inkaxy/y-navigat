@@ -22,6 +22,11 @@ export type CakeImage = {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  ticket_id?: string | null;
+  order_id?: string | null;
+  order_line_id?: string | null;
+  production_department_id?: string | null;
+  label_number?: string | null;
 };
 
 export const CAKE_BUCKET = "cake-images";
