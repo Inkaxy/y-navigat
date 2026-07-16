@@ -61,6 +61,8 @@ import {
   uploadOriginal,
 } from "@/ordre/lib/cakeImages";
 import { supabase } from "@/integrations/supabase/client";
+import { CakeFontPicker } from "@/ordre/components/cake-images/CakeFontPicker";
+import { loadCakeFont } from "@/ordre/lib/cakeFonts";
 
 const TEMPLATES = [
   { id: "qland", label: '1/4 ark — landskap (10×7,5")', w: 1000, h: 750 },
