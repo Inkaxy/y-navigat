@@ -119,7 +119,14 @@ export function CakeImageStatusCard({
             >
               <Thumb path={img.original_path} />
               <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-medium">{img.title}</div>
+                <div className="flex items-center gap-1.5">
+                  {img.label_number && (
+                    <span className="inline-flex items-center rounded bg-brand-ink px-1.5 py-0.5 font-mono text-[10px] font-semibold text-brand-cream">
+                      #{img.label_number}
+                    </span>
+                  )}
+                  <div className="truncate text-sm font-medium">{img.title}</div>
+                </div>
                 <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                   <Badge
                     variant="outline"
