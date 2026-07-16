@@ -343,12 +343,26 @@ function AttachmentThumb({
     };
   }, [att.id]);
 
-  const isImage = (att.content_type ?? "").startsWith("image/");
+  const ct = att.content_type ?? "";
+  const isImage = ct.startsWith("image/");
+  const isPdf = ct === "application/pdf" || /\.pdf$/i.test(att.file_name);
+
+  const handleClick = () => {
+    if (!url) return;
+    if (isImage) {
+      onOpen(url, att.file_name);
+    } else {
+      // PDF and other files: open in new tab for native viewer / download
+      window.open(url, "_blank", "noopener,noreferrer");
+    }
+  };
+
   return (
     <button
       type="button"
-      onClick={() => url && onOpen(url, att.file_name)}
+      onClick={handleClick}
       className="group flex items-center gap-2 rounded-md border bg-background px-2 py-1.5 text-left text-xs hover:bg-muted"
+      title={isPdf ? "Åpne PDF i ny fane" : isImage ? "Åpne bilde" : "Åpne vedlegg"}
     >
       {isImage && url ? (
         <img
@@ -357,8 +371,12 @@ function AttachmentThumb({
           className="h-10 w-10 rounded object-cover"
         />
       ) : (
-        <div className="flex h-10 w-10 items-center justify-center rounded bg-muted">
-          <Paperclip className="h-4 w-4 text-muted-foreground" />
+        <div className={`flex h-10 w-10 items-center justify-center rounded ${isPdf ? "bg-red-100 text-red-700" : "bg-muted text-muted-foreground"}`}>
+          {isPdf ? (
+            <span className="text-[10px] font-bold">PDF</span>
+          ) : (
+            <Paperclip className="h-4 w-4" />
+          )}
         </div>
       )}
       <div className="min-w-0">
