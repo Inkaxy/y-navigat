@@ -200,6 +200,9 @@ function EmailBody({
       )}
     </>
   );
+}
+
+
 
 function initials(name: string | null, email?: string | null): string {
   const src = (name ?? email ?? "?").trim();
