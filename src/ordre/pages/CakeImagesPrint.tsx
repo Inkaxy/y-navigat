@@ -104,7 +104,7 @@ export default function CakeImagesPrint() {
           .cake-print-page { page-break-after: always; break-after: page; height: 100vh; }
           body { background: white !important; }
         }
-        .cake-print-page { display:flex; align-items:center; justify-content:center; padding:24px; }
+        .cake-print-page { position:relative; display:flex; align-items:center; justify-content:center; padding:24px; }
         .cake-print-page img { max-width:100%; max-height:90vh; object-fit:contain; }
       `}</style>
 
