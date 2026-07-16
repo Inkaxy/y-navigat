@@ -68,8 +68,15 @@ export function CakeImageCard({
       <div className="flex flex-col gap-1 p-3">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <div className="truncate text-sm font-semibold" title={image.title}>
-              {image.title}
+            <div className="flex items-center gap-1.5">
+              {image.label_number && (
+                <span className="inline-flex items-center rounded bg-brand-ink px-1.5 py-0.5 font-mono text-[11px] font-semibold text-brand-cream">
+                  #{image.label_number}
+                </span>
+              )}
+              <div className="truncate text-sm font-semibold" title={image.title}>
+                {image.title}
+              </div>
             </div>
             {image.customer_name && (
               <div className="truncate text-xs text-muted-foreground">
