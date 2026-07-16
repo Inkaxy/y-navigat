@@ -211,7 +211,7 @@ export default function CakeImageEditor() {
   useEffect(() => {
     if (!canvasRef.current) return;
     const c = new fabric.Canvas(canvasRef.current, {
-      backgroundColor: "#ffffff",
+      backgroundColor: "",
       preserveObjectStacking: true,
       width: tpl.w,
       height: tpl.h,
