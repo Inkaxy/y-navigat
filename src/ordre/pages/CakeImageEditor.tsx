@@ -321,16 +321,17 @@ export default function CakeImageEditor() {
   const active = fabRef.current?.getActiveObject() ?? null;
   const isText = active && (active as fabric.IText).isType?.("i-text");
 
-  const addText = () => {
+  const addText = async () => {
     const c = fabRef.current;
     if (!c) return;
     const preset = TEXT_PRESETS.find((p) => p.id === textPreset)!;
+    await loadCakeFont(fontFamily);
     const txt = new fabric.IText(textInput || "Tekst", {
       left: c.getWidth() / 2,
       top: c.getHeight() / 2,
       originX: "center",
       originY: "center",
-      fontFamily: "Inter",
+      fontFamily,
       fontSize: preset.size,
       fontWeight: preset.weight,
       fill: "#1f1b16",
