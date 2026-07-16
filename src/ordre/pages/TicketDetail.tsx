@@ -65,6 +65,145 @@ function sanitize(html: string): string {
   });
 }
 
+// Extract cid: content-ids referenced from HTML (img src="cid:xxx").
+function extractCidRefs(html: string | null): string[] {
+  if (!html) return [];
+  const out = new Set<string>();
+  const re = /(?:src|href)\s*=\s*["']cid:([^"'>]+)["']/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(html))) out.add(m[1].trim());
+  return [...out];
+}
+
+// Rewrites cid:XYZ img src to a signed URL when an attachment matches by
+// content_id. Async — call inside a useEffect that awaits signed URLs.
+function rewriteCidImages(html: string, urlMap: Record<string, string>): string {
+  return html.replace(
+    /(<(?:img|source)[^>]+?)(src|srcset)\s*=\s*["']cid:([^"'>]+)["']/gi,
+    (full, prefix, attr, cid) => {
+      const key = cid.trim().replace(/^<|>$/g, "");
+      const url = urlMap[key] ?? urlMap[`<${key}>`] ?? urlMap[key.replace(/@.*$/, "")];
+      return url ? `${prefix}${attr}="${url}"` : full;
+    },
+  );
+}
+
+// Hook: resolve signed URLs for cid-referenced inline attachments.
+function useCidUrls(attachments: TicketAttachment[], cidRefs: string[]) {
+  const [map, setMap] = useState<Record<string, string>>({});
+  const key = cidRefs.slice().sort().join(",") + "|" + attachments.map((a) => a.id).join(",");
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const next: Record<string, string> = {};
+      for (const ref of cidRefs) {
+        const bare = ref.replace(/^<|>$/g, "");
+        const match = attachments.find((a) => {
+          const cid = (a.content_id ?? "").replace(/^<|>$/g, "");
+          return cid && (cid === bare || cid === ref);
+        });
+        if (!match) continue;
+        try {
+          const url = await getTicketAttachmentSignedUrl(match.id, { inline: true });
+          next[bare] = url;
+        } catch {
+          /* ignore */
+        }
+      }
+      if (!cancelled) setMap(next);
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+  return map;
+}
+
+// Render sanitized HTML email body with inline cid: images resolved to signed URLs.
+// Shows a "Hent vedlegg fra Outlook" button when there are cid: refs without a matching attachment.
+function EmailBody({
+  html,
+  fallbackText,
+  attachments,
+  ticketId,
+}: {
+  html: string | null;
+  fallbackText: string;
+  attachments: TicketAttachment[];
+  ticketId: string;
+}) {
+  const cidRefs = useMemo(() => extractCidRefs(html), [html]);
+  const cidUrls = useCidUrls(attachments, cidRefs);
+  const missing = cidRefs.filter((r) => {
+    const bare = r.replace(/^<|>$/g, "");
+    return !cidUrls[bare];
+  });
+  const [refetching, setRefetching] = useState(false);
+  const qc = useQueryClient();
+
+  const rewritten = useMemo(() => {
+    if (!html) return null;
+    return rewriteCidImages(html, cidUrls);
+  }, [html, cidUrls]);
+
+  const onRefetch = async () => {
+    setRefetching(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("ticket-refetch-attachments", {
+        body: { ticket_id: ticketId },
+      });
+      if (error) throw error;
+      const inserted = (data as { inserted?: number } | null)?.inserted ?? 0;
+      toast.success(
+        inserted > 0 ? `Hentet ${inserted} vedlegg fra Outlook` : "Ingen nye vedlegg funnet",
+      );
+      qc.invalidateQueries({ queryKey: ["ticket", ticketId] });
+    } catch (e) {
+      toast.error("Klarte ikke å hente vedlegg", {
+        description: (e as Error).message,
+      });
+    } finally {
+      setRefetching(false);
+    }
+  };
+
+  return (
+    <>
+      {rewritten ? (
+        <div
+          className="prose prose-sm max-w-none text-sm text-foreground [&_a]:text-primary [&_img]:max-w-full [&_img]:rounded [&_img]:border"
+          dangerouslySetInnerHTML={{ __html: rewritten }}
+        />
+      ) : (
+        <p className="whitespace-pre-wrap text-sm text-foreground">{fallbackText}</p>
+      )}
+      {missing.length > 0 && (
+        <div className="mt-3 flex items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-amber-800 dark:text-amber-200">
+          <Paperclip className="h-3.5 w-3.5" />
+          <span>
+            {missing.length} innebygde bilder ble ikke lastet ned fra e-posten.
+          </span>
+          <Button
+            size="sm"
+            variant="outline"
+            className="ml-auto h-7 text-xs"
+            onClick={onRefetch}
+            disabled={refetching}
+          >
+            {refetching ? (
+              <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+            ) : null}
+            Hent fra Outlook
+          </Button>
+        </div>
+      )}
+    </>
+  );
+}
+
+
+
 function initials(name: string | null, email?: string | null): string {
   const src = (name ?? email ?? "?").trim();
   const parts = src.split(/[\s@.]+/).filter(Boolean);
@@ -365,7 +504,7 @@ export default function TicketDetail() {
       items.push({
         kind: "email",
         at: m.received_at,
-        node: <InboundMessageBubble m={m} />,
+        node: <InboundMessageBubble m={m} attachments={attachments} />,
       });
     }
     for (const e of events) {
@@ -827,25 +966,23 @@ function IncomingEmail({
           {fmtTime(ticket.received_at)}
         </div>
       </div>
-      {html ? (
-        <div
-          className="prose prose-sm max-w-none text-sm text-foreground [&_a]:text-primary"
-          dangerouslySetInnerHTML={{ __html: html }}
-        />
-      ) : (
-        <p className="whitespace-pre-wrap text-sm text-foreground">
-          {ticket.body_text ?? ticket.body_preview ?? ""}
-        </p>
-      )}
-      {attachments.length > 0 && (
+      <EmailBody
+        html={html}
+        fallbackText={ticket.body_text ?? ticket.body_preview ?? ""}
+        attachments={attachments}
+        ticketId={ticket.id}
+      />
+      {attachments.filter((a) => !a.is_inline || !a.content_id).length > 0 && (
         <div className="mt-3 flex flex-wrap gap-2 border-t pt-3">
-          {attachments.map((a) => (
-            <AttachmentThumb
-              key={a.id}
-              att={a}
-              onOpen={(url, name) => onOpen({ url, name })}
-            />
-          ))}
+          {attachments
+            .filter((a) => !a.is_inline || !a.content_id)
+            .map((a) => (
+              <AttachmentThumb
+                key={a.id}
+                att={a}
+                onOpen={(url, name) => onOpen({ url, name })}
+              />
+            ))}
         </div>
       )}
     </div>
@@ -941,7 +1078,13 @@ function EventBubble({ e }: { e: TicketEvent }) {
   );
 }
 
-function InboundMessageBubble({ m }: { m: InboundMessage }) {
+function InboundMessageBubble({
+  m,
+  attachments,
+}: {
+  m: InboundMessage;
+  attachments: TicketAttachment[];
+}) {
   const html = m.body_html ? sanitize(m.body_html) : null;
   return (
     <div className="rounded-lg border border-l-4 border-l-blue-500 bg-[hsl(var(--brand-cream))] p-4 shadow-sm">
@@ -962,16 +1105,13 @@ function InboundMessageBubble({ m }: { m: InboundMessage }) {
         </div>
         <div className="text-xs text-muted-foreground">{fmtTime(m.received_at)}</div>
       </div>
-      {html ? (
-        <div
-          className="prose prose-sm max-w-none text-sm text-foreground [&_a]:text-primary"
-          dangerouslySetInnerHTML={{ __html: html }}
-        />
-      ) : (
-        <p className="whitespace-pre-wrap text-sm text-foreground">
-          {m.body_text ?? m.body_preview ?? ""}
-        </p>
-      )}
+      <EmailBody
+        html={html}
+        fallbackText={m.body_text ?? m.body_preview ?? ""}
+        attachments={attachments}
+        ticketId={m.ticket_id}
+      />
     </div>
   );
 }
+

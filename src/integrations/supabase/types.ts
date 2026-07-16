@@ -8278,6 +8278,7 @@ export type Database = {
           attached_at: string | null
           attached_by: string | null
           attached_to_order_id: string | null
+          content_id: string | null
           content_type: string | null
           created_at: string
           file_name: string
@@ -8295,6 +8296,7 @@ export type Database = {
           attached_at?: string | null
           attached_by?: string | null
           attached_to_order_id?: string | null
+          content_id?: string | null
           content_type?: string | null
           created_at?: string
           file_name: string
@@ -8312,6 +8314,7 @@ export type Database = {
           attached_at?: string | null
           attached_by?: string | null
           attached_to_order_id?: string | null
+          content_id?: string | null
           content_type?: string | null
           created_at?: string
           file_name?: string
