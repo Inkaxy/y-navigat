@@ -685,6 +685,12 @@ img { max-width:100%; max-height:100vh; }
                     ))}
                   </SelectContent>
                 </Select>
+                <div>
+                  <Label className="mb-1 block text-[10px] uppercase tracking-wide text-muted-foreground">
+                    Skrifttype
+                  </Label>
+                  <CakeFontPicker value={fontFamily} onChange={setFontFamily} />
+                </div>
                 <Input
                   value={textInput}
                   onChange={(e) => setTextInput(e.target.value)}
