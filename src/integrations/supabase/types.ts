@@ -633,13 +633,16 @@ export type Database = {
           edited_path: string | null
           editor_state: Json | null
           id: string
+          label_number: string | null
           legal_entity_id: string
           notes: string | null
           order_id: string | null
+          order_line_id: string | null
           order_ref: string | null
           original_path: string
           print_count: number
           printed_at: string | null
+          production_department_id: string | null
           source: string
           status: string
           ticket_id: string | null
@@ -654,13 +657,16 @@ export type Database = {
           edited_path?: string | null
           editor_state?: Json | null
           id?: string
+          label_number?: string | null
           legal_entity_id: string
           notes?: string | null
           order_id?: string | null
+          order_line_id?: string | null
           order_ref?: string | null
           original_path: string
           print_count?: number
           printed_at?: string | null
+          production_department_id?: string | null
           source?: string
           status?: string
           ticket_id?: string | null
@@ -675,13 +681,16 @@ export type Database = {
           edited_path?: string | null
           editor_state?: Json | null
           id?: string
+          label_number?: string | null
           legal_entity_id?: string
           notes?: string | null
           order_id?: string | null
+          order_line_id?: string | null
           order_ref?: string | null
           original_path?: string
           print_count?: number
           printed_at?: string | null
+          production_department_id?: string | null
           source?: string
           status?: string
           ticket_id?: string | null
@@ -694,6 +703,20 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cake_images_order_line_id_fkey"
+            columns: ["order_line_id"]
+            isOneToOne: false
+            referencedRelation: "order_lines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cake_images_production_department_id_fkey"
+            columns: ["production_department_id"]
+            isOneToOne: false
+            referencedRelation: "production_departments"
             referencedColumns: ["id"]
           },
           {

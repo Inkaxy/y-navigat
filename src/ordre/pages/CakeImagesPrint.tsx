@@ -104,7 +104,7 @@ export default function CakeImagesPrint() {
           .cake-print-page { page-break-after: always; break-after: page; height: 100vh; }
           body { background: white !important; }
         }
-        .cake-print-page { display:flex; align-items:center; justify-content:center; padding:24px; }
+        .cake-print-page { position:relative; display:flex; align-items:center; justify-content:center; padding:24px; }
         .cake-print-page img { max-width:100%; max-height:90vh; object-fit:contain; }
       `}</style>
 
@@ -129,6 +129,11 @@ export default function CakeImagesPrint() {
 
       {items.map((it) => (
         <div key={it.image.id} className="cake-print-page">
+          {it.image.label_number && (
+            <div className="absolute left-6 top-6 rounded bg-black px-2 py-1 font-mono text-sm font-bold text-white no-print-hide">
+              #{it.image.label_number}
+            </div>
+          )}
           {it.url ? (
             <img src={it.url} alt={it.image.title} />
           ) : (

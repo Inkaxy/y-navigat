@@ -22,6 +22,11 @@ export type CakeImage = {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  ticket_id?: string | null;
+  order_id?: string | null;
+  order_line_id?: string | null;
+  production_department_id?: string | null;
+  label_number?: string | null;
 };
 
 export const CAKE_BUCKET = "cake-images";
@@ -74,10 +79,41 @@ export async function createCakeImage(input: {
   customer_name?: string | null;
   ticket_id?: string | null;
   order_id?: string | null;
+  order_line_id?: string | null;
+  production_department_id?: string | null;
   order_ref?: string | null;
   notes?: string | null;
 }): Promise<CakeImage> {
   const { data: u } = await supabase.auth.getUser();
+
+  // Reserver etikett-nummer hvis vi har både ordrelinje og produksjonsavdeling.
+  // Modifisert assign_label_number gjenbruker nummeret når etiketten skrives ut senere.
+  let labelNumber: string | null = null;
+  if (input.order_line_id && input.production_department_id) {
+    try {
+      const { data: line } = await supabase
+        .from("order_lines")
+        .select("product_id")
+        .eq("id", input.order_line_id)
+        .maybeSingle();
+      const productId = (line as { product_id?: string } | null)?.product_id;
+      if (productId) {
+        const { data: num, error: nErr } = await supabase.rpc(
+          "assign_label_number",
+          {
+            p_dept_id: input.production_department_id,
+            p_product_id: productId,
+            p_order_line_id: input.order_line_id,
+            p_seq_date: input.delivery_date,
+          } as never,
+        );
+        if (!nErr && num) labelNumber = String(num);
+      }
+    } catch (err) {
+      console.warn("[cake_images] Kunne ikke reservere label_number", err);
+    }
+  }
+
   const { data, error } = await supabase
     .from("cake_images")
     .insert({
@@ -89,6 +125,9 @@ export async function createCakeImage(input: {
       customer_name: input.customer_name ?? null,
       ticket_id: input.ticket_id ?? null,
       order_id: input.order_id ?? null,
+      order_line_id: input.order_line_id ?? null,
+      production_department_id: input.production_department_id ?? null,
+      label_number: labelNumber,
       order_ref: input.order_ref ?? null,
       notes: input.notes ?? null,
       created_by: u.user?.id,
@@ -109,6 +148,8 @@ export async function createCakeImageFromTicketAttachment(input: {
   file_name: string;
   ticket_id: string;
   order_id: string;
+  order_line_id?: string | null;
+  production_department_id?: string | null;
   delivery_date: string;
   title: string;
   customer_name?: string | null;
@@ -134,7 +175,7 @@ export async function createCakeImageFromTicketAttachment(input: {
   // 3) Last opp til cake-images bucket
   const { path } = await uploadOriginal(file, input.delivery_date);
 
-  // 4) Opprett cake_images-rad
+  // 4) Opprett cake_images-rad (label_number reserveres inne i createCakeImage)
   return await createCakeImage({
     delivery_date: input.delivery_date,
     title: input.title,
@@ -143,9 +184,48 @@ export async function createCakeImageFromTicketAttachment(input: {
     customer_name: input.customer_name ?? null,
     ticket_id: input.ticket_id,
     order_id: input.order_id,
+    order_line_id: input.order_line_id ?? null,
+    production_department_id: input.production_department_id ?? null,
     order_ref: input.order_ref ?? null,
     notes: input.notes ?? null,
   });
+}
+
+/**
+ * Finn første kake-ordrelinje for ordren og tilhørende produksjonsavdeling
+ * som skal brukes til etikettnummer-reservasjon. Returnerer null hvis ingen
+ * passende linje/avdeling finnes.
+ */
+export async function findCakeLineForOrder(orderId: string): Promise<{
+  order_line_id: string;
+  production_department_id: string | null;
+} | null> {
+  const { data: lines } = await supabase
+    .from("order_lines")
+    .select("id, line_number, product_id, product:products!order_lines_product_id_fkey(id, cake_role, is_cake_component)")
+    .eq("order_id", orderId)
+    .order("line_number", { ascending: true });
+  const rows = (lines ?? []) as Array<{
+    id: string;
+    product_id: string;
+    product: { cake_role: string | null; is_cake_component: boolean } | null;
+  }>;
+  const cakeLine =
+    rows.find((r) => r.product?.cake_role === "base") ??
+    rows.find((r) => r.product?.is_cake_component) ??
+    rows[0];
+  if (!cakeLine) return null;
+  const { data: dept } = await supabase
+    .from("product_label_departments")
+    .select("department_id")
+    .eq("product_id", cakeLine.product_id)
+    .limit(1)
+    .maybeSingle();
+  return {
+    order_line_id: cakeLine.id,
+    production_department_id:
+      (dept as { department_id?: string } | null)?.department_id ?? null,
+  };
 }
 
 export async function updateCakeImage(
