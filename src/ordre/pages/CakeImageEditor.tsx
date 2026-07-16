@@ -299,7 +299,7 @@ export default function CakeImageEditor() {
           console.warn("editor_state load failed", e);
         }
         c.clear();
-        c.backgroundColor = "#ffffff";
+        c.backgroundColor = "";
       }
       // Init med original-bilde sentrert
       const url = await cakeObjectUrl(image.original_path);
