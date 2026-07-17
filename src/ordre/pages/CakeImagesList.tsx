@@ -125,6 +125,16 @@ export default function CakeImagesList() {
         <UploadButton date={date} />
       </div>
 
+      {status === "for-utskrift" && readyIds.length > 0 && (
+        <div className="flex justify-end">
+          <Button size="sm" variant="default" onClick={printAllReady}>
+            <Printer className="mr-2 h-4 w-4" />
+            Skriv ut alle ferdig redigerte ({readyIds.length})
+          </Button>
+        </div>
+      )}
+
+
       <div
         role="tablist"
         className="mx-auto flex w-fit items-center gap-1 rounded-lg border border-border bg-muted/40 p-1"
