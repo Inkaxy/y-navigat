@@ -9782,6 +9782,7 @@ export type Database = {
         }
         Returns: Json
       }
+      is_internal_user: { Args: never; Returns: boolean }
       is_kiosk_user: { Args: never; Returns: boolean }
       is_ordre_admin: { Args: never; Returns: boolean }
       is_platform_admin: { Args: never; Returns: boolean }
