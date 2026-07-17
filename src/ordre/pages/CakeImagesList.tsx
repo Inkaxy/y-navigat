@@ -66,6 +66,19 @@ export default function CakeImagesList() {
     navigate(`/ordre/kakebilder/print?ids=${ids.join(",")}`);
   };
 
+  const readyIds = useMemo(
+    () => images.filter((i) => i.status === "ferdig_redigert").map((i) => i.id),
+    [images],
+  );
+
+  const printAllReady = () => {
+    if (readyIds.length === 0) return;
+    window.open(
+      `/ordre/kakebilder/print?ids=${readyIds.join(",")}&auto=1`,
+      "_blank",
+    );
+  };
+
   const markFerdig = async () => {
     await Promise.all(
       Array.from(selected).map((id) =>
@@ -111,6 +124,16 @@ export default function CakeImagesList() {
         </div>
         <UploadButton date={date} />
       </div>
+
+      {status === "for-utskrift" && readyIds.length > 0 && (
+        <div className="flex justify-end">
+          <Button size="sm" variant="default" onClick={printAllReady}>
+            <Printer className="mr-2 h-4 w-4" />
+            Skriv ut alle ferdig redigerte ({readyIds.length})
+          </Button>
+        </div>
+      )}
+
 
       <div
         role="tablist"
