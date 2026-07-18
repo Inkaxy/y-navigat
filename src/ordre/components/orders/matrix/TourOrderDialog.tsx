@@ -21,7 +21,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { Loader2, Trash2, Save, Lock, Plus, ShoppingCart, Copy, ClipboardList, Info } from "lucide-react";
+import { Loader2, Trash2, Save, Lock, Plus, ShoppingCart, Copy, ClipboardList, Info, Repeat } from "lucide-react";
 import { OrderInfoDialog } from "./OrderInfoDialog";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -32,6 +32,8 @@ import {
   useDeleteOrderLine,
   type TourOrderLine,
 } from "@/ordre/hooks/useTourOrder";
+import { useRecurringGhost } from "@/ordre/hooks/useRecurringGhost";
+import { useProductsByIds } from "@/ordre/hooks/useProductsByIds";
 import type { MatrixProduct, MatrixTour } from "@/ordre/hooks/useMatrix";
 import { formatNOK } from "@/ordre/lib/format";
 import { getStatusMeta } from "@/ordre/lib/orderStatus";
