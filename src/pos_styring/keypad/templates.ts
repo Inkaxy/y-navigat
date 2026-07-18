@@ -4,7 +4,13 @@
 
 import type { KioskTheme, CustomerScreenConfig } from "@/kiosk/render/kioskTheme";
 
-export type TemplateKey = "notteroy" | "hvasser" | "halvorsen";
+export type TemplateKey =
+  | "notteroy"
+  | "hvasser"
+  | "halvorsen"
+  | "bakeri_standard"
+  | "kafe"
+  | "sesong_jul";
 
 export interface TemplateButton {
   button_type: "category" | "function";
