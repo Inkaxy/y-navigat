@@ -4515,6 +4515,44 @@ export type Database = {
           },
         ]
       }
+      pos_journal_verifications: {
+        Row: {
+          broken_at_id: number | null
+          error_message: string | null
+          id: string
+          is_valid: boolean
+          terminal_id: string
+          total_events: number
+          verified_at: string
+        }
+        Insert: {
+          broken_at_id?: number | null
+          error_message?: string | null
+          id?: string
+          is_valid: boolean
+          terminal_id: string
+          total_events?: number
+          verified_at?: string
+        }
+        Update: {
+          broken_at_id?: number | null
+          error_message?: string | null
+          id?: string
+          is_valid?: boolean
+          terminal_id?: string
+          total_events?: number
+          verified_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pos_journal_verifications_terminal_id_fkey"
+            columns: ["terminal_id"]
+            isOneToOne: false
+            referencedRelation: "pos_terminals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pos_keypad_buttons: {
         Row: {
           background_color: string | null
@@ -10060,6 +10098,17 @@ export type Database = {
         }
         Returns: string
       }
+      pos_journal_append: {
+        Args: {
+          p_event_type: string
+          p_operator_id?: string
+          p_payload?: Json
+          p_session_id?: string
+          p_terminal_id: string
+          p_transaction_id?: string
+        }
+        Returns: number
+      }
       pos_list_pickup_orders: {
         Args: {
           p_date: string
@@ -10156,6 +10205,14 @@ export type Database = {
         }
       }
       pos_verify_journal_chain: {
+        Args: { p_terminal_id: string }
+        Returns: {
+          broken_at_id: number
+          is_valid: boolean
+          total_events: number
+        }[]
+      }
+      pos_verify_journal_chain_admin: {
         Args: { p_terminal_id: string }
         Returns: {
           broken_at_id: number

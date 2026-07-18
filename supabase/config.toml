@@ -1,5 +1,8 @@
 project_id = "xpgoztaraqdvliitkkfv"
 
+[functions.pos-daily-journal-verify]
+verify_jwt = false
+
 [functions.validate-rfq-access]
 verify_jwt = false
 
