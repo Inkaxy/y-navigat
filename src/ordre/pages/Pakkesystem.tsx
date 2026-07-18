@@ -10,10 +10,34 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Copy, Download, Key, PlusCircle, Trash2, Zap, ExternalLink, Clock, CheckCircle2, XCircle } from "lucide-react";
+import { Copy, Download, Key, PlusCircle, Trash2, Zap, ExternalLink, Clock, CheckCircle2, XCircle, SlidersHorizontal } from "lucide-react";
 import { format } from "date-fns";
+import { SettKriteriaDialog } from "@/produksjon/features/produksjonsplan/components/SettKriteriaDialog";
+import { DEFAULT_CRITERIA, type ProduksjonsplanCriteria } from "@/produksjon/features/produksjonsplan/types";
 
 const FUNCTIONS_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
+
+function criteriaToQuery(c: ProduksjonsplanCriteria): string {
+  const qs = new URLSearchParams();
+  if (c.tour_numbers?.length) qs.set("tours", c.tour_numbers.join(","));
+  if (c.main_category_ids?.length) qs.set("main_categories", c.main_category_ids.join(","));
+  if (c.sub_category_ids?.length) qs.set("sub_categories", c.sub_category_ids.join(","));
+  if (c.include_products_without_subcategory === false) qs.set("include_no_sub", "0");
+  if (c.customer_group_ids?.length) qs.set("customer_groups", c.customer_group_ids.join(","));
+  const s = qs.toString();
+  return s ? `&${s}` : "";
+}
+
+function criteriaSummary(c: ProduksjonsplanCriteria): string {
+  const parts: string[] = [];
+  if (c.tour_numbers?.length) parts.push(`Tur ${c.tour_numbers.join(",")}`);
+  else parts.push("Alle turer");
+  if (c.main_category_ids?.length) parts.push(`${c.main_category_ids.length} hovedgrp.`);
+  if (c.sub_category_ids?.length) parts.push(`${c.sub_category_ids.length} undergrp.`);
+  if (c.customer_group_ids?.length) parts.push(`${c.customer_group_ids.length} kundegrp.`);
+  return parts.join(" · ");
+}
+
 
 function NotesReadyBadge({ date }: { date: string }) {
   const q = useQuery({
