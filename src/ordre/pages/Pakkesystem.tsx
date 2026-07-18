@@ -419,13 +419,30 @@ export default function PakkesystemPage() {
                   <Label>Authorization-header (valgfritt)</Label>
                   <Input value={destForm.auth_header} onChange={(e) => setDestForm({ ...destForm, auth_header: e.target.value })} placeholder="Bearer xxx" />
                 </div>
+                <div className="border rounded p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="m-0">Kriteria (samme som pakksedler)</Label>
+                    <Button size="sm" variant="outline" onClick={() => setNewDestCriteriaOpen(true)}>
+                      <SlidersHorizontal className="w-4 h-4 mr-2" /> Endre
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">{criteriaSummary(newDestCriteria)}</p>
+                </div>
               </div>
               <DialogFooter>
                 <Button onClick={() => createDest.mutate()} disabled={!destForm.name || !destForm.url || createDest.isPending}>Lagre</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
+          <SettKriteriaDialog
+            open={newDestCriteriaOpen}
+            onOpenChange={setNewDestCriteriaOpen}
+            legalEntityId={NB_LEGAL_ENTITY_ID}
+            initial={newDestCriteria}
+            onApply={(c) => setNewDestCriteria(c)}
+          />
         </div>
+
 
         <div className="space-y-2">
           {(dests.data ?? []).map((d) => (
