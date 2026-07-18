@@ -20,6 +20,7 @@ import {
   Eye,
   BookOpen,
   CalendarIcon,
+  ShoppingCart,
 } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { format as fmtDate } from "date-fns";
