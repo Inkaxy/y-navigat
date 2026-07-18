@@ -403,12 +403,61 @@ export function TourOrderDialog({
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
           ) : !order ? (
-            <div className="py-16 text-center text-muted-foreground">
-              <p className="text-sm">
-                Ingen ordre for denne kunden, datoen og turen ennå. Legg til antall i matrisen for å opprette
-                ordren, eller åpne fra en eksisterende bestilling.
-              </p>
+            <div className="space-y-4">
+              <div className="rounded-md border border-dashed border-border bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
+                Ingen ordre for denne kunden, datoen og turen ennå.
+                {ghostRows.length > 0
+                  ? " Fastordre-forslagene under kan legges til for å opprette en ordre."
+                  : " Legg til antall i matrisen for å opprette ordren."}
+              </div>
+              {ghostRows.length > 0 ? (
+                <div className="rounded-md border border-border overflow-hidden">
+                  <table className="w-full text-sm">
+                    <tbody className="divide-y divide-border">
+                      <tr className="bg-muted/40">
+                        <td colSpan={5} className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                          <span className="inline-flex items-center gap-1.5">
+                            <Repeat className="h-3 w-3" />
+                            Fra fastordre
+                          </span>
+                        </td>
+                      </tr>
+                      {ghostRows.map((g) => {
+                        const p = ghostProductMap.get(g.productId);
+                        return (
+                          <tr key={`ghost-${g.productId}`} className="bg-blue-50/40 dark:bg-blue-950/20 text-muted-foreground">
+                            <td className="w-14 px-2 py-2 tabular-nums text-right">{p?.display_number ?? ""}</td>
+                            <td className="px-2 py-2 font-medium">
+                              <span className="flex items-center gap-2">
+                                <Repeat className="h-3.5 w-3.5 text-blue-600" />
+                                {p?.display_name ?? "—"}
+                              </span>
+                            </td>
+                            <td className="w-24 px-2 py-2 text-center text-base font-semibold tabular-nums">
+                              {g.quantity}
+                            </td>
+                            <td className="w-16 px-2 py-2 text-sm">{p?.sales_unit ?? ""}</td>
+                            <td className="w-28 px-2 py-2 text-right">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={readOnly}
+                                onClick={() => addGhostAsLine(g.productId, g.quantity)}
+                                className="h-7 text-xs"
+                              >
+                                <Plus className="h-3.5 w-3.5" />
+                                Legg til
+                              </Button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              ) : null}
             </div>
+
           ) : (
             <>
               <div className="mb-2 flex justify-end">
