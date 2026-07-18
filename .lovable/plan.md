@@ -1,44 +1,81 @@
-# Klikkbar tur/dag-kolonne → åpne ordren
 
-## Hva du får
+# Pakkesystem-API — leveranse fra NB Hub
 
-I ordrematrisen (`/ordre/leveringskalender`) gjør vi hver tur-kolonne under en dato klikkbar. Klikk på f.eks. «T1» under «Ti. 21.07» åpner en dialog som viser **den ene ordren** for valgt kunde × dato × tur — akkurat som skjermbildene: kunde-header, dag/tur-tittel, linjer med redigerbart antall og pris, kommentar/rabatt/merknad/slett-ikoner, «Ny ordrelinje», sum, og Ferdig/Lagre.
+Bygg et REST-API som pakkeleverandøren kan spørre mot for å hente ordre/produkter/kunder i det nøyaktige JSON-formatet i kravspec'en. Én langlevd Bearer-nøkkel per legal_entity.
 
-## Interaksjon
+## 1. Database
 
-- **Klikk på tur-cellen** (der «T1» / «T3» står): åpner `TourOrderDialog`.
-- Fjerne dagens ikonrad? Nei — vi beholder Copy/Comment/Delete/Packing-ikonene, men gjør resten av cellen (tallet og bakgrunnen) til en knapp som åpner dialogen. Ikonene stopper klikk-propagasjon.
-- Header i dialogen: `Ordre for {kunde} ({kundenr})` + `{Ukedag} {DD.MM.YYYY} — tur {N}` + kjørerute-linje + weather-chip.
-- Chip «Erstatter fastordre» vises hvis raden er en aktiv fast-rute (ghost-erstatning finnes allerede i matrisen).
+Ny tabell `pakkesystem_api_keys`:
 
-## Redigering
+- `id uuid pk`
+- `legal_entity_id uuid` (FK → legal_entities)
+- `name text` (etikett, f.eks. "Bakemann pakkesystem")
+- `key_prefix text` (første 8 tegn, vises i UI)
+- `key_hash text` (SHA-256 av full nøkkel — plaintext vises ÉN gang ved opprettelse)
+- `created_at`, `created_by uuid`, `last_used_at`, `revoked_at`
+- RLS: kun platform_owner/admin på entity kan lese/skrive. `service_role` ALL.
 
-- **Antall**: samme som i matrisen (numerisk input).
-- **Pris**: klikk på à-prisen → inline input (tooltip «varepris er X,XX» som i skjermbilde-256). Setter `order_lines.unit_price` og `unit_price_source='manual'`.
-- **Kommentar-ikon**: åpner eksisterende `MerknadDialog`.
-- **Rabatt-ikon**: liten popover med `discount_percent`.
-- **Kopi-ikon**: kopier linje til neste dag (eksisterende `handleCopyNextDay`).
-- **Slett-ikon**: setter quantity=0.
-- **Ny ordrelinje**: søk i produkter (samme som `AddProductDialog`), legger til linje.
-- **Ferdig**: lukker uten lagring; **Lagre**: kjører samme `useSaveMatrix` for dette (date,tour), pluss egne `updateOrderLine`-kall for pris/rabatt-endringer.
+Loggtabell `pakkesystem_api_log` (append-only):
+- `id`, `api_key_id`, `legal_entity_id`, `endpoint`, `query_params jsonb`, `status_code`, `row_count`, `ip`, `ua`, `created_at`
+- Brukes til rate-limit + audit. Enkel: tell requests siste 60 sek per key ≤ 60.
 
-## Låsing når fakturert
+Migrasjonen inkluderer GRANTs (`authenticated`: select/insert/update/delete på keys-tabellen; `service_role`: ALL på begge; ingen `anon`).
 
-Ordren låses (read-only) når `orders.status = 'invoiced'` eller `is_paid = true`. Dialogen viser da et grått banner «Ordren er fakturert — kan ikke endres» og skjuler Lagre-knapp.
+## 2. Edge-funksjon `pakkesystem-api`
 
-## Teknisk
+Én funksjon som ruter på path:
 
-- Ny komponent `src/ordre/components/orders/matrix/TourOrderDialog.tsx`.
-- Ny hook `useTourOrder(customerId, date, tourId)` som henter `orders` + `order_lines` (join på customer_id/delivery_date/delivery_tour_id, ta nyeste). Realtime på begge tabellene.
-- Ny hook `useUpdateOrderLine` for pris/rabatt-oppdateringer (audit_log-innslag som eksisterende endringer).
-- Header-endring i `Leveringskalender.tsx` (linje ~1823-1859): wrap tur-cellen i en knapp, ikoner stopper propagasjon.
-- Ingen DB-migrasjoner nødvendig — bruker eksisterende felter (`unit_price`, `discount_percent`, `notes`, `merknad`).
-- Sum-visning bruker `subtotal_excl_vat` / `total_incl_vat` fra orders-raden.
+- `GET /pakkesystem-api/orders?from=YYYY-MM-DD&to=YYYY-MM-DD`
+- `GET /pakkesystem-api/products`
+- `GET /pakkesystem-api/customers`
+- `GET /pakkesystem-api/snapshot?date=YYYY-MM-DD` — full snapshot per spec (produkter+kunder+ordre samlet, `schema_version: "1.0"`)
 
-## Ute av scope (spør før jeg bygger dette)
+`verify_jwt = false` (custom Bearer). Flyt per request:
 
-- Endre selve matrisens layout eller dagens ikon-rad.
-- Slett-hele-ordren, kopier-hele-ordren og pakkseddel-knapper nederst (image-252) — dette finnes allerede via kolonne-ikonene og kan gjenbrukes hvis du vil.
-- «vis gruppeteller» og «Legg til varer kunden ofte bestiller» fra skjermbilde-252 — kan legges til etterpå.
+1. Les `Authorization: Bearer <key>` → SHA-256 → oppslag i `pakkesystem_api_keys` der `revoked_at is null`. 401 hvis ikke funnet.
+2. Rate-limit: count log-rader siste 60s for denne key_id. 429 hvis ≥ 60.
+3. Zod-validering av query-params. 400 med `{error, code}` ved feil.
+4. Kjør Supabase-query med service-role, scoped til `legal_entity_id` fra nøkkelen.
+5. Map til spec-JSON (feltnavn nøyaktig som i kravspec — ikke våre interne kolonnenavn).
+6. Skriv audit-rad, oppdater `last_used_at`.
+7. Returner `application/json; charset=utf-8`, HTTP-koder per spec (200/400/401/429/500).
 
-Vil du at jeg bygger dette som beskrevet, eller vil du justere scope først (f.eks. droppe prisredigering, eller også inkludere Slett/Kopier ordre-knappene nederst)?
+### Feltmapping (utdrag)
+
+**products** ← `products` (kun `is_for_sale`, ikke `discontinued`, legal_entity scoped):
+`id`=products.id, `product_number`=display_number, `name`=display_name, `category`=main_category-navn, `pieces_per_tray`=pieces_per_tray/pack_size, `ean`=ean, `unit_price`=null (prisliste-avhengig — utelates i produktkatalogen; kan legges på ordrelinjer hvis ønskelig), `active`=(status='active').
+
+**customers** ← `customers` (status='active'):
+`id`, `customer_number`, `name`=display_name, `address`={street, postal_code, city}, `phone`, `email`, `delivery_route`=(fra tour/rule), `delivery_sequence`=(fra rule), `notes`=delivery_instructions.
+
+**orders** ← `orders` + `order_lines` (status i {confirmed, in_production, packed}, ikke cancelled):
+`id`, `customer_id`, `delivery_date`, `delivery_window`={from, to} fra delivery_time + rule, `trip`=tour-nummer, `status` mappet til {draft|confirmed|cancelled}, `lines[]`, `created_at`, `updated_at`.
+
+## 3. UI: `src/ordre/pages/PakkesystemApi.tsx`
+
+Ny side under `/ordre/innstillinger/pakkesystem-api`:
+
+- Liste over eksisterende nøkler (name, prefix, opprettet, sist brukt, revoke-knapp).
+- «Opprett nøkkel»-dialog → viser plaintext-nøkkelen ÉN gang med copy-knapp og advarsel.
+- Info-panel med endepunkt-URL-er, eksempel-curl, link til nedlastbar `openapi.yaml` og `schema.json`.
+- Fane «Aktivitet» — siste 100 kall fra `pakkesystem_api_log`.
+
+Rute registreres i `App.tsx`, meny-lenke i `SubAppNav.tsx` under Ordre → Innstillinger.
+
+## 4. Dokumentasjons-artefakter (statiske filer i `public/pakkesystem/`)
+
+- `schema.json` — JSON Schema 2020-12 for snapshot-formatet
+- `openapi.yaml` — OpenAPI 3.1 for de 4 endepunktene
+- `example-snapshot.json` — realistisk eksempel (10 kunder, 20 produkter, 50+ linjer)
+- Kort README med Bearer-flyt og feilkoder
+
+## Ikke inkludert nå
+- Webhook ved endring (kan legges til senere ved å subscribe på `orders`-realtime i en scheduler-funksjon)
+- Alternativ B (JSON-fil til OneDrive/SFTP)
+
+## Filer som endres/opprettes
+- Migrasjon: 2 tabeller + RLS + GRANTs
+- `supabase/functions/pakkesystem-api/index.ts`
+- `src/ordre/pages/PakkesystemApi.tsx`, `src/ordre/hooks/usePakkesystemKeys.ts`
+- `src/App.tsx`, `src/components/layout/SubAppNav.tsx`
+- `public/pakkesystem/{schema.json, openapi.yaml, example-snapshot.json, README.md}`
