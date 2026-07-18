@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   useDeleteRecurringSchedule,
+  useDuplicateRecurringSchedule,
   useRecurringSchedules,
   type RecurringScheduleFilter,
   type RecurringScheduleWithCustomer,
