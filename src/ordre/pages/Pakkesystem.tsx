@@ -267,19 +267,30 @@ export default function PakkesystemPage() {
           <Download className="w-5 h-5" />
           <h2 className="text-lg font-semibold">Last ned pakkefil</h2>
         </div>
-        <div className="flex items-end gap-3">
+        <div className="flex items-end gap-3 flex-wrap">
           <div>
             <Label>Leveringsdato</Label>
             <Input type="date" value={downloadDate} onChange={(e) => setDownloadDate(e.target.value)} className="w-48" />
           </div>
           <NotesReadyBadge date={downloadDate} />
+          <Button variant="outline" onClick={() => setDownloadCriteriaOpen(true)}>
+            <SlidersHorizontal className="w-4 h-4 mr-2" /> Sett kriteria
+          </Button>
           <Button onClick={downloadFile}>
             <Download className="w-4 h-4 mr-2" /> Last ned JSON
           </Button>
         </div>
         <p className="text-xs text-muted-foreground">
-          Pakkefilen kan kun lastes ned etter at pakksedlene for leveringsdagen er generert.
+          Kriteria: <span className="font-medium">{criteriaSummary(downloadCriteria)}</span>. Samme filtrering som pakksedler/produksjonslister. Pakkefilen kan kun lastes ned etter at pakksedlene for leveringsdagen er generert.
         </p>
+        <SettKriteriaDialog
+          open={downloadCriteriaOpen}
+          onOpenChange={setDownloadCriteriaOpen}
+          criteria={downloadCriteria}
+          onCriteriaChange={setDownloadCriteria}
+          onApply={() => setDownloadCriteriaOpen(false)}
+        />
+
       </Card>
 
       {/* API-endepunkt */}
