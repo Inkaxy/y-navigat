@@ -4215,6 +4215,97 @@ export type Database = {
           },
         ]
       }
+      pakkesystem_api_keys: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          key_hash: string
+          key_prefix: string
+          last_used_at: string | null
+          legal_entity_id: string
+          name: string
+          revoked_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          key_hash: string
+          key_prefix: string
+          last_used_at?: string | null
+          legal_entity_id: string
+          name: string
+          revoked_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          key_hash?: string
+          key_prefix?: string
+          last_used_at?: string | null
+          legal_entity_id?: string
+          name?: string
+          revoked_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pakkesystem_api_keys_legal_entity_id_fkey"
+            columns: ["legal_entity_id"]
+            isOneToOne: false
+            referencedRelation: "legal_entities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pakkesystem_api_log: {
+        Row: {
+          api_key_id: string | null
+          created_at: string
+          endpoint: string
+          id: string
+          ip: string | null
+          legal_entity_id: string | null
+          query_params: Json | null
+          row_count: number | null
+          status_code: number
+          ua: string | null
+        }
+        Insert: {
+          api_key_id?: string | null
+          created_at?: string
+          endpoint: string
+          id?: string
+          ip?: string | null
+          legal_entity_id?: string | null
+          query_params?: Json | null
+          row_count?: number | null
+          status_code: number
+          ua?: string | null
+        }
+        Update: {
+          api_key_id?: string | null
+          created_at?: string
+          endpoint?: string
+          id?: string
+          ip?: string | null
+          legal_entity_id?: string | null
+          query_params?: Json | null
+          row_count?: number | null
+          status_code?: number
+          ua?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pakkesystem_api_log_api_key_id_fkey"
+            columns: ["api_key_id"]
+            isOneToOne: false
+            referencedRelation: "pakkesystem_api_keys"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pickup_locations: {
         Row: {
           address_line_1: string | null
