@@ -589,20 +589,7 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
           setKakebyggerOpen(true);
           return;
         case "open_drawer":
-          stubToast("Åpne kasseskuff");
-          if (terminal?.id) {
-            kioskSupabase
-              .rpc("pos_journal_append", {
-                p_terminal_id: terminal.id,
-                p_event_type: "drawer_open",
-                p_operator_id: operator?.id ?? null,
-                p_session_id: session?.id ?? null,
-                p_payload: { reason: "manual" },
-              } as never)
-              .then(({ error }) => {
-                if (error) console.warn("pos_journal_append drawer_open failed", error.message);
-              });
-          }
+          setOpenDrawerDialogOpen(true);
           return;
         default:
           toast.info(`${code}: ikke koblet`);
