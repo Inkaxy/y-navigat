@@ -1,0 +1,40 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-07-18T04:30:00+02:00",
+  "bakery": { "id": "NB", "name": "Nøtterø Bakeri AS" },
+  "delivery_date": "2026-07-19",
+  "products": [
+    { "id": "PROD-101", "product_number": "101", "name": "Rundstykker", "category": "Brød", "pieces_per_tray": 24, "ean": null, "unit_price": 12.50, "active": true },
+    { "id": "PROD-102", "product_number": "102", "name": "Grovbrød 750g", "category": "Brød", "pieces_per_tray": 8, "ean": null, "unit_price": 42.00, "active": true },
+    { "id": "PROD-201", "product_number": "201", "name": "Kanelsnurr", "category": "Konditori", "pieces_per_tray": 20, "ean": null, "unit_price": 24.00, "active": true }
+  ],
+  "customers": [
+    {
+      "id": "CUST-000123",
+      "customer_number": "123",
+      "name": "Kafé Sentrum AS",
+      "address": { "street": "Storgata 1", "postal_code": "0155", "city": "Oslo" },
+      "phone": "+4712345678",
+      "email": "post@kafesentrum.no",
+      "delivery_route": "Rute 3",
+      "delivery_sequence": 5,
+      "notes": "Leveres bak, bruk kode 1234"
+    }
+  ],
+  "orders": [
+    {
+      "id": "ORD-2026-07-19-000123",
+      "customer_id": "CUST-000123",
+      "delivery_date": "2026-07-19",
+      "delivery_window": { "from": "06:00", "to": "07:30" },
+      "trip": 1,
+      "status": "confirmed",
+      "lines": [
+        { "product_id": "PROD-101", "quantity": 50, "unit": "stk", "note": null },
+        { "product_id": "PROD-201", "quantity": 12, "unit": "stk", "note": null }
+      ],
+      "created_at": "2026-07-17T14:22:00+02:00",
+      "updated_at": "2026-07-18T03:10:00+02:00"
+    }
+  ]
+}

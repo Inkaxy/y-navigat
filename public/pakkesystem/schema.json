@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nbhub.no/pakkesystem/schema.json",
+  "title": "Pakkesystem snapshot",
+  "type": "object",
+  "required": ["schema_version", "generated_at", "bakery", "delivery_date", "products", "customers", "orders"],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "bakery": {
+      "type": "object",
+      "required": ["id", "name"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" }
+      }
+    },
+    "delivery_date": { "type": "string", "format": "date" },
+    "products": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "product_number", "name", "active"],
+        "properties": {
+          "id": { "type": "string" },
+          "product_number": { "type": "string" },
+          "name": { "type": "string" },
+          "category": { "type": ["string", "null"] },
+          "pieces_per_tray": { "type": ["integer", "null"] },
+          "ean": { "type": ["string", "null"] },
+          "unit_price": { "type": ["number", "null"] },
+          "active": { "type": "boolean" }
+        }
+      }
+    },
+    "customers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "customer_number", "name"],
+        "properties": {
+          "id": { "type": "string" },
+          "customer_number": { "type": "string" },
+          "name": { "type": "string" },
+          "address": {
+            "type": "object",
+            "properties": {
+              "street": { "type": ["string", "null"] },
+              "postal_code": { "type": ["string", "null"] },
+              "city": { "type": ["string", "null"] }
+            }
+          },
+          "phone": { "type": ["string", "null"] },
+          "email": { "type": ["string", "null"] },
+          "delivery_route": { "type": ["string", "null"] },
+          "delivery_sequence": { "type": ["integer", "null"] },
+          "notes": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "orders": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "customer_id", "delivery_date", "lines", "updated_at"],
+        "properties": {
+          "id": { "type": "string" },
+          "customer_id": { "type": "string" },
+          "delivery_date": { "type": "string", "format": "date" },
+          "delivery_window": {
+            "type": ["object", "null"],
+            "properties": {
+              "from": { "type": "string" },
+              "to": { "type": "string" }
+            }
+          },
+          "trip": { "type": ["integer", "null"] },
+          "status": { "enum": ["draft", "confirmed", "cancelled"] },
+          "lines": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["product_id", "quantity"],
+              "properties": {
+                "product_id": { "type": "string" },
+                "quantity": { "type": "number", "exclusiveMinimum": 0 },
+                "unit": { "type": "string" },
+                "note": { "type": ["string", "null"] }
+              }
+            }
+          },
+          "created_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" }
+        }
+      }
+    }
+  }
+}
