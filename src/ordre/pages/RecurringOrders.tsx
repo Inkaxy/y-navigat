@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { CalendarRange, Loader2, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { CalendarRange, Copy, Loader2, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { AppBanner } from "@/ordre/components/shell/AppBanner";
 import { Button } from "@/components/ui/button";
