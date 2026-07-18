@@ -87,7 +87,7 @@ function formatValue(key: string, value: unknown): string {
   if (value === null || value === undefined) return "—";
   if (typeof value === "boolean") return value ? "Ja" : "Nei";
   if (key === "status" || key === "from" || key === "to") {
-    return ORDER_STATUS_LABELS[value as OrderStatus] ?? String(value);
+    return getStatusMeta(String(value)).label;
   }
   if (key === "distribution") {
     return value === "pickup" ? "Henting" : value === "delivery" ? "Levering" : String(value);
