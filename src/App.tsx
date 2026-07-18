@@ -93,6 +93,7 @@ import PosStyringTransaksjonDetalj from "@/pos_styring/pages/TransaksjonDetalj";
 import PosStyringRapporter from "@/pos_styring/pages/Rapporter";
 import PosStyringZDetalj from "@/pos_styring/pages/ZDetalj";
 import PosStyringInnstillinger from "@/pos_styring/pages/Innstillinger";
+import PosStyringSafT from "@/pos_styring/pages/SafTExport";
 import PosStyringSkrivere from "@/pos_styring/pages/Skrivere";
 import PosStyringStasjoner from "@/pos_styring/pages/Stasjoner";
 
