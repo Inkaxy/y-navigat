@@ -186,6 +186,7 @@ export default function MatrixPage() {
   const [copyColCol, setCopyColCol] = useState<{ date: string; tour: MatrixTour } | null>(null);
   const [commentCol, setCommentCol] = useState<{ date: string; tour: MatrixTour } | null>(null);
   const [deleteColConfirm, setDeleteColConfirm] = useState<{ date: string; tour: MatrixTour } | null>(null);
+  const [tourOrderCol, setTourOrderCol] = useState<{ date: string; tour: MatrixTour } | null>(null);
 
   // Handling-meny dialog state
   const [setForAllOpen, setSetForAllOpen] = useState(false);
