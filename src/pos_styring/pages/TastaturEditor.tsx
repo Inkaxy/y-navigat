@@ -1397,6 +1397,22 @@ export default function TastaturEditor() {
           initialCustomerScreen={layout.customer_screen}
         />
       )}
+
+      {activePage && layoutId && (
+        <FillFromCategoryDialog
+          open={fillDialogOpen}
+          onOpenChange={setFillDialogOpen}
+          layoutId={layoutId}
+          legalEntityId={layout.legal_entity_id}
+          pageId={activePage.id}
+          pageName={activePage.page_name}
+          gridCols={layout.grid_cols}
+          gridRows={layout.grid_rows}
+          initialKind={activePage.source_kind ?? null}
+          initialSourceId={activePage.source_id ?? null}
+          initialIsDynamic={activePage.is_dynamic ?? false}
+        />
+      )}
     </div>
   );
 }
