@@ -63,6 +63,7 @@ import {
   DEFAULT_PRINT_PAKKELISTE_OPTIONS,
   type PrintPakkelisteOptions,
 } from "../features/produksjonsplan/components/PrintPakkelisteDialog";
+import { OverforePakkesystemDialog } from "../features/produksjonsplan/components/OverforePakkesystemDialog";
 
 interface UiPrefs {
   showCustomers: boolean;
