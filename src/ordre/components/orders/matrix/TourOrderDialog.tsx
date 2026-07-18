@@ -601,6 +601,13 @@ export function TourOrderDialog({
           </div>
         ) : null}
       </DialogContent>
+      <OrderInfoDialog
+        open={infoOpen}
+        onOpenChange={setInfoOpen}
+        orderId={order?.id ?? null}
+        readOnly={readOnly}
+        legalEntityId={(order as any)?.legal_entity_id ?? null}
+      />
     </Dialog>
   );
 }
