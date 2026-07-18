@@ -51,11 +51,23 @@ Deno.serve(async (req) => {
     }
 
     try {
-      // Hent snapshot via intern edge-funksjon-kall (bruker service-role JWT).
-      const exportUrl = `${supabaseUrl}/functions/v1/pakkesystem-export?date=${dateStr}&legal_entity_id=${d.legal_entity_id}`;
+      // Serialiser kriterier fra destinasjonen til query-string
+      const c = (d.criteria ?? {}) as Record<string, any>;
+      const qs = new URLSearchParams();
+      qs.set("date", dateStr);
+      qs.set("legal_entity_id", d.legal_entity_id);
+      const csv = (v: any) => Array.isArray(v) ? v.join(",") : "";
+      if (Array.isArray(c.tour_numbers) && c.tour_numbers.length) qs.set("tours", csv(c.tour_numbers));
+      if (Array.isArray(c.main_category_ids) && c.main_category_ids.length) qs.set("main_categories", csv(c.main_category_ids));
+      if (Array.isArray(c.sub_category_ids) && c.sub_category_ids.length) qs.set("sub_categories", csv(c.sub_category_ids));
+      if (c.include_products_without_subcategory === false) qs.set("include_no_sub", "0");
+      if (Array.isArray(c.customer_group_ids) && c.customer_group_ids.length) qs.set("customer_groups", csv(c.customer_group_ids));
+
+      const exportUrl = `${supabaseUrl}/functions/v1/pakkesystem-export?${qs.toString()}`;
       const snapRes = await fetch(exportUrl, {
         headers: { Authorization: `Bearer ${serviceKey}` },
       });
+
       if (snapRes.status === 409) {
         // Pakksedler ikke generert enda — vent, ikke marker som pushet.
         const body = await snapRes.text();
