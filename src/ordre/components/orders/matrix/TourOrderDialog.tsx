@@ -252,6 +252,78 @@ export function TourOrderDialog({
     return products.filter((p) => !already.has(p.id));
   }, [products, order]);
 
+  // ── Fastordre-ghost for denne datoen + turen ──
+  const { data: ghostMap } = useRecurringGhost(customer?.id ?? null, date ?? "", date ?? "");
+  const ghostRows = useMemo(() => {
+    if (!ghostMap || !date || !tour) return [] as { productId: string; quantity: number }[];
+    const usedProductIds = new Set((order?.lines ?? []).map((l) => l.product_id));
+    const rows: { productId: string; quantity: number }[] = [];
+    for (const [key, qty] of ghostMap.entries()) {
+      const [d, tid, pid] = key.split("|");
+      if (d !== date || tid !== tour.id) continue;
+      if (usedProductIds.has(pid)) continue;
+      rows.push({ productId: pid, quantity: qty });
+    }
+    return rows;
+  }, [ghostMap, date, tour, order]);
+
+  const ghostMissingIds = useMemo(
+    () => ghostRows.map((g) => g.productId).filter((id) => !productMap.has(id)),
+    [ghostRows, productMap],
+  );
+  const { data: ghostExtraProducts } = useProductsByIds(ghostMissingIds);
+  const ghostProductMap = useMemo(() => {
+    const m = new Map<string, MatrixProduct>(productMap);
+    for (const p of ghostExtraProducts ?? []) m.set(p.id, p);
+    return m;
+  }, [productMap, ghostExtraProducts]);
+
+  async function addGhostAsLine(productId: string, quantity: number) {
+    const p = ghostProductMap.get(productId);
+    if (!p || !customer || !date || !tour) return;
+    if (readOnly) return;
+    try {
+      let orderId = order?.id;
+      if (!orderId) {
+        const { data: newOrder, error: oe } = await supabase
+          .from("orders")
+          .insert({
+            customer_id: customer.id,
+            delivery_date: date,
+            delivery_tour_id: tour.id,
+            status: "draft",
+          } as never)
+          .select("id")
+          .single();
+        if (oe) throw oe;
+        orderId = (newOrder as any).id;
+      }
+      const nextLineNumber =
+        ((order?.lines ?? []).reduce((max, l) => Math.max(max, l.line_number), 0) || 0) + 1;
+      const { error } = await supabase.from("order_lines").insert({
+        order_id: orderId,
+        line_number: nextLineNumber,
+        product_id: p.id,
+        quantity,
+        sales_unit: p.sales_unit,
+        unit_price: p.unit_price ?? 0,
+        unit_price_source: p.unit_price == null ? "manual" : p.price_source ?? "manual",
+        vat_rate: p.mva_rate,
+        product_snapshot: {
+          display_number: p.display_number,
+          display_name: p.display_name,
+          code: p.code,
+        },
+      } as never);
+      if (error) throw error;
+      toast.success(`La til ${p.display_name} fra fastordre`);
+      qc.invalidateQueries({ queryKey: ["tour-order"] });
+      qc.invalidateQueries({ queryKey: ["matrix"] });
+    } catch (e: any) {
+      toast.error("Kunne ikke legge til", { description: e?.message });
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl max-h-[92vh] overflow-hidden flex flex-col p-0 gap-0">
