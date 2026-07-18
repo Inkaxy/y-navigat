@@ -350,13 +350,14 @@ const App = () => (
               <Route path="/ordre/ai-forslag" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreAiForslag /></AppAccessGuard></Shell>} />
               <Route path="/ordre/ticket-rapporter" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreTicketReports /></AppAccessGuard></Shell>} />
               <Route path="/ordre/avvik" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdrePlaceholder title="Avvik" subtitle="Kommer i en senere fase" /></AppAccessGuard></Shell>} />
-              <Route path="/ordre/pakkesystem" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdrePakkesystem /></AppAccessGuard></Shell>} />
+              <Route path="/ordre/pakkesystem" element={<Navigate to="/produksjon/pakkesystem" replace />} />
               <Route path="/ordre/innstillinger" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreInnstillinger /></AppAccessGuard></Shell>} />
               <Route path="/ordre/innstillinger/m365-callback" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><M365Callback /></AppAccessGuard></Shell>} />
               <Route path="/ordre/portal-test" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdrePortalTest /></AppAccessGuard></Shell>} />
               <Route path="/produksjon" element={<Shell><AppAccessGuard appCode="produksjon" appName="Produksjon"><Navigate to="/produksjon/oversikt" replace /></AppAccessGuard></Shell>} />
               <Route path="/produksjon/oversikt" element={<Shell><AppAccessGuard appCode="produksjon" appName="Produksjon"><ProduksjonOversikt /></AppAccessGuard></Shell>} />
               <Route path="/produksjon/produksjonsplan" element={<Shell><AppAccessGuard appCode="produksjon" appName="Produksjon"><ProduksjonsplanPage /></AppAccessGuard></Shell>} />
+              <Route path="/produksjon/pakkesystem" element={<Shell><AppAccessGuard appCode="produksjon" appName="Produksjon"><OrdrePakkesystem /></AppAccessGuard></Shell>} />
               <Route path="/produksjon/etiketter" element={<Shell><AppAccessGuard appCode="produksjon" appName="Produksjon"><ProduksjonEtiketter /></AppAccessGuard></Shell>} />
               <Route path="/produksjon/innstillinger/produksjonsavdelinger" element={<Shell><AppAccessGuard appCode="produksjon" appName="Produksjon"><ProduksjonsavdelingerPage /></AppAccessGuard></Shell>} />
               <Route path="/produksjon/innstillinger/pakkeomrader" element={<Shell><AppAccessGuard appCode="produksjon" appName="Produksjon"><PakkeomraderPage /></AppAccessGuard></Shell>} />

@@ -97,7 +97,7 @@ const STATIC_SUBMENUS: Record<string, { prefix: string; appSlug: string; items: 
       { kind: "link", to: "/ordre/ai-forslag", label: "AI-forslag", icon: Sparkles },
       { kind: "link", to: "/ordre/ticket-rapporter", label: "Rapporter", icon: BarChart3 },
       { kind: "link", to: "/ordre/avvik", label: "Avvik", icon: AlertTriangle },
-      { kind: "link", to: "/ordre/pakkesystem", label: "Pakkesystem", icon: Plug },
+      
       { kind: "link", to: "/ordre/innstillinger", label: "Innstillinger", icon: Settings },
     ],
   },
@@ -107,6 +107,7 @@ const STATIC_SUBMENUS: Record<string, { prefix: string; appSlug: string; items: 
     items: [
       { kind: "link", to: "/produksjon/oversikt", label: "Oversikt", icon: LayoutDashboard },
       { kind: "link", to: "/produksjon/produksjonsplan", label: "Produksjonsplan", icon: ClipboardList },
+      { kind: "link", to: "/produksjon/pakkesystem", label: "Pakkesystem", icon: Plug },
       { kind: "link", to: "/produksjon/etiketter", label: "Etiketter", icon: Tags },
       { kind: "dropdown", label: "Innstillinger", icon: Settings, basePath: "/produksjon/innstillinger", links: [
         { to: "/produksjon/innstillinger/produksjonsavdelinger", label: "Produksjonsavdelinger" },

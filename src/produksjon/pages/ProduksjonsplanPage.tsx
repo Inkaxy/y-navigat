@@ -63,6 +63,7 @@ import {
   DEFAULT_PRINT_PAKKELISTE_OPTIONS,
   type PrintPakkelisteOptions,
 } from "../features/produksjonsplan/components/PrintPakkelisteDialog";
+import { OverforePakkesystemDialog } from "../features/produksjonsplan/components/OverforePakkesystemDialog";
 
 interface UiPrefs {
   showCustomers: boolean;
@@ -125,6 +126,7 @@ export default function ProduksjonsplanPage() {
 
   const [printProdDialog, setPrintProdDialog] = useState(false);
   const [printPackDialog, setPrintPackDialog] = useState(false);
+  const [pakkesystemDialog, setPakkesystemDialog] = useState(false);
   const { value: printProdDefaults, setValue: setPrintProdDefaults } =
     useUiPreference<PrintProduksjonslisteOptions>(
       "produksjonsplan.print.produksjon",
@@ -361,6 +363,7 @@ export default function ProduksjonsplanPage() {
               <DropdownMenuItem disabled>Veieliste</DropdownMenuItem>
               <DropdownMenuItem disabled>Kvitteringsliste</DropdownMenuItem>
               <DropdownMenuItem disabled>Lagerliste</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setPakkesystemDialog(true)}>Overføre til Pakkesystem</DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => setSetDialog(true)}>Sett kriteria</DropdownMenuItem>
               <DropdownMenuItem onClick={() => setHentDialog(true)}>Hent kriteria</DropdownMenuItem>
@@ -562,6 +565,14 @@ export default function ProduksjonsplanPage() {
           // Vent én tick slik at criteria oppdateres før vi printer
           setTimeout(() => handlePrint(o), 50);
         }}
+      />
+
+      <OverforePakkesystemDialog
+        open={pakkesystemDialog}
+        onOpenChange={setPakkesystemDialog}
+        date={dateStr}
+        criteria={criteria}
+        summary={summary}
       />
 
       <PrintPakkelisteDialog
