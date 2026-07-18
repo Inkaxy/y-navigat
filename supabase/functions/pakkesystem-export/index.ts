@@ -311,14 +311,14 @@ Deno.serve(async (req) => {
         .in("id", customerIds);
   if (custErr) return jsonRes({ error: custErr.message, code: "customers_failed" }, 500);
 
-  // Bare produkter som brukes i dagens ordre (holder filen liten)
+  // Bare produkter som brukes i dagens (filtrerte) ordre
   const usedProductIds = new Set<string>();
-  for (const o of ordersRaw ?? []) {
+  for (const o of ordersFiltered) {
     for (const l of (o.order_lines ?? []) as any[]) usedProductIds.add(l.product_id);
   }
 
   const products = (productsRaw ?? [])
-    .filter((p: any) => usedProductIds.has(p.id) || p.status === "active")
+    .filter((p: any) => usedProductIds.has(p.id))
     .map((p: any) => ({
       id: p.id,
       product_number: p.display_number != null ? String(p.display_number) : (p.code ?? p.id),
@@ -346,7 +346,7 @@ Deno.serve(async (req) => {
     notes: c.delivery_instructions ?? null,
   }));
 
-  const orders = (ordersRaw ?? []).map((o: any) => {
+  const orders = ordersFiltered.map((o: any) => {
     const tour = o.delivery_tours;
     const window = tour?.time_from || tour?.time_to
       ? { from: (tour.time_from ?? "").slice(0, 5), to: (tour.time_to ?? "").slice(0, 5) }
@@ -377,18 +377,18 @@ Deno.serve(async (req) => {
       name: entity?.legal_name ?? "",
     },
     delivery_date: dateParam,
+    filters: filtersEcho,
     products,
     customers,
     orders,
   };
 
-  // Logg forespørselen (bare API-key-baserte forespørsler ryddig)
   if (apiKeyId) {
     admin.from("pakkesystem_api_log").insert({
       api_key_id: apiKeyId,
       legal_entity_id: legalEntityId,
       endpoint: "pakkesystem-export",
-      query_params: { date: dateParam },
+      query_params: { date: dateParam, ...filtersEcho },
       status_code: 200,
       row_count: orders.length,
       ip: req.headers.get("x-forwarded-for") ?? null,
@@ -398,3 +398,4 @@ Deno.serve(async (req) => {
 
   return jsonRes(payload);
 });
+
