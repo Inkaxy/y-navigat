@@ -304,7 +304,87 @@ const halvorsen: KeypadTemplate = {
   ],
 };
 
-export const TEMPLATES: KeypadTemplate[] = [notteroy, hvasser, halvorsen];
+// ── Ferdigmaler for hurtigoppsett (dynamiske) ────────────────────────────────
+// Disse tre malene har tomme sider med sourceKindHint — etter «Bruk mal» kan
+// operatør trykke «Fyll fra varegruppe…» og synke innhold fra dagens sortiment.
+
+const bakeriStandard: KeypadTemplate = {
+  key: "bakeri_standard",
+  name: "Bakeri standard",
+  tagline: "Klassisk bakeri · dynamisk sortiment fra varekatalogen",
+  description:
+    "Grunnoppsett for et bakeri-utsalg. Sidene er koblet til hovedvaregruppene Brød, Boller, Kaker, Påsmurt, Kaffe og Drikke — bruk «Fyll fra varegruppe» for å synke inn dagens sortiment.",
+  gridCols: 5,
+  gridRows: 4,
+  theme: notteroy.theme,
+  customerScreen: notteroy.customerScreen,
+  pages: [
+    { page_name: "Brød", icon: "Wheat", background_color: null, buttons: [], sourceKindHint: "main_category", sourceNameHint: "Brød" },
+    { page_name: "Boller & bakst", icon: "Cookie", background_color: null, buttons: [], sourceKindHint: "main_category", sourceNameHint: "Boller" },
+    { page_name: "Kaker", icon: "Cake", background_color: null, buttons: [], sourceKindHint: "main_category", sourceNameHint: "Kaker" },
+    { page_name: "Påsmurt", icon: "Sandwich", background_color: null, buttons: [], sourceKindHint: "main_category", sourceNameHint: "Påsmurt" },
+    { page_name: "Kaffe", icon: "Coffee", background_color: null, buttons: [], sourceKindHint: "main_category", sourceNameHint: "Kaffe" },
+    { page_name: "Drikke", icon: "GlassWater", background_color: null, buttons: [], sourceKindHint: "main_category", sourceNameHint: "Drikke" },
+    { page_name: "Favoritter", icon: "Star", background_color: null, buttons: [] },
+  ],
+};
+
+const kafe: KeypadTemplate = {
+  key: "kafe",
+  name: "Kafé-oppsett",
+  tagline: "Kafé & take-away · fokus på drikke og lunsj",
+  description:
+    "Optimalisert for kafé-drift: fanene Kaffe, Kalde drikker, Lunsj, Sandwich, Salater og Bakst kobles til hovedvaregruppene i katalogen.",
+  gridCols: 5,
+  gridRows: 3,
+  theme: halvorsen.theme,
+  customerScreen: halvorsen.customerScreen,
+  pages: [
+    { page_name: "Kaffe", icon: "Coffee", background_color: null, buttons: [], sourceKindHint: "main_category", sourceNameHint: "Kaffe" },
+    { page_name: "Kalde drikker", icon: "CupSoda", background_color: null, buttons: [], sourceKindHint: "main_category", sourceNameHint: "Drikke" },
+    { page_name: "Lunsj", icon: "Utensils", background_color: null, buttons: [], sourceKindHint: "main_category", sourceNameHint: "Lunsj" },
+    { page_name: "Sandwich", icon: "Sandwich", background_color: null, buttons: [], sourceKindHint: "main_category", sourceNameHint: "Sandwich" },
+    { page_name: "Salater", icon: "Salad", background_color: null, buttons: [], sourceKindHint: "main_category", sourceNameHint: "Salater" },
+    { page_name: "Bakst", icon: "Cookie", background_color: null, buttons: [], sourceKindHint: "main_category", sourceNameHint: "Bakst" },
+    { page_name: "Favoritter", icon: "Star", background_color: null, buttons: [] },
+  ],
+};
+
+const sesongJul: KeypadTemplate = {
+  key: "sesong_jul",
+  name: "Sesong – Jul",
+  tagline: "Julesortiment · pepperkaker, julekaker og julebrød",
+  description:
+    "Sesongoppsett for jul. Fanene kobles til produksjonsgruppene for julebakst — synk gruppa når nye julevarer produseres og fjern raskt etter sesong.",
+  gridCols: 5,
+  gridRows: 3,
+  theme: {
+    ...halvorsen.theme,
+    bg: "#F7EEDF",
+    accent: "#8B1A1A",
+    accentSoft: "rgba(139,26,26,0.14)",
+    brandName: "JULESORTIMENT",
+    brandTagline: "Sesong – desember",
+  },
+  customerScreen: { ...halvorsen.customerScreen, accent: "#8B1A1A", footerText: "God jul fra bakeriet" },
+  pages: [
+    { page_name: "Julebrød", icon: "Wheat", background_color: null, buttons: [], sourceKindHint: "production_group", sourceNameHint: "Julebrød" },
+    { page_name: "Julekaker", icon: "Cake", background_color: null, buttons: [], sourceKindHint: "production_group", sourceNameHint: "Julekaker" },
+    { page_name: "Pepperkaker", icon: "Cookie", background_color: null, buttons: [], sourceKindHint: "production_group", sourceNameHint: "Pepperkaker" },
+    { page_name: "Konfekt", icon: "Candy", background_color: null, buttons: [], sourceKindHint: "production_group", sourceNameHint: "Konfekt" },
+    { page_name: "Gaveesker", icon: "Gift", background_color: null, buttons: [], sourceKindHint: "main_category", sourceNameHint: "Gaver" },
+    { page_name: "Kaffe & gløgg", icon: "Coffee", background_color: null, buttons: [], sourceKindHint: "main_category", sourceNameHint: "Drikke" },
+  ],
+};
+
+export const TEMPLATES: KeypadTemplate[] = [
+  notteroy,
+  hvasser,
+  halvorsen,
+  bakeriStandard,
+  kafe,
+  sesongJul,
+];
 
 export function getTemplate(key: TemplateKey): KeypadTemplate | undefined {
   return TEMPLATES.find((t) => t.key === key);
