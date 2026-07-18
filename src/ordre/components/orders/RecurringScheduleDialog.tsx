@@ -326,8 +326,8 @@ export function RecurringScheduleDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl w-[95vw] h-[min(90svh,900px)] top-4 translate-y-0 sm:top-6 data-[state=open]:slide-in-from-top-4 data-[state=closed]:slide-out-to-top-4 overflow-y-auto overscroll-contain relative pb-24">
-        <DialogHeader>
+      <DialogContent className="max-w-4xl w-[95vw] p-0 gap-0 grid-rows-[auto_1fr_auto] max-h-[calc(100dvh-2rem)] h-[min(90dvh,900px)] overflow-hidden">
+        <DialogHeader className="px-6 pt-6 pb-3 border-b">
           <DialogTitle>
             {isEdit ? `Rediger fastordre — ${editing?.customer_display_name}` : "Ny fastordre"}
           </DialogTitle>
@@ -338,7 +338,7 @@ export function RecurringScheduleDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-5">
+        <div className="space-y-5 overflow-y-auto overscroll-contain px-6 py-4 relative">
           {/* Kunde + meta */}
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className="space-y-2">
@@ -659,22 +659,21 @@ export function RecurringScheduleDialog({
               </div>
             )}
           </div>
+          {/* Sticky FAB — vises når «Legg til produkt» øverst er ute av syne */}
+          {showFab && rows.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setProductPickerOpen(true)}
+              aria-label="Legg til produkt"
+              title="Legg til produkt"
+              className="sticky bottom-4 float-right mr-2 -mt-14 z-20 h-11 w-11 rounded-full bg-primary text-primary-foreground shadow-lg ring-1 ring-primary/20 hover:bg-primary/90 transition-transform hover:scale-105 flex items-center justify-center"
+            >
+              <Plus className="h-5 w-5" />
+            </button>
+          )}
         </div>
 
-        {/* Sticky FAB — vises når «Legg til produkt» øverst er ute av syne */}
-        {showFab && rows.length > 0 && (
-          <button
-            type="button"
-            onClick={() => setProductPickerOpen(true)}
-            aria-label="Legg til produkt"
-            title="Legg til produkt"
-            className="sticky bottom-4 float-right mr-2 -mt-14 z-20 h-11 w-11 rounded-full bg-primary text-primary-foreground shadow-lg ring-1 ring-primary/20 hover:bg-primary/90 transition-transform hover:scale-105 flex items-center justify-center"
-          >
-            <Plus className="h-5 w-5" />
-          </button>
-        )}
-
-        <DialogFooter className="gap-2 sm:justify-between">
+        <DialogFooter className="gap-2 sm:justify-between px-6 py-3 border-t bg-background">
           <div>
             {isEdit && (
               <Button
