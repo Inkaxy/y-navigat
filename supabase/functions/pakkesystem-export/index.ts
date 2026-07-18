@@ -182,6 +182,23 @@ Deno.serve(async (req) => {
 
   if (!legalEntityId) return jsonRes({ error: "Fant ikke selskap", code: "no_entity" }, 400);
 
+  // --- Kriterier (matcher ProduksjonsplanCriteria) ---
+  const parseList = (s: string | null): string[] =>
+    (s ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+  const filterTours = parseList(url.searchParams.get("tours")).map(Number).filter((n) => !Number.isNaN(n));
+  const filterMainCats = parseList(url.searchParams.get("main_categories"));
+  const filterSubCats = parseList(url.searchParams.get("sub_categories"));
+  const includeNoSub = (url.searchParams.get("include_no_sub") ?? "1") !== "0";
+  const filterCustomerGroups = parseList(url.searchParams.get("customer_groups"));
+
+  const filtersEcho = {
+    tours: filterTours,
+    main_categories: filterMainCats,
+    sub_categories: filterSubCats,
+    include_products_without_subcategory: includeNoSub,
+    customer_groups: filterCustomerGroups,
+  };
+
   // --- Gate: pakksedler må være generert for datoen ---
   const { count: noteCount, error: noteErr } = await admin
     .from("delivery_notes")
@@ -196,7 +213,7 @@ Deno.serve(async (req) => {
         api_key_id: apiKeyId,
         legal_entity_id: legalEntityId,
         endpoint: "pakkesystem-export",
-        query_params: { date: dateParam },
+        query_params: { date: dateParam, ...filtersEcho },
         status_code: 409,
         row_count: 0,
         ip: req.headers.get("x-forwarded-for") ?? null,
@@ -219,11 +236,38 @@ Deno.serve(async (req) => {
 
   const { data: productsRaw, error: prodErr } = await admin
     .from("products")
-    .select("id, display_number, code, display_name, unit_of_sale, pieces_per_unit, ean_code, gtin, status, main_category_id, product_main_categories(display_name)")
+    .select("id, display_number, code, display_name, unit_of_sale, pieces_per_unit, ean_code, gtin, status, main_category_id, sub_category_id, product_main_categories(display_name)")
     .eq("legal_entity_id", legalEntityId);
   if (prodErr) return jsonRes({ error: prodErr.message, code: "products_failed" }, 500);
 
-  const { data: ordersRaw, error: ordErr } = await admin
+  const productById = new Map<string, any>((productsRaw ?? []).map((p: any) => [p.id, p]));
+
+  // Tur-filter: oversett tour_numbers -> tour_id-er
+  let allowedTourIds: string[] | null = null;
+  if (filterTours.length > 0) {
+    const { data: tourRows, error: tourErr } = await admin
+      .from("delivery_tours")
+      .select("id, tour_number")
+      .eq("legal_entity_id", legalEntityId)
+      .in("tour_number", filterTours);
+    if (tourErr) return jsonRes({ error: tourErr.message, code: "tours_failed" }, 500);
+    allowedTourIds = (tourRows ?? []).map((t: any) => t.id);
+    if (allowedTourIds.length === 0) allowedTourIds = ["00000000-0000-0000-0000-000000000000"];
+  }
+
+  // Kundegruppe-filter
+  let allowedCustomerIds: string[] | null = null;
+  if (filterCustomerGroups.length > 0) {
+    const { data: memRows, error: memErr } = await admin
+      .from("customer_group_members")
+      .select("customer_id")
+      .in("group_id", filterCustomerGroups);
+    if (memErr) return jsonRes({ error: memErr.message, code: "customer_groups_failed" }, 500);
+    allowedCustomerIds = Array.from(new Set((memRows ?? []).map((m: any) => m.customer_id)));
+    if (allowedCustomerIds.length === 0) allowedCustomerIds = ["00000000-0000-0000-0000-000000000000"];
+  }
+
+  let ordersQ = admin
     .from("orders")
     .select(`
       id, order_number, customer_id, status, delivery_date, delivery_time, delivery_tour_id,
@@ -234,9 +278,31 @@ Deno.serve(async (req) => {
     .eq("legal_entity_id", legalEntityId)
     .eq("delivery_date", dateParam)
     .neq("status", "draft");
+  if (allowedTourIds) ordersQ = ordersQ.in("delivery_tour_id", allowedTourIds);
+  if (allowedCustomerIds) ordersQ = ordersQ.in("customer_id", allowedCustomerIds);
+  const { data: ordersRaw, error: ordErr } = await ordersQ;
   if (ordErr) return jsonRes({ error: ordErr.message, code: "orders_failed" }, 500);
 
-  const customerIds = Array.from(new Set((ordersRaw ?? []).map((o: any) => o.customer_id).filter(Boolean)));
+  const lineIncluded = (productId: string): boolean => {
+    const p = productById.get(productId);
+    if (!p) return false;
+    if (filterMainCats.length > 0 && !filterMainCats.includes(p.main_category_id)) return false;
+    if (p.sub_category_id == null) {
+      if (!includeNoSub) return false;
+    } else if (filterSubCats.length > 0 && !filterSubCats.includes(p.sub_category_id)) {
+      return false;
+    }
+    return true;
+  };
+
+  const ordersFiltered = (ordersRaw ?? [])
+    .map((o: any) => ({
+      ...o,
+      order_lines: (o.order_lines ?? []).filter((l: any) => lineIncluded(l.product_id)),
+    }))
+    .filter((o: any) => o.order_lines.length > 0);
+
+  const customerIds = Array.from(new Set(ordersFiltered.map((o: any) => o.customer_id).filter(Boolean)));
   const { data: customersRaw, error: custErr } = customerIds.length === 0
     ? { data: [], error: null }
     : await admin
