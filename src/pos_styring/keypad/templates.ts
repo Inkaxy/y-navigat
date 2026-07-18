@@ -31,6 +31,9 @@ export interface TemplatePage {
   icon: string; // lucide-react ikon-navn
   background_color: string | null;
   buttons: TemplateButton[];
+  /** Hint til «Fyll fra varegruppe»-dialogen for dynamiske maler. */
+  sourceKindHint?: "main_category" | "sub_category" | "production_group";
+  sourceNameHint?: string;
 }
 
 export interface KeypadTemplate {
