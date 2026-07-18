@@ -5082,12 +5082,14 @@ export type Database = {
           counted_cash: number | null
           expected_cash: number | null
           id: string
+          locked_at: string | null
           opened_at: string
           opening_float: number
           operator_id: string
           session_number: number
           status: string
           terminal_id: string
+          z_report_id: string | null
         }
         Insert: {
           closed_at?: string | null
@@ -5095,12 +5097,14 @@ export type Database = {
           counted_cash?: number | null
           expected_cash?: number | null
           id?: string
+          locked_at?: string | null
           opened_at?: string
           opening_float: number
           operator_id: string
           session_number: number
           status?: string
           terminal_id: string
+          z_report_id?: string | null
         }
         Update: {
           closed_at?: string | null
@@ -5108,12 +5112,14 @@ export type Database = {
           counted_cash?: number | null
           expected_cash?: number | null
           id?: string
+          locked_at?: string | null
           opened_at?: string
           opening_float?: number
           operator_id?: string
           session_number?: number
           status?: string
           terminal_id?: string
+          z_report_id?: string | null
         }
         Relationships: [
           {
@@ -5128,6 +5134,13 @@ export type Database = {
             columns: ["terminal_id"]
             isOneToOne: false
             referencedRelation: "pos_terminals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pos_sessions_z_report_id_fkey"
+            columns: ["z_report_id"]
+            isOneToOne: false
+            referencedRelation: "pos_z_reports"
             referencedColumns: ["id"]
           },
         ]
@@ -5194,6 +5207,10 @@ export type Database = {
           drawer_opened_at: string | null
           drawer_opened_operator_id: string | null
           drawer_opened_reason: string | null
+          grand_total_gross: number
+          grand_total_net: number
+          grand_total_returns: number
+          grand_total_tx_count: number
           id: string
           legal_entity_id: string
           logo_url: string | null
@@ -5218,6 +5235,10 @@ export type Database = {
           drawer_opened_at?: string | null
           drawer_opened_operator_id?: string | null
           drawer_opened_reason?: string | null
+          grand_total_gross?: number
+          grand_total_net?: number
+          grand_total_returns?: number
+          grand_total_tx_count?: number
           id?: string
           legal_entity_id: string
           logo_url?: string | null
@@ -5242,6 +5263,10 @@ export type Database = {
           drawer_opened_at?: string | null
           drawer_opened_operator_id?: string | null
           drawer_opened_reason?: string | null
+          grand_total_gross?: number
+          grand_total_net?: number
+          grand_total_returns?: number
+          grand_total_tx_count?: number
           id?: string
           legal_entity_id?: string
           logo_url?: string | null
@@ -5452,18 +5477,33 @@ export type Database = {
           cash_variance_total: number | null
           closed_at: string
           closing_float_total: number | null
+          correction_count: number
+          correction_total: number
           counted_cash_total: number | null
+          discount_count: number
+          discount_total: number
+          drawer_open_outside_sale_count: number
           expected_cash_total: number | null
+          extras: Json
+          first_receipt_number: string | null
+          grand_total_gross_after: number | null
+          grand_total_returns_after: number | null
+          grand_total_tx_count_after: number | null
           id: string
           last_journal_id: number
+          last_receipt_number: string | null
           mva_breakdown: Json
           opening_float_total: number | null
           payment_breakdown: Json
           period_end: string
           period_start: string
+          proforma_view_count: number
+          receipt_copy_count: number
+          receipt_count: number
           refund_count: number
           refund_total: number
           report_hash: string
+          sale_count: number
           session_breakdown: Json | null
           terminal_id: string
           total_mva: number
@@ -5478,18 +5518,33 @@ export type Database = {
           cash_variance_total?: number | null
           closed_at?: string
           closing_float_total?: number | null
+          correction_count?: number
+          correction_total?: number
           counted_cash_total?: number | null
+          discount_count?: number
+          discount_total?: number
+          drawer_open_outside_sale_count?: number
           expected_cash_total?: number | null
+          extras?: Json
+          first_receipt_number?: string | null
+          grand_total_gross_after?: number | null
+          grand_total_returns_after?: number | null
+          grand_total_tx_count_after?: number | null
           id?: string
           last_journal_id: number
+          last_receipt_number?: string | null
           mva_breakdown: Json
           opening_float_total?: number | null
           payment_breakdown: Json
           period_end: string
           period_start: string
+          proforma_view_count?: number
+          receipt_copy_count?: number
+          receipt_count?: number
           refund_count: number
           refund_total: number
           report_hash: string
+          sale_count?: number
           session_breakdown?: Json | null
           terminal_id: string
           total_mva: number
@@ -5504,18 +5559,33 @@ export type Database = {
           cash_variance_total?: number | null
           closed_at?: string
           closing_float_total?: number | null
+          correction_count?: number
+          correction_total?: number
           counted_cash_total?: number | null
+          discount_count?: number
+          discount_total?: number
+          drawer_open_outside_sale_count?: number
           expected_cash_total?: number | null
+          extras?: Json
+          first_receipt_number?: string | null
+          grand_total_gross_after?: number | null
+          grand_total_returns_after?: number | null
+          grand_total_tx_count_after?: number | null
           id?: string
           last_journal_id?: number
+          last_receipt_number?: string | null
           mva_breakdown?: Json
           opening_float_total?: number | null
           payment_breakdown?: Json
           period_end?: string
           period_start?: string
+          proforma_view_count?: number
+          receipt_copy_count?: number
+          receipt_count?: number
           refund_count?: number
           refund_total?: number
           report_hash?: string
+          sale_count?: number
           session_breakdown?: Json | null
           terminal_id?: string
           total_mva?: number

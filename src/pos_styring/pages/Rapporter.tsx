@@ -93,6 +93,17 @@ interface XReport {
   totals: RapportTotals;
   mva_breakdown: MvaBreakdownEntry[];
   payment_breakdown: PaymentBreakdownEntry[];
+  journal_counts?: {
+    receipt_copy?: number;
+    proforma_view?: number;
+    drawer_open_outside_sale?: number;
+  };
+  cash_summary?: {
+    opening_float?: number;
+    cash_movement?: number;
+    expected_cash?: number;
+  };
+  grand_total?: { gross: number; returns: number; tx_count: number };
   last_journal_id: number | null;
 }
 
@@ -373,7 +384,7 @@ export default function Rapporter() {
         toast.error("Du har ikke tilgang");
       } else if (msg.includes("Invalid period")) {
         toast.error("Periodens slutt må være etter start");
-      } else if (msg.toLowerCase().includes("cannot generate z while sessions are open")) {
+      } else if (msg.toLowerCase().includes("open session") && msg.toLowerCase().includes("overlap")) {
         toast.error(
           "Det er en åpen sesjon i perioden. Lukk den fra kassen først, eller velg en annen periode.",
         );
@@ -653,6 +664,9 @@ export default function Rapporter() {
                 totals={xResult.totals}
                 mva_breakdown={xResult.mva_breakdown}
                 payment_breakdown={xResult.payment_breakdown}
+                journal_counts={xResult.journal_counts}
+                cash_summary={xResult.cash_summary}
+                grand_total={xResult.grand_total}
               />
             </div>
           )}
