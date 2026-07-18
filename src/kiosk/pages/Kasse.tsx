@@ -353,7 +353,9 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
         { p_terminal_id: terminal.id, p_transaction_id: r.tx.id } as never,
       );
       if (pkErr) throw pkErr;
-      const kindRow = Array.isArray(printKindData) ? printKindData[0] : printKindData;
+      const kindRow = Array.isArray(printKindData)
+        ? printKindData[0]
+        : printKindData;
       const isCopy = (kindRow as { kind?: string } | null)?.kind === "copy";
 
       const [{ data: mapping, error: mErr }, { data: entity, error: eErr }] =
