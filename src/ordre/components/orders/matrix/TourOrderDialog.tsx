@@ -153,7 +153,7 @@ export function TourOrderDialog({
     if (!order || readOnly) return;
     setSavingAll(true);
     try {
-      const ops: Promise<unknown>[] = [];
+      const ops: PromiseLike<unknown>[] = [];
       for (const [lineId, e] of Object.entries(edits)) {
         const patch: Record<string, unknown> = {};
         if (e.quantity !== undefined) patch.quantity = Number(e.quantity.replace(",", ".") || 0);
@@ -170,7 +170,9 @@ export function TourOrderDialog({
         if (patch.quantity === 0) {
           ops.push(supabase.from("order_lines").delete().eq("id", lineId));
         } else {
-          ops.push(supabase.from("order_lines").update(patch).eq("id", lineId));
+          ops.push(
+            supabase.from("order_lines").update(patch as never).eq("id", lineId),
+          );
         }
       }
       const results = await Promise.all(ops);
