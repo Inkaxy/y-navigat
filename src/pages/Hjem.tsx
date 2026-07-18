@@ -10,6 +10,8 @@ import { AppCard } from "@/components/AppCard";
 import { Logo } from "@/components/brand/Logo";
 import { Sparkles } from "lucide-react";
 import { TicketQueueWidget } from "@/ordre/components/widgets/TicketQueueWidget";
+import { PosHealthWidget } from "@/pos_styring/components/PosHealthWidget";
+import { LegalEntityProvider as PosStyringGate } from "@/pos_styring/contexts/LegalEntityContext";
 
 export default function Hjem() {
   const { data: profile } = useCurrentUser();
@@ -24,6 +26,7 @@ export default function Hjem() {
   const greeting = getTimeGreeting();
   const accessibleApps = (apps ?? []).filter((a) => a.access_level !== "none");
   const hasOrdreAccess = accessibleApps.some((a) => a.code === "ordre");
+  const hasPosStyringAccess = accessibleApps.some((a) => a.code === "pos_styring");
   const today = new Date().toLocaleDateString("nb-NO", {
     weekday: "long",
     day: "numeric",
@@ -69,9 +72,14 @@ export default function Hjem() {
       </section>
 
       {/* Widgets */}
-      {hasOrdreAccess && (
+      {(hasOrdreAccess || hasPosStyringAccess) && (
         <div className="grid gap-4 md:grid-cols-2">
-          <TicketQueueWidget />
+          {hasOrdreAccess && <TicketQueueWidget />}
+          {hasPosStyringAccess && (
+            <PosStyringGate>
+              <PosHealthWidget />
+            </PosStyringGate>
+          )}
         </div>
       )}
 
