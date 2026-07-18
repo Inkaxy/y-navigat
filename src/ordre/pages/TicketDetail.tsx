@@ -7,8 +7,6 @@ import { nb } from "date-fns/locale";
 import {
   ArrowLeft,
   ArrowRight,
-  CheckCircle2,
-  Loader2,
   Package,
   CheckCircle2,
   Loader2,
