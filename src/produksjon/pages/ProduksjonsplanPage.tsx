@@ -567,6 +567,14 @@ export default function ProduksjonsplanPage() {
         }}
       />
 
+      <OverforePakkesystemDialog
+        open={pakkesystemDialog}
+        onOpenChange={setPakkesystemDialog}
+        date={dateStr}
+        criteria={criteria}
+        summary={summary}
+      />
+
       <PrintPakkelisteDialog
         open={printPackDialog}
         onOpenChange={setPrintPackDialog}
