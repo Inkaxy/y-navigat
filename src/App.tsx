@@ -377,6 +377,7 @@ const App = () => (
               <Route path="/pos-styring/rapporter" element={<PosStyringShell><PosStyringRapporter /></PosStyringShell>} />
               <Route path="/pos-styring/rapporter/z/:id" element={<PosStyringShell><PosStyringZDetalj /></PosStyringShell>} />
               <Route path="/pos-styring/innstillinger" element={<PosStyringShell><PosStyringInnstillinger /></PosStyringShell>} />
+              <Route path="/pos-styring/innstillinger/saf-t" element={<PosStyringShell><PosStyringSafT /></PosStyringShell>} />
               <Route path="/pos-styring/skrivere" element={<PosStyringShell><PosStyringSkrivere /></PosStyringShell>} />
               <Route path="/pos-styring/stasjoner" element={<PosStyringShell><PosStyringStasjoner /></PosStyringShell>} />
 
