@@ -126,6 +126,7 @@ export default function ProduksjonsplanPage() {
 
   const [printProdDialog, setPrintProdDialog] = useState(false);
   const [printPackDialog, setPrintPackDialog] = useState(false);
+  const [pakkesystemDialog, setPakkesystemDialog] = useState(false);
   const { value: printProdDefaults, setValue: setPrintProdDefaults } =
     useUiPreference<PrintProduksjonslisteOptions>(
       "produksjonsplan.print.produksjon",
