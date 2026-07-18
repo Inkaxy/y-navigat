@@ -72,6 +72,8 @@ export function TourOrderDialog({
   tour,
   products,
   canEdit,
+  onCreatePackingNote,
+  onCopyOrder,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -80,6 +82,8 @@ export function TourOrderDialog({
   tour: MatrixTour | null;
   products: MatrixProduct[];
   canEdit: boolean;
+  onCreatePackingNote?: () => void;
+  onCopyOrder?: () => void;
 }) {
   const { data: order, isLoading } = useTourOrder({
     customerId: customer?.id ?? null,
