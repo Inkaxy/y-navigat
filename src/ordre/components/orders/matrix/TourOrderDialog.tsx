@@ -206,8 +206,8 @@ export function TourOrderDialog({
         display_number: p.display_number,
         display_name: p.display_name,
         code: p.code,
-      } as any,
-    });
+      },
+    } as never);
     if (error) {
       toast.error("Kunne ikke legge til linje", { description: error.message });
       return;
