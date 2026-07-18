@@ -50,6 +50,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { TemplatesDialog } from "@/pos_styring/components/TemplatesDialog";
 import { ThemeSettingsDialog } from "@/pos_styring/components/ThemeSettingsDialog";
+import { FillFromCategoryDialog } from "@/pos_styring/components/FillFromCategoryDialog";
 import { KioskRender } from "@/kiosk/render/KioskRender";
 import { parseTheme } from "@/kiosk/render/kioskTheme";
 
