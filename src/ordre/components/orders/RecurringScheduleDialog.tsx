@@ -49,6 +49,7 @@ import {
   WEEKDAY_LONG,
   useRecurringScheduleDetail,
   useSaveRecurringSchedule,
+  useDuplicateRecurringSchedule,
   type RecurringScheduleWithCustomer,
 } from "@/ordre/hooks/useRecurringOrders";
 import { cn } from "@/lib/utils";
