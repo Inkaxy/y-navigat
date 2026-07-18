@@ -363,6 +363,7 @@ export default function ProduksjonsplanPage() {
               <DropdownMenuItem disabled>Veieliste</DropdownMenuItem>
               <DropdownMenuItem disabled>Kvitteringsliste</DropdownMenuItem>
               <DropdownMenuItem disabled>Lagerliste</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setPakkesystemDialog(true)}>Overføre til Pakkesystem</DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => setSetDialog(true)}>Sett kriteria</DropdownMenuItem>
               <DropdownMenuItem onClick={() => setHentDialog(true)}>Hent kriteria</DropdownMenuItem>
