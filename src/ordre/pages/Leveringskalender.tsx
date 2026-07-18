@@ -1521,6 +1521,24 @@ export default function MatrixPage() {
         onPick={handleAddProduct}
       />
 
+      <TourOrderDialog
+        open={!!tourOrderCol}
+        onOpenChange={(v) => !v && setTourOrderCol(null)}
+        customer={
+          selectedCustomer
+            ? {
+                id: selectedCustomer.id,
+                customer_number: selectedCustomer.customer_number,
+                display_name: selectedCustomer.display_name,
+              }
+            : null
+        }
+        date={tourOrderCol?.date ?? null}
+        tour={tourOrderCol?.tour ?? null}
+        products={allProducts}
+        canEdit={canEdit}
+      />
+
       {merknadCell && labelProfileByProduct.get(merknadCell.productId) && (
         <MerknadDialog
           open={!!merknadCell}
