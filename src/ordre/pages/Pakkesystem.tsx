@@ -466,8 +466,14 @@ export default function PakkesystemPage() {
                     )}
                   </div>
                   {d.last_error && <div className="text-xs text-destructive">{d.last_error}</div>}
+                  <div className="text-xs text-muted-foreground">
+                    Kriteria: {criteriaSummary(((d as any).criteria ?? DEFAULT_CRITERIA) as ProduksjonsplanCriteria)}
+                  </div>
                 </div>
                 <div className="flex gap-1">
+                  <Button size="sm" variant="ghost" onClick={() => setDestCriteriaFor(d.id)}>
+                    <SlidersHorizontal className="w-4 h-4 mr-1" /> Kriteria
+                  </Button>
                   <Button size="sm" variant="ghost" onClick={() => testPushNow.mutate(d.id)} disabled={testPushNow.isPending}>
                     <Zap className="w-4 h-4 mr-1" /> Test
                   </Button>
@@ -479,8 +485,16 @@ export default function PakkesystemPage() {
                   </Button>
                 </div>
               </div>
+              <SettKriteriaDialog
+                open={destCriteriaFor === d.id}
+                onOpenChange={(o) => { if (!o) setDestCriteriaFor(null); }}
+                legalEntityId={NB_LEGAL_ENTITY_ID}
+                initial={((d as any).criteria ?? DEFAULT_CRITERIA) as ProduksjonsplanCriteria}
+                onApply={(c) => updateDestCriteria.mutate({ id: d.id, criteria: c })}
+              />
             </div>
           ))}
+
           {(dests.data ?? []).length === 0 && (
             <p className="text-sm text-muted-foreground">Ingen destinasjoner. Cron-jobb sjekker hvert 10. min.</p>
           )}
