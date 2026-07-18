@@ -427,13 +427,18 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
             company,
             outlet: receiptHeader.outlet,
             footer_lines,
+            is_copy: isCopy,
+            copy_label: isCopy ? "KOPI" : null,
           } as unknown as never,
 
           status: "queued",
         });
 
       if (jErr) throw jErr;
-      toast.success("Kvittering lagt i utskriftskø");
+      if (isCopy) setCopyIssued(true);
+      toast.success(
+        isCopy ? "KOPI lagt i utskriftskø" : "Kvittering lagt i utskriftskø",
+      );
     } catch (e) {
       toast.error("Kunne ikke legge i utskriftskø", { description: (e as Error).message });
     } finally {
