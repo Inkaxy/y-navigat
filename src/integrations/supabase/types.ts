@@ -4700,25 +4700,37 @@ export type Database = {
           background_color: string | null
           icon: string | null
           id: string
+          is_dynamic: boolean
           layout_id: string
           page_name: string
           sort_order: number
+          source_id: string | null
+          source_kind: string | null
+          source_last_synced_at: string | null
         }
         Insert: {
           background_color?: string | null
           icon?: string | null
           id?: string
+          is_dynamic?: boolean
           layout_id: string
           page_name: string
           sort_order?: number
+          source_id?: string | null
+          source_kind?: string | null
+          source_last_synced_at?: string | null
         }
         Update: {
           background_color?: string | null
           icon?: string | null
           id?: string
+          is_dynamic?: boolean
           layout_id?: string
           page_name?: string
           sort_order?: number
+          source_id?: string | null
+          source_kind?: string | null
+          source_last_synced_at?: string | null
         }
         Relationships: [
           {
