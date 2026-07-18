@@ -97,7 +97,10 @@ const STATIC_SUBMENUS: Record<string, { prefix: string; appSlug: string; items: 
       { kind: "link", to: "/ordre/ai-forslag", label: "AI-forslag", icon: Sparkles },
       { kind: "link", to: "/ordre/ticket-rapporter", label: "Rapporter", icon: BarChart3 },
       { kind: "link", to: "/ordre/avvik", label: "Avvik", icon: AlertTriangle },
-      { kind: "link", to: "/ordre/innstillinger", label: "Innstillinger", icon: Settings },
+      { kind: "dropdown", label: "Innstillinger", icon: Settings, basePath: "/ordre/innstillinger", links: [
+        { to: "/ordre/innstillinger", label: "Generelt" },
+        { to: "/ordre/innstillinger/pakkesystem-api", label: "Pakkesystem-API" },
+      ]},
     ],
   },
   produksjon: {
