@@ -50,6 +50,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { TemplatesDialog } from "@/pos_styring/components/TemplatesDialog";
 import { ThemeSettingsDialog } from "@/pos_styring/components/ThemeSettingsDialog";
+import { FillFromCategoryDialog } from "@/pos_styring/components/FillFromCategoryDialog";
 import { KioskRender } from "@/kiosk/render/KioskRender";
 import { parseTheme } from "@/kiosk/render/kioskTheme";
 
@@ -71,6 +72,10 @@ interface KeypadPage {
   page_name: string;
   sort_order: number;
   background_color: string | null;
+  is_dynamic?: boolean | null;
+  source_kind?: "main_category" | "sub_category" | "production_group" | null;
+  source_id?: string | null;
+  source_last_synced_at?: string | null;
 }
 
 type ButtonType = "product" | "category" | "function";
@@ -193,7 +198,7 @@ async function fetchLayout(layoutId: string): Promise<KeypadLayoutDetail> {
 async function fetchPages(layoutId: string): Promise<KeypadPage[]> {
   const { data, error } = await supabase
     .from("pos_keypad_pages")
-    .select("id, page_name, sort_order, background_color")
+    .select("id, page_name, sort_order, background_color, is_dynamic, source_kind, source_id, source_last_synced_at")
     .eq("layout_id", layoutId)
     .order("sort_order", { ascending: true });
   if (error) throw error;
@@ -728,6 +733,7 @@ export default function TastaturEditor() {
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [themeSettingsOpen, setThemeSettingsOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(true);
+  const [fillDialogOpen, setFillDialogOpen] = useState(false);
   const gridRef = useRef<HTMLDivElement>(null);
 
   const { data: layout, isLoading: layoutLoading, error: layoutError } = useQuery({
@@ -1206,6 +1212,9 @@ export default function TastaturEditor() {
                   >
                     <GripVertical className="h-4 w-4 text-muted-foreground" />
                     <span className="min-w-0 flex-1 truncate">{page.page_name}</span>
+                    {page.is_dynamic && (
+                      <Sparkles className="h-3 w-3 shrink-0 text-primary" aria-label="Dynamisk side" />
+                    )}
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <span className="inline-flex h-7 w-7 items-center justify-center rounded-md hover:bg-accent"><MoreHorizontal className="h-4 w-4" /></span>
@@ -1231,9 +1240,30 @@ export default function TastaturEditor() {
         </aside>
 
         <section className="min-w-0 rounded-lg border bg-card p-4 shadow-card">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="font-semibold">{activePage?.page_name ?? "Ingen side"}</h2>
-            <span className="text-xs text-muted-foreground">Klikk tom celle for ny knapp · dra knapp for å flytte</span>
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-2">
+              <h2 className="truncate font-semibold">{activePage?.page_name ?? "Ingen side"}</h2>
+              {activePage?.is_dynamic && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
+                  <Sparkles className="h-3 w-3" /> Dynamisk
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              {activePage && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setFillDialogOpen(true)}
+                >
+                  <Sparkles className="h-4 w-4" />
+                  {activePage.is_dynamic ? "Synk fra varegruppe" : "Fyll fra varegruppe…"}
+                </Button>
+              )}
+              <span className="hidden text-xs text-muted-foreground md:inline">
+                Klikk tom celle · dra for å flytte
+              </span>
+            </div>
           </div>
           {buttonsLoading ? <Skeleton className="h-[560px] w-full" /> : activePage ? (
             <>
@@ -1368,6 +1398,22 @@ export default function TastaturEditor() {
           legalEntityId={layout.legal_entity_id}
           initialTheme={layout.theme}
           initialCustomerScreen={layout.customer_screen}
+        />
+      )}
+
+      {activePage && layoutId && (
+        <FillFromCategoryDialog
+          open={fillDialogOpen}
+          onOpenChange={setFillDialogOpen}
+          layoutId={layoutId}
+          legalEntityId={layout.legal_entity_id}
+          pageId={activePage.id}
+          pageName={activePage.page_name}
+          gridCols={layout.grid_cols}
+          gridRows={layout.grid_rows}
+          initialKind={activePage.source_kind ?? null}
+          initialSourceId={activePage.source_id ?? null}
+          initialIsDynamic={activePage.is_dynamic ?? false}
         />
       )}
     </div>
