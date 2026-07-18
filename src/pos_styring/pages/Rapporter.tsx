@@ -93,6 +93,17 @@ interface XReport {
   totals: RapportTotals;
   mva_breakdown: MvaBreakdownEntry[];
   payment_breakdown: PaymentBreakdownEntry[];
+  journal_counts?: {
+    receipt_copy?: number;
+    proforma_view?: number;
+    drawer_open_outside_sale?: number;
+  };
+  cash_summary?: {
+    opening_float?: number;
+    cash_movement?: number;
+    expected_cash?: number;
+  };
+  grand_total?: { gross: number; returns: number; tx_count: number };
   last_journal_id: number | null;
 }
 
