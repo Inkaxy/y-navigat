@@ -96,7 +96,7 @@ function relative(d: string | null | undefined) {
 
 // ── Page ──────────────────────────────────────────────────────────────────
 export default function KasseHelse() {
-  const { selectedEntityId } = useLegalEntity();
+  const { activeEntityId: selectedEntityId } = useLegalEntity();
 
   // Terminals for entity
   const { data: terminals = [], isLoading: terminalsLoading } = useQuery({
