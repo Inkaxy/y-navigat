@@ -1858,6 +1858,9 @@ function MatrixGrid({
                     <button type="button" disabled={!colHas} onClick={() => onColPackingNote(c.date, c.tour)} className="rounded p-0.5 text-muted-foreground/70 hover:bg-accent hover:text-foreground disabled:opacity-30" title="Lag pakkseddel">
                       <PackageCheck className="h-3 w-3" />
                     </button>
+                    <button type="button" disabled={!colHas} onClick={() => onOpenTourOrder(c.date, c.tour)} className="rounded p-0.5 text-muted-foreground/70 hover:bg-primary/10 hover:text-primary disabled:opacity-30" title="Åpne ordre for denne turen">
+                      <ShoppingCart className="h-3 w-3" />
+                    </button>
                   </div>
                 </th>
               );
