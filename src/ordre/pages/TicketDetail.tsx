@@ -305,7 +305,7 @@ function useLinkedOrder(orderId: string | null) {
       const { data, error } = await supabase
         .from("orders")
         .select(
-          "id, order_number, status, delivery_date, delivery_time, subtotal_excl_vat, total_incl_vat, legal_entity_id, order_lines:order_lines(quantity, product_name:internal_notes)",
+          "id, order_number, status, delivery_date, delivery_time, subtotal_excl_vat, total_incl_vat, legal_entity_id",
         )
         .eq("id", orderId!)
         .maybeSingle();
