@@ -7,7 +7,7 @@ interface SettingsLink {
   href: string;
   title: string;
   description: string;
-  icon: React.ReactNode;
+  icon: ReactNode;
 }
 
 const LINKS: SettingsLink[] = [
