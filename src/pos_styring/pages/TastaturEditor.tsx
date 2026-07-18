@@ -733,6 +733,7 @@ export default function TastaturEditor() {
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [themeSettingsOpen, setThemeSettingsOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(true);
+  const [fillDialogOpen, setFillDialogOpen] = useState(false);
   const gridRef = useRef<HTMLDivElement>(null);
 
   const { data: layout, isLoading: layoutLoading, error: layoutError } = useQuery({
