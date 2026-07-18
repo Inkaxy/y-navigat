@@ -1,0 +1,1 @@
+ALTER TABLE public.pakkesystem_push_destinations ADD COLUMN IF NOT EXISTS criteria jsonb NOT NULL DEFAULT '{}'::jsonb;

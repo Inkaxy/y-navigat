@@ -4318,6 +4318,7 @@ export type Database = {
           auth_header: string | null
           created_at: string
           created_by: string | null
+          criteria: Json
           extra_headers: Json
           http_method: string
           id: string
@@ -4336,6 +4337,7 @@ export type Database = {
           auth_header?: string | null
           created_at?: string
           created_by?: string | null
+          criteria?: Json
           extra_headers?: Json
           http_method?: string
           id?: string
@@ -4354,6 +4356,7 @@ export type Database = {
           auth_header?: string | null
           created_at?: string
           created_by?: string | null
+          criteria?: Json
           extra_headers?: Json
           http_method?: string
           id?: string

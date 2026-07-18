@@ -10,10 +10,34 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Copy, Download, Key, PlusCircle, Trash2, Zap, ExternalLink, Clock, CheckCircle2, XCircle } from "lucide-react";
+import { Copy, Download, Key, PlusCircle, Trash2, Zap, ExternalLink, Clock, CheckCircle2, XCircle, SlidersHorizontal } from "lucide-react";
 import { format } from "date-fns";
+import { SettKriteriaDialog } from "@/produksjon/features/produksjonsplan/components/SettKriteriaDialog";
+import { DEFAULT_CRITERIA, type ProduksjonsplanCriteria } from "@/produksjon/features/produksjonsplan/types";
 
 const FUNCTIONS_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
+
+function criteriaToQuery(c: ProduksjonsplanCriteria): string {
+  const qs = new URLSearchParams();
+  if (c.tour_numbers?.length) qs.set("tours", c.tour_numbers.join(","));
+  if (c.main_category_ids?.length) qs.set("main_categories", c.main_category_ids.join(","));
+  if (c.sub_category_ids?.length) qs.set("sub_categories", c.sub_category_ids.join(","));
+  if (c.include_products_without_subcategory === false) qs.set("include_no_sub", "0");
+  if (c.customer_group_ids?.length) qs.set("customer_groups", c.customer_group_ids.join(","));
+  const s = qs.toString();
+  return s ? `&${s}` : "";
+}
+
+function criteriaSummary(c: ProduksjonsplanCriteria): string {
+  const parts: string[] = [];
+  if (c.tour_numbers?.length) parts.push(`Tur ${c.tour_numbers.join(",")}`);
+  else parts.push("Alle turer");
+  if (c.main_category_ids?.length) parts.push(`${c.main_category_ids.length} hovedgrp.`);
+  if (c.sub_category_ids?.length) parts.push(`${c.sub_category_ids.length} undergrp.`);
+  if (c.customer_group_ids?.length) parts.push(`${c.customer_group_ids.length} kundegrp.`);
+  return parts.join(" · ");
+}
+
 
 function NotesReadyBadge({ date }: { date: string }) {
   const q = useQuery({
@@ -43,6 +67,12 @@ export default function PakkesystemPage() {
   const [newKeyName, setNewKeyName] = useState("");
   const [newKeyNote, setNewKeyNote] = useState("");
   const [revealedKey, setRevealedKey] = useState<string | null>(null);
+
+  const [downloadCriteria, setDownloadCriteria] = useState<ProduksjonsplanCriteria>(DEFAULT_CRITERIA);
+  const [downloadCriteriaOpen, setDownloadCriteriaOpen] = useState(false);
+  const [destCriteriaFor, setDestCriteriaFor] = useState<string | null>(null);
+  const [newDestCriteria, setNewDestCriteria] = useState<ProduksjonsplanCriteria>(DEFAULT_CRITERIA);
+  const [newDestCriteriaOpen, setNewDestCriteriaOpen] = useState(false);
 
   const [destOpen, setDestOpen] = useState(false);
   const [destForm, setDestForm] = useState({
@@ -133,6 +163,7 @@ export default function PakkesystemPage() {
         push_time: destForm.push_time,
         target_offset_days: Number(destForm.target_offset_days),
         auth_header: destForm.auth_header || null,
+        criteria: newDestCriteria as any,
         active: true,
       });
       if (error) throw error;
@@ -141,6 +172,22 @@ export default function PakkesystemPage() {
       toast.success("Destinasjon lagret");
       setDestOpen(false);
       setDestForm({ name: "", url: "", push_time: "04:00", target_offset_days: 0, auth_header: "" });
+      setNewDestCriteria(DEFAULT_CRITERIA);
+      qc.invalidateQueries({ queryKey: ["pakkesystem-dests"] });
+    },
+    onError: (e: any) => toast.error("Feilet: " + (e?.message ?? "ukjent")),
+  });
+
+  const updateDestCriteria = useMutation({
+    mutationFn: async ({ id, criteria }: { id: string; criteria: ProduksjonsplanCriteria }) => {
+      const { error } = await supabase
+        .from("pakkesystem_push_destinations")
+        .update({ criteria: criteria as any })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Kriterier oppdatert");
       qc.invalidateQueries({ queryKey: ["pakkesystem-dests"] });
     },
     onError: (e: any) => toast.error("Feilet: " + (e?.message ?? "ukjent")),
@@ -169,7 +216,8 @@ export default function PakkesystemPage() {
       const { data: sess } = await supabase.auth.getSession();
       const jwt = sess.session?.access_token;
       if (!jwt) throw new Error("Ingen session");
-      const exportRes = await fetch(`${FUNCTIONS_BASE}/pakkesystem-export?date=${downloadDate}&legal_entity_id=${NB_LEGAL_ENTITY_ID}`, {
+      const destCrit = ((dest as any).criteria ?? DEFAULT_CRITERIA) as ProduksjonsplanCriteria;
+      const exportRes = await fetch(`${FUNCTIONS_BASE}/pakkesystem-export?date=${downloadDate}&legal_entity_id=${NB_LEGAL_ENTITY_ID}${criteriaToQuery(destCrit)}`, {
         headers: { Authorization: `Bearer ${jwt}` },
       });
       if (!exportRes.ok) throw new Error("Kunne ikke hente snapshot");
@@ -187,7 +235,7 @@ export default function PakkesystemPage() {
     const { data: sess } = await supabase.auth.getSession();
     const jwt = sess.session?.access_token;
     if (!jwt) return toast.error("Ingen session");
-    const res = await fetch(`${FUNCTIONS_BASE}/pakkesystem-export?date=${downloadDate}&legal_entity_id=${NB_LEGAL_ENTITY_ID}`, {
+    const res = await fetch(`${FUNCTIONS_BASE}/pakkesystem-export?date=${downloadDate}&legal_entity_id=${NB_LEGAL_ENTITY_ID}${criteriaToQuery(downloadCriteria)}`, {
       headers: { Authorization: `Bearer ${jwt}` },
     });
     if (!res.ok) {
@@ -219,19 +267,31 @@ export default function PakkesystemPage() {
           <Download className="w-5 h-5" />
           <h2 className="text-lg font-semibold">Last ned pakkefil</h2>
         </div>
-        <div className="flex items-end gap-3">
+        <div className="flex items-end gap-3 flex-wrap">
           <div>
             <Label>Leveringsdato</Label>
             <Input type="date" value={downloadDate} onChange={(e) => setDownloadDate(e.target.value)} className="w-48" />
           </div>
           <NotesReadyBadge date={downloadDate} />
+          <Button variant="outline" onClick={() => setDownloadCriteriaOpen(true)}>
+            <SlidersHorizontal className="w-4 h-4 mr-2" /> Sett kriteria
+          </Button>
           <Button onClick={downloadFile}>
             <Download className="w-4 h-4 mr-2" /> Last ned JSON
           </Button>
         </div>
         <p className="text-xs text-muted-foreground">
-          Pakkefilen kan kun lastes ned etter at pakksedlene for leveringsdagen er generert.
+          Kriteria: <span className="font-medium">{criteriaSummary(downloadCriteria)}</span>. Samme filtrering som pakksedler/produksjonslister. Pakkefilen kan kun lastes ned etter at pakksedlene for leveringsdagen er generert.
         </p>
+        <SettKriteriaDialog
+          open={downloadCriteriaOpen}
+          onOpenChange={setDownloadCriteriaOpen}
+          legalEntityId={NB_LEGAL_ENTITY_ID}
+          initial={downloadCriteria}
+          onApply={(c) => setDownloadCriteria(c)}
+        />
+
+
       </Card>
 
       {/* API-endepunkt */}
@@ -359,13 +419,30 @@ export default function PakkesystemPage() {
                   <Label>Authorization-header (valgfritt)</Label>
                   <Input value={destForm.auth_header} onChange={(e) => setDestForm({ ...destForm, auth_header: e.target.value })} placeholder="Bearer xxx" />
                 </div>
+                <div className="border rounded p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="m-0">Kriteria (samme som pakksedler)</Label>
+                    <Button size="sm" variant="outline" onClick={() => setNewDestCriteriaOpen(true)}>
+                      <SlidersHorizontal className="w-4 h-4 mr-2" /> Endre
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">{criteriaSummary(newDestCriteria)}</p>
+                </div>
               </div>
               <DialogFooter>
                 <Button onClick={() => createDest.mutate()} disabled={!destForm.name || !destForm.url || createDest.isPending}>Lagre</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
+          <SettKriteriaDialog
+            open={newDestCriteriaOpen}
+            onOpenChange={setNewDestCriteriaOpen}
+            legalEntityId={NB_LEGAL_ENTITY_ID}
+            initial={newDestCriteria}
+            onApply={(c) => setNewDestCriteria(c)}
+          />
         </div>
+
 
         <div className="space-y-2">
           {(dests.data ?? []).map((d) => (
@@ -389,8 +466,14 @@ export default function PakkesystemPage() {
                     )}
                   </div>
                   {d.last_error && <div className="text-xs text-destructive">{d.last_error}</div>}
+                  <div className="text-xs text-muted-foreground">
+                    Kriteria: {criteriaSummary(((d as any).criteria ?? DEFAULT_CRITERIA) as ProduksjonsplanCriteria)}
+                  </div>
                 </div>
                 <div className="flex gap-1">
+                  <Button size="sm" variant="ghost" onClick={() => setDestCriteriaFor(d.id)}>
+                    <SlidersHorizontal className="w-4 h-4 mr-1" /> Kriteria
+                  </Button>
                   <Button size="sm" variant="ghost" onClick={() => testPushNow.mutate(d.id)} disabled={testPushNow.isPending}>
                     <Zap className="w-4 h-4 mr-1" /> Test
                   </Button>
@@ -402,8 +485,16 @@ export default function PakkesystemPage() {
                   </Button>
                 </div>
               </div>
+              <SettKriteriaDialog
+                open={destCriteriaFor === d.id}
+                onOpenChange={(o) => { if (!o) setDestCriteriaFor(null); }}
+                legalEntityId={NB_LEGAL_ENTITY_ID}
+                initial={((d as any).criteria ?? DEFAULT_CRITERIA) as ProduksjonsplanCriteria}
+                onApply={(c) => updateDestCriteria.mutate({ id: d.id, criteria: c })}
+              />
             </div>
           ))}
+
           {(dests.data ?? []).length === 0 && (
             <p className="text-sm text-muted-foreground">Ingen destinasjoner. Cron-jobb sjekker hvert 10. min.</p>
           )}
