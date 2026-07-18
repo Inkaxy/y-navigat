@@ -1212,6 +1212,9 @@ export default function TastaturEditor() {
                   >
                     <GripVertical className="h-4 w-4 text-muted-foreground" />
                     <span className="min-w-0 flex-1 truncate">{page.page_name}</span>
+                    {page.is_dynamic && (
+                      <Sparkles className="h-3 w-3 shrink-0 text-primary" aria-label="Dynamisk side" />
+                    )}
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <span className="inline-flex h-7 w-7 items-center justify-center rounded-md hover:bg-accent"><MoreHorizontal className="h-4 w-4" /></span>
