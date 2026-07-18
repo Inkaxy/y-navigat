@@ -197,7 +197,7 @@ async function fetchLayout(layoutId: string): Promise<KeypadLayoutDetail> {
 async function fetchPages(layoutId: string): Promise<KeypadPage[]> {
   const { data, error } = await supabase
     .from("pos_keypad_pages")
-    .select("id, page_name, sort_order, background_color")
+    .select("id, page_name, sort_order, background_color, is_dynamic, source_kind, source_id, source_last_synced_at")
     .eq("layout_id", layoutId)
     .order("sort_order", { ascending: true });
   if (error) throw error;
