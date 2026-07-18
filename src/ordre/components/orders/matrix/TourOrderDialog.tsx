@@ -558,13 +558,72 @@ export function TourOrderDialog({
                         </tr>
                       );
                     })}
-                    {order.lines.length === 0 ? (
+                    {order.lines.length === 0 && ghostRows.length === 0 ? (
                       <tr>
                         <td colSpan={7} className="px-4 py-6 text-center text-sm text-muted-foreground">
                           Ingen linjer på ordren.
                         </td>
                       </tr>
                     ) : null}
+                    {ghostRows.length > 0 ? (
+                      <>
+                        <tr className="bg-muted/40">
+                          <td colSpan={7} className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                            <span className="inline-flex items-center gap-1.5">
+                              <Repeat className="h-3 w-3" />
+                              Fra fastordre
+                            </span>
+                          </td>
+                        </tr>
+                        {ghostRows.map((g) => {
+                          const p = ghostProductMap.get(g.productId);
+                          const displayNumber = p?.display_number ?? "";
+                          const displayName = p?.display_name ?? "—";
+                          const unitPrice = p?.unit_price ?? null;
+                          const sum = unitPrice != null ? unitPrice * g.quantity : null;
+                          return (
+                            <tr key={`ghost-${g.productId}`} className="bg-blue-50/40 dark:bg-blue-950/20 hover:bg-blue-50/60 text-muted-foreground">
+                              <td className="w-14 px-2 py-2 tabular-nums text-right">{displayNumber}</td>
+                              <td className="px-2 py-2 font-medium">
+                                <span className="flex items-center gap-2">
+                                  <Repeat className="h-3.5 w-3.5 text-blue-600" />
+                                  {displayName}
+                                </span>
+                              </td>
+                              <td className="w-24 px-2 py-2 text-center text-base font-semibold tabular-nums">
+                                {g.quantity}
+                              </td>
+                              <td className="w-16 px-2 py-2 text-sm">{p?.sales_unit ?? ""}</td>
+                              {showPrices ? (
+                                <>
+                                  <td className="w-32 px-2 py-2 text-right text-xs">
+                                    {unitPrice != null ? `à ${formatNOK(unitPrice)}` : "—"}
+                                  </td>
+                                  <td className="w-28 px-2 py-2 text-right tabular-nums">
+                                    {sum != null ? formatNOK(sum) : "—"}
+                                  </td>
+                                </>
+                              ) : null}
+                              <td className="w-28 px-2 py-2">
+                                <div className="flex items-center justify-end">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={readOnly}
+                                    onClick={() => addGhostAsLine(g.productId, g.quantity)}
+                                    className="h-7 text-xs"
+                                  >
+                                    <Plus className="h-3.5 w-3.5" />
+                                    Legg til
+                                  </Button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </>
+                    ) : null}
+
                   </tbody>
                 </table>
               </div>
