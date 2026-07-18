@@ -163,6 +163,7 @@ export default function PakkesystemPage() {
         push_time: destForm.push_time,
         target_offset_days: Number(destForm.target_offset_days),
         auth_header: destForm.auth_header || null,
+        criteria: newDestCriteria as any,
         active: true,
       });
       if (error) throw error;
@@ -171,6 +172,22 @@ export default function PakkesystemPage() {
       toast.success("Destinasjon lagret");
       setDestOpen(false);
       setDestForm({ name: "", url: "", push_time: "04:00", target_offset_days: 0, auth_header: "" });
+      setNewDestCriteria(DEFAULT_CRITERIA);
+      qc.invalidateQueries({ queryKey: ["pakkesystem-dests"] });
+    },
+    onError: (e: any) => toast.error("Feilet: " + (e?.message ?? "ukjent")),
+  });
+
+  const updateDestCriteria = useMutation({
+    mutationFn: async ({ id, criteria }: { id: string; criteria: ProduksjonsplanCriteria }) => {
+      const { error } = await supabase
+        .from("pakkesystem_push_destinations")
+        .update({ criteria: criteria as any })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Kriterier oppdatert");
       qc.invalidateQueries({ queryKey: ["pakkesystem-dests"] });
     },
     onError: (e: any) => toast.error("Feilet: " + (e?.message ?? "ukjent")),
