@@ -664,6 +664,9 @@ export default function Rapporter() {
                 totals={xResult.totals}
                 mva_breakdown={xResult.mva_breakdown}
                 payment_breakdown={xResult.payment_breakdown}
+                journal_counts={xResult.journal_counts}
+                cash_summary={xResult.cash_summary}
+                grand_total={xResult.grand_total}
               />
             </div>
           )}
