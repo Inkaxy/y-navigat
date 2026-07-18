@@ -1,0 +1,70 @@
+openapi: 3.1.0
+info:
+  title: NB Hub — Pakkesystem-API
+  version: "1.0"
+  description: |
+    REST-API for eksternt pakkesystem. Autentisering med langlevd Bearer-nøkkel
+    (én per bakeri). Alle svar er `application/json; charset=utf-8`, UTF-8, ISO 8601.
+    Rate-limit: 60 requests/min per nøkkel.
+servers:
+  - url: https://xpgoztaraqdvliitkkfv.supabase.co/functions/v1/pakkesystem-api
+security:
+  - bearerAuth: []
+paths:
+  /snapshot:
+    get:
+      summary: Full snapshot for én leveringsdag
+      parameters:
+        - in: query
+          name: date
+          required: true
+          schema: { type: string, format: date }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "https://nbhub.no/pakkesystem/schema.json" }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/Error" }
+  /orders:
+    get:
+      summary: Ordre i periode
+      parameters:
+        - in: query
+          name: from
+          required: true
+          schema: { type: string, format: date }
+        - in: query
+          name: to
+          required: true
+          schema: { type: string, format: date }
+      responses:
+        "200": { description: OK }
+  /products:
+    get:
+      summary: Produktkatalog
+      responses:
+        "200": { description: OK }
+  /customers:
+    get:
+      summary: Kundeliste
+      responses:
+        "200": { description: OK }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  responses:
+    Error:
+      description: Feil
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [error, code]
+            properties:
+              error: { type: string }
+              code: { type: string }
