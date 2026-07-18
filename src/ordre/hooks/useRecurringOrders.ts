@@ -270,6 +270,68 @@ export function useDeleteRecurringSchedule() {
   });
 }
 
+/** Kopierer en fastordre-mal inkl. alle linjer til en ny (inaktiv) mal. */
+export function useDuplicateRecurringSchedule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (sourceId: string): Promise<{ scheduleId: string }> => {
+      const { data: userRes } = await supabase.auth.getUser();
+      const userId = userRes.user?.id ?? null;
+
+      const { data: src, error: sErr } = await supabase
+        .from("recurring_order_schedules")
+        .select("*")
+        .eq("id", sourceId)
+        .maybeSingle();
+      if (sErr) throw sErr;
+      if (!src) throw new Error("Fant ikke original mal");
+
+      const { data: items, error: iErr } = await supabase
+        .from("recurring_order_items")
+        .select("product_id, weekday, tour_id, quantity, notes")
+        .eq("schedule_id", sourceId);
+      if (iErr) throw iErr;
+
+      const { data: created, error: cErr } = await supabase
+        .from("recurring_order_schedules")
+        .insert({
+          customer_id: src.customer_id,
+          legal_entity_id: src.legal_entity_id,
+          name: `${src.name} (kopi)`,
+          is_active: false,
+          valid_from: src.valid_from,
+          valid_to: src.valid_to,
+          notes: src.notes,
+          created_by: userId,
+        })
+        .select("id")
+        .single();
+      if (cErr) throw cErr;
+
+      if (items && items.length > 0) {
+        const rows = items.map((it) => ({
+          schedule_id: created.id,
+          product_id: it.product_id,
+          weekday: it.weekday,
+          tour_id: it.tour_id,
+          quantity: it.quantity,
+          notes: it.notes,
+        }));
+        const { error: insErr } = await supabase
+          .from("recurring_order_items")
+          .insert(rows);
+        if (insErr) throw insErr;
+      }
+
+      return { scheduleId: created.id };
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["recurring-schedules"] });
+    },
+  });
+}
+
+
 export const WEEKDAY_SHORT = ["Ma", "Ti", "On", "To", "Fr", "Lø", "Sø"] as const;
 export const WEEKDAY_LONG = [
   "Mandag",

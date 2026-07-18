@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { Loader2, Plus, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Copy, Loader2, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -49,6 +49,7 @@ import {
   WEEKDAY_LONG,
   useRecurringScheduleDetail,
   useSaveRecurringSchedule,
+  useDuplicateRecurringSchedule,
   type RecurringScheduleWithCustomer,
 } from "@/ordre/hooks/useRecurringOrders";
 import { cn } from "@/lib/utils";
@@ -145,6 +146,34 @@ export function RecurringScheduleDialog({
   }, [searchedProducts, allProducts, rowProducts]);
 
   const save = useSaveRecurringSchedule();
+  const duplicate = useDuplicateRecurringSchedule();
+
+  const topAddRef = useRef<HTMLDivElement | null>(null);
+  const [showFab, setShowFab] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    const el = topAddRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      ([entry]) => setShowFab(!entry.isIntersecting),
+      { threshold: 0, rootMargin: "-40px 0px 0px 0px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [open, rows.length]);
+
+  async function handleDuplicate() {
+    if (!editing) return;
+    try {
+      const { scheduleId } = await duplicate.mutateAsync(editing.id);
+      toast.success(`Kopi opprettet — «${editing.name} (kopi)» (inaktiv)`);
+      onSaved();
+      onOpenChange(false);
+      void scheduleId;
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Kunne ikke kopiere mal");
+    }
+  }
 
   // Init/reset på open
   useEffect(() => {
@@ -297,7 +326,7 @@ export function RecurringScheduleDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto relative">
         <DialogHeader>
           <DialogTitle>
             {isEdit ? `Rediger fastordre — ${editing?.customer_display_name}` : "Ny fastordre"}
@@ -446,7 +475,7 @@ export function RecurringScheduleDialog({
 
           {/* Ukesvisning */}
           <div className="space-y-3">
-            <div className="flex items-center justify-between gap-3">
+            <div ref={topAddRef} className="flex items-center justify-between gap-3">
               <Label>Ukesvisning — mengde per ukedag</Label>
               <Popover open={productPickerOpen} onOpenChange={setProductPickerOpen}>
                 <PopoverTrigger asChild>
@@ -632,18 +661,50 @@ export function RecurringScheduleDialog({
           </div>
         </div>
 
-        <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={save.isPending}
+        {/* Sticky FAB — vises når «Legg til produkt» øverst er ute av syne */}
+        {showFab && rows.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setProductPickerOpen(true)}
+            aria-label="Legg til produkt"
+            title="Legg til produkt"
+            className="sticky bottom-4 float-right mr-2 -mt-14 z-20 h-11 w-11 rounded-full bg-primary text-primary-foreground shadow-lg ring-1 ring-primary/20 hover:bg-primary/90 transition-transform hover:scale-105 flex items-center justify-center"
           >
-            Avbryt
-          </Button>
-          <Button onClick={handleSave} disabled={save.isPending}>
-            {save.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {isEdit ? "Lagre endringer" : "Opprett fastordre"}
-          </Button>
+            <Plus className="h-5 w-5" />
+          </button>
+        )}
+
+        <DialogFooter className="gap-2 sm:justify-between">
+          <div>
+            {isEdit && (
+              <Button
+                variant="outline"
+                onClick={handleDuplicate}
+                disabled={duplicate.isPending || save.isPending}
+                className="gap-1.5"
+              >
+                {duplicate.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Copy className="h-4 w-4" />
+                )}
+                Dupliser som ny mal
+              </Button>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={save.isPending}
+            >
+              Avbryt
+            </Button>
+            <Button onClick={handleSave} disabled={save.isPending}>
+              {save.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isEdit ? "Lagre endringer" : "Opprett fastordre"}
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

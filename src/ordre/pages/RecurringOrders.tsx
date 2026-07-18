@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { CalendarRange, Loader2, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { CalendarRange, Copy, Loader2, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { AppBanner } from "@/ordre/components/shell/AppBanner";
 import { Button } from "@/components/ui/button";
@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   useDeleteRecurringSchedule,
+  useDuplicateRecurringSchedule,
   useRecurringSchedules,
   type RecurringScheduleFilter,
   type RecurringScheduleWithCustomer,
@@ -54,6 +55,16 @@ export default function RecurringOrders() {
   const [deleting, setDeleting] = useState<RecurringScheduleWithCustomer | null>(null);
 
   const deleteSchedule = useDeleteRecurringSchedule();
+  const duplicateSchedule = useDuplicateRecurringSchedule();
+
+  async function handleDuplicate(s: RecurringScheduleWithCustomer) {
+    try {
+      await duplicateSchedule.mutateAsync(s.id);
+      toast.success(`Kopi opprettet: «${s.name} (kopi)» — inaktiv til du aktiverer den`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Kunne ikke kopiere mal");
+    }
+  }
 
   function openNew() {
     setEditing(null);
@@ -202,6 +213,17 @@ export default function RecurringOrders() {
                         aria-label="Rediger"
                       >
                         <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleDuplicate(s)}
+                        disabled={duplicateSchedule.isPending}
+                        className="h-7 w-7 p-0"
+                        aria-label="Kopier som ny mal"
+                        title="Kopier som ny mal"
+                      >
+                        <Copy className="h-3.5 w-3.5" />
                       </Button>
                       <Button
                         size="sm"
