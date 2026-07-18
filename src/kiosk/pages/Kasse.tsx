@@ -292,7 +292,22 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
       const r = { tx, lines: lines ?? [] };
       setReceipt(r);
       setLastReceipt(r);
+      setCopyIssued(false);
       setPayOpen(false);
+      // Kassasystemforskrifta: kvittering MÅ produseres for hvert salg. Vis
+      // elektronisk kvittering (modal) og journalfør leveransen umiddelbart.
+      kioskSupabase
+        .rpc("pos_journal_append", {
+          p_terminal_id: terminal!.id,
+          p_event_type: "receipt_delivered",
+          p_operator_id: operator?.id ?? null,
+          p_session_id: session?.id ?? null,
+          p_transaction_id: id,
+          p_payload: { channel: "screen" },
+        } as never)
+        .then(({ error }) => {
+          if (error) console.warn("receipt_delivered append failed", error.message);
+        });
       if (activePickupOrderId) {
         await kioskSupabase.rpc("pos_complete_pickup_order" as never, {
           p_order_id: activePickupOrderId,
