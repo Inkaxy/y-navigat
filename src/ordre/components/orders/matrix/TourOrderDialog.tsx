@@ -223,6 +223,25 @@ export function TourOrderDialog({
     qc.invalidateQueries({ queryKey: ["matrix"] });
   }
 
+  const [deleting, setDeleting] = useState(false);
+  async function deleteWholeOrder() {
+    if (!order || readOnly) return;
+    if (!confirm(`Slett hele ordren #${order.order_number}?\n\nAlle ${order.lines.length} linjer fjernes.`)) return;
+    setDeleting(true);
+    try {
+      const { error } = await supabase.from("orders").delete().eq("id", order.id);
+      if (error) throw error;
+      toast.success(`Ordre #${order.order_number} slettet`);
+      qc.invalidateQueries({ queryKey: ["tour-order"] });
+      qc.invalidateQueries({ queryKey: ["matrix"] });
+      onOpenChange(false);
+    } catch (e: any) {
+      toast.error("Kunne ikke slette ordren", { description: e?.message });
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   const addableProducts = useMemo(() => {
     if (!order) return [] as MatrixProduct[];
     const already = new Set(order.lines.map((l) => l.product_id));
