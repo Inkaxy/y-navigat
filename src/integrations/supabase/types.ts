@@ -5075,6 +5075,81 @@ export type Database = {
           },
         ]
       }
+      pos_saf_t_exports: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          event_count: number
+          file_name: string
+          file_size_bytes: number | null
+          generated_by: string | null
+          id: string
+          legal_entity_id: string
+          period_end: string
+          period_start: string
+          sha256: string | null
+          status: string
+          storage_path: string | null
+          terminal_id: string | null
+          transaction_count: number
+          updated_at: string
+          validation_errors: Json
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          event_count?: number
+          file_name: string
+          file_size_bytes?: number | null
+          generated_by?: string | null
+          id?: string
+          legal_entity_id: string
+          period_end: string
+          period_start: string
+          sha256?: string | null
+          status?: string
+          storage_path?: string | null
+          terminal_id?: string | null
+          transaction_count?: number
+          updated_at?: string
+          validation_errors?: Json
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          event_count?: number
+          file_name?: string
+          file_size_bytes?: number | null
+          generated_by?: string | null
+          id?: string
+          legal_entity_id?: string
+          period_end?: string
+          period_start?: string
+          sha256?: string | null
+          status?: string
+          storage_path?: string | null
+          terminal_id?: string | null
+          transaction_count?: number
+          updated_at?: string
+          validation_errors?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pos_saf_t_exports_legal_entity_id_fkey"
+            columns: ["legal_entity_id"]
+            isOneToOne: false
+            referencedRelation: "legal_entities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pos_saf_t_exports_terminal_id_fkey"
+            columns: ["terminal_id"]
+            isOneToOne: false
+            referencedRelation: "pos_terminals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pos_sessions: {
         Row: {
           closed_at: string | null

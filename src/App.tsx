@@ -93,6 +93,7 @@ import PosStyringTransaksjonDetalj from "@/pos_styring/pages/TransaksjonDetalj";
 import PosStyringRapporter from "@/pos_styring/pages/Rapporter";
 import PosStyringZDetalj from "@/pos_styring/pages/ZDetalj";
 import PosStyringInnstillinger from "@/pos_styring/pages/Innstillinger";
+import PosStyringSafT from "@/pos_styring/pages/SafTExport";
 import PosStyringSkrivere from "@/pos_styring/pages/Skrivere";
 import PosStyringStasjoner from "@/pos_styring/pages/Stasjoner";
 
@@ -376,6 +377,7 @@ const App = () => (
               <Route path="/pos-styring/rapporter" element={<PosStyringShell><PosStyringRapporter /></PosStyringShell>} />
               <Route path="/pos-styring/rapporter/z/:id" element={<PosStyringShell><PosStyringZDetalj /></PosStyringShell>} />
               <Route path="/pos-styring/innstillinger" element={<PosStyringShell><PosStyringInnstillinger /></PosStyringShell>} />
+              <Route path="/pos-styring/innstillinger/saf-t" element={<PosStyringShell><PosStyringSafT /></PosStyringShell>} />
               <Route path="/pos-styring/skrivere" element={<PosStyringShell><PosStyringSkrivere /></PosStyringShell>} />
               <Route path="/pos-styring/stasjoner" element={<PosStyringShell><PosStyringStasjoner /></PosStyringShell>} />
 
