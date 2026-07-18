@@ -16,6 +16,9 @@ import { PaymentModal } from "@/kiosk/components/PaymentModal";
 import { KakebyggerModal } from "@/kiosk/components/KakebyggerModal";
 import { HenteordreModal, type PickupOrderRow, type PickupOrderLine } from "@/kiosk/components/HenteordreModal";
 import { ReceiptView } from "@/kiosk/components/ReceiptView";
+import { DrawerOpenOverlay } from "@/kiosk/components/DrawerOpenOverlay";
+import { OpenDrawerReasonDialog } from "@/kiosk/components/OpenDrawerReasonDialog";
+import { useTerminalDrawerStatus } from "@/kiosk/hooks/useTerminalDrawerStatus";
 import { useReceiptHeader } from "@/kiosk/hooks/useReceiptHeader";
 import { useTerminal } from "@/kiosk/context/TerminalContext";
 
@@ -152,7 +155,9 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
     lines: any[];
   } | null>(null);
   const [copyIssued, setCopyIssued] = useState(false);
+  const [openDrawerDialogOpen, setOpenDrawerDialogOpen] = useState(false);
 
+  const drawerCtl = useTerminalDrawerStatus(terminal?.id ?? null, operator?.id ?? null, session?.id ?? null);
 
   const theme = parseTheme(data?.layout.theme ?? null);
   const sessionOpen = sessionStatus === "open" && !!session;
@@ -584,20 +589,7 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
           setKakebyggerOpen(true);
           return;
         case "open_drawer":
-          stubToast("Åpne kasseskuff");
-          if (terminal?.id) {
-            kioskSupabase
-              .rpc("pos_journal_append", {
-                p_terminal_id: terminal.id,
-                p_event_type: "drawer_open",
-                p_operator_id: operator?.id ?? null,
-                p_session_id: session?.id ?? null,
-                p_payload: { reason: "manual" },
-              } as never)
-              .then(({ error }) => {
-                if (error) console.warn("pos_journal_append drawer_open failed", error.message);
-              });
-          }
+          setOpenDrawerDialogOpen(true);
           return;
         default:
           toast.info(`${code}: ikke koblet`);
@@ -652,6 +644,10 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
           onButtonClick={handleButtonClick}
           onPay={() => {
             if (cart.items.length === 0) return;
+            if (drawerCtl.status.isOpen) {
+              toast.error("Lukk skuffen for å fortsette");
+              return;
+            }
             setRpcError(null);
             setPayOpen(true);
           }}
@@ -849,6 +845,32 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <OpenDrawerReasonDialog
+        open={openDrawerDialogOpen}
+        onOpenChange={setOpenDrawerDialogOpen}
+        onConfirm={async (reason) => {
+          await drawerCtl.openDrawer(reason, "manual");
+          toast.success("Skuff åpnet — hendelse journalført");
+        }}
+      />
+
+      {drawerCtl.status.isOpen && (
+        <DrawerOpenOverlay
+          reason={drawerCtl.status.reason}
+          openedAt={drawerCtl.status.openedAt}
+          busy={drawerCtl.busy}
+          onClose={async () => {
+            try {
+              await drawerCtl.closeDrawer();
+            } catch (e) {
+              toast.error("Kunne ikke registrere at skuffen er lukket", {
+                description: (e as Error).message,
+              });
+            }
+          }}
+        />
+      )}
     </div>
   );
 }

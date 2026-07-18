@@ -4,14 +4,16 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { RefreshCw, Monitor } from "lucide-react";
+import { RefreshCw, Monitor, AlertTriangle } from "lucide-react";
 import {
   aggregateToday,
   fetchLatestZ,
   fetchOpenSessions,
   fetchTerminals,
   fetchTodayTransactions,
+  fetchVarianceAlerts,
   verifyJournalChain,
+  fmtMoney,
   type JournalChainResult,
 } from "@/pos_styring/lib/dashboardQueries";
 import { DashboardKpiRow } from "@/pos_styring/components/DashboardKpiRow";
@@ -36,6 +38,10 @@ const Dashboard = () => {
   const zQ = useQuery({
     queryKey: ["pos-styring", "dash", "latest-z"],
     queryFn: fetchLatestZ,
+  });
+  const varianceQ = useQuery({
+    queryKey: ["pos-styring", "dash", "variance-alerts"],
+    queryFn: fetchVarianceAlerts,
   });
 
   const terminals = terminalsQ.data ?? [];
@@ -121,6 +127,43 @@ const Dashboard = () => {
         terminalsActive={terminalsActive}
         terminalsTotal={terminals.length}
       />
+
+      {(varianceQ.data?.length ?? 0) > 0 && (
+        <Card className="border-amber-400/40 bg-amber-50 p-4 text-sm text-amber-900">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+            <div className="flex-1 space-y-2">
+              <div className="font-semibold">
+                Kontantavvik i Z-rapport ({varianceQ.data!.length})
+              </div>
+              <ul className="space-y-1">
+                {varianceQ.data!.slice(0, 5).map((v) => {
+                  const t = terminals.find((x) => x.id === v.terminal_id);
+                  const sign = v.cash_variance_total >= 0 ? "+" : "";
+                  return (
+                    <li key={v.id} className="flex flex-wrap justify-between gap-2">
+                      <span>
+                        {t?.display_name ?? t?.terminal_code ?? "Terminal"} · Z#{v.z_number}
+                        {v.variance_threshold != null && (
+                          <span className="ml-1 text-amber-700/70">
+                            (terskel {fmtMoney(v.variance_threshold)})
+                          </span>
+                        )}
+                      </span>
+                      <span className="font-mono tabular-nums font-semibold">
+                        {sign}
+                        {fmtMoney(v.cash_variance_total)}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          </div>
+        </Card>
+      )}
+
+
 
       {anyError && (
         <Card className="border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
