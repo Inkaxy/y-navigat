@@ -381,6 +381,8 @@ const App = () => (
               <Route path="/pos-styring/innstillinger/saf-t" element={<PosStyringShell><PosStyringSafT /></PosStyringShell>} />
               <Route path="/pos-styring/skrivere" element={<PosStyringShell><PosStyringSkrivere /></PosStyringShell>} />
               <Route path="/pos-styring/stasjoner" element={<PosStyringShell><PosStyringStasjoner /></PosStyringShell>} />
+              <Route path="/pos-styring/helse" element={<PosStyringShell><PosStyringKasseHelse /></PosStyringShell>} />
+
 
               {/* Kiosk-ruter — bypasser NBhub <Shell>/<ProtectedRoute>; egen Supabase-klient (storageKey 'pos-kiosk-auth') */}
               <Route path="/kiosk/o/:terminalId" element={<KioskOperatorRoute />} />
