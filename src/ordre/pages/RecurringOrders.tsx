@@ -55,6 +55,16 @@ export default function RecurringOrders() {
   const [deleting, setDeleting] = useState<RecurringScheduleWithCustomer | null>(null);
 
   const deleteSchedule = useDeleteRecurringSchedule();
+  const duplicateSchedule = useDuplicateRecurringSchedule();
+
+  async function handleDuplicate(s: RecurringScheduleWithCustomer) {
+    try {
+      await duplicateSchedule.mutateAsync(s.id);
+      toast.success(`Kopi opprettet: «${s.name} (kopi)» — inaktiv til du aktiverer den`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Kunne ikke kopiere mal");
+    }
+  }
 
   function openNew() {
     setEditing(null);
