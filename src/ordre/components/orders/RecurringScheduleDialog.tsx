@@ -661,18 +661,50 @@ export function RecurringScheduleDialog({
           </div>
         </div>
 
-        <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={save.isPending}
+        {/* Sticky FAB — vises når «Legg til produkt» øverst er ute av syne */}
+        {showFab && rows.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setProductPickerOpen(true)}
+            aria-label="Legg til produkt"
+            title="Legg til produkt"
+            className="sticky bottom-4 float-right mr-2 -mt-14 z-20 h-11 w-11 rounded-full bg-primary text-primary-foreground shadow-lg ring-1 ring-primary/20 hover:bg-primary/90 transition-transform hover:scale-105 flex items-center justify-center"
           >
-            Avbryt
-          </Button>
-          <Button onClick={handleSave} disabled={save.isPending}>
-            {save.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {isEdit ? "Lagre endringer" : "Opprett fastordre"}
-          </Button>
+            <Plus className="h-5 w-5" />
+          </button>
+        )}
+
+        <DialogFooter className="gap-2 sm:justify-between">
+          <div>
+            {isEdit && (
+              <Button
+                variant="outline"
+                onClick={handleDuplicate}
+                disabled={duplicate.isPending || save.isPending}
+                className="gap-1.5"
+              >
+                {duplicate.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Copy className="h-4 w-4" />
+                )}
+                Dupliser som ny mal
+              </Button>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={save.isPending}
+            >
+              Avbryt
+            </Button>
+            <Button onClick={handleSave} disabled={save.isPending}>
+              {save.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isEdit ? "Lagre endringer" : "Opprett fastordre"}
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
