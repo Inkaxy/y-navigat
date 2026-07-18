@@ -264,11 +264,20 @@ export function TourOrderDialog({
                     : "Ordre"}
                 </div>
                 {date && tour ? (
-                  <div className="mt-1 text-sm text-muted-foreground">
+                  <div className="mt-1 text-sm text-muted-foreground flex items-center gap-2 flex-wrap">
                     <span className="font-medium text-foreground">
                       {formatHeader(date)} — tur {tour.tour_number}
                     </span>
-                    <span className="ml-2">
+                    <button
+                      type="button"
+                      onClick={() => setInfoOpen(true)}
+                      disabled={!order}
+                      className="inline-flex h-6 w-6 items-center justify-center rounded border border-primary/40 bg-primary/5 text-primary hover:bg-primary/10 disabled:opacity-40"
+                      title="Ordreinfo"
+                    >
+                      <Info className="h-3.5 w-3.5" />
+                    </button>
+                    <span>
                       · {tour.display_name} ({tour.time_from.slice(0, 5)}–{tour.time_to.slice(0, 5)})
                     </span>
                   </div>
