@@ -845,6 +845,32 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <OpenDrawerReasonDialog
+        open={openDrawerDialogOpen}
+        onOpenChange={setOpenDrawerDialogOpen}
+        onConfirm={async (reason) => {
+          await drawerCtl.openDrawer(reason, "manual");
+          toast.success("Skuff åpnet — hendelse journalført");
+        }}
+      />
+
+      {drawerCtl.status.isOpen && (
+        <DrawerOpenOverlay
+          reason={drawerCtl.status.reason}
+          openedAt={drawerCtl.status.openedAt}
+          busy={drawerCtl.busy}
+          onClose={async () => {
+            try {
+              await drawerCtl.closeDrawer();
+            } catch (e) {
+              toast.error("Kunne ikke registrere at skuffen er lukket", {
+                description: (e as Error).message,
+              });
+            }
+          }}
+        />
+      )}
     </div>
   );
 }
