@@ -20,6 +20,7 @@ import {
   Eye,
   BookOpen,
   CalendarIcon,
+  ShoppingCart,
 } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { format as fmtDate } from "date-fns";
@@ -69,6 +70,7 @@ import {
 import { CorrectionsDialog } from "@/ordre/components/orders/matrix/CorrectionsDialog";
 import { FlatLinesView } from "@/ordre/components/orders/matrix/FlatLinesView";
 import { ProductInfoDialog } from "@/ordre/components/orders/matrix/ProductInfoDialog";
+import { TourOrderDialog } from "@/ordre/components/orders/matrix/TourOrderDialog";
 import {
   useColumnComments,
   useUpsertColumnComment,
@@ -186,6 +188,7 @@ export default function MatrixPage() {
   const [copyColCol, setCopyColCol] = useState<{ date: string; tour: MatrixTour } | null>(null);
   const [commentCol, setCommentCol] = useState<{ date: string; tour: MatrixTour } | null>(null);
   const [deleteColConfirm, setDeleteColConfirm] = useState<{ date: string; tour: MatrixTour } | null>(null);
+  const [tourOrderCol, setTourOrderCol] = useState<{ date: string; tour: MatrixTour } | null>(null);
 
   // Handling-meny dialog state
   const [setForAllOpen, setSetForAllOpen] = useState(false);
@@ -1484,6 +1487,7 @@ export default function MatrixPage() {
               onColPackingNote={(date, tour) => generatePackingNoteForColumn(date, tour)}
               colHasData={colHasAnyData}
               canEdit={canEdit}
+              onOpenTourOrder={(date, tour) => setTourOrderCol({ date, tour })}
             />
             <div className="sticky left-0 flex flex-wrap items-center gap-2 border-t border-border bg-card px-4 py-3 sm:px-6">
               {hasAddable ? (
@@ -1515,6 +1519,24 @@ export default function MatrixPage() {
         onOpenChange={setAddOpen}
         customerId={customerId}
         onPick={handleAddProduct}
+      />
+
+      <TourOrderDialog
+        open={!!tourOrderCol}
+        onOpenChange={(v) => !v && setTourOrderCol(null)}
+        customer={
+          selectedCustomer
+            ? {
+                id: selectedCustomer.id,
+                customer_number: selectedCustomer.customer_number,
+                display_name: selectedCustomer.display_name,
+              }
+            : null
+        }
+        date={tourOrderCol?.date ?? null}
+        tour={tourOrderCol?.tour ?? null}
+        products={allProducts}
+        canEdit={canEdit}
       />
 
       {merknadCell && labelProfileByProduct.get(merknadCell.productId) && (
@@ -1740,6 +1762,7 @@ function MatrixGrid({
   onColPackingNote,
   colHasData,
   canEdit,
+  onOpenTourOrder,
 }: {
   columns: { date: string; tour: MatrixTour }[];
   products: MatrixProduct[];
@@ -1766,6 +1789,7 @@ function MatrixGrid({
   onColPackingNote: (date: string, tour: MatrixTour) => void;
   colHasData: (date: string, tourId: string) => boolean;
   canEdit: boolean;
+  onOpenTourOrder: (date: string, tour: MatrixTour) => void;
 }) {
   const [infoProduct, setInfoProduct] = useState<{ id: string; name: string } | null>(null);
   const dateGroups = useMemo(() => {
@@ -1852,6 +1876,9 @@ function MatrixGrid({
                     </button>
                     <button type="button" disabled={!colHas} onClick={() => onColPackingNote(c.date, c.tour)} className="rounded p-0.5 text-muted-foreground/70 hover:bg-accent hover:text-foreground disabled:opacity-30" title="Lag pakkseddel">
                       <PackageCheck className="h-3 w-3" />
+                    </button>
+                    <button type="button" disabled={!colHas} onClick={() => onOpenTourOrder(c.date, c.tour)} className="rounded p-0.5 text-muted-foreground/70 hover:bg-primary/10 hover:text-primary disabled:opacity-30" title="Åpne ordre for denne turen">
+                      <ShoppingCart className="h-3 w-3" />
                     </button>
                   </div>
                 </th>
