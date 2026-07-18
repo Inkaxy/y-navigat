@@ -131,6 +131,7 @@ import OrdreTicketDetail from "@/ordre/pages/TicketDetail";
 import OrdreAiForslag from "@/ordre/pages/AiForslag";
 import OrdreTicketReports from "@/ordre/pages/TicketReports";
 import OrdreRefundsQueue from "@/ordre/pages/RefundsQueue";
+import OrdrePakkesystemApi from "@/ordre/pages/PakkesystemApi";
 
 import { RavarerProvider } from "@/ravarer/context/RavarerContext";
 import RavarerVareliste from "@/ravarer/pages/Vareliste";
