@@ -146,6 +146,34 @@ export function RecurringScheduleDialog({
   }, [searchedProducts, allProducts, rowProducts]);
 
   const save = useSaveRecurringSchedule();
+  const duplicate = useDuplicateRecurringSchedule();
+
+  const topAddRef = useRef<HTMLDivElement | null>(null);
+  const [showFab, setShowFab] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    const el = topAddRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      ([entry]) => setShowFab(!entry.isIntersecting),
+      { threshold: 0, rootMargin: "-40px 0px 0px 0px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [open, rows.length]);
+
+  async function handleDuplicate() {
+    if (!editing) return;
+    try {
+      const { scheduleId } = await duplicate.mutateAsync(editing.id);
+      toast.success(`Kopi opprettet — «${editing.name} (kopi)» (inaktiv)`);
+      onSaved();
+      onOpenChange(false);
+      void scheduleId;
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Kunne ikke kopiere mal");
+    }
+  }
 
   // Init/reset på open
   useEffect(() => {
