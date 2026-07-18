@@ -708,6 +708,8 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
         terminalName={terminal?.display_name ?? ""}
         terminalId={terminal?.id ?? null}
         operatorCode={operator?.code ?? null}
+        operatorName={operator?.display_name ?? null}
+        copyIssued={copyIssued}
         company={receiptHeader.company}
         outlet={receiptHeader.outlet}
         onNewSale={handleNewSale}
