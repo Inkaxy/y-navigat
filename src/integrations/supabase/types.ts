@@ -4225,7 +4225,9 @@ export type Database = {
           last_used_at: string | null
           legal_entity_id: string
           name: string
+          note: string | null
           revoked_at: string | null
+          scopes: string[]
         }
         Insert: {
           created_at?: string
@@ -4236,7 +4238,9 @@ export type Database = {
           last_used_at?: string | null
           legal_entity_id: string
           name: string
+          note?: string | null
           revoked_at?: string | null
+          scopes?: string[]
         }
         Update: {
           created_at?: string
@@ -4247,7 +4251,9 @@ export type Database = {
           last_used_at?: string | null
           legal_entity_id?: string
           name?: string
+          note?: string | null
           revoked_at?: string | null
+          scopes?: string[]
         }
         Relationships: [
           {
@@ -4302,6 +4308,71 @@ export type Database = {
             columns: ["api_key_id"]
             isOneToOne: false
             referencedRelation: "pakkesystem_api_keys"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pakkesystem_push_destinations: {
+        Row: {
+          active: boolean
+          auth_header: string | null
+          created_at: string
+          created_by: string | null
+          extra_headers: Json
+          http_method: string
+          id: string
+          last_error: string | null
+          last_pushed_at: string | null
+          last_status_code: number | null
+          legal_entity_id: string
+          name: string
+          push_time: string
+          target_offset_days: number
+          updated_at: string
+          url: string
+        }
+        Insert: {
+          active?: boolean
+          auth_header?: string | null
+          created_at?: string
+          created_by?: string | null
+          extra_headers?: Json
+          http_method?: string
+          id?: string
+          last_error?: string | null
+          last_pushed_at?: string | null
+          last_status_code?: number | null
+          legal_entity_id: string
+          name: string
+          push_time?: string
+          target_offset_days?: number
+          updated_at?: string
+          url: string
+        }
+        Update: {
+          active?: boolean
+          auth_header?: string | null
+          created_at?: string
+          created_by?: string | null
+          extra_headers?: Json
+          http_method?: string
+          id?: string
+          last_error?: string | null
+          last_pushed_at?: string | null
+          last_status_code?: number | null
+          legal_entity_id?: string
+          name?: string
+          push_time?: string
+          target_offset_days?: number
+          updated_at?: string
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pakkesystem_push_destinations_legal_entity_id_fkey"
+            columns: ["legal_entity_id"]
+            isOneToOne: false
+            referencedRelation: "legal_entities"
             referencedColumns: ["id"]
           },
         ]
@@ -10230,6 +10301,7 @@ export type Database = {
           order_year: number
         }[]
       }
+      pakkesystem_hash_key: { Args: { p_key: string }; Returns: string }
       portal_create_customer_order: { Args: { p_payload: Json }; Returns: Json }
       portal_create_order: { Args: { p_payload: Json }; Returns: Json }
       portal_create_return_order: { Args: { p_payload: Json }; Returns: Json }
