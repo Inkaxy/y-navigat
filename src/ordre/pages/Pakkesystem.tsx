@@ -68,6 +68,12 @@ export default function PakkesystemPage() {
   const [newKeyNote, setNewKeyNote] = useState("");
   const [revealedKey, setRevealedKey] = useState<string | null>(null);
 
+  const [downloadCriteria, setDownloadCriteria] = useState<ProduksjonsplanCriteria>(DEFAULT_CRITERIA);
+  const [downloadCriteriaOpen, setDownloadCriteriaOpen] = useState(false);
+  const [destCriteriaFor, setDestCriteriaFor] = useState<string | null>(null);
+  const [newDestCriteria, setNewDestCriteria] = useState<ProduksjonsplanCriteria>(DEFAULT_CRITERIA);
+  const [newDestCriteriaOpen, setNewDestCriteriaOpen] = useState(false);
+
   const [destOpen, setDestOpen] = useState(false);
   const [destForm, setDestForm] = useState({
     name: "",
