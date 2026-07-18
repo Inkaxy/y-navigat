@@ -151,6 +151,8 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     lines: any[];
   } | null>(null);
+  const [copyIssued, setCopyIssued] = useState(false);
+
 
   const theme = parseTheme(data?.layout.theme ?? null);
   const sessionOpen = sessionStatus === "open" && !!session;
