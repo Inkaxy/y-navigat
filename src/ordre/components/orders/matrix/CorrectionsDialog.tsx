@@ -22,7 +22,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { Link } from "react-router-dom";
-import { ORDER_STATUS_LABELS, type OrderStatus } from "@/ordre/lib/orderStatus";
+import { getStatusMeta } from "@/ordre/lib/orderStatus";
 
 type AuditRow = {
   id: string;
