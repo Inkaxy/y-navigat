@@ -151,6 +151,8 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     lines: any[];
   } | null>(null);
+  const [copyIssued, setCopyIssued] = useState(false);
+
 
   const theme = parseTheme(data?.layout.theme ?? null);
   const sessionOpen = sessionStatus === "open" && !!session;
@@ -271,7 +273,7 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
           kioskSupabase
             .from("pos_transactions")
             .select(
-              "id, receipt_number, receipt_sequence, created_at, dining_mode, subtotal_excl_mva, total_mva, total_incl_mva, mva_breakdown, payment_summary",
+              "id, receipt_number, receipt_sequence, created_at, dining_mode, subtotal_excl_mva, total_mva, total_incl_mva, mva_breakdown, payment_summary, transaction_type, reference_transaction_id",
             )
             .eq("id", id)
             .single(),
@@ -290,7 +292,22 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
       const r = { tx, lines: lines ?? [] };
       setReceipt(r);
       setLastReceipt(r);
+      setCopyIssued(false);
       setPayOpen(false);
+      // Kassasystemforskrifta: kvittering MÅ produseres for hvert salg. Vis
+      // elektronisk kvittering (modal) og journalfør leveransen umiddelbart.
+      kioskSupabase
+        .rpc("pos_journal_append", {
+          p_terminal_id: terminal!.id,
+          p_event_type: "receipt_delivered",
+          p_operator_id: operator?.id ?? null,
+          p_session_id: session?.id ?? null,
+          p_transaction_id: id,
+          p_payload: { channel: "screen" },
+        } as never)
+        .then(({ error }) => {
+          if (error) console.warn("receipt_delivered append failed", error.message);
+        });
       if (activePickupOrderId) {
         await kioskSupabase.rpc("pos_complete_pickup_order" as never, {
           p_order_id: activePickupOrderId,
@@ -315,6 +332,7 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
 
   const handleNewSale = () => {
     setReceipt(null);
+    setCopyIssued(false);
     cart.clear();
     nav.reset();
   };
@@ -327,6 +345,21 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
     }
     setPrintingReceipt(true);
     try {
+      // Kassasystemforskrifta: kun 1 kvitteringskopi per salg. RPC-en avgjør
+      // atomisk om dette er original eller KOPI, og feiler hvis kopi allerede
+      // er utstedt.
+      const { data: printKindData, error: pkErr } = await kioskSupabase.rpc(
+        "pos_record_receipt_print" as never,
+        { p_terminal_id: terminal.id, p_transaction_id: r.tx.id } as never,
+      );
+      if (pkErr) throw pkErr;
+      const raw = printKindData as unknown;
+      const kindRow = (Array.isArray(raw) ? raw[0] : raw) as
+        | { kind?: string }
+        | null
+        | undefined;
+      const isCopy = kindRow?.kind === "copy";
+
       const [{ data: mapping, error: mErr }, { data: entity, error: eErr }] =
         await Promise.all([
           kioskSupabase
@@ -394,13 +427,18 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
             company,
             outlet: receiptHeader.outlet,
             footer_lines,
+            is_copy: isCopy,
+            copy_label: isCopy ? "KOPI" : null,
           } as unknown as never,
 
           status: "queued",
         });
 
       if (jErr) throw jErr;
-      toast.success("Kvittering lagt i utskriftskø");
+      if (isCopy) setCopyIssued(true);
+      toast.success(
+        isCopy ? "KOPI lagt i utskriftskø" : "Kvittering lagt i utskriftskø",
+      );
     } catch (e) {
       toast.error("Kunne ikke legge i utskriftskø", { description: (e as Error).message });
     } finally {
@@ -670,6 +708,8 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
         terminalName={terminal?.display_name ?? ""}
         terminalId={terminal?.id ?? null}
         operatorCode={operator?.code ?? null}
+        operatorName={operator?.display_name ?? null}
+        copyIssued={copyIssued}
         company={receiptHeader.company}
         outlet={receiptHeader.outlet}
         onNewSale={handleNewSale}
