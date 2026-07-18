@@ -11,6 +11,7 @@ import { Logo } from "@/components/brand/Logo";
 import { Sparkles } from "lucide-react";
 import { TicketQueueWidget } from "@/ordre/components/widgets/TicketQueueWidget";
 import { PosHealthWidget } from "@/pos_styring/components/PosHealthWidget";
+import { LegalEntityProvider as PosStyringGate } from "@/pos_styring/contexts/LegalEntityContext";
 
 export default function Hjem() {
   const { data: profile } = useCurrentUser();
