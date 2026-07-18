@@ -326,7 +326,7 @@ export function RecurringScheduleDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto relative">
+      <DialogContent className="max-w-4xl w-[95vw] h-[min(90svh,900px)] top-4 translate-y-0 sm:top-6 data-[state=open]:slide-in-from-top-4 data-[state=closed]:slide-out-to-top-4 overflow-y-auto overscroll-contain relative pb-24">
         <DialogHeader>
           <DialogTitle>
             {isEdit ? `Rediger fastordre — ${editing?.customer_display_name}` : "Ny fastordre"}
