@@ -21,7 +21,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { Loader2, Trash2, Save, Lock, Plus, ShoppingCart } from "lucide-react";
+import { Loader2, Trash2, Save, Lock, Plus, ShoppingCart, Copy, ClipboardList } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
