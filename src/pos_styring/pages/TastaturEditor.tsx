@@ -1237,9 +1237,30 @@ export default function TastaturEditor() {
         </aside>
 
         <section className="min-w-0 rounded-lg border bg-card p-4 shadow-card">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="font-semibold">{activePage?.page_name ?? "Ingen side"}</h2>
-            <span className="text-xs text-muted-foreground">Klikk tom celle for ny knapp · dra knapp for å flytte</span>
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-2">
+              <h2 className="truncate font-semibold">{activePage?.page_name ?? "Ingen side"}</h2>
+              {activePage?.is_dynamic && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
+                  <Sparkles className="h-3 w-3" /> Dynamisk
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              {activePage && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setFillDialogOpen(true)}
+                >
+                  <Sparkles className="h-4 w-4" />
+                  {activePage.is_dynamic ? "Synk fra varegruppe" : "Fyll fra varegruppe…"}
+                </Button>
+              )}
+              <span className="hidden text-xs text-muted-foreground md:inline">
+                Klikk tom celle · dra for å flytte
+              </span>
+            </div>
           </div>
           {buttonsLoading ? <Skeleton className="h-[560px] w-full" /> : activePage ? (
             <>
