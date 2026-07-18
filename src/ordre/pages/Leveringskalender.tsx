@@ -1743,6 +1743,7 @@ function MatrixGrid({
   onColPackingNote,
   colHasData,
   canEdit,
+  onOpenTourOrder,
 }: {
   columns: { date: string; tour: MatrixTour }[];
   products: MatrixProduct[];
@@ -1769,6 +1770,7 @@ function MatrixGrid({
   onColPackingNote: (date: string, tour: MatrixTour) => void;
   colHasData: (date: string, tourId: string) => boolean;
   canEdit: boolean;
+  onOpenTourOrder: (date: string, tour: MatrixTour) => void;
 }) {
   const [infoProduct, setInfoProduct] = useState<{ id: string; name: string } | null>(null);
   const dateGroups = useMemo(() => {
