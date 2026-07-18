@@ -71,9 +71,14 @@ export default function Hjem() {
       </section>
 
       {/* Widgets */}
-      {hasOrdreAccess && (
+      {(hasOrdreAccess || hasPosStyringAccess) && (
         <div className="grid gap-4 md:grid-cols-2">
-          <TicketQueueWidget />
+          {hasOrdreAccess && <TicketQueueWidget />}
+          {hasPosStyringAccess && (
+            <PosStyringGate>
+              <PosHealthWidget />
+            </PosStyringGate>
+          )}
         </div>
       )}
 
