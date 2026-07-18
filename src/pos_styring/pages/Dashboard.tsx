@@ -4,14 +4,16 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { RefreshCw, Monitor } from "lucide-react";
+import { RefreshCw, Monitor, AlertTriangle } from "lucide-react";
 import {
   aggregateToday,
   fetchLatestZ,
   fetchOpenSessions,
   fetchTerminals,
   fetchTodayTransactions,
+  fetchVarianceAlerts,
   verifyJournalChain,
+  fmtMoney,
   type JournalChainResult,
 } from "@/pos_styring/lib/dashboardQueries";
 import { DashboardKpiRow } from "@/pos_styring/components/DashboardKpiRow";
