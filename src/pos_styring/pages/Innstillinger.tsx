@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { FileDown } from "lucide-react";
 import { Card } from "@/components/ui/card";
