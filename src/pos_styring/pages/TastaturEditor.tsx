@@ -71,6 +71,10 @@ interface KeypadPage {
   page_name: string;
   sort_order: number;
   background_color: string | null;
+  is_dynamic?: boolean | null;
+  source_kind?: "main_category" | "sub_category" | "production_group" | null;
+  source_id?: string | null;
+  source_last_synced_at?: string | null;
 }
 
 type ButtonType = "product" | "category" | "function";
