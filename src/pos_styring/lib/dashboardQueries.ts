@@ -172,3 +172,43 @@ export async function verifyJournalChain(terminalId: string): Promise<JournalCha
     total_events: Number(row.total_events ?? 0),
   };
 }
+
+export interface VarianceAlertRow {
+  id: string;
+  terminal_id: string;
+  z_number: number;
+  closed_at: string;
+  cash_variance_total: number;
+  variance_threshold: number | null;
+  counted_cash_total: number;
+  expected_cash_total: number;
+}
+
+/**
+ * Henter Z-rapporter fra siste 7 dager som er flagget med kontantavvik over
+ * konfigurerbar terskel (default 100 kr). Brukes til varselbanner på
+ * POS Styring → Oversikt.
+ */
+export async function fetchVarianceAlerts(): Promise<VarianceAlertRow[]> {
+  const sinceIso = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
+  const { data, error } = await supabase
+    .from("pos_z_reports")
+    .select(
+      "id, terminal_id, z_number, closed_at, cash_variance_total, variance_threshold, counted_cash_total, expected_cash_total, variance_flagged",
+    )
+    .eq("variance_flagged", true)
+    .gte("closed_at", sinceIso)
+    .order("closed_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map((r: any) => ({
+    id: r.id,
+    terminal_id: r.terminal_id,
+    z_number: Number(r.z_number),
+    closed_at: r.closed_at,
+    cash_variance_total: Number(r.cash_variance_total) || 0,
+    variance_threshold: r.variance_threshold != null ? Number(r.variance_threshold) : null,
+    counted_cash_total: Number(r.counted_cash_total) || 0,
+    expected_cash_total: Number(r.expected_cash_total) || 0,
+  }));
+}
+
