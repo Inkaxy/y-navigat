@@ -273,7 +273,7 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
           kioskSupabase
             .from("pos_transactions")
             .select(
-              "id, receipt_number, receipt_sequence, created_at, dining_mode, subtotal_excl_mva, total_mva, total_incl_mva, mva_breakdown, payment_summary",
+              "id, receipt_number, receipt_sequence, created_at, dining_mode, subtotal_excl_mva, total_mva, total_incl_mva, mva_breakdown, payment_summary, transaction_type, reference_transaction_id",
             )
             .eq("id", id)
             .single(),
