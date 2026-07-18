@@ -10,6 +10,7 @@ import { AppCard } from "@/components/AppCard";
 import { Logo } from "@/components/brand/Logo";
 import { Sparkles } from "lucide-react";
 import { TicketQueueWidget } from "@/ordre/components/widgets/TicketQueueWidget";
+import { PosHealthWidget } from "@/pos_styring/components/PosHealthWidget";
 
 export default function Hjem() {
   const { data: profile } = useCurrentUser();
