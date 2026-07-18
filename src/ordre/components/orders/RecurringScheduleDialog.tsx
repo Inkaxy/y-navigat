@@ -475,7 +475,7 @@ export function RecurringScheduleDialog({
 
           {/* Ukesvisning */}
           <div className="space-y-3">
-            <div className="flex items-center justify-between gap-3">
+            <div ref={topAddRef} className="flex items-center justify-between gap-3">
               <Label>Ukesvisning — mengde per ukedag</Label>
               <Popover open={productPickerOpen} onOpenChange={setProductPickerOpen}>
                 <PopoverTrigger asChild>
