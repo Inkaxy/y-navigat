@@ -235,7 +235,7 @@ export default function PakkesystemPage() {
     const { data: sess } = await supabase.auth.getSession();
     const jwt = sess.session?.access_token;
     if (!jwt) return toast.error("Ingen session");
-    const res = await fetch(`${FUNCTIONS_BASE}/pakkesystem-export?date=${downloadDate}&legal_entity_id=${NB_LEGAL_ENTITY_ID}`, {
+    const res = await fetch(`${FUNCTIONS_BASE}/pakkesystem-export?date=${downloadDate}&legal_entity_id=${NB_LEGAL_ENTITY_ID}${criteriaToQuery(downloadCriteria)}`, {
       headers: { Authorization: `Bearer ${jwt}` },
     });
     if (!res.ok) {
