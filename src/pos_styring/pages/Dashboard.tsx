@@ -39,6 +39,10 @@ const Dashboard = () => {
     queryKey: ["pos-styring", "dash", "latest-z"],
     queryFn: fetchLatestZ,
   });
+  const varianceQ = useQuery({
+    queryKey: ["pos-styring", "dash", "variance-alerts"],
+    queryFn: fetchVarianceAlerts,
+  });
 
   const terminals = terminalsQ.data ?? [];
   const sessions = sessionsQ.data ?? [];
