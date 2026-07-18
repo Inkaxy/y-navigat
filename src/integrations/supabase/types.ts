@@ -10153,6 +10153,13 @@ export type Database = {
           operator_id: string
         }[]
       }
+      pos_record_receipt_print: {
+        Args: { p_terminal_id: string; p_transaction_id: string }
+        Returns: {
+          copies_remaining: number
+          kind: string
+        }[]
+      }
       pos_record_sale: {
         Args: {
           p_customer_id?: string
