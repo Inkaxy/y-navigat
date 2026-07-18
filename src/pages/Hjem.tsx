@@ -25,6 +25,7 @@ export default function Hjem() {
   const greeting = getTimeGreeting();
   const accessibleApps = (apps ?? []).filter((a) => a.access_level !== "none");
   const hasOrdreAccess = accessibleApps.some((a) => a.code === "ordre");
+  const hasPosStyringAccess = accessibleApps.some((a) => a.code === "pos_styring");
   const today = new Date().toLocaleDateString("nb-NO", {
     weekday: "long",
     day: "numeric",
