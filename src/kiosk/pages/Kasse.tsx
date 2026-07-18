@@ -155,7 +155,9 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
     lines: any[];
   } | null>(null);
   const [copyIssued, setCopyIssued] = useState(false);
+  const [openDrawerDialogOpen, setOpenDrawerDialogOpen] = useState(false);
 
+  const drawerCtl = useTerminalDrawerStatus(terminal?.id ?? null, operator?.id ?? null, session?.id ?? null);
 
   const theme = parseTheme(data?.layout.theme ?? null);
   const sessionOpen = sessionStatus === "open" && !!session;
