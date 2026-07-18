@@ -384,7 +384,7 @@ export default function Rapporter() {
         toast.error("Du har ikke tilgang");
       } else if (msg.includes("Invalid period")) {
         toast.error("Periodens slutt må være etter start");
-      } else if (msg.toLowerCase().includes("cannot generate z while sessions are open")) {
+      } else if (msg.toLowerCase().includes("open session") && msg.toLowerCase().includes("overlap")) {
         toast.error(
           "Det er en åpen sesjon i perioden. Lukk den fra kassen først, eller velg en annen periode.",
         );
