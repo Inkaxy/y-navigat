@@ -1537,6 +1537,16 @@ export default function MatrixPage() {
         tour={tourOrderCol?.tour ?? null}
         products={allProducts}
         canEdit={canEdit}
+        onCreatePackingNote={
+          tourOrderCol
+            ? () => generatePackingNoteForColumn(tourOrderCol.date, tourOrderCol.tour)
+            : undefined
+        }
+        onCopyOrder={
+          tourOrderCol && canEdit
+            ? () => setCopyColCol({ date: tourOrderCol.date, tour: tourOrderCol.tour })
+            : undefined
+        }
       />
 
       {merknadCell && labelProfileByProduct.get(merknadCell.productId) && (
