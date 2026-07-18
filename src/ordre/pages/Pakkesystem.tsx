@@ -286,10 +286,11 @@ export default function PakkesystemPage() {
         <SettKriteriaDialog
           open={downloadCriteriaOpen}
           onOpenChange={setDownloadCriteriaOpen}
-          criteria={downloadCriteria}
-          onCriteriaChange={setDownloadCriteria}
-          onApply={() => setDownloadCriteriaOpen(false)}
+          legalEntityId={NB_LEGAL_ENTITY_ID}
+          initial={downloadCriteria}
+          onApply={(c) => setDownloadCriteria(c)}
         />
+
 
       </Card>
 
