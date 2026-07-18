@@ -106,9 +106,20 @@ export function OperatorProvider({
   );
 
   const logout = useCallback(() => {
+    const opId = operator?.id ?? null;
+    // Journalfør utlogging (fire-and-forget; må ikke blokkere UI).
+    kioskSupabase
+      .rpc("pos_journal_append", {
+        p_terminal_id: terminalId,
+        p_event_type: "operator_logout",
+        p_operator_id: opId,
+      } as never)
+      .then(({ error }) => {
+        if (error) console.warn("pos_journal_append operator_logout failed", error.message);
+      });
     clearKey(storageKey);
     setOperator(null);
-  }, [storageKey]);
+  }, [storageKey, terminalId, operator?.id]);
 
   return <Ctx.Provider value={{ operator, login, logout }}>{children}</Ctx.Provider>;
 }
