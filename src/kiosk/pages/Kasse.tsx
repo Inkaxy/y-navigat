@@ -565,7 +565,7 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
           toast.info(`${code}: ikke koblet`);
       }
     },
-    [lastReceipt],
+    [lastReceipt, terminal?.id, operator?.id, session?.id],
   );
 
   const footerDisabled: Record<string, boolean> = {
