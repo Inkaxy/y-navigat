@@ -671,7 +671,7 @@ export default function TicketDetail() {
             </span>
             {linked?.order && (
               <Link
-                to={`/ordre/${linked.order.id}`}
+                to={`/ordre/ordrer/${linked.order.id}`}
                 title={`Åpne ordre #${linked.order.order_number}`}
                 className="group inline-flex items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-1 text-xs font-semibold text-emerald-800 shadow-sm transition-colors hover:bg-emerald-500/20 dark:text-emerald-200"
               >
@@ -876,7 +876,7 @@ export default function TicketDetail() {
                   variant="outline"
                   size="sm"
                   className="mt-2 w-full"
-                  onClick={() => navigate(`/ordre/${linked.order!.id}`)}
+                  onClick={() => navigate(`/ordre/ordrer/${linked.order!.id}`)}
                 >
                   Åpne ordren →
                 </Button>
