@@ -96,6 +96,7 @@ import PosStyringInnstillinger from "@/pos_styring/pages/Innstillinger";
 import PosStyringSafT from "@/pos_styring/pages/SafTExport";
 import PosStyringSkrivere from "@/pos_styring/pages/Skrivere";
 import PosStyringStasjoner from "@/pos_styring/pages/Stasjoner";
+import PosStyringKasseHelse from "@/pos_styring/pages/KasseHelse";
 
 // Kiosk-ruter — bypass NBhub-shell + auth-guard, egen Supabase-klient
 import { KioskOperatorRoute, KioskCustomerRoute, KioskSelfServiceRoute } from "@/kiosk/routes";
