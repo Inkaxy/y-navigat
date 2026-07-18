@@ -42,7 +42,7 @@ Deno.serve(async (req) => {
   }
 
   const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
-  const { data: isOwner } = await admin.rpc("is_platform_owner", { p_user_id: userRes.user.id });
+  const { data: isOwner } = await admin.rpc("is_platform_owner", { _user_id: userRes.user.id });
   if (!isOwner) {
     return new Response(JSON.stringify({ error: "forbidden" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
