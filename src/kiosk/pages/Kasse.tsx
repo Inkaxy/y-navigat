@@ -644,6 +644,10 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
           onButtonClick={handleButtonClick}
           onPay={() => {
             if (cart.items.length === 0) return;
+            if (drawerCtl.status.isOpen) {
+              toast.error("Lukk skuffen for å fortsette");
+              return;
+            }
             setRpcError(null);
             setPayOpen(true);
           }}
