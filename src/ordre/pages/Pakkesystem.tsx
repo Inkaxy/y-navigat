@@ -203,10 +203,14 @@ export default function PakkesystemPage() {
             <Label>Leveringsdato</Label>
             <Input type="date" value={downloadDate} onChange={(e) => setDownloadDate(e.target.value)} className="w-48" />
           </div>
+          <NotesReadyBadge date={downloadDate} />
           <Button onClick={downloadFile}>
             <Download className="w-4 h-4 mr-2" /> Last ned JSON
           </Button>
         </div>
+        <p className="text-xs text-muted-foreground">
+          Pakkefilen kan kun lastes ned etter at pakksedlene for leveringsdagen er generert.
+        </p>
       </Card>
 
       {/* API-endepunkt */}
