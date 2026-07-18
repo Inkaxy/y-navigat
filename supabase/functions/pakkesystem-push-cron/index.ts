@@ -56,6 +56,15 @@ Deno.serve(async (req) => {
       const snapRes = await fetch(exportUrl, {
         headers: { Authorization: `Bearer ${serviceKey}` },
       });
+      if (snapRes.status === 409) {
+        // Pakksedler ikke generert enda — vent, ikke marker som pushet.
+        const body = await snapRes.text();
+        await admin.from("pakkesystem_push_destinations").update({
+          last_error: `Venter på pakksedler for ${dateStr}: ${body.slice(0, 200)}`,
+        }).eq("id", d.id);
+        results.push({ id: d.id, name: d.name, status: 409, skipped: "packing_slips_not_generated" });
+        continue;
+      }
       if (!snapRes.ok) {
         const body = await snapRes.text();
         throw new Error(`Snapshot failed (${snapRes.status}): ${body.slice(0, 200)}`);

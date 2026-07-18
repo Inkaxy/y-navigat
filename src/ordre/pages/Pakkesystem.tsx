@@ -15,6 +15,27 @@ import { format } from "date-fns";
 
 const FUNCTIONS_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
 
+function NotesReadyBadge({ date }: { date: string }) {
+  const q = useQuery({
+    queryKey: ["pakkesystem-notes-ready", date],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("delivery_notes")
+        .select("id", { count: "exact", head: true })
+        .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
+        .eq("delivery_date", date)
+        .neq("status", "cancelled");
+      if (error) throw error;
+      return count ?? 0;
+    },
+  });
+  if (q.isLoading) return <Badge variant="outline">Sjekker…</Badge>;
+  if ((q.data ?? 0) === 0) {
+    return <Badge variant="destructive">Pakksedler ikke generert</Badge>;
+  }
+  return <Badge variant="secondary">{q.data} pakksedler klare</Badge>;
+}
+
 export default function PakkesystemPage() {
   const qc = useQueryClient();
   const [downloadDate, setDownloadDate] = useState(format(new Date(), "yyyy-MM-dd"));
@@ -203,10 +224,14 @@ export default function PakkesystemPage() {
             <Label>Leveringsdato</Label>
             <Input type="date" value={downloadDate} onChange={(e) => setDownloadDate(e.target.value)} className="w-48" />
           </div>
+          <NotesReadyBadge date={downloadDate} />
           <Button onClick={downloadFile}>
             <Download className="w-4 h-4 mr-2" /> Last ned JSON
           </Button>
         </div>
+        <p className="text-xs text-muted-foreground">
+          Pakkefilen kan kun lastes ned etter at pakksedlene for leveringsdagen er generert.
+        </p>
       </Card>
 
       {/* API-endepunkt */}

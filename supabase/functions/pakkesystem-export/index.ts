@@ -182,6 +182,34 @@ Deno.serve(async (req) => {
 
   if (!legalEntityId) return jsonRes({ error: "Fant ikke selskap", code: "no_entity" }, 400);
 
+  // --- Gate: pakksedler må være generert for datoen ---
+  const { count: noteCount, error: noteErr } = await admin
+    .from("delivery_notes")
+    .select("id", { count: "exact", head: true })
+    .eq("legal_entity_id", legalEntityId)
+    .eq("delivery_date", dateParam)
+    .neq("status", "cancelled");
+  if (noteErr) return jsonRes({ error: noteErr.message, code: "notes_check_failed" }, 500);
+  if (!noteCount || noteCount === 0) {
+    if (apiKeyId) {
+      admin.from("pakkesystem_api_log").insert({
+        api_key_id: apiKeyId,
+        legal_entity_id: legalEntityId,
+        endpoint: "pakkesystem-export",
+        query_params: { date: dateParam },
+        status_code: 409,
+        row_count: 0,
+        ip: req.headers.get("x-forwarded-for") ?? null,
+        ua: req.headers.get("user-agent") ?? null,
+      }).then();
+    }
+    return jsonRes({
+      error: "Pakkesedler er ikke generert for denne leveringsdagen. Kjør pakkseddel-generering før pakkefilen kan hentes.",
+      code: "packing_slips_not_generated",
+      delivery_date: dateParam,
+    }, 409);
+  }
+
   // --- Hent data ---
   const { data: entity } = await admin
     .from("legal_entities")
