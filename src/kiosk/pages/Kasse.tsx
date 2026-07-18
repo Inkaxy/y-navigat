@@ -345,6 +345,17 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
     }
     setPrintingReceipt(true);
     try {
+      // Kassasystemforskrifta: kun 1 kvitteringskopi per salg. RPC-en avgjør
+      // atomisk om dette er original eller KOPI, og feiler hvis kopi allerede
+      // er utstedt.
+      const { data: printKindData, error: pkErr } = await kioskSupabase.rpc(
+        "pos_record_receipt_print" as never,
+        { p_terminal_id: terminal.id, p_transaction_id: r.tx.id } as never,
+      );
+      if (pkErr) throw pkErr;
+      const kindRow = Array.isArray(printKindData) ? printKindData[0] : printKindData;
+      const isCopy = (kindRow as { kind?: string } | null)?.kind === "copy";
+
       const [{ data: mapping, error: mErr }, { data: entity, error: eErr }] =
         await Promise.all([
           kioskSupabase
