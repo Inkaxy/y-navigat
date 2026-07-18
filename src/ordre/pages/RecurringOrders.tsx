@@ -217,6 +217,17 @@ export default function RecurringOrders() {
                       <Button
                         size="sm"
                         variant="ghost"
+                        onClick={() => handleDuplicate(s)}
+                        disabled={duplicateSchedule.isPending}
+                        className="h-7 w-7 p-0"
+                        aria-label="Kopier som ny mal"
+                        title="Kopier som ny mal"
+                      >
+                        <Copy className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
                         onClick={() => setDeleting(s)}
                         className="h-7 w-7 p-0 text-destructive hover:bg-destructive/10"
                         aria-label="Slett"
