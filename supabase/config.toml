@@ -55,3 +55,6 @@ verify_jwt = true
 
 [functions.portal-manage-user]
 verify_jwt = true
+
+[functions.pakkesystem-api]
+verify_jwt = false
