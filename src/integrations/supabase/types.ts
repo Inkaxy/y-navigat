@@ -5190,6 +5190,10 @@ export type Database = {
           customer_screen_mode: string
           default_price_list_id: string | null
           display_name: string
+          drawer_is_open: boolean
+          drawer_opened_at: string | null
+          drawer_opened_operator_id: string | null
+          drawer_opened_reason: string | null
           id: string
           legal_entity_id: string
           logo_url: string | null
@@ -5210,6 +5214,10 @@ export type Database = {
           customer_screen_mode?: string
           default_price_list_id?: string | null
           display_name: string
+          drawer_is_open?: boolean
+          drawer_opened_at?: string | null
+          drawer_opened_operator_id?: string | null
+          drawer_opened_reason?: string | null
           id?: string
           legal_entity_id: string
           logo_url?: string | null
@@ -5230,6 +5238,10 @@ export type Database = {
           customer_screen_mode?: string
           default_price_list_id?: string | null
           display_name?: string
+          drawer_is_open?: boolean
+          drawer_opened_at?: string | null
+          drawer_opened_operator_id?: string | null
+          drawer_opened_reason?: string | null
           id?: string
           legal_entity_id?: string
           logo_url?: string | null
@@ -5437,57 +5449,81 @@ export type Database = {
       }
       pos_z_reports: {
         Row: {
+          cash_variance_total: number | null
           closed_at: string
+          closing_float_total: number | null
+          counted_cash_total: number | null
+          expected_cash_total: number | null
           id: string
           last_journal_id: number
           mva_breakdown: Json
+          opening_float_total: number | null
           payment_breakdown: Json
           period_end: string
           period_start: string
           refund_count: number
           refund_total: number
           report_hash: string
+          session_breakdown: Json | null
           terminal_id: string
           total_mva: number
           total_sales_excl_mva: number
           total_sales_incl_mva: number
           transaction_count: number
+          variance_flagged: boolean | null
+          variance_threshold: number | null
           z_number: number
         }
         Insert: {
+          cash_variance_total?: number | null
           closed_at?: string
+          closing_float_total?: number | null
+          counted_cash_total?: number | null
+          expected_cash_total?: number | null
           id?: string
           last_journal_id: number
           mva_breakdown: Json
+          opening_float_total?: number | null
           payment_breakdown: Json
           period_end: string
           period_start: string
           refund_count: number
           refund_total: number
           report_hash: string
+          session_breakdown?: Json | null
           terminal_id: string
           total_mva: number
           total_sales_excl_mva: number
           total_sales_incl_mva: number
           transaction_count: number
+          variance_flagged?: boolean | null
+          variance_threshold?: number | null
           z_number: number
         }
         Update: {
+          cash_variance_total?: number | null
           closed_at?: string
+          closing_float_total?: number | null
+          counted_cash_total?: number | null
+          expected_cash_total?: number | null
           id?: string
           last_journal_id?: number
           mva_breakdown?: Json
+          opening_float_total?: number | null
           payment_breakdown?: Json
           period_end?: string
           period_start?: string
           refund_count?: number
           refund_total?: number
           report_hash?: string
+          session_breakdown?: Json | null
           terminal_id?: string
           total_mva?: number
           total_sales_excl_mva?: number
           total_sales_incl_mva?: number
           transaction_count?: number
+          variance_flagged?: boolean | null
+          variance_threshold?: number | null
           z_number?: number
         }
         Relationships: [
@@ -10066,6 +10102,14 @@ export type Database = {
         }
         Returns: Json
       }
+      pos_close_drawer: {
+        Args: {
+          p_operator_id?: string
+          p_session_id?: string
+          p_terminal_id: string
+        }
+        Returns: number
+      }
       pos_close_session: {
         Args: {
           p_closing_float: number
@@ -10135,6 +10179,16 @@ export type Database = {
           receipt_number: string
           receipt_sequence: number
         }[]
+      }
+      pos_open_drawer: {
+        Args: {
+          p_context?: string
+          p_operator_id: string
+          p_reason: string
+          p_session_id: string
+          p_terminal_id: string
+        }
+        Returns: number
       }
       pos_open_session: {
         Args: {
