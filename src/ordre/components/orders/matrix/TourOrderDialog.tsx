@@ -21,7 +21,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { Loader2, Trash2, Save, Lock, Plus, ShoppingCart } from "lucide-react";
+import { Loader2, Trash2, Save, Lock, Plus, ShoppingCart, Copy, ClipboardList } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
@@ -72,6 +72,8 @@ export function TourOrderDialog({
   tour,
   products,
   canEdit,
+  onCreatePackingNote,
+  onCopyOrder,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -80,6 +82,8 @@ export function TourOrderDialog({
   tour: MatrixTour | null;
   products: MatrixProduct[];
   canEdit: boolean;
+  onCreatePackingNote?: () => void;
+  onCopyOrder?: () => void;
 }) {
   const { data: order, isLoading } = useTourOrder({
     customerId: customer?.id ?? null,
@@ -217,6 +221,25 @@ export function TourOrderDialog({
     setAddSearch("");
     qc.invalidateQueries({ queryKey: ["tour-order"] });
     qc.invalidateQueries({ queryKey: ["matrix"] });
+  }
+
+  const [deleting, setDeleting] = useState(false);
+  async function deleteWholeOrder() {
+    if (!order || readOnly) return;
+    if (!confirm(`Slett hele ordren #${order.order_number}?\n\nAlle ${order.lines.length} linjer fjernes.`)) return;
+    setDeleting(true);
+    try {
+      const { error } = await supabase.from("orders").delete().eq("id", order.id);
+      if (error) throw error;
+      toast.success(`Ordre #${order.order_number} slettet`);
+      qc.invalidateQueries({ queryKey: ["tour-order"] });
+      qc.invalidateQueries({ queryKey: ["matrix"] });
+      onOpenChange(false);
+    } catch (e: any) {
+      toast.error("Kunne ikke slette ordren", { description: e?.message });
+    } finally {
+      setDeleting(false);
+    }
   }
 
   const addableProducts = useMemo(() => {
@@ -513,6 +536,59 @@ export function TourOrderDialog({
             </>
           )}
         </div>
+
+        {order ? (
+          <div className="flex items-center justify-between gap-2 border-t bg-muted/20 px-6 py-3">
+            <div className="flex items-center gap-2">
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={deleteWholeOrder}
+                disabled={readOnly || deleting}
+              >
+                {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                Slett
+              </Button>
+              {onCreatePackingNote ? (
+                <Button
+                  size="sm"
+                  onClick={onCreatePackingNote}
+                  disabled={order.lines.length === 0}
+                  className="bg-amber-400 hover:bg-amber-500 text-amber-950"
+                >
+                  <ClipboardList className="h-4 w-4" />
+                  Lag pakkseddel
+                </Button>
+              ) : null}
+              {onCopyOrder ? (
+                <Button variant="outline" size="sm" onClick={onCopyOrder} disabled={order.lines.length === 0}>
+                  <Copy className="h-4 w-4" />
+                  Kopiere ordren
+                </Button>
+              ) : null}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+                Ferdig
+              </Button>
+              {!readOnly ? (
+                <Button
+                  size="sm"
+                  onClick={saveAll}
+                  disabled={dirtyCount === 0 || savingAll}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                >
+                  {savingAll ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4" />
+                  )}
+                  Lagre{dirtyCount > 0 ? ` (${dirtyCount})` : ""}
+                </Button>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
       </DialogContent>
     </Dialog>
   );
