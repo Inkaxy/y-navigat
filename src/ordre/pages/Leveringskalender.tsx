@@ -1859,6 +1859,9 @@ function MatrixGrid({
               const pause = isPaused(pauseMap, c.date, c.tour.id);
               const hasComment = columnComments?.has(`${c.date}|${c.tour.id}`);
               const colHas = colHasData(c.date, c.tour.id);
+              const d = new Date(c.date + "T00:00:00");
+              const dow = (d.getDay() + 6) % 7;
+              const dayLabel = DAY_LABELS[dow];
               return (
                 <th
                   key={`${c.date}-${c.tour.id}`}
@@ -1868,27 +1871,30 @@ function MatrixGrid({
                   )}
                   title={`${c.tour.display_name} (${c.tour.time_from.slice(0, 5)}–${c.tour.time_to.slice(0, 5)})${pause?.reason ? ` · Pause: ${pause.reason}` : pause ? " · Pause" : ""}${hasComment ? `\nKommentar: ${columnComments?.get(`${c.date}|${c.tour.id}`)}` : ""}`}
                 >
-                  <div>T{c.tour.tour_number}</div>
+                  <button
+                    type="button"
+                    disabled={!colHas}
+                    onClick={() => onOpenTourOrder(c.date, c.tour)}
+                    className="mx-auto block rounded px-1.5 py-0.5 text-[12px] font-semibold text-foreground hover:bg-primary/10 hover:text-primary disabled:cursor-default disabled:opacity-60 disabled:hover:bg-transparent disabled:hover:text-foreground"
+                    title={colHas ? "Åpne ordre for denne turen" : "Ingen ordre på denne turen"}
+                  >
+                    {dayLabel} ({c.tour.tour_number})
+                    {hasComment && <span className="ml-1 text-primary">•</span>}
+                  </button>
                   {pause && (
                     <div className="mt-0.5 inline-block rounded-sm bg-sky-200/80 px-1 text-[9px] font-semibold uppercase tracking-wide text-sky-900 dark:bg-sky-800/60 dark:text-sky-100">
                       Pause
                     </div>
                   )}
-                  <div className="mt-1 flex items-center justify-center gap-0.5">
-                    <button type="button" disabled={!canEdit || !colHas} onClick={() => onColCopy(c.date, c.tour)} className="rounded p-0.5 text-muted-foreground/70 hover:bg-accent hover:text-foreground disabled:opacity-30" title="Kopier kolonne">
-                      <Copy className="h-3 w-3" />
+                  <div className="mt-1 flex items-center justify-center gap-1.5">
+                    <button type="button" disabled={!canEdit || !colHas} onClick={() => onColCopy(c.date, c.tour)} className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-30" title="Kopier kolonne">
+                      <Copy className="h-4 w-4" />
                     </button>
-                    <button type="button" disabled={!canEdit} onClick={() => onColComment(c.date, c.tour)} className={cn("rounded p-0.5 hover:bg-accent disabled:opacity-30", hasComment ? "text-primary" : "text-muted-foreground/70 hover:text-foreground")} title={hasComment ? "Rediger kommentar" : "Legg til kommentar"}>
-                      <MessageSquare className="h-3 w-3" />
+                    <button type="button" disabled={!canEdit || !colHas} onClick={() => onColDelete(c.date, c.tour)} className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-30" title="Slett kolonne">
+                      <Trash2 className="h-4 w-4" />
                     </button>
-                    <button type="button" disabled={!canEdit || !colHas} onClick={() => onColDelete(c.date, c.tour)} className="rounded p-0.5 text-muted-foreground/70 hover:bg-destructive/10 hover:text-destructive disabled:opacity-30" title="Slett kolonne">
-                      <Trash2 className="h-3 w-3" />
-                    </button>
-                    <button type="button" disabled={!colHas} onClick={() => onColPackingNote(c.date, c.tour)} className="rounded p-0.5 text-muted-foreground/70 hover:bg-accent hover:text-foreground disabled:opacity-30" title="Lag pakkseddel">
-                      <PackageCheck className="h-3 w-3" />
-                    </button>
-                    <button type="button" disabled={!colHas} onClick={() => onOpenTourOrder(c.date, c.tour)} className="rounded p-0.5 text-muted-foreground/70 hover:bg-primary/10 hover:text-primary disabled:opacity-30" title="Åpne ordre for denne turen">
-                      <ShoppingCart className="h-3 w-3" />
+                    <button type="button" disabled={!colHas} onClick={() => onColPackingNote(c.date, c.tour)} className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-30" title="Lag pakkseddel">
+                      <PackageCheck className="h-4 w-4" />
                     </button>
                   </div>
                 </th>
