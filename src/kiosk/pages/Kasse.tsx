@@ -16,6 +16,9 @@ import { PaymentModal } from "@/kiosk/components/PaymentModal";
 import { KakebyggerModal } from "@/kiosk/components/KakebyggerModal";
 import { HenteordreModal, type PickupOrderRow, type PickupOrderLine } from "@/kiosk/components/HenteordreModal";
 import { ReceiptView } from "@/kiosk/components/ReceiptView";
+import { DrawerOpenOverlay } from "@/kiosk/components/DrawerOpenOverlay";
+import { OpenDrawerReasonDialog } from "@/kiosk/components/OpenDrawerReasonDialog";
+import { useTerminalDrawerStatus } from "@/kiosk/hooks/useTerminalDrawerStatus";
 import { useReceiptHeader } from "@/kiosk/hooks/useReceiptHeader";
 import { useTerminal } from "@/kiosk/context/TerminalContext";
 
