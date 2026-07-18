@@ -332,6 +332,7 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
 
   const handleNewSale = () => {
     setReceipt(null);
+    setCopyIssued(false);
     cart.clear();
     nav.reset();
   };
