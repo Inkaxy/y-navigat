@@ -1305,6 +1305,18 @@ export default function MatrixPage() {
                   Ny ordre
                 </DropdownMenuItem>
                 <DropdownMenuItem
+                  onSelect={() =>
+                    navigate(
+                      customerId
+                        ? `/ordre/kundeordrer?customerId=${customerId}`
+                        : "/ordre/kundeordrer",
+                    )
+                  }
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Kundeordre
+                </DropdownMenuItem>
+                <DropdownMenuItem
                   disabled={!customerId}
                   onSelect={() => navigate(`/ordre/ordrer/ny?customer_id=${customerId}&is_return=true`)}
                 >
@@ -1345,18 +1357,6 @@ export default function MatrixPage() {
                 <DropdownMenuItem onSelect={() => setCorrectionsOpen(true)}>
                   <MessageSquare className="h-4 w-4 mr-2" />
                   Se korrigeringer
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onSelect={() =>
-                    navigate(
-                      customerId
-                        ? `/ordre/kundeordrer?customerId=${customerId}`
-                        : "/ordre/kundeordrer",
-                    )
-                  }
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Kundeordre
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuLabel>Visning</DropdownMenuLabel>
