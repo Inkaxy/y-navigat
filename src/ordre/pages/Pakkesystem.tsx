@@ -216,7 +216,8 @@ export default function PakkesystemPage() {
       const { data: sess } = await supabase.auth.getSession();
       const jwt = sess.session?.access_token;
       if (!jwt) throw new Error("Ingen session");
-      const exportRes = await fetch(`${FUNCTIONS_BASE}/pakkesystem-export?date=${downloadDate}&legal_entity_id=${NB_LEGAL_ENTITY_ID}`, {
+      const destCrit = ((dest as any).criteria ?? DEFAULT_CRITERIA) as ProduksjonsplanCriteria;
+      const exportRes = await fetch(`${FUNCTIONS_BASE}/pakkesystem-export?date=${downloadDate}&legal_entity_id=${NB_LEGAL_ENTITY_ID}${criteriaToQuery(destCrit)}`, {
         headers: { Authorization: `Bearer ${jwt}` },
       });
       if (!exportRes.ok) throw new Error("Kunne ikke hente snapshot");
