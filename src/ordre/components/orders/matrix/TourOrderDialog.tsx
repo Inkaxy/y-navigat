@@ -100,6 +100,7 @@ export function TourOrderDialog({
   const [addOpen, setAddOpen] = useState(false);
   const [addSearch, setAddSearch] = useState("");
   const [showPrices, setShowPrices] = useState(true);
+  const [infoOpen, setInfoOpen] = useState(false);
 
   useEffect(() => {
     if (!open) {
