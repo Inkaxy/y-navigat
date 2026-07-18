@@ -876,7 +876,7 @@ export default function TicketDetail() {
                   variant="outline"
                   size="sm"
                   className="mt-2 w-full"
-                  onClick={() => navigate(`/ordre/${linked.order!.id}`)}
+                  onClick={() => navigate(`/ordre/ordrer/${linked.order!.id}`)}
                 >
                   Åpne ordren →
                 </Button>
