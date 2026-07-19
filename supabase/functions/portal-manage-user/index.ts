@@ -14,6 +14,20 @@ const json = (status: number, body: unknown) =>
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 
+type SupabaseAdmin = ReturnType<typeof createClient>;
+
+async function findAuthUserByEmail(admin: SupabaseAdmin, email: string) {
+  const normalized = email.toLowerCase();
+  for (let page = 1; page <= 50; page++) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 });
+    if (error) throw error;
+    const found = data.users.find((u) => u.email?.toLowerCase() === normalized);
+    if (found) return found;
+    if (data.users.length < 1000) break;
+  }
+  return null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -56,8 +70,7 @@ Deno.serve(async (req) => {
       }
       // Reconcile hvis auth-user finnes med annen id (slettet og gjenopprettet)
       if (!authUser && email) {
-        const { data: list } = await admin.auth.admin.listUsers({ page: 1, perPage: 200 });
-        authUser = list?.users?.find((x) => x.email?.toLowerCase() === email!.toLowerCase()) ?? null;
+        authUser = await findAuthUserByEmail(admin, email);
         if (authUser && authUser.id !== user_id) {
           await admin.from("portal_user_profiles").update({ user_id: authUser.id }).eq("user_id", user_id);
           await admin.from("customer_portal_accounts").update({ user_id: authUser.id }).eq("user_id", user_id);
@@ -80,10 +93,11 @@ Deno.serve(async (req) => {
         email: opts.email,
         options: { redirectTo: opts.redirect },
       });
-      // Hvis invite feiler pga eksisterende bruker → fall tilbake til magic link
+      // Hvis invite feiler pga eksisterende bruker → fall tilbake til recovery,
+      // som er riktig flow for å sette/endre passord i kundeportalen.
       if (error && /already been registered|already registered|already exists/i.test(error.message)) {
         const fallback = await admin.auth.admin.generateLink({
-          type: "magiclink",
+          type: "recovery",
           email: opts.email,
           options: { redirectTo: opts.redirect },
         });
@@ -133,11 +147,9 @@ Deno.serve(async (req) => {
       case "resend_invite": {
         const { email, authUser, firstName } = await resolveAuthUser();
         if (!email) return json(404, { error: "Bruker ikke funnet (mangler epost)" });
-        const alreadyConfirmed = !!authUser?.email_confirmed_at || !!authUser?.last_sign_in_at;
-        const type: "invite" | "magiclink" = alreadyConfirmed ? "magiclink" : "invite";
         try {
           await generateAndSend({
-            type,
+            type: "recovery",
             email,
             firstName,
             subject: "Velkommen til Nøtterø Bakeri kundeportal",
@@ -149,10 +161,8 @@ Deno.serve(async (req) => {
           return json(500, { error: (e as Error).message });
         }
         const targetId = authUser?.id ?? user_id;
-        if (type === "invite") {
-          await admin.from("portal_user_profiles").update({ status: "invited" }).eq("user_id", targetId);
-        }
-        return json(200, { success: true, email, mode: type });
+        await admin.from("portal_user_profiles").update({ status: "invited" }).eq("user_id", targetId);
+        return json(200, { success: true, email, mode: "recovery" });
       }
 
       case "disable": {
