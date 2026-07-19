@@ -101,8 +101,13 @@ export async function fetchPendingRecurringOrderCounts(
   const byTour: Record<string, number> = {};
   let nullTourCount = 0;
   let total = 0;
+  const rawSchedules = (schedules ?? []) as RecurringScheduleRow[];
+  const effective = pickEffectiveSchedulesForDate(
+    rawSchedules as Array<RecurringScheduleRow & { valid_from: string | null; valid_to: string | null }>,
+    date,
+  );
 
-  for (const schedule of (schedules ?? []) as RecurringScheduleRow[]) {
+  for (const schedule of effective) {
     if (materializedScheduleIds.has(schedule.id) || pausedCustomerIds.has(schedule.customer_id)) continue;
 
     const tourIds = new Set(
