@@ -1378,7 +1378,7 @@ export default function MatrixPage() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto">
+      <div className="mx-auto w-full max-w-[1400px] flex-1 overflow-auto px-6">
         {!customerId ? (
           <div className="grid h-full place-items-center p-10 text-center text-muted-foreground">
             <div className="max-w-2xl">
