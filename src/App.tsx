@@ -10,6 +10,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import AcceptInvite from "./pages/auth/AcceptInvite";
+import SetPortalPassword from "./pages/auth/SetPortalPassword";
 import Hjem from "./pages/Hjem";
 
 import MinProfil from "./pages/MinProfil";
@@ -222,6 +223,10 @@ const App = () => (
           <AuthProvider>
             <Routes>
               <Route path="/login" element={<Login />} />
+              <Route path="/velg-passord" element={<SetPortalPassword />} />
+              <Route path="/tilbakestill-passord" element={<SetPortalPassword />} />
+              <Route path="/login/velg-passord" element={<SetPortalPassword />} />
+              <Route path="/login/tilbakestill-passord" element={<SetPortalPassword />} />
               <Route path="/auth/accept-invite" element={<AcceptInvite />} />
               <Route path="/aktiver" element={<AcceptInvite />} />
               <Route path="/" element={<Index />} />

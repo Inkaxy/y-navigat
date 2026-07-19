@@ -23,6 +23,34 @@ const json = (status: number, body: unknown) =>
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 
+function normalizePortalUrl(value: string | undefined | null) {
+  const fallback = "https://kundeportal.nbhub.no";
+  try {
+    const url = new URL(value ?? fallback);
+    if (url.hostname !== "kundeportal.nbhub.no") return fallback;
+    url.pathname = url.pathname.replace(/\/login\/?$/, "").replace(/\/$/, "");
+    url.search = "";
+    url.hash = "";
+    return url.toString().replace(/\/$/, "");
+  } catch {
+    return fallback;
+  }
+}
+
+type SupabaseAdmin = ReturnType<typeof createClient>;
+
+async function findAuthUserByEmail(admin: SupabaseAdmin, email: string) {
+  const normalized = email.toLowerCase();
+  for (let page = 1; page <= 50; page++) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 });
+    if (error) throw error;
+    const found = data.users.find((u) => u.email?.toLowerCase() === normalized);
+    if (found) return found;
+    if (data.users.length < 1000) break;
+  }
+  return null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -30,7 +58,7 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const portalUrl = Deno.env.get("CUSTOMER_PORTAL_URL") ?? "https://kundeportal.nbhub.no";
+    const portalUrl = normalizePortalUrl(Deno.env.get("CUSTOMER_PORTAL_URL"));
 
     const authHeader = req.headers.get("Authorization") ?? "";
     if (!authHeader) return json(401, { error: "Missing Authorization" });
@@ -59,8 +87,7 @@ Deno.serve(async (req) => {
     // 1) Finn eller opprett auth-bruker (uten å sende Supabase-epost)
     let userId: string | null = null;
     let isNew = false;
-    const { data: existing } = await admin.auth.admin.listUsers({ page: 1, perPage: 200 });
-    const found = existing?.users?.find((u) => u.email?.toLowerCase() === email);
+    const found = await findAuthUserByEmail(admin, email);
     if (found) {
       userId = found.id;
     } else {
@@ -104,9 +131,10 @@ Deno.serve(async (req) => {
 
     // 4) Generer action-link som lander på kundeportalen og send via Graph
     //    (bypass Supabase sin default-epost slik at vi kontrollerer URL-en 100%)
-    const linkType = isNew || body.resend === false ? "invite" : "magiclink";
+    // Bruk recovery-lenke også ved førstegangsoppsett: den gir bruker en trygg
+    // session på kundeportal.nbhub.no og lar dem sette eget passord uten Supabase-invite-email.
     const { data: linkData, error: linkGenErr } = await admin.auth.admin.generateLink({
-      type: linkType as "invite" | "magiclink",
+      type: "recovery",
       email,
       options: { redirectTo: `${portalUrl}/velg-passord` },
     });
@@ -144,6 +172,7 @@ Deno.serve(async (req) => {
       email,
       email_sent: emailSent,
       email_error: emailError,
+      mode: "recovery",
       // Returner action_url så admin kan dele manuelt hvis e-posten feilet
       action_url: emailSent ? null : actionUrl,
     });
