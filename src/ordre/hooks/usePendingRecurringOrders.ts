@@ -179,11 +179,14 @@ export async function fetchPendingRecurringOrderRows(
   type Row = {
     id: string;
     customer_id: string;
+    valid_from: string | null;
+    valid_to: string | null;
     recurring_order_items?: Array<{ tour_id: string | null; quantity: number | string | null }>;
   };
 
+  const effectiveRows = pickEffectiveSchedulesForDate((schedules ?? []) as Row[], date);
   const filtered: Array<{ row: Row; resolvedTourId: string | null }> = [];
-  for (const s of (schedules ?? []) as Row[]) {
+  for (const s of effectiveRows) {
     if (materialized.has(s.id) || paused.has(s.customer_id)) continue;
     const tourIds = new Set(
       (s.recurring_order_items ?? [])
