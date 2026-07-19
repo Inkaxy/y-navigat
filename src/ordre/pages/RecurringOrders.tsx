@@ -195,9 +195,22 @@ export default function RecurringOrders() {
                     </TableCell>
                     <TableCell>
                       {s.is_active ? (
-                        <span className="inline-flex rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
-                          Aktiv
-                        </span>
+                        isScheduleLiveNow(s, TODAY_ISO) ? (
+                          <span
+                            className="inline-flex items-center gap-1 rounded-full bg-success/15 px-2 py-0.5 text-xs font-medium text-success"
+                            title="Aktiv i dag — gjeldende mal for kunden"
+                          >
+                            <span className="h-1.5 w-1.5 rounded-full bg-success" />
+                            Aktiv nå
+                          </span>
+                        ) : (
+                          <span
+                            className="inline-flex rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary"
+                            title="Aktivert, men utenfor gyldighetsperioden"
+                          >
+                            Planlagt
+                          </span>
+                        )
                       ) : (
                         <span className="inline-flex rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
                           Inaktiv
