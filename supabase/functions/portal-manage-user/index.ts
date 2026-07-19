@@ -37,10 +37,15 @@ Deno.serve(async (req) => {
     switch (action) {
       case "recovery": {
         const { data: u } = await admin.auth.admin.getUserById(user_id);
-        if (!u?.user?.email) return json(404, { error: "Bruker ikke funnet" });
+        let email = u?.user?.email ?? null;
+        if (!email) {
+          const { data: prof } = await admin.from("portal_user_profiles").select("email").eq("user_id", user_id).maybeSingle();
+          email = prof?.email ?? null;
+        }
+        if (!email) return json(404, { error: "Bruker ikke funnet (mangler epost i auth og profil)" });
         const { error } = await admin.auth.admin.generateLink({
           type: "recovery",
-          email: u.user.email,
+          email,
           options: { redirectTo: `${portalUrl}/tilbakestill-passord` },
         });
         if (error) return json(500, { error: error.message });
@@ -48,9 +53,14 @@ Deno.serve(async (req) => {
       }
       case "resend_invite": {
         const { data: u } = await admin.auth.admin.getUserById(user_id);
-        if (!u?.user?.email) return json(404, { error: "Bruker ikke funnet" });
-        const email = u.user.email;
-        const alreadyConfirmed = !!u.user.email_confirmed_at || !!u.user.last_sign_in_at;
+        let email = u?.user?.email ?? null;
+        let authUser = u?.user ?? null;
+        if (!email) {
+          const { data: prof } = await admin.from("portal_user_profiles").select("email").eq("user_id", user_id).maybeSingle();
+          email = prof?.email ?? null;
+        }
+        if (!email) return json(404, { error: "Bruker ikke funnet (mangler epost)" });
+        const alreadyConfirmed = !!authUser?.email_confirmed_at || !!authUser?.last_sign_in_at;
         // Bruker som allerede har bekreftet konto: send magic link. Ellers: re-invite.
         const { error } = alreadyConfirmed
           ? await admin.auth.admin.generateLink({
