@@ -1,9 +1,12 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
+import { buildPortalEmailHtml, sendGraphMail } from "../_shared/graph-mail.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+const PORTAL_FROM_EMAIL = "NBOS@nottero-bakeri.no";
 
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), {
@@ -34,88 +37,126 @@ Deno.serve(async (req) => {
 
     const admin = createClient(supabaseUrl, serviceKey);
 
+    // Hjelpefunksjoner
+    const resolveAuthUser = async () => {
+      const { data: u } = await admin.auth.admin.getUserById(user_id);
+      let email = u?.user?.email ?? null;
+      let authUser = u?.user ?? null;
+      let firstName: string | null = null;
+      if (!email) {
+        const { data: prof } = await admin
+          .from("portal_user_profiles")
+          .select("email, display_name")
+          .eq("user_id", user_id)
+          .maybeSingle();
+        email = prof?.email ?? null;
+        firstName = prof?.display_name?.split(" ")[0] ?? null;
+      } else {
+        firstName = (u?.user?.user_metadata?.display_name as string | undefined)?.split(" ")[0] ?? null;
+      }
+      // Reconcile hvis auth-user finnes med annen id (slettet og gjenopprettet)
+      if (!authUser && email) {
+        const { data: list } = await admin.auth.admin.listUsers({ page: 1, perPage: 200 });
+        authUser = list?.users?.find((x) => x.email?.toLowerCase() === email!.toLowerCase()) ?? null;
+        if (authUser && authUser.id !== user_id) {
+          await admin.from("portal_user_profiles").update({ user_id: authUser.id }).eq("user_id", user_id);
+          await admin.from("customer_portal_accounts").update({ user_id: authUser.id }).eq("user_id", user_id);
+        }
+      }
+      return { email, authUser, firstName: firstName ?? "der" };
+    };
+
+    const generateAndSend = async (opts: {
+      type: "invite" | "magiclink" | "recovery";
+      email: string;
+      firstName: string;
+      subject: string;
+      intro: string;
+      cta: string;
+      redirect: string;
+    }) => {
+      let { data: linkData, error } = await admin.auth.admin.generateLink({
+        type: opts.type,
+        email: opts.email,
+        options: { redirectTo: opts.redirect },
+      });
+      // Hvis invite feiler pga eksisterende bruker → fall tilbake til magic link
+      if (error && /already been registered|already registered|already exists/i.test(error.message)) {
+        const fallback = await admin.auth.admin.generateLink({
+          type: "magiclink",
+          email: opts.email,
+          options: { redirectTo: opts.redirect },
+        });
+        linkData = fallback.data;
+        error = fallback.error;
+      }
+      if (error || !linkData?.properties?.action_link) {
+        throw new Error(error?.message ?? "Kunne ikke generere lenke");
+      }
+      const actionUrl = linkData.properties.action_link;
+      await sendGraphMail({
+        admin,
+        from: PORTAL_FROM_EMAIL,
+        to: opts.email,
+        subject: opts.subject,
+        html: buildPortalEmailHtml({
+          greeting_name: opts.firstName,
+          intro: opts.intro,
+          cta_label: opts.cta,
+          action_url: actionUrl,
+          footer_note: "Lenken er gyldig i 24 timer.",
+        }),
+      });
+      return actionUrl;
+    };
+
     switch (action) {
       case "recovery": {
-        const { data: u } = await admin.auth.admin.getUserById(user_id);
-        let email = u?.user?.email ?? null;
-        if (!email) {
-          const { data: prof } = await admin.from("portal_user_profiles").select("email").eq("user_id", user_id).maybeSingle();
-          email = prof?.email ?? null;
-        }
-        if (!email) return json(404, { error: "Bruker ikke funnet (mangler epost i auth og profil)" });
-        const { error } = await admin.auth.admin.generateLink({
-          type: "recovery",
-          email,
-          options: { redirectTo: `${portalUrl}/tilbakestill-passord` },
-        });
-        if (error) return json(500, { error: error.message });
-        return json(200, { success: true });
-      }
-      case "resend_invite": {
-        const { data: u } = await admin.auth.admin.getUserById(user_id);
-        let email = u?.user?.email ?? null;
-        let authUser = u?.user ?? null;
-        if (!email) {
-          const { data: prof } = await admin.from("portal_user_profiles").select("email").eq("user_id", user_id).maybeSingle();
-          email = prof?.email ?? null;
-        }
+        const { email, firstName } = await resolveAuthUser();
         if (!email) return json(404, { error: "Bruker ikke funnet (mangler epost)" });
-
-        // Hvis vi ikke fant auth-brukeren via user_id, prøv å finne via epost
-        // (kan skje hvis auth-bruker ble slettet og gjenopprettet med ny id).
-        if (!authUser) {
-          const { data: list } = await admin.auth.admin.listUsers({ page: 1, perPage: 200 });
-          authUser = list?.users?.find((x) => x.email?.toLowerCase() === email!.toLowerCase()) ?? null;
-          if (authUser && authUser.id !== user_id) {
-            // Reconcile profil-user_id med faktisk auth-id
-            await admin.from("portal_user_profiles").update({ user_id: authUser.id }).eq("user_id", user_id);
-            await admin.from("customer_portal_accounts").update({ user_id: authUser.id }).eq("user_id", user_id);
-          }
-        }
-
-        const alreadyConfirmed = !!authUser?.email_confirmed_at || !!authUser?.last_sign_in_at;
-        const targetId = authUser?.id ?? user_id;
-
-        // Bekreftet konto: magic link. Uekseisterende/uverifisert: invite, med fallback til magic link
-        // hvis eposten allerede er registrert (409/"already been registered").
-        let mode: "magiclink" | "invite" = alreadyConfirmed ? "magiclink" : "invite";
-        let sendErr: { message: string } | null = null;
-
-        if (mode === "magiclink") {
-          const { error } = await admin.auth.admin.generateLink({
-            type: "magiclink",
+        try {
+          await generateAndSend({
+            type: "recovery",
             email,
-            options: { redirectTo: `${portalUrl}/velg-passord` },
+            firstName,
+            subject: "Tilbakestill passord — Nøtterø Bakeri kundeportal",
+            intro: `Vi har mottatt en forespørsel om å tilbakestille passordet til <strong>Nøtterø Bakeri kundeportal</strong> (${portalUrl.replace(/^https?:\/\//, "")}). Klikk på knappen under for å velge et nytt passord.`,
+            cta: "Tilbakestill passord",
+            redirect: `${portalUrl}/tilbakestill-passord`,
           });
-          sendErr = error;
-        } else {
-          const { error } = await admin.auth.admin.inviteUserByEmail(email, {
-            redirectTo: `${portalUrl}/velg-passord`,
-          });
-          if (error && /already been registered|already registered|already exists/i.test(error.message)) {
-            // Fall tilbake til magic link – brukeren finnes allerede i auth
-            const { error: mlErr } = await admin.auth.admin.generateLink({
-              type: "magiclink",
-              email,
-              options: { redirectTo: `${portalUrl}/velg-passord` },
-            });
-            sendErr = mlErr;
-            mode = "magiclink";
-          } else {
-            sendErr = error;
-          }
+        } catch (e) {
+          return json(500, { error: (e as Error).message });
         }
+        return json(200, { success: true, mode: "recovery" });
+      }
 
-        if (sendErr) return json(500, { error: sendErr.message });
-        if (mode === "invite") {
+      case "resend_invite": {
+        const { email, authUser, firstName } = await resolveAuthUser();
+        if (!email) return json(404, { error: "Bruker ikke funnet (mangler epost)" });
+        const alreadyConfirmed = !!authUser?.email_confirmed_at || !!authUser?.last_sign_in_at;
+        const type: "invite" | "magiclink" = alreadyConfirmed ? "magiclink" : "invite";
+        try {
+          await generateAndSend({
+            type,
+            email,
+            firstName,
+            subject: "Velkommen til Nøtterø Bakeri kundeportal",
+            intro: `Du er invitert til <strong>Nøtterø Bakeri kundeportal</strong> på <a href="${portalUrl}">${portalUrl.replace(/^https?:\/\//, "")}</a>. Klikk på knappen under for å sette passord og logge inn.`,
+            cta: "Sett passord og logg inn",
+            redirect: `${portalUrl}/velg-passord`,
+          });
+        } catch (e) {
+          return json(500, { error: (e as Error).message });
+        }
+        const targetId = authUser?.id ?? user_id;
+        if (type === "invite") {
           await admin.from("portal_user_profiles").update({ status: "invited" }).eq("user_id", targetId);
         }
-        return json(200, { success: true, email, mode });
+        return json(200, { success: true, email, mode: type });
       }
+
       case "disable": {
-        const { error: aerr } = await admin.auth.admin.updateUserById(user_id, {
-          ban_duration: "876000h", // 100 år
-        });
+        const { error: aerr } = await admin.auth.admin.updateUserById(user_id, { ban_duration: "876000h" });
         if (aerr) return json(500, { error: aerr.message });
         await admin.from("portal_user_profiles").update({ status: "disabled" }).eq("user_id", user_id);
         return json(200, { success: true });
@@ -137,7 +178,6 @@ Deno.serve(async (req) => {
       }
       case "set_customers": {
         if (!Array.isArray(customer_ids)) return json(400, { error: "customer_ids kreves" });
-        // Enkleste sanne synk: slett alt for bruker, sett inn ny liste
         const { error: delErr } = await admin.from("customer_portal_accounts").delete().eq("user_id", user_id);
         if (delErr) return json(500, { error: delErr.message });
         if (customer_ids.length > 0) {
