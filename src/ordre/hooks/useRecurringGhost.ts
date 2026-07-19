@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
 import { isoDayOfWeek } from "@/ordre/hooks/useDeliveryTours";
+import { pickEffectiveSchedulesForDate } from "@/ordre/lib/recurringOverrides";
 
 export type RecurringGhostMap = Map<string, number>; // key: `${date}|${tourId}|${productId}`
 
