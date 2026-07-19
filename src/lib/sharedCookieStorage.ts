@@ -13,6 +13,10 @@ function cookieOptions() {
   };
 }
 
+function isCustomerPortalHost() {
+  return typeof window !== "undefined" && window.location.hostname === "kundeportal.nbhub.no";
+}
+
 function removeOptions() {
   const host = typeof window !== "undefined" ? window.location.hostname : "";
   return host === "kundeportal.nbhub.no"
@@ -71,6 +75,7 @@ const cookieAdapter = {
   setItem: (key: string, value: string): void => {
     if (value.length <= MAX_CHUNK) {
       Cookies.set(key, value, cookieOptions());
+      if (isCustomerPortalHost()) Cookies.remove(key, LEGACY_SHARED_REMOVE_OPTIONS);
       let i = 0;
       while (Cookies.get(`${key}.${i}`) !== undefined) {
         Cookies.remove(`${key}.${i}`, removeOptions());

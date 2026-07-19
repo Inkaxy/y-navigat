@@ -14,6 +14,20 @@ const json = (status: number, body: unknown) =>
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 
+function normalizePortalUrl(value: string | undefined | null) {
+  const fallback = "https://kundeportal.nbhub.no";
+  try {
+    const url = new URL(value ?? fallback);
+    if (url.hostname !== "kundeportal.nbhub.no") return fallback;
+    url.pathname = url.pathname.replace(/\/login\/?$/, "").replace(/\/$/, "");
+    url.search = "";
+    url.hash = "";
+    return url.toString().replace(/\/$/, "");
+  } catch {
+    return fallback;
+  }
+}
+
 type SupabaseAdmin = ReturnType<typeof createClient>;
 
 async function findAuthUserByEmail(admin: SupabaseAdmin, email: string) {
@@ -35,7 +49,7 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const portalUrl = Deno.env.get("CUSTOMER_PORTAL_URL") ?? "https://kundeportal.nbhub.no";
+    const portalUrl = normalizePortalUrl(Deno.env.get("CUSTOMER_PORTAL_URL"));
 
     const authHeader = req.headers.get("Authorization") ?? "";
     if (!authHeader) return json(401, { error: "Missing Authorization" });
