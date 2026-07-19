@@ -60,22 +60,57 @@ Deno.serve(async (req) => {
           email = prof?.email ?? null;
         }
         if (!email) return json(404, { error: "Bruker ikke funnet (mangler epost)" });
+
+        // Hvis vi ikke fant auth-brukeren via user_id, prøv å finne via epost
+        // (kan skje hvis auth-bruker ble slettet og gjenopprettet med ny id).
+        if (!authUser) {
+          const { data: list } = await admin.auth.admin.listUsers({ page: 1, perPage: 200 });
+          authUser = list?.users?.find((x) => x.email?.toLowerCase() === email!.toLowerCase()) ?? null;
+          if (authUser && authUser.id !== user_id) {
+            // Reconcile profil-user_id med faktisk auth-id
+            await admin.from("portal_user_profiles").update({ user_id: authUser.id }).eq("user_id", user_id);
+            await admin.from("customer_portal_accounts").update({ user_id: authUser.id }).eq("user_id", user_id);
+          }
+        }
+
         const alreadyConfirmed = !!authUser?.email_confirmed_at || !!authUser?.last_sign_in_at;
-        // Bruker som allerede har bekreftet konto: send magic link. Ellers: re-invite.
-        const { error } = alreadyConfirmed
-          ? await admin.auth.admin.generateLink({
+        const targetId = authUser?.id ?? user_id;
+
+        // Bekreftet konto: magic link. Uekseisterende/uverifisert: invite, med fallback til magic link
+        // hvis eposten allerede er registrert (409/"already been registered").
+        let mode: "magiclink" | "invite" = alreadyConfirmed ? "magiclink" : "invite";
+        let sendErr: { message: string } | null = null;
+
+        if (mode === "magiclink") {
+          const { error } = await admin.auth.admin.generateLink({
+            type: "magiclink",
+            email,
+            options: { redirectTo: `${portalUrl}/velg-passord` },
+          });
+          sendErr = error;
+        } else {
+          const { error } = await admin.auth.admin.inviteUserByEmail(email, {
+            redirectTo: `${portalUrl}/velg-passord`,
+          });
+          if (error && /already been registered|already registered|already exists/i.test(error.message)) {
+            // Fall tilbake til magic link – brukeren finnes allerede i auth
+            const { error: mlErr } = await admin.auth.admin.generateLink({
               type: "magiclink",
               email,
               options: { redirectTo: `${portalUrl}/velg-passord` },
-            })
-          : await admin.auth.admin.inviteUserByEmail(email, {
-              redirectTo: `${portalUrl}/velg-passord`,
             });
-        if (error) return json(500, { error: error.message });
-        if (!alreadyConfirmed) {
-          await admin.from("portal_user_profiles").update({ status: "invited" }).eq("user_id", user_id);
+            sendErr = mlErr;
+            mode = "magiclink";
+          } else {
+            sendErr = error;
+          }
         }
-        return json(200, { success: true, email, mode: alreadyConfirmed ? "magiclink" : "invite" });
+
+        if (sendErr) return json(500, { error: sendErr.message });
+        if (mode === "invite") {
+          await admin.from("portal_user_profiles").update({ status: "invited" }).eq("user_id", targetId);
+        }
+        return json(200, { success: true, email, mode });
       }
       case "disable": {
         const { error: aerr } = await admin.auth.admin.updateUserById(user_id, {
