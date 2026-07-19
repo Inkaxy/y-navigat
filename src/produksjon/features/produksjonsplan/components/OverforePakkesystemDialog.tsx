@@ -42,8 +42,21 @@ export function OverforePakkesystemDialog({ open, onOpenChange, date, criteria, 
       { headers: { Authorization: `Bearer ${jwt}` } },
     );
     if (!res.ok) {
-      const err = await res.text();
-      return toast({ title: "Nedlasting feilet", description: err.slice(0, 200), variant: "destructive" });
+      let msg = `HTTP ${res.status}`;
+      try {
+        const j = await res.json();
+        if (res.status === 409 && j?.code === "packing_slips_not_generated") {
+          return toast({
+            title: "Pakksedler mangler",
+            description: `Kjør pakkseddel-generering for ${date} før pakkefilen kan lastes ned.`,
+            variant: "destructive",
+          });
+        }
+        msg = j?.error ?? msg;
+      } catch {
+        msg = (await res.text()).slice(0, 200) || msg;
+      }
+      return toast({ title: "Nedlasting feilet", description: msg, variant: "destructive" });
     }
     const blob = await res.blob();
     const a = document.createElement("a");
