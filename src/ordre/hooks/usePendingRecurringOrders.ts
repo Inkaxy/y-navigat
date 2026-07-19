@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
 import { useDeliveryTours } from "@/ordre/hooks/useDeliveryTours";
 import { NULL_TOUR_KEY } from "@/ordre/hooks/useTourRunStatus";
+import { pickEffectiveSchedulesForDate } from "@/ordre/lib/recurringOverrides";
 
 type DeliveryTourLike = {
   id: string;
@@ -66,7 +67,7 @@ export async function fetchPendingRecurringOrderCounts(
     await Promise.all([
       supabase
         .from("recurring_order_schedules")
-        .select("id, customer_id, recurring_order_items!inner(tour_id, quantity)")
+        .select("id, customer_id, valid_from, valid_to, recurring_order_items!inner(tour_id, quantity)")
         .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
         .eq("is_active", true)
         .or(`valid_from.is.null,valid_from.lte.${date}`)
@@ -100,8 +101,13 @@ export async function fetchPendingRecurringOrderCounts(
   const byTour: Record<string, number> = {};
   let nullTourCount = 0;
   let total = 0;
+  const rawSchedules = (schedules ?? []) as RecurringScheduleRow[];
+  const effective = pickEffectiveSchedulesForDate(
+    rawSchedules as Array<RecurringScheduleRow & { valid_from: string | null; valid_to: string | null }>,
+    date,
+  );
 
-  for (const schedule of (schedules ?? []) as RecurringScheduleRow[]) {
+  for (const schedule of effective) {
     if (materializedScheduleIds.has(schedule.id) || pausedCustomerIds.has(schedule.customer_id)) continue;
 
     const tourIds = new Set(
@@ -139,7 +145,7 @@ export async function fetchPendingRecurringOrderRows(
     await Promise.all([
       supabase
         .from("recurring_order_schedules")
-        .select("id, customer_id, recurring_order_items!inner(tour_id, quantity)")
+        .select("id, customer_id, valid_from, valid_to, recurring_order_items!inner(tour_id, quantity)")
         .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
         .eq("is_active", true)
         .or(`valid_from.is.null,valid_from.lte.${date}`)
@@ -173,11 +179,14 @@ export async function fetchPendingRecurringOrderRows(
   type Row = {
     id: string;
     customer_id: string;
+    valid_from: string | null;
+    valid_to: string | null;
     recurring_order_items?: Array<{ tour_id: string | null; quantity: number | string | null }>;
   };
 
+  const effectiveRows = pickEffectiveSchedulesForDate((schedules ?? []) as Row[], date);
   const filtered: Array<{ row: Row; resolvedTourId: string | null }> = [];
-  for (const s of (schedules ?? []) as Row[]) {
+  for (const s of effectiveRows) {
     if (materialized.has(s.id) || paused.has(s.customer_id)) continue;
     const tourIds = new Set(
       (s.recurring_order_items ?? [])

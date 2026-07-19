@@ -467,7 +467,7 @@ export function RecurringScheduleDialog({
                 Aktiv
               </Label>
               <span className="text-xs text-muted-foreground">
-                Du kan ha flere maler per kunde — alle aktive maler summeres i matrisen.
+                En mal med snevrere <em>Gyldig fra/til</em> overstyrer grunnmalen helt i sin periode (f.eks. ferie- eller sesong-mal).
               </span>
             </div>
 
