@@ -39,6 +39,9 @@ import {
 } from "@/ordre/hooks/useRecurringOrders";
 import { formatDateLong } from "@/ordre/lib/format";
 import { RecurringScheduleDialog } from "@/ordre/components/orders/RecurringScheduleDialog";
+import { isScheduleLiveNow } from "@/ordre/lib/recurringOverrides";
+
+const TODAY_ISO = new Date().toISOString().slice(0, 10);
 
 export default function RecurringOrders() {
   const [search, setSearch] = useState("");
