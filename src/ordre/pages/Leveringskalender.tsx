@@ -952,9 +952,9 @@ export default function MatrixPage() {
   const hasCustomerCoords = customerLat != null && customerLon != null;
 
   return (
-    <div className="relative left-1/2 right-1/2 -ml-[50vw] -mr-[50vw] w-screen -mt-8 -mb-12 flex h-full flex-col bg-background">
+    <div className="-mt-8 -mb-12 flex h-full flex-col bg-background">
 
-      <div className="px-6 py-5">
+      <div className="mx-auto w-full max-w-[1400px] px-6 py-5">
         <div className="rounded-[16px] border-2 border-brand-bronze/40 bg-gradient-to-br from-card to-brand-cream/20 p-5 shadow-lg ring-1 ring-inset ring-brand-bronze/10 px-[10px] py-[20px]">
         <div className="flex flex-wrap items-center gap-3">
           <Button
@@ -1378,7 +1378,7 @@ export default function MatrixPage() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto">
+      <div className="mx-auto w-full max-w-[1400px] flex-1 overflow-auto px-6">
         {!customerId ? (
           <div className="grid h-full place-items-center p-10 text-center text-muted-foreground">
             <div className="max-w-2xl">
