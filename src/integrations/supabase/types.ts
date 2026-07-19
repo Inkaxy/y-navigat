@@ -4472,6 +4472,32 @@ export type Database = {
         }
         Relationships: []
       }
+      portal_active_customer: {
+        Row: {
+          customer_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          customer_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          customer_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "portal_active_customer_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       portal_user_profiles: {
         Row: {
           created_at: string
@@ -10313,6 +10339,7 @@ export type Database = {
         Returns: Json
       }
       portal_get_order: { Args: { p_order_id: string }; Returns: Json }
+      portal_get_product_info: { Args: { p_product_id: string }; Returns: Json }
       portal_get_returnable_lines: {
         Args: { p_delivery_note_id: string }
         Returns: {
@@ -10329,6 +10356,18 @@ export type Database = {
           return_value: number
           sales_unit: string
           vat_rate: number
+        }[]
+      }
+      portal_list_my_customers: {
+        Args: never
+        Returns: {
+          allows_returns: boolean
+          customer_id: string
+          customer_number: string
+          default_price_list_id: string
+          display_name: string
+          is_active_selection: boolean
+          legal_entity_id: string
         }[]
       }
       portal_list_products: {
@@ -10411,6 +10450,10 @@ export type Database = {
           total_incl_vat: number
           tour_number: number
         }[]
+      }
+      portal_set_active_customer: {
+        Args: { p_customer_id: string }
+        Returns: string
       }
       portal_set_own_geocode: {
         Args: { p_latitude: number; p_longitude: number; p_source: string }
