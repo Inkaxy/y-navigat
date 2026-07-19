@@ -39,7 +39,7 @@ export function useRecurringGhost(
         supabase
           .from("recurring_order_schedules")
           .select(
-            "id, valid_from, valid_to, is_active, recurring_order_items(product_id, weekday, tour_id, quantity)",
+            "id, customer_id, valid_from, valid_to, is_active, recurring_order_items(product_id, weekday, tour_id, quantity)",
           )
           .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
           .eq("customer_id", customerId!)
@@ -68,7 +68,9 @@ export function useRecurringGhost(
       const out: RecurringGhostMap = new Map();
       const days = enumerateDates(dateFrom, dateTo);
 
-      for (const sched of (schedRes.data ?? []) as Array<{
+      type Sched = {
+        id: string;
+        customer_id: string;
         valid_from: string | null;
         valid_to: string | null;
         recurring_order_items: Array<{
@@ -77,11 +79,14 @@ export function useRecurringGhost(
           tour_id: string | null;
           quantity: number;
         }> | null;
-      }>) {
-        for (const date of days) {
-          if (sched.valid_from && date < sched.valid_from) continue;
-          if (sched.valid_to && date > sched.valid_to) continue;
-          const dow = isoDayOfWeek(date);
+      };
+      const allSchedules = (schedRes.data ?? []) as Sched[];
+
+      for (const date of days) {
+        // Per dato: overstyrings-mal (snevrere periode) slår grunnmal helt.
+        const effective = pickEffectiveSchedulesForDate(allSchedules, date);
+        const dow = isoDayOfWeek(date);
+        for (const sched of effective) {
           for (const item of sched.recurring_order_items ?? []) {
             if (item.weekday !== dow) continue;
             if (!item.quantity || Number(item.quantity) <= 0) continue;
