@@ -10334,6 +10334,10 @@ export type Database = {
       portal_create_customer_order: { Args: { p_payload: Json }; Returns: Json }
       portal_create_order: { Args: { p_payload: Json }; Returns: Json }
       portal_create_return_order: { Args: { p_payload: Json }; Returns: Json }
+      portal_get_delivery_note: {
+        Args: { p_delivery_note_id: string }
+        Returns: Json
+      }
       portal_get_matrix: {
         Args: { p_from: string; p_to: string }
         Returns: Json
@@ -10356,6 +10360,23 @@ export type Database = {
           return_value: number
           sales_unit: string
           vat_rate: number
+        }[]
+      }
+      portal_list_delivery_notes: {
+        Args: { p_from?: string; p_to?: string }
+        Returns: {
+          delivery_date: string
+          delivery_note_id: string
+          delivery_tour_id: string
+          display_number: string
+          finalized_at: string
+          line_count: number
+          route_label: string
+          status: string
+          subtotal_excl_vat: number
+          total_incl_vat: number
+          total_vat: number
+          tour_number: number
         }[]
       }
       portal_list_my_customers: {
