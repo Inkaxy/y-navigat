@@ -1,9 +1,12 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
+import { buildPortalEmailHtml, sendGraphMail } from "../_shared/graph-mail.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+const PORTAL_FROM_EMAIL = "NBOS@nottero-bakeri.no";
 
 interface Payload {
   email: string;
@@ -53,44 +56,42 @@ Deno.serve(async (req) => {
 
     const admin = createClient(supabaseUrl, serviceKey);
 
-    // Finn eller opprett auth-bruker
+    // 1) Finn eller opprett auth-bruker (uten å sende Supabase-epost)
     let userId: string | null = null;
+    let isNew = false;
     const { data: existing } = await admin.auth.admin.listUsers({ page: 1, perPage: 200 });
     const found = existing?.users?.find((u) => u.email?.toLowerCase() === email);
     if (found) {
       userId = found.id;
     } else {
-      const { data: invited, error: invErr } = await admin.auth.admin.inviteUserByEmail(email, {
-        redirectTo: `${portalUrl}/velg-passord`,
-        data: { display_name, role, portal: true },
+      const tempPw = crypto.randomUUID() + "Aa1!";
+      const { data: created, error: createErr } = await admin.auth.admin.createUser({
+        email,
+        password: tempPw,
+        email_confirm: true,
+        user_metadata: { display_name, role, portal: true },
       });
-      if (invErr || !invited?.user) {
-        return json(500, { error: `Invitasjon feilet: ${invErr?.message ?? "ukjent"}` });
+      if (createErr || !created?.user) {
+        return json(500, { error: `Kunne ikke opprette bruker: ${createErr?.message ?? "ukjent"}` });
       }
-      userId = invited.user.id;
+      userId = created.user.id;
+      isNew = true;
     }
 
-    if (body.resend && found) {
-      const { error: linkErr } = await admin.auth.admin.inviteUserByEmail(email, {
-        redirectTo: `${portalUrl}/velg-passord`,
-      });
-      if (linkErr) return json(500, { error: `Ny invitasjon feilet: ${linkErr.message}` });
-    }
-
-    // Upsert profil
+    // 2) Upsert profil
     const { error: profErr } = await admin.from("portal_user_profiles").upsert(
       {
         user_id: userId,
         display_name,
         email,
         role,
-        status: found ? "active" : "invited",
+        status: isNew ? "invited" : "active",
       },
       { onConflict: "user_id" },
     );
     if (profErr) return json(500, { error: `Profil-lagring feilet: ${profErr.message}` });
 
-    // Sett kunde-koblinger (idempotent)
+    // 3) Kunde-koblinger
     const links = body.customer_ids.map((cid) => ({
       user_id: userId!,
       customer_id: cid,
@@ -101,7 +102,51 @@ Deno.serve(async (req) => {
       .upsert(links, { onConflict: "user_id,customer_id" });
     if (linkErr) return json(500, { error: `Kunde-koblinger feilet: ${linkErr.message}` });
 
-    return json(200, { success: true, user_id: userId, email });
+    // 4) Generer action-link som lander på kundeportalen og send via Graph
+    //    (bypass Supabase sin default-epost slik at vi kontrollerer URL-en 100%)
+    const linkType = isNew || body.resend === false ? "invite" : "magiclink";
+    const { data: linkData, error: linkGenErr } = await admin.auth.admin.generateLink({
+      type: linkType as "invite" | "magiclink",
+      email,
+      options: { redirectTo: `${portalUrl}/velg-passord` },
+    });
+    if (linkGenErr || !linkData?.properties?.action_link) {
+      return json(500, {
+        error: `Kunne ikke generere lenke: ${linkGenErr?.message ?? "ukjent"}`,
+      });
+    }
+    const actionUrl = linkData.properties.action_link;
+
+    let emailSent = false;
+    let emailError: string | null = null;
+    try {
+      await sendGraphMail({
+        admin,
+        from: PORTAL_FROM_EMAIL,
+        to: email,
+        subject: "Velkommen til Nøtterø Bakeri kundeportal",
+        html: buildPortalEmailHtml({
+          greeting_name: body.first_name.trim(),
+          intro: `Du er invitert til <strong>Nøtterø Bakeri kundeportal</strong> på <a href="${portalUrl}">${portalUrl.replace(/^https?:\/\//, "")}</a>. Klikk på knappen under for å sette passord og logge inn.`,
+          cta_label: "Sett passord og logg inn",
+          action_url: actionUrl,
+          footer_note: "Lenken er gyldig i 24 timer. Har du ikke ventet denne invitasjonen kan du ignorere e-posten.",
+        }),
+      });
+      emailSent = true;
+    } catch (e) {
+      emailError = e instanceof Error ? e.message : String(e);
+    }
+
+    return json(200, {
+      success: true,
+      user_id: userId,
+      email,
+      email_sent: emailSent,
+      email_error: emailError,
+      // Returner action_url så admin kan dele manuelt hvis e-posten feilet
+      action_url: emailSent ? null : actionUrl,
+    });
   } catch (e) {
     console.error("portal-invite-user", e);
     return json(500, { error: (e as Error).message });
