@@ -70,7 +70,7 @@ const cookieAdapter = {
   },
   setItem: (key: string, value: string): void => {
     if (value.length <= MAX_CHUNK) {
-      Cookies.set(key, value, COOKIE_OPTIONS);
+      Cookies.set(key, value, cookieOptions());
       let i = 0;
       while (Cookies.get(`${key}.${i}`) !== undefined) {
         Cookies.remove(`${key}.${i}`, removeOptions());
