@@ -1,12 +1,33 @@
 import Cookies from "js-cookie";
 
-const COOKIE_DOMAIN = ".nbhub.no";
-const COOKIE_OPTIONS = {
-  domain: COOKIE_DOMAIN,
-  sameSite: "Lax" as const,
-  secure: true,
+const SHARED_COOKIE_DOMAIN = ".nbhub.no";
+
+function cookieOptions() {
+  const host = typeof window !== "undefined" ? window.location.hostname : "";
+  return {
+    ...(host === "kundeportal.nbhub.no" ? {} : { domain: SHARED_COOKIE_DOMAIN }),
+    sameSite: "Lax" as const,
+    secure: true,
+    path: "/",
+    expires: 7,
+  };
+}
+
+function removeOptions() {
+  const host = typeof window !== "undefined" ? window.location.hostname : "";
+  return host === "kundeportal.nbhub.no"
+    ? { path: "/" }
+    : { domain: SHARED_COOKIE_DOMAIN, path: "/" };
+}
+
+const LEGACY_SHARED_REMOVE_OPTIONS = {
+  domain: SHARED_COOKIE_DOMAIN,
   path: "/",
-  expires: 7,
+};
+
+const LEGACY_HOST_REMOVE_OPTIONS = {
+  sameSite: "Lax" as const,
+  path: "/",
 };
 
 const MAX_CHUNK = 3500;
@@ -52,22 +73,28 @@ const cookieAdapter = {
       Cookies.set(key, value, COOKIE_OPTIONS);
       let i = 0;
       while (Cookies.get(`${key}.${i}`) !== undefined) {
-        Cookies.remove(`${key}.${i}`, { domain: COOKIE_DOMAIN, path: "/" });
+        Cookies.remove(`${key}.${i}`, removeOptions());
+        Cookies.remove(`${key}.${i}`, LEGACY_SHARED_REMOVE_OPTIONS);
         i++;
       }
     } else {
       const chunks = value.match(new RegExp(`.{1,${MAX_CHUNK}}`, "g")) ?? [];
       chunks.forEach((chunk, idx) => {
-        Cookies.set(`${key}.${idx}`, chunk, COOKIE_OPTIONS);
+        Cookies.set(`${key}.${idx}`, chunk, cookieOptions());
       });
-      Cookies.remove(key, { domain: COOKIE_DOMAIN, path: "/" });
+      Cookies.remove(key, removeOptions());
+      Cookies.remove(key, LEGACY_SHARED_REMOVE_OPTIONS);
     }
   },
   removeItem: (key: string): void => {
-    Cookies.remove(key, { domain: COOKIE_DOMAIN, path: "/" });
+    Cookies.remove(key, removeOptions());
+    Cookies.remove(key, LEGACY_SHARED_REMOVE_OPTIONS);
+    Cookies.remove(key, LEGACY_HOST_REMOVE_OPTIONS);
     let i = 0;
     while (Cookies.get(`${key}.${i}`) !== undefined) {
-      Cookies.remove(`${key}.${i}`, { domain: COOKIE_DOMAIN, path: "/" });
+      Cookies.remove(`${key}.${i}`, removeOptions());
+      Cookies.remove(`${key}.${i}`, LEGACY_SHARED_REMOVE_OPTIONS);
+      Cookies.remove(`${key}.${i}`, LEGACY_HOST_REMOVE_OPTIONS);
       i++;
     }
   },
