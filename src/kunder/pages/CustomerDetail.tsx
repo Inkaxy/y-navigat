@@ -840,6 +840,20 @@ export default function CustomerDetail() {
                     </div>
                   </Field>
                   <Field
+                    label="Steker varer selv"
+                    className="col-span-2"
+                    hint="Aktiverer submenyen «Varer stekt selv» i Kundeportalen, der kunden kan registrere hvor mange råvarer de har stekt til en gitt dato. Kobles opp på varekortet (råvare → ferdigstekt salgsprodukt)."
+                  >
+                    <div className="flex h-10 items-center gap-2">
+                      <Switch
+                        checked={watchBakesOwnProducts}
+                        onCheckedChange={(v) => form.setValue("bakes_own_products", !!v, { shouldDirty: true })}
+                        disabled={!canWrite}
+                      />
+                      <span className="text-sm text-muted-foreground">{watchBakesOwnProducts ? "Aktiv" : "Av"}</span>
+                    </div>
+                  </Field>
+                  <Field
                     label="Overfør til POS"
                     className="col-span-2"
                     hint="Hvis aktivert, blir kunden tilgjengelig som POS-kunde i kassen. Skru av for å sette POS-kunden til inaktiv."
