@@ -247,6 +247,7 @@ export default function CustomerDetail() {
       customer_type: (customer.customer_type ?? "business") as any,
       is_private_person: !!customer.is_private_person,
       allows_returns: !!customer.allows_returns,
+      bakes_own_products: !!(customer as any).bakes_own_products,
       organization_number: customer.organization_number ?? "",
       gln: customer.gln ?? "",
       customer_category: customer.customer_category ?? "",
