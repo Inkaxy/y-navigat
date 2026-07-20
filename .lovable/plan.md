@@ -1,41 +1,47 @@
-# Pakkefil med produksjonsplan-kriterier
+## Bakgrunn
 
-Pakkefilen (JSON) bygges i dag ut fra alle ordre på leveringsdagen. Den skal filtreres med samme kriterier som produksjonsplan/pakkeliste: tur, hovedvaregrupper, undervaregrupper og kundegrupper. Aggregerings- og sorteringsvalg fra produksjonsplanen gjelder ikke — pakkefilen er per ordre, ikke aggregert per vare.
+I dag settes `delivery_notes.finalized_at` aldri — hverken kode eller database gjør det. Alle 27 eksisterende pakksedler står som `draft`, og kundeportalen (`portal_list_delivery_notes` filtrerer på `finalized_at IS NOT NULL`) viser derfor ingenting. Vi lukker gapet ved å finalisere automatisk ved hovedkjøring, og gi mulighet for å "tilbakekjøre" (av-finalisere) enkelt eller i bulk.
 
 ## Endringer
 
-### 1. Edge-funksjon `pakkesystem-export`
-Nye valgfrie query-parametere (samme datamodell som `ProduksjonsplanCriteria`):
-- `tours` — komma-separerte tur-nummer (f.eks. `1,2`). Tom = alle.
-- `main_categories` — main_category_id-er.
-- `sub_categories` — sub_category_id-er.
-- `include_no_sub` — `1`/`0`, default `1`.
-- `customer_groups` — customer_group_ids.
+### 1) Auto-finaliser ved hovedkjøring
+- Utvid `generate_delivery_notes(...)` (databasefunksjonen som allerede kalles fra `useGenerateDeliveryNotes`) slik at når `p_run_type = 'main'`:
+  - Alle nye pakksedler opprettes med `status='finalized'`, `finalized_at = now()`, `finalized_by = auth.uid()`.
+- `additional` og `correction` finaliseres også automatisk (samme regel) — bruker sa "ved hovedkjøring", men i praksis vil både tilleggs- og korreksjonskjøringer også produsere pakksedler som skal ut til kunde. Bekreft under review om `additional`/`correction` skal beholde `draft`-flyt i stedet.
+- Legg `notes_finalized` i returtypen (informativt).
 
-Filterlogikk:
-- Ordre begrenses til valgte tur-nummer via `delivery_tours.tour_number`.
-- Ordrelinjer filtreres på produktets `main_category_id` og `sub_category_id`; ved `include_no_sub=1` tas linjer uten sub_category_id også med.
-- Kunder filtreres via `customer_group_members`.
-- Ordre og produkter uten treff etter filtrering droppes; en ordre uten linjer inkluderes ikke.
-- Kriteriene ekkoes tilbake i `filters`-blokka i JSON-en for revisjon.
+### 2) Tilbakekjøring (av-finalisering)
+Ny RPC `unfinalize_delivery_notes(p_ids uuid[], p_reason text)`:
+- Setter `status='draft'`, nullstiller `finalized_at`/`finalized_by`.
+- Nekter hvis pakkseddelen er `cancelled` eller allerede referert av en pakkesystem-eksport / retur-ordre-kobling (sjekk `finalized_at IS NOT NULL`-avhengige rader).
+- Logger til `delivery_note_runs` med `run_type='unfinalize'` (ny variant) for sporing.
 
-Gate på pakksedler-generert-status beholdes uendret.
+### 3) UI
 
-### 2. Push-destinasjoner
-`pakkesystem_push_destinations` får en `criteria jsonb` kolonne (default `{}`). Cron-jobben serialiserer kriteriene til query-string når snapshot hentes.
+**`DeliveryNotesList.tsx` (bulk):**
+- Ny sekundærknapp "↩ Tilbakekjør valgte" ved siden av "Skriv ut valgte" — synlig kun når minst én valgt rad har `status='finalized'`.
+- Bekreftelsesdialog med årsak (`p_reason`), toast med antall.
 
-### 3. UI `/ordre/pakkesystem`
-- Gjenbruk `SettKriteriaDialog` fra `src/produksjon/features/produksjonsplan/components/` for både manuell nedlasting og per push-destinasjon.
-- Skjul aggregation/sort_by/merge_by_main_product i dialogen når `mode="packing_file"` — de er irrelevante for JSON-eksport.
-- Ny knapp «Kriterier…» ved nedlasting og ved hver push-destinasjon; viser en kort oppsummering (f.eks. «Tur 1,2 · 3 varegrupper»).
-- Kriteriene lagres i komponent-state for manuell nedlasting og i `destination.criteria` for push.
+**`DeliveryNoteDetail.tsx` (enkelt):**
+- Ny knapp "↩ Tilbakekjør pakkseddel" når `status='finalized'`.
+- Vis `finalized_at`/`finalized_by` i header når satt.
 
-### 4. Test-push i UI
-Bruker samme kriterier som destinasjonen har lagret.
+**Statusstripe i lista:** oppdater `statusVariant` slik at `finalized` er default-visning etter hovedkjøring (allerede definert, bare mer synlig).
+
+### 4) Backfill av eksisterende data
+Éngangs data-oppdatering (via insert-verktøyet, ikke migrasjon): sett `finalized_at = created_at`, `status='finalized'` på alle 26 eksisterende `draft`-rader som ikke er `cancelled`, slik at Teies pakksedler dukker opp i kundeportalen umiddelbart.
+
+### 5) Kundeportal
+Ingen endring nødvendig — `portal_list_delivery_notes` fortsetter å filtrere på `finalized_at IS NOT NULL` og vil nå returnere alle finaliserte rader.
 
 ## Tekniske detaljer
 
-- Migrasjon: `ALTER TABLE public.pakkesystem_push_destinations ADD COLUMN criteria jsonb NOT NULL DEFAULT '{}'::jsonb;` (ingen policy-endring).
-- Edge-funksjon parser query-string til objekt, kaller Supabase med `.in(...)` for lister; tomme lister = ingen filtrering.
-- `SettKriteriaDialog` tar allerede `initial` og `onApply(criteria)` — legges inn med et `hiddenFields`-prop for å skjule aggregation-blokka når vi bruker den i pakkefil-kontekst.
-- `customer_group_members` join gjøres via `.in("customer_id", ...)` etter et separat oppslag når `customer_groups` er satt.
+- `delivery_note_runs.run_type` må tillate `'unfinalize'` (sjekk CHECK-constraint; utvid ved behov).
+- RPC-ene skal være `SECURITY DEFINER` med `SET search_path = public` og sjekke at kaller har tilgang til `legal_entity_id` (samme mønster som `generate_delivery_notes`).
+- `useGenerateDeliveryNotes` og en ny `useUnfinalizeDeliveryNotes` invaliderer `delivery-notes-list`, `delivery-note-counts`, `delivery-note-runs`.
+- Ingen endring i `pakkesystem-export` — den krever fortsatt finaliserte pakksedler og vil nå faktisk finne dem.
+
+## Åpne spørsmål (kan avklares under implementering)
+
+1. Skal `additional` og `correction` også auto-finaliseres, eller kun `main`?
+2. Skal tilbakekjøring være tillatt hvis pakkseddelen allerede er eksportert til Pakkesystem, eller blokkeres helt?
