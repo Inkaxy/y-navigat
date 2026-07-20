@@ -84,6 +84,7 @@ const baseSchema = z
     customer_type: z.enum(["business", "consumer", "internal"]),
     is_private_person: z.boolean(),
     allows_returns: z.boolean(),
+    bakes_own_products: z.boolean(),
     enforce_custom_reference: z.boolean(),
     organization_number: z.string().trim().max(20).optional().or(z.literal("")),
     gln: z.string().trim().max(20).optional().or(z.literal("")),
