@@ -108,7 +108,7 @@ export default function CakeBuilderEmbed() {
     const meta = document.createElement("meta");
     meta.httpEquiv = "Content-Security-Policy";
     meta.content =
-      "frame-ancestors 'self' https://*.lovable.app https://*.lovable.dev https://*.lovableproject.com https://nottero-bakeri.no https://*.nottero-bakeri.no";
+      "frame-ancestors 'self' https://*.lovable.app https://*.lovable.dev https://*.lovableproject.com https://nottero-bakeri.no https://*.nottero-bakeri.no https://nbhub.no https://*.nbhub.no";
     document.head.appendChild(meta);
     return () => {
       document.head.removeChild(meta);
@@ -124,6 +124,23 @@ export default function CakeBuilderEmbed() {
           if (msg.theme === "dark") document.documentElement.classList.add("dark");
           else document.documentElement.classList.remove("dark");
         }
+      } else if (msg.type === "cake-builder/set-session") {
+        // Parent (kundeportal) injiserer sin supabase-sesjon slik at RPC-er
+        // som krever `authenticated` fungerer inne i iframen.
+        (async () => {
+          try {
+            if (msg.access_token && msg.refresh_token) {
+              await supabase.auth.setSession({
+                access_token: msg.access_token,
+                refresh_token: msg.refresh_token,
+              });
+            }
+          } catch {
+            /* ignore */
+          } finally {
+            setAuthReady(true);
+          }
+        })();
       }
       // 'init' (initialConfig) and 'reset' implemented in F1.3
     });
