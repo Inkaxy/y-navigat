@@ -10461,6 +10461,7 @@ export type Database = {
           display_name: string
           display_number: number
           id: string
+          pieces_per_tray: number
           unit_of_sale: string
         }[]
       }
