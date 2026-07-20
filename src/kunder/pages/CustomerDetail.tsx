@@ -291,6 +291,7 @@ export default function CustomerDetail() {
   const watchStatus = form.watch("status");
   const watchIsPrivate = form.watch("is_private_person");
   const watchAllowsReturns = form.watch("allows_returns");
+  const watchBakesOwnProducts = form.watch("bakes_own_products");
   const watchEnforceCustomRef = form.watch("enforce_custom_reference");
   const watchCustomReference = form.watch("custom_reference");
 
