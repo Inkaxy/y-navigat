@@ -361,6 +361,7 @@ export default function CustomerDetail() {
         customer_type: values.customer_type,
         is_private_person: values.is_private_person,
         allows_returns: values.allows_returns,
+        bakes_own_products: values.bakes_own_products,
         organization_number: values.organization_number?.trim() || null,
         gln: values.gln?.trim() || null,
         customer_category: values.customer_category?.trim() || null,
