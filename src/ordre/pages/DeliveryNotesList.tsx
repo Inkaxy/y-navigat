@@ -245,8 +245,16 @@ export default function DeliveryNotesList() {
               const printableSelected = Array.from(selected).filter((id) =>
                 printableRows.some((r) => r.id === id),
               );
+              const selectedFinalizedIds = Array.from(selected).filter((id) =>
+                rows.some((r) => r.id === id && r.status === "finalized"),
+              );
               return (
                 <>
+                  <UnfinalizeButton
+                    ids={selectedFinalizedIds}
+                    label="Tilbakekjør valgte"
+                    disabled={selectedFinalizedIds.length === 0}
+                  />
                   <BulkPakkseddelPDFButton
                     scope={{ kind: "ids", date, ids: printableRows.map((r) => r.id) }}
                     label="Skriv ut alle ferdige"
