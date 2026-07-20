@@ -437,18 +437,25 @@ export default function ProductDetail() {
           />
         )}
         {tab === "produksjon" && lookups && (
-          <ProduksjonTab
-            productId={product.id}
-            canWrite={canWrite}
-            legalEntityId={legalEntityId}
-            productionGroups={lookups.productionGroups}
-            productionDepartments={lookups.productionDepartments}
-            selectedDepartmentIds={labelDepartmentIds}
-            onDepartmentsChange={setLabelDepartmentIds}
-            cakeLinks={cakeLinks}
-            originalCakeLinks={originalCakeLinks}
-            onCakeLinksChange={setCakeLinks}
-          />
+          <div className="space-y-4">
+            <ProduksjonTab
+              productId={product.id}
+              canWrite={canWrite}
+              legalEntityId={legalEntityId}
+              productionGroups={lookups.productionGroups}
+              productionDepartments={lookups.productionDepartments}
+              selectedDepartmentIds={labelDepartmentIds}
+              onDepartmentsChange={setLabelDepartmentIds}
+              cakeLinks={cakeLinks}
+              originalCakeLinks={originalCakeLinks}
+              onCakeLinksChange={setCakeLinks}
+            />
+            <SelvStekingCard
+              productId={product.id}
+              productName={product.display_name}
+              canWrite={canWrite}
+            />
+          </div>
         )}
         {tab === "varedetaljer" && (
           <VaredetaljerTab canWrite={canWrite} keywords={keywords} onKeywordsChange={setKeywords} productId={product.id} />
