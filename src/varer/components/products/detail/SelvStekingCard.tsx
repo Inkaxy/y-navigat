@@ -39,7 +39,7 @@ export function SelvStekingCard({ productId, productName, canWrite }: Props) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")
-        .select("id, is_bakeable_raw, baked_product_id")
+        .select("id, is_bakeable_raw, baked_product_id, pieces_per_tray")
         .eq("id", productId)
         .maybeSingle();
       if (error) throw error;
@@ -47,6 +47,7 @@ export function SelvStekingCard({ productId, productName, canWrite }: Props) {
         id: string;
         is_bakeable_raw: boolean | null;
         baked_product_id: string | null;
+        pieces_per_tray: number | null;
       } | null;
     },
   });
