@@ -38,7 +38,8 @@ export default function CakeBuilderEmbed() {
   const vatToggle = searchParams.get("vat_toggle") !== "false";
   const returnUrl = searchParams.get("return_url");
   const source = searchParams.get("source");
-  const [authReady, setAuthReady] = useState(source !== "kiosk");
+  const needsInjectedSession = source === "kiosk" || source === "portal";
+  const [authReady, setAuthReady] = useState(!needsInjectedSession);
 
   // Optional prefilled customer meta (e.g. when launched from POS-kiosken som
   // allerede har samlet inn kundeopplysningene først). Når disse er satt skal
