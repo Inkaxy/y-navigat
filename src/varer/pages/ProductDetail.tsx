@@ -44,6 +44,7 @@ import { LeveranseTab } from "@/varer/components/products/detail/tabs/LeveranseT
 import { PakkeTab, type PackageItem } from "@/varer/components/products/detail/tabs/PakkeTab";
 import { ReturTab } from "@/varer/components/products/detail/tabs/ReturTab";
 import { RecipeEditor } from "@/varer/components/products/RecipeEditor";
+import { SelvStekingCard } from "@/varer/components/products/detail/SelvStekingCard";
 import { DeclarationTab } from "@/varer/components/products/DeclarationTab";
 import { CalculationTab } from "@/varer/components/products/CalculationTab";
 import { useNavigate as useNav } from "react-router-dom";
