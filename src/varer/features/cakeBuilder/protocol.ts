@@ -21,7 +21,8 @@ export type EmbedToParentMessage =
 export type ParentToEmbedMessage =
   | { type: "cake-builder/init"; initialConfig?: CakeConfig }
   | { type: "cake-builder/reset" }
-  | { type: "cake-builder/set-theme"; theme: "light" | "dark" };
+  | { type: "cake-builder/set-theme"; theme: "light" | "dark" }
+  | { type: "cake-builder/set-session"; access_token: string; refresh_token: string };
 
 export interface WrappedMessage<T> {
   source: typeof CAKE_BUILDER_SOURCE;
