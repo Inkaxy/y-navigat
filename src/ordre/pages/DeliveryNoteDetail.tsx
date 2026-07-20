@@ -189,6 +189,13 @@ export default function DeliveryNoteDetail() {
               Vis interne priser
             </Label>
           </div>
+          {data.status === "finalized" && (
+            <UnfinalizeButton
+              ids={[data.id]}
+              label="Tilbakekjør"
+              description="Pakkseddelen settes tilbake til utkast. Den forsvinner fra kundeportalen og kan redigeres på nytt."
+            />
+          )}
           <PakkseddelPDFButton id={data.id} />
           <div className="text-right">
             <div className="text-xs uppercase tracking-wider text-muted-foreground">Pakkseddel</div>
