@@ -325,7 +325,7 @@ export default function DeliveryNotesList() {
                   key={`${p.kind}-${p.id}`}
                   className="flex items-center gap-3 px-4 py-2.5 hover:bg-muted/60 cursor-pointer"
                   onClick={() => {
-                    if (p.kind === "order") navigate(`/ordre/ordre/${p.id}`);
+                    if (p.kind === "order") navigate(`/ordre/ordrer/${p.id}`);
                   }}
                 >
                   <div className="flex-1 min-w-0 flex items-baseline gap-2 truncate">
