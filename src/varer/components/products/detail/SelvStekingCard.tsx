@@ -102,6 +102,7 @@ export function SelvStekingCard({ productId, productName, canWrite }: Props) {
     mutationFn: async (patch: {
       is_bakeable_raw?: boolean;
       baked_product_id?: string | null;
+      pieces_per_tray?: number | null;
     }) => {
       const { error } = await supabase
         .from("products")
