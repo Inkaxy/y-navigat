@@ -54,6 +54,12 @@ export function SelvStekingCard({ productId, productName, canWrite }: Props) {
 
   const isEnabled = !!productQuery.data?.is_bakeable_raw;
   const bakedProductId = productQuery.data?.baked_product_id ?? null;
+  const piecesPerTray = productQuery.data?.pieces_per_tray ?? null;
+  const [trayDraft, setTrayDraft] = useState<string>("");
+
+  useEffect(() => {
+    setTrayDraft(piecesPerTray != null ? String(piecesPerTray) : "");
+  }, [piecesPerTray]);
 
   const bakedProductQuery = useQuery({
     queryKey: ["product-lite", bakedProductId],
