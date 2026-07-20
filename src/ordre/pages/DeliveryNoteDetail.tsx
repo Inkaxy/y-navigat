@@ -14,6 +14,7 @@ import { useSaveDeliveryNote, type EditableLine } from "@/ordre/hooks/useSaveDel
 import { formatDate, formatNOK } from "@/ordre/lib/format";
 import { cn } from "@/lib/utils";
 import { PakkseddelPDFButton } from "@/ordre/components/pakksedler/PakkseddelPDFButton";
+import { UnfinalizeButton } from "@/ordre/components/pakksedler/UnfinalizeButton";
 import { AddProductDialog } from "@/ordre/components/orders/AddProductDialog";
 
 const PRICE_TOGGLE_STORAGE_KEY = "nbos.order.showInternalPrices";
