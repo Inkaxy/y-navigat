@@ -1,47 +1,55 @@
-## Bakgrunn
+## Mål
 
-I dag settes `delivery_notes.finalized_at` aldri — hverken kode eller database gjør det. Alle 27 eksisterende pakksedler står som `draft`, og kundeportalen (`portal_list_delivery_notes` filtrerer på `finalized_at IS NOT NULL`) viser derfor ingenting. Vi lukker gapet ved å finalisere automatisk ved hovedkjøring, og gi mulighet for å "tilbakekjøre" (av-finalisere) enkelt eller i bulk.
+Aktivere en per-kunde submeny "Varer stekt selv" i Kundeportalen der kunden registrerer hvor mye de har stekt **i dag**. Loggen brukes senere til klikk-og-hent tilgjengelighet på nettsiden og til å godkjenne returer.
 
-## Endringer
+## 1. Datamodell (Supabase-migrasjon)
 
-### 1) Auto-finaliser ved hovedkjøring
-- Utvid `generate_delivery_notes(...)` (databasefunksjonen som allerede kalles fra `useGenerateDeliveryNotes`) slik at når `p_run_type = 'main'`:
-  - Alle nye pakksedler opprettes med `status='finalized'`, `finalized_at = now()`, `finalized_by = auth.uid()`.
-- `additional` og `correction` finaliseres også automatisk (samme regel) — bruker sa "ved hovedkjøring", men i praksis vil både tilleggs- og korreksjonskjøringer også produsere pakksedler som skal ut til kunde. Bekreft under review om `additional`/`correction` skal beholde `draft`-flyt i stedet.
-- Legg `notes_finalized` i returtypen (informativt).
+**`customers`** — ny kolonne
+- `bakes_own_products boolean not null default false`
 
-### 2) Tilbakekjøring (av-finalisering)
-Ny RPC `unfinalize_delivery_notes(p_ids uuid[], p_reason text)`:
-- Setter `status='draft'`, nullstiller `finalized_at`/`finalized_by`.
-- Nekter hvis pakkseddelen er `cancelled` eller allerede referert av en pakkesystem-eksport / retur-ordre-kobling (sjekk `finalized_at IS NOT NULL`-avhengige rader).
-- Logger til `delivery_note_runs` med `run_type='unfinalize'` (ny variant) for sporing.
+**`products`** — to nye kolonner (kobler råvare/deig → ferdig salgsprodukt)
+- `is_bakeable_raw boolean not null default false` — kan stekes selv av kunder
+- `baked_product_id uuid null references products(id)` — ferdig produkt som selges/returneres når den råe er stekt
 
-### 3) UI
+**`customer_bake_logs`** — ny tabell (én rad per kunde+produkt+dato)
+- `customer_id`, `raw_product_id`, `baked_product_id` (snapshot), `bake_date date`, `qty numeric`, `registered_by_user_id`, `source text default 'portal'`
+- UNIQUE `(customer_id, raw_product_id, bake_date)` — samme dag oppdaterer eksisterende rad
+- GRANT + RLS: `authenticated` får ingenting direkte; all tilgang via portal-RPC. `service_role` full.
 
-**`DeliveryNotesList.tsx` (bulk):**
-- Ny sekundærknapp "↩ Tilbakekjør valgte" ved siden av "Skriv ut valgte" — synlig kun når minst én valgt rad har `status='finalized'`.
-- Bekreftelsesdialog med årsak (`p_reason`), toast med antall.
+## 2. Portal-RPC-er (SECURITY DEFINER, scoped til `current_portal_customer_id()`)
 
-**`DeliveryNoteDetail.tsx` (enkelt):**
-- Ny knapp "↩ Tilbakekjør pakkseddel" når `status='finalized'`.
-- Vis `finalized_at`/`finalized_by` i header når satt.
+- `portal_can_bake_own()` → boolean (leser `customers.bakes_own_products`)
+- `portal_list_bakeable_products()` → produkter med `is_bakeable_raw = true` som finnes i kundens prisliste (samme filter som `portal_list_products`)
+- `portal_upsert_bake_log(p_raw_product_id uuid, p_qty numeric)` → låst til `bake_date = current_date`; qty=0 sletter raden
+- `portal_list_bake_logs(p_date date default current_date)` → dagens registreringer
 
-**Statusstripe i lista:** oppdater `statusVariant` slik at `finalized` er default-visning etter hovedkjøring (allerede definert, bare mer synlig).
+## 3. NBOS — kundekort
 
-### 4) Backfill av eksisterende data
-Éngangs data-oppdatering (via insert-verktøyet, ikke migrasjon): sett `finalized_at = created_at`, `status='finalized'` på alle 26 eksisterende `draft`-rader som ikke er `cancelled`, slik at Teies pakksedler dukker opp i kundeportalen umiddelbart.
+`src/kunder/components/customers/…` (kundedetalj-panel): legg til seksjon "Kundeportal" med toggle **"Steker varer selv"** som skriver `customers.bakes_own_products`. Under toggle: kort forklaring + link til varekort-innstilling.
 
-### 5) Kundeportal
-Ingen endring nødvendig — `portal_list_delivery_notes` fortsetter å filtrere på `finalized_at IS NOT NULL` og vil nå returnere alle finaliserte rader.
+## 4. NBOS — varekort
 
-## Tekniske detaljer
+`src/varer/…` produktdetalj: nytt panel "Selv-steking":
+- Checkbox `is_bakeable_raw`
+- Når aktiv: søkefelt for å velge `baked_product_id` (kobling til ferdig salgsprodukt for retur/salg)
 
-- `delivery_note_runs.run_type` må tillate `'unfinalize'` (sjekk CHECK-constraint; utvid ved behov).
-- RPC-ene skal være `SECURITY DEFINER` med `SET search_path = public` og sjekke at kaller har tilgang til `legal_entity_id` (samme mønster som `generate_delivery_notes`).
-- `useGenerateDeliveryNotes` og en ny `useUnfinalizeDeliveryNotes` invaliderer `delivery-notes-list`, `delivery-note-counts`, `delivery-note-runs`.
-- Ingen endring i `pakkesystem-export` — den krever fortsatt finaliserte pakksedler og vil nå faktisk finne dem.
+## 5. Kundeportal (separat prosjekt — instruksjoner)
 
-## Åpne spørsmål (kan avklares under implementering)
+Ny rute `/varer-stekt-selv`:
+- Vis i venstremeny kun når `portal_can_bake_own()` returnerer true
+- Liste over bakeable produkter fra `portal_list_bakeable_products()`
+- Per rad: antall-input som upserter mot `portal_upsert_bake_log` for dagens dato
+- Viser dagens registrerte totaler; ingen historikk-redigering (kun i dag)
 
-1. Skal `additional` og `correction` også auto-finaliseres, eller kun `main`?
-2. Skal tilbakekjøring være tillatt hvis pakkseddelen allerede er eksportert til Pakkesystem, eller blokkeres helt?
+## 6. Forberedelse for senere faser (kun kommentert i migrasjonen, ikke implementert)
+
+- **Klikk-og-hent**: nettsiden vil lese `customer_bake_logs` for gitt dato/utsalg og eksponere `baked_product_id` som tilgjengelig
+- **Retur-godkjenning**: eksisterende retur-RPC vil senere sjekke at `baked_product_id` finnes i `customer_bake_logs` for kunden på den datoen retur gjelder
+
+Retur-håndhevelse og klikk-og-hent er **ikke** en del av denne leveransen — kun datamodell og portal-registrering.
+
+## Teknisk oppsummering
+
+- 1 migrasjon: kolonner på `customers`+`products`, tabell `customer_bake_logs` (GRANT + RLS), 4 RPC-er.
+- NBOS: toggle på kundekort, panel på varekort.
+- Kundeportal-prosjekt: ny side + menylenke (leveres som instruksjon siden det er separat repo, samme mønster som tidligere portal-endringer).
