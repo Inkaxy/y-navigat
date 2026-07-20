@@ -44,6 +44,7 @@ import { LeveranseTab } from "@/varer/components/products/detail/tabs/LeveranseT
 import { PakkeTab, type PackageItem } from "@/varer/components/products/detail/tabs/PakkeTab";
 import { ReturTab } from "@/varer/components/products/detail/tabs/ReturTab";
 import { RecipeEditor } from "@/varer/components/products/RecipeEditor";
+import { SelvStekingCard } from "@/varer/components/products/detail/SelvStekingCard";
 import { DeclarationTab } from "@/varer/components/products/DeclarationTab";
 import { CalculationTab } from "@/varer/components/products/CalculationTab";
 import { useNavigate as useNav } from "react-router-dom";
@@ -437,18 +438,25 @@ export default function ProductDetail() {
           />
         )}
         {tab === "produksjon" && lookups && (
-          <ProduksjonTab
-            productId={product.id}
-            canWrite={canWrite}
-            legalEntityId={legalEntityId}
-            productionGroups={lookups.productionGroups}
-            productionDepartments={lookups.productionDepartments}
-            selectedDepartmentIds={labelDepartmentIds}
-            onDepartmentsChange={setLabelDepartmentIds}
-            cakeLinks={cakeLinks}
-            originalCakeLinks={originalCakeLinks}
-            onCakeLinksChange={setCakeLinks}
-          />
+          <div className="space-y-4">
+            <ProduksjonTab
+              productId={product.id}
+              canWrite={canWrite}
+              legalEntityId={legalEntityId}
+              productionGroups={lookups.productionGroups}
+              productionDepartments={lookups.productionDepartments}
+              selectedDepartmentIds={labelDepartmentIds}
+              onDepartmentsChange={setLabelDepartmentIds}
+              cakeLinks={cakeLinks}
+              originalCakeLinks={originalCakeLinks}
+              onCakeLinksChange={setCakeLinks}
+            />
+            <SelvStekingCard
+              productId={product.id}
+              productName={product.display_name}
+              canWrite={canWrite}
+            />
+          </div>
         )}
         {tab === "varedetaljer" && (
           <VaredetaljerTab canWrite={canWrite} keywords={keywords} onKeywordsChange={setKeywords} productId={product.id} />

@@ -850,6 +850,67 @@ export type Database = {
           },
         ]
       }
+      customer_bake_logs: {
+        Row: {
+          bake_date: string
+          baked_product_id: string | null
+          created_at: string
+          customer_id: string
+          id: string
+          qty: number
+          raw_product_id: string
+          registered_by_user_id: string | null
+          source: string
+          updated_at: string
+        }
+        Insert: {
+          bake_date?: string
+          baked_product_id?: string | null
+          created_at?: string
+          customer_id: string
+          id?: string
+          qty: number
+          raw_product_id: string
+          registered_by_user_id?: string | null
+          source?: string
+          updated_at?: string
+        }
+        Update: {
+          bake_date?: string
+          baked_product_id?: string | null
+          created_at?: string
+          customer_id?: string
+          id?: string
+          qty?: number
+          raw_product_id?: string
+          registered_by_user_id?: string | null
+          source?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_bake_logs_baked_product_id_fkey"
+            columns: ["baked_product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_bake_logs_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_bake_logs_raw_product_id_fkey"
+            columns: ["raw_product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customer_contacts: {
         Row: {
           created_at: string
@@ -1269,6 +1330,7 @@ export type Database = {
       customers: {
         Row: {
           allows_returns: boolean
+          bakes_own_products: boolean
           billing_address_line1: string | null
           billing_address_line2: string | null
           billing_city: string | null
@@ -1318,6 +1380,7 @@ export type Database = {
         }
         Insert: {
           allows_returns?: boolean
+          bakes_own_products?: boolean
           billing_address_line1?: string | null
           billing_address_line2?: string | null
           billing_city?: string | null
@@ -1367,6 +1430,7 @@ export type Database = {
         }
         Update: {
           allows_returns?: boolean
+          bakes_own_products?: boolean
           billing_address_line1?: string | null
           billing_address_line2?: string | null
           billing_city?: string | null
@@ -6902,6 +6966,7 @@ export type Database = {
         Row: {
           account_reference: string | null
           allows_return: boolean
+          baked_product_id: string | null
           breadscale_value: number | null
           cake_role: string | null
           cert_nokkelhull: boolean
@@ -6928,6 +6993,7 @@ export type Database = {
           in_web_shop: boolean
           include_in_price_lists: boolean
           internal_sku: string | null
+          is_bakeable_raw: boolean
           is_cake_component: boolean
           is_divisible: boolean
           is_for_sale: boolean
@@ -6983,6 +7049,7 @@ export type Database = {
         Insert: {
           account_reference?: string | null
           allows_return?: boolean
+          baked_product_id?: string | null
           breadscale_value?: number | null
           cake_role?: string | null
           cert_nokkelhull?: boolean
@@ -7009,6 +7076,7 @@ export type Database = {
           in_web_shop?: boolean
           include_in_price_lists?: boolean
           internal_sku?: string | null
+          is_bakeable_raw?: boolean
           is_cake_component?: boolean
           is_divisible?: boolean
           is_for_sale?: boolean
@@ -7064,6 +7132,7 @@ export type Database = {
         Update: {
           account_reference?: string | null
           allows_return?: boolean
+          baked_product_id?: string | null
           breadscale_value?: number | null
           cake_role?: string | null
           cert_nokkelhull?: boolean
@@ -7090,6 +7159,7 @@ export type Database = {
           in_web_shop?: boolean
           include_in_price_lists?: boolean
           internal_sku?: string | null
+          is_bakeable_raw?: boolean
           is_cake_component?: boolean
           is_divisible?: boolean
           is_for_sale?: boolean
@@ -7143,6 +7213,13 @@ export type Database = {
           weight_per_unit_grams?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "products_baked_product_id_fkey"
+            columns: ["baked_product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "products_label_profile_id_fkey"
             columns: ["label_profile_id"]
@@ -10331,6 +10408,7 @@ export type Database = {
         }[]
       }
       pakkesystem_hash_key: { Args: { p_key: string }; Returns: string }
+      portal_can_bake_own: { Args: never; Returns: boolean }
       portal_create_customer_order: { Args: { p_payload: Json }; Returns: Json }
       portal_create_order: { Args: { p_payload: Json }; Returns: Json }
       portal_create_return_order: { Args: { p_payload: Json }; Returns: Json }
@@ -10360,6 +10438,30 @@ export type Database = {
           return_value: number
           sales_unit: string
           vat_rate: number
+        }[]
+      }
+      portal_list_bake_logs: {
+        Args: { p_date?: string }
+        Returns: {
+          bake_date: string
+          baked_display_name: string
+          baked_product_id: string
+          id: string
+          qty: number
+          raw_display_name: string
+          raw_product_id: string
+        }[]
+      }
+      portal_list_bakeable_products: {
+        Args: never
+        Returns: {
+          baked_display_name: string
+          baked_product_id: string
+          code: string
+          display_name: string
+          display_number: number
+          id: string
+          unit_of_sale: string
         }[]
       }
       portal_list_delivery_notes: {
@@ -10488,6 +10590,10 @@ export type Database = {
           p_weekday: number
         }
         Returns: Json
+      }
+      portal_upsert_bake_log: {
+        Args: { p_qty: number; p_raw_product_id: string }
+        Returns: string
       }
       pos_close_drawer: {
         Args: {

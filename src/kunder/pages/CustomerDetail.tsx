@@ -84,6 +84,7 @@ const baseSchema = z
     customer_type: z.enum(["business", "consumer", "internal"]),
     is_private_person: z.boolean(),
     allows_returns: z.boolean(),
+    bakes_own_products: z.boolean(),
     enforce_custom_reference: z.boolean(),
     organization_number: z.string().trim().max(20).optional().or(z.literal("")),
     gln: z.string().trim().max(20).optional().or(z.literal("")),
@@ -196,6 +197,7 @@ export default function CustomerDetail() {
       customer_type: "business",
       is_private_person: false,
       allows_returns: false,
+      bakes_own_products: false,
       organization_number: "",
       gln: "",
       customer_category: "",
@@ -245,6 +247,7 @@ export default function CustomerDetail() {
       customer_type: (customer.customer_type ?? "business") as any,
       is_private_person: !!customer.is_private_person,
       allows_returns: !!customer.allows_returns,
+      bakes_own_products: !!(customer as any).bakes_own_products,
       organization_number: customer.organization_number ?? "",
       gln: customer.gln ?? "",
       customer_category: customer.customer_category ?? "",
@@ -288,6 +291,7 @@ export default function CustomerDetail() {
   const watchStatus = form.watch("status");
   const watchIsPrivate = form.watch("is_private_person");
   const watchAllowsReturns = form.watch("allows_returns");
+  const watchBakesOwnProducts = form.watch("bakes_own_products");
   const watchEnforceCustomRef = form.watch("enforce_custom_reference");
   const watchCustomReference = form.watch("custom_reference");
 
@@ -357,6 +361,7 @@ export default function CustomerDetail() {
         customer_type: values.customer_type,
         is_private_person: values.is_private_person,
         allows_returns: values.allows_returns,
+        bakes_own_products: values.bakes_own_products,
         organization_number: values.organization_number?.trim() || null,
         gln: values.gln?.trim() || null,
         customer_category: values.customer_category?.trim() || null,
@@ -832,6 +837,20 @@ export default function CustomerDetail() {
                         disabled={!canWrite}
                       />
                       <span className="text-sm text-muted-foreground">{watchAllowsReturns ? "Ja" : "Nei"}</span>
+                    </div>
+                  </Field>
+                  <Field
+                    label="Steker varer selv"
+                    className="col-span-2"
+                    hint="Aktiverer submenyen «Varer stekt selv» i Kundeportalen, der kunden kan registrere hvor mange råvarer de har stekt til en gitt dato. Kobles opp på varekortet (råvare → ferdigstekt salgsprodukt)."
+                  >
+                    <div className="flex h-10 items-center gap-2">
+                      <Switch
+                        checked={watchBakesOwnProducts}
+                        onCheckedChange={(v) => form.setValue("bakes_own_products", !!v, { shouldDirty: true })}
+                        disabled={!canWrite}
+                      />
+                      <span className="text-sm text-muted-foreground">{watchBakesOwnProducts ? "Aktiv" : "Av"}</span>
                     </div>
                   </Field>
                   <Field
