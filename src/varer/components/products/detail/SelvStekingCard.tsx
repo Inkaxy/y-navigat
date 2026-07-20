@@ -39,7 +39,7 @@ export function SelvStekingCard({ productId, productName, canWrite }: Props) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")
-        .select("id, is_bakeable_raw, baked_product_id")
+        .select("id, is_bakeable_raw, baked_product_id, pieces_per_tray")
         .eq("id", productId)
         .maybeSingle();
       if (error) throw error;
@@ -47,12 +47,19 @@ export function SelvStekingCard({ productId, productName, canWrite }: Props) {
         id: string;
         is_bakeable_raw: boolean | null;
         baked_product_id: string | null;
+        pieces_per_tray: number | null;
       } | null;
     },
   });
 
   const isEnabled = !!productQuery.data?.is_bakeable_raw;
   const bakedProductId = productQuery.data?.baked_product_id ?? null;
+  const piecesPerTray = productQuery.data?.pieces_per_tray ?? null;
+  const [trayDraft, setTrayDraft] = useState<string>("");
+
+  useEffect(() => {
+    setTrayDraft(piecesPerTray != null ? String(piecesPerTray) : "");
+  }, [piecesPerTray]);
 
   const bakedProductQuery = useQuery({
     queryKey: ["product-lite", bakedProductId],
@@ -95,6 +102,7 @@ export function SelvStekingCard({ productId, productName, canWrite }: Props) {
     mutationFn: async (patch: {
       is_bakeable_raw?: boolean;
       baked_product_id?: string | null;
+      pieces_per_tray?: number | null;
     }) => {
       const { error } = await supabase
         .from("products")
@@ -234,10 +242,54 @@ export function SelvStekingCard({ productId, productName, canWrite }: Props) {
                 </PopoverContent>
               </Popover>
             )}
+            <div className="pt-2 space-y-2">
+              <Label className="text-xs uppercase text-muted-foreground">
+                Antall pr brett (hel plate)
+              </Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  min={1}
+                  step={1}
+                  inputMode="numeric"
+                  value={trayDraft}
+                  onChange={(e) => setTrayDraft(e.target.value)}
+                  disabled={!canWrite || updateMutation.isPending}
+                  placeholder="f.eks. 24"
+                  className="w-32"
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={
+                    !canWrite ||
+                    updateMutation.isPending ||
+                    trayDraft === (piecesPerTray != null ? String(piecesPerTray) : "")
+                  }
+                  onClick={() => {
+                    const n = trayDraft.trim() === "" ? null : Number(trayDraft);
+                    if (n !== null && (!Number.isFinite(n) || n <= 0)) {
+                      toast.error("Antall pr brett må være et positivt tall");
+                      return;
+                    }
+                    updateMutation.mutate({ pieces_per_tray: n });
+                  }}
+                >
+                  Lagre
+                </Button>
+                {piecesPerTray != null && (
+                  <span className="text-xs text-muted-foreground">
+                    Forhåndsutfylles i kundeportalen — kunden kan overstyre
+                    ved avvik på platen.
+                  </span>
+                )}
+              </div>
+            </div>
+
             <p className="text-xs text-muted-foreground">
-              Når kunden registrerer at «{productName}» er stekt, blir
-              tilsvarende antall av valgt ferdigvare gjort tilgjengelig for
-              salg og retur.
+              Når kunden registrerer at «{productName}» er stekt (hele plater
+              × antall pr brett + løse stk), blir tilsvarende antall av valgt
+              ferdigvare gjort tilgjengelig for salg og retur.
             </p>
           </div>
         )}

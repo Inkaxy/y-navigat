@@ -10591,16 +10591,10 @@ export type Database = {
         }
         Returns: Json
       }
-      portal_upsert_bake_log:
-        | { Args: { p_qty: number; p_raw_product_id: string }; Returns: string }
-        | {
-            Args: {
-              p_bake_date?: string
-              p_qty: number
-              p_raw_product_id: string
-            }
-            Returns: string
-          }
+      portal_upsert_bake_log: {
+        Args: { p_bake_date?: string; p_qty: number; p_raw_product_id: string }
+        Returns: string
+      }
       pos_close_drawer: {
         Args: {
           p_operator_id?: string
