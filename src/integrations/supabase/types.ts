@@ -10748,6 +10748,10 @@ export type Database = {
         }
         Returns: Json
       }
+      unfinalize_delivery_notes: {
+        Args: { p_ids: string[]; p_reason?: string }
+        Returns: Json
+      }
       upsert_matrix_column_comment: {
         Args: {
           p_comment: string

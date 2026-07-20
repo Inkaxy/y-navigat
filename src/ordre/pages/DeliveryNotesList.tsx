@@ -20,6 +20,7 @@ import {
 import { formatDate, formatNOK, todayISO } from "@/ordre/lib/format";
 import { cn } from "@/lib/utils";
 import { BulkPakkseddelPDFButton } from "@/ordre/components/pakksedler/BulkPakkseddelPDFButton";
+import { UnfinalizeButton } from "@/ordre/components/pakksedler/UnfinalizeButton";
 import { PendingOrderRowActions } from "@/ordre/components/pakksedler/PendingOrderRowActions";
 import { NULL_TOUR_KEY } from "@/ordre/hooks/useTourRunStatus";
 
@@ -244,8 +245,16 @@ export default function DeliveryNotesList() {
               const printableSelected = Array.from(selected).filter((id) =>
                 printableRows.some((r) => r.id === id),
               );
+              const selectedFinalizedIds = Array.from(selected).filter((id) =>
+                rows.some((r) => r.id === id && r.status === "finalized"),
+              );
               return (
                 <>
+                  <UnfinalizeButton
+                    ids={selectedFinalizedIds}
+                    label="Tilbakekjør valgte"
+                    disabled={selectedFinalizedIds.length === 0}
+                  />
                   <BulkPakkseddelPDFButton
                     scope={{ kind: "ids", date, ids: printableRows.map((r) => r.id) }}
                     label="Skriv ut alle ferdige"

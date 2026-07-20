@@ -14,6 +14,7 @@ import { useSaveDeliveryNote, type EditableLine } from "@/ordre/hooks/useSaveDel
 import { formatDate, formatNOK } from "@/ordre/lib/format";
 import { cn } from "@/lib/utils";
 import { PakkseddelPDFButton } from "@/ordre/components/pakksedler/PakkseddelPDFButton";
+import { UnfinalizeButton } from "@/ordre/components/pakksedler/UnfinalizeButton";
 import { AddProductDialog } from "@/ordre/components/orders/AddProductDialog";
 
 const PRICE_TOGGLE_STORAGE_KEY = "nbos.order.showInternalPrices";
@@ -188,6 +189,13 @@ export default function DeliveryNoteDetail() {
               Vis interne priser
             </Label>
           </div>
+          {data.status === "finalized" && (
+            <UnfinalizeButton
+              ids={[data.id]}
+              label="Tilbakekjør"
+              description="Pakkseddelen settes tilbake til utkast. Den forsvinner fra kundeportalen og kan redigeres på nytt."
+            />
+          )}
           <PakkseddelPDFButton id={data.id} />
           <div className="text-right">
             <div className="text-xs uppercase tracking-wider text-muted-foreground">Pakkseddel</div>
