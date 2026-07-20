@@ -20,6 +20,7 @@ import {
 import { formatDate, formatNOK, todayISO } from "@/ordre/lib/format";
 import { cn } from "@/lib/utils";
 import { BulkPakkseddelPDFButton } from "@/ordre/components/pakksedler/BulkPakkseddelPDFButton";
+import { UnfinalizeButton } from "@/ordre/components/pakksedler/UnfinalizeButton";
 import { PendingOrderRowActions } from "@/ordre/components/pakksedler/PendingOrderRowActions";
 import { NULL_TOUR_KEY } from "@/ordre/hooks/useTourRunStatus";
 
