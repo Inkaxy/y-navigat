@@ -197,6 +197,7 @@ export default function CustomerDetail() {
       customer_type: "business",
       is_private_person: false,
       allows_returns: false,
+      bakes_own_products: false,
       organization_number: "",
       gln: "",
       customer_category: "",
