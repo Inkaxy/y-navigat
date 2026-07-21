@@ -138,7 +138,7 @@ export default function OrderDetail() {
   const showDelete = canDelete(status, isWriter, isAdmin);
   const cancelDisabled = !canCancel(status);
 
-  const actions = getStatusActions(status);
+  const actions = getStatusActions(status, order.is_return ?? false);
   const primaryAction = actions.find((a) => (a.variant ?? "default") !== "destructive") ?? null;
   const secondaryActions = actions.filter((a) => a !== primaryAction);
 
