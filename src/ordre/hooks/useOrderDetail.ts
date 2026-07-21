@@ -45,6 +45,8 @@ export type OrderDetail = {
   created_at: string;
   created_by: string | null;
   updated_at: string;
+  is_return: boolean | null;
+  is_customer_order: boolean | null;
 };
 
 export type OrderLineDetail = {
