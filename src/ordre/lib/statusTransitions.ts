@@ -17,8 +17,37 @@ export type StatusAction = {
   clearsPreviousStatus?: boolean;
 };
 
-/** Standard fremover-handlinger basert på nåværende status. */
-export function getStatusActions(current: OrderStatus): StatusAction[] {
+/**
+ * Standard fremover-handlinger basert på nåværende status.
+ * For returordrer hoppes produksjon/pakking over — «Godkjenn» går rett til fakturert.
+ */
+export function getStatusActions(current: OrderStatus, isReturn = false): StatusAction[] {
+  if (isReturn) {
+    switch (current) {
+      case "draft":
+        return [{ label: "Godkjenn og fakturer", to: "invoiced" }];
+      case "awaiting_confirmation":
+        return [
+          { label: "Godkjenn og fakturer", to: "invoiced" },
+          {
+            label: "Avvis",
+            to: "cancelled",
+            variant: "destructive",
+            requireComment: true,
+            commentLabel: "Hvorfor avvises returen?",
+          },
+        ];
+      case "confirmed":
+        return [{ label: "Marker som fakturert", to: "invoiced" }];
+      case "on_hold":
+      case "invoiced":
+      case "cancelled":
+        return [];
+      default:
+        return [{ label: "Marker som fakturert", to: "invoiced" }];
+    }
+  }
+
   switch (current) {
     case "draft":
       return [{ label: "Bekreft ordre", to: "confirmed" }];
