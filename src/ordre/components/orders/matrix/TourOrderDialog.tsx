@@ -186,7 +186,22 @@ export function TourOrderDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [order, edits]);
 
-  async function saveAll() {
+  async function saveAll(overrideReason: string | null = null) {
+    if (!order || readOnly) return;
+    if (rulesPreview.blocks.length > 0 && !overrideReason) {
+      toast.error(`Kan ikke lagre — bryter leveringsregel: ${rulesPreview.blocks[0].message}`);
+      return;
+    }
+    if (overrideReason) {
+      const { error: ovErr } = await supabase
+        .from("orders")
+        .update({ rule_override_reason: overrideReason } as never)
+        .eq("id", order.id);
+      if (ovErr) {
+        toast.error("Kunne ikke lagre overstyring", { description: ovErr.message });
+        return;
+      }
+    }
     if (!order || readOnly) return;
     setSavingAll(true);
     try {
