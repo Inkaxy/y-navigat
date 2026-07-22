@@ -517,21 +517,20 @@ export function CustomerOrderModal({
 
   const today = new Date().toISOString().slice(0, 10);
 
-  // ----- Håndhevelse av leveringsregler -----
-  const { data: activeRules = [] } = useActiveDeliveryRules();
-  const ruleEnforcement = useMemo(
-    () =>
-      enforceDeliveryRules(
-        {
-          deliveryDate,
-          deliveryTourId: tourId === "none" ? null : tourId,
-          productIds,
-          customerId: customer.id,
-        },
-        activeRules,
-      ),
-    [activeRules, deliveryDate, tourId, productIds, customer.id],
-  );
+  // ----- Håndhevelse av leveringsregler (DB-motor) -----
+  const { user } = useAuth();
+  const { data: access } = useUserAccess(user);
+  const hasOrdreWrite = access?.hasOrdreWrite ?? false;
+  const rulesPreview = usePreviewDeliveryRules({
+    legalEntityId: NB_LEGAL_ENTITY_ID,
+    customerId: customer.id,
+    deliveryDate,
+    deliveryTourId: tourId === "none" ? null : tourId,
+    productIds,
+    existingOrderId: orderId ?? null,
+  });
+  const [overrideOpen, setOverrideOpen] = useState(false);
+  const [pendingOverrideReason, setPendingOverrideReason] = useState<string | null>(null);
 
 
   function removeLine(uid: string) {
