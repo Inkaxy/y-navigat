@@ -452,6 +452,19 @@ export function TourOrderDialog({
         </DialogHeader>
 
         <div className="flex-1 overflow-auto px-6 py-4">
+          {order && (
+            <DeliveryRulesFeedback
+              className="mb-4"
+              blocks={rulesPreview.blocks}
+              warns={rulesPreview.warns}
+              infos={rulesPreview.infos}
+              blockedHint={
+                rulesPreview.blocks.length > 0 && !hasOrdreWrite
+                  ? "Endringene kan ikke lagres. Kontakt ordrekontoret."
+                  : undefined
+              }
+            />
+          )}
           {isLoading ? (
             <div className="grid place-items-center py-24">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -849,6 +862,17 @@ export function TourOrderDialog({
         orderId={order?.id ?? null}
         readOnly={readOnly}
         legalEntityId={(order as any)?.legal_entity_id ?? null}
+      />
+      <OverrideRuleDialog
+        open={overrideOpen}
+        onOpenChange={setOverrideOpen}
+        blocks={rulesPreview.blocks}
+        contextLine={customer && date ? `${customer.display_name} · ${date}` : undefined}
+        submitting={savingAll}
+        onConfirm={async (reason) => {
+          setOverrideOpen(false);
+          await saveAll(reason);
+        }}
       />
     </Dialog>
   );
