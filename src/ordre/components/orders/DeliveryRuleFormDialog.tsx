@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, X, Search, AlertTriangle, Calendar as CalendarIcon } from "lucide-react";
+import { Loader2, X, Search, AlertTriangle, Calendar as CalendarIcon, Play, ShieldCheck } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -28,9 +28,14 @@ import {
   WEEKDAY_LABELS,
   WEEKDAY_LABELS_LONG,
   RULE_TYPE_LABEL,
+  EFFECT_LABEL,
+  EFFECT_ICON,
+  describeRule,
   type DeliveryRule,
   type DeliveryRuleType,
+  type DeliveryRuleEffect,
 } from "@/ordre/hooks/useDeliveryRules";
+import { evaluateDraftRule } from "@/ordre/lib/evaluateDraftRule";
 import { cn } from "@/lib/utils";
 
 type Props = {
