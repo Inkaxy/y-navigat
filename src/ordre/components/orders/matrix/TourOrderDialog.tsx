@@ -202,7 +202,6 @@ export function TourOrderDialog({
         return;
       }
     }
-    if (!order || readOnly) return;
     setSavingAll(true);
     try {
       const ops: PromiseLike<unknown>[] = [];
