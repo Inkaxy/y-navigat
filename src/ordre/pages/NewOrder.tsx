@@ -1357,9 +1357,24 @@ export default function NewOrder() {
               {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Opprett ordre
               <kbd className="ml-2 hidden rounded border border-primary-foreground/30 bg-primary-foreground/10 px-1.5 py-0.5 text-[10px] sm:inline">⌘↵</kbd>
-          </Button>
+            </Button>
+          )}
         </div>
       </div>
+
+      {/* Overstyringsdialog for leveringsregler */}
+      <OverrideRuleDialog
+        open={overrideOpen}
+        onOpenChange={setOverrideOpen}
+        blocks={rulesPreview.blocks}
+        contextLine={customer ? `Ordre til ${customer.display_name} · levering ${deliveryDate}` : undefined}
+        submitting={submitting}
+        onConfirm={async (reason) => {
+          setPendingOverrideReason(reason);
+          setOverrideOpen(false);
+          await save();
+        }}
+      />
 
       {/* 6.1 Kopier fra tidligere ordre */}
       <CopyFromPreviousOrderDialog
