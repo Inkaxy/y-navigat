@@ -1335,14 +1335,28 @@ export default function NewOrder() {
           <Button variant="ghost" asChild>
             <Link to="/ordre/ordrer">Avbryt</Link>
           </Button>
-          <Button
-            onClick={() => save()}
-            disabled={submitting || !customer || (qaSummary.severity === "red" && !qaOverride)}
-            title="⌘Enter / Ctrl+Enter"
-          >
-            {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Opprett ordre
-            <kbd className="ml-2 hidden rounded border border-primary-foreground/30 bg-primary-foreground/10 px-1.5 py-0.5 text-[10px] sm:inline">⌘↵</kbd>
+          {rulesPreview.blocks.length > 0 && hasOrdreWrite ? (
+            <Button
+              variant="brand"
+              onClick={() => setOverrideOpen(true)}
+              disabled={submitting || !customer || (qaSummary.severity === "red" && !qaOverride)}
+            >
+              Overstyr …
+            </Button>
+          ) : (
+            <Button
+              onClick={() => save()}
+              disabled={
+                submitting ||
+                !customer ||
+                (qaSummary.severity === "red" && !qaOverride) ||
+                rulesPreview.blocks.length > 0
+              }
+              title="⌘Enter / Ctrl+Enter"
+            >
+              {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Opprett ordre
+              <kbd className="ml-2 hidden rounded border border-primary-foreground/30 bg-primary-foreground/10 px-1.5 py-0.5 text-[10px] sm:inline">⌘↵</kbd>
           </Button>
         </div>
       </div>
