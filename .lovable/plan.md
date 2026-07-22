@@ -1,105 +1,91 @@
-## Bakgrunn
+Steg 1 av omleggingen: kun **SQL-fundamentet** + rydding av deadline-drift. Ingen trigger, ingen UI-endringer — appen fortsetter å bruke dagens motorer inntil steg 2.
 
-I NBOS er databasen og admin-UI-et klart:
+## Leveranse
 
-- `customers.bakes_own_products` (boolean) — styrer om kunden ser menyen.
-- `products.is_bakeable_raw` + `products.baked_product_id` — kobler råvare → ferdigstekt salgsvare.
-- `customer_bake_logs` — én rad per (kunde, råvare, dato) med `qty`.
-- Fire RPC-er (SECURITY DEFINER, RLS-safe) er ferdig deployet:
-  - `portal_can_bake_own() → boolean`
-  - `portal_list_bakeable_products() → id, display_number, code, display_name, unit_of_sale, baked_product_id, baked_display_name`
-  - `portal_upsert_bake_log(p_raw_product_id uuid, p_qty numeric) → uuid` (idempotent på dato, `p_qty = 0` sletter)
-  - `portal_list_bake_logs(p_date date default current_date) → id, raw_product_id, raw_display_name, baked_product_id, baked_display_name, qty, bake_date`
+**Én migrasjon** som gjør alt følgende i riktig rekkefølge:
 
-Kundeportalen trenger å eksponere denne funksjonaliteten som en ny meny + side, kun for kunder der flagget er på.
-
-## Det som skal bygges i Kundeportal
-
-### 1. Ny side: `src/pages/StektSelv.tsx`
-
-Rute: `/stekt-selv` — legges inn i `App.tsx` innenfor den samme `ProtectedRoute + AppLayout`-blokken som `/bestill`, `/mine-ordre` osv.
-
-Innhold på siden:
-
-- Datovelger øverst (default: dagens dato). Brukes både for lesing (`portal_list_bake_logs(p_date)`) og skriving (RPC-en lagrer alltid på dagens dato — se punkt om datovalg lenger ned).
-- Liste over stekbare varer fra `portal_list_bakeable_products`. Én rad per råvare med:
-  - Varenavn (`display_name`) + varenummer.
-  - Ferdigstekt-badge: «→ {baked_display_name}» hvis satt, ellers grå «Ikke koblet — kan ikke registreres».
-  - Talltast/stepper for antall (`qty`), enhet fra `unit_of_sale`.
-  - «Lagre»-knapp per rad (eller auto-lagre på blur / debounce 500 ms).
-- Sammendrag nederst: «Registrert i dag: X varelinjer, totalt Y enheter».
-- Tomtilstand hvis listen er tom: «Ingen råvarer er merket som stekbare av din leverandør ennå.»
-
-### 2. Meny-synlighet
-
-I `src/components/Header.tsx`:
-
-- Kall `portal_can_bake_own()` via en `useQuery` (hook: `useCanBakeOwn` i `src/hooks/useCanBakeOwn.ts`) — cache i 5 min.
-- Hvis `true`: sett inn menyelement `{ to: "/stekt-selv", label: "Stekt selv" }` mellom «Bestill» og «Mine ordre» i `NAV`-arrayet.
-- Skal gjøres både i desktop-nav og mobil-sheet (samme `NAV`-array håndterer begge).
-
-### 3. Route-guard
-
-Legg til en enkel guard i `StektSelv.tsx`:
-
-- Ved mount, kall `portal_can_bake_own`. Hvis `false`, redirect til `/start` med `toast.info("Denne funksjonen er ikke aktivert for din bruker")`.
-- Dette hindrer at kunder som taster URL-en direkte får en tom side eller en RPC-feil.
-
-### 4. Datovalg og RPC-utvidelse (viktig avklaring)
-
-Dagens `portal_upsert_bake_log(p_raw_product_id, p_qty)` skriver **kun til dagens dato**. Kravet fra brukeren er:
-
-> «det som blir registrert som stekt til valgt dato skal på sikt bli tilgjengelig for klikk og hent»
-> «kun til den datoen det er stekt til»
-
-Så «stekt til dato» er en reell forretningsverdi (produktet skal være tilgjengelig for salg/retur akkurat den datoen). Portalen må derfor kunne velge dato — vanligvis dagens dato, men også fram i tid (kunden registrerer i dag at de skal steke til i morgen).
-
-Vi må derfor utvide RPC-en i NBOS-prosjektet før portalen kan lagre annet enn dagens dato:
+### 1. Schema-endringer på `delivery_rules`
 
 ```sql
-create or replace function public.portal_upsert_bake_log(
-  p_raw_product_id uuid,
-  p_qty numeric,
-  p_bake_date date default current_date
-) returns uuid ...
+ALTER TABLE public.delivery_rules
+  ADD COLUMN effect text NOT NULL DEFAULT 'block'
+    CHECK (effect IN ('block','warn','info')),
+  ADD COLUMN priority int NOT NULL DEFAULT 0,
+  ADD COLUMN allowed_product_ids uuid[],
+  ADD COLUMN allowed_product_group_ids uuid[];
 ```
 
-Denne endringen gjøres i NBOS, ikke i Kundeportal — men portalen må vente på den før datovelgeren gjør noe utover å endre lesevisningen. Første iterasjon kan låse datovelgeren til «I dag» og aktivere fri dato når RPC-en er utvidet.
+### 2. Datamigrasjon (idempotent, i samme migrasjon)
 
-### 5. Filer som skal opprettes/endres i Kundeportal
+- `UPDATE delivery_rules SET effect='warn' WHERE rule_type='order_deadline'` (resten forblir `'block'` fra default).
+- For `rule_type='available_products'`: kopier `product_ids → allowed_product_ids` og `product_group_ids → allowed_product_group_ids`, deretter sett de opprinnelige kolonnene til `NULL` (så de får entydig scope-betydning framover).
+- **Ingen** DROP av `product_ids`/`product_group_ids` — de beholder nå kun scope-betydning for alle regeltyper.
 
-Nye filer:
+### 3. Ny funksjon `public.evaluate_delivery_rules`
 
-- `src/pages/StektSelv.tsx` — siden.
-- `src/hooks/useBakeableProducts.ts` — `useQuery` mot `portal_list_bakeable_products`.
-- `src/hooks/useBakeLogs.ts` — `useQuery` mot `portal_list_bake_logs(date)`.
-- `src/hooks/useUpsertBakeLog.ts` — `useMutation` mot `portal_upsert_bake_log`, invalidérer `useBakeLogs`.
-- `src/hooks/useCanBakeOwn.ts` — `useQuery` mot `portal_can_bake_own`.
+```sql
+CREATE OR REPLACE FUNCTION public.evaluate_delivery_rules(
+  p_legal_entity_id uuid,
+  p_customer_id uuid,
+  p_customer_group_ids uuid[],
+  p_delivery_date date,
+  p_delivery_tour_id uuid,
+  p_product_ids uuid[],
+  p_product_group_ids uuid[],
+  p_ordered_at timestamptz DEFAULT now(),
+  p_existing_order_id uuid DEFAULT NULL
+) RETURNS TABLE(
+  rule_id uuid,
+  rule_name text,
+  rule_type text,
+  effect text,
+  priority int,
+  matched boolean,
+  message text
+)
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, extensions
+```
 
-Endringer:
+**Ansvar:**
+- Filtrerer aktive regler på `legal_entity_id`, `valid_from/valid_until`, `specific_delivery_date`, kunde-scope (`customer_ids`), kundegruppe-scope (`customer_group_ids`), ukedag-scope (`weekdays` — kun når `rule_type != 'delivery_weekdays'`), tur-scope (`tour_filter` — kun når `rule_type != 'available_tours'`), vare-/varegruppe-scope (`product_ids`/`product_group_ids` — kun når `rule_type != 'available_products'`). Portert 1:1 fra dagens `deliveryRuleEnforcement.ts`.
+- Evaluerer alle 6 typer inkludert **`delivery_pauses`** (tabellen finnes allerede — joines inn som virtuelle regler med `effect='block'`, `rule_type='delivery_pause'`).
+- `order_deadline`: beregner deadline som `((p_delivery_date - deadline_days_before) + deadline_time) AT TIME ZONE 'Europe/Oslo'` og sammenligner mot `p_ordered_at`. `matched=true` når fristen er passert.
+- `available_products`: bruker nye `allowed_product_ids` + `allowed_product_group_ids`. `matched=true` når minst én vare i `p_product_ids` faller utenfor tillatt-listen.
+- `p_existing_order_id`: reservert for framtidig bruk (ekskludere egen ordre ved re-evaluering) — tas som parameter nå så signaturen er stabil for steg 2.
 
-- `src/App.tsx`: importér `StektSelv`, legg til `<Route path="/stekt-selv" element={<StektSelv />} />` inne i den beskyttede blokken.
-- `src/components/Header.tsx`: kall `useCanBakeOwn`, injisér menyelementet betinget i `NAV`.
+**Prioritets-/effekt-oppløsning:**
+- Grupperer treff (`matched=true`) per `rule_type`. Innen hver gruppe: høyeste `priority` vinner. `effect='info'` med høyere prioritet «demper» lavere-prioritets treff av samme type (returneres med `matched=false`, beholdes for audit).
+- Returnerer **alle** rader (også ikke-matchede treff som ble demput) med korrekt `matched`-flagg — caller kan filtrere selv.
 
-### 6. Design
+### 4. Deadline-drift ryddet
 
-Følg samme mønster som `Matrise.tsx` og `MineOrdre.tsx`:
+- `DROP FUNCTION IF EXISTS public.check_order_deadline_violations(...)` (alle overloads).
+- Erstattes av tynn RPC `public.check_order_deadline_violations_v2(...)` med samme returkolonner (`rule_id, rule_name, deadline_timestamp, is_passed, minutes_over`) implementert som SELECT over `evaluate_delivery_rules(...)` filtrert på `rule_type='order_deadline'`. **Grunn**: `useOrderDeadlineCheck` fortsetter å virke uendret i steg 1; oppdateres i steg 2.
+- `GRANT EXECUTE ... TO authenticated, service_role` på begge nye funksjoner.
 
-- `max-w-4xl mx-auto px-4 py-6`
-- Bruk eksisterende shadcn-komponenter: `Card`, `Input`, `Button`, `Badge`.
-- Talltast-stepper: enkel `Input type="number"` med `+`/`−`-knapper (samme som i matrisen).
-- Toast via `sonner` på lagring — «Lagret {qty} {enhet} {navn}».
+### 5. Sommertid-test (kjøres i migrasjonen som `DO $$ ... ASSERT ... $$`)
 
-## Teknisk sekvens for Kundeportal-agenten
+Seedes én `order_deadline`-regel `deadline_time='10:00', deadline_days_before=1`, med `valid_from='2026-03-01'`. Verifiserer:
 
-1. Utvid `portal_upsert_bake_log` i NBOS med `p_bake_date`. **Gjøres i NBOS-prosjektet, ikke i Kundeportal.**
-2. Opprett hooks (steg 5).
-3. Bygg `StektSelv.tsx` med datovelger, liste og lagring.
-4. Kobl inn menyelementet i `Header.tsx` bak `useCanBakeOwn`.
-5. Legg til route i `App.tsx`.
-6. Test som kunde med `bakes_own_products = true` og en kunde uten — verifisér at menyen kun synes for førstnevnte.
+| Scenario | p_delivery_date | p_ordered_at (UTC) | Forventet matched |
+|---|---|---|---|
+| Før DST-hopp (vintertid, UTC+1) | 2026-03-28 (lør) | 2026-03-27 09:01Z (=10:01 Oslo) | `true` |
+| Før DST-hopp, akkurat i tide | 2026-03-28 | 2026-03-27 08:59Z (=09:59 Oslo) | `false` |
+| Etter DST-hopp (sommertid, UTC+2) | 2026-03-30 (man) | 2026-03-29 08:01Z (=10:01 Oslo) | `true` |
+| Etter DST-hopp, akkurat i tide | 2026-03-30 | 2026-03-29 07:59Z (=09:59 Oslo) | `false` |
 
-## Ute av scope for denne iterasjonen
+Migrasjonen ruller tilbake hvis en assert feiler.
 
-- Kobling mot klikk-og-hent (nettsiden). Det bygges når nettside-integrasjonen er på plass — RPC-en `portal_list_bake_logs` og `customer_bake_logs`-tabellen er allerede fundamentet.
-- Retur av selv-stekte varer. Håndteres i eksisterende returordre-flyt senere ved å sjekke `customer_bake_logs` for kunden/datoen før returen tillates.
+## Hva som IKKE gjøres i dette steget
+
+- Ingen trigger på `orders`.
+- Ingen endringer i `CustomerOrderModal`, `TourOrderDialog`, fastordre-generator, portal-RPC.
+- Ingen sletting av `deliveryRuleEnforcement.ts` eller `useOrderDeadlineCheck`.
+- Ingen admin-UI-endringer for de nye kolonnene `effect`/`priority`/`allowed_*` (kommer i eget steg).
+
+Etter denne migrasjonen finnes den nye motoren side om side med den gamle, men er ikke i bruk enda. Steg 2 kobler den på.
+
+## Åpne avklaringer
+
+1. **`delivery_pauses`**: skal disse også få `effect`/`priority`-kolonner, eller er de alltid `block/priority=0`? Anbefaling: alltid `block`, ingen kolonner nå — kan legges til senere om behov.
+2. **Info-som-unntak**: en `info`-regel med høyere prioritet demper matchende `block`/`warn` av **samme rule_type**. Skal den også kunne dempe **på tvers** av typer (f.eks. info-regel opphever både no_delivery og weekdays for jul)? Anbefaling: kun samme type nå — enklere å resonnere om, og din formulering sa «samme type».
