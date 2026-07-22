@@ -1,91 +1,99 @@
-Steg 1 av omleggingen: kun **SQL-fundamentet** + rydding av deadline-drift. Ingen trigger, ingen UI-endringer — appen fortsetter å bruke dagens motorer inntil steg 2.
 
-## Leveranse
+## Mål
 
-**Én migrasjon** som gjør alt følgende i riktig rekkefølge:
+Én sannhet for leveringsregler i alle ordreflater. NBHub ser konsekvenser live og kan overstyre med begrunnelse. Portalen kan aldri overstyre — får vennlig veiledning med gyldige alternativer.
 
-### 1. Schema-endringer på `delivery_rules`
+## 1. Ny hook: `usePreviewDeliveryRules`
 
-```sql
-ALTER TABLE public.delivery_rules
-  ADD COLUMN effect text NOT NULL DEFAULT 'block'
-    CHECK (effect IN ('block','warn','info')),
-  ADD COLUMN priority int NOT NULL DEFAULT 0,
-  ADD COLUMN allowed_product_ids uuid[],
-  ADD COLUMN allowed_product_group_ids uuid[];
+Fil: `src/ordre/hooks/usePreviewDeliveryRules.ts`
+
+- Input: `{ legal_entity_id, customer_id, delivery_date, delivery_tour_id, product_ids, ordered_at?, existing_order_id? }`
+- Henter automatisk `customer_group_ids` (fra `customer_group_members`) og `product_group_ids` (fra `product_sales_groups`) — dette mangler i dag, så gruppe-scopede regler treffer aldri.
+- Kaller `supabase.rpc('evaluate_delivery_rules', ...)` med alle 9 argumentene.
+- 300ms debounce på input-endringer, TanStack Query med kort staleTime.
+- Returnerer: `{ blocks, warns, infos, isLoading, canSave }` (canSave = ingen blocks).
+
+## 2. Live-visning i skjemaene
+
+Ny presentasjonskomponent: `src/ordre/components/rules/DeliveryRulesFeedback.tsx`
+
+- Rød boks per block med regelnavn + melding + prioritet.
+- Gul boks per warn.
+- Diskret grå notis per info.
+
+Wires inn i:
+- `src/ordre/pages/NewOrder.tsx`
+- `src/ordre/components/CustomerOrderModal.tsx`
+- `src/ordre/components/TourOrderDialog.tsx`
+
+Lagre-knapp disables når `canSave === false` og bruker ikke har overstyring aktivert.
+
+## 3. Overstyringsdialog (kun NBHub)
+
+Ny komponent: `src/ordre/components/rules/OverrideRuleDialog.tsx` — layout matcher venstre kort i skjermbildet:
+
+```text
+┌─ Leveringsregel blokkerer ordren ────────┐
+│ Ordre til <kunde> · levering <dato>      │
+│ ┌─ rød regelblokk (navn + prioritet) ──┐ │
+│ │ regelmelding i klartekst             │ │
+│ └──────────────────────────────────────┘ │
+│ [grønn badge: Du har ordrekontor-tilgang]│
+│ BEGRUNNELSE FOR OVERSTYRING (PÅKREVD)    │
+│ [ textarea ]                             │
+│ 🔒 Overstyringen logges i revisjons…    │
+│               [Avbryt] [Overstyr og lagre]│
+└──────────────────────────────────────────┘
 ```
 
-### 2. Datamigrasjon (idempotent, i samme migrasjon)
+- Trigges av knappen «Overstyr …» som kun vises når:
+  - `usePermissions().hasWriteAccess('ordre') === true`
+  - `blocks.length > 0`
+- Tekstfelt er påkrevd (min. 10 tegn).
+- Ved bekreft: setter `rule_override_reason` på ordre-payloaden og trigger vanlig lagring. Trigger på DB-siden gjør resten (logger til `audit_log`).
 
-- `UPDATE delivery_rules SET effect='warn' WHERE rule_type='order_deadline'` (resten forblir `'block'` fra default).
-- For `rule_type='available_products'`: kopier `product_ids → allowed_product_ids` og `product_group_ids → allowed_product_group_ids`, deretter sett de opprinnelige kolonnene til `NULL` (så de får entydig scope-betydning framover).
-- **Ingen** DROP av `product_ids`/`product_group_ids` — de beholder nå kun scope-betydning for alle regeltyper.
+Brukere uten `has_app_write_access('ordre')` ser bare rødboksene og en forklaring («Ordren kan ikke lagres — kontakt ordrekontoret ved behov»).
 
-### 3. Ny funksjon `public.evaluate_delivery_rules`
+## 4. Kundeportalen — vennlig veiledning
 
-```sql
-CREATE OR REPLACE FUNCTION public.evaluate_delivery_rules(
-  p_legal_entity_id uuid,
-  p_customer_id uuid,
-  p_customer_group_ids uuid[],
-  p_delivery_date date,
-  p_delivery_tour_id uuid,
-  p_product_ids uuid[],
-  p_product_group_ids uuid[],
-  p_ordered_at timestamptz DEFAULT now(),
-  p_existing_order_id uuid DEFAULT NULL
-) RETURNS TABLE(
-  rule_id uuid,
-  rule_name text,
-  rule_type text,
-  effect text,
-  priority int,
-  matched boolean,
-  message text
-)
-LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, extensions
-```
+Denne appen bruker allerede `portal_create_customer_order`. Endringene her er UI i selve portalen (`kundeportal.nbhub.no`, egen repo — ikke rørt her), men vi eksponerer det som trengs:
 
-**Ansvar:**
-- Filtrerer aktive regler på `legal_entity_id`, `valid_from/valid_until`, `specific_delivery_date`, kunde-scope (`customer_ids`), kundegruppe-scope (`customer_group_ids`), ukedag-scope (`weekdays` — kun når `rule_type != 'delivery_weekdays'`), tur-scope (`tour_filter` — kun når `rule_type != 'available_tours'`), vare-/varegruppe-scope (`product_ids`/`product_group_ids` — kun når `rule_type != 'available_products'`). Portert 1:1 fra dagens `deliveryRuleEnforcement.ts`.
-- Evaluerer alle 6 typer inkludert **`delivery_pauses`** (tabellen finnes allerede — joines inn som virtuelle regler med `effect='block'`, `rule_type='delivery_pause'`).
-- `order_deadline`: beregner deadline som `((p_delivery_date - deadline_days_before) + deadline_time) AT TIME ZONE 'Europe/Oslo'` og sammenligner mot `p_ordered_at`. `matched=true` når fristen er passert.
-- `available_products`: bruker nye `allowed_product_ids` + `allowed_product_group_ids`. `matched=true` når minst én vare i `p_product_ids` faller utenfor tillatt-listen.
-- `p_existing_order_id`: reservert for framtidig bruk (ekskludere egen ordre ved re-evaluering) — tas som parameter nå så signaturen er stabil for steg 2.
+- Sørger for at `evaluate_delivery_rules` fungerer med portal-brukerens `auth.uid()` (SECURITY DEFINER er allerede satt).
+- Legger en plan-notat i `.lovable/plan.md` for portal-agenten som beskriver: kall `evaluate_delivery_rules` for de neste 14 dagene, filtrer bort dager med block-treff, vis 3 første gyldige som chips (matcher høyre kort i skjermbildet), pluss «kontakt bakeriet»-kort med telefonnummer fra `legal_entities`.
 
-**Prioritets-/effekt-oppløsning:**
-- Grupperer treff (`matched=true`) per `rule_type`. Innen hver gruppe: høyeste `priority` vinner. `effect='info'` med høyere prioritet «demper» lavere-prioritets treff av samme type (returneres med `matched=false`, beholdes for audit).
-- Returnerer **alle** rader (også ikke-matchede treff som ble demput) med korrekt `matched`-flagg — caller kan filtrere selv.
+I NBHub selv: ingen endring i portalflaten — kun sikre at `portal_create_customer_order` returnerer strukturert blokk-info (allerede på plass via `check_violation`-exception + `_notify_ordre_team`).
 
-### 4. Deadline-drift ryddet
+## 5. Opprydding
 
-- `DROP FUNCTION IF EXISTS public.check_order_deadline_violations(...)` (alle overloads).
-- Erstattes av tynn RPC `public.check_order_deadline_violations_v2(...)` med samme returkolonner (`rule_id, rule_name, deadline_timestamp, is_passed, minutes_over`) implementert som SELECT over `evaluate_delivery_rules(...)` filtrert på `rule_type='order_deadline'`. **Grunn**: `useOrderDeadlineCheck` fortsetter å virke uendret i steg 1; oppdateres i steg 2.
-- `GRANT EXECUTE ... TO authenticated, service_role` på begge nye funksjoner.
+- Slett `src/ordre/lib/deliveryRuleEnforcement.ts` (motoren er nå i DB).
+- I `src/ordre/lib/orderRules.ts`: fjern deadline-duplikatet (`checkOrderDeadline`, evt. `resolveDeadline`), behold `lead_time_days`-, allergi- og åpningstids-sjekkene.
+- `src/ordre/components/OrderDeadlineWarning.tsx`: fjern død kode (`passed`, `passedFinal` som ikke leses noe sted) — komponenten erstattes uansett av `DeliveryRulesFeedback` for deadline-visning, men beholdes for legacy lister til alt er migrert.
+- Erstatt `useOrderDeadlineCheck`-kall med den nye hook-en.
+- I ordrelisten (`src/ordre/pages/OrdersList.tsx` og `CustomerOrdersTab.tsx`): les `orders.rule_flags` (jsonb) og vis liten ⚠️-indikator med tooltip på ordrer som har lagrede warns eller er lagret med `rule_override_reason IS NOT NULL`.
 
-### 5. Sommertid-test (kjøres i migrasjonen som `DO $$ ... ASSERT ... $$`)
+## Tekniske detaljer
 
-Seedes én `order_deadline`-regel `deadline_time='10:00', deadline_days_before=1`, med `valid_from='2026-03-01'`. Verifiserer:
+- Hook returnerer også `groupsLoading` slik at UI kan vise skeleton mens `customer_group_ids`/`product_group_ids` hentes.
+- `evaluate_delivery_rules` kalles fra klient — SECURITY DEFINER, ingen ekstra grants nødvendig.
+- Overstyringsdialog: `<AlertDialog>` fra shadcn med custom body, farger fra semantic tokens (`destructive`, `warning`, `success`), matcher cream/bronze designsystemet.
+- Alle skjemaer sender `rule_override_reason` i samme insert/update — DB-triggeren gjør resten (auth-sjekk + audit_log).
+- Ordreliste-indikator: lite ikon `AlertTriangle` fra lucide, farge `text-amber-600`, tooltip lister regelnavnene fra `rule_flags`.
 
-| Scenario | p_delivery_date | p_ordered_at (UTC) | Forventet matched |
-|---|---|---|---|
-| Før DST-hopp (vintertid, UTC+1) | 2026-03-28 (lør) | 2026-03-27 09:01Z (=10:01 Oslo) | `true` |
-| Før DST-hopp, akkurat i tide | 2026-03-28 | 2026-03-27 08:59Z (=09:59 Oslo) | `false` |
-| Etter DST-hopp (sommertid, UTC+2) | 2026-03-30 (man) | 2026-03-29 08:01Z (=10:01 Oslo) | `true` |
-| Etter DST-hopp, akkurat i tide | 2026-03-30 | 2026-03-29 07:59Z (=09:59 Oslo) | `false` |
+## Filer som endres/opprettes
 
-Migrasjonen ruller tilbake hvis en assert feiler.
+Nye:
+- `src/ordre/hooks/usePreviewDeliveryRules.ts`
+- `src/ordre/components/rules/DeliveryRulesFeedback.tsx`
+- `src/ordre/components/rules/OverrideRuleDialog.tsx`
 
-## Hva som IKKE gjøres i dette steget
+Endres:
+- `src/ordre/pages/NewOrder.tsx`
+- `src/ordre/components/CustomerOrderModal.tsx`
+- `src/ordre/components/TourOrderDialog.tsx`
+- `src/ordre/lib/orderRules.ts`
+- `src/ordre/components/OrderDeadlineWarning.tsx`
+- `src/ordre/pages/OrdersList.tsx` og `src/kunder/components/CustomerOrdersTab.tsx`
+- `src/ordre/hooks/useOrderDeadlineCheck.ts` (fjernes eller re-implementeres som wrapper)
 
-- Ingen trigger på `orders`.
-- Ingen endringer i `CustomerOrderModal`, `TourOrderDialog`, fastordre-generator, portal-RPC.
-- Ingen sletting av `deliveryRuleEnforcement.ts` eller `useOrderDeadlineCheck`.
-- Ingen admin-UI-endringer for de nye kolonnene `effect`/`priority`/`allowed_*` (kommer i eget steg).
-
-Etter denne migrasjonen finnes den nye motoren side om side med den gamle, men er ikke i bruk enda. Steg 2 kobler den på.
-
-## Åpne avklaringer
-
-1. **`delivery_pauses`**: skal disse også få `effect`/`priority`-kolonner, eller er de alltid `block/priority=0`? Anbefaling: alltid `block`, ingen kolonner nå — kan legges til senere om behov.
-2. **Info-som-unntak**: en `info`-regel med høyere prioritet demper matchende `block`/`warn` av **samme rule_type**. Skal den også kunne dempe **på tvers** av typer (f.eks. info-regel opphever både no_delivery og weekdays for jul)? Anbefaling: kun samme type nå — enklere å resonnere om, og din formulering sa «samme type».
+Slettes:
+- `src/ordre/lib/deliveryRuleEnforcement.ts`
