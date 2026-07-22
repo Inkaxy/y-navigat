@@ -18,6 +18,8 @@ export type OrderListRow = {
   ordered_at: string;
   created_at: string;
   line_count?: number;
+  rule_flags: unknown;
+  rule_override_reason: string | null;
 };
 
 export type OrderListFilters = {
@@ -41,7 +43,7 @@ export function useOrderList(filters: OrderListFilters) {
       let q = supabase
         .from("orders")
         .select(
-          "id, order_number, status, source, customer_id, customer_snapshot, delivery_date, delivery_time, delivery_tour_id, total_incl_vat, status_changed_at, ordered_at, created_at, order_lines(count)",
+          "id, order_number, status, source, customer_id, customer_snapshot, delivery_date, delivery_time, delivery_tour_id, total_incl_vat, status_changed_at, ordered_at, created_at, rule_flags, rule_override_reason, order_lines(count)",
           { count: "exact" },
         )
         .eq("legal_entity_id", NB_LEGAL_ENTITY_ID);
