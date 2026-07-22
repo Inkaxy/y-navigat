@@ -337,70 +337,27 @@ export function DeliveryRuleFormDialog({ open, onOpenChange, rule, template, onS
     }
   }
 
-  // ----- "Regelen i ord" -----
-  const ruleInWords = useMemo(() => {
-    const lines: string[] = [];
-    switch (form.rule_type) {
-      case "order_deadline":
-        lines.push(
-          `Ordrefrist: kl ${form.deadline_time} ${
-            form.deadline_days_before === "0"
-              ? "samme dag"
-              : `${form.deadline_days_before} dag(er) før leveranse`
-          }.`,
-        );
-        break;
-      case "delivery_weekdays":
-        lines.push(
-          form.weekdays.length === 0
-            ? "Velg ukedager."
-            : `Leverer kun ${form.weekdays.map((d) => WEEKDAY_LABELS_LONG[d - 1]).join(", ")}.`,
-        );
-        break;
-      case "available_tours":
-        lines.push(
-          form.tour_filter.length === 0
-            ? "Velg turer."
-            : `Tilgjengelige turer: ${form.tour_filter.length} stk.`,
-        );
-        break;
-      case "available_products":
-        lines.push(
-          form.product_ids.length === 0 && form.product_group_ids.length === 0
-            ? "Velg varer eller salgsgrupper."
-            : `Bestillbart: ${form.product_ids.length} vare(r), ${form.product_group_ids.length} salgsgruppe(r).`,
-        );
-        break;
-      case "no_delivery":
-        lines.push(
-          form.blackout_from && form.blackout_until
-            ? `Stengt fra ${form.blackout_from} til ${form.blackout_until}.`
-            : "Sett start- og sluttdato.",
-        );
-        break;
-    }
-    const cust =
-      form.customer_ids.length > 0 || form.customer_group_ids.length > 0
-        ? `${form.customer_ids.length} kunde(r) / ${form.customer_group_ids.length} kundegruppe(r)`
-        : "Alle Kunder";
-    const turer =
-      form.tour_filter.length > 0 && form.rule_type !== "available_tours"
-        ? `${form.tour_filter.length} tur(er)`
-        : "Alle turer";
-    const dager =
-      form.weekdays.length > 0 && form.rule_type !== "delivery_weekdays"
-        ? form.weekdays.map((d) => WEEKDAY_LABELS_LONG[d - 1]).join(", ")
-        : "Alle dager";
-    lines.push(`Regelen gjelder for ${cust} for turer ${turer} på ${dager}.`);
-    if (form.rule_type !== "available_products") {
-      const varer =
-        form.product_ids.length > 0 || form.product_group_ids.length > 0
-          ? `${form.product_ids.length} vare(r) / ${form.product_group_ids.length} salgsgruppe(r)`
-          : "Alle Varer";
-      lines.push(`Regelen gjelder for ${varer}.`);
-    }
-    return lines;
-  }, [form]);
+  // ----- "Regelen i ord" — én sannhet via describeRule() -----
+  const ruleSentence = useMemo(
+    () =>
+      describeRule({
+        rule_type: form.rule_type,
+        effect: form.effect,
+        priority: form.priority,
+        weekdays: form.weekdays.length > 0 ? form.weekdays : null,
+        tour_filter: form.tour_filter.length > 0 ? form.tour_filter : null,
+        product_ids: form.product_ids.length > 0 ? form.product_ids : null,
+        product_group_ids: form.product_group_ids.length > 0 ? form.product_group_ids : null,
+        customer_ids: form.customer_ids.length > 0 ? form.customer_ids : null,
+        customer_group_ids: form.customer_group_ids.length > 0 ? form.customer_group_ids : null,
+        specific_delivery_date: form.specific_delivery_date || null,
+        blackout_from: form.blackout_from || null,
+        blackout_until: form.blackout_until || null,
+        deadline_time: form.deadline_time ? `${form.deadline_time}:00` : null,
+        deadline_days_before: form.deadline_days_before ? parseInt(form.deadline_days_before, 10) : null,
+      }),
+    [form],
+  );
 
   return (
     <Dialog open={open} onOpenChange={(o) => !busy && onOpenChange(o)}>
