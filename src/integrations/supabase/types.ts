@@ -5062,20 +5062,31 @@ export type Database = {
       pos_kiosk_users: {
         Row: {
           created_at: string
+          legal_entity_id: string | null
           note: string | null
           user_id: string
         }
         Insert: {
           created_at?: string
+          legal_entity_id?: string | null
           note?: string | null
           user_id: string
         }
         Update: {
           created_at?: string
+          legal_entity_id?: string | null
           note?: string | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "pos_kiosk_users_legal_entity_id_fkey"
+            columns: ["legal_entity_id"]
+            isOneToOne: false
+            referencedRelation: "legal_entities"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       pos_operator_terminals: {
         Row: {
@@ -10340,6 +10351,7 @@ export type Database = {
       }
       is_internal_user: { Args: never; Returns: boolean }
       is_kiosk_user: { Args: never; Returns: boolean }
+      is_kiosk_user_in_entity: { Args: { p_entity: string }; Returns: boolean }
       is_ordre_admin: { Args: never; Returns: boolean }
       is_platform_admin: { Args: never; Returns: boolean }
       is_platform_owner: { Args: { _user_id: string }; Returns: boolean }
