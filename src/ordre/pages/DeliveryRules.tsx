@@ -226,10 +226,10 @@ export default function DeliveryRules() {
       from.setDate(from.getDate() - 30);
       const { data, error } = await supabase
         .from("audit_log")
-        .select("changes, created_at")
+        .select("changes, occurred_at")
         .eq("action", "delivery_rule_overridden")
         .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
-        .gte("created_at", from.toISOString())
+        .gte("occurred_at", from.toISOString())
         .limit(1000);
       if (error) throw error;
       return data ?? [];
