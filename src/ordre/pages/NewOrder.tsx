@@ -23,8 +23,11 @@ import { TourPicker } from "@/ordre/components/orders/TourPicker";
 import { CopyFromPreviousOrderDialog } from "@/ordre/components/orders/CopyFromPreviousOrderDialog";
 import { DuplicateOrderWarning } from "@/ordre/components/orders/DuplicateOrderWarning";
 import { useDuplicateOrderCheck } from "@/ordre/hooks/useDuplicateOrderCheck";
-import { OrderDeadlineWarning } from "@/ordre/components/orders/OrderDeadlineWarning";
-import { useOrderDeadlineCheck } from "@/ordre/hooks/useOrderDeadlineCheck";
+import { usePreviewDeliveryRules } from "@/ordre/hooks/usePreviewDeliveryRules";
+import { DeliveryRulesFeedback } from "@/ordre/components/rules/DeliveryRulesFeedback";
+import { OverrideRuleDialog } from "@/ordre/components/rules/OverrideRuleDialog";
+import { useUserAccess } from "@/ordre/hooks/useUserAccess";
+import { useAuth } from "@/hooks/useAuth";
 import type { CopyableOrderLine } from "@/ordre/hooks/useRecentOrdersForCustomer";
 import { QaChecklistCard } from "@/ordre/components/orders/QaChecklistCard";
 import { evaluateOrderDraftChecks, summarizeQa } from "@/ordre/lib/qaChecks";
@@ -454,18 +457,22 @@ export default function NewOrder() {
   });
   const productPriceListId = effectivePriceListId ?? customer?.default_price_list_id ?? null;
 
-  // A.5.5.6.2 — Ordrefrist-sjekk
+  // Leveringsregel-preview (SQL-motor)
+  const { user } = useAuth();
+  const { data: access } = useUserAccess(user);
+  const hasOrdreWrite = access?.hasOrdreWrite ?? false;
   const productIdsForCheck = lines
     .map((l) => l.product?.id)
     .filter((id): id is string => !!id);
-  const { data: deadlineViolations = [] } = useOrderDeadlineCheck({
+  const rulesPreview = usePreviewDeliveryRules({
     legalEntityId: NB_LEGAL_ENTITY_ID,
     customerId: customer?.id ?? null,
     deliveryDate: deliveryDate || null,
     deliveryTourId: manualTourId,
     productIds: productIdsForCheck,
   });
-  const passedDeadlines = deadlineViolations.filter((v) => v.minutes_over > 0);
+  const [overrideOpen, setOverrideOpen] = useState(false);
+  const [pendingOverrideReason, setPendingOverrideReason] = useState<string | null>(null);
 
   // Når kunde endres: pre-fyll adresse + håndter kunde-referanse
   useEffect(() => {
