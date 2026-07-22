@@ -231,6 +231,8 @@ export type CustomerOrderInput = {
   sendSms: boolean;
   sendEmail: boolean;
   isPaid: boolean;
+  /** Sett til ikke-null begrunnelse for å overstyre en 'block'-leveringsregel. */
+  ruleOverrideReason?: string | null;
   lines: CustomerOrderLineInput[];
 
 };
