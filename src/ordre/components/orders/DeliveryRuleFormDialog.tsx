@@ -189,19 +189,142 @@ const RULE_TYPES: DeliveryRuleType[] = [
   "no_delivery",
 ];
 
+// ────────────────────────────────────────────────────────────────────────────
+// Ferdige oppskrifter — hjelper nye brukere i gang. Alle kan finjusteres i
+// wizarden etterpå. `apply` returnerer et komplett Form-utkast.
+// ────────────────────────────────────────────────────────────────────────────
+type Template = {
+  id: string;
+  title: string;
+  desc: string;
+  icon: typeof Clock;
+  accent: string; // tailwind bg class for icon-badge
+  apply: (base: Form) => Form;
+};
+
+function nextMonday(): string {
+  const d = new Date();
+  const diff = (8 - d.getDay()) % 7 || 7;
+  d.setDate(d.getDate() + diff);
+  return d.toISOString().slice(0, 10);
+}
+
+const TEMPLATES: Template[] = [
+  {
+    id: "deadline-all",
+    title: "Ordrefrist for alle kunder",
+    desc: "Bestillinger må inn før et bestemt klokkeslett, et visst antall dager før leveranse.",
+    icon: Clock,
+    accent: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300",
+    apply: (b) => ({
+      ...b,
+      rule_type: "order_deadline",
+      name: "Ordrefrist – alle kunder",
+      deadline_time: "14:00",
+      deadline_days_before: "1",
+      effect: "block",
+      priority: 10,
+    }),
+  },
+  {
+    id: "no-delivery-holiday",
+    title: "Stengt i ferieperiode",
+    desc: "Blokker leveranser i en gitt datoperiode (f.eks. jul, påske, sommer).",
+    icon: CalendarOff,
+    accent: "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300",
+    apply: (b) => ({
+      ...b,
+      rule_type: "no_delivery",
+      name: "Stengt – ferieperiode",
+      effect: "block",
+      priority: 50,
+    }),
+  },
+  {
+    id: "product-days",
+    title: "Vare kun tilgjengelig utvalgte dager",
+    desc: "Enkelte varer kan bare bestilles på bestemte ukedager.",
+    icon: Package,
+    accent: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
+    apply: (b) => ({
+      ...b,
+      rule_type: "available_products",
+      name: "Vare – kun visse dager",
+      effect: "block",
+      priority: 20,
+      weekdays: [3, 5], // ons/fre som utgangspunkt
+    }),
+  },
+  {
+    id: "group-tours",
+    title: "Kundegruppe kun visse turer",
+    desc: "Begrens hvilke leveringsturer en kundegruppe kan bruke.",
+    icon: MapPin,
+    accent: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
+    apply: (b) => ({
+      ...b,
+      rule_type: "available_tours",
+      name: "Turer – kundegruppe",
+      effect: "warn",
+      priority: 5,
+    }),
+  },
+  {
+    id: "weekdays-only",
+    title: "Vi leverer kun visse ukedager",
+    desc: "Begrens hvilke ukedager kunden kan velge leveringsdato på.",
+    icon: CalendarDays,
+    accent: "bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300",
+    apply: (b) => ({
+      ...b,
+      rule_type: "delivery_weekdays",
+      name: "Kun ukedager",
+      weekdays: [1, 2, 3, 4, 5],
+      effect: "block",
+      priority: 5,
+    }),
+  },
+  {
+    id: "blank",
+    title: "Tom regel",
+    desc: "Start fra bunnen og velg alt selv.",
+    icon: FileText,
+    accent: "bg-muted text-muted-foreground",
+    apply: (b) => b,
+  },
+];
+
+const STEPS = [
+  { key: "what", title: "Hva skal regelen gjøre?", hint: "Velg regeltype og hovedinnstilling" },
+  { key: "who", title: "Hvem og når gjelder den?", hint: "Kunder, varer, turer og ukedager" },
+  { key: "effect", title: "Effekt, navn og lagring", hint: "Hvor streng skal den være?" },
+] as const;
+
 export function DeliveryRuleFormDialog({ open, onOpenChange, rule, template, onSaved }: Props) {
   const qc = useQueryClient();
   const [form, setForm] = useState<Form>(EMPTY);
   const [busy, setBusy] = useState(false);
   const isEdit = !!rule;
+  // Stage: "gallery" = maler først (kun ved ny regel), "wizard" = 3-stegs skjema
+  const [stage, setStage] = useState<"gallery" | "wizard">("wizard");
+  const [step, setStep] = useState<0 | 1 | 2>(0);
 
   useEffect(() => {
     if (!open) return;
-    if (rule) setForm(fromRule(rule));
-    else if (template) {
+    if (rule) {
+      setForm(fromRule(rule));
+      setStage("wizard");
+      setStep(0);
+    } else if (template) {
       const base = fromRule(template);
       setForm({ ...base, name: `${base.name} (kopi)` });
-    } else setForm(EMPTY);
+      setStage("wizard");
+      setStep(0);
+    } else {
+      setForm(EMPTY);
+      setStage("gallery");
+      setStep(0);
+    }
   }, [open, rule, template]);
 
   const { data: tours = [] } = useDeliveryTours({ activeOnly: true });
