@@ -421,19 +421,30 @@ export function TourOrderDialog({
                   Ferdig
                 </Button>
                 {!readOnly && order ? (
-                  <Button
-                    size="sm"
-                    onClick={saveAll}
-                    disabled={dirtyCount === 0 || savingAll}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white"
-                  >
-                    {savingAll ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Save className="h-4 w-4" />
-                    )}
-                    Lagre{dirtyCount > 0 ? ` (${dirtyCount})` : ""}
-                  </Button>
+                  rulesPreview.blocks.length > 0 && hasOrdreWrite ? (
+                    <Button
+                      size="sm"
+                      variant="brand"
+                      onClick={() => setOverrideOpen(true)}
+                      disabled={savingAll}
+                    >
+                      Overstyr …
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      onClick={() => saveAll()}
+                      disabled={dirtyCount === 0 || savingAll || rulesPreview.blocks.length > 0}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                    >
+                      {savingAll ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Save className="h-4 w-4" />
+                      )}
+                      Lagre{dirtyCount > 0 ? ` (${dirtyCount})` : ""}
+                    </Button>
+                  )
                 ) : null}
               </div>
             </div>
@@ -808,19 +819,25 @@ export function TourOrderDialog({
                 Ferdig
               </Button>
               {!readOnly ? (
-                <Button
-                  size="sm"
-                  onClick={saveAll}
-                  disabled={dirtyCount === 0 || savingAll}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white"
-                >
-                  {savingAll ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Save className="h-4 w-4" />
-                  )}
-                  Lagre{dirtyCount > 0 ? ` (${dirtyCount})` : ""}
-                </Button>
+                rulesPreview.blocks.length > 0 && hasOrdreWrite ? (
+                  <Button size="sm" variant="brand" onClick={() => setOverrideOpen(true)} disabled={savingAll}>
+                    Overstyr …
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    onClick={() => saveAll()}
+                    disabled={dirtyCount === 0 || savingAll || rulesPreview.blocks.length > 0}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                  >
+                    {savingAll ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Save className="h-4 w-4" />
+                    )}
+                    Lagre{dirtyCount > 0 ? ` (${dirtyCount})` : ""}
+                  </Button>
+                )
               ) : null}
             </div>
           </div>
