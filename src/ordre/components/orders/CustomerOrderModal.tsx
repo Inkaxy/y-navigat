@@ -1259,7 +1259,7 @@ export function CustomerOrderModal({
             ) : (
               <Button
                 type="button"
-                onClick={handleSave}
+                onClick={() => handleSave()}
                 disabled={submitting || rulesPreview.blocks.length > 0}
                 title={
                   rulesPreview.blocks.length > 0
@@ -1331,10 +1331,7 @@ export function CustomerOrderModal({
         onConfirm={async (reason) => {
           setPendingOverrideReason(reason);
           setOverrideOpen(false);
-          // Bruk setTimeout for å la state oppdatere før handleSave leser den
-          setTimeout(() => {
-            void handleSave();
-          }, 0);
+          await handleSave(reason);
         }}
       />
 
