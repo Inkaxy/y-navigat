@@ -399,31 +399,37 @@ export function DeliveryRuleFormDialog({ open, onOpenChange, rule, template, onS
               {/* Type-spesifikke felter */}
               <div className="mt-4 space-y-3">
                 {form.rule_type === "order_deadline" && (
-                  <div className="flex flex-wrap items-end gap-3">
-                    <div>
-                      <Label className="text-xs">Antall dager før leveranse</Label>
-                      <Input
-                        type="number"
-                        min={0}
-                        max={14}
-                        className="w-24"
-                        value={form.deadline_days_before}
-                        onChange={(e) =>
-                          setForm({ ...form, deadline_days_before: e.target.value })
-                        }
-                      />
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap items-end gap-3">
+                      <div>
+                        <Label className="text-xs">Antall dager før leveranse</Label>
+                        <Input
+                          type="number"
+                          min={0}
+                          max={14}
+                          className="w-24"
+                          value={form.deadline_days_before}
+                          onChange={(e) =>
+                            setForm({ ...form, deadline_days_before: e.target.value })
+                          }
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs">før klokken</Label>
+                        <Input
+                          type="time"
+                          className="w-32"
+                          value={form.deadline_time}
+                          onChange={(e) =>
+                            setForm({ ...form, deadline_time: e.target.value })
+                          }
+                        />
+                      </div>
                     </div>
-                    <div>
-                      <Label className="text-xs">før klokken</Label>
-                      <Input
-                        type="time"
-                        className="w-32"
-                        value={form.deadline_time}
-                        onChange={(e) =>
-                          setForm({ ...form, deadline_time: e.target.value })
-                        }
-                      />
-                    </div>
+                    <DeadlinePreview
+                      daysBefore={parseInt(form.deadline_days_before, 10)}
+                      time={form.deadline_time}
+                    />
                   </div>
                 )}
 
