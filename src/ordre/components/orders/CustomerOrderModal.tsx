@@ -1322,6 +1322,23 @@ export function CustomerOrderModal({
         </AlertDialogContent>
       </AlertDialog>
 
+      <OverrideRuleDialog
+        open={overrideOpen}
+        onOpenChange={setOverrideOpen}
+        blocks={rulesPreview.blocks}
+        contextLine={`Ordre til ${customer.display_name} · levering ${deliveryDate}`}
+        submitting={submitting}
+        onConfirm={async (reason) => {
+          setPendingOverrideReason(reason);
+          setOverrideOpen(false);
+          // Bruk setTimeout for å la state oppdatere før handleSave leser den
+          setTimeout(() => {
+            void handleSave();
+          }, 0);
+        }}
+      />
+
+
       {(() => {
         const activeLine = lines.find((l) => l.uid === merknadFor);
         if (!activeLine || !activeLine.product) return null;
