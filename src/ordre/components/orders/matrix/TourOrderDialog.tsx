@@ -1,4 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
+import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
+import { usePreviewDeliveryRules } from "@/ordre/hooks/usePreviewDeliveryRules";
+import { DeliveryRulesFeedback } from "@/ordre/components/rules/DeliveryRulesFeedback";
+import { OverrideRuleDialog } from "@/ordre/components/rules/OverrideRuleDialog";
+import { useUserAccess } from "@/ordre/hooks/useUserAccess";
+import { useAuth } from "@/hooks/useAuth";
 import {
   Dialog,
   DialogContent,
@@ -125,6 +131,29 @@ export function TourOrderDialog({
   function patch(lineId: string, p: LineEdit) {
     setEdits((prev) => ({ ...prev, [lineId]: { ...prev[lineId], ...p } }));
   }
+
+  // Leveringsregel-preview for hele ordren
+  const { user } = useAuth();
+  const { data: access } = useUserAccess(user);
+  const hasOrdreWrite = access?.hasOrdreWrite ?? false;
+  const productIdsForRules = useMemo(() => {
+    if (!order) return [];
+    const out: string[] = [];
+    for (const l of order.lines) {
+      const qty = edits[l.id]?.quantity != null ? Number(edits[l.id]!.quantity!.replace(",", ".") || 0) : Number(l.quantity);
+      if (qty > 0 && l.product_id) out.push(l.product_id);
+    }
+    return out;
+  }, [order, edits]);
+  const rulesPreview = usePreviewDeliveryRules({
+    legalEntityId: (order as any)?.legal_entity_id ?? NB_LEGAL_ENTITY_ID,
+    customerId: customer?.id ?? null,
+    deliveryDate: date,
+    deliveryTourId: tour?.id ?? null,
+    productIds: productIdsForRules,
+    existingOrderId: order?.id ?? null,
+  });
+  const [overrideOpen, setOverrideOpen] = useState(false);
 
   function getQty(l: TourOrderLine): number {
     const raw = edits[l.id]?.quantity;
