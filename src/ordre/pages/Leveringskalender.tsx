@@ -582,15 +582,17 @@ export default function MatrixPage() {
     setQuickFilter(null);
     const baseMon = isoWeekMonday(dateFrom);
     const newMon = addDays(baseMon, delta * 7);
+    const span = Math.max(1, daysCount);
     setDateFrom(newMon);
-    setDateTo(addDays(newMon, 6));
+    setDateTo(addDays(newMon, span - 1));
   }
 
   function jumpToday() {
     setQuickFilter(null);
     const mon = isoWeekMonday(todayISO());
+    const span = Math.max(1, daysCount);
     setDateFrom(mon);
-    setDateTo(addDays(mon, 6));
+    setDateTo(addDays(mon, span - 1));
   }
 
   // ----- Cell action helpers -----
