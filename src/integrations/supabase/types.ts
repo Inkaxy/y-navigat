@@ -1841,6 +1841,8 @@ export type Database = {
       }
       delivery_rules: {
         Row: {
+          allowed_product_group_ids: string[] | null
+          allowed_product_ids: string[] | null
           blackout_from: string | null
           blackout_until: string | null
           created_at: string
@@ -1850,10 +1852,12 @@ export type Database = {
           deadline_days_before: number | null
           deadline_time: string | null
           description: string | null
+          effect: string
           id: string
           is_active: boolean
           legal_entity_id: string
           name: string
+          priority: number
           product_group_ids: string[] | null
           product_ids: string[] | null
           rule_type: string
@@ -1865,6 +1869,8 @@ export type Database = {
           weekdays: number[] | null
         }
         Insert: {
+          allowed_product_group_ids?: string[] | null
+          allowed_product_ids?: string[] | null
           blackout_from?: string | null
           blackout_until?: string | null
           created_at?: string
@@ -1874,10 +1880,12 @@ export type Database = {
           deadline_days_before?: number | null
           deadline_time?: string | null
           description?: string | null
+          effect?: string
           id?: string
           is_active?: boolean
           legal_entity_id: string
           name: string
+          priority?: number
           product_group_ids?: string[] | null
           product_ids?: string[] | null
           rule_type: string
@@ -1889,6 +1897,8 @@ export type Database = {
           weekdays?: number[] | null
         }
         Update: {
+          allowed_product_group_ids?: string[] | null
+          allowed_product_ids?: string[] | null
           blackout_from?: string | null
           blackout_until?: string | null
           created_at?: string
@@ -1898,10 +1908,12 @@ export type Database = {
           deadline_days_before?: number | null
           deadline_time?: string | null
           description?: string | null
+          effect?: string
           id?: string
           is_active?: boolean
           legal_entity_id?: string
           name?: string
+          priority?: number
           product_group_ids?: string[] | null
           product_ids?: string[] | null
           rule_type?: string
@@ -10004,6 +10016,28 @@ export type Database = {
         Returns: {
           lines_deleted: number
           order_deleted: boolean
+        }[]
+      }
+      evaluate_delivery_rules: {
+        Args: {
+          p_customer_group_ids: string[]
+          p_customer_id: string
+          p_delivery_date: string
+          p_delivery_tour_id: string
+          p_existing_order_id?: string
+          p_legal_entity_id: string
+          p_ordered_at?: string
+          p_product_group_ids: string[]
+          p_product_ids: string[]
+        }
+        Returns: {
+          effect: string
+          matched: boolean
+          message: string
+          priority: number
+          rule_id: string
+          rule_name: string
+          rule_type: string
         }[]
       }
       extract_legal_entity_id_from_path: {
