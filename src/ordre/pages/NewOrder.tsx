@@ -1372,7 +1372,7 @@ export default function NewOrder() {
         onConfirm={async (reason) => {
           setPendingOverrideReason(reason);
           setOverrideOpen(false);
-          await save();
+          await save(reason);
         }}
       />
 
