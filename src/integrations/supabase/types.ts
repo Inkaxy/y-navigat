@@ -3884,6 +3884,8 @@ export type Database = {
           previous_status_before_hold: string | null
           production_notes: string | null
           recurring_schedule_id: string | null
+          rule_flags: Json
+          rule_override_reason: string | null
           send_email_confirm: boolean
           send_sms_confirm: boolean
           source: string
@@ -3945,6 +3947,8 @@ export type Database = {
           previous_status_before_hold?: string | null
           production_notes?: string | null
           recurring_schedule_id?: string | null
+          rule_flags?: Json
+          rule_override_reason?: string | null
           send_email_confirm?: boolean
           send_sms_confirm?: boolean
           source: string
@@ -4006,6 +4010,8 @@ export type Database = {
           previous_status_before_hold?: string | null
           production_notes?: string | null
           recurring_schedule_id?: string | null
+          rule_flags?: Json
+          rule_override_reason?: string | null
           send_email_confirm?: boolean
           send_sms_confirm?: boolean
           source?: string
@@ -9909,9 +9915,22 @@ export type Database = {
       }
     }
     Functions: {
+      _enforce_order_delivery_rules: {
+        Args: { p_order_id: string }
+        Returns: undefined
+      }
       _import_upsert_price: {
         Args: { p_price: number; p_price_list_id: string; p_product_id: string }
         Returns: number
+      }
+      _notify_ordre_team: {
+        Args: {
+          p_body: string
+          p_legal_entity_id: string
+          p_order_id?: string
+          p_title: string
+        }
+        Returns: undefined
       }
       _pos_period_aggregate: {
         Args: {
