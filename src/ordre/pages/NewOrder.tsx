@@ -787,13 +787,8 @@ export default function NewOrder() {
           delivery_country: useCustomerAddress ? customer.delivery_country : delAddr.country || "NO",
           delivery_instructions: deliveryInstructions || null,
           use_customer_default_address: useCustomerAddress,
-          internal_notes: (() => {
-            const breach = passedDeadlines.length > 0
-              ? `Lagret med ordrefrist-brudd: ${passedDeadlines.map((v) => `«${v.rule_name}»`).join(", ")}`
-              : null;
-            const parts = [internalNotes?.trim(), breach].filter(Boolean);
-            return parts.length > 0 ? parts.join("\n\n") : null;
-          })(),
+          internal_notes: internalNotes?.trim() || null,
+          rule_override_reason: pendingOverrideReason,
           production_notes: productionNotes.trim() || null,
           store_notes: storeNotes.trim() || null,
           customer_notes: customerNotes || null,
@@ -954,9 +949,18 @@ export default function NewOrder() {
           />
         )}
 
-        {/* A.5.5.6.2 Ordrefrist-advarsel */}
-        {customer && deliveryDate && deadlineViolations.length > 0 && (
-          <OrderDeadlineWarning violations={deadlineViolations} />
+        {/* Leveringsregler (blokk/advarsel/info) */}
+        {customer && deliveryDate && (
+          <DeliveryRulesFeedback
+            blocks={rulesPreview.blocks}
+            warns={rulesPreview.warns}
+            infos={rulesPreview.infos}
+            blockedHint={
+              rulesPreview.blocks.length > 0 && !hasOrdreWrite
+                ? "Ordren kan ikke opprettes. Kontakt ordrekontoret hvis den likevel må gjennom."
+                : undefined
+            }
+          />
         )}
 
         {/* Seksjon 2: Levering */}
