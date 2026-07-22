@@ -1219,21 +1219,16 @@ export function CustomerOrderModal({
             </div>
           )}
 
-          {ruleEnforcement.blocked && (
-            <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm">
-              <div className="mb-1 flex items-center gap-1.5 font-medium text-destructive">
-                <AlertTriangle className="h-4 w-4" />
-                Ordren bryter leveringsregler
-              </div>
-              <ul className="ml-5 list-disc space-y-0.5 text-xs text-destructive">
-                {ruleEnforcement.violations.map((v) => (
-                  <li key={v.rule_id}>
-                    <strong>{v.rule_name}:</strong> {v.message}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+          <DeliveryRulesFeedback
+            blocks={rulesPreview.blocks}
+            warns={rulesPreview.warns}
+            infos={rulesPreview.infos}
+            blockedHint={
+              rulesPreview.blocks.length > 0 && !hasOrdreWrite
+                ? "Ordren kan ikke lagres. Kontakt ordrekontoret hvis den likevel må gjennom."
+                : undefined
+            }
+          />
 
           <DialogFooter className="gap-2 sm:gap-2">
             {isEdit && (
@@ -1252,19 +1247,30 @@ export function CustomerOrderModal({
             <Button type="button" variant="outline" onClick={handleClose} disabled={submitting}>
               Avbryt
             </Button>
-            <Button
-              type="button"
-              onClick={handleSave}
-              disabled={submitting || ruleEnforcement.blocked}
-              title={
-                ruleEnforcement.blocked
-                  ? "Ordren bryter en leveringsregel"
-                  : undefined
-              }
-            >
-              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              {isEdit ? "Lagre endringer" : "Opprett kundeordre"}
-            </Button>
+            {rulesPreview.blocks.length > 0 && hasOrdreWrite ? (
+              <Button
+                type="button"
+                variant="brand"
+                onClick={() => setOverrideOpen(true)}
+                disabled={submitting}
+              >
+                Overstyr …
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                onClick={handleSave}
+                disabled={submitting || rulesPreview.blocks.length > 0}
+                title={
+                  rulesPreview.blocks.length > 0
+                    ? "Ordren bryter en leveringsregel"
+                    : undefined
+                }
+              >
+                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                {isEdit ? "Lagre endringer" : "Opprett kundeordre"}
+              </Button>
+            )}
           </DialogFooter>
 
         </DialogContent>
