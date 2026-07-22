@@ -591,7 +591,7 @@ export function CustomerOrderModal({
   const fmtKr = (n: number) =>
     n.toLocaleString("nb-NO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-  function buildInput(): CustomerOrderInput | null {
+  function buildInput(overrideReason: string | null = pendingOverrideReason): CustomerOrderInput | null {
     const nameRes = NameSchema.safeParse(name);
     if (!nameRes.success) {
       toast.error(nameRes.error.errors[0].message);
@@ -618,7 +618,7 @@ export function CustomerOrderModal({
       toast.error("Legg til minst én linje med produkt og mengde");
       return null;
     }
-    if (rulesPreview.blocks.length > 0 && !pendingOverrideReason) {
+    if (rulesPreview.blocks.length > 0 && !overrideReason) {
       toast.error(
         `Kan ikke lagre — bryter leveringsregel: ${rulesPreview.blocks[0].message}`,
       );
@@ -660,14 +660,14 @@ export function CustomerOrderModal({
       sendSms,
       sendEmail,
       isPaid,
-      ruleOverrideReason: pendingOverrideReason,
+      ruleOverrideReason: overrideReason,
       lines: inputLines,
     };
 
   }
 
-  async function handleSave() {
-    const input = buildInput();
+  async function handleSave(overrideReason: string | null = null) {
+    const input = buildInput(overrideReason);
     if (!input) return;
     setSubmitting(true);
     try {
