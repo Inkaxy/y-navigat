@@ -722,21 +722,227 @@ export function DeliveryRuleFormDialog({ open, onOpenChange, rule, template, onS
             </div>
           </div>
 
-          {/* Høyre: regelen i ord */}
-          <aside className="h-fit rounded-lg border border-border bg-muted/30 p-4 lg:sticky lg:top-0">
-            <div className="mb-3 flex items-center gap-2 text-sm font-semibold">
-              <AlertTriangle className="h-4 w-4" />
-              Regelen i ord
+          {/* Høyre: effekt/prioritet + klartekst + test-panel */}
+          <aside className="space-y-4 lg:sticky lg:top-0 h-fit">
+            <div className="rounded-lg border-2 border-primary/40 bg-muted/30 p-4">
+              <div className="mb-3 text-sm font-semibold">Effekt & prioritet</div>
+              <div className="space-y-2">
+                {(["block", "warn", "info"] as DeliveryRuleEffect[]).map((e) => {
+                  const active = form.effect === e;
+                  return (
+                    <button
+                      key={e}
+                      type="button"
+                      onClick={() => setForm({ ...form, effect: e })}
+                      className={cn(
+                        "w-full rounded-md border px-3 py-2 text-left text-xs transition-colors",
+                        active ? "border-primary bg-primary/10" : "border-border hover:bg-muted",
+                      )}
+                    >
+                      <div className="font-medium">{EFFECT_ICON[e]} {EFFECT_LABEL[e]}</div>
+                      <div className="text-[11px] text-muted-foreground">
+                        {e === "block"
+                          ? "Stopper lagring — ordrekontor kan overstyre med begrunnelse."
+                          : e === "warn"
+                            ? "Advarer, men tillater lagring."
+                            : "Diskret notis i skjema og på ordren."}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="mt-3">
+                <Label className="text-xs">Prioritet (høyest vinner ved overlapp)</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={999}
+                  value={form.priority}
+                  onChange={(e) => setForm({ ...form, priority: Number(e.target.value) || 0 })}
+                  className="mt-1 w-24"
+                />
+              </div>
             </div>
-            <div className="space-y-2 text-xs leading-relaxed text-muted-foreground">
-              {ruleInWords.map((l, i) => (
-                <p key={i}>{l}</p>
-              ))}
+
+            <div className="rounded-lg border border-border bg-muted/30 p-4">
+              <div className="mb-2 flex items-center gap-2 text-sm font-semibold">
+                <AlertTriangle className="h-4 w-4" /> Regelen i klartekst
+              </div>
+              <p className="text-xs leading-relaxed text-muted-foreground">{ruleSentence}</p>
             </div>
+
+            <RuleTestPanel form={form} />
           </aside>
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// ── Test-panel ────────────────────────────────────────────────────────────
+function RuleTestPanel({ form }: { form: Form }) {
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [now, setNow] = useState(new Date().toISOString().slice(0, 16));
+  const [customerId, setCustomerId] = useState<string | null>(null);
+  const [customerLabel, setCustomerLabel] = useState<string>("");
+  const [tourId, setTourId] = useState<string | null>(null);
+  const [q, setQ] = useState("");
+  const debouncedQ = useDebouncedValue(q, 250);
+  const { data: matches = [] } = useNBCustomers(debouncedQ);
+  const { data: tours = [] } = useDeliveryTours({ activeOnly: true });
+
+  const groupIds = useQuery({
+    queryKey: ["rule-test-groups", customerId],
+    enabled: !!customerId,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("customer_group_members")
+        .select("group_id")
+        .eq("customer_id", customerId!);
+      return (data ?? []).map((r) => r.group_id as string);
+    },
+  });
+
+  const productGroupIds = useQuery({
+    queryKey: ["rule-test-pgroups", form.product_ids],
+    enabled: form.product_ids.length > 0,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("product_sales_groups")
+        .select("sales_group_id")
+        .in("product_id", form.product_ids);
+      return Array.from(new Set((data ?? []).map((r) => r.sales_group_id as string)));
+    },
+  });
+
+  const result = useMemo(() => {
+    if (!customerId || !date) return null;
+    return evaluateDraftRule(
+      {
+        rule_type: form.rule_type,
+        name: form.name || "Utkast",
+        effect: form.effect,
+        priority: form.priority,
+        weekdays: form.weekdays.length > 0 ? form.weekdays : null,
+        tour_filter: form.tour_filter.length > 0 ? form.tour_filter : null,
+        product_ids: form.product_ids.length > 0 ? form.product_ids : null,
+        product_group_ids: form.product_group_ids.length > 0 ? form.product_group_ids : null,
+        customer_ids: form.customer_ids.length > 0 ? form.customer_ids : null,
+        customer_group_ids: form.customer_group_ids.length > 0 ? form.customer_group_ids : null,
+        specific_delivery_date: form.specific_delivery_date || null,
+        blackout_from: form.blackout_from || null,
+        blackout_until: form.blackout_until || null,
+        deadline_time: form.deadline_time ? `${form.deadline_time}:00` : null,
+        deadline_days_before: form.deadline_days_before ? parseInt(form.deadline_days_before, 10) : null,
+        valid_from: form.valid_from,
+        valid_until: form.valid_until || null,
+        is_active: form.is_active,
+      },
+      {
+        customerId,
+        customerGroupIds: groupIds.data ?? [],
+        deliveryDate: date,
+        deliveryTourId: tourId,
+        productIds: form.product_ids,
+        productGroupIds: productGroupIds.data ?? [],
+        orderedAt: new Date(now).toISOString(),
+      },
+    );
+  }, [form, date, now, customerId, tourId, groupIds.data, productGroupIds.data]);
+
+  return (
+    <div className="rounded-lg border border-border bg-background p-4">
+      <div className="mb-3 flex items-center gap-2 text-sm font-semibold">
+        <Play className="h-4 w-4" /> Test regelen
+      </div>
+      <div className="space-y-2 text-xs">
+        <div>
+          <Label className="text-xs">Kunde</Label>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="mt-1 w-full justify-start">
+                <Search className="mr-2 h-3.5 w-3.5" />
+                {customerLabel || "Velg testkunde…"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-[320px] p-0">
+              <div className="border-b p-2">
+                <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Søk kunde…" autoFocus />
+              </div>
+              <div className="max-h-[240px] overflow-y-auto">
+                {matches.slice(0, 30).map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => {
+                      setCustomerId(c.id);
+                      setCustomerLabel(`${c.customer_number} — ${c.display_name}`);
+                    }}
+                    className="block w-full border-b px-3 py-2 text-left text-xs hover:bg-accent"
+                  >
+                    {c.customer_number} — {c.display_name}
+                  </button>
+                ))}
+              </div>
+            </PopoverContent>
+          </Popover>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <Label className="text-xs">Leveringsdato</Label>
+            <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="mt-1" />
+          </div>
+          <div>
+            <Label className="text-xs">Registrert</Label>
+            <Input type="datetime-local" value={now} onChange={(e) => setNow(e.target.value)} className="mt-1" />
+          </div>
+        </div>
+        <div>
+          <Label className="text-xs">Tur</Label>
+          <select
+            className="mt-1 w-full rounded-md border border-input bg-background px-2 py-1.5 text-xs"
+            value={tourId ?? ""}
+            onChange={(e) => setTourId(e.target.value || null)}
+          >
+            <option value="">— ingen —</option>
+            {sortToursByPriority(tours).map((t) => (
+              <option key={t.id} value={t.id}>{t.display_name}</option>
+            ))}
+          </select>
+        </div>
+
+        {result && (
+          <div
+            className={cn(
+              "mt-3 rounded-md border p-3",
+              result.matched && result.effect === "block" && "border-destructive/40 bg-destructive/5",
+              result.matched && result.effect === "warn" && "border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/30",
+              result.matched && result.effect === "info" && "border-blue-300 bg-blue-50 dark:border-blue-700 dark:bg-blue-950/30",
+              !result.matched && "border-emerald-300 bg-emerald-50 dark:border-emerald-700 dark:bg-emerald-950/30",
+            )}
+          >
+            <div className="flex items-center gap-2 text-xs font-medium">
+              {result.matched ? (
+                <>
+                  <span>{EFFECT_ICON[result.effect]}</span>
+                  <span>Treffer — {EFFECT_LABEL[result.effect]}</span>
+                </>
+              ) : (
+                <>
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                  <span>Ingen treff</span>
+                </>
+              )}
+            </div>
+            <div className="mt-1 text-[11px] text-muted-foreground">{result.message}</div>
+            <div className="mt-0.5 text-[11px] italic text-muted-foreground">Grunn: {result.reason}</div>
+          </div>
+        )}
+        {!customerId && (
+          <p className="text-[11px] italic text-muted-foreground">Velg en kunde for å teste regelen.</p>
+        )}
+      </div>
+    </div>
   );
 }
 
