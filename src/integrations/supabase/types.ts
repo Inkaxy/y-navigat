@@ -9932,6 +9932,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      _portal_create_customer_order_impl: {
+        Args: { p_payload: Json }
+        Returns: Json
+      }
       _pos_period_aggregate: {
         Args: {
           p_period_end: string
