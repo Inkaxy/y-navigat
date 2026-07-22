@@ -101,6 +101,8 @@ function fromRule(r: DeliveryRule): Form {
     rule_type: r.rule_type,
     name: r.name,
     description: r.description ?? "",
+    effect: r.effect ?? "warn",
+    priority: r.priority ?? 0,
     deadline_time: (r.deadline_time ?? "14:00:00").slice(0, 5),
     deadline_days_before: String(r.deadline_days_before ?? 1),
     weekdays: r.weekdays ?? [],
