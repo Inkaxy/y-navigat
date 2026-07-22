@@ -48,8 +48,11 @@ import {
 } from "@/ordre/hooks/useCustomerOrders";
 import type { CustomerOption } from "@/ordre/hooks/useNBCustomers";
 import { tomorrow } from "@/ordre/lib/format";
-import { useActiveDeliveryRules } from "@/ordre/hooks/useDeliveryRules";
-import { enforceDeliveryRules } from "@/ordre/lib/deliveryRuleEnforcement";
+import { usePreviewDeliveryRules } from "@/ordre/hooks/usePreviewDeliveryRules";
+import { DeliveryRulesFeedback } from "@/ordre/components/rules/DeliveryRulesFeedback";
+import { OverrideRuleDialog } from "@/ordre/components/rules/OverrideRuleDialog";
+import { useUserAccess } from "@/ordre/hooks/useUserAccess";
+import { useAuth } from "@/hooks/useAuth";
 
 import { logAudit } from "@/ordre/lib/audit";
 import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
@@ -514,21 +517,20 @@ export function CustomerOrderModal({
 
   const today = new Date().toISOString().slice(0, 10);
 
-  // ----- Håndhevelse av leveringsregler -----
-  const { data: activeRules = [] } = useActiveDeliveryRules();
-  const ruleEnforcement = useMemo(
-    () =>
-      enforceDeliveryRules(
-        {
-          deliveryDate,
-          deliveryTourId: tourId === "none" ? null : tourId,
-          productIds,
-          customerId: customer.id,
-        },
-        activeRules,
-      ),
-    [activeRules, deliveryDate, tourId, productIds, customer.id],
-  );
+  // ----- Håndhevelse av leveringsregler (DB-motor) -----
+  const { user } = useAuth();
+  const { data: access } = useUserAccess(user);
+  const hasOrdreWrite = access?.hasOrdreWrite ?? false;
+  const rulesPreview = usePreviewDeliveryRules({
+    legalEntityId: NB_LEGAL_ENTITY_ID,
+    customerId: customer.id,
+    deliveryDate,
+    deliveryTourId: tourId === "none" ? null : tourId,
+    productIds,
+    existingOrderId: orderId ?? null,
+  });
+  const [overrideOpen, setOverrideOpen] = useState(false);
+  const [pendingOverrideReason, setPendingOverrideReason] = useState<string | null>(null);
 
 
   function removeLine(uid: string) {
@@ -589,7 +591,7 @@ export function CustomerOrderModal({
   const fmtKr = (n: number) =>
     n.toLocaleString("nb-NO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-  function buildInput(): CustomerOrderInput | null {
+  function buildInput(overrideReason: string | null = pendingOverrideReason): CustomerOrderInput | null {
     const nameRes = NameSchema.safeParse(name);
     if (!nameRes.success) {
       toast.error(nameRes.error.errors[0].message);
@@ -616,9 +618,9 @@ export function CustomerOrderModal({
       toast.error("Legg til minst én linje med produkt og mengde");
       return null;
     }
-    if (ruleEnforcement.blocked) {
+    if (rulesPreview.blocks.length > 0 && !overrideReason) {
       toast.error(
-        `Kan ikke lagre — bryter leveringsregel: ${ruleEnforcement.violations[0]?.message ?? "ukjent"}`,
+        `Kan ikke lagre — bryter leveringsregel: ${rulesPreview.blocks[0].message}`,
       );
       return null;
     }
@@ -658,13 +660,14 @@ export function CustomerOrderModal({
       sendSms,
       sendEmail,
       isPaid,
+      ruleOverrideReason: overrideReason,
       lines: inputLines,
     };
 
   }
 
-  async function handleSave() {
-    const input = buildInput();
+  async function handleSave(overrideReason: string | null = null) {
+    const input = buildInput(overrideReason);
     if (!input) return;
     setSubmitting(true);
     try {
@@ -1216,21 +1219,16 @@ export function CustomerOrderModal({
             </div>
           )}
 
-          {ruleEnforcement.blocked && (
-            <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm">
-              <div className="mb-1 flex items-center gap-1.5 font-medium text-destructive">
-                <AlertTriangle className="h-4 w-4" />
-                Ordren bryter leveringsregler
-              </div>
-              <ul className="ml-5 list-disc space-y-0.5 text-xs text-destructive">
-                {ruleEnforcement.violations.map((v) => (
-                  <li key={v.rule_id}>
-                    <strong>{v.rule_name}:</strong> {v.message}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+          <DeliveryRulesFeedback
+            blocks={rulesPreview.blocks}
+            warns={rulesPreview.warns}
+            infos={rulesPreview.infos}
+            blockedHint={
+              rulesPreview.blocks.length > 0 && !hasOrdreWrite
+                ? "Ordren kan ikke lagres. Kontakt ordrekontoret hvis den likevel må gjennom."
+                : undefined
+            }
+          />
 
           <DialogFooter className="gap-2 sm:gap-2">
             {isEdit && (
@@ -1249,19 +1247,30 @@ export function CustomerOrderModal({
             <Button type="button" variant="outline" onClick={handleClose} disabled={submitting}>
               Avbryt
             </Button>
-            <Button
-              type="button"
-              onClick={handleSave}
-              disabled={submitting || ruleEnforcement.blocked}
-              title={
-                ruleEnforcement.blocked
-                  ? "Ordren bryter en leveringsregel"
-                  : undefined
-              }
-            >
-              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              {isEdit ? "Lagre endringer" : "Opprett kundeordre"}
-            </Button>
+            {rulesPreview.blocks.length > 0 && hasOrdreWrite ? (
+              <Button
+                type="button"
+                variant="brand"
+                onClick={() => setOverrideOpen(true)}
+                disabled={submitting}
+              >
+                Overstyr …
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                onClick={() => handleSave()}
+                disabled={submitting || rulesPreview.blocks.length > 0}
+                title={
+                  rulesPreview.blocks.length > 0
+                    ? "Ordren bryter en leveringsregel"
+                    : undefined
+                }
+              >
+                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                {isEdit ? "Lagre endringer" : "Opprett kundeordre"}
+              </Button>
+            )}
           </DialogFooter>
 
         </DialogContent>
@@ -1312,6 +1321,20 @@ export function CustomerOrderModal({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <OverrideRuleDialog
+        open={overrideOpen}
+        onOpenChange={setOverrideOpen}
+        blocks={rulesPreview.blocks}
+        contextLine={`Ordre til ${customer.display_name} · levering ${deliveryDate}`}
+        submitting={submitting}
+        onConfirm={async (reason) => {
+          setPendingOverrideReason(reason);
+          setOverrideOpen(false);
+          await handleSave(reason);
+        }}
+      />
+
 
       {(() => {
         const activeLine = lines.find((l) => l.uid === merknadFor);

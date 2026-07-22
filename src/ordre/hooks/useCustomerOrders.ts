@@ -41,8 +41,7 @@ export function useCustomerOrders(params: {
           `id, order_number, delivery_date, delivery_time, distribution,
            final_customer_name, final_customer_email, final_customer_phone,
            picked_up_at, status, source, send_sms_confirm, send_email_confirm,
-           delivery_tour_id, is_paid, order_lines(count)`,
-
+           delivery_tour_id, is_paid, rule_flags, rule_override_reason, order_lines(count)`,
         )
         .eq("customer_id", customerId!)
         .eq("is_customer_order", true)
@@ -231,6 +230,8 @@ export type CustomerOrderInput = {
   sendSms: boolean;
   sendEmail: boolean;
   isPaid: boolean;
+  /** Sett til ikke-null begrunnelse for å overstyre en 'block'-leveringsregel. */
+  ruleOverrideReason?: string | null;
   lines: CustomerOrderLineInput[];
 
 };
@@ -276,6 +277,7 @@ export function useCreateCustomerOrder() {
         send_sms_confirm: input.sendSms,
         send_email_confirm: input.sendEmail,
         is_paid: input.isPaid,
+        rule_override_reason: input.ruleOverrideReason ?? null,
         created_by: userId,
 
       };
@@ -362,6 +364,7 @@ export function useUpdateCustomerOrder() {
         send_sms_confirm: input.sendSms,
         send_email_confirm: input.sendEmail,
         is_paid: input.isPaid,
+        rule_override_reason: input.ruleOverrideReason ?? null,
       };
 
       const { error: updErr } = await supabase

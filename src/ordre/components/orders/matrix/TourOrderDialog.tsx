@@ -1,4 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
+import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
+import { usePreviewDeliveryRules } from "@/ordre/hooks/usePreviewDeliveryRules";
+import { DeliveryRulesFeedback } from "@/ordre/components/rules/DeliveryRulesFeedback";
+import { OverrideRuleDialog } from "@/ordre/components/rules/OverrideRuleDialog";
+import { useUserAccess } from "@/ordre/hooks/useUserAccess";
+import { useAuth } from "@/hooks/useAuth";
 import {
   Dialog,
   DialogContent,
@@ -126,6 +132,29 @@ export function TourOrderDialog({
     setEdits((prev) => ({ ...prev, [lineId]: { ...prev[lineId], ...p } }));
   }
 
+  // Leveringsregel-preview for hele ordren
+  const { user } = useAuth();
+  const { data: access } = useUserAccess(user);
+  const hasOrdreWrite = access?.hasOrdreWrite ?? false;
+  const productIdsForRules = useMemo(() => {
+    if (!order) return [];
+    const out: string[] = [];
+    for (const l of order.lines) {
+      const qty = edits[l.id]?.quantity != null ? Number(edits[l.id]!.quantity!.replace(",", ".") || 0) : Number(l.quantity);
+      if (qty > 0 && l.product_id) out.push(l.product_id);
+    }
+    return out;
+  }, [order, edits]);
+  const rulesPreview = usePreviewDeliveryRules({
+    legalEntityId: (order as any)?.legal_entity_id ?? NB_LEGAL_ENTITY_ID,
+    customerId: customer?.id ?? null,
+    deliveryDate: date,
+    deliveryTourId: tour?.id ?? null,
+    productIds: productIdsForRules,
+    existingOrderId: order?.id ?? null,
+  });
+  const [overrideOpen, setOverrideOpen] = useState(false);
+
   function getQty(l: TourOrderLine): number {
     const raw = edits[l.id]?.quantity;
     if (raw != null) return Number(raw.replace(",", ".") || 0);
@@ -157,8 +186,22 @@ export function TourOrderDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [order, edits]);
 
-  async function saveAll() {
+  async function saveAll(overrideReason: string | null = null) {
     if (!order || readOnly) return;
+    if (rulesPreview.blocks.length > 0 && !overrideReason) {
+      toast.error(`Kan ikke lagre — bryter leveringsregel: ${rulesPreview.blocks[0].message}`);
+      return;
+    }
+    if (overrideReason) {
+      const { error: ovErr } = await supabase
+        .from("orders")
+        .update({ rule_override_reason: overrideReason } as never)
+        .eq("id", order.id);
+      if (ovErr) {
+        toast.error("Kunne ikke lagre overstyring", { description: ovErr.message });
+        return;
+      }
+    }
     setSavingAll(true);
     try {
       const ops: PromiseLike<unknown>[] = [];
@@ -378,19 +421,30 @@ export function TourOrderDialog({
                   Ferdig
                 </Button>
                 {!readOnly && order ? (
-                  <Button
-                    size="sm"
-                    onClick={saveAll}
-                    disabled={dirtyCount === 0 || savingAll}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white"
-                  >
-                    {savingAll ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Save className="h-4 w-4" />
-                    )}
-                    Lagre{dirtyCount > 0 ? ` (${dirtyCount})` : ""}
-                  </Button>
+                  rulesPreview.blocks.length > 0 && hasOrdreWrite ? (
+                    <Button
+                      size="sm"
+                      variant="brand"
+                      onClick={() => setOverrideOpen(true)}
+                      disabled={savingAll}
+                    >
+                      Overstyr …
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      onClick={() => saveAll()}
+                      disabled={dirtyCount === 0 || savingAll || rulesPreview.blocks.length > 0}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                    >
+                      {savingAll ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Save className="h-4 w-4" />
+                      )}
+                      Lagre{dirtyCount > 0 ? ` (${dirtyCount})` : ""}
+                    </Button>
+                  )
                 ) : null}
               </div>
             </div>
@@ -398,6 +452,19 @@ export function TourOrderDialog({
         </DialogHeader>
 
         <div className="flex-1 overflow-auto px-6 py-4">
+          {order && (
+            <DeliveryRulesFeedback
+              className="mb-4"
+              blocks={rulesPreview.blocks}
+              warns={rulesPreview.warns}
+              infos={rulesPreview.infos}
+              blockedHint={
+                rulesPreview.blocks.length > 0 && !hasOrdreWrite
+                  ? "Endringene kan ikke lagres. Kontakt ordrekontoret."
+                  : undefined
+              }
+            />
+          )}
           {isLoading ? (
             <div className="grid place-items-center py-24">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -765,19 +832,25 @@ export function TourOrderDialog({
                 Ferdig
               </Button>
               {!readOnly ? (
-                <Button
-                  size="sm"
-                  onClick={saveAll}
-                  disabled={dirtyCount === 0 || savingAll}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white"
-                >
-                  {savingAll ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Save className="h-4 w-4" />
-                  )}
-                  Lagre{dirtyCount > 0 ? ` (${dirtyCount})` : ""}
-                </Button>
+                rulesPreview.blocks.length > 0 && hasOrdreWrite ? (
+                  <Button size="sm" variant="brand" onClick={() => setOverrideOpen(true)} disabled={savingAll}>
+                    Overstyr …
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    onClick={() => saveAll()}
+                    disabled={dirtyCount === 0 || savingAll || rulesPreview.blocks.length > 0}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                  >
+                    {savingAll ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Save className="h-4 w-4" />
+                    )}
+                    Lagre{dirtyCount > 0 ? ` (${dirtyCount})` : ""}
+                  </Button>
+                )
               ) : null}
             </div>
           </div>
@@ -789,6 +862,17 @@ export function TourOrderDialog({
         orderId={order?.id ?? null}
         readOnly={readOnly}
         legalEntityId={(order as any)?.legal_entity_id ?? null}
+      />
+      <OverrideRuleDialog
+        open={overrideOpen}
+        onOpenChange={setOverrideOpen}
+        blocks={rulesPreview.blocks}
+        contextLine={customer && date ? `${customer.display_name} · ${date}` : undefined}
+        submitting={savingAll}
+        onConfirm={async (reason) => {
+          setOverrideOpen(false);
+          await saveAll(reason);
+        }}
       />
     </Dialog>
   );

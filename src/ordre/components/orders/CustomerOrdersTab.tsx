@@ -8,6 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { StatusBadge } from "@/ordre/components/orders/StatusBadge";
+import { OrderRuleFlagsIndicator } from "@/ordre/components/orders/OrderRuleFlagsIndicator";
 import { CustomerOrderModal } from "@/ordre/components/orders/CustomerOrderModal";
 import { useCustomerOrders } from "@/ordre/hooks/useCustomerOrders";
 import { useOrderConversationCounts } from "@/ordre/hooks/useOrderConversations";
@@ -218,7 +219,13 @@ export function CustomerOrdersTab({ customer }: { customer: CustomerOption }) {
                           <Check className="h-3 w-3" /> Hentet
                         </span>
                       ) : (
-                        <StatusBadge status={o.status} />
+                        <span className="inline-flex items-center gap-1.5">
+                          <StatusBadge status={o.status} />
+                          <OrderRuleFlagsIndicator
+                            flags={(o as any).rule_flags}
+                            overrideReason={(o as any).rule_override_reason ?? null}
+                          />
+                        </span>
                       )}
                     </td>
                     <td className="px-3 py-2 text-center">

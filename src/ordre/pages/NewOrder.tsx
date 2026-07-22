@@ -23,8 +23,11 @@ import { TourPicker } from "@/ordre/components/orders/TourPicker";
 import { CopyFromPreviousOrderDialog } from "@/ordre/components/orders/CopyFromPreviousOrderDialog";
 import { DuplicateOrderWarning } from "@/ordre/components/orders/DuplicateOrderWarning";
 import { useDuplicateOrderCheck } from "@/ordre/hooks/useDuplicateOrderCheck";
-import { OrderDeadlineWarning } from "@/ordre/components/orders/OrderDeadlineWarning";
-import { useOrderDeadlineCheck } from "@/ordre/hooks/useOrderDeadlineCheck";
+import { usePreviewDeliveryRules } from "@/ordre/hooks/usePreviewDeliveryRules";
+import { DeliveryRulesFeedback } from "@/ordre/components/rules/DeliveryRulesFeedback";
+import { OverrideRuleDialog } from "@/ordre/components/rules/OverrideRuleDialog";
+import { useUserAccess } from "@/ordre/hooks/useUserAccess";
+import { useAuth } from "@/hooks/useAuth";
 import type { CopyableOrderLine } from "@/ordre/hooks/useRecentOrdersForCustomer";
 import { QaChecklistCard } from "@/ordre/components/orders/QaChecklistCard";
 import { evaluateOrderDraftChecks, summarizeQa } from "@/ordre/lib/qaChecks";
@@ -454,18 +457,22 @@ export default function NewOrder() {
   });
   const productPriceListId = effectivePriceListId ?? customer?.default_price_list_id ?? null;
 
-  // A.5.5.6.2 — Ordrefrist-sjekk
+  // Leveringsregel-preview (SQL-motor)
+  const { user } = useAuth();
+  const { data: access } = useUserAccess(user);
+  const hasOrdreWrite = access?.hasOrdreWrite ?? false;
   const productIdsForCheck = lines
     .map((l) => l.product?.id)
     .filter((id): id is string => !!id);
-  const { data: deadlineViolations = [] } = useOrderDeadlineCheck({
+  const rulesPreview = usePreviewDeliveryRules({
     legalEntityId: NB_LEGAL_ENTITY_ID,
     customerId: customer?.id ?? null,
     deliveryDate: deliveryDate || null,
     deliveryTourId: manualTourId,
     productIds: productIdsForCheck,
   });
-  const passedDeadlines = deadlineViolations.filter((v) => v.minutes_over > 0);
+  const [overrideOpen, setOverrideOpen] = useState(false);
+  const [pendingOverrideReason, setPendingOverrideReason] = useState<string | null>(null);
 
   // Når kunde endres: pre-fyll adresse + håndter kunde-referanse
   useEffect(() => {
@@ -709,7 +716,7 @@ export default function NewOrder() {
   }, [deliveryDate, deliveryTime, lines, customer?.id, ticketAi, ticketBodyText]);
   const qaSummary = summarizeQa(qaChecks);
 
-  async function save() {
+  async function save(overrideReason: string | null = pendingOverrideReason) {
     if (!customer) {
       toast.error("Velg en kunde");
       return;
@@ -731,6 +738,12 @@ export default function NewOrder() {
     // QA: blokkér på røde sjekker med mindre brukeren har bekreftet override
     if (qaSummary.severity === "red" && !qaOverride) {
       toast.error("Kvalitetssikring: røde punkter må løses (eller bekreft override)");
+      return;
+    }
+    if (rulesPreview.blocks.length > 0 && !overrideReason) {
+      toast.error(
+        `Kan ikke lagre — bryter leveringsregel: ${rulesPreview.blocks[0].message}`,
+      );
       return;
     }
 
@@ -780,13 +793,8 @@ export default function NewOrder() {
           delivery_country: useCustomerAddress ? customer.delivery_country : delAddr.country || "NO",
           delivery_instructions: deliveryInstructions || null,
           use_customer_default_address: useCustomerAddress,
-          internal_notes: (() => {
-            const breach = passedDeadlines.length > 0
-              ? `Lagret med ordrefrist-brudd: ${passedDeadlines.map((v) => `«${v.rule_name}»`).join(", ")}`
-              : null;
-            const parts = [internalNotes?.trim(), breach].filter(Boolean);
-            return parts.length > 0 ? parts.join("\n\n") : null;
-          })(),
+          internal_notes: internalNotes?.trim() || null,
+          rule_override_reason: overrideReason,
           production_notes: productionNotes.trim() || null,
           store_notes: storeNotes.trim() || null,
           customer_notes: customerNotes || null,
@@ -947,9 +955,18 @@ export default function NewOrder() {
           />
         )}
 
-        {/* A.5.5.6.2 Ordrefrist-advarsel */}
-        {customer && deliveryDate && deadlineViolations.length > 0 && (
-          <OrderDeadlineWarning violations={deadlineViolations} />
+        {/* Leveringsregler (blokk/advarsel/info) */}
+        {customer && deliveryDate && (
+          <DeliveryRulesFeedback
+            blocks={rulesPreview.blocks}
+            warns={rulesPreview.warns}
+            infos={rulesPreview.infos}
+            blockedHint={
+              rulesPreview.blocks.length > 0 && !hasOrdreWrite
+                ? "Ordren kan ikke opprettes. Kontakt ordrekontoret hvis den likevel må gjennom."
+                : undefined
+            }
+          />
         )}
 
         {/* Seksjon 2: Levering */}
@@ -1318,17 +1335,46 @@ export default function NewOrder() {
           <Button variant="ghost" asChild>
             <Link to="/ordre/ordrer">Avbryt</Link>
           </Button>
-          <Button
-            onClick={() => save()}
-            disabled={submitting || !customer || (qaSummary.severity === "red" && !qaOverride)}
-            title="⌘Enter / Ctrl+Enter"
-          >
-            {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Opprett ordre
-            <kbd className="ml-2 hidden rounded border border-primary-foreground/30 bg-primary-foreground/10 px-1.5 py-0.5 text-[10px] sm:inline">⌘↵</kbd>
-          </Button>
+          {rulesPreview.blocks.length > 0 && hasOrdreWrite ? (
+            <Button
+              variant="brand"
+              onClick={() => setOverrideOpen(true)}
+              disabled={submitting || !customer || (qaSummary.severity === "red" && !qaOverride)}
+            >
+              Overstyr …
+            </Button>
+          ) : (
+            <Button
+              onClick={() => save()}
+              disabled={
+                submitting ||
+                !customer ||
+                (qaSummary.severity === "red" && !qaOverride) ||
+                rulesPreview.blocks.length > 0
+              }
+              title="⌘Enter / Ctrl+Enter"
+            >
+              {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Opprett ordre
+              <kbd className="ml-2 hidden rounded border border-primary-foreground/30 bg-primary-foreground/10 px-1.5 py-0.5 text-[10px] sm:inline">⌘↵</kbd>
+            </Button>
+          )}
         </div>
       </div>
+
+      {/* Overstyringsdialog for leveringsregler */}
+      <OverrideRuleDialog
+        open={overrideOpen}
+        onOpenChange={setOverrideOpen}
+        blocks={rulesPreview.blocks}
+        contextLine={customer ? `Ordre til ${customer.display_name} · levering ${deliveryDate}` : undefined}
+        submitting={submitting}
+        onConfirm={async (reason) => {
+          setPendingOverrideReason(reason);
+          setOverrideOpen(false);
+          await save(reason);
+        }}
+      />
 
       {/* 6.1 Kopier fra tidligere ordre */}
       <CopyFromPreviousOrderDialog

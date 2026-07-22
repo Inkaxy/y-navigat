@@ -30,6 +30,7 @@ import {
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useOrderList, type OrderListRow } from "@/ordre/hooks/useOrders";
+import { OrderRuleFlagsIndicator } from "@/ordre/components/orders/OrderRuleFlagsIndicator";
 import { useDebouncedValue } from "@/ordre/hooks/useDebouncedValue";
 import {
   DEFAULT_EXCLUDED_STATUSES,
@@ -660,6 +661,9 @@ export default function OrdersList() {
                           >
                             {r.order_number}
                           </Link>
+                          <span className="ml-1 inline-flex align-middle">
+                            <OrderRuleFlagsIndicator flags={r.rule_flags} overrideReason={r.rule_override_reason} />
+                          </span>
                         </TableCell>
                         <TableCell className="px-3 py-1.5">
                           <StatusBadge status={r.status} />
@@ -836,6 +840,7 @@ export default function OrdersList() {
                           {r.order_number}
                         </span>
                         <StatusBadge status={r.status} />
+                        <OrderRuleFlagsIndicator flags={r.rule_flags} overrideReason={r.rule_override_reason} />
                       </div>
                       <div className="mt-1 truncate text-base font-medium text-foreground">
                         {r.customer_snapshot?.display_name ?? "—"}
