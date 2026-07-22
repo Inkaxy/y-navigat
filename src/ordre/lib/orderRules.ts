@@ -247,33 +247,10 @@ export function evaluateRules(input: RulesInput): RuleCheck[] {
     }
   }
 
-  // 4) Bestillingsfrist (delivery_rules)
-  if (date) {
-    const wd = ((date.getDay() + 6) % 7) + 1; // 1=mandag .. 7=søndag
-    for (const r of input.delivery_rules) {
-      if (r.rule_type !== "order_deadline") continue;
-      if (r.weekdays && r.weekdays.length > 0 && !r.weekdays.includes(wd)) continue;
-      if (r.product_ids && r.product_ids.length > 0) {
-        const overlap = r.product_ids.some((pid) => input.product_ids.includes(pid));
-        if (!overlap) continue;
-      }
-      const daysBefore = r.deadline_days_before ?? 1;
-      const deadlineDate = new Date(date);
-      deadlineDate.setDate(deadlineDate.getDate() - daysBefore);
-      const [hh = 12, mm = 0] = (r.deadline_time ?? "12:00").split(":").map(Number);
-      deadlineDate.setHours(hh, mm, 0, 0);
-      if (now.getTime() > deadlineDate.getTime()) {
-        checks.push({
-          id: "deadline_passed",
-          severity: "red",
-          title: "Bestillingsfrist er passert",
-          detail: `Frist var ${deadlineDate.toLocaleString("nb-NO", { dateStyle: "short", timeStyle: "short" })}.`,
-          suggestion: "Avklar med produksjon om bestillingen likevel kan tas.",
-        });
-        break;
-      }
-    }
-  }
+  // 4) Bestillingsfrist håndteres nå av SQL-motoren evaluate_delivery_rules
+  //    (se usePreviewDeliveryRules). Denne libben tar seg fortsatt av
+  //    åpningstider, lead time og allergier — men ikke delivery_rules.
+
 
   // 5) Stor ordre
   if (input.total_quantity != null && input.total_quantity >= LARGE_ORDER_THRESHOLD) {
