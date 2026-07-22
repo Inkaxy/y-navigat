@@ -618,9 +618,9 @@ export function CustomerOrderModal({
       toast.error("Legg til minst én linje med produkt og mengde");
       return null;
     }
-    if (ruleEnforcement.blocked) {
+    if (rulesPreview.blocks.length > 0 && !pendingOverrideReason) {
       toast.error(
-        `Kan ikke lagre — bryter leveringsregel: ${ruleEnforcement.violations[0]?.message ?? "ukjent"}`,
+        `Kan ikke lagre — bryter leveringsregel: ${rulesPreview.blocks[0].message}`,
       );
       return null;
     }
@@ -660,6 +660,7 @@ export function CustomerOrderModal({
       sendSms,
       sendEmail,
       isPaid,
+      ruleOverrideReason: pendingOverrideReason,
       lines: inputLines,
     };
 
