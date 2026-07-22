@@ -271,6 +271,8 @@ export function DeliveryRuleFormDialog({ open, onOpenChange, rule, template, onS
         rule_type: form.rule_type,
         name: form.name.trim(),
         description: form.description.trim() || null,
+        effect: form.effect,
+        priority: form.priority,
         weekdays: form.weekdays.length > 0 ? form.weekdays : null,
         tour_filter: form.tour_filter.length > 0 ? form.tour_filter : null,
         product_ids: form.product_ids.length > 0 ? form.product_ids : null,
