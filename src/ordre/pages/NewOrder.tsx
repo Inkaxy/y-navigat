@@ -740,6 +740,12 @@ export default function NewOrder() {
       toast.error("Kvalitetssikring: røde punkter må løses (eller bekreft override)");
       return;
     }
+    if (rulesPreview.blocks.length > 0 && !pendingOverrideReason) {
+      toast.error(
+        `Kan ikke lagre — bryter leveringsregel: ${rulesPreview.blocks[0].message}`,
+      );
+      return;
+    }
 
 
     setSubmitting(true);
