@@ -38,6 +38,67 @@ import {
 import { evaluateDraftRule } from "@/ordre/lib/evaluateDraftRule";
 import { cn } from "@/lib/utils";
 
+const WEEKDAY_NB_LONG = ["søndag", "mandag", "tirsdag", "onsdag", "torsdag", "fredag", "lørdag"];
+
+function DeadlinePreview({ daysBefore, time }: { daysBefore: number; time: string }) {
+  if (!Number.isFinite(daysBefore) || daysBefore < 0 || !time) {
+    return (
+      <div className="rounded-md border border-dashed border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+        Fyll ut dager og klokkeslett for å se hva fristen blir.
+      </div>
+    );
+  }
+  // Ta neste 3 ukedag-leveringer (man-fre) som eksempler
+  const examples: { delivery: Date; deadline: Date }[] = [];
+  const cursor = new Date();
+  cursor.setHours(12, 0, 0, 0);
+  cursor.setDate(cursor.getDate() + 1);
+  while (examples.length < 3) {
+    const wd = cursor.getDay();
+    if (wd !== 0 && wd !== 6) {
+      const delivery = new Date(cursor);
+      const deadline = new Date(delivery);
+      deadline.setDate(deadline.getDate() - daysBefore);
+      const [hh, mm] = time.split(":").map(Number);
+      deadline.setHours(hh || 0, mm || 0, 0, 0);
+      examples.push({ delivery, deadline });
+    }
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  const fmtDate = (d: Date) =>
+    `${WEEKDAY_NB_LONG[d.getDay()]} ${d.getDate()}.${d.getMonth() + 1}`;
+  const fmtTime = (d: Date) =>
+    `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+
+  const relative =
+    daysBefore === 0
+      ? "samme dag"
+      : daysBefore === 1
+        ? "dagen før"
+        : `${daysBefore} dager før`;
+
+  return (
+    <div className="rounded-md border border-border bg-muted/40 p-3">
+      <div className="mb-2 text-xs font-medium text-muted-foreground">
+        Slik blir fristen ({relative} kl {time}):
+      </div>
+      <div className="space-y-1.5">
+        {examples.map((ex, i) => (
+          <div key={i} className="flex items-center justify-between gap-3 text-sm">
+            <span className="text-muted-foreground">
+              Leveranse <span className="font-medium text-foreground">{fmtDate(ex.delivery)}</span>
+            </span>
+            <span className="text-muted-foreground">→</span>
+            <span className="font-medium text-foreground">
+              frist {fmtDate(ex.deadline)} kl {fmtTime(ex.deadline)}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -399,31 +460,37 @@ export function DeliveryRuleFormDialog({ open, onOpenChange, rule, template, onS
               {/* Type-spesifikke felter */}
               <div className="mt-4 space-y-3">
                 {form.rule_type === "order_deadline" && (
-                  <div className="flex flex-wrap items-end gap-3">
-                    <div>
-                      <Label className="text-xs">Antall dager før leveranse</Label>
-                      <Input
-                        type="number"
-                        min={0}
-                        max={14}
-                        className="w-24"
-                        value={form.deadline_days_before}
-                        onChange={(e) =>
-                          setForm({ ...form, deadline_days_before: e.target.value })
-                        }
-                      />
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap items-end gap-3">
+                      <div>
+                        <Label className="text-xs">Antall dager før leveranse</Label>
+                        <Input
+                          type="number"
+                          min={0}
+                          max={14}
+                          className="w-24"
+                          value={form.deadline_days_before}
+                          onChange={(e) =>
+                            setForm({ ...form, deadline_days_before: e.target.value })
+                          }
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs">før klokken</Label>
+                        <Input
+                          type="time"
+                          className="w-32"
+                          value={form.deadline_time}
+                          onChange={(e) =>
+                            setForm({ ...form, deadline_time: e.target.value })
+                          }
+                        />
+                      </div>
                     </div>
-                    <div>
-                      <Label className="text-xs">før klokken</Label>
-                      <Input
-                        type="time"
-                        className="w-32"
-                        value={form.deadline_time}
-                        onChange={(e) =>
-                          setForm({ ...form, deadline_time: e.target.value })
-                        }
-                      />
-                    </div>
+                    <DeadlinePreview
+                      daysBefore={parseInt(form.deadline_days_before, 10)}
+                      time={form.deadline_time}
+                    />
                   </div>
                 )}
 
