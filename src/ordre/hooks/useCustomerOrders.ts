@@ -278,6 +278,7 @@ export function useCreateCustomerOrder() {
         send_sms_confirm: input.sendSms,
         send_email_confirm: input.sendEmail,
         is_paid: input.isPaid,
+        rule_override_reason: input.ruleOverrideReason ?? null,
         created_by: userId,
 
       };
@@ -364,6 +365,7 @@ export function useUpdateCustomerOrder() {
         send_sms_confirm: input.sendSms,
         send_email_confirm: input.sendEmail,
         is_paid: input.isPaid,
+        rule_override_reason: input.ruleOverrideReason ?? null,
       };
 
       const { error: updErr } = await supabase
