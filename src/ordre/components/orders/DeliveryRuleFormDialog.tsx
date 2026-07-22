@@ -50,6 +50,8 @@ type Form = {
   rule_type: DeliveryRuleType;
   name: string;
   description: string;
+  effect: DeliveryRuleEffect;
+  priority: number;
   // order_deadline
   deadline_time: string;
   deadline_days_before: string;
@@ -76,6 +78,8 @@ const EMPTY: Form = {
   rule_type: "order_deadline",
   name: "",
   description: "",
+  effect: "warn",
+  priority: 0,
   deadline_time: "14:00",
   deadline_days_before: "1",
   weekdays: [],
