@@ -1418,7 +1418,29 @@ function ProductMultiPicker({
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const debouncedQ = useDebouncedValue(q, 250);
-  const { data: products = [], isLoading } = useNBProducts(debouncedQ);
+  const { data: products = [], isLoading } = useQuery({
+    queryKey: ["delivery-rule-products", debouncedQ],
+    queryFn: async () => {
+      let query = supabase
+        .from("products")
+        .select("id, code, display_name")
+        .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
+        .eq("is_for_sale", true)
+        .neq("status", "discontinued")
+        .order("display_name")
+        .limit(200);
+      const s = debouncedQ.trim();
+      if (s.length > 0) {
+        const safe = s.replace(/[%,]/g, " ");
+        query = query.or(`display_name.ilike.%${safe}%,code.ilike.%${safe}%`);
+      }
+      const { data, error } = await query;
+      if (error) throw error;
+      return data ?? [];
+    },
+    staleTime: 30_000,
+  });
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
