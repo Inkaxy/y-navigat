@@ -716,7 +716,7 @@ export default function NewOrder() {
   }, [deliveryDate, deliveryTime, lines, customer?.id, ticketAi, ticketBodyText]);
   const qaSummary = summarizeQa(qaChecks);
 
-  async function save() {
+  async function save(overrideReason: string | null = pendingOverrideReason) {
     if (!customer) {
       toast.error("Velg en kunde");
       return;
@@ -740,7 +740,7 @@ export default function NewOrder() {
       toast.error("Kvalitetssikring: røde punkter må løses (eller bekreft override)");
       return;
     }
-    if (rulesPreview.blocks.length > 0 && !pendingOverrideReason) {
+    if (rulesPreview.blocks.length > 0 && !overrideReason) {
       toast.error(
         `Kan ikke lagre — bryter leveringsregel: ${rulesPreview.blocks[0].message}`,
       );
@@ -794,7 +794,7 @@ export default function NewOrder() {
           delivery_instructions: deliveryInstructions || null,
           use_customer_default_address: useCustomerAddress,
           internal_notes: internalNotes?.trim() || null,
-          rule_override_reason: pendingOverrideReason,
+          rule_override_reason: overrideReason,
           production_notes: productionNotes.trim() || null,
           store_notes: storeNotes.trim() || null,
           customer_notes: customerNotes || null,
