@@ -580,19 +580,33 @@ export default function MatrixPage() {
   function shiftWeek(delta: number) {
     // Manual nav clears chip selection but does NOT touch localStorage.
     setQuickFilter(null);
-    const baseMon = isoWeekMonday(dateFrom);
-    const newMon = addDays(baseMon, delta * 7);
     const span = Math.max(1, daysCount);
-    setDateFrom(newMon);
-    setDateTo(addDays(newMon, span - 1));
+    if (span >= 7) {
+      // Uke-visning: hopp hele uker og hold mandag-justering.
+      const baseMon = isoWeekMonday(dateFrom);
+      const newMon = addDays(baseMon, delta * 7);
+      setDateFrom(newMon);
+      setDateTo(addDays(newMon, span - 1));
+    } else {
+      // Kortere visning: bla ett vindu (= span dager) om gangen.
+      const newFrom = addDays(dateFrom, delta * span);
+      setDateFrom(newFrom);
+      setDateTo(addDays(newFrom, span - 1));
+    }
   }
 
   function jumpToday() {
     setQuickFilter(null);
-    const mon = isoWeekMonday(todayISO());
     const span = Math.max(1, daysCount);
-    setDateFrom(mon);
-    setDateTo(addDays(mon, span - 1));
+    if (span >= 7) {
+      const mon = isoWeekMonday(todayISO());
+      setDateFrom(mon);
+      setDateTo(addDays(mon, span - 1));
+    } else {
+      const today = todayISO();
+      setDateFrom(today);
+      setDateTo(addDays(today, span - 1));
+    }
   }
 
   // ----- Cell action helpers -----
