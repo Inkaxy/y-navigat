@@ -46,8 +46,9 @@ function scopeMatches(rule: DeliveryRule, ctx: EvaluateContext): boolean {
   if (rule.customer_group_ids && rule.customer_group_ids.length > 0) {
     if (!anyOverlap(rule.customer_group_ids, ctx.customerGroupIds)) return false;
   }
-  // Ukedager (tomt = alle)
-  if (rule.weekdays && rule.weekdays.length > 0 && ctx.deliveryDate) {
+  // Ukedager (tomt = alle) — men når enforce_weekdays er på skal regelen holdes
+  // i scope selv om ukedagen ikke matcher (violation håndteres i evaluateType).
+  if (!rule.enforce_weekdays && rule.weekdays && rule.weekdays.length > 0 && ctx.deliveryDate) {
     if (!rule.weekdays.includes(isoWeekday(ctx.deliveryDate))) return false;
   }
   // Turer
