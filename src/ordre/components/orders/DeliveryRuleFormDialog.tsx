@@ -133,6 +133,10 @@ type Form = {
   valid_from: string;
   valid_until: string;
   is_active: boolean;
+  // Kombinerer ukedag-begrensning inn i regelen (gjelder order_deadline,
+  // available_tours, available_products). Uten dette er ukedager bare et
+  // scope-filter — regelen gjelder kun *når* leveransen faller på dagene.
+  enforce_weekdays: boolean;
 };
 
 const EMPTY: Form = {
