@@ -133,6 +133,10 @@ type Form = {
   valid_from: string;
   valid_until: string;
   is_active: boolean;
+  // Kombinerer ukedag-begrensning inn i regelen (gjelder order_deadline,
+  // available_tours, available_products). Uten dette er ukedager bare et
+  // scope-filter — regelen gjelder kun *når* leveransen faller på dagene.
+  enforce_weekdays: boolean;
 };
 
 const EMPTY: Form = {
@@ -155,6 +159,7 @@ const EMPTY: Form = {
   valid_from: new Date().toISOString().slice(0, 10),
   valid_until: "",
   is_active: true,
+  enforce_weekdays: false,
 };
 
 function fromRule(r: DeliveryRule): Form {
@@ -178,6 +183,7 @@ function fromRule(r: DeliveryRule): Form {
     valid_from: r.valid_from,
     valid_until: r.valid_until ?? "",
     is_active: r.is_active,
+    enforce_weekdays: r.enforce_weekdays ?? false,
   };
 }
 
@@ -282,6 +288,58 @@ const TEMPLATES: Template[] = [
       weekdays: [1, 2, 3, 4, 5],
       effect: "block",
       priority: 5,
+    }),
+  },
+  {
+    id: "product-fixed-day-deadline",
+    title: "Vare med fast produksjonsdag + frist",
+    desc: "Kombinert regel: varen leveres kun én ukedag OG må bestilles X dager før. Erstatter to gamle regler.",
+    icon: Sparkles,
+    accent: "bg-teal-100 text-teal-700 dark:bg-teal-950 dark:text-teal-300",
+    apply: (b) => ({
+      ...b,
+      rule_type: "order_deadline",
+      name: "Vare – fast produksjonsdag + frist",
+      effect: "block",
+      priority: 30,
+      weekdays: [3], // onsdag
+      enforce_weekdays: true,
+      deadline_time: "14:00",
+      deadline_days_before: "4",
+    }),
+  },
+  {
+    id: "group-days-with-deadline",
+    title: "Kundegruppe: bestemte leveringsdager + frist",
+    desc: "F.eks. «gruppen leveres kun tirsdag/torsdag, må bestilles dagen før kl 12».",
+    icon: CalendarDays,
+    accent: "bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300",
+    apply: (b) => ({
+      ...b,
+      rule_type: "order_deadline",
+      name: "Kundegruppe – ukedager + frist",
+      effect: "block",
+      priority: 20,
+      weekdays: [2, 4],
+      enforce_weekdays: true,
+      deadline_time: "12:00",
+      deadline_days_before: "1",
+    }),
+  },
+  {
+    id: "tour-single-weekday",
+    title: "Tur kjører kun én ukedag",
+    desc: "Turen er kun tilgjengelig utvalgte dager. Bestillinger til andre dager sperres.",
+    icon: MapPin,
+    accent: "bg-cyan-100 text-cyan-700 dark:bg-cyan-950 dark:text-cyan-300",
+    apply: (b) => ({
+      ...b,
+      rule_type: "available_tours",
+      name: "Tur – kun bestemte ukedager",
+      effect: "block",
+      priority: 15,
+      weekdays: [5], // fredag
+      enforce_weekdays: true,
     }),
   },
   {
@@ -477,6 +535,7 @@ export function DeliveryRuleFormDialog({ open, onOpenChange, rule, template, onS
         valid_from: form.valid_from,
         valid_until: form.valid_until || null,
         is_active: form.is_active,
+        enforce_weekdays: form.enforce_weekdays,
       };
 
       if (isEdit && rule) {
@@ -539,6 +598,7 @@ export function DeliveryRuleFormDialog({ open, onOpenChange, rule, template, onS
         blackout_until: form.blackout_until || null,
         deadline_time: form.deadline_time ? `${form.deadline_time}:00` : null,
         deadline_days_before: form.deadline_days_before ? parseInt(form.deadline_days_before, 10) : null,
+        enforce_weekdays: form.enforce_weekdays,
       }),
     [form],
   );
@@ -907,6 +967,23 @@ export function DeliveryRuleFormDialog({ open, onOpenChange, rule, template, onS
                           onChange={(w) => setForm({ ...form, weekdays: w })}
                           label="Gjelder kun på disse ukedagene"
                         />
+                        {form.weekdays.length > 0 && (
+                          <label className="flex items-start gap-2 rounded-md border border-primary/30 bg-primary/5 p-2 text-xs">
+                            <Checkbox
+                              checked={form.enforce_weekdays}
+                              onCheckedChange={(c) => setForm({ ...form, enforce_weekdays: !!c })}
+                              className="mt-0.5"
+                            />
+                            <div>
+                              <div className="font-medium text-foreground">Begrens også leveringsdag til valgte ukedager</div>
+                              <div className="text-muted-foreground">
+                                Med denne blir regelen også en sperre: leveringer på andre dager blokkeres/varsles.
+                                Uten den gjelder regelen kun <em>når</em> leveransen faller på valgt ukedag — men den
+                                stopper ikke andre dager. Nyttig for f.eks. «vare bakes onsdag med 4 dagers frist» i én regel.
+                              </div>
+                            </div>
+                          </label>
+                        )}
                         {form.rule_type !== "available_tours" && (
                           <div>
                             <Label className="text-xs">Kun disse turene</Label>
@@ -1171,6 +1248,7 @@ function RuleTestPanel({ form }: { form: Form }) {
         valid_from: form.valid_from,
         valid_until: form.valid_until || null,
         is_active: form.is_active,
+        enforce_weekdays: form.enforce_weekdays,
       },
       {
         customerId,

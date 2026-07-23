@@ -1853,6 +1853,7 @@ export type Database = {
           deadline_time: string | null
           description: string | null
           effect: string
+          enforce_weekdays: boolean
           id: string
           is_active: boolean
           legal_entity_id: string
@@ -1881,6 +1882,7 @@ export type Database = {
           deadline_time?: string | null
           description?: string | null
           effect?: string
+          enforce_weekdays?: boolean
           id?: string
           is_active?: boolean
           legal_entity_id: string
@@ -1909,6 +1911,7 @@ export type Database = {
           deadline_time?: string | null
           description?: string | null
           effect?: string
+          enforce_weekdays?: boolean
           id?: string
           is_active?: boolean
           legal_entity_id?: string

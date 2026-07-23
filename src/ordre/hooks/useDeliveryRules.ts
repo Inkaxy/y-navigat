@@ -32,6 +32,7 @@ export type DeliveryRule = {
   blackout_until: string | null;
   deadline_time: string | null; // "HH:MM:SS"
   deadline_days_before: number | null;
+  enforce_weekdays: boolean;
   valid_from: string;
   valid_until: string | null;
   is_active: boolean;
@@ -261,10 +262,18 @@ export function describeRule(rule: DescribeRuleInput, l: NameLookup = {}): strin
       ? "advares"
       : "merkes";
 
+  // Ekstra setning når regelen også begrenser leveringsdag (enforce_weekdays).
+  const weekdayEnforcement =
+    rule.enforce_weekdays &&
+    rule.weekdays && rule.weekdays.length > 0 &&
+    rule.rule_type !== "delivery_weekdays" && rule.rule_type !== "no_delivery"
+      ? ` I tillegg tillater regelen kun levering ${rule.weekdays.map((d) => WEEKDAY_LABELS_LONG[d - 1]).join(", ")} — andre dager ${effectVerb}.`
+      : "";
+
   switch (rule.rule_type) {
     case "order_deadline": {
       const when = formatDeadlineDefinition(rule.deadline_time ?? null, rule.deadline_days_before ?? null);
-      return `Ordre for ${scope} må legges inn senest ${when} — ellers ${effectVerb} operatøren${effect === "warn" ? " (kan overstyres av ordrekontoret med begrunnelse)" : ""}.`;
+      return `Ordre for ${scope} må legges inn senest ${when} — ellers ${effectVerb} operatøren${effect === "warn" ? " (kan overstyres av ordrekontoret med begrunnelse)" : ""}.${weekdayEnforcement}`;
     }
     case "delivery_weekdays": {
       const days = (rule.weekdays ?? []).map((d) => WEEKDAY_LABELS_LONG[d - 1]).join(", ") || "—";
@@ -272,12 +281,12 @@ export function describeRule(rule: DescribeRuleInput, l: NameLookup = {}): strin
     }
     case "available_tours": {
       const n = rule.tour_filter?.length ?? 0;
-      return `${scope.charAt(0).toUpperCase()}${scope.slice(1)} kan kun bruke ${n} valgt(e) tur(er). Andre turer ${effectVerb}.`;
+      return `${scope.charAt(0).toUpperCase()}${scope.slice(1)} kan kun bruke ${n} valgt(e) tur(er). Andre turer ${effectVerb}.${weekdayEnforcement}`;
     }
     case "available_products": {
       const v = rule.allowed_product_ids?.length ?? rule.product_ids?.length ?? 0;
       const g = rule.allowed_product_group_ids?.length ?? rule.product_group_ids?.length ?? 0;
-      return `${scope.charAt(0).toUpperCase()}${scope.slice(1)} kan bestille ${v} vare(r) og ${g} varegruppe(r). Andre varer ${effectVerb}.`;
+      return `${scope.charAt(0).toUpperCase()}${scope.slice(1)} kan bestille ${v} vare(r) og ${g} varegruppe(r). Andre varer ${effectVerb}.${weekdayEnforcement}`;
     }
     case "no_delivery": {
       const fromTo = rule.blackout_from && rule.blackout_until

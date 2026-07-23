@@ -3,7 +3,7 @@
 // semantikken i SQL-funksjonen `evaluate_delivery_rules` for en enkelt rad.
 
 import type { DeliveryRule, DeliveryRuleEffect, DeliveryRuleType } from "@/ordre/hooks/useDeliveryRules";
-import { describeRule } from "@/ordre/hooks/useDeliveryRules";
+import { describeRule, WEEKDAY_LABELS_LONG } from "@/ordre/hooks/useDeliveryRules";
 import type { DeliveryRuleHit } from "@/ordre/hooks/usePreviewDeliveryRules";
 
 export type EvaluateContext = {
@@ -46,8 +46,9 @@ function scopeMatches(rule: DeliveryRule, ctx: EvaluateContext): boolean {
   if (rule.customer_group_ids && rule.customer_group_ids.length > 0) {
     if (!anyOverlap(rule.customer_group_ids, ctx.customerGroupIds)) return false;
   }
-  // Ukedager (tomt = alle)
-  if (rule.weekdays && rule.weekdays.length > 0 && ctx.deliveryDate) {
+  // Ukedager (tomt = alle) — men når enforce_weekdays er på skal regelen holdes
+  // i scope selv om ukedagen ikke matcher (violation håndteres i evaluateType).
+  if (!rule.enforce_weekdays && rule.weekdays && rule.weekdays.length > 0 && ctx.deliveryDate) {
     if (!rule.weekdays.includes(isoWeekday(ctx.deliveryDate))) return false;
   }
   // Turer
@@ -72,6 +73,21 @@ function evaluateType(rule: DeliveryRule, ctx: EvaluateContext): { matched: bool
   const type: DeliveryRuleType = rule.rule_type;
   const date = ctx.deliveryDate;
   if (!date) return { matched: false, message: "Mangler leveringsdato" };
+
+  // enforce_weekdays: for order_deadline/available_tours/available_products
+  // blokkerer regelen også leveringsdager utenfor valgte ukedager.
+  if (
+    rule.enforce_weekdays &&
+    rule.weekdays && rule.weekdays.length > 0 &&
+    (type === "order_deadline" || type === "available_tours" || type === "available_products")
+  ) {
+    const wd = isoWeekday(date);
+    if (!rule.weekdays.includes(wd)) {
+      const days = rule.weekdays.map((d) => WEEKDAY_LABELS_LONG[d - 1]).join(", ");
+      return { matched: true, message: `Regelen tillater kun leveringsdager: ${days}.` };
+    }
+  }
+
 
   switch (type) {
     case "order_deadline": {
@@ -156,6 +172,7 @@ export function evaluateDraftRule(
     blackout_until: draft.blackout_until ?? null,
     deadline_time: draft.deadline_time ?? null,
     deadline_days_before: draft.deadline_days_before ?? null,
+    enforce_weekdays: draft.enforce_weekdays ?? false,
     valid_from: draft.valid_from ?? "1970-01-01",
     valid_until: draft.valid_until ?? null,
     is_active: draft.is_active ?? true,

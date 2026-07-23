@@ -1,99 +1,64 @@
 
-## Mål
+# Én regel = frist + produksjonsdag
 
-Én sannhet for leveringsregler i alle ordreflater. NBHub ser konsekvenser live og kan overstyre med begrunnelse. Portalen kan aldri overstyre — får vennlig veiledning med gyldige alternativer.
+## Målbilde
+I dag må operatøren lage **to regler** for scenariet «Herregårdsbrød bakes onsdag, må bestilles 4 dager før kl 14»:
+1. `available_products` (bare onsdag)
+2. `order_deadline` (4 dager før, 14:00)
 
-## 1. Ny hook: `usePreviewDeliveryRules`
+Etter endringen holder det med **én** `order_deadline`-regel som også har ukedager huket av — motoren tolker det da som «gjelder disse ukedagene *og* blokkerer alle andre».
 
-Fil: `src/ordre/hooks/usePreviewDeliveryRules.ts`
+Ingen datamigrering: eksisterende regler oppfører seg akkurat som før (ny bryter er `false` som default).
 
-- Input: `{ legal_entity_id, customer_id, delivery_date, delivery_tour_id, product_ids, ordered_at?, existing_order_id? }`
-- Henter automatisk `customer_group_ids` (fra `customer_group_members`) og `product_group_ids` (fra `product_sales_groups`) — dette mangler i dag, så gruppe-scopede regler treffer aldri.
-- Kaller `supabase.rpc('evaluate_delivery_rules', ...)` med alle 9 argumentene.
-- 300ms debounce på input-endringer, TanStack Query med kort staleTime.
-- Returnerer: `{ blocks, warns, infos, isLoading, canSave }` (canSave = ingen blocks).
+## Endringer
 
-## 2. Live-visning i skjemaene
+### 1. DB — én ny kolonne + oppdatert motor
+`delivery_rules.enforce_weekdays boolean not null default false`
 
-Ny presentasjonskomponent: `src/ordre/components/rules/DeliveryRulesFeedback.tsx`
+Utvid `evaluate_delivery_rules` (Postgres):
+- For rule_type `order_deadline` **og** `available_tours` **og** `available_products`: hvis `enforce_weekdays = true` og `weekdays` er satt, og leveransedagen ikke er blant `weekdays`, produser samme funn som en `delivery_weekdays`-regel ville gjort (samme `effect`, samme `priority`, kilde-id peker på denne regelen).
+- Fristberegningen (`deadline_days_before`/`deadline_time`) er uendret.
+- Konflikt-/prioritetslogikken uendret.
 
-- Rød boks per block med regelnavn + melding + prioritet.
-- Gul boks per warn.
-- Diskret grå notis per info.
+### 2. Editor — én ekstra checkbox
+I `DeliveryRuleFormDialog.tsx`, i «Tidspunkt (valgfritt)» → «Ukedager»-blokken:
 
-Wires inn i:
-- `src/ordre/pages/NewOrder.tsx`
-- `src/ordre/components/CustomerOrderModal.tsx`
-- `src/ordre/components/TourOrderDialog.tsx`
-
-Lagre-knapp disables når `canSave === false` og bruker ikke har overstyring aktivert.
-
-## 3. Overstyringsdialog (kun NBHub)
-
-Ny komponent: `src/ordre/components/rules/OverrideRuleDialog.tsx` — layout matcher venstre kort i skjermbildet:
-
-```text
-┌─ Leveringsregel blokkerer ordren ────────┐
-│ Ordre til <kunde> · levering <dato>      │
-│ ┌─ rød regelblokk (navn + prioritet) ──┐ │
-│ │ regelmelding i klartekst             │ │
-│ └──────────────────────────────────────┘ │
-│ [grønn badge: Du har ordrekontor-tilgang]│
-│ BEGRUNNELSE FOR OVERSTYRING (PÅKREVD)    │
-│ [ textarea ]                             │
-│ 🔒 Overstyringen logges i revisjons…    │
-│               [Avbryt] [Overstyr og lagre]│
-└──────────────────────────────────────────┘
+```
+[✓] ons  [ ] tor …
+[ ] Begrens også leveringsdag til valgte ukedager
+     (uten dette: regelen gjelder kun *når* leveransen er på disse dagene, men
+     blokkerer ikke andre dager)
 ```
 
-- Trigges av knappen «Overstyr …» som kun vises når:
-  - `usePermissions().hasWriteAccess('ordre') === true`
-  - `blocks.length > 0`
-- Tekstfelt er påkrevd (min. 10 tegn).
-- Ved bekreft: setter `rule_override_reason` på ordre-payloaden og trigger vanlig lagring. Trigger på DB-siden gjør resten (logger til `audit_log`).
+- Vises kun for `order_deadline`, `available_tours`, `available_products`.
+- Krever minst én ukedag valgt.
+- Speiles i «Regelen i ord» + `describeRule` (`useDeliveryRules.ts`).
 
-Brukere uten `has_app_write_access('ordre')` ser bare rødboksene og en forklaring («Ordren kan ikke lagres — kontakt ordrekontoret ved behov»).
+### 3. Live-preview og test-panel
+- `usePreviewDeliveryRules` trenger ingen endring — motoren returnerer allerede alle funn.
+- Test-panelet viser to funn fra samme regel når begge trigges (frist brutt + feil dag), begge tagget med regelnavnet.
 
-## 4. Kundeportalen — vennlig veiledning
+### 4. Mal-galleri — 3 nye maler
+Legg til i wizardens mal-galleri (`DeliveryRuleFormDialog.tsx` gallery-seksjon):
 
-Denne appen bruker allerede `portal_create_customer_order`. Endringene her er UI i selve portalen (`kundeportal.nbhub.no`, egen repo — ikke rørt her), men vi eksponerer det som trengs:
+| Mal | Type | Forhåndsutfylt |
+|---|---|---|
+| **Vare med fast produksjonsdag + frist** | `order_deadline` | `enforce_weekdays=true`, tomt vare-felt, deadline 4 dager 14:00 |
+| **Kun tirsdags-/torsdags-levering for kundegruppe** | `order_deadline` | `enforce_weekdays=true`, ukedager 2+4, tom kundegruppe, deadline 1 dag 12:00 |
+| **Turen kjører kun fredag** | `available_tours` | `enforce_weekdays=true`, fre |
 
-- Sørger for at `evaluate_delivery_rules` fungerer med portal-brukerens `auth.uid()` (SECURITY DEFINER er allerede satt).
-- Legger en plan-notat i `.lovable/plan.md` for portal-agenten som beskriver: kall `evaluate_delivery_rules` for de neste 14 dagene, filtrer bort dager med block-treff, vis 3 første gyldige som chips (matcher høyre kort i skjermbildet), pluss «kontakt bakeriet»-kort med telefonnummer fra `legal_entities`.
+Eksisterende maler beholdes.
 
-I NBHub selv: ingen endring i portalflaten — kun sikre at `portal_create_customer_order` returnerer strukturert blokk-info (allerede på plass via `check_violation`-exception + `_notify_ordre_team`).
+### 5. Beholde gamle regler
+Ingenting migreres. Kolonnen får `default false`, så alle 20 NB-regler oppfører seg identisk. Operatøren kan gradvis rydde ved å slå sammen manuelt (bruke «Lag kopi» + huke av bryteren + slette den overflødige).
 
-## 5. Opprydding
+## Filer som endres
+- `supabase/migrations/…` (ny) — kolonne + oppdatert `evaluate_delivery_rules`
+- `src/ordre/hooks/useDeliveryRules.ts` — type + `describeRule`
+- `src/ordre/components/orders/DeliveryRuleFormDialog.tsx` — checkbox + wizard-validering + 3 nye maler
+- `src/ordre/lib/evaluateDraftRule.ts` — klient-preview må også respektere `enforce_weekdays` (så live-visning stemmer)
 
-- Slett `src/ordre/lib/deliveryRuleEnforcement.ts` (motoren er nå i DB).
-- I `src/ordre/lib/orderRules.ts`: fjern deadline-duplikatet (`checkOrderDeadline`, evt. `resolveDeadline`), behold `lead_time_days`-, allergi- og åpningstids-sjekkene.
-- `src/ordre/components/OrderDeadlineWarning.tsx`: fjern død kode (`passed`, `passedFinal` som ikke leses noe sted) — komponenten erstattes uansett av `DeliveryRulesFeedback` for deadline-visning, men beholdes for legacy lister til alt er migrert.
-- Erstatt `useOrderDeadlineCheck`-kall med den nye hook-en.
-- I ordrelisten (`src/ordre/pages/OrdersList.tsx` og `CustomerOrdersTab.tsx`): les `orders.rule_flags` (jsonb) og vis liten ⚠️-indikator med tooltip på ordrer som har lagrede warns eller er lagret med `rule_override_reason IS NOT NULL`.
-
-## Tekniske detaljer
-
-- Hook returnerer også `groupsLoading` slik at UI kan vise skeleton mens `customer_group_ids`/`product_group_ids` hentes.
-- `evaluate_delivery_rules` kalles fra klient — SECURITY DEFINER, ingen ekstra grants nødvendig.
-- Overstyringsdialog: `<AlertDialog>` fra shadcn med custom body, farger fra semantic tokens (`destructive`, `warning`, `success`), matcher cream/bronze designsystemet.
-- Alle skjemaer sender `rule_override_reason` i samme insert/update — DB-triggeren gjør resten (auth-sjekk + audit_log).
-- Ordreliste-indikator: lite ikon `AlertTriangle` fra lucide, farge `text-amber-600`, tooltip lister regelnavnene fra `rule_flags`.
-
-## Filer som endres/opprettes
-
-Nye:
-- `src/ordre/hooks/usePreviewDeliveryRules.ts`
-- `src/ordre/components/rules/DeliveryRulesFeedback.tsx`
-- `src/ordre/components/rules/OverrideRuleDialog.tsx`
-
-Endres:
-- `src/ordre/pages/NewOrder.tsx`
-- `src/ordre/components/CustomerOrderModal.tsx`
-- `src/ordre/components/TourOrderDialog.tsx`
-- `src/ordre/lib/orderRules.ts`
-- `src/ordre/components/OrderDeadlineWarning.tsx`
-- `src/ordre/pages/OrdersList.tsx` og `src/kunder/components/CustomerOrdersTab.tsx`
-- `src/ordre/hooks/useOrderDeadlineCheck.ts` (fjernes eller re-implementeres som wrapper)
-
-Slettes:
-- `src/ordre/lib/deliveryRuleEnforcement.ts`
+## Ikke i scope
+- Full sammenslåing av alle rule_types (avvist av deg)
+- Auto-migrering av eksisterende regelpar (avvist av deg)
+- Kombinere varer + salgsgrupper i én regel — separat problem, tas ved behov
