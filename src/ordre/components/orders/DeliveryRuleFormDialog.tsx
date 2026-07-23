@@ -546,6 +546,7 @@ export function DeliveryRuleFormDialog({ open, onOpenChange, rule, template, onS
         blackout_until: form.blackout_until || null,
         deadline_time: form.deadline_time ? `${form.deadline_time}:00` : null,
         deadline_days_before: form.deadline_days_before ? parseInt(form.deadline_days_before, 10) : null,
+        enforce_weekdays: form.enforce_weekdays,
       }),
     [form],
   );
