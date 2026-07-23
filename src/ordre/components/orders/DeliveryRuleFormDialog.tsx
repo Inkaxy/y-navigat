@@ -483,6 +483,7 @@ export function DeliveryRuleFormDialog({ open, onOpenChange, rule, template, onS
         valid_from: form.valid_from,
         valid_until: form.valid_until || null,
         is_active: form.is_active,
+        enforce_weekdays: form.enforce_weekdays,
       };
 
       if (isEdit && rule) {
