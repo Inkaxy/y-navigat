@@ -156,6 +156,7 @@ export function evaluateDraftRule(
     blackout_until: draft.blackout_until ?? null,
     deadline_time: draft.deadline_time ?? null,
     deadline_days_before: draft.deadline_days_before ?? null,
+    enforce_weekdays: draft.enforce_weekdays ?? false,
     valid_from: draft.valid_from ?? "1970-01-01",
     valid_until: draft.valid_until ?? null,
     is_active: draft.is_active ?? true,
