@@ -74,6 +74,21 @@ function evaluateType(rule: DeliveryRule, ctx: EvaluateContext): { matched: bool
   const date = ctx.deliveryDate;
   if (!date) return { matched: false, message: "Mangler leveringsdato" };
 
+  // enforce_weekdays: for order_deadline/available_tours/available_products
+  // blokkerer regelen også leveringsdager utenfor valgte ukedager.
+  if (
+    rule.enforce_weekdays &&
+    rule.weekdays && rule.weekdays.length > 0 &&
+    (type === "order_deadline" || type === "available_tours" || type === "available_products")
+  ) {
+    const wd = isoWeekday(date);
+    if (!rule.weekdays.includes(wd)) {
+      const days = rule.weekdays.map((d) => WEEKDAY_LABELS_LONG[d - 1]).join(", ");
+      return { matched: true, message: `Regelen tillater kun leveringsdager: ${days}.` };
+    }
+  }
+
+
   switch (type) {
     case "order_deadline": {
       const daysBefore = rule.deadline_days_before ?? 1;
