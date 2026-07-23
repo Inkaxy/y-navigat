@@ -183,6 +183,7 @@ function fromRule(r: DeliveryRule): Form {
     valid_from: r.valid_from,
     valid_until: r.valid_until ?? "",
     is_active: r.is_active,
+    enforce_weekdays: r.enforce_weekdays ?? false,
   };
 }
 
