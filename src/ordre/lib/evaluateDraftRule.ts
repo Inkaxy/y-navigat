@@ -3,7 +3,7 @@
 // semantikken i SQL-funksjonen `evaluate_delivery_rules` for en enkelt rad.
 
 import type { DeliveryRule, DeliveryRuleEffect, DeliveryRuleType } from "@/ordre/hooks/useDeliveryRules";
-import { describeRule } from "@/ordre/hooks/useDeliveryRules";
+import { describeRule, WEEKDAY_LABELS_LONG } from "@/ordre/hooks/useDeliveryRules";
 import type { DeliveryRuleHit } from "@/ordre/hooks/usePreviewDeliveryRules";
 
 export type EvaluateContext = {
