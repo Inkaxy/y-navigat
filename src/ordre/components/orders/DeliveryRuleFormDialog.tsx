@@ -915,6 +915,23 @@ export function DeliveryRuleFormDialog({ open, onOpenChange, rule, template, onS
                           onChange={(w) => setForm({ ...form, weekdays: w })}
                           label="Gjelder kun på disse ukedagene"
                         />
+                        {form.weekdays.length > 0 && (
+                          <label className="flex items-start gap-2 rounded-md border border-primary/30 bg-primary/5 p-2 text-xs">
+                            <Checkbox
+                              checked={form.enforce_weekdays}
+                              onCheckedChange={(c) => setForm({ ...form, enforce_weekdays: !!c })}
+                              className="mt-0.5"
+                            />
+                            <div>
+                              <div className="font-medium text-foreground">Begrens også leveringsdag til valgte ukedager</div>
+                              <div className="text-muted-foreground">
+                                Med denne blir regelen også en sperre: leveringer på andre dager blokkeres/varsles.
+                                Uten den gjelder regelen kun <em>når</em> leveransen faller på valgt ukedag — men den
+                                stopper ikke andre dager. Nyttig for f.eks. «vare bakes onsdag med 4 dagers frist» i én regel.
+                              </div>
+                            </div>
+                          </label>
+                        )}
                         {form.rule_type !== "available_tours" && (
                           <div>
                             <Label className="text-xs">Kun disse turene</Label>
