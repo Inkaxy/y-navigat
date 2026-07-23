@@ -32,6 +32,7 @@ export type DeliveryRule = {
   blackout_until: string | null;
   deadline_time: string | null; // "HH:MM:SS"
   deadline_days_before: number | null;
+  enforce_weekdays: boolean;
   valid_from: string;
   valid_until: string | null;
   is_active: boolean;
