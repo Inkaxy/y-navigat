@@ -159,6 +159,7 @@ const EMPTY: Form = {
   valid_from: new Date().toISOString().slice(0, 10),
   valid_until: "",
   is_active: true,
+  enforce_weekdays: false,
 };
 
 function fromRule(r: DeliveryRule): Form {
