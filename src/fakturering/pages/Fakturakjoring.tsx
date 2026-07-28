@@ -271,7 +271,27 @@ export default function Fakturakjoring() {
             />
           );
         })}
+        {unknownGroupKeys.map((key) => {
+          const row = rowByKey.get(key)!;
+          const def = groupDefFor(key);
+          return (
+            <GroupCard
+              key={`unknown-${key}`}
+              def={def}
+              customerCount={row.customer_count}
+              orderCount={row.order_count}
+              sumInclVat={row.sum_incl_vat}
+              isEmpty={row.customer_count === 0}
+              isInternal={false}
+              isNonTransfer={false}
+              selected={selected.has(key)}
+              onToggle={() => toggleGroup(key)}
+            />
+          );
+        })}
       </div>
+
+
 
       {/* Handlingslinje */}
       <div className="flex flex-col gap-4 rounded-2xl border border-line-subtle bg-surface-raised p-5 lg:flex-row lg:items-center">
