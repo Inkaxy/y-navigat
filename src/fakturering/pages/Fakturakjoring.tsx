@@ -8,6 +8,8 @@ import {
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useFaktureringEntity } from "@/fakturering/context/FaktureringContext";
@@ -158,17 +160,37 @@ export default function Fakturakjoring() {
           >
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <div className="text-center">
-            <div className="font-display text-3xl font-semibold tabular-nums">
-              {format(runDate, "dd.MM.yyyy")}
-            </div>
-            <div className={cn(
-              "text-sm font-medium capitalize",
-              isToday(runDate) ? "text-[hsl(var(--brand-bronze))]" : "text-muted-foreground",
-            )}>
-              {isToday(runDate) ? "i dag, " : ""}{format(runDate, "EEEE", { locale: nb })}
-            </div>
-          </div>
+          <Popover>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                className="text-center rounded-md px-3 py-1 -mx-1 hover:bg-muted/50 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                aria-label="Velg dato"
+              >
+                <div className="font-display text-3xl font-semibold tabular-nums">
+                  {format(runDate, "dd.MM.yyyy")}
+                </div>
+                <div className={cn(
+                  "text-sm font-medium capitalize",
+                  isToday(runDate) ? "text-[hsl(var(--brand-bronze))]" : "text-muted-foreground",
+                )}>
+                  {isToday(runDate) ? "i dag, " : ""}{format(runDate, "EEEE", { locale: nb })}
+                </div>
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="center">
+              <Calendar
+                mode="single"
+                selected={runDate}
+                onSelect={(d) => d && setRunDate(d)}
+                initialFocus
+                locale={nb}
+                weekStartsOn={1}
+                showWeekNumber
+                className="p-3 pointer-events-auto"
+              />
+            </PopoverContent>
+          </Popover>
           <Button
             variant="outline"
             size="icon"
