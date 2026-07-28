@@ -487,8 +487,68 @@ function drawHeader(
 }
 
 function estimateSectionHeight(rowCount: number): number {
-  // section band + header row + rows*22 + summary rows
-  return 42 + 18 + rowCount * 22 + 34;
+  return 42 + 18 + rowCount * 26 + 40;
+}
+
+// Column layout is shared between the section header, table header (drawn on
+// every new page when a section continues) and body rows.
+const NAME_COL_W = 165;
+const SUM_COL_W = 68;
+
+function drawSectionHeader(
+  page: PDFPage,
+  fonts: Fonts,
+  sec: CustomerWeekSection,
+  startY: number,
+  isContinuation: boolean,
+): number {
+  const contentW = PAGE_W - 2 * MARGIN_X;
+  let y = startY;
+
+  page.drawRectangle({
+    x: MARGIN_X, y: y - 30, width: contentW, height: 30, color: COLORS.cream,
+  });
+  drawText(page, "Leveranser til: ", MARGIN_X + 12, y - 18, { font: fonts.reg, size: 10, color: COLORS.muted });
+  const lblW = textWidth(fonts.reg, "Leveranser til: ", 10);
+  const namePart = sec.customer_name + (isContinuation ? " (forts.)" : "");
+  drawText(page, namePart, MARGIN_X + 12 + lblW, y - 18, { font: fonts.bold, size: 10 });
+  const nameW = textWidth(fonts.bold, namePart, 10);
+  drawText(page, ` (kundenr ${sec.customer_number})`, MARGIN_X + 12 + lblW + nameW, y - 18, {
+    font: fonts.reg, size: 10, color: COLORS.muted,
+  });
+
+  const chipText = `UKE ${sec.week_no} · ${formatWeekRange(sec.monday, sec.sunday)}`;
+  const chipW = textWidth(fonts.bold, chipText, 9) + 18;
+  const chipX = MARGIN_X + contentW - chipW - 8;
+  page.drawRectangle({ x: chipX, y: y - 26, width: chipW, height: 22, color: COLORS.chipInk });
+  drawText(page, chipText, chipX + 9, y - 20, { font: fonts.bold, size: 9, color: COLORS.white });
+
+  y -= 44;
+  return y;
+}
+
+function drawTableHeader(page: PDFPage, fonts: Fonts, startY: number): number {
+  const contentW = PAGE_W - 2 * MARGIN_X;
+  const dayColW = (contentW - NAME_COL_W - SUM_COL_W) / 7;
+  const sumColX = MARGIN_X + NAME_COL_W + dayColW * 7;
+  let y = startY;
+
+  drawText(page, "Varenr / navn", MARGIN_X, y, { font: fonts.reg, size: 8, color: COLORS.muted });
+  for (let i = 0; i < 7; i++) {
+    const label = DAY_LABELS[i];
+    const cx = MARGIN_X + NAME_COL_W + i * dayColW + dayColW / 2;
+    drawText(page, label, cx - textWidth(fonts.reg, label, 8) / 2, y, { font: fonts.reg, size: 8, color: COLORS.muted });
+  }
+  drawText(page, "Sum uke", sumColX + SUM_COL_W - textWidth(fonts.reg, "Sum uke", 8), y, {
+    font: fonts.reg, size: 8, color: COLORS.muted,
+  });
+  y -= 6;
+  page.drawLine({
+    start: { x: MARGIN_X, y }, end: { x: MARGIN_X + contentW, y },
+    thickness: 0.5, color: COLORS.line,
+  });
+  y -= 12;
+  return y;
 }
 
 function drawSection(
@@ -504,122 +564,96 @@ function drawSection(
   }>,
   vatLetter: Map<number, string>,
   startY: number,
-): number {
-  let y = startY;
+  beginPage: () => { page: PDFPage; y: number },
+): { page: PDFPage; y: number } {
   const contentW = PAGE_W - 2 * MARGIN_X;
+  const dayColW = (contentW - NAME_COL_W - SUM_COL_W) / 7;
+  const sumColX = MARGIN_X + NAME_COL_W + dayColW * 7;
 
-  // ---- Section band (cream) ----
-  page.drawRectangle({
-    x: MARGIN_X,
-    y: y - 30,
-    width: contentW,
-    height: 30,
-    color: COLORS.cream,
-  });
-  drawText(page, "Leveranser til: ", MARGIN_X + 12, y - 18, { font: fonts.reg, size: 10, color: COLORS.muted });
-  const lblW = textWidth(fonts.reg, "Leveranser til: ", 10);
-  drawText(page, sec.customer_name, MARGIN_X + 12 + lblW, y - 18, { font: fonts.bold, size: 10 });
-  const nameW = textWidth(fonts.bold, sec.customer_name, 10);
-  drawText(page, ` (kundenr ${sec.customer_number})`, MARGIN_X + 12 + lblW + nameW, y - 18, {
-    font: fonts.reg, size: 10, color: COLORS.muted,
-  });
-
-  // Week chip (ink) right-aligned
-  const chipText = `UKE ${sec.week_no} · ${formatWeekRange(sec.monday, sec.sunday)}`;
-  const chipW = textWidth(fonts.bold, chipText, 9) + 18;
-  const chipX = MARGIN_X + contentW - chipW - 8;
-  page.drawRectangle({ x: chipX, y: y - 26, width: chipW, height: 22, color: COLORS.chipInk });
-  drawText(page, chipText, chipX + 9, y - 20, { font: fonts.bold, size: 9, color: COLORS.white });
-
-  y -= 44;
-
-  // ---- Table column layout ----
-  const nameColW = 165;
-  const dayColW = (contentW - nameColW - 68) / 7; // reserve 68 for "Sum uke"
-  const sumColX = MARGIN_X + nameColW + dayColW * 7;
-  const sumColW = 68;
-
-  // Header row
-  drawText(page, "Varenr / navn", MARGIN_X, y, { font: fonts.reg, size: 8, color: COLORS.muted });
-  for (let i = 0; i < 7; i++) {
-    const label = DAY_LABELS[i];
-    const cx = MARGIN_X + nameColW + i * dayColW + dayColW / 2;
-    drawText(page, label, cx - textWidth(fonts.reg, label, 8) / 2, y, { font: fonts.reg, size: 8, color: COLORS.muted });
+  // Requirement: section band + table header + at least the first row must fit.
+  const minInitial = 30 + 12 + 18 + 26;
+  let curPage = page;
+  let y = startY;
+  if (y - minInitial < MARGIN_BOTTOM + 60) {
+    ({ page: curPage, y } = beginPage());
   }
-  drawText(page, "Sum uke", sumColX + sumColW - textWidth(fonts.reg, "Sum uke", 8), y, {
-    font: fonts.reg, size: 8, color: COLORS.muted,
-  });
-  y -= 6;
-  page.drawLine({
-    start: { x: MARGIN_X, y }, end: { x: MARGIN_X + contentW, y },
-    thickness: 0.5, color: COLORS.line,
-  });
-  y -= 12;
 
-  // Rows (rely on estimateSectionHeight for pagination outside; if we still run out, break cleanly)
+  let isContinuation = false;
+  y = drawSectionHeader(curPage, fonts, sec, y, isContinuation);
+  y = drawTableHeader(curPage, fonts, y);
+
+  const ROW_H = 26;
+
   for (const row of productRows) {
-    if (y < MARGIN_BOTTOM + 60) break;
-    // Varenr + name (bold), vat marker under
-    drawText(page, `${row.product_number} ${row.product_name}`, MARGIN_X, y, {
+    // Reserve room for at least this row + the week-total footer band (34pt).
+    if (y - ROW_H < MARGIN_BOTTOM + 44) {
+      // Break to a new page and repeat section+table header marked as continuation.
+      ({ page: curPage, y } = beginPage());
+      isContinuation = true;
+      y = drawSectionHeader(curPage, fonts, sec, y, isContinuation);
+      y = drawTableHeader(curPage, fonts, y);
+    }
+
+    drawText(curPage, `${row.product_number} ${row.product_name}`, MARGIN_X, y, {
       font: fonts.bold, size: 9.5,
     });
     const letter = vatLetter.get(Number(row.vat_rate)) ?? "";
     const hasReturn = row.days.some((d) => d && d.qty < 0);
     const subline = `(${letter})${hasReturn ? " · retur" : ""}`;
-    drawText(page, subline, MARGIN_X, y - 10, { font: fonts.reg, size: 8, color: COLORS.muted });
+    drawText(curPage, subline, MARGIN_X, y - 10, { font: fonts.reg, size: 8, color: COLORS.muted });
 
-    // Day cells
     for (let i = 0; i < 7; i++) {
       const cell = row.days[i];
       if (!cell) continue;
-      const cx = MARGIN_X + nameColW + i * dayColW + dayColW / 2;
+      const cx = MARGIN_X + NAME_COL_W + i * dayColW + dayColW / 2;
       const qtyStr = formatInt(cell.qty);
       const qtyColor = cell.qty < 0 ? COLORS.red : COLORS.ink;
-      drawText(page, qtyStr, cx - textWidth(fonts.bold, qtyStr, 10) / 2, y, {
+      drawText(curPage, qtyStr, cx - textWidth(fonts.bold, qtyStr, 10) / 2, y, {
         font: fonts.bold, size: 10, color: qtyColor,
       });
       if (cell.unit_price != null) {
         const pStr = formatPrice(cell.unit_price);
-        drawText(page, pStr, cx - textWidth(fonts.reg, pStr, 8) / 2, y - 10, {
+        drawText(curPage, pStr, cx - textWidth(fonts.reg, pStr, 8) / 2, y - 10, {
           font: fonts.reg, size: 8, color: COLORS.muted,
         });
       }
       if (cell.qty < 0) {
         const rt = "RETUR";
-        drawText(page, rt, cx - textWidth(fonts.bold, rt, 6.5) / 2, y - 19, {
+        drawText(curPage, rt, cx - textWidth(fonts.bold, rt, 6.5) / 2, y - 19, {
           font: fonts.bold, size: 6.5, color: COLORS.red,
         });
       }
     }
 
-    // Sum uke right-aligned
     const sumStr = formatKr(row.week_sum_excl);
     const sumColor = row.week_sum_excl < 0 ? COLORS.red : COLORS.ink;
-    drawText(page, sumStr, sumColX + sumColW - textWidth(fonts.bold, sumStr, 10), y, {
+    drawText(curPage, sumStr, sumColX + SUM_COL_W - textWidth(fonts.bold, sumStr, 10), y, {
       font: fonts.bold, size: 10, color: sumColor,
     });
 
-    y -= 26;
-    page.drawLine({
+    y -= ROW_H;
+    curPage.drawLine({
       start: { x: MARGIN_X, y: y + 6 }, end: { x: MARGIN_X + contentW, y: y + 6 },
       thickness: 0.3, color: COLORS.line,
     });
   }
 
-  // ---- Week total row ----
-  // Aggregate by vat rate for the "herav" text
+  // ---- Week total row (always on same page as last body row; make room if tight) ----
+  if (y - 40 < MARGIN_BOTTOM) {
+    ({ page: curPage, y } = beginPage());
+  }
   const byRate = new Map<number, number>();
   let total = 0;
   for (const row of productRows) {
     byRate.set(Number(row.vat_rate), (byRate.get(Number(row.vat_rate)) ?? 0) + row.week_sum_excl);
     total += row.week_sum_excl;
   }
-  page.drawLine({
+  curPage.drawLine({
     start: { x: MARGIN_X, y: y + 8 }, end: { x: MARGIN_X + contentW, y: y + 8 },
     thickness: 1.2, color: COLORS.ink,
   });
   y -= 2;
-  drawText(page, `Sum uke ${sec.week_no}`, MARGIN_X, y, { font: fonts.bold, size: 10 });
+  drawText(curPage, `Sum uke ${sec.week_no}`, MARGIN_X, y, { font: fonts.bold, size: 10 });
 
   const heravParts: string[] = [];
   for (const [rate, sum] of [...byRate.entries()].sort((a, b) => a[0] - b[0])) {
@@ -630,13 +664,24 @@ function drawSection(
   const heravW = textWidth(fonts.reg, heravText, 9);
   const totalStr = formatKr(total);
   const totalW = textWidth(fonts.bold, totalStr, 10);
-  drawText(page, heravText, sumColX + sumColW - totalW - 12 - heravW, y, {
+  drawText(curPage, heravText, sumColX + SUM_COL_W - totalW - 12 - heravW, y, {
     font: fonts.reg, size: 9, color: COLORS.muted,
   });
-  drawText(page, totalStr, sumColX + sumColW - totalW, y, {
+  drawText(curPage, totalStr, sumColX + SUM_COL_W - totalW, y, {
     font: fonts.bold, size: 10, color: total < 0 ? COLORS.red : COLORS.ink,
   });
   y -= 16;
+
+  const legendParts: string[] = [];
+  for (const [rate, letter] of [...vatLetter.entries()].sort((a, b) => a[0] - b[0])) {
+    legendParts.push(`(${letter}) = ${rate} % mva`);
+  }
+  legendParts.push("RETUR = negativ mengde krediteres");
+  drawText(curPage, legendParts.join("    "), MARGIN_X, y, { font: fonts.reg, size: 8, color: COLORS.muted });
+  y -= 20;
+
+  return { page: curPage, y };
+}
 
   // Legend
   const legendParts: string[] = [];
