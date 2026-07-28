@@ -185,9 +185,24 @@ export interface BasisRow {
   transferred_at: string | null;
   invoiced_at: string | null;
   created_at: string;
+  attachment_path: string | null;
+  attachment_generated_at: string | null;
+  attachment_error: string | null;
+  attachment_uploaded_at: string | null;
   customer?: { id: string; display_name: string; customer_number: string; invoice_method: string | null } | null;
   run?: { id: string; run_date: string; started_at: string | null } | null;
   _order_count?: number;
+}
+
+export async function getAttachmentSignedUrl(path: string, expiresSec = 60): Promise<string> {
+  const { data, error } = await supabase.storage.from("invoice-attachments").createSignedUrl(path, expiresSec);
+  if (error) throw error;
+  return data.signedUrl;
+}
+
+export async function regenerateAttachment(input: { run_id?: string; basis_id?: string }): Promise<void> {
+  const { error } = await supabase.functions.invoke("fakturering-generate-vedlegg", { body: input });
+  if (error) throw error;
 }
 
 async function attachOrderCounts(bases: any[]): Promise<any[]> {
