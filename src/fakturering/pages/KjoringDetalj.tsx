@@ -17,6 +17,7 @@ import {
 import { formatKr, groupDefFor } from "@/fakturering/lib/groups";
 import { BasisStatusChip, tripletexInvoiceUrl, tripletexOrderUrl } from "@/fakturering/components/BasisStatusChip";
 import { BasisDetailsDrawer } from "@/fakturering/components/BasisDetailsDrawer";
+import { readEdgeError } from "@/fakturering/lib/edgeError";
 
 export default function KjoringDetalj() {
   const { id } = useParams<{ id: string }>();
@@ -26,10 +27,10 @@ export default function KjoringDetalj() {
   const [busy, setBusy] = useState<"retry" | "cancel" | null>(null);
 
   const runQ = useInvoiceRun(id);
-  const basesQ = useBasesForRun(id);
+  const run = runQ.data;
+  const basesQ = useBasesForRun(id, run?.status === "running");
   const writeAccess = useHasFakturaWriteAccess();
 
-  const run = runQ.data;
   const bases = basesQ.data ?? [];
 
   const stats = useMemo(() => {
@@ -54,7 +55,7 @@ export default function KjoringDetalj() {
       toast({ title: "Prøver igjen", description: "Overføring startet for feilede grunnlag." });
       qc.invalidateQueries({ queryKey: ["fakturering"] });
     } catch (e: any) {
-      toast({ title: "Feil", description: e?.message ?? String(e), variant: "destructive" });
+      toast({ title: "Feil", description: await readEdgeError(e), variant: "destructive" });
     } finally {
       setBusy(null);
     }
@@ -69,7 +70,7 @@ export default function KjoringDetalj() {
       toast({ title: "Kjøring angret", description: "Ikke-overførte grunnlag er slettet og ordrene frigjort." });
       qc.invalidateQueries({ queryKey: ["fakturering"] });
     } catch (e: any) {
-      toast({ title: "Kunne ikke angre kjøringen", description: e?.message ?? String(e), variant: "destructive" });
+      toast({ title: "Kunne ikke angre kjøringen", description: await readEdgeError(e), variant: "destructive" });
     } finally {
       setBusy(null);
     }

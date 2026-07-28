@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { formatKr } from "@/fakturering/lib/groups";
 import { BasisStatusChip, tripletexInvoiceUrl, tripletexOrderUrl } from "./BasisStatusChip";
+import { readEdgeError } from "@/fakturering/lib/edgeError";
 
 interface Props {
   basis: BasisRow | null;
@@ -39,7 +40,7 @@ export function BasisDetailsDrawer({ basis, onOpenChange }: Props) {
       const url = await getAttachmentSignedUrl(basis.attachment_path, 60);
       window.open(url, "_blank", "noopener");
     } catch (e: any) {
-      toast({ title: "Kunne ikke åpne vedlegg", description: e?.message ?? String(e), variant: "destructive" });
+      toast({ title: "Kunne ikke åpne vedlegg", description: await readEdgeError(e), variant: "destructive" });
     } finally {
       setBusy(null);
     }
@@ -53,7 +54,7 @@ export function BasisDetailsDrawer({ basis, onOpenChange }: Props) {
       toast({ title: "Vedlegg generert på nytt" });
       qc.invalidateQueries({ queryKey: ["fakturering"] });
     } catch (e: any) {
-      toast({ title: "Feilet", description: e?.message ?? String(e), variant: "destructive" });
+      toast({ title: "Feilet", description: await readEdgeError(e), variant: "destructive" });
     } finally {
       setBusy(null);
     }
