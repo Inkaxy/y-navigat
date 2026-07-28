@@ -405,6 +405,15 @@ const App = () => (
               <Route path="/pos-styring/stasjoner" element={<PosStyringShell><PosStyringStasjoner /></PosStyringShell>} />
               <Route path="/pos-styring/helse" element={<PosStyringShell><PosStyringKasseHelse /></PosStyringShell>} />
 
+              {/* Fakturering (steg 1: skeletons — data-modell klar) */}
+              <Route path="/fakturering" element={<FaktureringShell><FakturaSkeleton title="Fakturakjøring" subtitle="Start ny faktureringskjøring basert på leverte pakksedler." /></FaktureringShell>} />
+              <Route path="/fakturering/sok" element={<FaktureringShell><FakturaSkeleton title="Fakturasøk" subtitle="Søk i historiske fakturagrunnlag og overførte fakturaer." /></FaktureringShell>} />
+              <Route path="/fakturering/kjoringer" element={<FaktureringShell><FakturaSkeleton title="Kjøringer" subtitle="Oversikt over tidligere faktureringskjøringer." /></FaktureringShell>} />
+              <Route path="/fakturering/kjoringer/:id" element={<FaktureringShell><FakturaSkeleton title="Kjøringsdetaljer" subtitle="Detaljer for en enkelt faktureringskjøring." /></FaktureringShell>} />
+              <Route path="/fakturering/innstillinger" element={<FaktureringShell><FakturaSkeleton title="Innstillinger" subtitle="Forfallsdager, mva-konto-mapping og Tripletex-cache." body="Merk: mva-kontonumre må avklares med regnskapsfører før faktureringen aktiveres." /></FaktureringShell>} />
+
+
+
 
               {/* Kiosk-ruter — bypasser NBhub <Shell>/<ProtectedRoute>; egen Supabase-klient (storageKey 'pos-kiosk-auth') */}
               <Route path="/kiosk/o/:terminalId" element={<KioskOperatorRoute />} />
