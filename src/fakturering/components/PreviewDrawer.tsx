@@ -25,56 +25,24 @@ export function PreviewDrawer({ open, onOpenChange, entityId, runDate, selectedG
   const { data, isLoading } = useQuery({
     queryKey: ["fakturering", "preview-details", entityId, runDate, [...selectedGroups].sort()],
     enabled: open && !!entityId,
+    staleTime: 30 * 1000,
     queryFn: async (): Promise<CustomerBasisRow[]> => {
-      const { data, error } = await supabase
-        .from("orders")
-        .select(`
-          id,
-          total_incl_vat,
-          invoice_recipient_customer_id,
-          customer_id,
-          status,
-          is_return,
-          delivery_date,
-          customers:customer_id(id, name, customer_profile_id, profile_overrides, customer_profiles(invoicing_group)),
-          recipient:invoice_recipient_customer_id(id, name, customer_profile_id, profile_overrides, customer_profiles(invoicing_group))
-        `)
-        .eq("legal_entity_id", entityId!)
-        .lte("delivery_date", runDate)
-        .limit(2000);
+      const { data, error } = await (supabase.rpc as any)("get_invoice_run_preview_customers", {
+        p_legal_entity_id: entityId,
+        p_run_date: runDate,
+        p_groups: selectedGroups.length ? selectedGroups : null,
+      });
       if (error) throw error;
-
-      const buckets = new Map<string, CustomerBasisRow>();
-      for (const o of (data ?? []) as any[]) {
-        const isReturn = o.is_return === true;
-        const okStatus = isReturn
-          ? ["confirmed", "delivered"].includes(o.status)
-          : o.status === "delivered";
-        if (!okStatus) continue;
-        const rec = o.recipient ?? o.customers;
-        if (!rec) continue;
-        const grp = rec.profile_overrides?.invoicing_group
-          ?? rec.customer_profiles?.invoicing_group
-          ?? null;
-        if (selectedGroups.length && !selectedGroups.includes(grp ?? "__none")) continue;
-        const key = rec.id as string;
-        const existing = buckets.get(key);
-        if (existing) {
-          existing.order_count += 1;
-          existing.sum_incl_vat += Number(o.total_incl_vat ?? 0);
-        } else {
-          buckets.set(key, {
-            recipient_id: key,
-            customer_name: rec.name ?? "—",
-            invoicing_group: grp,
-            order_count: 1,
-            sum_incl_vat: Number(o.total_incl_vat ?? 0),
-          });
-        }
-      }
-      return Array.from(buckets.values()).sort((a, b) => a.customer_name.localeCompare(b.customer_name, "no"));
+      return ((data ?? []) as any[]).map((r) => ({
+        recipient_id: r.recipient_id,
+        customer_name: r.customer_name ?? "—",
+        invoicing_group: r.invoicing_group ?? null,
+        order_count: Number(r.order_count ?? 0),
+        sum_incl_vat: Number(r.sum_incl_vat ?? 0),
+      }));
     },
   });
+
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
