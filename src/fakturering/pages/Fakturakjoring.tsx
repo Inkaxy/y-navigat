@@ -21,10 +21,11 @@ import {
   useRecentInvoiceRuns,
   type PreviewRow,
 } from "@/fakturering/hooks/useFakturering";
-import { KNOWN_GROUPS, groupDefFor, formatKr } from "@/fakturering/lib/groups";
+import { KNOWN_GROUPS, isKnownGroup, groupDefFor, formatKr } from "@/fakturering/lib/groups";
 import { GroupCard } from "@/fakturering/components/GroupCard";
 import { ConfirmRunDialog } from "@/fakturering/components/ConfirmRunDialog";
 import { PreviewDrawer } from "@/fakturering/components/PreviewDrawer";
+import { EntityPickerBanner } from "@/fakturering/components/EntityPickerBanner";
 import { cn } from "@/lib/utils";
 import { readEdgeError } from "@/fakturering/lib/edgeError";
 
