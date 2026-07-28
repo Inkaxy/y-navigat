@@ -1,12 +1,13 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { format, addDays } from "date-fns";
-import { FileText, Search, RotateCw, X, Check } from "lucide-react";
+import { FileText, Search, RotateCw, X, Check, Paperclip, AlertTriangle } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandInput, CommandItem, CommandList, CommandEmpty, CommandGroup } from "@/components/ui/command";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useFaktureringEntity } from "@/fakturering/context/FaktureringContext";
@@ -15,6 +16,8 @@ import {
   useEntityCustomersLite,
   useInvoiceSearch,
   useInvoiceSettings,
+  useHasFakturaWriteAccess,
+  getAttachmentSignedUrl,
   type BasisRow,
   type SearchFilters,
 } from "@/fakturering/hooks/useFakturering";
@@ -23,6 +26,7 @@ import { BasisStatusChip, tripletexInvoiceUrl, tripletexOrderUrl } from "@/faktu
 import { useBasisDetails } from "@/fakturering/hooks/useFakturering";
 import { cn } from "@/lib/utils";
 import { readEdgeError } from "@/fakturering/lib/edgeError";
+import { EntityPickerBanner } from "@/fakturering/components/EntityPickerBanner";
 
 const MONTHS = ["jan","feb","mar","apr","mai","jun","jul","aug","sep","okt","nov","des"];
 const YEAR_NOW = new Date().getFullYear();
@@ -31,6 +35,7 @@ const YEARS = Array.from({ length: 6 }, (_, i) => YEAR_NOW - i);
 export default function Fakturasok() {
   const { activeEntityId } = useFaktureringEntity();
   const { toast } = useToast();
+  const writeAccess = useHasFakturaWriteAccess();
 
   const [numberQuery, setNumberQuery] = useState("");
   const [runId, setRunId] = useState<string | null>(null);
@@ -42,6 +47,7 @@ export default function Fakturasok() {
   const [execToken, setExecToken] = useState(1);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [retrying, setRetrying] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState<string | null>(null);
 
   const runs = useAllInvoiceRuns(activeEntityId);
   const customers = useEntityCustomersLite(activeEntityId);
@@ -49,7 +55,9 @@ export default function Fakturasok() {
 
   const filters: SearchFilters = { numberQuery, runId, customerIds, year, monthFrom, monthTo, excludeInternal };
   const search = useInvoiceSearch(activeEntityId, filters, execToken);
-  const results = search.data ?? [];
+  const results: BasisRow[] = search.data?.rows ?? [];
+  const totalCount = search.data?.totalCount ?? 0;
+  const truncated = search.data?.truncated ?? false;
 
   const totals = useMemo(() => {
     return results.reduce(
@@ -88,9 +96,25 @@ export default function Fakturasok() {
     }
   }
 
+  async function downloadAttachment(row: BasisRow) {
+    if (!row.attachment_path) return;
+    setDownloading(row.id);
+    try {
+      const url = await getAttachmentSignedUrl(row.attachment_path, 120);
+      window.open(url, "_blank", "noopener");
+    } catch (e: any) {
+      toast({ title: "Kunne ikke åpne vedlegg", description: await readEdgeError(e), variant: "destructive" });
+    } finally {
+      setDownloading(null);
+    }
+  }
+
   return (
+    <TooltipProvider>
     <div className="space-y-6">
       <PageHeader eyebrow="Fakturering" title="Fakturasøk" subtitle="Søk i grunnlag og overførte fakturaer" icon={FileText} />
+
+      <EntityPickerBanner />
 
       {/* Filterlinje */}
       <div className="grid grid-cols-1 gap-3 rounded-2xl border border-line-subtle bg-surface-raised p-4 lg:grid-cols-[minmax(160px,1fr)_180px_240px_100px_110px_110px_auto_auto]">
@@ -192,10 +216,27 @@ export default function Fakturasok() {
         </div>
       </div>
 
+      {search.isError && (
+        <div className="flex items-start gap-3 rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm">
+          <AlertTriangle className="mt-0.5 h-4 w-4 text-red-700 dark:text-red-400" />
+          <div className="flex-1">
+            <div className="font-medium text-text-primary">Søket feilet</div>
+            <div className="text-muted-foreground">{search.error instanceof Error ? search.error.message : "Ukjent feil"}</div>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => search.refetch()}>
+            <RotateCw className="mr-2 h-3.5 w-3.5" /> Prøv igjen
+          </Button>
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <span className="text-sm text-muted-foreground">Sortert på grunnlagsnr ↓</span>
         <span className="inline-flex items-center rounded-md bg-[hsl(var(--app-primary)/0.12)] px-2.5 py-1 text-xs font-semibold text-[hsl(var(--app-primary))]">
-          {search.isFetching ? "Søker…" : `${results.length} treff`}
+          {search.isFetching
+            ? "Søker…"
+            : truncated
+              ? `Viser ${results.length} av ${totalCount} — innsnevr filtrene`
+              : `${totalCount} treff`}
         </span>
       </div>
 
@@ -210,7 +251,7 @@ export default function Fakturasok() {
               <th className="px-3 py-2 text-right font-semibold">Mva</th>
               <th className="px-3 py-2 text-right font-semibold">Sum ink. mva</th>
               <th className="px-3 py-2 text-left font-semibold">Status</th>
-              <th className="px-3 py-2 text-left font-semibold">Tripletex</th>
+              <th className="px-3 py-2 text-left font-semibold">Handlinger</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-line-subtle">
@@ -220,43 +261,77 @@ export default function Fakturasok() {
               const txUrl = r.tripletex_invoice_id
                 ? tripletexInvoiceUrl(r.tripletex_invoice_id)
                 : tripletexOrderUrl(r.tripletex_order_id);
+              const retryDisabled = !writeAccess.data || retrying === r.id;
               return (
-                <>
-                  <tr key={r.id} className="cursor-pointer hover:bg-surface-sunken/60" onClick={() => toggleExpand(r.id)}>
-                    <td className="px-3 py-2 font-mono font-semibold">{r.basis_number}</td>
-                    <td className="px-3 py-2">{r.customer?.display_name ?? "—"} ({r.customer?.customer_number ?? "?"})</td>
-                    <td className="px-3 py-2 tabular-nums">{invDate ? format(new Date(invDate), "dd.MM.yyyy") : "—"}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{formatKr(Number(r.sum_excl_vat))}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{formatKr(Number(r.sum_vat))}</td>
-                    <td className="px-3 py-2 text-right font-semibold tabular-nums">{formatKr(Number(r.sum_incl_vat))}</td>
-                    <td className="px-3 py-2">
-                      <BasisStatusChip status={r.status} invoiceNumber={r.tripletex_invoice_number} errorMessage={r.transfer_error} doTransfer={r.do_transfer} />
-                    </td>
-                    <td className="px-3 py-2">
-                      {r.status === "error" ? (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); retryBasis(r); }}
-                          disabled={retrying === r.id}
-                          className="inline-flex items-center gap-1 text-sm font-medium text-[hsl(var(--app-primary))] hover:underline"
-                        >
-                          <RotateCw className={cn("h-3.5 w-3.5", retrying === r.id && "animate-spin")} /> Prøv igjen
-                        </button>
-                      ) : txUrl ? (
-                        <a href={txUrl} target="_blank" rel="noreferrer"
-                          className="inline-flex items-center gap-1 text-sm font-medium text-[hsl(var(--app-primary))] hover:underline"
-                          onClick={(e) => e.stopPropagation()}>
-                          TX-ordre {r.tripletex_order_id ?? r.tripletex_invoice_id} ↗
-                        </a>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </td>
-                  </tr>
-                  {isOpen && <ExpandedRow key={`${r.id}-x`} basis={r} settings={settings.data} />}
-                </>
+                <Fragment key={r.id}>
+                    <tr className="cursor-pointer hover:bg-surface-sunken/60" onClick={() => toggleExpand(r.id)}>
+                      <td className="px-3 py-2 font-mono font-semibold">{r.basis_number}</td>
+                      <td className="px-3 py-2">{r.customer?.display_name ?? "—"} ({r.customer?.customer_number ?? "?"})</td>
+                      <td className="px-3 py-2 tabular-nums">{invDate ? format(new Date(invDate), "dd.MM.yyyy") : "—"}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{formatKr(Number(r.sum_excl_vat))}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{formatKr(Number(r.sum_vat))}</td>
+                      <td className="px-3 py-2 text-right font-semibold tabular-nums">{formatKr(Number(r.sum_incl_vat))}</td>
+                      <td className="px-3 py-2">
+                        <BasisStatusChip
+                          status={r.status}
+                          invoiceNumber={r.tripletex_invoice_number}
+                          errorMessage={r.transfer_error}
+                          doTransfer={r.do_transfer}
+                          invoicingGroup={r.invoicing_group}
+                        />
+                      </td>
+                      <td className="px-3 py-2">
+                        <div className="flex items-center gap-3">
+                          {r.status === "error" ? (
+                            writeAccess.data ? (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); retryBasis(r); }}
+                                disabled={retryDisabled}
+                                className="inline-flex items-center gap-1 text-sm font-medium text-[hsl(var(--app-primary))] hover:underline disabled:opacity-60"
+                              >
+                                <RotateCw className={cn("h-3.5 w-3.5", retrying === r.id && "animate-spin")} /> Prøv igjen
+                              </button>
+                            ) : (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground opacity-60">
+                                    <RotateCw className="h-3.5 w-3.5" /> Prøv igjen
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent>Krever skrivetilgang til Fakturering</TooltipContent>
+                              </Tooltip>
+                            )
+                          ) : txUrl ? (
+                            <a href={txUrl} target="_blank" rel="noreferrer"
+                              className="inline-flex items-center gap-1 text-sm font-medium text-[hsl(var(--app-primary))] hover:underline"
+                              onClick={(e) => e.stopPropagation()}>
+                              TX-ordre {r.tripletex_order_id ?? r.tripletex_invoice_id} ↗
+                            </a>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                          {r.attachment_path && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); downloadAttachment(r); }}
+                                  disabled={downloading === r.id}
+                                  className="inline-flex items-center rounded-md p-1 text-muted-foreground hover:bg-surface-sunken hover:text-text-primary"
+                                >
+                                  <Paperclip className={cn("h-3.5 w-3.5", downloading === r.id && "animate-pulse")} />
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent>Åpne vedlegg (PDF)</TooltipContent>
+                            </Tooltip>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                    {isOpen && <ExpandedRow basis={r} settings={settings.data} />}
+                </Fragment>
               );
             })}
-            {!search.isFetching && results.length === 0 && (
+            {!search.isFetching && !search.isError && results.length === 0 && (
               <tr><td colSpan={8} className="p-8 text-center text-muted-foreground">Ingen treff for gjeldende filtre.</td></tr>
             )}
           </tbody>
@@ -274,6 +349,7 @@ export default function Fakturasok() {
         </table>
       </div>
     </div>
+    </TooltipProvider>
   );
 }
 
@@ -294,16 +370,14 @@ function ExpandedRow({ basis, settings }: { basis: BasisRow; settings: { interna
     ? format(addDays(new Date(invDate), basis.payment_terms_days), "dd.MM.yyyy")
     : "—";
 
-  // Group lines by iso_week
-  const byWeek = new Map<number | string, typeof details.data extends { lines: infer L } ? L : any>();
+  const byWeek = new Map<number | string, any[]>();
   for (const l of details.data?.lines ?? []) {
     const w = l.iso_week ?? "?";
-    const arr = (byWeek.get(w) as any[]) ?? [];
+    const arr = byWeek.get(w) ?? [];
     arr.push(l);
-    byWeek.set(w, arr as any);
+    byWeek.set(w, arr);
   }
 
-  // Group VAT sums
   const vatByRate = new Map<number, { excl: number; vat: number }>();
   for (const l of details.data?.lines ?? []) {
     const rate = Number(l.vat_rate);
@@ -321,7 +395,7 @@ function ExpandedRow({ basis, settings }: { basis: BasisRow; settings: { interna
             <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Leveranser</div>
             <div className="mt-1 space-y-1 text-sm">
               {[...byWeek.entries()].map(([w, arr]) => {
-                const lines = arr as any[];
+                const lines = arr;
                 const summary = lines.slice(0, 3).map((l) => `${l.product_number ?? ""} ${l.description} −${l.quantity}`).join(" · ");
                 const more = lines.length > 3 ? ` · +${lines.length - 3} varer` : "";
                 return (

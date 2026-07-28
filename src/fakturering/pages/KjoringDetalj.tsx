@@ -2,9 +2,10 @@ import { useMemo, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { Receipt, RotateCw, Undo2, ExternalLink, Pin, Loader2 } from "lucide-react";
+import { Receipt, RotateCw, Undo2, ExternalLink, Pin, Loader2, Paperclip, AlertTriangle } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
@@ -12,39 +13,62 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import {
-  useInvoiceRun, useBasesForRun, useHasFakturaWriteAccess, type BasisRow,
+  useInvoiceRun, useBasesForRun, useHasFakturaWriteAccess, uploadRunAttachments, type BasisRow,
 } from "@/fakturering/hooks/useFakturering";
 import { formatKr, groupDefFor } from "@/fakturering/lib/groups";
 import { BasisStatusChip, tripletexInvoiceUrl, tripletexOrderUrl } from "@/fakturering/components/BasisStatusChip";
 import { BasisDetailsDrawer } from "@/fakturering/components/BasisDetailsDrawer";
 import { readEdgeError } from "@/fakturering/lib/edgeError";
+import { cn } from "@/lib/utils";
+
+type AttachmentState = "uploaded" | "not_applicable" | "failed" | "pending";
+
+function attachmentState(b: BasisRow): { state: AttachmentState; reason?: string } {
+  if (b.attachment_uploaded_at) return { state: "uploaded" };
+  if (b.status !== "transferred" && b.status !== "invoiced") return { state: "pending" };
+  if (b.attachment_error) {
+    // Vi bruker attachment_error både for "ikke aktuelt"-årsaker og feilmeldinger.
+    const err = b.attachment_error.toLowerCase();
+    if (err.includes("ehf") || err.includes("vedleggstype") || err.includes("slått av")) {
+      return { state: "not_applicable", reason: b.attachment_error };
+    }
+    return { state: "failed", reason: b.attachment_error };
+  }
+  return { state: "pending" };
+}
 
 export default function KjoringDetalj() {
   const { id } = useParams<{ id: string }>();
   const { toast } = useToast();
   const qc = useQueryClient();
   const [drawerBasis, setDrawerBasis] = useState<BasisRow | null>(null);
-  const [busy, setBusy] = useState<"retry" | "cancel" | null>(null);
+  const [busy, setBusy] = useState<"retry" | "cancel" | "attachments" | null>(null);
 
   const runQ = useInvoiceRun(id);
   const run = runQ.data;
-  const basesQ = useBasesForRun(id, run?.status === "running");
+  const basesQ = useBasesForRun(id, run?.status === "running" || run?.status === "pending");
   const writeAccess = useHasFakturaWriteAccess();
 
   const bases = basesQ.data ?? [];
 
   const stats = useMemo(() => {
-    let transferred = 0, invoiced = 0, failed = 0, skipped = 0;
+    let transferred = 0, invoiced = 0, failed = 0, skipped = 0, pending = 0;
+    let attachUploaded = 0, attachApplicable = 0;
     for (const b of bases) {
       if (b.status === "invoiced") invoiced++;
       else if (b.status === "transferred") transferred++;
       else if (b.status === "error") failed++;
       else if (b.status === "skipped" || b.status === "excluded" || !b.do_transfer) skipped++;
+      else pending++;
+
+      const a = attachmentState(b);
+      if (a.state === "uploaded") { attachUploaded++; attachApplicable++; }
+      else if (a.state === "failed" || a.state === "pending") { attachApplicable++; }
     }
-    return { transferred, invoiced, failed, skipped };
+    return { transferred, invoiced, failed, skipped, pending, attachUploaded, attachApplicable };
   }, [bases]);
 
-  const failedCount = stats.failed;
+  const failedAndPending = stats.failed + stats.pending;
 
   async function retryFailed() {
     if (!id) return;
@@ -52,10 +76,24 @@ export default function KjoringDetalj() {
     try {
       const { error } = await supabase.functions.invoke("fakturering-transfer-run", { body: { run_id: id } });
       if (error) throw error;
-      toast({ title: "Prøver igjen", description: "Overføring startet for feilede grunnlag." });
+      toast({ title: "Prøver igjen", description: "Overføring startet for feilede og ventende grunnlag." });
       qc.invalidateQueries({ queryKey: ["fakturering"] });
     } catch (e: any) {
       toast({ title: "Feil", description: await readEdgeError(e), variant: "destructive" });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function reuploadAttachments() {
+    if (!id) return;
+    setBusy("attachments");
+    try {
+      await uploadRunAttachments(id);
+      toast({ title: "Vedlegg lastes opp", description: "Manglende og feilede vedlegg forsøkes på nytt." });
+      qc.invalidateQueries({ queryKey: ["fakturering"] });
+    } catch (e: any) {
+      toast({ title: "Feil ved opplasting", description: await readEdgeError(e), variant: "destructive" });
     } finally {
       setBusy(null);
     }
@@ -77,19 +115,27 @@ export default function KjoringDetalj() {
   }
 
   if (!id) return null;
-
-  const isRunning = run?.status === "running";
+  const isRunning = run?.status === "running" || run?.status === "pending";
 
   return (
+    <TooltipProvider>
     <div className="space-y-6">
-      <PageHeader eyebrow="Fakturering" title={`Fakturakjøring #${id.slice(0, 8)}`} icon={Receipt}
-        subtitle={run ? `${(run.groups ?? []).map((g) => groupDefFor(g).label).join(" + ")} · startet ${run.started_at ? format(new Date(run.started_at), "HH:mm") : "—"}` : ""}
+      <PageHeader eyebrow="Fakturering" title={`Fakturakjøring · ${run?.started_at ? format(new Date(run.started_at), "dd.MM.yyyy HH:mm") : id.slice(0, 8)}`} icon={Receipt}
+        subtitle={run ? `${(run.groups ?? []).map((g) => groupDefFor(g).label).join(" + ")}` : ""}
         actions={
           <div className="flex gap-2">
             <Link to="/fakturering/kjoringer" className="text-sm text-muted-foreground hover:underline self-center">← Alle kjøringer</Link>
           </div>
         }
       />
+
+      {runQ.isError && (
+        <div className="flex items-start gap-3 rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm">
+          <AlertTriangle className="mt-0.5 h-4 w-4 text-red-700 dark:text-red-400" />
+          <div className="flex-1">Kunne ikke laste kjøring: {runQ.error instanceof Error ? runQ.error.message : "ukjent feil"}</div>
+          <Button variant="outline" size="sm" onClick={() => runQ.refetch()}><RotateCw className="mr-2 h-3.5 w-3.5" />Prøv igjen</Button>
+        </div>
+      )}
 
       {isRunning && (
         <div className="flex items-center gap-3 rounded-xl border border-[hsl(var(--app-primary)/0.3)] bg-[hsl(var(--app-primary)/0.08)] px-4 py-3 text-sm">
@@ -98,13 +144,21 @@ export default function KjoringDetalj() {
         </div>
       )}
 
+      {run?.status === "completed_with_errors" && (
+        <div className="flex items-center gap-3 rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm">
+          <AlertTriangle className="h-4 w-4 text-red-700 dark:text-red-400" />
+          Fullført med feil — se feilede grunnlag under.
+        </div>
+      )}
+
       {/* Tellerkort */}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-6">
         <StatCard label="Grunnlag" value={bases.length} />
         <StatCard label="Overført som utkast" value={stats.transferred} tone="emerald" />
         <StatCard label="Fakturert i Tripletex" value={stats.invoiced} tone="emerald" />
+        <StatCard label="Venter" value={stats.pending} tone="muted" />
         <StatCard label="Feilet" value={stats.failed} tone={stats.failed > 0 ? "red" : "muted"} />
-        <StatCard label="Hoppet over" value={stats.skipped} tone="muted" />
+        <StatCard label="Vedlegg" value={stats.attachUploaded} sublabel={`av ${stats.attachApplicable} aktuelle`} tone="emerald" />
       </div>
 
       {/* Info-banner */}
@@ -125,12 +179,14 @@ export default function KjoringDetalj() {
               <th className="px-3 py-2 text-right font-semibold">Ordrer</th>
               <th className="px-3 py-2 text-right font-semibold">Sum ink. mva</th>
               <th className="px-3 py-2 text-left font-semibold">Status</th>
+              <th className="px-3 py-2 text-left font-semibold">Vedlegg</th>
               <th className="px-3 py-2 text-left font-semibold">Tripletex</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-line-subtle">
             {bases.map((b) => {
               const txUrl = b.tripletex_invoice_id ? tripletexInvoiceUrl(b.tripletex_invoice_id) : tripletexOrderUrl(b.tripletex_order_id);
+              const a = attachmentState(b);
               return (
                 <tr key={b.id} className="cursor-pointer hover:bg-surface-sunken/60" onClick={() => setDrawerBasis(b)}>
                   <td className="px-3 py-2 font-mono font-semibold">{b.basis_number || "—"}</td>
@@ -139,11 +195,37 @@ export default function KjoringDetalj() {
                   <td className="px-3 py-2 text-right font-semibold tabular-nums">{formatKr(Number(b.sum_incl_vat))}</td>
                   <td className="px-3 py-2">
                     <div className="space-y-1">
-                      <BasisStatusChip status={b.status} invoiceNumber={b.tripletex_invoice_number} errorMessage={b.transfer_error} doTransfer={b.do_transfer} />
+                      <BasisStatusChip
+                        status={b.status}
+                        invoiceNumber={b.tripletex_invoice_number}
+                        errorMessage={b.transfer_error}
+                        doTransfer={b.do_transfer}
+                        invoicingGroup={b.invoicing_group}
+                      />
                       {b.status === "error" && b.transfer_error && (
                         <div className="text-xs text-red-700 dark:text-red-400">{b.transfer_error}</div>
                       )}
                     </div>
+                  </td>
+                  <td className="px-3 py-2">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span onClick={(e) => e.stopPropagation()}>
+                          <Paperclip className={cn("h-4 w-4",
+                            a.state === "uploaded" && "text-emerald-600 dark:text-emerald-400",
+                            a.state === "failed" && "text-red-600 dark:text-red-400",
+                            a.state === "not_applicable" && "text-muted-foreground opacity-50",
+                            a.state === "pending" && "text-muted-foreground",
+                          )} />
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        {a.state === "uploaded" && "Vedlegg lastet opp til Tripletex"}
+                        {a.state === "failed" && `Feilet: ${a.reason}`}
+                        {a.state === "not_applicable" && (a.reason ?? "Ikke aktuelt")}
+                        {a.state === "pending" && "Venter på overføring"}
+                      </TooltipContent>
+                    </Tooltip>
                   </td>
                   <td className="px-3 py-2">
                     {txUrl ? (
@@ -157,7 +239,7 @@ export default function KjoringDetalj() {
               );
             })}
             {!basesQ.isLoading && bases.length === 0 && (
-              <tr><td colSpan={6} className="p-8 text-center text-muted-foreground">Ingen grunnlag i denne kjøringen.</td></tr>
+              <tr><td colSpan={7} className="p-8 text-center text-muted-foreground">Ingen grunnlag i denne kjøringen.</td></tr>
             )}
           </tbody>
         </table>
@@ -165,14 +247,37 @@ export default function KjoringDetalj() {
 
       {/* Handlinger */}
       <div className="flex flex-wrap items-center gap-3">
-        <Button
-          onClick={retryFailed}
-          disabled={!writeAccess.data || failedCount === 0 || busy !== null}
-          className="bg-orange-600 text-white hover:bg-orange-700"
-        >
-          <RotateCw className={busy === "retry" ? "mr-2 h-4 w-4 animate-spin" : "mr-2 h-4 w-4"} />
-          Prøv igjen — kun feilede ({failedCount})
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span>
+              <Button
+                onClick={retryFailed}
+                disabled={!writeAccess.data || failedAndPending === 0 || busy !== null}
+                className="bg-orange-600 text-white hover:bg-orange-700"
+              >
+                <RotateCw className={busy === "retry" ? "mr-2 h-4 w-4 animate-spin" : "mr-2 h-4 w-4"} />
+                Prøv igjen — feilede og ventende ({failedAndPending})
+              </Button>
+            </span>
+          </TooltipTrigger>
+          {!writeAccess.data && <TooltipContent>Krever skrivetilgang til Fakturering</TooltipContent>}
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span>
+              <Button
+                variant="outline"
+                onClick={reuploadAttachments}
+                disabled={!writeAccess.data || busy !== null}
+              >
+                <Paperclip className={busy === "attachments" ? "mr-2 h-4 w-4 animate-pulse" : "mr-2 h-4 w-4"} />
+                Last opp vedlegg på nytt
+              </Button>
+            </span>
+          </TooltipTrigger>
+          {!writeAccess.data && <TooltipContent>Krever skrivetilgang til Fakturering</TooltipContent>}
+        </Tooltip>
 
         <AlertDialog>
           <AlertDialogTrigger asChild>
@@ -202,17 +307,20 @@ export default function KjoringDetalj() {
 
       <BasisDetailsDrawer basis={drawerBasis} onOpenChange={(o) => !o && setDrawerBasis(null)} />
     </div>
+    </TooltipProvider>
   );
 }
 
-function StatCard({ label, value, tone = "default" }: { label: string; value: number; tone?: "default" | "emerald" | "red" | "muted" }) {
+function StatCard({ label, value, sublabel, tone = "default" }: { label: string; value: number; sublabel?: string; tone?: "default" | "emerald" | "red" | "muted" }) {
   const color = tone === "emerald" ? "text-emerald-700 dark:text-emerald-400"
     : tone === "red" ? "text-red-700 dark:text-red-400"
     : tone === "muted" ? "text-muted-foreground" : "text-text-primary";
   return (
     <div className="rounded-xl border border-line-subtle bg-surface-raised px-4 py-3">
       <div className={`font-display text-3xl font-semibold tabular-nums ${color}`}>{value}</div>
-      <div className="mt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{label}</div>
+      <div className="mt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+        {label}{sublabel ? <span className="ml-1 normal-case tracking-normal text-muted-foreground/70">{sublabel}</span> : null}
+      </div>
     </div>
   );
 }

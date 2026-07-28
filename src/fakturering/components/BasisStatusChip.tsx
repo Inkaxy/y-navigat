@@ -1,19 +1,34 @@
 import { cn } from "@/lib/utils";
+import { groupDefFor } from "@/fakturering/lib/groups";
 
 interface Props {
   status: string;
   invoiceNumber?: string | null;
   errorMessage?: string | null;
   doTransfer?: boolean;
+  invoicingGroup?: string | null;
   className?: string;
 }
 
 /** Kort status-chip for et fakturagrunnlag. */
-export function BasisStatusChip({ status, invoiceNumber, errorMessage, doTransfer = true, className }: Props) {
+export function BasisStatusChip({
+  status,
+  invoiceNumber,
+  errorMessage,
+  doTransfer = true,
+  invoicingGroup,
+  className,
+}: Props) {
   const base = "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-semibold";
 
   if (!doTransfer || status === "excluded" || status === "skipped") {
-    const label = doTransfer === false ? "Overføres ikke (test)" : status === "excluded" ? "Ekskludert" : "Hoppet over — kredittsperre";
+    const groupLabel = invoicingGroup ? groupDefFor(invoicingGroup).label : null;
+    const label =
+      doTransfer === false
+        ? `Overføres ikke${groupLabel ? ` — ${groupLabel}` : ""}`
+        : status === "excluded"
+          ? "Ekskludert"
+          : "Hoppet over — kredittsperre";
     return <span className={cn(base, "bg-muted text-muted-foreground", className)}>{label}</span>;
   }
 

@@ -34,6 +34,7 @@ export interface InvoiceSettings {
   legal_entity_id: string;
   internal_groups: string[];
   non_transfer_groups: string[];
+  attach_vedlegg: boolean;
 }
 
 export function useInvoiceSettings(entityId: string | null) {
@@ -43,7 +44,7 @@ export function useInvoiceSettings(entityId: string | null) {
     queryFn: async (): Promise<InvoiceSettings | null> => {
       const { data, error } = await supabase
         .from("invoice_settings")
-        .select("legal_entity_id, internal_groups, non_transfer_groups")
+        .select("legal_entity_id, internal_groups, non_transfer_groups, attach_vedlegg")
         .eq("legal_entity_id", entityId!)
         .maybeSingle();
       if (error) throw error;
@@ -51,6 +52,7 @@ export function useInvoiceSettings(entityId: string | null) {
         legal_entity_id: entityId!,
         internal_groups: ["internal_outlets"],
         non_transfer_groups: ["test"],
+        attach_vedlegg: true,
       };
     },
   });
@@ -119,11 +121,7 @@ export function useRecentInvoiceRuns(entityId: string | null, limit = 5) {
         .order("started_at", { ascending: false })
         .limit(limit);
       if (error) throw error;
-      return (data ?? []).map((r: any, idx) => ({
-        ...r,
-        run_no: r.run_no ?? r.sequence ?? null,
-        _fallback_no: idx,
-      }));
+      return (data ?? []).map((r: any) => ({ ...r, run_no: r.run_no ?? r.sequence ?? null }));
     },
   });
 }
@@ -141,7 +139,11 @@ export function useInvoiceRun(runId: string | undefined) {
       if (error) throw error;
       return (data as unknown) as InvoiceRunRow | null;
     },
-    refetchInterval: (q) => (q.state.data?.status === "running" ? 2000 : false),
+    // Poll while running OR pending (transfer just started, run still 'pending')
+    refetchInterval: (q) => {
+      const s = q.state.data?.status;
+      return s === "running" || s === "pending" ? 2000 : false;
+    },
   });
 }
 
@@ -159,6 +161,27 @@ export function useAllInvoiceRuns(entityId: string | null) {
       if (error) throw error;
       return ((data ?? []) as unknown) as InvoiceRunRow[];
     },
+  });
+}
+
+/** Antall invoice_basis med status='invoiced' per run_id, for gjeldende enhet. */
+export function useRunInvoicedCounts(entityId: string | null) {
+  return useQuery({
+    queryKey: ["fakturering", "run-invoiced-counts", entityId],
+    enabled: !!entityId,
+    queryFn: async (): Promise<Map<string, number>> => {
+      const { data, error } = await supabase
+        .from("invoice_basis")
+        .select("run_id")
+        .eq("legal_entity_id", entityId!)
+        .eq("status", "invoiced")
+        .limit(50000);
+      if (error) throw error;
+      const map = new Map<string, number>();
+      for (const r of (data ?? []) as any[]) map.set(r.run_id, (map.get(r.run_id) ?? 0) + 1);
+      return map;
+    },
+    staleTime: 30_000,
   });
 }
 
@@ -189,7 +212,14 @@ export interface BasisRow {
   attachment_generated_at: string | null;
   attachment_error: string | null;
   attachment_uploaded_at: string | null;
-  customer?: { id: string; display_name: string; customer_number: string; invoice_method: string | null } | null;
+  customer?: {
+    id: string;
+    display_name: string;
+    customer_number: string;
+    invoice_method: string | null;
+    invoice_attachment?: string | null;
+    include_attachments_in_ehf?: boolean | null;
+  } | null;
   run?: { id: string; run_date: string; started_at: string | null } | null;
   _order_count?: number;
 }
@@ -202,6 +232,14 @@ export async function getAttachmentSignedUrl(path: string, expiresSec = 60): Pro
 
 export async function regenerateAttachment(input: { run_id?: string; basis_id?: string }): Promise<void> {
   const { error } = await supabase.functions.invoke("fakturering-generate-vedlegg", { body: input });
+  if (error) throw error;
+}
+
+/** Kun (re)opplasting av vedlegg for allerede overførte grunnlag. */
+export async function uploadRunAttachments(runId: string): Promise<void> {
+  const { error } = await supabase.functions.invoke("fakturering-transfer-run", {
+    body: { run_id: runId, only_attachments: true },
+  });
   if (error) throw error;
 }
 
@@ -224,7 +262,7 @@ export function useBasesForRun(runId: string | undefined, isRunning: boolean = f
     queryFn: async (): Promise<BasisRow[]> => {
       const { data, error } = await supabase
         .from("invoice_basis")
-        .select(`*, customer:customer_id(id, display_name, customer_number, invoice_method)`)
+        .select(`*, customer:customer_id(id, display_name, customer_number, invoice_method, invoice_attachment, include_attachments_in_ehf)`)
         .eq("run_id", runId!)
         .order("basis_number", { ascending: true });
       if (error) throw error;
@@ -290,23 +328,35 @@ export interface SearchFilters {
   runId: string | null;
   customerIds: string[];
   year: number | null;
-  monthFrom: number | null; // 1..12
+  monthFrom: number | null;
   monthTo: number | null;
   excludeInternal: boolean;
 }
 
+export interface SearchResult {
+  rows: BasisRow[];
+  totalCount: number;
+  truncated: boolean;
+}
+
+const SEARCH_LIMIT = 500;
+
 export function useInvoiceSearch(entityId: string | null, filters: SearchFilters, execToken: number) {
   const settings = useInvoiceSettings(entityId);
+  const internalKey = (settings.data?.internal_groups ?? []).slice().sort().join(",");
   return useQuery({
-    queryKey: ["fakturering", "search", entityId, execToken],
+    queryKey: ["fakturering", "search", entityId, execToken, internalKey],
     enabled: execToken > 0 && !!entityId,
-    queryFn: async (): Promise<BasisRow[]> => {
+    queryFn: async (): Promise<SearchResult> => {
       let q = supabase
         .from("invoice_basis")
-        .select(`*, customer:customer_id(id, display_name, customer_number, invoice_method), run:run_id(id, run_date, started_at)`)
+        .select(
+          `*, customer:customer_id(id, display_name, customer_number, invoice_method, invoice_attachment, include_attachments_in_ehf), run:run_id(id, run_date, started_at)`,
+          { count: "exact" },
+        )
         .eq("legal_entity_id", entityId!)
         .order("basis_number", { ascending: false })
-        .limit(500);
+        .limit(SEARCH_LIMIT);
 
       if (filters.runId) q = q.eq("run_id", filters.runId);
       if (filters.customerIds.length > 0) q = q.in("customer_id", filters.customerIds);
@@ -315,8 +365,6 @@ export function useInvoiceSearch(entityId: string | null, filters: SearchFilters
         if (internal.length > 0) q = q.not("invoicing_group", "in", `(${internal.map((g) => `"${g}"`).join(",")})`);
       }
 
-      // Year + month range filter on tripletex_invoice_date OR run_date (via run).
-      // Build date bounds when year is present.
       if (filters.year) {
         const y = filters.year;
         const mFrom = filters.monthFrom ?? 1;
@@ -324,27 +372,30 @@ export function useInvoiceSearch(entityId: string | null, filters: SearchFilters
         const start = `${y}-${String(mFrom).padStart(2, "0")}-01`;
         const endDate = new Date(y, mTo, 0);
         const end = `${y}-${String(mTo).padStart(2, "0")}-${String(endDate.getDate()).padStart(2, "0")}`;
-        // Filter on tripletex_invoice_date primarily; fallback via created_at range
-        q = q.or(`and(tripletex_invoice_date.gte.${start},tripletex_invoice_date.lte.${end}),and(tripletex_invoice_date.is.null,created_at.gte.${start},created_at.lte.${end}T23:59:59)`);
+        q = q.or(
+          `and(tripletex_invoice_date.gte.${start},tripletex_invoice_date.lte.${end}),and(tripletex_invoice_date.is.null,created_at.gte.${start},created_at.lte.${end}T23:59:59)`,
+        );
       }
 
-      // Number query: exact / range / partial on basis_number and tripletex_invoice_number
+      // Nummersøk:
+      //  - «100-200» / «100..200» / «100 til 200» → range på basis_number KUN når BEGGE er rene tall
+      //  - alt annet (inkludert «FG-2026») → prefix-søk på basis_number ELLER tripletex_invoice_number
       const nq = filters.numberQuery.trim();
       if (nq) {
-        if (nq.includes("-till") || nq.includes("..") || nq.includes(" til ") || nq.match(/^\S+-\S+$/) && nq.split("-").length === 2) {
-          // fra-til; we accept "A..B" or "A-B" for pure numbers
-          const parts = nq.includes("..") ? nq.split("..") : nq.split(/\s+til\s+|-/);
-          if (parts.length === 2) {
-            q = q.gte("basis_number", parts[0].trim()).lte("basis_number", parts[1].trim());
-          }
+        const rangeMatch = nq.match(/^\s*(\d+)\s*(?:-|\.\.|\s+til\s+)\s*(\d+)\s*$/i);
+        if (rangeMatch) {
+          q = q.gte("basis_number", rangeMatch[1]).lte("basis_number", rangeMatch[2]);
         } else {
-          q = q.or(`basis_number.ilike.%${nq}%,tripletex_invoice_number.ilike.%${nq}%`);
+          const escaped = nq.replace(/[,%]/g, "");
+          q = q.or(`basis_number.ilike.${escaped}%,tripletex_invoice_number.ilike.${escaped}%`);
         }
       }
 
-      const { data, error } = await q;
+      const { data, error, count } = await q;
       if (error) throw error;
-      return (await attachOrderCounts(data ?? [])) as BasisRow[];
+      const rows = (await attachOrderCounts(data ?? [])) as BasisRow[];
+      const totalCount = typeof count === "number" ? count : rows.length;
+      return { rows, totalCount, truncated: totalCount > rows.length };
     },
   });
 }
@@ -379,6 +430,7 @@ export interface FullInvoiceSettings {
   vat_account_map: Record<string, string>;
   non_transfer_groups: string[];
   internal_groups: string[];
+  attach_vedlegg: boolean;
   tripletex_meta: Record<string, any>;
   updated_at: string;
 }
@@ -394,14 +446,16 @@ export function useFullInvoiceSettings(entityId: string | null) {
         .eq("legal_entity_id", entityId!)
         .maybeSingle();
       if (error) throw error;
-      return (data as any) ?? {
-        legal_entity_id: entityId!,
-        default_due_days: 14,
-        vat_account_map: { "15": "3001", "25": "3000" },
-        non_transfer_groups: ["test"],
-        internal_groups: ["internal_outlets"],
-        tripletex_meta: {},
-        updated_at: new Date().toISOString(),
+      const row: any = data ?? {};
+      return {
+        legal_entity_id: row.legal_entity_id ?? entityId!,
+        default_due_days: row.default_due_days ?? 14,
+        vat_account_map: row.vat_account_map ?? { "15": "3001", "25": "3000" },
+        non_transfer_groups: row.non_transfer_groups ?? ["test"],
+        internal_groups: row.internal_groups ?? ["internal_outlets"],
+        attach_vedlegg: row.attach_vedlegg ?? true,
+        tripletex_meta: row.tripletex_meta ?? {},
+        updated_at: row.updated_at ?? new Date().toISOString(),
       };
     },
     staleTime: 30 * 1000,
@@ -414,6 +468,7 @@ export interface SaveInvoiceSettingsInput {
   vat_account_map: Record<string, string>;
   non_transfer_groups: string[];
   internal_groups: string[];
+  attach_vedlegg: boolean;
 }
 
 export async function saveInvoiceSettings(input: SaveInvoiceSettingsInput) {
@@ -426,6 +481,7 @@ export async function saveInvoiceSettings(input: SaveInvoiceSettingsInput) {
         vat_account_map: input.vat_account_map,
         non_transfer_groups: input.non_transfer_groups,
         internal_groups: input.internal_groups,
+        attach_vedlegg: input.attach_vedlegg,
         updated_at: new Date().toISOString(),
       } as any,
       { onConflict: "legal_entity_id" },

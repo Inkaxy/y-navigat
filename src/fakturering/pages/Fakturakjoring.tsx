@@ -21,10 +21,11 @@ import {
   useRecentInvoiceRuns,
   type PreviewRow,
 } from "@/fakturering/hooks/useFakturering";
-import { KNOWN_GROUPS, groupDefFor, formatKr } from "@/fakturering/lib/groups";
+import { KNOWN_GROUPS, isKnownGroup, groupDefFor, formatKr } from "@/fakturering/lib/groups";
 import { GroupCard } from "@/fakturering/components/GroupCard";
 import { ConfirmRunDialog } from "@/fakturering/components/ConfirmRunDialog";
 import { PreviewDrawer } from "@/fakturering/components/PreviewDrawer";
+import { EntityPickerBanner } from "@/fakturering/components/EntityPickerBanner";
 import { cn } from "@/lib/utils";
 import { readEdgeError } from "@/fakturering/lib/edgeError";
 
@@ -69,12 +70,29 @@ export default function Fakturakjoring() {
     });
   };
 
-  const selectedRows: PreviewRow[] = useMemo(
-    () => KNOWN_GROUPS.filter((g) => selected.has(g.key))
-      .map((g) => rowByKey.get(g.key))
-      .filter((r): r is PreviewRow => !!r && r.customer_count > 0),
-    [selected, rowByKey],
+  // Kjente + ukjente grupper (ukjente kommer fra preview-radene og skal
+  // fortsatt kunne fakturers — de ble tidligere skjult stille).
+  const unknownGroupKeys = useMemo(
+    () => previewRows
+      .map((r) => r.invoicing_group)
+      .filter((g): g is string => !!g && !isKnownGroup(g)),
+    [previewRows],
   );
+
+  const selectedRows: PreviewRow[] = useMemo(() => {
+    const rows: PreviewRow[] = [];
+    for (const g of KNOWN_GROUPS) {
+      if (!selected.has(g.key)) continue;
+      const r = rowByKey.get(g.key);
+      if (r && r.customer_count > 0) rows.push(r);
+    }
+    for (const k of unknownGroupKeys) {
+      if (!selected.has(k)) continue;
+      const r = rowByKey.get(k);
+      if (r && r.customer_count > 0) rows.push(r);
+    }
+    return rows;
+  }, [selected, rowByKey, unknownGroupKeys]);
 
   const totalBasis = selectedRows.reduce((s, r) => s + r.customer_count, 0);
   const totalSum = selectedRows.reduce((s, r) => s + r.sum_incl_vat, 0);
@@ -109,22 +127,27 @@ export default function Fakturakjoring() {
 
       toast({ title: "Grunnlag opprettet", description: `${runResult.basis_count} grunnlag klare for overføring.` });
 
-      const { error: transferErr } = await supabase.functions.invoke("fakturering-transfer-run", {
-        body: { run_id: runId },
-      });
-      if (transferErr) {
-        toast({
-          title: "Overføring startet med feil",
-          description: await readEdgeError(transferErr),
-          variant: "destructive",
+      // Ikke-blokkerende overføring: naviger til kjørings-siden umiddelbart —
+      // running-pollingen der viser status live og fanger opp feil.
+      supabase.functions
+        .invoke("fakturering-transfer-run", { body: { run_id: runId } })
+        .then(({ error }) => {
+          if (error) {
+            readEdgeError(error).then((msg) =>
+              toast({ title: "Overføring feilet", description: msg, variant: "destructive" }),
+            );
+          }
+          qc.invalidateQueries({ queryKey: ["fakturering"] });
+        })
+        .catch(async (e) => {
+          toast({ title: "Overføring feilet", description: await readEdgeError(e), variant: "destructive" });
         });
-      } else {
-        toast({ title: "Overføring ferdig", description: "Ordre-utkast opprettet i Tripletex." });
-      }
 
       // Fire-and-forget attachment generation — feil stopper aldri kjøringen.
       supabase.functions.invoke("fakturering-generate-vedlegg", { body: { run_id: runId } })
         .catch((e) => console.warn("vedlegg-gen failed", e));
+
+      toast({ title: "Overføring startet", description: "Følg med på fremdriften — vedlegg lastes opp underveis." });
 
       qc.invalidateQueries({ queryKey: ["fakturering"] });
       setConfirmOpen(false);
@@ -149,6 +172,10 @@ export default function Fakturakjoring() {
         icon={Receipt}
         actions={<TripletexChip status={tripletex.data} entityName={activeEntity?.legal_name ?? null} isLoading={tripletex.isLoading} />}
       />
+
+      <EntityPickerBanner />
+
+
 
       {/* Datovelger */}
       <div className="flex flex-col items-center gap-2 py-4">
@@ -244,7 +271,27 @@ export default function Fakturakjoring() {
             />
           );
         })}
+        {unknownGroupKeys.map((key) => {
+          const row = rowByKey.get(key)!;
+          const def = groupDefFor(key);
+          return (
+            <GroupCard
+              key={`unknown-${key}`}
+              def={def}
+              customerCount={row.customer_count}
+              orderCount={row.order_count}
+              sumInclVat={row.sum_incl_vat}
+              isEmpty={row.customer_count === 0}
+              isInternal={false}
+              isNonTransfer={false}
+              selected={selected.has(key)}
+              onToggle={() => toggleGroup(key)}
+            />
+          );
+        })}
       </div>
+
+
 
       {/* Handlingslinje */}
       <div className="flex flex-col gap-4 rounded-2xl border border-line-subtle bg-surface-raised p-5 lg:flex-row lg:items-center">
