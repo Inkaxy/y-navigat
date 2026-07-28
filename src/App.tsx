@@ -164,6 +164,10 @@ import RavarerLiveForhandlingSetup from "@/ravarer/pages/forhandlinger/LiveForha
 import RavarerLiveForhandlingWorkspace from "@/ravarer/pages/forhandlinger/LiveForhandlingWorkspace";
 import RavarerLiveConfirmationPortal from "@/ravarer/pages/forhandlinger/LiveConfirmationPortal";
 
+// Fakturering (utgående kundefakturaer → Tripletex) — steg 1: skeletons
+import { FaktureringProvider } from "@/fakturering/context/FaktureringContext";
+import FakturaSkeleton from "@/fakturering/pages/FakturaSkeleton";
+
 const KunderEntityProvider = ({ children }: { children: React.ReactNode }) => {
   const { user } = useNbhubAuth();
   const { data: access } = useKunderUserAccess(user);
