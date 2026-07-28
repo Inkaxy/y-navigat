@@ -416,7 +416,7 @@ const App = () => (
               <Route path="/fakturering/sok" element={<FaktureringShell><Fakturasok /></FaktureringShell>} />
               <Route path="/fakturering/kjoringer" element={<FaktureringShell><Kjoringer /></FaktureringShell>} />
               <Route path="/fakturering/kjoringer/:id" element={<FaktureringShell><KjoringDetalj /></FaktureringShell>} />
-              <Route path="/fakturering/innstillinger" element={<FaktureringShell><FakturaSkeleton title="Innstillinger" subtitle="Forfallsdager, mva-konto-mapping og Tripletex-cache." body="Merk: mva-kontonumre må avklares med regnskapsfører før faktureringen aktiveres." /></FaktureringShell>} />
+              <Route path="/fakturering/innstillinger" element={<FaktureringShell><FakturaInnstillinger /></FaktureringShell>} />
 
 
 
