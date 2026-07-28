@@ -328,8 +328,7 @@ export default function Fakturasok() {
                       </td>
                     </tr>
                     {isOpen && <ExpandedRow basis={r} settings={settings.data} />}
-                  </td>
-                </tr>
+                </Fragment>
               );
             })}
             {!search.isFetching && !search.isError && results.length === 0 && (
