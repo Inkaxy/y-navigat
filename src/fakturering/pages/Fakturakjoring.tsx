@@ -119,6 +119,10 @@ export default function Fakturakjoring() {
         toast({ title: "Overføring ferdig", description: "Ordre-utkast opprettet i Tripletex." });
       }
 
+      // Fire-and-forget attachment generation — feil stopper aldri kjøringen.
+      supabase.functions.invoke("fakturering-generate-vedlegg", { body: { run_id: runId } })
+        .catch((e) => console.warn("vedlegg-gen failed", e));
+
       qc.invalidateQueries({ queryKey: ["fakturering"] });
       setConfirmOpen(false);
       navigate(`/fakturering/kjoringer/${runId}`);

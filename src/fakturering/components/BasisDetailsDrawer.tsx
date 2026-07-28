@@ -1,7 +1,17 @@
+import { useState } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Link } from "react-router-dom";
 import { format } from "date-fns";
-import { useBasisDetails, type BasisRow } from "@/fakturering/hooks/useFakturering";
+import { Paperclip, RotateCw, Loader2 } from "lucide-react";
+import {
+  useBasisDetails,
+  getAttachmentSignedUrl,
+  regenerateAttachment,
+  useHasFakturaWriteAccess,
+  type BasisRow,
+} from "@/fakturering/hooks/useFakturering";
+import { useToast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
 import { formatKr } from "@/fakturering/lib/groups";
 import { BasisStatusChip, tripletexInvoiceUrl, tripletexOrderUrl } from "./BasisStatusChip";
 
