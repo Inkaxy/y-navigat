@@ -10293,6 +10293,10 @@ export type Database = {
           deleted_rows: number
         }[]
       }
+      clear_invoice_tripletex_meta: {
+        Args: { p_legal_entity_id: string }
+        Returns: Json
+      }
       create_invoice_run: {
         Args: {
           p_groups: string[]
