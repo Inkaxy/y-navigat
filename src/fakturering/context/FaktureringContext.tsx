@@ -20,6 +20,8 @@ interface FaktureringContextValue {
   setActiveEntity: (entityId: string) => void;
   isLoading: boolean;
   hasNoAccess: boolean;
+  /** Global valgt enhet finnes ikke i faktura-tilgjengelige — vis picker i stedet for å endre kontekst stille. */
+  needsEntitySelection: boolean;
 }
 
 const Ctx = createContext<FaktureringContextValue | undefined>(undefined);
@@ -58,11 +60,14 @@ export function FaktureringProvider({ children }: { children: ReactNode }) {
     staleTime: 5 * 60 * 1000,
   });
 
+  // Sett bare første enhet som globalt valg dersom brukeren ikke har valgt noe
+  // fra før. Vi bytter ALDRI en gyldig global enhet bare fordi den ikke er
+  // faktura-tilgjengelig — det ville stille endret Ordre/Produksjon-konteksten
+  // for brukeren. I stedet viser vi en enhetsvelger på faktura-sidene.
   useEffect(() => {
     if (isLoading) return;
     if (availableEntities.length === 0) return;
-    const stillValid = legalEntityId && availableEntities.some((e) => e.id === legalEntityId);
-    if (!stillValid) setLegalEntityId(availableEntities[0].id);
+    if (!legalEntityId) setLegalEntityId(availableEntities[0].id);
   }, [availableEntities, isLoading, legalEntityId, setLegalEntityId]);
 
   const setActiveEntity = useCallback(
@@ -75,13 +80,16 @@ export function FaktureringProvider({ children }: { children: ReactNode }) {
     [availableEntities, legalEntityId],
   );
 
+  const activeEntityId = activeEntity ? legalEntityId : null;
+
   const value: FaktureringContextValue = {
-    activeEntityId: legalEntityId,
+    activeEntityId,
     activeEntity,
     availableEntities,
     setActiveEntity,
     isLoading,
     hasNoAccess: !isLoading && availableEntities.length === 0,
+    needsEntitySelection: !isLoading && availableEntities.length > 0 && !activeEntity,
   };
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

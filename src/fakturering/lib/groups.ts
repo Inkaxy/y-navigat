@@ -19,11 +19,16 @@ export function groupDefFor(key: string | null | undefined): GroupDef {
   if (!key) return { key: "__none", code: "?", label: "Uten gruppe" };
   const match = KNOWN_GROUPS.find((g) => g.key === key);
   if (match) return match;
-  return { key, code: "?", label: key };
+  // Ukjent gruppe — vis nøkkelen selv med tydelig prefix
+  return { key, code: "?", label: `Ukjent: ${key}` };
+}
+
+export function isKnownGroup(key: string | null | undefined): boolean {
+  return !!key && KNOWN_GROUPS.some((g) => g.key === key);
 }
 
 export function formatKr(n: number): string {
-  return new Intl.NumberFormat("no-NB", {
+  return new Intl.NumberFormat("nb-NO", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(n) + " kr";
