@@ -22,6 +22,7 @@ import { formatKr, groupDefFor } from "@/fakturering/lib/groups";
 import { BasisStatusChip, tripletexInvoiceUrl, tripletexOrderUrl } from "@/fakturering/components/BasisStatusChip";
 import { useBasisDetails } from "@/fakturering/hooks/useFakturering";
 import { cn } from "@/lib/utils";
+import { readEdgeError } from "@/fakturering/lib/edgeError";
 
 const MONTHS = ["jan","feb","mar","apr","mai","jun","jul","aug","sep","okt","nov","des"];
 const YEAR_NOW = new Date().getFullYear();
@@ -81,7 +82,7 @@ export default function Fakturasok() {
       toast({ title: "Prøver igjen", description: `Overføring startet for kjøringen.` });
       search.refetch();
     } catch (e: any) {
-      toast({ title: "Feil ved re-overføring", description: e?.message ?? String(e), variant: "destructive" });
+      toast({ title: "Feil ved re-overføring", description: await readEdgeError(e), variant: "destructive" });
     } finally {
       setRetrying(null);
     }

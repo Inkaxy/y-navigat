@@ -26,6 +26,7 @@ import { GroupCard } from "@/fakturering/components/GroupCard";
 import { ConfirmRunDialog } from "@/fakturering/components/ConfirmRunDialog";
 import { PreviewDrawer } from "@/fakturering/components/PreviewDrawer";
 import { cn } from "@/lib/utils";
+import { readEdgeError } from "@/fakturering/lib/edgeError";
 
 function toISO(d: Date) { return format(d, "yyyy-MM-dd"); }
 
@@ -114,7 +115,7 @@ export default function Fakturakjoring() {
       if (transferErr) {
         toast({
           title: "Overføring startet med feil",
-          description: transferErr.message ?? "Se kjøringsdetaljer.",
+          description: await readEdgeError(transferErr),
           variant: "destructive",
         });
       } else {
@@ -131,7 +132,7 @@ export default function Fakturakjoring() {
     } catch (e: any) {
       toast({
         title: "Kunne ikke kjøre fakturering",
-        description: e?.message ?? String(e),
+        description: await readEdgeError(e),
         variant: "destructive",
       });
     } finally {

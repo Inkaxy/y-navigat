@@ -217,7 +217,7 @@ async function attachOrderCounts(bases: any[]): Promise<any[]> {
   return bases.map((b) => ({ ...b, _order_count: counts.get(b.id) ?? 0 }));
 }
 
-export function useBasesForRun(runId: string | undefined) {
+export function useBasesForRun(runId: string | undefined, isRunning: boolean = false) {
   return useQuery({
     queryKey: ["fakturering", "run-bases", runId],
     enabled: !!runId,
@@ -230,7 +230,7 @@ export function useBasesForRun(runId: string | undefined) {
       if (error) throw error;
       return (await attachOrderCounts(data ?? [])) as BasisRow[];
     },
-    refetchInterval: 4000,
+    refetchInterval: isRunning ? 4000 : false,
   });
 }
 

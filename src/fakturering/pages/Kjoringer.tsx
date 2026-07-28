@@ -36,7 +36,15 @@ export default function Kjoringer() {
                 <td className="px-3 py-2 font-mono">#{(runs.data?.length ?? 0) - idx}</td>
                 <td className="px-3 py-2 tabular-nums">{r.started_at ? format(new Date(r.started_at), "dd.MM.yyyy HH:mm") : format(new Date(r.run_date), "dd.MM.yyyy")}</td>
                 <td className="px-3 py-2">{(r.groups ?? []).map((g) => groupDefFor(g).label).join(" + ") || "—"}</td>
-                <td className="px-3 py-2 capitalize">{r.status}</td>
+                <td className="px-3 py-2">
+                  {r.status === "completed_with_errors" ? (
+                    <span className="inline-flex items-center gap-1 rounded-md bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-800 dark:bg-red-950/40 dark:text-red-300">
+                      Fullført med feil
+                    </span>
+                  ) : (
+                    <span className="capitalize">{r.status}</span>
+                  )}
+                </td>
                 <td className="px-3 py-2 text-right tabular-nums">{r.basis_count}</td>
                 <td className="px-3 py-2 text-right tabular-nums text-emerald-700 dark:text-emerald-400">{r.transferred_count}</td>
                 <td className="px-3 py-2 text-right tabular-nums">—</td>
