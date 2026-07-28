@@ -139,7 +139,7 @@ export function useInvoiceRun(runId: string | undefined) {
         .eq("id", runId!)
         .maybeSingle();
       if (error) throw error;
-      return data as InvoiceRunRow | null;
+      return (data as unknown) as InvoiceRunRow | null;
     },
     refetchInterval: (q) => (q.state.data?.status === "running" ? 2000 : false),
   });
