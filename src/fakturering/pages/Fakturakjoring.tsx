@@ -127,22 +127,27 @@ export default function Fakturakjoring() {
 
       toast({ title: "Grunnlag opprettet", description: `${runResult.basis_count} grunnlag klare for overføring.` });
 
-      const { error: transferErr } = await supabase.functions.invoke("fakturering-transfer-run", {
-        body: { run_id: runId },
-      });
-      if (transferErr) {
-        toast({
-          title: "Overføring startet med feil",
-          description: await readEdgeError(transferErr),
-          variant: "destructive",
+      // Ikke-blokkerende overføring: naviger til kjørings-siden umiddelbart —
+      // running-pollingen der viser status live og fanger opp feil.
+      supabase.functions
+        .invoke("fakturering-transfer-run", { body: { run_id: runId } })
+        .then(({ error }) => {
+          if (error) {
+            readEdgeError(error).then((msg) =>
+              toast({ title: "Overføring feilet", description: msg, variant: "destructive" }),
+            );
+          }
+          qc.invalidateQueries({ queryKey: ["fakturering"] });
+        })
+        .catch(async (e) => {
+          toast({ title: "Overføring feilet", description: await readEdgeError(e), variant: "destructive" });
         });
-      } else {
-        toast({ title: "Overføring ferdig", description: "Ordre-utkast opprettet i Tripletex." });
-      }
 
       // Fire-and-forget attachment generation — feil stopper aldri kjøringen.
       supabase.functions.invoke("fakturering-generate-vedlegg", { body: { run_id: runId } })
         .catch((e) => console.warn("vedlegg-gen failed", e));
+
+      toast({ title: "Overføring startet", description: "Følg med på fremdriften — vedlegg lastes opp underveis." });
 
       qc.invalidateQueries({ queryKey: ["fakturering"] });
       setConfirmOpen(false);
