@@ -683,17 +683,7 @@ function drawSection(
   return { page: curPage, y };
 }
 
-  // Legend
-  const legendParts: string[] = [];
-  for (const [rate, letter] of [...vatLetter.entries()].sort((a, b) => a[0] - b[0])) {
-    legendParts.push(`(${letter}) = ${rate} % mva`);
-  }
-  legendParts.push("RETUR = negativ mengde krediteres");
-  drawText(page, legendParts.join("    "), MARGIN_X, y, { font: fonts.reg, size: 8, color: COLORS.muted });
-  y -= 20;
 
-  return y;
-}
 
 function drawFooter(page: PDFPage, fonts: Fonts, entity: any, genStamp: string, pageIdx: number, totalPages: number) {
   const y = 26;
