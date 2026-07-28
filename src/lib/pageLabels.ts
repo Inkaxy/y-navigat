@@ -76,6 +76,12 @@ const RULES: PageRule[] = [
   { test: (p) => p.startsWith("/produksjon/innstillinger/utskriftsprofiler"), label: "Utskriftsprofiler" },
   { test: (p) => p.startsWith("/produksjon/innstillinger"), label: "Innstillinger" },
   { test: (p) => p.startsWith("/produksjon"), label: "Produksjon" },
+
+  // Fakturering
+  { test: (p) => p.startsWith("/fakturering/sok"), label: "Fakturasøk" },
+  { test: (p) => p.startsWith("/fakturering/kjoringer"), label: "Kjøringer" },
+  { test: (p) => p.startsWith("/fakturering/innstillinger"), label: "Innstillinger" },
+  { test: (p) => p === "/fakturering", label: "Fakturakjøring" },
 ];
 
 export function getPageLabel(pathname: string, fallback: string): string {

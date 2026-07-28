@@ -136,6 +136,16 @@ const STATIC_SUBMENUS: Record<string, { prefix: string; appSlug: string; items: 
       { kind: "link", to: "/pos-styring/innstillinger", label: "Innstillinger", icon: Settings },
     ],
   },
+  faktura: {
+    prefix: "/fakturering",
+    appSlug: "faktura",
+    items: [
+      { kind: "link", to: "/fakturering", label: "Fakturakjøring", icon: Receipt },
+      { kind: "link", to: "/fakturering/sok", label: "Fakturasøk", icon: FileText },
+      { kind: "link", to: "/fakturering/kjoringer", label: "Kjøringer", icon: ClipboardList },
+      { kind: "link", to: "/fakturering/innstillinger", label: "Innstillinger", icon: Settings },
+    ],
+  },
   admin: {
     prefix: "/admin",
     appSlug: "nbos",
@@ -302,7 +312,7 @@ function NavBar({ appSlug, items }: { appSlug: string; items: NavItem[] }) {
     if (path === "/ravarer/fakturaer" && !query) {
       return pathname === path && !new URLSearchParams(search).get("status");
     }
-    if (path === "/pos-styring" && !query) {
+    if ((path === "/pos-styring" || path === "/fakturering") && !query) {
       return pathname === path;
     }
     if (query) {

@@ -1376,6 +1376,7 @@ export type Database = {
           primary_contact_phone: string | null
           profile_overrides: Json
           status: string
+          tripletex_customer_id: number | null
           updated_at: string
         }
         Insert: {
@@ -1426,6 +1427,7 @@ export type Database = {
           primary_contact_phone?: string | null
           profile_overrides?: Json
           status?: string
+          tripletex_customer_id?: number | null
           updated_at?: string
         }
         Update: {
@@ -1476,6 +1478,7 @@ export type Database = {
           primary_contact_phone?: string | null
           profile_overrides?: Json
           status?: string
+          tripletex_customer_id?: number | null
           updated_at?: string
         }
         Relationships: [
@@ -2231,6 +2234,177 @@ export type Database = {
           },
         ]
       }
+      invoice_basis: {
+        Row: {
+          basis_number: string
+          created_at: string
+          customer_id: string
+          customer_snapshot: Json | null
+          do_transfer: boolean
+          id: string
+          invoiced_at: string | null
+          invoicing_group: string
+          legal_entity_id: string
+          payment_terms_days: number | null
+          run_id: string
+          source_customer_ids: string[] | null
+          status: string
+          sum_excl_vat: number
+          sum_incl_vat: number
+          sum_vat: number
+          transfer_error: string | null
+          transferred_at: string | null
+          tripletex_customer_id: number | null
+          tripletex_invoice_date: string | null
+          tripletex_invoice_id: number | null
+          tripletex_invoice_number: string | null
+          tripletex_order_id: number | null
+        }
+        Insert: {
+          basis_number: string
+          created_at?: string
+          customer_id: string
+          customer_snapshot?: Json | null
+          do_transfer?: boolean
+          id?: string
+          invoiced_at?: string | null
+          invoicing_group: string
+          legal_entity_id: string
+          payment_terms_days?: number | null
+          run_id: string
+          source_customer_ids?: string[] | null
+          status?: string
+          sum_excl_vat?: number
+          sum_incl_vat?: number
+          sum_vat?: number
+          transfer_error?: string | null
+          transferred_at?: string | null
+          tripletex_customer_id?: number | null
+          tripletex_invoice_date?: string | null
+          tripletex_invoice_id?: number | null
+          tripletex_invoice_number?: string | null
+          tripletex_order_id?: number | null
+        }
+        Update: {
+          basis_number?: string
+          created_at?: string
+          customer_id?: string
+          customer_snapshot?: Json | null
+          do_transfer?: boolean
+          id?: string
+          invoiced_at?: string | null
+          invoicing_group?: string
+          legal_entity_id?: string
+          payment_terms_days?: number | null
+          run_id?: string
+          source_customer_ids?: string[] | null
+          status?: string
+          sum_excl_vat?: number
+          sum_incl_vat?: number
+          sum_vat?: number
+          transfer_error?: string | null
+          transferred_at?: string | null
+          tripletex_customer_id?: number | null
+          tripletex_invoice_date?: string | null
+          tripletex_invoice_id?: number | null
+          tripletex_invoice_number?: string | null
+          tripletex_order_id?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_basis_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "invoice_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoice_basis_lines: {
+        Row: {
+          basis_id: string
+          description: string
+          id: string
+          iso_week: number | null
+          line_excl_vat: number
+          line_incl_vat: number
+          line_number: number
+          line_vat: number
+          product_id: string | null
+          product_number: string | null
+          quantity: number
+          sales_unit: string | null
+          unit_price_excl_vat: number | null
+          vat_rate: number
+        }
+        Insert: {
+          basis_id: string
+          description: string
+          id?: string
+          iso_week?: number | null
+          line_excl_vat: number
+          line_incl_vat: number
+          line_number: number
+          line_vat: number
+          product_id?: string | null
+          product_number?: string | null
+          quantity: number
+          sales_unit?: string | null
+          unit_price_excl_vat?: number | null
+          vat_rate: number
+        }
+        Update: {
+          basis_id?: string
+          description?: string
+          id?: string
+          iso_week?: number | null
+          line_excl_vat?: number
+          line_incl_vat?: number
+          line_number?: number
+          line_vat?: number
+          product_id?: string | null
+          product_number?: string | null
+          quantity?: number
+          sales_unit?: string | null
+          unit_price_excl_vat?: number | null
+          vat_rate?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_basis_lines_basis_id_fkey"
+            columns: ["basis_id"]
+            isOneToOne: false
+            referencedRelation: "invoice_basis"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoice_basis_orders: {
+        Row: {
+          basis_id: string
+          created_at: string
+          order_id: string
+        }
+        Insert: {
+          basis_id: string
+          created_at?: string
+          order_id: string
+        }
+        Update: {
+          basis_id?: string
+          created_at?: string
+          order_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_basis_orders_basis_id_fkey"
+            columns: ["basis_id"]
+            isOneToOne: false
+            referencedRelation: "invoice_basis"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoice_line_exclusion_patterns: {
         Row: {
           created_at: string | null
@@ -2492,6 +2666,96 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      invoice_runs: {
+        Row: {
+          basis_count: number
+          completed_at: string | null
+          created_at: string
+          details: Json
+          error_message: string | null
+          failed_count: number
+          groups: string[]
+          id: string
+          legal_entity_id: string
+          run_date: string
+          skipped_count: number
+          started_at: string | null
+          started_by: string | null
+          status: string
+          total_incl_vat: number
+          transferred_count: number
+          updated_at: string
+        }
+        Insert: {
+          basis_count?: number
+          completed_at?: string | null
+          created_at?: string
+          details?: Json
+          error_message?: string | null
+          failed_count?: number
+          groups: string[]
+          id?: string
+          legal_entity_id: string
+          run_date: string
+          skipped_count?: number
+          started_at?: string | null
+          started_by?: string | null
+          status?: string
+          total_incl_vat?: number
+          transferred_count?: number
+          updated_at?: string
+        }
+        Update: {
+          basis_count?: number
+          completed_at?: string | null
+          created_at?: string
+          details?: Json
+          error_message?: string | null
+          failed_count?: number
+          groups?: string[]
+          id?: string
+          legal_entity_id?: string
+          run_date?: string
+          skipped_count?: number
+          started_at?: string | null
+          started_by?: string | null
+          status?: string
+          total_incl_vat?: number
+          transferred_count?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      invoice_settings: {
+        Row: {
+          default_due_days: number
+          internal_groups: string[]
+          legal_entity_id: string
+          non_transfer_groups: string[]
+          tripletex_meta: Json
+          updated_at: string
+          vat_account_map: Json
+        }
+        Insert: {
+          default_due_days?: number
+          internal_groups?: string[]
+          legal_entity_id: string
+          non_transfer_groups?: string[]
+          tripletex_meta?: Json
+          updated_at?: string
+          vat_account_map?: Json
+        }
+        Update: {
+          default_due_days?: number
+          internal_groups?: string[]
+          legal_entity_id?: string
+          non_transfer_groups?: string[]
+          tripletex_meta?: Json
+          updated_at?: string
+          vat_account_map?: Json
+        }
+        Relationships: []
       }
       invoices: {
         Row: {
