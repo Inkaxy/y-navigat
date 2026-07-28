@@ -378,6 +378,24 @@ function SettingsSection({ entityId, canWrite }: { entityId: string; canWrite: b
           </div>
         </div>
 
+        <div className="space-y-2 rounded-md border border-line-subtle bg-surface-sunken/40 p-3">
+          <label className="flex items-start gap-2 text-sm">
+            <Checkbox
+              checked={attachVedlegg}
+              onCheckedChange={(v) => setAttachVedlegg(!!v)}
+              disabled={!canWrite}
+            />
+            <span className="space-y-1">
+              <span className="block font-medium">Legg ved fakturagrunnlag-PDF på Tripletex-ordren</span>
+              <span className="block text-xs text-muted-foreground">
+                Etter overføring lastes matrise-vedlegget opp til Tripletex-ordren slik at det følger fakturaen. Kunder med
+                vedleggstype ≠ «Spesifisert pr. uke» eller EHF-kunder uten «Inkluder vedlegg i EHF» hoppes over automatisk.
+              </span>
+            </span>
+          </label>
+        </div>
+
+
         <div className="flex justify-end">
           <Button onClick={handleSave} disabled={saving || !canWrite} style={{ background: ACCENT, color: "white" }}>
             <Save className="h-4 w-4 mr-1" />
