@@ -10512,6 +10512,20 @@ export type Database = {
           sum_incl_vat: number
         }[]
       }
+      get_invoice_run_preview_customers: {
+        Args: {
+          p_groups?: string[]
+          p_legal_entity_id: string
+          p_run_date: string
+        }
+        Returns: {
+          customer_name: string
+          invoicing_group: string
+          order_count: number
+          recipient_id: string
+          sum_incl_vat: number
+        }[]
+      }
       get_label_products_for_date: {
         Args: {
           p_date: string
