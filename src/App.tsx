@@ -201,6 +201,16 @@ const PosStyringShell = ({ children }: { children: React.ReactNode }) => (
   </Shell>
 );
 
+const FaktureringShell = ({ children }: { children: React.ReactNode }) => (
+  <Shell>
+    <AppAccessGuard appCode="faktura" appName="Fakturering">
+      <AppColorProvider appCode="faktura">
+        <FaktureringProvider>{children}</FaktureringProvider>
+      </AppColorProvider>
+    </AppAccessGuard>
+  </Shell>
+);
+
 const AppRoute = ({
   code,
   name,
