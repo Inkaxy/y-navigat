@@ -2744,6 +2744,7 @@ export type Database = {
       }
       invoice_settings: {
         Row: {
+          attach_vedlegg: boolean
           default_due_days: number
           internal_groups: string[]
           legal_entity_id: string
@@ -2753,6 +2754,7 @@ export type Database = {
           vat_account_map: Json
         }
         Insert: {
+          attach_vedlegg?: boolean
           default_due_days?: number
           internal_groups?: string[]
           legal_entity_id: string
@@ -2762,6 +2764,7 @@ export type Database = {
           vat_account_map?: Json
         }
         Update: {
+          attach_vedlegg?: boolean
           default_due_days?: number
           internal_groups?: string[]
           legal_entity_id?: string
@@ -10626,6 +10629,13 @@ export type Database = {
           quantity: number
           schedule_id: string
           tour_id: string
+        }[]
+      }
+      get_run_invoiced_counts: {
+        Args: { p_legal_entity_id: string }
+        Returns: {
+          invoiced_count: number
+          run_id: string
         }[]
       }
       gtin_check_digit: { Args: { p_base12: string }; Returns: number }
