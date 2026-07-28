@@ -1,10 +1,7 @@
 // Pulls supplier invoices ("vouchers") from Tripletex for a given legal_entity_id.
 // Skips silently if Tripletex is not configured.
-// This is a SCAFFOLD: it logs the run and inserts placeholder rows; full mapping to invoice_lines
-// happens in a later step. The important contract here is: handles missing config gracefully,
-// writes a sync log, and rotates session tokens daily.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { decryptToken, createSessionToken, basicAuthHeader } from "../_shared/tripletex-crypto.ts";
+import { getSessionToken, tripletexFetch } from "../_shared/tripletex.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -13,8 +10,8 @@ const corsHeaders = {
 
 interface Body {
   legal_entity_id: string;
-  from?: string; // ISO date
-  to?: string;   // ISO date
+  from?: string;
+  to?: string;
 }
 
 Deno.serve(async (req) => {
@@ -55,45 +52,18 @@ Deno.serve(async (req) => {
       .single();
     logId = logRow?.id ?? null;
 
-    // Get / refresh session token
-    const now = Date.now();
-    const expiresAt = cred.session_expires_at ? new Date(cred.session_expires_at).getTime() : 0;
-    let sessionToken = cred.session_token;
-    if (!sessionToken || expiresAt - now < 30 * 60 * 1000) {
-      const employeeToken = await decryptToken(cred.employee_token_encrypted);
-      const consumerToken = cred.mode === "private"
-        ? employeeToken
-        : await decryptToken(cred.consumer_token_encrypted);
-      const session = await createSessionToken(consumerToken, employeeToken);
-      sessionToken = session.token;
-      const expiresAtIso = new Date(`${session.expirationDate}T23:59:59Z`).toISOString();
-      await supabase
-        .from("tripletex_credentials")
-        .update({ session_token: sessionToken, session_expires_at: expiresAtIso })
-        .eq("legal_entity_id", legalEntityId);
-    }
+    const sessionToken = await getSessionToken(supabase, legalEntityId);
 
-    // Compute date range — from last_synced_voucher_date or 30 days back
     const today = new Date();
     const defaultFrom = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
     const fromDate = body.from ?? (cred.last_synced_voucher_date ?? defaultFrom.toISOString().slice(0, 10));
     const toDate = body.to ?? today.toISOString().slice(0, 10);
 
-    // Fetch vouchers from Tripletex (supplier invoices = type SUPPLIER_INVOICE)
-    const url = new URL("https://tripletex.no/v2/ledger/voucher");
-    url.searchParams.set("dateFrom", fromDate);
-    url.searchParams.set("dateTo", toDate);
-    url.searchParams.set("count", "1000");
-    url.searchParams.set("fields", "id,date,number,description,attachment");
-    const res = await fetch(url.toString(), {
-      headers: { Authorization: basicAuthHeader(sessionToken!), Accept: "application/json" },
+    const json = await tripletexFetch("/v2/ledger/voucher", {
+      sessionToken,
+      query: { dateFrom: fromDate, dateTo: toDate, count: 1000, fields: "id,date,number,description,attachment" },
     });
-    const text = await res.text();
-    if (!res.ok) throw new Error(`Tripletex voucher fetch failed (${res.status}): ${text.slice(0, 400)}`);
-    const json = JSON.parse(text);
     const vouchers: any[] = json?.values ?? [];
-
-    // Scaffold: count only — actual import logic is in next step
     const fetched = vouchers.length;
 
     if (logId) {
