@@ -363,33 +363,27 @@ Deno.serve(async (req) => {
 
         // Group sections by week totals (per section VAT totals shown at the bottom of each block)
         // Page pipeline
-        let page = pdf.addPage([PAGE_W, PAGE_H]);
-        let cursorY = drawHeader(page, fonts, {
+        const headerMeta = {
           basisNumber: basis.basis_number,
           invoiceDate: runDate ? formatDate(runDate) : "",
           tripletexOrder: basis.tripletex_order_number ?? null,
           entityDisplay: entity?.display_name ?? entity?.legal_name ?? "",
           mismatch,
-        });
+        };
+        const beginPage = (): { page: PDFPage; y: number } => {
+          const p = pdf.addPage([PAGE_W, PAGE_H]);
+          const y = drawHeader(p, fonts, headerMeta);
+          return { page: p, y };
+        };
+        let { page, y: cursorY } = beginPage();
 
         // Sections
         for (const sec of sectionsList) {
           const productRows = [...sec.productMap.values()].sort((a, b) => a.product_number.localeCompare(b.product_number, "nb", { numeric: true }));
           if (productRows.length === 0) continue;
-
-          const estimated = estimateSectionHeight(productRows.length);
-          if (cursorY - estimated < MARGIN_BOTTOM + 40) {
-            page = pdf.addPage([PAGE_W, PAGE_H]);
-            cursorY = drawHeader(page, fonts, {
-              basisNumber: basis.basis_number,
-              invoiceDate: runDate ? formatDate(runDate) : "",
-              tripletexOrder: basis.tripletex_order_number ?? null,
-              entityDisplay: entity?.display_name ?? entity?.legal_name ?? "",
-              mismatch,
-            });
-          }
-          cursorY = drawSection(page, fonts, sec, productRows, vatLetter, cursorY);
-          // pagination inside section if table too tall handled by drawSection returning early
+          const res = drawSection(page, fonts, sec, productRows, vatLetter, cursorY, beginPage);
+          page = res.page;
+          cursorY = res.y;
         }
 
         // Finalize footers with total page count
