@@ -1,0 +1,1 @@
+UPDATE public.apps SET deploy_url = 'https://nbhub.no' WHERE code = 'faktura';
