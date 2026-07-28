@@ -1,7 +1,17 @@
+import { useState } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Link } from "react-router-dom";
 import { format } from "date-fns";
-import { useBasisDetails, type BasisRow } from "@/fakturering/hooks/useFakturering";
+import { Paperclip, RotateCw, Loader2 } from "lucide-react";
+import {
+  useBasisDetails,
+  getAttachmentSignedUrl,
+  regenerateAttachment,
+  useHasFakturaWriteAccess,
+  type BasisRow,
+} from "@/fakturering/hooks/useFakturering";
+import { useToast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
 import { formatKr } from "@/fakturering/lib/groups";
 import { BasisStatusChip, tripletexInvoiceUrl, tripletexOrderUrl } from "./BasisStatusChip";
 
@@ -13,10 +23,42 @@ interface Props {
 export function BasisDetailsDrawer({ basis, onOpenChange }: Props) {
   const open = !!basis;
   const details = useBasisDetails(basis?.id, open);
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const writeAccess = useHasFakturaWriteAccess();
+  const [busy, setBusy] = useState<"open" | "regen" | null>(null);
 
   const txUrl = basis?.tripletex_invoice_id
     ? tripletexInvoiceUrl(basis.tripletex_invoice_id)
     : tripletexOrderUrl(basis?.tripletex_order_id);
+
+  async function openAttachment() {
+    if (!basis?.attachment_path) return;
+    setBusy("open");
+    try {
+      const url = await getAttachmentSignedUrl(basis.attachment_path, 60);
+      window.open(url, "_blank", "noopener");
+    } catch (e: any) {
+      toast({ title: "Kunne ikke åpne vedlegg", description: e?.message ?? String(e), variant: "destructive" });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function regen() {
+    if (!basis) return;
+    setBusy("regen");
+    try {
+      await regenerateAttachment({ basis_id: basis.id });
+      toast({ title: "Vedlegg generert på nytt" });
+      qc.invalidateQueries({ queryKey: ["fakturering"] });
+    } catch (e: any) {
+      toast({ title: "Feilet", description: e?.message ?? String(e), variant: "destructive" });
+    } finally {
+      setBusy(null);
+    }
+  }
+
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -51,6 +93,47 @@ export function BasisDetailsDrawer({ basis, onOpenChange }: Props) {
                 {basis.transfer_error}
               </div>
             )}
+
+            {/* Vedlegg (PDF) */}
+            <section className="mt-4 rounded-lg border border-line-subtle bg-surface-sunken p-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <Paperclip className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-semibold">Vedlegg (PDF)</span>
+                <span className="text-xs text-muted-foreground">
+                  {basis.attachment_path
+                    ? `Generert ${basis.attachment_generated_at ? format(new Date(basis.attachment_generated_at), "dd.MM HH:mm") : ""}`
+                    : basis.attachment_error?.includes("ikke aktuelt")
+                      ? "ikke aktuelt (ingen leveranselinjer)"
+                      : basis.attachment_generated_at
+                        ? "genereringsfeil — se detaljer"
+                        : "genereres …"}
+                </span>
+                <div className="ml-auto flex gap-2">
+                  {basis.attachment_path && (
+                    <button
+                      onClick={openAttachment}
+                      disabled={busy !== null}
+                      className="inline-flex items-center gap-1 rounded-md bg-[hsl(var(--app-primary))] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[hsl(var(--app-primary)/0.9)] disabled:opacity-50"
+                    >
+                      {busy === "open" ? <Loader2 className="h-3 w-3 animate-spin" /> : <Paperclip className="h-3 w-3" />} Åpne vedlegg
+                    </button>
+                  )}
+                  {writeAccess.data && (
+                    <button
+                      onClick={regen}
+                      disabled={busy !== null}
+                      className="inline-flex items-center gap-1 rounded-md border border-line-subtle bg-surface-raised px-3 py-1.5 text-xs font-semibold hover:bg-surface-sunken disabled:opacity-50"
+                    >
+                      <RotateCw className={busy === "regen" ? "h-3 w-3 animate-spin" : "h-3 w-3"} /> Generer på nytt
+                    </button>
+                  )}
+                </div>
+              </div>
+              {basis.attachment_error && !basis.attachment_error.includes("ikke aktuelt") && (
+                <div className="mt-2 text-xs text-red-700 dark:text-red-400">{basis.attachment_error}</div>
+              )}
+            </section>
+
 
             <section className="mt-6">
               <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">

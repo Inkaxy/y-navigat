@@ -61,3 +61,6 @@ verify_jwt = true
 
 [functions.fakturering-sync-status]
 verify_jwt = true
+
+[functions.fakturering-generate-vedlegg]
+verify_jwt = true

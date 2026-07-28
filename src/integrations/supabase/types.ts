@@ -2236,6 +2236,10 @@ export type Database = {
       }
       invoice_basis: {
         Row: {
+          attachment_error: string | null
+          attachment_generated_at: string | null
+          attachment_path: string | null
+          attachment_uploaded_at: string | null
           basis_number: string
           created_at: string
           customer_id: string
@@ -2262,6 +2266,10 @@ export type Database = {
           tripletex_order_number: string | null
         }
         Insert: {
+          attachment_error?: string | null
+          attachment_generated_at?: string | null
+          attachment_path?: string | null
+          attachment_uploaded_at?: string | null
           basis_number: string
           created_at?: string
           customer_id: string
@@ -2288,6 +2296,10 @@ export type Database = {
           tripletex_order_number?: string | null
         }
         Update: {
+          attachment_error?: string | null
+          attachment_generated_at?: string | null
+          attachment_path?: string | null
+          attachment_uploaded_at?: string | null
           basis_number?: string
           created_at?: string
           customer_id?: string
