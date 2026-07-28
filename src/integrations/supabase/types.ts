@@ -2259,6 +2259,7 @@ export type Database = {
           tripletex_invoice_id: number | null
           tripletex_invoice_number: string | null
           tripletex_order_id: number | null
+          tripletex_order_number: string | null
         }
         Insert: {
           basis_number: string
@@ -2284,6 +2285,7 @@ export type Database = {
           tripletex_invoice_id?: number | null
           tripletex_invoice_number?: string | null
           tripletex_order_id?: number | null
+          tripletex_order_number?: string | null
         }
         Update: {
           basis_number?: string
@@ -2309,6 +2311,7 @@ export type Database = {
           tripletex_invoice_id?: number | null
           tripletex_invoice_number?: string | null
           tripletex_order_id?: number | null
+          tripletex_order_number?: string | null
         }
         Relationships: [
           {
