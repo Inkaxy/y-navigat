@@ -157,7 +157,7 @@ export function useAllInvoiceRuns(entityId: string | null) {
         .order("started_at", { ascending: false })
         .limit(200);
       if (error) throw error;
-      return (data ?? []) as InvoiceRunRow[];
+      return ((data ?? []) as unknown) as InvoiceRunRow[];
     },
   });
 }
