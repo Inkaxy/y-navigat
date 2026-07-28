@@ -48,16 +48,18 @@ Deno.serve(async (req) => {
     const userClient = createClient(SUPABASE_URL, ANON_KEY, {
       global: { headers: { Authorization: authHeader } },
     });
-    const { data: claims, error: claimsErr } = await userClient.auth.getClaims(
-      authHeader.replace("Bearer ", ""),
-    );
-    if (claimsErr || !claims?.claims?.sub) return json(401, { error: "Unauthorized" });
+    const { data: userData, error: userErr } = await userClient.auth.getUser();
+    if (userErr || !userData?.user?.id) return json(401, { error: "Unauthorized" });
+    const userId = userData.user.id;
 
     const [{ data: hasWrite }, { data: hasPos }] = await Promise.all([
       userClient.rpc("has_app_write_access", { p_app_code: "faktura" }),
-      userClient.rpc("has_position_in_entity", { p_entity: run.legal_entity_id }),
+      userClient.rpc("has_position_in_entity", { p_legal_entity_id: run.legal_entity_id }),
     ]);
     if (!hasWrite || !hasPos) return json(403, { error: "Mangler tilgang til Fakturering for dette selskapet" });
+
+    // Flip run to 'running' so UI polling reflects work-in-progress.
+    await admin.from("invoice_runs").update({ status: "running" }).eq("id", runId);
 
     // Load settings + candidate basis rows
     const { data: settings } = await admin
@@ -231,11 +233,10 @@ Deno.serve(async (req) => {
             unitPriceExcludingVatCurrency: unitPrice,
             vatType: { id: vatTypeId },
           };
-          const accountNumber = vatAccountMap[String(Number(line.vat_rate))];
-          if (accountNumber) {
-            // Best-effort: include account by number (Tripletex may ignore if not supported)
-            linePayload.account = { number: accountNumber };
-          }
+          // Merk: `account` finnes ikke på Tripletex OrderLine — inntektskonto
+          // styres av mva-typen/produktet i Tripletex. vat_account_map beholdes
+          // som dokumentasjon i innstillingene, men sendes ikke med.
+          void vatAccountMap;
           await tripletexFetch("/v2/orderline", {
             sessionToken, method: "POST", body: linePayload,
           });
@@ -267,7 +268,7 @@ Deno.serve(async (req) => {
             order_id: o.id,
             from_status: o.status,
             to_status: "invoiced",
-            changed_by: claims.claims.sub,
+            changed_by: userId,
             notes: `Overført til Tripletex (grunnlag ${basis.basis_number})`,
             metadata: { basis_id: basis.id, tripletex_order_id: orderId, tripletex_order_number: orderNumber },
           }));
@@ -298,7 +299,7 @@ Deno.serve(async (req) => {
           entity_id: basis.id,
           entity_display_reference: basis.basis_number,
           legal_entity_id: run.legal_entity_id,
-          user_id: claims.claims.sub,
+          user_id: userId,
           source_app: "faktura",
           changes: { tripletex_order_id: orderId, tripletex_order_number: orderNumber, run_id: runId },
         });
@@ -319,7 +320,7 @@ Deno.serve(async (req) => {
           entity_id: basis.id,
           entity_display_reference: basis.basis_number,
           legal_entity_id: run.legal_entity_id,
-          user_id: claims.claims.sub,
+          user_id: userId,
           source_app: "faktura",
           reason: msg.slice(0, 500),
         });

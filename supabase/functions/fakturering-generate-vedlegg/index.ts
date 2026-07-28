@@ -170,11 +170,12 @@ Deno.serve(async (req) => {
     const userClient = createClient(SUPABASE_URL, ANON_KEY, {
       global: { headers: { Authorization: authHeader } },
     });
-    const { data: claims, error: claimsErr } = await userClient.auth.getClaims(authHeader.replace("Bearer ", ""));
-    if (claimsErr || !claims?.claims?.sub) return json(401, { error: "Unauthorized" });
+    const { data: userData, error: userErr } = await userClient.auth.getUser();
+    if (userErr || !userData?.user?.id) return json(401, { error: "Unauthorized" });
+    const userId = userData.user.id;
     const [{ data: hasWrite }, { data: hasPos }] = await Promise.all([
       userClient.rpc("has_app_write_access", { p_app_code: "faktura" }),
-      userClient.rpc("has_position_in_entity", { p_entity: entityId }),
+      userClient.rpc("has_position_in_entity", { p_legal_entity_id: entityId }),
     ]);
     if (!hasWrite || !hasPos) return json(403, { error: "Mangler tilgang til Fakturering for dette selskapet" });
 
@@ -421,7 +422,7 @@ Deno.serve(async (req) => {
           entity_id: basis.id,
           entity_display_reference: basis.basis_number,
           legal_entity_id: basis.legal_entity_id,
-          user_id: claims.claims.sub,
+          user_id: userId,
           source_app: "faktura",
           changes: { path, mismatch, control_sum: controlSum, basis_total: basisTotal },
         });
