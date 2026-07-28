@@ -171,6 +171,7 @@ import Fakturakjoring from "@/fakturering/pages/Fakturakjoring";
 import Fakturasok from "@/fakturering/pages/Fakturasok";
 import Kjoringer from "@/fakturering/pages/Kjoringer";
 import KjoringDetalj from "@/fakturering/pages/KjoringDetalj";
+import FakturaInnstillinger from "@/fakturering/pages/FakturaInnstillinger";
 
 
 const KunderEntityProvider = ({ children }: { children: React.ReactNode }) => {
