@@ -168,6 +168,10 @@ import RavarerLiveConfirmationPortal from "@/ravarer/pages/forhandlinger/LiveCon
 import { FaktureringProvider } from "@/fakturering/context/FaktureringContext";
 import FakturaSkeleton from "@/fakturering/pages/FakturaSkeleton";
 import Fakturakjoring from "@/fakturering/pages/Fakturakjoring";
+import Fakturasok from "@/fakturering/pages/Fakturasok";
+import Kjoringer from "@/fakturering/pages/Kjoringer";
+import KjoringDetalj from "@/fakturering/pages/KjoringDetalj";
+
 
 const KunderEntityProvider = ({ children }: { children: React.ReactNode }) => {
   const { user } = useNbhubAuth();
@@ -408,10 +412,11 @@ const App = () => (
 
               {/* Fakturering (steg 1: skeletons — data-modell klar) */}
               <Route path="/fakturering" element={<FaktureringShell><Fakturakjoring /></FaktureringShell>} />
-              <Route path="/fakturering/sok" element={<FaktureringShell><FakturaSkeleton title="Fakturasøk" subtitle="Søk i historiske fakturagrunnlag og overførte fakturaer." /></FaktureringShell>} />
-              <Route path="/fakturering/kjoringer" element={<FaktureringShell><FakturaSkeleton title="Kjøringer" subtitle="Oversikt over tidligere faktureringskjøringer." /></FaktureringShell>} />
-              <Route path="/fakturering/kjoringer/:id" element={<FaktureringShell><FakturaSkeleton title="Kjøringsdetaljer" subtitle="Detaljer for en enkelt faktureringskjøring." /></FaktureringShell>} />
+              <Route path="/fakturering/sok" element={<FaktureringShell><Fakturasok /></FaktureringShell>} />
+              <Route path="/fakturering/kjoringer" element={<FaktureringShell><Kjoringer /></FaktureringShell>} />
+              <Route path="/fakturering/kjoringer/:id" element={<FaktureringShell><KjoringDetalj /></FaktureringShell>} />
               <Route path="/fakturering/innstillinger" element={<FaktureringShell><FakturaSkeleton title="Innstillinger" subtitle="Forfallsdager, mva-konto-mapping og Tripletex-cache." body="Merk: mva-kontonumre må avklares med regnskapsfører før faktureringen aktiveres." /></FaktureringShell>} />
+
 
 
 
