@@ -23,10 +23,42 @@ interface Props {
 export function BasisDetailsDrawer({ basis, onOpenChange }: Props) {
   const open = !!basis;
   const details = useBasisDetails(basis?.id, open);
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const writeAccess = useHasFakturaWriteAccess();
+  const [busy, setBusy] = useState<"open" | "regen" | null>(null);
 
   const txUrl = basis?.tripletex_invoice_id
     ? tripletexInvoiceUrl(basis.tripletex_invoice_id)
     : tripletexOrderUrl(basis?.tripletex_order_id);
+
+  async function openAttachment() {
+    if (!basis?.attachment_path) return;
+    setBusy("open");
+    try {
+      const url = await getAttachmentSignedUrl(basis.attachment_path, 60);
+      window.open(url, "_blank", "noopener");
+    } catch (e: any) {
+      toast({ title: "Kunne ikke åpne vedlegg", description: e?.message ?? String(e), variant: "destructive" });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function regen() {
+    if (!basis) return;
+    setBusy("regen");
+    try {
+      await regenerateAttachment({ basis_id: basis.id });
+      toast({ title: "Vedlegg generert på nytt" });
+      qc.invalidateQueries({ queryKey: ["fakturering"] });
+    } catch (e: any) {
+      toast({ title: "Feilet", description: e?.message ?? String(e), variant: "destructive" });
+    } finally {
+      setBusy(null);
+    }
+  }
+
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
