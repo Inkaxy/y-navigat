@@ -10261,6 +10261,7 @@ export type Database = {
         }
         Returns: Json
       }
+      cancel_invoice_run: { Args: { p_run_id: string }; Returns: Json }
       change_order_tour: {
         Args: { p_new_tour_id: string; p_order_id: string; p_reason?: string }
         Returns: undefined
@@ -10288,6 +10289,14 @@ export type Database = {
           deleted_objects: number
           deleted_rows: number
         }[]
+      }
+      create_invoice_run: {
+        Args: {
+          p_groups: string[]
+          p_legal_entity_id: string
+          p_run_date: string
+        }
+        Returns: Json
       }
       current_portal_customer_id: { Args: never; Returns: string }
       current_user_entity_ids: { Args: never; Returns: string[] }
@@ -10472,6 +10481,16 @@ export type Database = {
           last_refresh_at: string
           scope: string
           tenant_id: string
+        }[]
+      }
+      get_invoice_run_preview: {
+        Args: { p_legal_entity_id: string; p_run_date: string }
+        Returns: {
+          customer_count: number
+          invoicing_group: string
+          order_count: number
+          sum_excl_vat: number
+          sum_incl_vat: number
         }[]
       }
       get_label_products_for_date: {
