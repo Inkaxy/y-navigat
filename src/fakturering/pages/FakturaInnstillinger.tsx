@@ -250,6 +250,7 @@ function SettingsSection({ entityId, canWrite }: { entityId: string; canWrite: b
   const [vat0, setVat0] = useState("");
   const [nonTransfer, setNonTransfer] = useState<Set<string>>(new Set());
   const [internalGroups, setInternalGroups] = useState<Set<string>>(new Set());
+  const [attachVedlegg, setAttachVedlegg] = useState<boolean>(true);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -260,6 +261,7 @@ function SettingsSection({ entityId, canWrite }: { entityId: string; canWrite: b
     setVat0(String(settings.vat_account_map?.["0"] ?? ""));
     setNonTransfer(new Set(settings.non_transfer_groups ?? []));
     setInternalGroups(new Set(settings.internal_groups ?? []));
+    setAttachVedlegg(settings.attach_vedlegg ?? true);
   }, [settings]);
 
   const toggle = (set: Set<string>, setter: (s: Set<string>) => void, key: string) => {
@@ -279,6 +281,7 @@ function SettingsSection({ entityId, canWrite }: { entityId: string; canWrite: b
         vat_account_map: vatMap,
         non_transfer_groups: Array.from(nonTransfer),
         internal_groups: Array.from(internalGroups),
+        attach_vedlegg: attachVedlegg,
       });
       toast.success("Innstillinger lagret");
       qc.invalidateQueries({ queryKey: ["fakturering", "settings-full", entityId] });
