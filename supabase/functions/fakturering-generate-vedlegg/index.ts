@@ -378,7 +378,6 @@ Deno.serve(async (req) => {
 
           const estimated = estimateSectionHeight(productRows.length);
           if (cursorY - estimated < MARGIN_BOTTOM + 40) {
-            drawFooter(page, fonts, entity, genStamp, /*pageIdx*/ 0, /*totalPages*/ 0);
             page = pdf.addPage([PAGE_W, PAGE_H]);
             cursorY = drawHeader(page, fonts, {
               basisNumber: basis.basis_number,
@@ -562,14 +561,9 @@ function drawSection(
   });
   y -= 12;
 
-  // Rows
+  // Rows (rely on estimateSectionHeight for pagination outside; if we still run out, break cleanly)
   for (const row of productRows) {
-    if (y < MARGIN_BOTTOM + 60) {
-      // page break inside a section
-      const p = page.doc.addPage([PAGE_W, PAGE_H]);
-      page = p as any;
-      y = PAGE_H - MARGIN_TOP - 20;
-    }
+    if (y < MARGIN_BOTTOM + 60) break;
     // Varenr + name (bold), vat marker under
     drawText(page, `${row.product_number} ${row.product_name}`, MARGIN_X, y, {
       font: fonts.bold, size: 9.5,
