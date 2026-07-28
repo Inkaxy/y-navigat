@@ -159,7 +159,7 @@ export function BasisDetailsDrawer({ basis, onOpenChange }: Props) {
                         <td className="px-3 py-1.5 text-muted-foreground tabular-nums">{l.iso_week ?? "—"}</td>
                         <td className="px-3 py-1.5 font-mono text-xs">{l.product_number ?? ""}</td>
                         <td className="px-3 py-1.5">{l.description}</td>
-                        <td className="px-3 py-1.5 text-right tabular-nums">{Number(l.quantity).toLocaleString("no-NB")}</td>
+                        <td className="px-3 py-1.5 text-right tabular-nums">{Number(l.quantity).toLocaleString("nb-NO")}</td>
                         <td className="px-3 py-1.5 text-right tabular-nums">{l.unit_price_excl_vat != null ? formatKr(Number(l.unit_price_excl_vat)) : "—"}</td>
                         <td className="px-3 py-1.5 text-right tabular-nums">{Number(l.vat_rate)} %</td>
                         <td className="px-3 py-1.5 text-right font-semibold tabular-nums">{formatKr(Number(l.line_incl_vat))}</td>
