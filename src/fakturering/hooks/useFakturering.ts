@@ -92,7 +92,8 @@ export function useHasFakturaWriteAccess() {
 
 export interface InvoiceRunRow {
   id: string;
-  run_no: number | null;
+  run_no?: number | null;
+
   legal_entity_id: string;
   run_date: string;
   groups: string[];
