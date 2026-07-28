@@ -70,12 +70,29 @@ export default function Fakturakjoring() {
     });
   };
 
-  const selectedRows: PreviewRow[] = useMemo(
-    () => KNOWN_GROUPS.filter((g) => selected.has(g.key))
-      .map((g) => rowByKey.get(g.key))
-      .filter((r): r is PreviewRow => !!r && r.customer_count > 0),
-    [selected, rowByKey],
+  // Kjente + ukjente grupper (ukjente kommer fra preview-radene og skal
+  // fortsatt kunne fakturers — de ble tidligere skjult stille).
+  const unknownGroupKeys = useMemo(
+    () => previewRows
+      .map((r) => r.invoicing_group)
+      .filter((g): g is string => !!g && !isKnownGroup(g)),
+    [previewRows],
   );
+
+  const selectedRows: PreviewRow[] = useMemo(() => {
+    const rows: PreviewRow[] = [];
+    for (const g of KNOWN_GROUPS) {
+      if (!selected.has(g.key)) continue;
+      const r = rowByKey.get(g.key);
+      if (r && r.customer_count > 0) rows.push(r);
+    }
+    for (const k of unknownGroupKeys) {
+      if (!selected.has(k)) continue;
+      const r = rowByKey.get(k);
+      if (r && r.customer_count > 0) rows.push(r);
+    }
+    return rows;
+  }, [selected, rowByKey, unknownGroupKeys]);
 
   const totalBasis = selectedRows.reduce((s, r) => s + r.customer_count, 0);
   const totalSum = selectedRows.reduce((s, r) => s + r.sum_incl_vat, 0);
