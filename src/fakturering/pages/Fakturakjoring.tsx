@@ -173,6 +173,10 @@ export default function Fakturakjoring() {
         actions={<TripletexChip status={tripletex.data} entityName={activeEntity?.legal_name ?? null} isLoading={tripletex.isLoading} />}
       />
 
+      <EntityPickerBanner />
+
+
+
       {/* Datovelger */}
       <div className="flex flex-col items-center gap-2 py-4">
         <div className="flex items-center gap-4">
