@@ -263,8 +263,7 @@ export default function Fakturasok() {
                 : tripletexOrderUrl(r.tripletex_order_id);
               const retryDisabled = !writeAccess.data || retrying === r.id;
               return (
-                <tr key={r.id} className="contents">
-                  <td colSpan={8} className="contents">
+                <Fragment key={r.id}>
                     <tr className="cursor-pointer hover:bg-surface-sunken/60" onClick={() => toggleExpand(r.id)}>
                       <td className="px-3 py-2 font-mono font-semibold">{r.basis_number}</td>
                       <td className="px-3 py-2">{r.customer?.display_name ?? "—"} ({r.customer?.customer_number ?? "?"})</td>
