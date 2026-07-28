@@ -25,7 +25,7 @@ import { AlertTriangle, CheckCircle2, Info, RefreshCw, Save, Trash2 } from "luci
 const ACCENT = "#a855f7";
 
 export default function FakturaInnstillinger() {
-  const { activeEntity, activeEntityId, availableEntities, setActiveEntity, isLoading } = useFakturering();
+  const { activeEntity, activeEntityId, availableEntities, setActiveEntity, isLoading } = useFaktureringEntity();
   const { data: hasWrite } = useHasFakturaWriteAccess();
 
   if (isLoading) {
