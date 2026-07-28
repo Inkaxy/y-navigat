@@ -166,7 +166,7 @@ import RavarerLiveConfirmationPortal from "@/ravarer/pages/forhandlinger/LiveCon
 
 // Fakturering (utgående kundefakturaer → Tripletex)
 import { FaktureringProvider } from "@/fakturering/context/FaktureringContext";
-import FakturaSkeleton from "@/fakturering/pages/FakturaSkeleton";
+
 import Fakturakjoring from "@/fakturering/pages/Fakturakjoring";
 import Fakturasok from "@/fakturering/pages/Fakturasok";
 import Kjoringer from "@/fakturering/pages/Kjoringer";
