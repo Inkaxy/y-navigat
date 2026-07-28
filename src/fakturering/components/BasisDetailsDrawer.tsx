@@ -74,6 +74,7 @@ export function BasisDetailsDrawer({ basis, onOpenChange }: Props) {
                   invoiceNumber={basis.tripletex_invoice_number}
                   errorMessage={basis.transfer_error}
                   doTransfer={basis.do_transfer}
+                  invoicingGroup={basis.invoicing_group}
                 />
               </SheetTitle>
               <SheetDescription>
