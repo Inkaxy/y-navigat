@@ -353,3 +353,74 @@ export function useEntityCustomersLite(entityId: string | null) {
   });
 }
 
+
+// ---------------------------------------------------------------------------
+// Settings mutations (Innstillinger-siden)
+// ---------------------------------------------------------------------------
+
+export interface FullInvoiceSettings {
+  legal_entity_id: string;
+  default_due_days: number;
+  vat_account_map: Record<string, string>;
+  non_transfer_groups: string[];
+  internal_groups: string[];
+  tripletex_meta: Record<string, any>;
+  updated_at: string;
+}
+
+export function useFullInvoiceSettings(entityId: string | null) {
+  return useQuery({
+    queryKey: ["fakturering", "settings-full", entityId],
+    enabled: !!entityId,
+    queryFn: async (): Promise<FullInvoiceSettings> => {
+      const { data, error } = await supabase
+        .from("invoice_settings")
+        .select("*")
+        .eq("legal_entity_id", entityId!)
+        .maybeSingle();
+      if (error) throw error;
+      return (data as any) ?? {
+        legal_entity_id: entityId!,
+        default_due_days: 14,
+        vat_account_map: { "15": "3001", "25": "3000" },
+        non_transfer_groups: ["test"],
+        internal_groups: ["internal_outlets"],
+        tripletex_meta: {},
+        updated_at: new Date().toISOString(),
+      };
+    },
+    staleTime: 30 * 1000,
+  });
+}
+
+export interface SaveInvoiceSettingsInput {
+  legal_entity_id: string;
+  default_due_days: number;
+  vat_account_map: Record<string, string>;
+  non_transfer_groups: string[];
+  internal_groups: string[];
+}
+
+export async function saveInvoiceSettings(input: SaveInvoiceSettingsInput) {
+  const { error } = await supabase
+    .from("invoice_settings")
+    .upsert(
+      {
+        legal_entity_id: input.legal_entity_id,
+        default_due_days: input.default_due_days,
+        vat_account_map: input.vat_account_map,
+        non_transfer_groups: input.non_transfer_groups,
+        internal_groups: input.internal_groups,
+        updated_at: new Date().toISOString(),
+      } as any,
+      { onConflict: "legal_entity_id" },
+    );
+  if (error) throw error;
+}
+
+export async function clearTripletexMetaCache(entityId: string) {
+  const { error } = await (supabase.rpc as any)("clear_invoice_tripletex_meta", {
+    p_legal_entity_id: entityId,
+  });
+  if (error) throw error;
+}
