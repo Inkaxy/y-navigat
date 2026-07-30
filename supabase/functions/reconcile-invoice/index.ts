@@ -29,10 +29,16 @@ Deno.serve(async (req) => {
 
     const { data: invoice, error: invErr } = await svc
       .from("invoices")
-      .select("id, status, supplier_id, invoice_number, invoice_date, invoice_lines(id, raw_material_id, requires_review, match_confidence, price_per_base_unit, quantity, unit_price)")
+      .select("id, status, supplier_id, legal_entity_id, invoice_number, invoice_date, invoice_lines(id, raw_material_id, requires_review, match_confidence, price_per_base_unit, quantity, unit_price)")
       .eq("id", invoice_id)
       .single();
     if (invErr || !invoice) return json({ error: "Invoice not found" }, 404);
+
+    const { data: hasAccess } = await userClient.rpc("has_ravarer_invoice_access", {
+      _legal_entity_id: invoice.legal_entity_id,
+      _required_level: "write",
+    });
+    if (!hasAccess) return json({ error: "Mangler skrivetilgang til fakturaer" }, 403);
 
     const lines = (invoice as any).invoice_lines ?? [];
     const stillReview = lines.filter((l: any) => l.requires_review);

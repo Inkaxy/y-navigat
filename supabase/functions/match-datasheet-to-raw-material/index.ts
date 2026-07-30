@@ -18,6 +18,9 @@ Deno.serve(async (req) => {
     const { data: userRes } = await userClient.auth.getUser();
     if (!userRes.user) return json({ error: "Unauthorized" }, 401);
 
+    const { data: canWrite } = await userClient.rpc("has_app_write_access", { p_app_code: "ravarer" });
+    if (!canWrite) return json({ error: "Ingen tilgang" }, 403);
+
     const service = createClient(supaUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     const { data: ds } = await service.from("raw_material_datasheets").select("*").eq("id", datasheet_id).maybeSingle();
     if (!ds) return json({ error: "Not found" }, 404);

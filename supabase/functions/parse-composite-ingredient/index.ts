@@ -35,6 +35,9 @@ Deno.serve(async (req) => {
     const { data: userRes } = await userClient.auth.getUser();
     if (!userRes.user) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
+    const { data: canWrite } = await userClient.rpc("has_app_write_access", { p_app_code: "ravarer" });
+    if (!canWrite) return new Response(JSON.stringify({ error: "Ingen tilgang" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
     const service = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     const { data: rm } = await service
       .from("raw_materials")

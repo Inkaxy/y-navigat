@@ -40,6 +40,13 @@ Deno.serve(async (req) => {
 
     const service = createClient(supaUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
+    // Valider at file_path sitt ledende segment (legal_entity uuid) er en enhet brukeren har posisjon i
+    const pathEntityId = String(file_path).split("/")[0];
+    const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRe.test(pathEntityId)) return json({ error: "Ugyldig file_path" }, 400);
+    const { data: hasPos } = await userClient.rpc("has_position_in_entity", { p_legal_entity_id: pathEntityId });
+    if (!hasPos) return json({ error: "Ingen tilgang" }, 403);
+
     // Last ned filen og base64-encode (Gemini godtar ikke signed URLs for PDF/bilde via image_url)
     const { data: blob, error: dlErr } = await service.storage.from("raw-material-datasheets").download(file_path);
     if (dlErr || !blob) return json({ error: `Kunne ikke laste fil: ${dlErr?.message ?? "ukjent"}` }, 404);
