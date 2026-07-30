@@ -31,13 +31,17 @@ export function useApps() {
         .order("sort_order", { ascending: true });
       if (error) throw error;
 
-      const results = await Promise.all(
-        (apps ?? []).map(async (a) => {
-          const { data: level } = await supabase.rpc("app_access_level", { p_app_code: a.code });
-          return { ...a, access_level: (level ?? "none") as AccessLevel };
-        }),
+      // Én RPC for alle tilganger (unngår N+1 med app_access_level per app).
+      const { data: accessible, error: accErr } = await supabase.rpc("get_my_accessible_apps");
+      if (accErr) throw accErr;
+      const levelById = new Map<string, AccessLevel>(
+        (accessible ?? []).map((a) => [a.id, (a.access_level ?? "none") as AccessLevel]),
       );
-      return results;
+
+      return (apps ?? []).map((a) => ({
+        ...a,
+        access_level: levelById.get(a.id) ?? ("none" as AccessLevel),
+      }));
     },
   });
 }

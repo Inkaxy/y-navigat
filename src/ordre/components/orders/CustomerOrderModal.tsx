@@ -347,7 +347,6 @@ export function CustomerOrderModal({
         existing.lines.length > 0
           ? existing.lines.map((l) => ({
               uid: crypto.randomUUID(),
-              product: null,
               product_display_name: l.product_display_name,
               product_display_number: l.product_display_number,
               product_unit_of_sale: l.product_unit_of_sale,

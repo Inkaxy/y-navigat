@@ -17,7 +17,7 @@ export function useUnfinalizeDeliveryNotes() {
     mutationFn: async ({ ids, reason }: UnfinalizeArgs): Promise<UnfinalizeResult> => {
       const { data, error } = await supabase.rpc("unfinalize_delivery_notes", {
         p_ids: ids,
-        p_reason: reason ?? null,
+        p_reason: (reason ?? undefined) as string | undefined,
       });
       if (error) throw error;
       return data as unknown as UnfinalizeResult;

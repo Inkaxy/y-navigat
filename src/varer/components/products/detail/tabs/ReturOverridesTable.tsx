@@ -48,7 +48,7 @@ export function ReturOverridesTable({
         supabase
           .from("price_lists")
           .select("id, code, display_name, list_number, price_list_type")
-          .eq("legal_entity_id", legalEntityId)
+          .eq("legal_entity_id", legalEntityId!)
           .eq("status", "active")
           .order("list_number", { ascending: true, nullsFirst: false }),
         supabase

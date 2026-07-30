@@ -90,7 +90,7 @@ export default function SpecialPrices() {
       const { data, error } = await supabase
         .from("products")
         .select("id, display_number, display_name, code")
-        .eq("legal_entity_id", legalEntityId)
+        .eq("legal_entity_id", legalEntityId!)
         .order("display_number");
       if (error) throw error;
       return (data ?? []) as ProductLite[];
@@ -103,7 +103,7 @@ export default function SpecialPrices() {
       const { data, error } = await supabase
         .from("customers")
         .select("id, customer_number, display_name")
-        .eq("legal_entity_id", legalEntityId)
+        .eq("legal_entity_id", legalEntityId!)
         .order("customer_number");
       if (error) throw error;
       return (data ?? []) as CustomerLite[];
@@ -116,7 +116,7 @@ export default function SpecialPrices() {
       const { data, error } = await supabase
         .from("price_lists")
         .select("id, display_name")
-        .eq("legal_entity_id", legalEntityId)
+        .eq("legal_entity_id", legalEntityId!)
         .eq("status", "active")
         .order("display_name");
       if (error) throw error;
@@ -133,7 +133,7 @@ export default function SpecialPrices() {
           .select(
             "id, product_id, customer_id, price_list_id, valid_from, valid_to, weekday, precedence_over_weekday, price, is_net_price, notes, created_at",
           )
-          .eq("legal_entity_id", legalEntityId)
+          .eq("legal_entity_id", legalEntityId!)
           .order("valid_from", { ascending: false, nullsFirst: false })
           .range(from, to),
       );

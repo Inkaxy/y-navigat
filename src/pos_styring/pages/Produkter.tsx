@@ -171,7 +171,7 @@ function ProductImageDialog({ product, activeEntityId, open, onOpenChange }: { p
       // uten varer-skrivetilgang.
       const { error } = await supabase.rpc("pos_set_product_name", {
         p_product_id: product.id,
-        p_pos_name: next,
+        p_pos_name: (next ?? null) as unknown as string,
       });
       if (error) throw error;
     },
@@ -187,7 +187,7 @@ function ProductImageDialog({ product, activeEntityId, open, onOpenChange }: { p
       if (!product) return;
       const { error } = await supabase.rpc("pos_set_product_station", {
         p_product_id: product.id,
-        p_station_id: stationId,
+        p_station_id: (stationId ?? null) as unknown as string,
       });
       if (error) throw error;
     },

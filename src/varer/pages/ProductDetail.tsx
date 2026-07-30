@@ -101,14 +101,14 @@ export default function ProductDetail() {
     queryKey: ["product-lookups", legalEntityId],
     queryFn: async () => {
       const [main, sub, pages, sales, prod, le, allProducts, depts] = await Promise.all([
-        supabase.from("product_main_categories").select("id, display_name").eq("legal_entity_id", legalEntityId).eq("status", "active").order("sort_order"),
-        supabase.from("product_sub_categories").select("id, display_name, main_category_id").eq("legal_entity_id", legalEntityId).eq("status", "active").order("sort_order"),
-        supabase.from("product_pages").select("id, display_name").eq("legal_entity_id", legalEntityId).eq("status", "active").order("sort_order"),
-        supabase.from("sales_groups").select("id, display_name").eq("legal_entity_id", legalEntityId).eq("status", "active").order("sort_order"),
-        supabase.from("production_groups").select("id, display_name").eq("legal_entity_id", legalEntityId).eq("status", "active").order("sort_order"),
-        supabase.from("legal_entities").select("gs1_prefix").eq("id", legalEntityId).maybeSingle(),
-        supabase.from("products").select("id, display_name, display_number, code").eq("legal_entity_id", legalEntityId).order("display_number"),
-        supabase.from("production_departments").select("id, code, display_name").eq("legal_entity_id", legalEntityId).eq("status", "active").order("sort_order"),
+        supabase.from("product_main_categories").select("id, display_name").eq("legal_entity_id", legalEntityId!).eq("status", "active").order("sort_order"),
+        supabase.from("product_sub_categories").select("id, display_name, main_category_id").eq("legal_entity_id", legalEntityId!).eq("status", "active").order("sort_order"),
+        supabase.from("product_pages").select("id, display_name").eq("legal_entity_id", legalEntityId!).eq("status", "active").order("sort_order"),
+        supabase.from("sales_groups").select("id, display_name").eq("legal_entity_id", legalEntityId!).eq("status", "active").order("sort_order"),
+        supabase.from("production_groups").select("id, display_name").eq("legal_entity_id", legalEntityId!).eq("status", "active").order("sort_order"),
+        supabase.from("legal_entities").select("gs1_prefix").eq("id", legalEntityId!).maybeSingle(),
+        supabase.from("products").select("id, display_name, display_number, code").eq("legal_entity_id", legalEntityId!).order("display_number"),
+        supabase.from("production_departments").select("id, code, display_name").eq("legal_entity_id", legalEntityId!).eq("status", "active").order("sort_order"),
       ]);
       return {
         mainCategories: main.data ?? [],
@@ -461,7 +461,7 @@ export default function ProductDetail() {
             <ProduksjonTab
               productId={product.id}
               canWrite={canWrite}
-              legalEntityId={legalEntityId}
+              legalEntityId={legalEntityId!}
               productionGroups={lookups.productionGroups}
               productionDepartments={lookups.productionDepartments}
               selectedDepartmentIds={labelDepartmentIds}

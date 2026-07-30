@@ -370,7 +370,7 @@ export default function KasseHelse() {
 
     // 3. Cash drawer control
     const totalDrawer = Array.from((journalCounts as any).drawer?.values() ?? []).reduce(
-      (a: number, b: number) => a + b,
+      (a: number, b: unknown) => a + Number(b ?? 0),
       0,
     ) as number;
     items.push({
@@ -381,7 +381,7 @@ export default function KasseHelse() {
 
     // 4. Receipt copies
     const totalCopies = Array.from((journalCounts as any).receiptCopy?.values() ?? []).reduce(
-      (a: number, b: number) => a + b,
+      (a: number, b: unknown) => a + Number(b ?? 0),
       0,
     ) as number;
     items.push({
@@ -451,11 +451,11 @@ export default function KasseHelse() {
     const brokenChains = terminalHealth.filter((r) => r.journal === "red").length;
     const missingZ = terminalHealth.filter((r) => r.zTraffic === "red").length;
     const drawerTotal = Array.from((journalCounts as any).drawer?.values() ?? []).reduce(
-      (a: number, b: number) => a + b,
+      (a: number, b: unknown) => a + Number(b ?? 0),
       0,
     ) as number;
     const copyTotal = Array.from((journalCounts as any).receiptCopy?.values() ?? []).reduce(
-      (a: number, b: number) => a + b,
+      (a: number, b: unknown) => a + Number(b ?? 0),
       0,
     ) as number;
     return { brokenChains, missingZ, drawerTotal, copyTotal };

@@ -238,7 +238,7 @@ export default function PriceLists() {
         .select(
           "id, code, display_name, is_default, prices_include_mva, status, list_number, price_list_type, updated_at",
         )
-        .eq("legal_entity_id", legalEntityId)
+        .eq("legal_entity_id", legalEntityId!)
         .order("list_number", { ascending: true, nullsFirst: false });
       if (error) throw error;
       return data ?? [];
@@ -270,7 +270,7 @@ export default function PriceLists() {
         .select(
           "id, display_number, display_name, unit_of_sale, is_for_sale, mva_rate, main_category_id, sub_category_id, status",
         )
-        .eq("legal_entity_id", legalEntityId)
+        .eq("legal_entity_id", legalEntityId!)
         .neq("status", "discontinued")
         .order("display_number");
       if (error) throw error;
@@ -284,7 +284,7 @@ export default function PriceLists() {
       const { data } = await supabase
         .from("product_main_categories")
         .select("id, code, display_name")
-        .eq("legal_entity_id", legalEntityId);
+        .eq("legal_entity_id", legalEntityId!);
       return data ?? [];
     },
   });
@@ -295,7 +295,7 @@ export default function PriceLists() {
       const { data } = await supabase
         .from("product_sub_categories")
         .select("id, code, display_name, main_category_id")
-        .eq("legal_entity_id", legalEntityId);
+        .eq("legal_entity_id", legalEntityId!);
       return data ?? [];
     },
   });
@@ -367,7 +367,7 @@ export default function PriceLists() {
         supabase
           .from("special_prices")
           .select("product_id, price_list_id, customer_id, customer:customers(display_name)")
-          .eq("legal_entity_id", legalEntityId)
+          .eq("legal_entity_id", legalEntityId!)
           .or(`valid_from.is.null,valid_from.lte.${priceDate}`)
           .or(`valid_to.is.null,valid_to.gte.${priceDate}`)
           .range(from, to),

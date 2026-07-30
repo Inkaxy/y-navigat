@@ -47,7 +47,7 @@ export function CakeBuilderPreview({
       const { data, error } = await supabase
         .from("price_lists")
         .select("id")
-        .eq("legal_entity_id", legalEntityId)
+        .eq("legal_entity_id", legalEntityId!)
         .eq("is_default", true)
         .maybeSingle();
       if (error) throw error;
@@ -63,7 +63,7 @@ export function CakeBuilderPreview({
       const { data, error } = await supabase
         .from("cake_categories")
         .select("id, name, description, image_url, status")
-        .eq("legal_entity_id", legalEntityId)
+        .eq("legal_entity_id", legalEntityId!)
         .eq("status", "active")
         .order("sort_order", { ascending: true });
       if (error) throw error;
@@ -164,7 +164,7 @@ export function CakeBuilderPreview({
                 <CakeBuilder
                   categoryId={categoryId}
                   priceListId={priceListQuery.data}
-                  legalEntityId={legalEntityId}
+                  legalEntityId={legalEntityId!}
                   showVatToggle
                   onComplete={(result) => {
                     toast.success(

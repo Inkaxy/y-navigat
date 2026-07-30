@@ -16,7 +16,7 @@ export function useLabelProducts(filter: LabelScreenFilter | null) {
       const { data, error } = await supabase.rpc("get_label_products_for_date", {
         p_date: filter.date,
         p_legal_entity_id: filter.legalEntityId,
-        p_tour_ids: filter.tourIds,
+        p_tour_ids: filter.tourIds ?? undefined,
       });
       if (error) throw error;
       return (data ?? []) as unknown as LabelProductRow[];

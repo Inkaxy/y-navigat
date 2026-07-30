@@ -57,8 +57,8 @@ export function ChangeTourDialog({
       const newTourId = selected === "none" ? null : selected;
       const { error } = await supabase.rpc("change_order_tour", {
         p_order_id: orderId,
-        p_new_tour_id: newTourId,
-        p_reason: reason.trim() || null,
+        p_new_tour_id: newTourId as string,
+        p_reason: (reason.trim() || null) as string,
       });
       if (error) throw error;
 

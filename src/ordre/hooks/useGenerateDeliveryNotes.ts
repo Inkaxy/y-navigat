@@ -33,7 +33,7 @@ export function useGenerateDeliveryNotes() {
       const { data, error } = await supabase.rpc("generate_delivery_notes", {
         p_legal_entity_id: NB_LEGAL_ENTITY_ID,
         p_delivery_date: date,
-        p_tour_filter: tourFilter,
+        p_tour_filter: tourFilter as string[] | undefined,
         p_run_type: runType,
       });
       if (error) throw error;

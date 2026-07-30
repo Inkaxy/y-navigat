@@ -103,7 +103,7 @@ export function useUpdateOrderLine() {
         Pick<TourOrderLine, "quantity" | "unit_price" | "discount_percent" | "notes">
       > & { unit_price_source?: string };
     }) => {
-      const { error } = await supabase.from("order_lines").update(input.patch).eq("id", input.id);
+      const { error } = await supabase.from("order_lines").update(input.patch as any).eq("id", input.id);
       if (error) throw error;
     },
     onSuccess: () => {

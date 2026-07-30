@@ -1210,7 +1210,7 @@ function AddProductDialog({
       let q = supabase
         .from("products")
         .select("id, display_number, display_name, cake_role, code")
-        .eq("legal_entity_id", legalEntityId)
+        .eq("legal_entity_id", legalEntityId!)
         .eq("is_cake_component", true)
         .order("display_number", { ascending: true })
         .limit(500);
@@ -1593,7 +1593,7 @@ function LinkToProductDialog({
       const { data, error } = await supabase
         .from("products")
         .select("id, display_number, display_name, cake_role, code")
-        .eq("legal_entity_id", legalEntityId)
+        .eq("legal_entity_id", legalEntityId!)
         .eq("is_cake_component", true)
         .order("display_number", { ascending: true })
         .limit(500);

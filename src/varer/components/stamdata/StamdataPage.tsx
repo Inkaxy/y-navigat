@@ -152,7 +152,7 @@ export function StamdataPage({
       const { data, error } = await supabase
         .from(tableName as never)
         .select("*")
-        .eq("legal_entity_id", legalEntityId)
+        .eq("legal_entity_id", legalEntityId!)
         .order("sort_order")
         .order("code");
       if (error) throw error;
@@ -202,7 +202,7 @@ export function StamdataPage({
         const { data, error } = await supabase
           .from(t as never)
           .select("*")
-          .eq("legal_entity_id", legalEntityId)
+          .eq("legal_entity_id", legalEntityId!)
           .order("sort_order")
           .order("display_name");
         if (error) {

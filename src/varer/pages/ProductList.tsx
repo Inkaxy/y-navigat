@@ -95,7 +95,7 @@ export default function ProductList() {
         .select(
           "id, display_number, code, display_name, product_category, product_subcategory, unit_of_sale, status, variant_of_product_id, variant_label, label_mode, is_cake_component, cake_role, image_url, mva_rate, pieces_per_tray, in_web_shop, in_pos, main_category:product_main_categories(code, display_name), sub_category:product_sub_categories(code, display_name)",
         )
-        .eq("legal_entity_id", legalEntityId)
+        .eq("legal_entity_id", legalEntityId!)
         .order("display_number", { ascending: true })
         .limit(2000);
       if (error) throw error;
@@ -156,7 +156,7 @@ export default function ProductList() {
       const { data } = await supabase
         .from("price_lists")
         .select("id, display_name")
-        .eq("legal_entity_id", legalEntityId)
+        .eq("legal_entity_id", legalEntityId!)
         .eq("is_default", true)
         .maybeSingle();
       return data;

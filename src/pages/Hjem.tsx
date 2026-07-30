@@ -5,8 +5,6 @@ import { useApps } from "@/hooks/useApps";
 import { getTimeGreeting } from "@/lib/greeting";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PositionCard } from "@/components/PositionCard";
-import { AppCard } from "@/components/AppCard";
 import { Logo } from "@/components/brand/Logo";
 import { Sparkles } from "lucide-react";
 import { TicketQueueWidget } from "@/ordre/components/widgets/TicketQueueWidget";
@@ -106,19 +104,5 @@ export default function Hjem() {
 
 
     </div>
-  );
-}
-
-function EmptyState({ text }: { text: string }) {
-  return (
-    <Card className="relative overflow-hidden border-line-subtle">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -right-4 -bottom-4 text-brand-bronze opacity-[0.06]"
-      >
-        <Logo variant="monogram" className="h-32 w-32" />
-      </div>
-      <CardContent className="relative p-6 text-sm text-muted-foreground">{text}</CardContent>
-    </Card>
   );
 }

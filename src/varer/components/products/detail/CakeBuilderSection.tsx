@@ -64,7 +64,7 @@ export function CakeBuilderSection({
         supabase
           .from("cake_categories")
           .select("id, name, status")
-          .eq("legal_entity_id", legalEntityId)
+          .eq("legal_entity_id", legalEntityId!)
           .neq("status", "discontinued")
           .order("sort_order", { ascending: true }),
         supabase

@@ -71,7 +71,7 @@ export function QuickCreateProductDialog({ open, onOpenChange, productOptions }:
       const { data } = await supabase
         .from("product_main_categories")
         .select("id, display_name")
-        .eq("legal_entity_id", legalEntityId)
+        .eq("legal_entity_id", legalEntityId!)
         .eq("status", "active")
         .order("sort_order");
       return data ?? [];

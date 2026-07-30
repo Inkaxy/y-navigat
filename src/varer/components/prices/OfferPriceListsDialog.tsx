@@ -61,7 +61,7 @@ export function OfferPriceListsDialog({ open, onOpenChange }: Props) {
       const { data, error } = await supabase
         .from("price_lists")
         .select("id, display_name, list_number, price_list_type, status")
-        .eq("legal_entity_id", legalEntityId)
+        .eq("legal_entity_id", legalEntityId!)
         .eq("price_list_type", "offer")
         .eq("status", "active")
         .order("list_number", { ascending: true });
@@ -196,7 +196,7 @@ export function OfferPriceListsDialog({ open, onOpenChange }: Props) {
           const { data, error } = await supabase
             .from("price_lists")
             .insert({
-              legal_entity_id: legalEntityId,
+              legal_entity_id: legalEntityId!,
               code,
               display_name: fullName,
               list_number: num,

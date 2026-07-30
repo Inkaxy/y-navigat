@@ -45,7 +45,7 @@ export function NavnOgNummerTab({ product, canWrite, hasGs1Prefix }: Props) {
   async function generateGtin() {
     setGenerating(true);
     const { data, error } = await supabase.rpc("generate_next_gtin", {
-      p_legal_entity_id: legalEntityId,
+      p_legal_entity_id: legalEntityId!,
     });
     setGenerating(false);
     if (error) {
