@@ -268,6 +268,9 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
           p_lines: linesPayload,
           p_payment_summary: summary,
           p_dining_mode: cart.diningMode,
+          // Kassasystemforskrifta: salget skal journalføres på operatøren som
+          // faktisk står i kassa — ikke den som åpnet sesjonen.
+          p_operator_id: operator?.id ?? null,
         } as never,
       );
       if (error) throw error;
@@ -321,6 +324,12 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
         setActivePickupOrderId(null);
       }
 
+      // Kontantsalg åpner skuffen (journalført av DB-trigger 'drawer_open' /
+      // reason='cash_sale'). Hent status så sperren vises umiddelbart.
+      if (summary.payments.some((p) => p.method === "cash")) {
+        void drawerCtl.refresh();
+      }
+
       void broadcastSaleComplete(channel, {
         receipt_number: (tx as { receipt_number: string | null }).receipt_number ?? null,
         total_incl_mva: Number((tx as { total_incl_mva: number }).total_incl_mva),
@@ -350,21 +359,9 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
     }
     setPrintingReceipt(true);
     try {
-      // Kassasystemforskrifta: kun 1 kvitteringskopi per salg. RPC-en avgjør
-      // atomisk om dette er original eller KOPI, og feiler hvis kopi allerede
-      // er utstedt.
-      const { data: printKindData, error: pkErr } = await kioskSupabase.rpc(
-        "pos_record_receipt_print" as never,
-        { p_terminal_id: terminal.id, p_transaction_id: r.tx.id } as never,
-      );
-      if (pkErr) throw pkErr;
-      const raw = printKindData as unknown;
-      const kindRow = (Array.isArray(raw) ? raw[0] : raw) as
-        | { kind?: string }
-        | null
-        | undefined;
-      const isCopy = kindRow?.kind === "copy";
-
+      // Kassasystemforskrifta: originalen skal ikke «brennes» før utskriften
+      // faktisk er lagt i kø. Vi bygger og legger inn print-jobben FØRST, og
+      // registrerer original/KOPI i journalen etterpå (RPC-en avgjør atomisk).
       const [{ data: mapping, error: mErr }, { data: entity, error: eErr }] =
         await Promise.all([
           kioskSupabase
@@ -416,7 +413,8 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
         "Nøtterø Bakeri",
       ];
 
-      const { error: jErr } = await kioskSupabase
+      // 1) Legg print-jobben inn på vent (status='hold') før journalføring.
+      const { data: job, error: jErr } = await kioskSupabase
         .from("pos_print_jobs")
         .insert({
           printer_id: mapping.printer_id,
@@ -432,14 +430,55 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
             company,
             outlet: receiptHeader.outlet,
             footer_lines,
+          } as unknown as never,
+          status: "hold",
+        })
+        .select("id")
+        .single();
+
+      if (jErr) throw jErr;
+
+      // 2) Journalfør original/KOPI. Feiler dette (f.eks. kopi allerede
+      //    utstedt) avbrytes print-jobben — ingen ugyldig utskrift.
+      let isCopy = false;
+      try {
+        const { data: printKindData, error: pkErr } = await kioskSupabase.rpc(
+          "pos_record_receipt_print" as never,
+          { p_terminal_id: terminal.id, p_transaction_id: r.tx.id } as never,
+        );
+        if (pkErr) throw pkErr;
+        const raw = printKindData as unknown;
+        const kindRow = (Array.isArray(raw) ? raw[0] : raw) as { kind?: string } | null | undefined;
+        isCopy = kindRow?.kind === "copy";
+      } catch (e) {
+        await kioskSupabase
+          .from("pos_print_jobs")
+          .update({ status: "cancelled", error_message: (e as Error).message })
+          .eq("id", job.id);
+        throw e;
+      }
+
+      // 3) Frigi jobben til køen med riktig KOPI-merking.
+      const { error: relErr } = await kioskSupabase
+        .from("pos_print_jobs")
+        .update({
+          status: "queued",
+          payload: {
+            transaction: r.tx,
+            lines: r.lines,
+            terminal_name: terminal.display_name,
+            terminal_id: terminal.id,
+            operator_name: operator?.display_name ?? null,
+            operator_code: operator?.code ?? null,
+            company,
+            outlet: receiptHeader.outlet,
+            footer_lines,
             is_copy: isCopy,
             copy_label: isCopy ? "KOPI" : null,
           } as unknown as never,
-
-          status: "queued",
-        });
-
-      if (jErr) throw jErr;
+        })
+        .eq("id", job.id);
+      if (relErr) throw relErr;
       if (isCopy) setCopyIssued(true);
       toast.success(
         isCopy ? "KOPI lagt i utskriftskø" : "Kvittering lagt i utskriftskø",
