@@ -8,10 +8,16 @@ export type CartItem = {
   product_snapshot: ProductSnapshot;
   quantity: number;
   unit_price_excl_mva: number;
+  /**
+   * Satt når prislista har priser INKLUDERT mva. Da er hylleprisen fast:
+   * «sitt her» endrer bare mva-splitten, ikke totalen kunden betaler.
+   */
+  unit_price_incl_mva?: number | null;
   /** Sats ved takeaway (matvarer typisk 15, ikke-mat typisk 25). */
   base_mva_rate: number;
   /** Sats ved sitt her. NULL = ikke matvare, sats er lik uansett mode. */
   eatin_mva_rate: number | null;
+
   line_discount: number;
   dining_mode_override?: DiningMode | null;
   merknad?: string;
@@ -51,13 +57,30 @@ export function isFoodItem(item: CartItem): boolean {
   return item.eatin_mva_rate != null;
 }
 
+/** Netto enhetspris gitt effektiv mva-sats (viktig for mva-inklusive prislister). */
+export function effectiveUnitPriceExclMva(
+  item: CartItem,
+  cartDefault: DiningMode,
+): number {
+  if (item.unit_price_incl_mva == null) return item.unit_price_excl_mva;
+  const rate = effectiveMvaRate(item, cartDefault);
+  return round2(item.unit_price_incl_mva / (1 + rate / 100));
+}
+
 export function calcLine(item: CartItem, cartDefault: DiningMode) {
   const rate = effectiveMvaRate(item, cartDefault);
+  if (item.unit_price_incl_mva != null) {
+    // Mva-inklusiv prisliste: brutto er fast, mva-splitten endrer seg.
+    const gross = round2(item.quantity * item.unit_price_incl_mva - item.line_discount);
+    const net = round2(gross / (1 + rate / 100));
+    return { net, vat: round2(gross - net), gross, mva_rate: rate };
+  }
   const net = round2(item.quantity * item.unit_price_excl_mva - item.line_discount);
   const vat = round2((net * rate) / 100);
   const gross = round2(net + vat);
   return { net, vat, gross, mva_rate: rate };
 }
+
 
 export function calcTotals(items: CartItem[], cartDefault: DiningMode): CartTotals {
   const buckets = new Map<number, { net: number; vat: number; gross: number }>();

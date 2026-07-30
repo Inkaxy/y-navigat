@@ -174,16 +174,10 @@ export function useApproveRefund() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (refund: RefundWithJoins) => {
-      const { data: u } = await supabase.auth.getUser();
-      const uid = u.user?.id ?? null;
-      const { error } = await supabase
-        .from("refunds")
-        .update({
-          status: "approved",
-          approved_at: new Date().toISOString(),
-          approved_by: uid,
-        } as never)
-        .eq("id", refund.id);
+
+      const { error } = await (supabase as any).rpc("approve_refund", {
+        p_refund_id: refund.id,
+      });
       if (error) throw error;
       if (refund.ticket_id) {
         await supabase.from("ticket_events").insert({
@@ -209,14 +203,9 @@ export function useMarkRefundPaid() {
     mutationFn: async (refund: RefundWithJoins) => {
       const { data: u } = await supabase.auth.getUser();
       const uid = u.user?.id ?? null;
-      const { error } = await supabase
-        .from("refunds")
-        .update({
-          status: "paid",
-          paid_at: new Date().toISOString(),
-          paid_by: uid,
-        } as never)
-        .eq("id", refund.id);
+      const { error } = await (supabase as any).rpc("mark_refund_paid", {
+        p_refund_id: refund.id,
+      });
       if (error) throw error;
       if (refund.ticket_id) {
         await supabase.from("ticket_events").insert({

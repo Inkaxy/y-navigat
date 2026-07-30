@@ -10257,6 +10257,34 @@ export type Database = {
         Args: { p_app_code: string }
         Returns: Database["public"]["Enums"]["access_level"]
       }
+      approve_refund: {
+        Args: { p_refund_id: string }
+        Returns: {
+          amount: number
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          legal_entity_id: string
+          method: string | null
+          order_id: string | null
+          outlet_id: string | null
+          paid_at: string | null
+          paid_by: string | null
+          reason: string | null
+          requires_approval: boolean
+          route: string
+          status: string
+          ticket_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "refunds"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       assign_label_number: {
         Args: {
           p_dept_id: string
@@ -10783,6 +10811,34 @@ export type Database = {
           to: "raw_material_supplier_purchase_stats"
           isOneToOne: false
           isSetofReturn: true
+        }
+      }
+      mark_refund_paid: {
+        Args: { p_refund_id: string }
+        Returns: {
+          amount: number
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          legal_entity_id: string
+          method: string | null
+          order_id: string | null
+          outlet_id: string | null
+          paid_at: string | null
+          paid_by: string | null
+          reason: string | null
+          requires_approval: boolean
+          route: string
+          status: string
+          ticket_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "refunds"
+          isOneToOne: true
+          isSetofReturn: false
         }
       }
       materialize_recurring_orders: {

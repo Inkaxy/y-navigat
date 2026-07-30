@@ -24,6 +24,8 @@ export type AddItemInput = {
   product_snapshot: ProductSnapshot;
   quantity?: number;
   unit_price_excl_mva: number;
+  /** Bruttopris når prislista er mva-inklusiv. */
+  unit_price_incl_mva?: number | null;
   /** Sats ved takeaway / standardsats for produktet. */
   base_mva_rate: number;
   /** Sats ved sitt her. NULL = ikke matvare. */
@@ -90,6 +92,7 @@ export function CartProvider({
         product_snapshot: i.product_snapshot,
         quantity: qty,
         unit_price_excl_mva: i.unit_price_excl_mva,
+        unit_price_incl_mva: i.unit_price_incl_mva ?? null,
         base_mva_rate: i.base_mva_rate,
         eatin_mva_rate: i.eatin_mva_rate,
         line_discount: 0,

@@ -58,7 +58,12 @@ export function CalculationTab({ productId, productName, canWrite }: Props) {
         .eq("product_id", productId)
         .is("valid_to", null)
         .maybeSingle();
-      if (!recipe) return { recipe: null };
+      const { data: product } = await supabase
+        .from("products")
+        .select("mva_rate")
+        .eq("id", productId)
+        .maybeSingle();
+      if (!recipe) return { recipe: null, mvaRate: product?.mva_rate ?? null };
 
       const [lines, labor, packaging, link] = await Promise.all([
         supabase
@@ -81,6 +86,7 @@ export function CalculationTab({ productId, productName, canWrite }: Props) {
       ]);
       return {
         recipe,
+        mvaRate: product?.mva_rate ?? null,
         lines: lines.data ?? [],
         labor: labor.data ?? [],
         packaging: packaging.data ?? [],
@@ -175,10 +181,10 @@ export function CalculationTab({ productId, productName, canWrite }: Props) {
         engros_pkg: priceEngrosPkg ? Number(priceEngrosPkg) : null,
         egne_utsalg: priceEgne ? Number(priceEgne) : null,
       },
-      vat_rate: 0.15,
+      vat_rate: (Number(data?.mvaRate ?? 15) || 0) / 100,
       target_db_pct: Number(targetDb) || 40,
     });
-  }, [ingredients, labor, packaging, unitsPerBatch, hourlyRate, yieldWeightG, priceNetto, priceEngros, priceEngrosPkg, priceEgne, targetDb, whatIfLabor]);
+  }, [ingredients, labor, packaging, unitsPerBatch, hourlyRate, yieldWeightG, priceNetto, priceEngros, priceEngrosPkg, priceEgne, targetDb, whatIfLabor, data?.mvaRate]);
 
   if (dataQuery.isLoading) {
     return (

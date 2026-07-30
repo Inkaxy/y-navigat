@@ -210,8 +210,10 @@ export function ImportPricesDialog({ open, onOpenChange, onComplete }: Props) {
     });
   }
 
-  /* ---- Import-handler: kall edge function ---- */
+  /* ---- Import-handler: IKKE aktiv ennå (edge-funksjonen finnes ikke) ---- */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async function handleImport() {
+
     if (!file || classified.length === 0) return;
     setImporting(true);
     setImportError(null);
@@ -360,15 +362,16 @@ export function ImportPricesDialog({ open, onOpenChange, onComplete }: Props) {
               </Button>
             )}
             {step === 3 && (
-              <Button
-                size="sm"
-                onClick={handleImport}
-                disabled={!stats || (stats.to_create + stats.to_update === 0)}
-                className="bg-app hover:bg-app-dark text-app-foreground"
-              >
-                Bekreft og start import
-              </Button>
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-muted-foreground">
+                  Selve importen er ikke koblet på ennå — analysen over er ekte, skrivingen kommer.
+                </span>
+                <Button size="sm" disabled title="Importmotoren er ikke ferdig ennå">
+                  Bekreft og start import (kommer)
+                </Button>
+              </div>
             )}
+
             {step === 4 && importResult && (
               <Button
                 size="sm"

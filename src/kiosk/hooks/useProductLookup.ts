@@ -12,6 +12,9 @@ export type ProductLookup = {
   /** Sitt her-sats. NULL = ikke matvare, samme sats uansett. */
   eatin_mva_rate: number | null;
   unit_price_excl_mva: number;
+  /** Satt kun når prislista er mva-inklusiv (fast bruttopris). */
+  unit_price_incl_mva: number | null;
+
 };
 
 export function usePriceListConfig(priceListId: string | null) {
@@ -75,10 +78,11 @@ export function useProductLookup(
           .eatin_mva_rate;
         const eatin_mva_rate =
           eatinRaw == null || eatinRaw === undefined ? null : Number(eatinRaw);
-        // For pricelister med mva inkludert: bruk takeaway-sats (mva) som basis
-        // — sitt her-tillegget bokføres separat på linje-MVA, ikke i pris.
+        // Mva-inklusiv prisliste: prisen ER bruttoprisen. Vi tar vare på den slik at
+        // «sitt her» endrer mva-splitten, ikke totalen kunden betaler.
+        const unit_price_incl_mva = pricesIncludeMva ? Math.round(raw * 100) / 100 : null;
         const unit_price_excl_mva = pricesIncludeMva
-          ? raw / (1 + mva / 100)
+          ? Math.round((raw / (1 + mva / 100)) * 100) / 100
           : raw;
         return {
           id: pRes.data.id,
@@ -88,7 +92,9 @@ export function useProductLookup(
           mva_rate: mva,
           eatin_mva_rate,
           unit_price_excl_mva,
+          unit_price_incl_mva,
         };
+
       },
     });
   };

@@ -2,6 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRows } from "@/lib/supabasePaging";
 import { isoDayOfWeek } from "@/ordre/hooks/useDeliveryTours";
+import { productionRowKey } from "./useProductionPlanSnapshots";
+
 import type { ProductionPlanRow, ProductionPlanRowDetail, ProduksjonsplanCriteria } from "../types";
 
 const DAY_KEYS = [
@@ -60,16 +62,19 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
     queryFn: async (): Promise<{ rows: ProductionPlanRow[]; orderCounts: { fast: number; datert: number; pakkseddel: number } }> => {
       if (!legalEntityId) return { rows: [], orderCounts: { fast: 0, datert: 0, pakkseddel: 0 } };
 
-      // 1) Hent ordrer for dato + selskap
-      const orders = await fetchAllRows((from, to) =>
+      // 1) Hent ordrer for dato + selskap (inkl. kansellerte — de brukes til å
+      //    overstyre fastordre slik at en avbestilt vare ikke produseres likevel)
+      const allOrders = await fetchAllRows((from, to) =>
         supabase
           .from("orders")
           .select("id, delivery_tour_id, customer_id, status, source")
           .eq("legal_entity_id", legalEntityId)
           .eq("delivery_date", date)
-          .neq("status", "cancelled")
           .range(from, to),
       );
+      const cancelledOrders = (allOrders ?? []).filter((o) => o.status === "cancelled");
+      const orders = (allOrders ?? []).filter((o) => o.status !== "cancelled");
+
 
       // Hent alle aktive turer for selskapet (trenger info for ekspandering av fastordre uten tur).
       const { data: allTours } = await supabase
@@ -83,9 +88,11 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
       );
       const dow = isoDayOfWeek(date);
       const dayKey = DAY_KEYS[dow - 1];
-      const activeTourIdsForDow = (allTours ?? [])
+      const activeToursForDow = (allTours ?? [])
         .filter((t: any) => t.status === "active" && t[dayKey])
-        .map((t: any) => t.id as string);
+        .sort((a: any, b: any) => (a.tour_number ?? 9999) - (b.tour_number ?? 9999));
+      const defaultTourIdForDow: string | null = (activeToursForDow[0]?.id as string) ?? null;
+
 
       const filteredOrders: (OrderRow & { tour_number: number | null })[] = (orders ?? [])
         .map((o) => ({
@@ -124,14 +131,20 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
       // (kunden kan justere opp/ned). Andre produkter i fastordren beholdes.
       // Vi henter ordrelinjer tidlig her for å bygge (customer_id, product_id)-sett
       // som skal ekskluderes fra fastordre-ekspansjonen.
+      // Kansellerte ordrer teller også som overstyring: har kunden avbestilt varen
+      // skal fastordren IKKE gjenopplive den.
+      const overrideOrders = [
+        ...finalOrders.map((o) => ({ id: o.id, customer_id: o.customer_id })),
+        ...cancelledOrders.map((o) => ({ id: o.id, customer_id: o.customer_id })),
+      ];
       const customerProductOverride = new Set<string>(); // `${customer_id}|${product_id}`
-      const orderIdToCustomer = new Map(finalOrders.map((o) => [o.id, o.customer_id]));
-      if (finalOrders.length > 0) {
+      const orderIdToCustomer = new Map(overrideOrders.map((o) => [o.id, o.customer_id]));
+      if (overrideOrders.length > 0) {
         const preLines = await fetchAllRows((from, to) =>
           supabase
             .from("order_lines")
             .select("order_id, product_id")
-            .in("order_id", finalOrders.map((o) => o.id))
+            .in("order_id", overrideOrders.map((o) => o.id))
             .range(from, to),
         );
         for (const l of preLines) {
@@ -139,6 +152,7 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
           if (cid && l.product_id) customerProductOverride.add(`${cid}|${l.product_id}`);
         }
       }
+
 
       // === Fastordre (recurring) — virtuelle linjer ===========================
       // Maler genererer ikke faktiske ordre, men skal vises på produksjonslista.
@@ -180,17 +194,17 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
             if (!item.quantity || Number(item.quantity) <= 0) continue;
             // Per-produkt overstyring: hopp over hvis kunden har dette produktet i en faktisk ordre
             if (customerProductOverride.has(`${sched.customer_id}|${item.product_id}`)) continue;
-            const targetTours = item.tour_id ? [item.tour_id] : activeTourIdsForDow;
-            for (const tid of targetTours) {
-              const tn = tourMap.get(tid) ?? null;
-              recurringLines.push({
-                customer_id: sched.customer_id,
-                tour_id: tid,
-                tour_number: tn,
-                product_id: item.product_id,
-                quantity: Number(item.quantity),
-              });
-            }
+            // ÉN linje per fastordre-vare. Uten tur på malen legges mengden på
+            // dagens første aktive tur — den skal IKKE dupliseres per tur.
+            const tid = item.tour_id ?? defaultTourIdForDow;
+            recurringLines.push({
+              customer_id: sched.customer_id,
+              tour_id: tid,
+              tour_number: tid ? tourMap.get(tid) ?? null : null,
+              product_id: item.product_id,
+              quantity: Number(item.quantity),
+            });
+
           }
         }
       }
@@ -441,22 +455,12 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
         });
       }
 
-      // Aggregeringsnøkkel
-      // Sammenslåing av varer i samme produksjonsgruppe skjer KUN når
-      // `merge_by_main_product` er aktivert (mergeOn). Aggregeringsmodusene
-      // styrer bare sortering/visning, ikke om varer skal slås sammen.
-      const keyOf = (p: ProductRow): string => {
-        if (!mergeOn) return `p:${p.id}`;
-        if (criteria.aggregation === "per_product") return `p:${p.id}`;
-        if (criteria.aggregation === "per_production_group") return `pg:${p.production_group_id ?? `_${p.id}`}`;
-        // per_main_and_production_group
-        return `mp:${p.main_category_id ?? "_"}::${p.production_group_id ?? `_${p.id}`}`;
-      };
-
+      // Aggregeringsnøkkel — delt med snapshot/korreksjonslista (productionRowKey)
+      // slik at diffen sammenligner samme rader.
       const agg = new Map<string, ProductionPlanRow>();
       for (const { tour, product, originalProduct, quantity, customerId } of includedLines) {
-        const tourKey = criteria.sum_tours ? "ALL" : `t${tour ?? "x"}`;
-        const k = `${tourKey}::${keyOf(product)}`;
+        const k = productionRowKey(criteria.sum_tours ? null : tour, product.id, criteria);
+
         let row = agg.get(k);
         if (!row) {
           const main = product.main_category_id ? mainCatMap.get(product.main_category_id) : null;

@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { ReceiptView } from "@/kiosk/components/ReceiptView";
 import { useReceiptHeader } from "@/kiosk/hooks/useReceiptHeader";
+import { calcLine } from "@/kiosk/lib/cart";
 
 import { useTerminal } from "@/kiosk/context/TerminalContext";
 import { useOperator } from "@/kiosk/context/OperatorContext";
@@ -162,6 +163,7 @@ function SelfServiceFlow({ data, loading, loadError }: FlowProps) {
           mva_rate: p.mva_rate,
         },
         unit_price_excl_mva: p.unit_price_excl_mva,
+        unit_price_incl_mva: p.unit_price_incl_mva,
         base_mva_rate: p.mva_rate,
         eatin_mva_rate: p.eatin_mva_rate,
         quantity: 1,
@@ -422,12 +424,7 @@ function SelfServiceFlow({ data, loading, loadError }: FlowProps) {
       label: it.product_snapshot.display_name,
       qty: it.quantity,
       unit: it.product_snapshot.unit ?? null,
-      line_total:
-        Math.round(
-          (it.quantity * it.unit_price_excl_mva - it.line_discount) *
-            (1 + effRate / 100) *
-            100,
-        ) / 100,
+      line_total: calcLine(it, cart.diningMode).gross,
       image_url: signed ?? fallback ?? null,
       dining_mode: (it.dining_mode_override ?? cart.diningMode) as "takeaway" | "eatin",
       is_food: it.eatin_mva_rate != null,

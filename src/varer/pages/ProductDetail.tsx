@@ -277,56 +277,75 @@ export default function ProductDetail() {
     // Diff sales_groups
     const toAdd = salesGroupIds.filter((id) => !originalSalesGroupIds.includes(id));
     const toRemove = originalSalesGroupIds.filter((id) => !salesGroupIds.includes(id));
-    if (toRemove.length) {
-      await supabase.from("product_sales_groups").delete().eq("product_id", product.id).in("sales_group_id", toRemove);
-    }
-    if (toAdd.length) {
-      await supabase.from("product_sales_groups").insert(
-        toAdd.map((sgId) => ({ product_id: product.id, sales_group_id: sgId })) as never,
-      );
-    }
-
-    // Diff package_items — enkel DELETE+INSERT
-    if (JSON.stringify(packageItems) !== JSON.stringify(originalPackageItems)) {
-      await supabase.from("product_package_items").delete().eq("package_product_id", product.id);
-      if (packageItems.length) {
-        await supabase.from("product_package_items").insert(
-          packageItems.map((it, i) => ({
-            package_product_id: product.id,
-            contained_product_id: it.contained_product_id,
-            quantity: it.quantity,
-            sort_order: i,
-          })) as never,
-        );
-      }
-    }
 
     // Diff label_departments
     const ldToAdd = labelDepartmentIds.filter((id) => !originalLabelDepartmentIds.includes(id));
     const ldToRemove = originalLabelDepartmentIds.filter((id) => !labelDepartmentIds.includes(id));
-    if (ldToRemove.length) {
-      await supabase.from("product_label_departments").delete().eq("product_id", product.id).in("department_id", ldToRemove);
-    }
-    if (ldToAdd.length) {
-      await supabase.from("product_label_departments").insert(
-        ldToAdd.map((dId) => ({ product_id: product.id, department_id: dId })) as never,
-      );
-    }
 
-    // Diff cake_step_products — enkel DELETE+INSERT basert på step_id
+    // Diff cake_step_products — basert på step_id
     const oldStepIds = new Set(originalCakeLinks.map((l) => l.cake_step_id));
     const newStepIds = new Set(cakeLinks.map((l) => l.cake_step_id));
     const cspToRemove = [...oldStepIds].filter((s) => !newStepIds.has(s));
     const cspToAdd = [...newStepIds].filter((s) => !oldStepIds.has(s));
-    if (cspToRemove.length) {
-      await supabase.from("cake_step_products").delete()
-        .eq("product_id", product.id).in("cake_step_id", cspToRemove);
+
+    try {
+      if (toRemove.length) {
+        const { error: e } = await supabase.from("product_sales_groups").delete()
+          .eq("product_id", product.id).in("sales_group_id", toRemove);
+        if (e) throw e;
+      }
+      if (toAdd.length) {
+        const { error: e } = await supabase.from("product_sales_groups").insert(
+          toAdd.map((sgId) => ({ product_id: product.id, sales_group_id: sgId })) as never,
+        );
+        if (e) throw e;
+      }
+
+      // Pakkeinnhold: delete+insert i ÉN transaksjon (aldri tomt pakkeinnhold ved feil)
+      if (JSON.stringify(packageItems) !== JSON.stringify(originalPackageItems)) {
+        const { error: e } = await (supabase as any).rpc("replace_child_rows", {
+          p_table: "product_package_items",
+          p_parent_column: "package_product_id",
+          p_parent_id: product.id,
+          p_rows: packageItems.map((it, i) => ({
+            package_product_id: product.id,
+            contained_product_id: it.contained_product_id,
+            quantity: it.quantity,
+            sort_order: i,
+          })),
+        });
+        if (e) throw e;
+      }
+
+      if (ldToRemove.length) {
+        const { error: e } = await supabase.from("product_label_departments").delete()
+          .eq("product_id", product.id).in("department_id", ldToRemove);
+        if (e) throw e;
+      }
+      if (ldToAdd.length) {
+        const { error: e } = await supabase.from("product_label_departments").insert(
+          ldToAdd.map((dId) => ({ product_id: product.id, department_id: dId })) as never,
+        );
+        if (e) throw e;
+      }
+
+      if (cspToRemove.length) {
+        const { error: e } = await supabase.from("cake_step_products").delete()
+          .eq("product_id", product.id).in("cake_step_id", cspToRemove);
+        if (e) throw e;
+      }
+      if (cspToAdd.length) {
+        const { error: e } = await supabase.from("cake_step_products").insert(
+          cspToAdd.map((sid) => ({ product_id: product.id, cake_step_id: sid })) as never,
+        );
+        if (e) throw e;
+      }
+    } catch (e) {
+      setSaving(false);
+      toast.error((e as Error).message ?? "Kunne ikke lagre koblinger");
+      return;
     }
-    if (cspToAdd.length) {
-      await supabase.from("cake_step_products").insert(
-        cspToAdd.map((sid) => ({ product_id: product.id, cake_step_id: sid })) as never,
-      );
-    }
+
 
     await logAudit({
       action: "update",
