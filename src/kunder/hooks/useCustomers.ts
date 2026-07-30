@@ -34,12 +34,13 @@ export function useCustomers(scope: string | null, filters: CustomerFilters) {
     queryKey: ["customers", scope, filters],
     enabled: !!scope,
     queryFn: async (): Promise<CustomerListRow[]> => {
-      const applyFilters = (q: ReturnType<typeof supabase.from>) => {
+      const applyFilters = (q: any) => {
         let query = q
           .select(
             "id, customer_number, display_name, customer_type, organization_number, primary_contact_name, primary_contact_email, legal_entity_id, credit_limit, credit_hold, default_price_list_id, status, allows_returns, geocode_latitude, geocode_longitude",
           )
           .order("display_name", { ascending: true });
+
 
         if (scope && scope !== ALL_ENTITIES) {
           query = query.eq("legal_entity_id", scope);
