@@ -195,7 +195,7 @@ async function fetchZ(id: string): Promise<ZRow | null> {
     report_hash: r.report_hash,
     terminal_code: r.terminal?.terminal_code ?? "?",
     terminal_name: r.terminal?.display_name ?? "?",
-    legal_entity_name: r.terminal?.legal_entity?.name ?? null,
+    legal_entity_name: r.terminal?.legal_entity?.display_name ?? null,
     legal_entity_org_number: r.terminal?.legal_entity?.org_number ?? null,
   };
 }
