@@ -41,11 +41,58 @@ function qty(n: number | string | null | undefined): string {
   const v = Number(n ?? 0);
   return v.toFixed(3);
 }
+// Alle tidsstempler rapporteres i norsk lokaltid (Europe/Oslo), slik at
+// eksporten stemmer med Z-rapportene.
+const OSLO_FMT = new Intl.DateTimeFormat("sv-SE", {
+  timeZone: "Europe/Oslo",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hour12: false,
+});
+function osloParts(iso: string): { date: string; time: string } {
+  // sv-SE gir "YYYY-MM-DD HH:mm:ss"
+  const s = OSLO_FMT.format(new Date(iso)).replace(" ", "T");
+  return { date: s.slice(0, 10), time: s.slice(11, 19) };
+}
+function osloOffset(iso: string): string {
+  const d = new Date(iso);
+  const local = new Date(`${osloParts(iso).date}T${osloParts(iso).time}Z`);
+  const mins = Math.round((local.getTime() - d.getTime()) / 60000);
+  const sign = mins >= 0 ? "+" : "-";
+  const a = Math.abs(mins);
+  return `${sign}${String(Math.floor(a / 60)).padStart(2, "0")}:${String(a % 60).padStart(2, "0")}`;
+}
+function osloTimestamp(iso: string): string {
+  const p = osloParts(iso);
+  return `${p.date}T${p.time}${osloOffset(iso)}`;
+}
 function dateOnly(iso: string): string {
-  return new Date(iso).toISOString().slice(0, 10);
+  return osloParts(iso).date;
 }
 function timeOnly(iso: string): string {
-  return new Date(iso).toISOString().slice(11, 19);
+  return osloParts(iso).time;
+}
+
+/**
+ * Paginert uttrekk — PostgREST kapper stille på 1000 rader. Vi MÅ hente alt,
+ * ellers signeres en ufullstendig fil som «komplett».
+ */
+const PAGE = 1000;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function fetchAllPaged<T>(build: () => any): Promise<T[]> {
+  const out: T[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await build().range(from, from + PAGE - 1);
+    if (error) throw error;
+    const rows = (data ?? []) as T[];
+    out.push(...rows);
+    if (rows.length < PAGE) break;
+  }
+  return out;
 }
 async function sha256Hex(s: string): Promise<string> {
   const buf = new TextEncoder().encode(s);
@@ -197,23 +244,26 @@ function buildEvent(ev: any, idx: number): string {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function buildTransaction(tx: any, lines: any[], idx: number): string {
-  const rType = receiptTypeFor(tx.transaction_type, Boolean(tx.is_copy), Boolean(tx.is_proforma));
+  const rType = receiptTypeFor(tx.transaction_type, Boolean(tx._is_copy), Boolean(tx._is_proforma));
   const payments = (tx.payment_summary?.payments ?? []) as Array<{
     method: string;
     amount: number;
   }>;
   const linesXml = lines
     .map((l, i) => {
-      const vatRate = Number(l.mva_rate ?? 0);
+      const vatRate = Number(l.mva_rate ?? l.product_snapshot?.mva_rate ?? 0);
+      const snap = (l.product_snapshot ?? {}) as Record<string, unknown>;
+      const code = (snap.display_number as string) ?? l.product_id ?? "MISC";
+      const name = (snap.display_name as string) ?? "Ukjent";
       return (
         `      <Line>\n` +
-        el("Nr", String(i + 1), "        ") +
+        el("Nr", String(l.line_number ?? i + 1), "        ") +
         el("LineType", tx.transaction_type === "return" ? "Return" : "Sales", "        ") +
-        el("ProductCode", l.product_code ?? l.product_id ?? "MISC", "        ") +
-        el("ProductGroup", l.product_group ?? "", "        ") +
-        el("Description", l.description ?? l.product_name ?? "Ukjent", "        ") +
+        el("ProductCode", code, "        ") +
+        el("ProductGroup", (snap.product_group as string) ?? "", "        ") +
+        el("Description", name, "        ") +
         el("Quantity", qty(l.quantity), "        ") +
-        el("UnitPrice", money(l.unit_price), "        ") +
+        el("UnitPrice", money(l.unit_price_excl_mva), "        ") +
         el("VATCode", `V${Math.round(vatRate)}`, "        ") +
         el("VATRate", vatRate.toFixed(2), "        ") +
         el("VATAmount", money(l.line_mva), "        ") +
@@ -246,7 +296,7 @@ function buildTransaction(tx: any, lines: any[], idx: number): string {
     el("TransactionTime", timeOnly(tx.created_at), "      ") +
     el("TransactionType", tx.transaction_type ?? "sale", "      ") +
     el("OperatorID", tx.operator_id ?? "", "      ") +
-    el("SystemEntryTime", tx.created_at, "      ") +
+    el("SystemEntryTime", osloTimestamp(tx.created_at), "      ") +
     el("TransactionAmountExVAT", money(tx.subtotal_excl_mva), "      ") +
     el("TransactionAmountInVAT", money(tx.total_incl_mva), "      ") +
     el("TransactionVATAmount", money(tx.total_mva), "      ") +
