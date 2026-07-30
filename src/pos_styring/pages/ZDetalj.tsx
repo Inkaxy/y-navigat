@@ -305,7 +305,9 @@ export default function ZDetalj() {
                     Rapporthash lagret ved dagsavslutning. Verifisering av hash-kjeden
                     kjøres i journalkontrollen (Kassehelse), ikke her.
                   </p>
+                </TooltipContent>
               </Tooltip>
+
             )}
             <Badge variant="outline" className="gap-1">
               <Lock className="h-3 w-3" /> Sesjoner låst
