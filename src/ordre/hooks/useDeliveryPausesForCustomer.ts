@@ -32,20 +32,21 @@ export function useDeliveryPausesForCustomer(
         .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
         .eq("customer_id", customerId!)
         .lte("pause_from", dateTo)
-        .gte("pause_to", dateFrom);
+        // pause_to = NULL betyr «åpen pause» (ingen sluttdato) og skal alltid med.
+        .or(`pause_to.is.null,pause_to.gte.${dateFrom}`);
       if (error) throw error;
 
       const out: PauseMap = new Map();
       for (const p of (data ?? []) as Array<{
         pause_from: string;
-        pause_to: string;
+        pause_to: string | null;
         tour_filter: string[] | null;
         reason: string | null;
         notes: string | null;
       }>) {
         const days = enumerateDates(
           p.pause_from < dateFrom ? dateFrom : p.pause_from,
-          p.pause_to > dateTo ? dateTo : p.pause_to,
+          p.pause_to === null || p.pause_to > dateTo ? dateTo : p.pause_to,
         );
         const tourKeys: string[] =
           p.tour_filter && p.tour_filter.length > 0 ? p.tour_filter : ["*"];
