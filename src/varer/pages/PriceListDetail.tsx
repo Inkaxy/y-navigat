@@ -51,7 +51,7 @@ export default function PriceListDetail() {
       const { data } = await supabase
         .from("products")
         .select("id, display_name, code")
-        .eq("legal_entity_id", legalEntityId)
+        .eq("legal_entity_id", legalEntityId!)
         .order("display_name");
       return data ?? [];
     },
@@ -153,10 +153,10 @@ export default function PriceListDetail() {
                       autoFocus
                       type="number"
                       step="0.01"
-                      value={editing.price}
+                      value={editing!.price}
                       onChange={(e) => setEditing({ id: it.id, price: e.target.value })}
-                      onBlur={() => savePrice(it.id, editing.price, it.products?.display_name)}
-                      onKeyDown={(e) => { if (e.key === "Enter") savePrice(it.id, editing.price, it.products?.display_name); if (e.key === "Escape") setEditing(null); }}
+                      onBlur={() => savePrice(it.id, editing!.price, it.products?.display_name)}
+                      onKeyDown={(e) => { if (e.key === "Enter") savePrice(it.id, editing!.price, it.products?.display_name); if (e.key === "Escape") setEditing(null); }}
                       className="ml-auto w-28 text-right"
                     />
                   ) : (

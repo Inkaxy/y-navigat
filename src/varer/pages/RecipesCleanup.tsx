@@ -22,7 +22,7 @@ export default function RecipesCleanup() {
       const { data, error } = await supabase
         .from("recipes")
         .select("id, version, yield_quantity, yield_unit, requires_cleanup, products!inner(id, display_name, code, product_category, legal_entity_id), recipe_lines(id, raw_material_id, ingredient_name)")
-        .eq("products.legal_entity_id", legalEntityId)
+        .eq("products.legal_entity_id", legalEntityId!)
         .eq("requires_cleanup", true)
         .is("valid_to", null)
         .order("created_at", { ascending: false });

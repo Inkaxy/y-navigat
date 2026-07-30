@@ -86,10 +86,10 @@ export function DeclarationTab({ productId, productName, canWrite }: Props) {
         onOpenChange={setImportOpen}
         productId={productId}
         productName={productName}
-        productRecipeLinkId={linkQuery.data.id}
+        productRecipeLinkId={linkQuery.data!.id}
         onApproved={() => {
           qc.invalidateQueries({ queryKey: ["product-recipe-link-decl", productId] });
-          qc.invalidateQueries({ queryKey: ["compute-product-declaration", linkQuery.data.id] });
+          qc.invalidateQueries({ queryKey: ["compute-product-declaration", linkQuery.data!.id] });
         }}
       />
     </>

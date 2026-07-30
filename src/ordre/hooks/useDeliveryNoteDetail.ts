@@ -98,7 +98,7 @@ export function useDeliveryNoteDetail(id: string | undefined) {
           order_line_id: l.order_line_id ?? null,
           order_id: l.order_id ?? null,
         }))
-        .sort((a, b) => a.line_number - b.line_number);
+        .sort((a: any, b: any) => a.line_number - b.line_number);
 
       return {
         id: (data as any).id,

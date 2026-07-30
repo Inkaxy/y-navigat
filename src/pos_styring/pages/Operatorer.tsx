@@ -211,7 +211,7 @@ function CreateOperatorDialog({
         p_operator_code: code,
         p_display_name: values.display_name.trim(),
         p_pin: values.pin,
-        p_user_id: null,
+        p_user_id: undefined,
       });
       if (error) throw error;
     },

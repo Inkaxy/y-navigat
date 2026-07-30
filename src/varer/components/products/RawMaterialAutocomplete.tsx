@@ -71,7 +71,7 @@ export function RawMaterialAutocomplete({
       const { data, error } = await supabase
         .from("raw_materials")
         .select("id, sku, name, category, base_unit, current_cost_price")
-        .eq("legal_entity_id", legalEntityId)
+        .eq("legal_entity_id", legalEntityId!)
         .eq("is_active", true)
         .order("name", { ascending: true });
       if (error) throw error;

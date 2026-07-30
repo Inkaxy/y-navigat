@@ -55,7 +55,7 @@ export function RecipeProductLinks({ recipeId, currentProductId, canWrite }: Pro
       const { data } = await supabase
         .from("products")
         .select("id, display_name, display_number")
-        .eq("legal_entity_id", legalEntityId)
+        .eq("legal_entity_id", legalEntityId!)
         .neq("status", "discontinued")
         .order("display_name");
       return data ?? [];

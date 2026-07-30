@@ -232,7 +232,7 @@ function JsonTree({ value, depth = 0 }: { value: any; depth?: number }) {
         {isArray ? `[${entries.length}]` : `{${entries.length}}`}
       </summary>
       <ul className="ml-3 border-l border-line/60 pl-3 space-y-0.5">
-        {entries.map(([k, v]: [any, any]) => (
+        {entries.map(([k, v]) => (
           <li key={String(k)} className="text-xs font-mono">
             <span className="text-foreground/80">{String(k)}</span>
             <span className="text-muted-foreground">: </span>

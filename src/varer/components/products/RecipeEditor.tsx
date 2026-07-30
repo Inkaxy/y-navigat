@@ -449,7 +449,7 @@ function RecipeForm({ recipe, productName, canWrite }: { recipe: any; productNam
                     isLast={idx === parts.length - 1}
                     canWrite={canWrite}
                     lines={lines.filter((l) => l.recipe_part_id === part.id)}
-                    onUpdate={(patch) => updatePart(part.id, patch)}
+                    onUpdate={(patch: any) => updatePart(part.id, patch)}
                     onRemove={() => removePart(part.id)}
                     onDuplicate={() => duplicatePart(part.id)}
                     onMoveUp={() => movePart(part.id, -1)}

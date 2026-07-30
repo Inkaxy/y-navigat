@@ -20,7 +20,7 @@ export default function Recipes() {
       const { data } = await supabase
         .from("recipes")
         .select("id, version, valid_from, valid_to, yield_quantity, yield_unit, products!inner(id, display_name, code, product_category, legal_entity_id)")
-        .eq("products.legal_entity_id", legalEntityId)
+        .eq("products.legal_entity_id", legalEntityId!)
         .order("created_at", { ascending: false });
       return data ?? [];
     },

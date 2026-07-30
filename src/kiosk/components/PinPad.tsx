@@ -48,7 +48,7 @@ export function PinPad() {
     const result = await login(code, pin);
     setBusy(false);
     if (!result.ok) {
-      setError(result.error);
+      setError(result.error ?? "Innlogging feilet");
       setPin("");
       return;
     }

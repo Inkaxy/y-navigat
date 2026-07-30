@@ -28,7 +28,7 @@ export default function CakeBuilderList() {
     queryKey: ["cake-categories", legalEntityId],
     queryFn: async () => {
       const { data, error } = await supabase.rpc("get_cake_categories_with_counts", {
-        p_legal_entity_id: legalEntityId,
+        p_legal_entity_id: legalEntityId!,
       });
       if (error) throw error;
       return data ?? [];

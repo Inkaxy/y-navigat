@@ -387,7 +387,7 @@ export default function NewOrder() {
           if (cancelled || !prods) return;
           const byId = new Map(prods.map((p: any) => [p.id, p]));
           const newLines: LineDraft[] = matched
-            .map((m) => {
+            .map((m): LineDraft | null => {
               const p = byId.get(m.product_id!) as ProductOption | undefined;
               if (!p) return null;
               return {

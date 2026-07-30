@@ -154,7 +154,7 @@ export default function ForhandlingDetail() {
         rmName={rmName}
         supName={supName}
         activating={activating}
-        onActivate={async (onlyConfirmed) => {
+        onActivate={async (onlyConfirmed: boolean) => {
           setActivating(true);
           try {
             const targets = onlyConfirmed

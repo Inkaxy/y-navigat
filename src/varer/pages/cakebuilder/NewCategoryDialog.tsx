@@ -105,7 +105,7 @@ export function NewCategoryDialog({ open, onOpenChange, category, onSaved }: Pro
       const { data: maxRow } = await supabase
         .from("cake_categories")
         .select("sort_order")
-        .eq("legal_entity_id", legalEntityId)
+        .eq("legal_entity_id", legalEntityId!)
         .order("sort_order", { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -114,7 +114,7 @@ export function NewCategoryDialog({ open, onOpenChange, category, onSaved }: Pro
       const { data, error } = await supabase
         .from("cake_categories")
         .insert({
-          legal_entity_id: legalEntityId,
+          legal_entity_id: legalEntityId!,
           name: trimmedName,
           description: description.trim() || null,
           image_url: imageUrl,

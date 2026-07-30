@@ -29,7 +29,7 @@ export function ReturView({ priceDate, search }: Props) {
         .select(
           "id, display_number, display_name, unit_of_sale, allows_return, return_price_type, return_value, mva_rate",
         )
-        .eq("legal_entity_id", legalEntityId)
+        .eq("legal_entity_id", legalEntityId!)
         .eq("allows_return", true)
         .neq("status", "discontinued")
         .order("display_number");
@@ -44,7 +44,7 @@ export function ReturView({ priceDate, search }: Props) {
       const { data, error } = await supabase
         .from("price_lists")
         .select("id, code, display_name, list_number, price_list_type")
-        .eq("legal_entity_id", legalEntityId)
+        .eq("legal_entity_id", legalEntityId!)
         .eq("status", "active")
         .order("list_number", { ascending: true, nullsFirst: false });
       if (error) throw error;

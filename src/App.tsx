@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes, useParams } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -38,67 +39,13 @@ import Apper from "./pages/admin/Apper";
 import { Navigate } from "react-router-dom";
 import { AppProvider as VarerAppProvider } from "@/varer/context/AppContext";
 import { SelectionProvider } from "@/providers/SelectionProvider";
-import VarerProductList from "@/varer/pages/ProductList";
-import VarerProductDetail from "@/varer/pages/ProductDetail";
-import VarerPriceLists from "@/varer/pages/PriceLists";
-import VarerPriceListDetail from "@/varer/pages/PriceListDetail";
-import VarerSpecialPrices from "@/varer/pages/SpecialPrices";
-import VarerRecipes from "@/varer/pages/Recipes";
-import VarerRecipesCleanup from "@/varer/pages/RecipesCleanup";
-import VarerPlaceholder from "@/varer/pages/PlaceholderPage";
-import VarerCakeBuilderList from "@/varer/pages/cakebuilder/CakeBuilderList";
-import VarerCakeBuilderDetail from "@/varer/pages/cakebuilder/CakeBuilderDetail";
-import VarerSettingsLayout from "@/varer/pages/settings/SettingsLayout";
-import VarerSettingsGeneral from "@/varer/pages/settings/SettingsGeneral";
-import VarerSettingsMainCategories from "@/varer/pages/settings/SettingsMainCategories";
-import VarerSettingsSubCategories from "@/varer/pages/settings/SettingsSubCategories";
-import VarerSettingsProductPages from "@/varer/pages/settings/SettingsProductPages";
-import VarerSettingsSalesGroups from "@/varer/pages/settings/SettingsSalesGroups";
-import VarerSettingsProductionGroups from "@/varer/pages/settings/SettingsProductionGroups";
-import VarerSettingsAI from "@/varer/pages/settings/SettingsAI";
-import VarerCakeBuilderEmbed from "@/varer/pages/embed/CakeBuilderEmbed";
 import { SelectedEntityProvider as KunderEntityProviderRaw } from "@/kunder/state/SelectedEntityContext";
-import KunderCustomerList from "@/kunder/pages/CustomerList";
-import KunderCustomerDetail from "@/kunder/pages/CustomerDetail";
-import KunderProfileList from "@/kunder/pages/ProfileList";
-import KunderProfileDetail from "@/kunder/pages/ProfileDetail";
-import KunderPickupLocations from "@/kunder/pages/PickupLocations";
-import KunderInnstillinger from "@/kunder/pages/Innstillinger";
-import KunderCustomerGroups from "@/kunder/pages/CustomerGroups";
-import KunderCustomerHistory from "@/kunder/pages/CustomerHistory";
-import KunderPlaceholder from "@/kunder/pages/Placeholder";
-import KunderPortalUsers from "@/kunder/pages/PortalUsers";
 import { useUserAccess as useKunderUserAccess } from "@/kunder/hooks/useUserAccess";
 import { useAuth as useNbhubAuth } from "@/hooks/useAuth";
-import ProduksjonOversikt from "@/produksjon/pages/OversiktPage";
-import ProduksjonEtiketter from "@/produksjon/pages/EtiketterPage";
-import ProduksjonsplanPage from "@/produksjon/pages/ProduksjonsplanPage";
-import ProduksjonsavdelingerPage from "@/produksjon/pages/innstillinger/ProduksjonsavdelingerPage";
-import PakkeomraderPage from "@/produksjon/pages/innstillinger/PakkeomraderPage";
-import UtskriftsprofilerPage from "@/produksjon/pages/innstillinger/UtskriftsprofilerPage";
 
 // POS Styring (importert fra POS Manager Hub)
 import { AppColorProvider } from "@/providers/AppColorProvider";
 import { LegalEntityProvider as PosStyringEntityProvider } from "@/pos_styring/contexts/LegalEntityContext";
-import PosStyringDashboard from "@/pos_styring/pages/Dashboard";
-import PosStyringUtsalg from "@/pos_styring/pages/Utsalg";
-import PosStyringTerminaler from "@/pos_styring/pages/Terminaler";
-import PosStyringOperatorer from "@/pos_styring/pages/Operatorer";
-import PosStyringTastatur from "@/pos_styring/pages/Tastatur";
-import PosStyringTastaturEditor from "@/pos_styring/pages/TastaturEditor";
-import PosStyringPosKunder from "@/pos_styring/pages/PosKunder";
-import PosStyringProdukter from "@/pos_styring/pages/Produkter";
-import PosStyringSesjoner from "@/pos_styring/pages/Sesjoner";
-import PosStyringSesjonDetalj from "@/pos_styring/pages/SesjonDetalj";
-import PosStyringTransaksjoner from "@/pos_styring/pages/Transaksjoner";
-import PosStyringTransaksjonDetalj from "@/pos_styring/pages/TransaksjonDetalj";
-import PosStyringRapporter from "@/pos_styring/pages/Rapporter";
-import PosStyringZDetalj from "@/pos_styring/pages/ZDetalj";
-import PosStyringInnstillinger from "@/pos_styring/pages/Innstillinger";
-import PosStyringSafT from "@/pos_styring/pages/SafTExport";
-import PosStyringSkrivere from "@/pos_styring/pages/Skrivere";
-import PosStyringStasjoner from "@/pos_styring/pages/Stasjoner";
-import PosStyringKasseHelse from "@/pos_styring/pages/KasseHelse";
 
 // Kiosk-ruter — bypass NBhub-shell + auth-guard, egen Supabase-klient
 import { KioskOperatorRoute, KioskCustomerRoute, KioskSelfServiceRoute } from "@/kiosk/routes";
@@ -106,73 +53,15 @@ import { KioskOperatorRoute, KioskCustomerRoute, KioskSelfServiceRoute } from "@
 
 
 // Ordre-app
-import OrdreDashboard from "@/ordre/pages/Dashboard";
-import OrdreOrdersList from "@/ordre/pages/OrdersList";
-import OrdreNewOrder from "@/ordre/pages/NewOrder";
-import OrdreOrderDetail from "@/ordre/pages/OrderDetail";
-import OrdreLeveringskalender from "@/ordre/pages/Leveringskalender";
-import OrdreCustomerOrders from "@/ordre/pages/CustomerOrders";
-import OrdreTours from "@/ordre/pages/Tours";
-import OrdreDeliveryRules from "@/ordre/pages/DeliveryRules";
-import OrdreRecurringOrders from "@/ordre/pages/RecurringOrders";
-import OrdreDeliveryNoteDashboard from "@/ordre/pages/DeliveryNoteDashboard";
-import OrdreDeliveryNotesList from "@/ordre/pages/DeliveryNotesList";
-import OrdreDeliveryNoteDetail from "@/ordre/pages/DeliveryNoteDetail";
-import OrdreDeliveryNoteCorrections from "@/ordre/pages/DeliveryNoteCorrections";
-import OrdreDeliveryNoteSettings from "@/ordre/pages/DeliveryNoteSettings";
-import OrdreCakeImagesDashboard from "@/ordre/pages/CakeImagesDashboard";
-import OrdreCakeImagesList from "@/ordre/pages/CakeImagesList";
-import OrdreCakeImageEditor from "@/ordre/pages/CakeImageEditor";
-import OrdreCakeImagesPrint from "@/ordre/pages/CakeImagesPrint";
-import OrdrePlaceholder from "@/ordre/pages/Placeholder";
-import OrdreInnstillinger from "@/ordre/pages/Innstillinger";
-import M365Callback from "@/ordre/pages/M365Callback";
-import OrdrePortalTest from "@/ordre/pages/PortalTest";
-import OrdreTicketsList from "@/ordre/pages/TicketsInbox";
-import OrdreTicketDetail from "@/ordre/pages/TicketDetail";
-import OrdreAiForslag from "@/ordre/pages/AiForslag";
-import OrdreTicketReports from "@/ordre/pages/TicketReports";
-import OrdreRefundsQueue from "@/ordre/pages/RefundsQueue";
-import OrdrePakkesystem from "@/ordre/pages/Pakkesystem";
 
 import { RavarerProvider } from "@/ravarer/context/RavarerContext";
-import RavarerVareliste from "@/ravarer/pages/Vareliste";
-import RavarerDetail from "@/ravarer/pages/RawMaterialDetail";
 
 import { FakturaerProvider } from "@/fakturaer/context/FakturaerContext";
-import FakturaerList from "@/fakturaer/pages/FakturaerList";
-import FakturaerNew from "@/fakturaer/pages/NewInvoice";
-import FakturaerImportEhf from "@/fakturaer/pages/ImportEhf";
-import FakturaerImportPdf from "@/fakturaer/pages/ImportPdf";
-import FakturaerDetail from "@/fakturaer/pages/InvoiceDetail";
-import FakturaerReviewQueue from "@/fakturaer/pages/ReviewQueue";
-import FakturaerImport from "@/fakturaer/pages/ImportInvoice";
-import FakturaerRegistrerLinjer from "@/fakturaer/pages/RegistrerLinjer";
 import { InvoiceAccessGuard } from "@/ravarer/components/InvoiceAccessGuard";
-import TripletexSettings from "@/ravarer/pages/innstillinger/TripletexSettings";
-import AiServicesSettings from "@/ravarer/pages/innstillinger/AiServicesSettings";
-import MatchToleranserSettings from "@/ravarer/pages/innstillinger/MatchToleranser";
-import KategorierSettings from "@/ravarer/pages/innstillinger/KategorierSettings";
-import RavarerLeverandorer from "@/ravarer/pages/Leverandorer";
-import RavarerAvtaler from "@/ravarer/pages/Avtaler";
-import RavarerDatabladEndringer from "@/ravarer/pages/DatabladEndringer";
-import RavarerDatabladBulk from "@/ravarer/pages/DatabladBulk";
-import RavarerForhandlingerList from "@/ravarer/pages/forhandlinger/ForhandlingerList";
-import RavarerForhandlingWizard from "@/ravarer/pages/forhandlinger/ForhandlingWizard";
-import RavarerForhandlingDetail from "@/ravarer/pages/forhandlinger/ForhandlingDetail";
-import RavarerSupplierPortal from "@/ravarer/pages/forhandlinger/SupplierPortal";
-import RavarerLiveForhandlingSetup from "@/ravarer/pages/forhandlinger/LiveForhandlingSetup";
-import RavarerLiveForhandlingWorkspace from "@/ravarer/pages/forhandlinger/LiveForhandlingWorkspace";
-import RavarerLiveConfirmationPortal from "@/ravarer/pages/forhandlinger/LiveConfirmationPortal";
 
 // Fakturering (utgående kundefakturaer → Tripletex)
 import { FaktureringProvider } from "@/fakturering/context/FaktureringContext";
 
-import Fakturakjoring from "@/fakturering/pages/Fakturakjoring";
-import Fakturasok from "@/fakturering/pages/Fakturasok";
-import Kjoringer from "@/fakturering/pages/Kjoringer";
-import KjoringDetalj from "@/fakturering/pages/KjoringDetalj";
-import FakturaInnstillinger from "@/fakturering/pages/FakturaInnstillinger";
 
 
 const KunderEntityProvider = ({ children }: { children: React.ReactNode }) => {
@@ -184,6 +73,121 @@ const KunderEntityProvider = ({ children }: { children: React.ReactNode }) => {
     </KunderEntityProviderRaw>
   );
 };
+
+
+// Kodesplitting: hver app-side lastes først når ruten treffes.
+const VarerProductList = lazy(() => import("@/varer/pages/ProductList"));
+const VarerProductDetail = lazy(() => import("@/varer/pages/ProductDetail"));
+const VarerPriceLists = lazy(() => import("@/varer/pages/PriceLists"));
+const VarerPriceListDetail = lazy(() => import("@/varer/pages/PriceListDetail"));
+const VarerSpecialPrices = lazy(() => import("@/varer/pages/SpecialPrices"));
+const VarerRecipes = lazy(() => import("@/varer/pages/Recipes"));
+const VarerRecipesCleanup = lazy(() => import("@/varer/pages/RecipesCleanup"));
+const VarerPlaceholder = lazy(() => import("@/varer/pages/PlaceholderPage"));
+const VarerCakeBuilderList = lazy(() => import("@/varer/pages/cakebuilder/CakeBuilderList"));
+const VarerCakeBuilderDetail = lazy(() => import("@/varer/pages/cakebuilder/CakeBuilderDetail"));
+const VarerSettingsLayout = lazy(() => import("@/varer/pages/settings/SettingsLayout"));
+const VarerSettingsGeneral = lazy(() => import("@/varer/pages/settings/SettingsGeneral"));
+const VarerSettingsMainCategories = lazy(() => import("@/varer/pages/settings/SettingsMainCategories"));
+const VarerSettingsSubCategories = lazy(() => import("@/varer/pages/settings/SettingsSubCategories"));
+const VarerSettingsProductPages = lazy(() => import("@/varer/pages/settings/SettingsProductPages"));
+const VarerSettingsSalesGroups = lazy(() => import("@/varer/pages/settings/SettingsSalesGroups"));
+const VarerSettingsProductionGroups = lazy(() => import("@/varer/pages/settings/SettingsProductionGroups"));
+const VarerSettingsAI = lazy(() => import("@/varer/pages/settings/SettingsAI"));
+const VarerCakeBuilderEmbed = lazy(() => import("@/varer/pages/embed/CakeBuilderEmbed"));
+const KunderCustomerList = lazy(() => import("@/kunder/pages/CustomerList"));
+const KunderCustomerDetail = lazy(() => import("@/kunder/pages/CustomerDetail"));
+const KunderProfileList = lazy(() => import("@/kunder/pages/ProfileList"));
+const KunderProfileDetail = lazy(() => import("@/kunder/pages/ProfileDetail"));
+const KunderPickupLocations = lazy(() => import("@/kunder/pages/PickupLocations"));
+const KunderInnstillinger = lazy(() => import("@/kunder/pages/Innstillinger"));
+const KunderCustomerGroups = lazy(() => import("@/kunder/pages/CustomerGroups"));
+const KunderCustomerHistory = lazy(() => import("@/kunder/pages/CustomerHistory"));
+const KunderPlaceholder = lazy(() => import("@/kunder/pages/Placeholder"));
+const KunderPortalUsers = lazy(() => import("@/kunder/pages/PortalUsers"));
+const ProduksjonOversikt = lazy(() => import("@/produksjon/pages/OversiktPage"));
+const ProduksjonEtiketter = lazy(() => import("@/produksjon/pages/EtiketterPage"));
+const ProduksjonsplanPage = lazy(() => import("@/produksjon/pages/ProduksjonsplanPage"));
+const ProduksjonsavdelingerPage = lazy(() => import("@/produksjon/pages/innstillinger/ProduksjonsavdelingerPage"));
+const PakkeomraderPage = lazy(() => import("@/produksjon/pages/innstillinger/PakkeomraderPage"));
+const UtskriftsprofilerPage = lazy(() => import("@/produksjon/pages/innstillinger/UtskriftsprofilerPage"));
+const PosStyringDashboard = lazy(() => import("@/pos_styring/pages/Dashboard"));
+const PosStyringUtsalg = lazy(() => import("@/pos_styring/pages/Utsalg"));
+const PosStyringTerminaler = lazy(() => import("@/pos_styring/pages/Terminaler"));
+const PosStyringOperatorer = lazy(() => import("@/pos_styring/pages/Operatorer"));
+const PosStyringTastatur = lazy(() => import("@/pos_styring/pages/Tastatur"));
+const PosStyringTastaturEditor = lazy(() => import("@/pos_styring/pages/TastaturEditor"));
+const PosStyringPosKunder = lazy(() => import("@/pos_styring/pages/PosKunder"));
+const PosStyringProdukter = lazy(() => import("@/pos_styring/pages/Produkter"));
+const PosStyringSesjoner = lazy(() => import("@/pos_styring/pages/Sesjoner"));
+const PosStyringSesjonDetalj = lazy(() => import("@/pos_styring/pages/SesjonDetalj"));
+const PosStyringTransaksjoner = lazy(() => import("@/pos_styring/pages/Transaksjoner"));
+const PosStyringTransaksjonDetalj = lazy(() => import("@/pos_styring/pages/TransaksjonDetalj"));
+const PosStyringRapporter = lazy(() => import("@/pos_styring/pages/Rapporter"));
+const PosStyringZDetalj = lazy(() => import("@/pos_styring/pages/ZDetalj"));
+const PosStyringInnstillinger = lazy(() => import("@/pos_styring/pages/Innstillinger"));
+const PosStyringSafT = lazy(() => import("@/pos_styring/pages/SafTExport"));
+const PosStyringSkrivere = lazy(() => import("@/pos_styring/pages/Skrivere"));
+const PosStyringStasjoner = lazy(() => import("@/pos_styring/pages/Stasjoner"));
+const PosStyringKasseHelse = lazy(() => import("@/pos_styring/pages/KasseHelse"));
+const OrdreDashboard = lazy(() => import("@/ordre/pages/Dashboard"));
+const OrdreOrdersList = lazy(() => import("@/ordre/pages/OrdersList"));
+const OrdreNewOrder = lazy(() => import("@/ordre/pages/NewOrder"));
+const OrdreOrderDetail = lazy(() => import("@/ordre/pages/OrderDetail"));
+const OrdreLeveringskalender = lazy(() => import("@/ordre/pages/Leveringskalender"));
+const OrdreCustomerOrders = lazy(() => import("@/ordre/pages/CustomerOrders"));
+const OrdreTours = lazy(() => import("@/ordre/pages/Tours"));
+const OrdreDeliveryRules = lazy(() => import("@/ordre/pages/DeliveryRules"));
+const OrdreRecurringOrders = lazy(() => import("@/ordre/pages/RecurringOrders"));
+const OrdreDeliveryNoteDashboard = lazy(() => import("@/ordre/pages/DeliveryNoteDashboard"));
+const OrdreDeliveryNotesList = lazy(() => import("@/ordre/pages/DeliveryNotesList"));
+const OrdreDeliveryNoteDetail = lazy(() => import("@/ordre/pages/DeliveryNoteDetail"));
+const OrdreDeliveryNoteCorrections = lazy(() => import("@/ordre/pages/DeliveryNoteCorrections"));
+const OrdreDeliveryNoteSettings = lazy(() => import("@/ordre/pages/DeliveryNoteSettings"));
+const OrdreCakeImagesDashboard = lazy(() => import("@/ordre/pages/CakeImagesDashboard"));
+const OrdreCakeImagesList = lazy(() => import("@/ordre/pages/CakeImagesList"));
+const OrdreCakeImageEditor = lazy(() => import("@/ordre/pages/CakeImageEditor"));
+const OrdreCakeImagesPrint = lazy(() => import("@/ordre/pages/CakeImagesPrint"));
+const OrdrePlaceholder = lazy(() => import("@/ordre/pages/Placeholder"));
+const OrdreInnstillinger = lazy(() => import("@/ordre/pages/Innstillinger"));
+const M365Callback = lazy(() => import("@/ordre/pages/M365Callback"));
+const OrdrePortalTest = lazy(() => import("@/ordre/pages/PortalTest"));
+const OrdreTicketsList = lazy(() => import("@/ordre/pages/TicketsInbox"));
+const OrdreTicketDetail = lazy(() => import("@/ordre/pages/TicketDetail"));
+const OrdreAiForslag = lazy(() => import("@/ordre/pages/AiForslag"));
+const OrdreTicketReports = lazy(() => import("@/ordre/pages/TicketReports"));
+const OrdreRefundsQueue = lazy(() => import("@/ordre/pages/RefundsQueue"));
+const OrdrePakkesystem = lazy(() => import("@/ordre/pages/Pakkesystem"));
+const RavarerVareliste = lazy(() => import("@/ravarer/pages/Vareliste"));
+const RavarerDetail = lazy(() => import("@/ravarer/pages/RawMaterialDetail"));
+const FakturaerList = lazy(() => import("@/fakturaer/pages/FakturaerList"));
+const FakturaerNew = lazy(() => import("@/fakturaer/pages/NewInvoice"));
+const FakturaerImportEhf = lazy(() => import("@/fakturaer/pages/ImportEhf"));
+const FakturaerImportPdf = lazy(() => import("@/fakturaer/pages/ImportPdf"));
+const FakturaerDetail = lazy(() => import("@/fakturaer/pages/InvoiceDetail"));
+const FakturaerReviewQueue = lazy(() => import("@/fakturaer/pages/ReviewQueue"));
+const FakturaerImport = lazy(() => import("@/fakturaer/pages/ImportInvoice"));
+const FakturaerRegistrerLinjer = lazy(() => import("@/fakturaer/pages/RegistrerLinjer"));
+const TripletexSettings = lazy(() => import("@/ravarer/pages/innstillinger/TripletexSettings"));
+const AiServicesSettings = lazy(() => import("@/ravarer/pages/innstillinger/AiServicesSettings"));
+const MatchToleranserSettings = lazy(() => import("@/ravarer/pages/innstillinger/MatchToleranser"));
+const KategorierSettings = lazy(() => import("@/ravarer/pages/innstillinger/KategorierSettings"));
+const RavarerLeverandorer = lazy(() => import("@/ravarer/pages/Leverandorer"));
+const RavarerAvtaler = lazy(() => import("@/ravarer/pages/Avtaler"));
+const RavarerDatabladEndringer = lazy(() => import("@/ravarer/pages/DatabladEndringer"));
+const RavarerDatabladBulk = lazy(() => import("@/ravarer/pages/DatabladBulk"));
+const RavarerForhandlingerList = lazy(() => import("@/ravarer/pages/forhandlinger/ForhandlingerList"));
+const RavarerForhandlingWizard = lazy(() => import("@/ravarer/pages/forhandlinger/ForhandlingWizard"));
+const RavarerForhandlingDetail = lazy(() => import("@/ravarer/pages/forhandlinger/ForhandlingDetail"));
+const RavarerSupplierPortal = lazy(() => import("@/ravarer/pages/forhandlinger/SupplierPortal"));
+const RavarerLiveForhandlingSetup = lazy(() => import("@/ravarer/pages/forhandlinger/LiveForhandlingSetup"));
+const RavarerLiveForhandlingWorkspace = lazy(() => import("@/ravarer/pages/forhandlinger/LiveForhandlingWorkspace"));
+const RavarerLiveConfirmationPortal = lazy(() => import("@/ravarer/pages/forhandlinger/LiveConfirmationPortal"));
+const Fakturakjoring = lazy(() => import("@/fakturering/pages/Fakturakjoring"));
+const Fakturasok = lazy(() => import("@/fakturering/pages/Fakturasok"));
+const Kjoringer = lazy(() => import("@/fakturering/pages/Kjoringer"));
+const KjoringDetalj = lazy(() => import("@/fakturering/pages/KjoringDetalj"));
+const FakturaInnstillinger = lazy(() => import("@/fakturering/pages/FakturaInnstillinger"));
 
 const queryClient = new QueryClient();
 
@@ -242,7 +246,8 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <AuthProvider>
-            <Routes>
+            <Suspense fallback={<div className="p-8 text-sm text-muted-foreground">Laster …</div>}>
+              <Routes>
               <Route path="/login" element={<Login />} />
               <Route path="/velg-passord" element={<SetPortalPassword />} />
               <Route path="/tilbakestill-passord" element={<SetPortalPassword />} />
@@ -431,6 +436,7 @@ const App = () => (
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
+            </Suspense>
           </AuthProvider>
         </BrowserRouter>
       </TooltipProvider>

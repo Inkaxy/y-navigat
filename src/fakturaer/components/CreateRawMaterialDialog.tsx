@@ -78,7 +78,7 @@ export function CreateRawMaterialDialog({ open, onOpenChange, line }: Props) {
         name: name.trim(), category, base_unit: baseUnit,
         package_size: packageSize ? Number(packageSize) : null,
         package_unit: packageUnit || null,
-        current_cost_price: pricePerBase, price_source: "invoice", price_updated_at: nowIso,
+        current_cost_price: pricePerBase ?? 0, price_source: "invoice", price_updated_at: nowIso,
         primary_supplier_id: line.invoice.supplier_id, is_active: true, created_by: user?.id,
       }).select().single();
       if (rmErr) throw rmErr;
@@ -109,7 +109,7 @@ export function CreateRawMaterialDialog({ open, onOpenChange, line }: Props) {
 
       // 4) Price history
       await supabase.from("raw_material_price_history").insert({
-        raw_material_id: rm.id, supplier_id: line.invoice.supplier_id, price: pricePerBase,
+        raw_material_id: rm.id, supplier_id: line.invoice.supplier_id, price: pricePerBase ?? 0,
         effective_date: line.invoice.invoice_date, source: "invoice", invoice_id: line.invoice_id, created_by: user?.id,
       });
 

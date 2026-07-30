@@ -91,13 +91,13 @@ export function usePreviewDeliveryRules(
       const { data, error } = await supabase.rpc("evaluate_delivery_rules", {
         p_legal_entity_id: input.legalEntityId,
         p_customer_id: input.customerId!,
-        p_customer_group_ids: customerGroupIds.length > 0 ? customerGroupIds : null,
+        p_customer_group_ids: (customerGroupIds.length > 0 ? customerGroupIds : null) as string[],
         p_delivery_date: debouncedDate!,
-        p_delivery_tour_id: debouncedTour,
-        p_product_ids: debouncedProductIds.length > 0 ? debouncedProductIds : null,
-        p_product_group_ids: productGroupIds.length > 0 ? productGroupIds : null,
+        p_delivery_tour_id: debouncedTour as string,
+        p_product_ids: (debouncedProductIds.length > 0 ? debouncedProductIds : null) as string[],
+        p_product_group_ids: (productGroupIds.length > 0 ? productGroupIds : null) as string[],
         p_ordered_at: input.orderedAt ?? new Date().toISOString(),
-        p_existing_order_id: input.existingOrderId ?? null,
+        p_existing_order_id: (input.existingOrderId ?? null) as string,
       });
       if (error) throw error;
       return ((data ?? []) as DeliveryRuleHit[]).filter((h) => h.matched);

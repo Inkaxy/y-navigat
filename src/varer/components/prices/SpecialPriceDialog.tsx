@@ -213,7 +213,7 @@ export function SpecialPriceDialog({
       let q = supabase
         .from("special_prices")
         .select("id, valid_from, valid_to, price, weekday")
-        .eq("legal_entity_id", legalEntityId)
+        .eq("legal_entity_id", legalEntityId!)
         .eq("product_id", form.product_id!);
 
       if (form.customer_id) q = q.eq("customer_id", form.customer_id);
@@ -268,7 +268,7 @@ export function SpecialPriceDialog({
     }
 
     const payload = {
-      legal_entity_id: legalEntityId,
+      legal_entity_id: legalEntityId!,
       product_id: form.product_id!,
       customer_id: form.customer_id,
       price_list_id: form.price_list_id === NONE ? null : form.price_list_id,

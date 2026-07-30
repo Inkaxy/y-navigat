@@ -44,7 +44,7 @@ export function SkuConflictDialog({ open, onOpenChange, line, onOpenMatchDrawer 
       const { data: { user } } = await supabase.auth.getUser();
       await supabase.from("raw_material_supplier_aliases").insert({
         raw_material_supplier_id: hist.rms.id, alias_type: "product_name",
-        alias_value: line.description, status: "confirmed",
+        alias_value: line.description ?? "", status: "confirmed",
         confirmed_by: user?.id, confirmed_at: new Date().toISOString(),
       });
       await supabase.from("invoice_lines").update({
