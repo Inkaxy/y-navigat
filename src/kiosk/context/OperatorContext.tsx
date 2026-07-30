@@ -31,12 +31,48 @@ export function OperatorProvider({
   const storageKey = operatorStorageKey(terminalId);
   const [operator, setOperator] = useState<Operator | null>(null);
 
-  // Hydrate from localStorage on mount (only when no auto-operator)
+  // Hydrate from localStorage on mount (only when no auto-operator).
+  // Kassasystemforskrifta: operatøren i localStorage er klientdata og kan være
+  // manipulert eller utdatert — vi RE-VALIDERER mot serveren før vi lar
+  // vedkommende betjene kassa.
   useEffect(() => {
     if (autoOperatorId) return;
     const stored = readJSON<Operator>(storageKey);
-    if (stored) setOperator(stored);
-  }, [storageKey, autoOperatorId]);
+    if (!stored?.id) return;
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await kioskSupabase
+        .from("pos_operators")
+        .select("id, operator_code, display_name, legal_entity_id, status")
+        .eq("id", stored.id)
+        .maybeSingle();
+      if (cancelled) return;
+      if (error || !data || data.status !== "active") {
+        clearKey(storageKey);
+        setOperator(null);
+        return;
+      }
+      const { data: terms } = await kioskSupabase
+        .from("pos_operator_terminals")
+        .select("terminal_id")
+        .eq("operator_id", stored.id);
+      const list = terms ?? [];
+      if (list.length > 0 && !list.some((t) => t.terminal_id === terminalId)) {
+        clearKey(storageKey);
+        setOperator(null);
+        return;
+      }
+      setOperator({
+        id: data.id,
+        code: data.operator_code,
+        display_name: data.display_name ?? data.operator_code,
+        legal_entity_id: data.legal_entity_id,
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [storageKey, autoOperatorId, terminalId]);
 
   // Self-service: auto-load configured operator (no PIN)
   useEffect(() => {
@@ -100,6 +136,17 @@ export function OperatorProvider({
       };
       writeJSON(storageKey, op);
       setOperator(op);
+      // Journalfør innlogging — operatørbytte skal kunne spores i journalen.
+      kioskSupabase
+        .rpc("pos_journal_append", {
+          p_terminal_id: terminalId,
+          p_event_type: "operator_login",
+          p_operator_id: op.id,
+          p_payload: { operator_code: op.code },
+        } as never)
+        .then(({ error: jErr }) => {
+          if (jErr) console.warn("pos_journal_append operator_login failed", jErr.message);
+        });
       return { ok: true };
     },
     [terminalId, storageKey],
