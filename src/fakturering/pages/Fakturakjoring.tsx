@@ -249,8 +249,28 @@ export default function Fakturakjoring() {
         </div>
       )}
 
+      {/* Feiltilstand for forhåndsvisning */}
+      {preview.isError && (
+        <div className="rounded-xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm">
+          <div className="font-medium text-destructive">Kunne ikke hente grunnlaget</div>
+          <div className="mt-1 text-muted-foreground">
+            {(preview.error as Error)?.message ?? "Ukjent feil"}
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-3"
+            onClick={() => preview.refetch()}
+            disabled={preview.isFetching}
+          >
+            Prøv igjen
+          </Button>
+        </div>
+      )}
+
       {/* Gruppekort */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+
         {KNOWN_GROUPS.map((def) => {
           const row = rowByKey.get(def.key);
           const cc = row?.customer_count ?? 0;
