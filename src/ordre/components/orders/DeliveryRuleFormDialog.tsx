@@ -173,8 +173,16 @@ function fromRule(r: DeliveryRule): Form {
     deadline_days_before: String(r.deadline_days_before ?? 1),
     weekdays: r.weekdays ?? [],
     tour_filter: r.tour_filter ?? [],
-    product_ids: r.product_ids ?? [],
-    product_group_ids: r.product_group_ids ?? [],
+    // For «Tillatte produkter» ligger utvalget i allowed_*-kolonnene (det er dem
+    // evaluate_delivery_rules leser). For alle andre regeltyper er product_*
+    // et scope-filter («regelen gjelder disse varene»).
+    product_ids:
+      (r.rule_type === "available_products" ? r.allowed_product_ids : r.product_ids) ?? [],
+    product_group_ids:
+      (r.rule_type === "available_products"
+        ? r.allowed_product_group_ids
+        : r.product_group_ids) ?? [],
+
     blackout_from: r.blackout_from ?? "",
     blackout_until: r.blackout_until ?? "",
     customer_ids: r.customer_ids ?? [],
