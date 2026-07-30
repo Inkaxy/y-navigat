@@ -147,7 +147,7 @@ async function fetchZ(id: string): Promise<ZRow | null> {
        opening_float_total, closing_float_total, counted_cash_total, expected_cash_total,
        cash_variance_total, variance_flagged, variance_threshold, session_breakdown,
        last_journal_id, report_hash,
-       terminal:pos_terminals(terminal_code, display_name, legal_entity:legal_entities(name, org_number))`
+       terminal:pos_terminals(terminal_code, display_name, legal_entity:legal_entities(display_name, org_number))`
     )
     .eq("id", id)
     .maybeSingle();
