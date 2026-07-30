@@ -102,7 +102,14 @@ Deno.serve(async (req) => {
       .maybeSingle();
     const config: ProviderConfig = (cfgRow?.value as ProviderConfig | null) ?? DEFAULT_CONFIG;
 
-    // 2) Last ned PDF
+    // 2) Valider at file_path sitt ledende segment (legal_entity uuid) er en enhet brukeren har posisjon i
+    const pathEntityId = body.file_path.split("/")[0];
+    const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRe.test(pathEntityId)) return json({ error: "Ugyldig file_path" }, 400);
+    const { data: hasPos } = await userClient.rpc("has_position_in_entity", { p_legal_entity_id: pathEntityId });
+    if (!hasPos) return json({ error: "Ingen tilgang" }, 403);
+
+    // 2b) Last ned PDF
     const { data: file, error: dlErr } = await admin.storage
       .from("declaration-uploads")
       .download(body.file_path);

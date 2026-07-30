@@ -6,6 +6,7 @@ import { Cake, Loader2, ChevronLeft } from "lucide-react";
 import { toast } from "sonner";
 import { kioskSupabase } from "@/kiosk/integrations/supabase/client";
 import { listenFromParent } from "@/varer/features/cakeBuilder/protocol";
+import { isAllowedOrigin } from "@/varer/features/cakeBuilder/origins";
 import type { CakeResult } from "@/varer/features/cakeBuilder/types";
 import {
   CustomerStartStep,
@@ -95,6 +96,7 @@ export function KakebyggerModal({
       /* parent-receiver no-op */
     });
     const onMsg = async (event: MessageEvent) => {
+      if (!isAllowedOrigin(event.origin)) return;
       const data = event.data as
         | { source?: string; version?: number; payload?: { type?: string; result?: CakeResult } }
         | undefined;

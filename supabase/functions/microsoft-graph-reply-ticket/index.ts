@@ -31,6 +31,9 @@ Deno.serve(async (req) => {
     const { data: { user } } = await userClient.auth.getUser();
     if (!user) return json({ error: "Unauthorized" }, 401);
 
+    const { data: canWrite } = await userClient.rpc("has_app_write_access", { p_app_code: "ordre" });
+    if (!canWrite) return json({ error: "Ingen tilgang" }, 403);
+
     const body = await req.json() as {
       ticket_id?: string;
       body_html?: string;
@@ -45,7 +48,7 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    const { data: ticket, error: tErr } = await admin
+    const { data: ticket, error: tErr } = await userClient
       .from("tickets")
       .select("id, microsoft_message_id, source_mailbox, subject, sender_email")
       .eq("id", body.ticket_id)

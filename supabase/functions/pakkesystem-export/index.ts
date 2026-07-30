@@ -177,6 +177,10 @@ Deno.serve(async (req) => {
     if (!requestedEntity) {
       return jsonRes({ error: "legal_entity_id kreves ved bruker-innlogging", code: "missing_entity" }, 400);
     }
+    const { data: hasPos } = await userClient.rpc("has_position_in_entity", { p_legal_entity_id: requestedEntity });
+    if (!hasPos) {
+      return jsonRes({ error: "Ingen tilgang til dette selskapet", code: "forbidden" }, 403);
+    }
     legalEntityId = requestedEntity;
   }
 

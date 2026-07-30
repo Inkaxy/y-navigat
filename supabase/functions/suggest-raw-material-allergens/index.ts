@@ -27,6 +27,9 @@ Deno.serve(async (req) => {
     const { data: userRes } = await userClient.auth.getUser();
     if (!userRes.user) return json({ error: "Unauthorized" }, 401);
 
+    const { data: canWrite } = await userClient.rpc("has_app_write_access", { p_app_code: "ravarer" });
+    if (!canWrite) return json({ error: "Ingen tilgang" }, 403);
+
     const apiKey = Deno.env.get("LOVABLE_API_KEY");
     if (!apiKey) return json({ error: "LOVABLE_API_KEY missing" }, 500);
 

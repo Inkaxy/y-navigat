@@ -31,6 +31,13 @@ Deno.serve(async (req) => {
       });
     }
 
+    const { data: canWrite } = await userClient.rpc("has_app_write_access", { p_app_code: "kunder" });
+    if (!canWrite) {
+      return new Response(JSON.stringify({ error: "Ingen tilgang" }), {
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const { customer_id, force } = await req.json().catch(() => ({}));
     if (!customer_id || typeof customer_id !== "string") {
       return new Response(JSON.stringify({ error: "customer_id required" }), {

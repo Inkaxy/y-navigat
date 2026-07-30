@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { CakeBuilder } from "@/varer/features/cakeBuilder/CakeBuilder";
 import { listenFromParent, postToParent } from "@/varer/features/cakeBuilder/protocol";
+import { isAllowedOrigin } from "@/varer/features/cakeBuilder/origins";
 import { supabase } from "@/integrations/supabase/client";
 import type { CakeResult, PriceBreakdown } from "@/varer/features/cakeBuilder/types";
 import { AlertTriangle, Loader2 } from "lucide-react";
@@ -118,33 +119,40 @@ export default function CakeBuilderEmbed() {
   // Send "ready" once mounted; listen for parent commands
   useEffect(() => {
     postToParent({ type: "cake-builder/ready" });
+    const onSetSession = (event: MessageEvent) => {
+      if (!isAllowedOrigin(event.origin)) return;
+      const payload = (event.data as { source?: string; payload?: { type?: string; access_token?: string; refresh_token?: string } } | undefined)?.payload;
+      if (!payload || payload.type !== "cake-builder/set-session") return;
+      (async () => {
+        try {
+          if (payload.access_token && payload.refresh_token) {
+            await supabase.auth.setSession({
+              access_token: payload.access_token,
+              refresh_token: payload.refresh_token,
+            });
+          }
+        } catch {
+          /* ignore */
+        } finally {
+          setAuthReady(true);
+        }
+      })();
+    };
+    window.addEventListener("message", onSetSession);
     const unsub = listenFromParent((msg) => {
       if (msg.type === "cake-builder/set-theme") {
         if (typeof document !== "undefined") {
           if (msg.theme === "dark") document.documentElement.classList.add("dark");
           else document.documentElement.classList.remove("dark");
         }
-      } else if (msg.type === "cake-builder/set-session") {
-        // Parent (kundeportal) injiserer sin supabase-sesjon slik at RPC-er
-        // som krever `authenticated` fungerer inne i iframen.
-        (async () => {
-          try {
-            if (msg.access_token && msg.refresh_token) {
-              await supabase.auth.setSession({
-                access_token: msg.access_token,
-                refresh_token: msg.refresh_token,
-              });
-            }
-          } catch {
-            /* ignore */
-          } finally {
-            setAuthReady(true);
-          }
-        })();
       }
-      // 'init' (initialConfig) and 'reset' implemented in F1.3
+      // 'init' (initialConfig) and 'reset' implemented in F1.3; set-session
+      // is handled separately above with explicit origin validation.
     });
-    return unsub;
+    return () => {
+      unsub();
+      window.removeEventListener("message", onSetSession);
+    };
   }, []);
 
   const handleComplete = (result: CakeResult) => {

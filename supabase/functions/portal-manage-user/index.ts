@@ -60,6 +60,14 @@ Deno.serve(async (req) => {
     const { data: caller, error: callerErr } = await userClient.auth.getUser();
     if (callerErr || !caller.user) return json(401, { error: "Invalid session" });
 
+    const { data: isInternal } = await userClient.rpc("is_internal_user");
+    if (!isInternal) return json(403, { error: "Ingen tilgang" });
+    const [{ data: isAdmin }, { data: canWriteKunder }] = await Promise.all([
+      userClient.rpc("is_platform_admin"),
+      userClient.rpc("has_app_write_access", { p_app_code: "kunder" }),
+    ]);
+    if (!isAdmin && !canWriteKunder) return json(403, { error: "Ingen tilgang" });
+
     const { action, user_id, customer_ids, role, display_name } = await req.json();
     if (!user_id) return json(400, { error: "user_id kreves" });
 

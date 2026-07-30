@@ -15,52 +15,17 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
-import { ScrollText, ShieldOff } from "lucide-react";
-import { useAuth } from "@/hooks/useAuth";
+import { ScrollText } from "lucide-react";
+import { PlatformAdminGuard } from "@/components/auth/PlatformAdminGuard";
 
 export default function Audit() {
-  const { user } = useAuth();
-
-  // Egen guard: kun platform admin har tilgang.
-  const { data: isAdmin, isLoading: loadingAdmin } = useQuery({
-    queryKey: ["is-platform-admin", user?.id],
-    enabled: !!user?.id,
-    staleTime: 5 * 60_000,
-    queryFn: async () => {
-      const { data, error } = await (supabase.rpc as any)("is_platform_admin");
-      if (error) throw error;
-      return Boolean(data);
-    },
-  });
-
-  if (loadingAdmin) {
-    return (
-      <AdminLayout title="Audit">
-        <p className="text-sm text-muted-foreground">Sjekker tilgang…</p>
-      </AdminLayout>
-    );
-  }
-
-  if (!isAdmin) {
-    return (
-      <AdminLayout title="Audit">
-        <Card>
-          <CardContent className="flex flex-col items-center gap-3 p-10 text-center">
-            <ShieldOff className="h-10 w-10 text-muted-foreground" />
-            <div>
-              <h2 className="text-lg font-semibold">Ingen tilgang</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Audit-loggen er kun tilgjengelig for platform-administratorer.
-                Kontakt en admin hvis du tror dette er feil.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </AdminLayout>
-    );
-  }
-
-  return <AuditView />;
+  return (
+    <AdminLayout title="Audit">
+      <PlatformAdminGuard title="Audit-loggen">
+        <AuditView />
+      </PlatformAdminGuard>
+    </AdminLayout>
+  );
 }
 
 function AuditView() {
@@ -113,7 +78,7 @@ function AuditView() {
   }, [rows, search]);
 
   return (
-    <AdminLayout title="Audit">
+    <>
       <AppHeaderBanner
         icon={ScrollText}
         title="Audit"
@@ -234,7 +199,7 @@ function AuditView() {
           )}
         </DialogContent>
       </Dialog>
-    </AdminLayout>
+    </>
   );
 }
 

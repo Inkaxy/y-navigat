@@ -5,11 +5,18 @@ import { decryptToken, encryptToken, refreshAccessToken } from "../_shared/m365-
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-secret",
 };
 
 Deno.serve(async (_req) => {
   if (_req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  const expected = Deno.env.get("CRON_SECRET");
+  const provided = _req.headers.get("x-cron-secret");
+  if (!expected || provided !== expected) {
+    return json({ error: "Unauthorized" }, 401);
+  }
+
   try {
     const admin = createClient(
       Deno.env.get("SUPABASE_URL")!,

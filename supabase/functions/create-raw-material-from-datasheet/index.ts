@@ -33,6 +33,9 @@ Deno.serve(async (req) => {
     if (!userRes.user) return json({ error: "Unauthorized" }, 401);
     const userId = userRes.user.id;
 
+    const { data: canWrite } = await userClient.rpc("has_app_write_access", { p_app_code: "ravarer" });
+    if (!canWrite) return json({ error: "Ingen tilgang" }, 403);
+
     const service = createClient(supaUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
     const { data: ds } = await service

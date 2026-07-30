@@ -19,6 +19,7 @@ import Hjelp from "./pages/Hjelp";
 import NotFound from "./pages/NotFound";
 import AppPlaceholder from "./pages/apps/AppPlaceholder";
 import { AppAccessGuard } from "./components/auth/AppAccessGuard";
+import { PlatformAdminGuard } from "./components/auth/PlatformAdminGuard";
 import AdminIndex from "./pages/admin/AdminIndex";
 import AdminPlaceholder from "./pages/admin/AdminPlaceholder";
 import Integrasjoner from "./pages/admin/Integrasjoner";
@@ -256,13 +257,13 @@ const App = () => (
               <Route path="/varsler" element={<Shell><Varsler /></Shell>} />
               <Route path="/hjelp" element={<Shell><Hjelp /></Shell>} />
               <Route path="/admin" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><AdminIndex /></AppAccessGuard></Shell>} />
-              <Route path="/admin/selskaper" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><Selskaper /></AppAccessGuard></Shell>} />
+              <Route path="/admin/selskaper" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><PlatformAdminGuard title="Selskaper"><Selskaper /></PlatformAdminGuard></AppAccessGuard></Shell>} />
               <Route path="/admin/brukere" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><Brukere /></AppAccessGuard></Shell>} />
-              <Route path="/admin/brukere/:id" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><BrukerDetalj /></AppAccessGuard></Shell>} />
-              <Route path="/admin/tilganger" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><Tilganger /></AppAccessGuard></Shell>} />
-              <Route path="/admin/outlets" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><Outlets /></AppAccessGuard></Shell>} />
-              <Route path="/admin/stillinger" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><Stillinger /></AppAccessGuard></Shell>} />
-              <Route path="/admin/stillinger/:id" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><StillingDetalj /></AppAccessGuard></Shell>} />
+              <Route path="/admin/brukere/:id" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><PlatformAdminGuard title="Brukerdetaljer"><BrukerDetalj /></PlatformAdminGuard></AppAccessGuard></Shell>} />
+              <Route path="/admin/tilganger" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><PlatformAdminGuard title="Tilganger"><Tilganger /></PlatformAdminGuard></AppAccessGuard></Shell>} />
+              <Route path="/admin/outlets" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><PlatformAdminGuard title="Outlets"><Outlets /></PlatformAdminGuard></AppAccessGuard></Shell>} />
+              <Route path="/admin/stillinger" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><PlatformAdminGuard title="Stillinger"><Stillinger /></PlatformAdminGuard></AppAccessGuard></Shell>} />
+              <Route path="/admin/stillinger/:id" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><PlatformAdminGuard title="Stillingsdetaljer"><StillingDetalj /></PlatformAdminGuard></AppAccessGuard></Shell>} />
               <Route path="/admin/apper" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><Apper /></AppAccessGuard></Shell>} />
               <Route path="/admin/integrasjoner" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><Integrasjoner /></AppAccessGuard></Shell>} />
               <Route path="/admin/integrasjoner/tripletex" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><TripletexIntegrasjon /></AppAccessGuard></Shell>} />
