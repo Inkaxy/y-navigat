@@ -549,37 +549,10 @@ export default function TicketDetail() {
   // ─── handlers
 
   const onSendReply = async () => {
-    if (!replyText.trim() || !id) return;
+    if (!replyText.trim() || !id || sendReply.isPending) return;
     try {
-      // Note: microsoft-graph-reply-ticket accepts body_html. We send simple <p> paragraphs.
-      const html = replyText
-        .trim()
-        .split(/\n{2,}/)
-        .map((p) => `<p>${p.replace(/\n/g, "<br/>")}</p>`)
-        .join("");
-      const { data, error } = await supabase.functions.invoke(
-        "microsoft-graph-reply-ticket",
-        { body: { ticket_id: id, body_html: html } },
-      );
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      // Log reply in ticket_replies (mirror local state)
-      const { data: u } = await supabase.auth.getUser();
-      await supabase.from("ticket_replies").insert({
-        ticket_id: id,
-        body_text: replyText.trim(),
-        body_rendered: html,
-        sent_by: u.user?.id ?? "",
-        send_status: "sent",
-        sent_at: new Date().toISOString(),
-      } as never);
-      // Automatically flag "venter på kunde" via awaiting_internal=false + status in_progress
-      await updateTicket.mutateAsync({
-        id,
-        patch: { status: "in_progress", awaiting_internal: false } as never,
-      });
+      await sendReply.mutateAsync({ ticket_id: id, body_text: replyText.trim() });
       setReplyText("");
-      qc.invalidateQueries({ queryKey: ["ticket-replies", id] });
       toast.success("Svar sendt til kunde");
     } catch (e) {
       toast.error(`Kunne ikke sende: ${e instanceof Error ? e.message : String(e)}`);

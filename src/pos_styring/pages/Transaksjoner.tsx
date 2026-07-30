@@ -32,6 +32,7 @@ import {
   paymentLabel,
   type TransactionType,
 } from "@/pos_styring/lib/pos-types";
+import { osloDayStartIso, osloDayEndIso } from "@/pos_styring/lib/osloTime";
 
 interface TxRow {
   id: string;
@@ -130,8 +131,8 @@ async function fetchTransactions(entityId: string, f: TxFilters): Promise<TxRow[
       "id, receipt_number, receipt_sequence, transaction_type, is_training, created_at, total_incl_mva, payment_summary, terminal_id, operator_id, terminal:pos_terminals!inner(legal_entity_id, terminal_code, display_name), operator:pos_operators(display_name)",
     )
     .eq("terminal.legal_entity_id", entityId)
-    .gte("created_at", `${f.from}T00:00:00`)
-    .lte("created_at", `${f.to}T23:59:59.999`)
+    .gte("created_at", osloDayStartIso(f.from))
+    .lte("created_at", osloDayEndIso(f.to))
     .order("created_at", { ascending: false })
     .limit(500);
 

@@ -61,11 +61,14 @@ Deno.serve(async (req) => {
   }
 
   if (breaches.length) {
-    // Varsle alle plattform-eiere (positions.is_platform_owner = true)
-    const { data: adminPositions } = await supabase
+    // Varsle alle plattform-eiere (positions.is_owner = true)
+    const { data: adminPositions, error: posErr } = await supabase
       .from("positions")
       .select("id")
-      .eq("is_platform_owner", true);
+      .eq("is_owner", true);
+    if (posErr) {
+      console.error("kunne ikke hente plattform-eier-posisjoner", posErr);
+    }
     const positionIds = (adminPositions ?? []).map((p: any) => p.id);
 
     let adminUserIds: string[] = [];

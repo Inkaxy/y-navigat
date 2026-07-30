@@ -235,8 +235,12 @@ export function PauseDialog({
             <div className="space-y-1">
               <Label>Til</Label>
               <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+              <p className="text-xs text-muted-foreground">
+                {to ? "Pausen gjelder til og med denne datoen." : "Tomt = åpen pause uten sluttdato."}
+              </p>
             </div>
           </div>
+
           <div className="space-y-1">
             <Label>Årsak</Label>
             <Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="F.eks. Ferie, oppussing …" />

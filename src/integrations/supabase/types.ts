@@ -9408,6 +9408,7 @@ export type Database = {
           created_at: string
           error_message: string | null
           id: string
+          idempotency_key: string | null
           microsoft_conversation_id: string | null
           microsoft_message_id: string | null
           send_status: string
@@ -9421,6 +9422,7 @@ export type Database = {
           created_at?: string
           error_message?: string | null
           id?: string
+          idempotency_key?: string | null
           microsoft_conversation_id?: string | null
           microsoft_message_id?: string | null
           send_status?: string
@@ -9434,6 +9436,7 @@ export type Database = {
           created_at?: string
           error_message?: string | null
           id?: string
+          idempotency_key?: string | null
           microsoft_conversation_id?: string | null
           microsoft_message_id?: string | null
           send_status?: string

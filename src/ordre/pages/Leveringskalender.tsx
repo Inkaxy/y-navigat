@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect, useCallback } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import {
   Grid3x3,
@@ -138,6 +139,7 @@ type CellTarget = {
 };
 
 export default function MatrixPage() {
+  const qc = useQueryClient();
   const { user } = useAuth();
   const { data: access } = useUserAccess(user);
   const canEdit = access?.hasOrdreWrite ?? false;
@@ -940,8 +942,11 @@ export default function MatrixPage() {
     }
   }
 
+  const [savingPause, setSavingPause] = useState(false);
+
   async function handleCreatePause(input: { from: string; to: string; reason: string; tourFilter: string[] | null }) {
     if (!customerId || !selectedCustomer) return;
+    setSavingPause(true);
     try {
       const { error } = await supabase
         .from("delivery_pauses")
@@ -956,10 +961,16 @@ export default function MatrixPage() {
       if (error) throw error;
       toast.success("Leveransepause opprettet");
       setPauseOpen(false);
-      // Refresh
-      void Promise.resolve();
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["delivery-pauses"] }),
+        qc.invalidateQueries({ queryKey: ["active-pauses"] }),
+        qc.invalidateQueries({ queryKey: ["preview-delivery-rules"] }),
+        qc.invalidateQueries({ queryKey: ["matrix"] }),
+      ]);
     } catch (err) {
       toast.error("Kunne ikke opprette pause", { description: (err as Error).message });
+    } finally {
+      setSavingPause(false);
     }
   }
 
@@ -1704,7 +1715,7 @@ export default function MatrixPage() {
         defaultFrom={dateFrom}
         defaultTo={dateTo}
         onConfirm={handleCreatePause}
-        isSaving={false}
+        isSaving={savingPause}
       />
       <CorrectionsDialog
         open={correctionsOpen}

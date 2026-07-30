@@ -37,7 +37,7 @@ export default function RegistrerLinjerPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("invoices")
-        .select("id, invoice_number, source, lines_source, source_document_url, total_amount, supplier:suppliers(name), legal_entity:legal_entities(name)")
+        .select("id, invoice_number, source, lines_source, source_document_url, total_amount, supplier:suppliers(name), legal_entity:legal_entities(legal_name)")
         .eq("id", id!)
         .single();
       if (error) throw error;

@@ -43,20 +43,63 @@ export function useTicketReplies(ticketId: string | undefined) {
   });
 }
 
+/**
+ * Sender svar til kunde via Microsoft Graph, logger svaret i ticket_replies og
+ * setter ticket til «venter på kunde». All sending går gjennom denne
+ * mutasjonen, slik at `isPending` faktisk kan deaktivere Send-knappen og
+ * hindre dobbeltsending ved raske dobbeltklikk.
+ */
 export function useSendTicketReply() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ ticket_id, body_text }: { ticket_id: string; body_text: string }) => {
-      const { data, error } = await supabase.functions.invoke("microsoft-graph-reply", {
-        body: { ticket_id, body_text },
-      });
+    mutationFn: async ({
+      ticket_id,
+      body_text,
+    }: {
+      ticket_id: string;
+      body_text: string;
+    }) => {
+      const text = body_text.trim();
+      if (!text) throw new Error("Tomt svar");
+      const html = text
+        .split(/\n{2,}/)
+        .map((p) => `<p>${p.replace(/\n/g, "<br/>")}</p>`)
+        .join("");
+      // Idempotens-nøkkel: hindrer duplikate rader dersom to kall slipper gjennom.
+      const idempotencyKey = crypto.randomUUID();
+
+      const { data, error } = await supabase.functions.invoke(
+        "microsoft-graph-reply-ticket",
+        { body: { ticket_id, body_html: html, idempotency_key: idempotencyKey } },
+      );
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
+
+      const { data: u } = await supabase.auth.getUser();
+      const { error: insErr } = await supabase.from("ticket_replies").insert({
+        ticket_id,
+        body_text: text,
+        body_rendered: html,
+        sent_by: u.user?.id ?? "",
+        send_status: "sent",
+        sent_at: new Date().toISOString(),
+        idempotency_key: idempotencyKey,
+      } as never);
+      // Unik-konflikt = allerede logget; ikke en reell feil.
+      if (insErr && insErr.code !== "23505") throw insErr;
+
+      const { error: updErr } = await supabase
+        .from("tickets")
+        .update({ status: "in_progress", awaiting_internal: false } as never)
+        .eq("id", ticket_id);
+      if (updErr) throw updErr;
+
       return data;
     },
     onSuccess: (_d, vars) => {
       qc.invalidateQueries({ queryKey: ["ticket-replies", vars.ticket_id] });
       qc.invalidateQueries({ queryKey: ["ticket", vars.ticket_id] });
+      qc.invalidateQueries({ queryKey: ["ticket-events", vars.ticket_id] });
       qc.invalidateQueries({ queryKey: ["tickets"] });
       qc.invalidateQueries({ queryKey: ["tickets-counts"] });
     },

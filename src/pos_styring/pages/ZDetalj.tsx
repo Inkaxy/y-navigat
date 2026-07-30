@@ -147,7 +147,7 @@ async function fetchZ(id: string): Promise<ZRow | null> {
        opening_float_total, closing_float_total, counted_cash_total, expected_cash_total,
        cash_variance_total, variance_flagged, variance_threshold, session_breakdown,
        last_journal_id, report_hash,
-       terminal:pos_terminals(terminal_code, display_name, legal_entity:legal_entities(name, org_number))`
+       terminal:pos_terminals(terminal_code, display_name, legal_entity:legal_entities(display_name, org_number))`
     )
     .eq("id", id)
     .maybeSingle();
@@ -195,7 +195,7 @@ async function fetchZ(id: string): Promise<ZRow | null> {
     report_hash: r.report_hash,
     terminal_code: r.terminal?.terminal_code ?? "?",
     terminal_name: r.terminal?.display_name ?? "?",
-    legal_entity_name: r.terminal?.legal_entity?.name ?? null,
+    legal_entity_name: r.terminal?.legal_entity?.display_name ?? null,
     legal_entity_org_number: r.terminal?.legal_entity?.org_number ?? null,
   };
 }

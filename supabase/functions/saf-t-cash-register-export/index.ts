@@ -347,29 +347,37 @@ Deno.serve(async (req) => {
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
     // Verifiser at brukeren har tilgang til selskapet
-    const { data: accessCheck, error: accessErr } = await admin.rpc("has_position_in_entity", {
-      _entity_id: body.legal_entity_id,
+    // has_position_in_entity leser auth.uid(), så den må kalles med brukerens klient.
+    const { data: hasPos, error: accessErr } = await userClient.rpc("has_position_in_entity", {
+      p_legal_entity_id: body.legal_entity_id,
     });
-    // has_position_in_entity leser auth.uid() så vi bruker userClient til denne sjekken.
-    // Fallback: sjekk direkte i user_positions.
-    const { data: hasPos } = await userClient.rpc("has_position_in_entity", {
-      _entity_id: body.legal_entity_id,
-    });
-    if (!hasPos) {
+    if (accessErr || !hasPos) {
       return new Response(JSON.stringify({ error: "forbidden" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    void accessCheck;
-    void accessErr;
 
-    // Hent selskap
-    const { data: entity, error: entErr } = await admin
+    // Hent selskap (kolonnenavn iht. legal_entities-skjemaet)
+    const { data: entityRow, error: entErr } = await admin
       .from("legal_entities")
-      .select("id, name, org_number, address_line1, address_line2, postal_code, city, country")
+      .select(
+        "id, legal_name, display_name, org_number, invoice_address_line1, invoice_address_line2, invoice_postal_code, invoice_city, invoice_country",
+      )
       .eq("id", body.legal_entity_id)
       .maybeSingle();
+    const entity: Company | null = entityRow
+      ? {
+          id: entityRow.id,
+          name: entityRow.legal_name ?? entityRow.display_name ?? "",
+          org_number: entityRow.org_number,
+          address_line1: entityRow.invoice_address_line1,
+          address_line2: entityRow.invoice_address_line2,
+          postal_code: entityRow.invoice_postal_code,
+          city: entityRow.invoice_city,
+          country: entityRow.invoice_country,
+        }
+      : null;
     if (entErr || !entity) {
       return new Response(JSON.stringify({ error: "entity_not_found" }), {
         status: 404,
@@ -494,7 +502,7 @@ Deno.serve(async (req) => {
       const xml =
         `<?xml version="1.0" encoding="UTF-8"?>\n` +
         `<AuditFile xmlns="${SAF_T_NS}">\n` +
-        buildHeader(entity as Company, body.period_start, body.period_end) +
+        buildHeader(entity, body.period_start, body.period_end) +
         buildMasterFiles([], Array.from(vatSet).sort((a, b) => a - b)) +
         registers +
         `</AuditFile>\n`;
