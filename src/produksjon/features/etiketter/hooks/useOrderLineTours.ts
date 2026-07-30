@@ -12,6 +12,17 @@ export function useOrderLineTours(orderLineIds: string[] | undefined) {
     queryKey: ["order_line_tours", ids.join(",")],
     enabled: ids.length > 0,
     queryFn: () => fetchOrderLineTours(ids),
+    staleTime: 30_000,
+  });
+}
+
+/** Ikke-hook variant, for bruk i bulk-PDF-generering. */
+export async function fetchOrderLineTours(
+  orderLineIds: string[],
+): Promise<Record<string, string | null>> {
+  const ids = orderLineIds.filter(Boolean);
+  if (ids.length === 0) return {};
+  {
       const { data: lines, error } = await supabase
         .from("order_lines")
         .select("id, order_id")
@@ -38,7 +49,7 @@ export function useOrderLineTours(orderLineIds: string[] | undefined) {
         ),
       );
 
-      let tourMap: Record<string, number> = {};
+      const tourMap: Record<string, number> = {};
       if (tourIds.length > 0) {
         const { data: tours, error: tErr } = await supabase
           .from("delivery_tours")
@@ -62,7 +73,5 @@ export function useOrderLineTours(orderLineIds: string[] | undefined) {
         out[row.id] = orderToTour[row.order_id] ?? null;
       }
       return out;
-    },
-    staleTime: 30_000,
-  });
+  }
 }
