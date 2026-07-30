@@ -117,15 +117,6 @@ export function TerminalPrintersDialog({ terminalId, terminalName, activeEntityI
   const saveMutation = useMutation({
     mutationFn: async () => {
       if (!terminalId) return;
-      // Strategi: slett alle eksisterende mappinger for denne terminalen og
-      // sett inn nye i en operasjon. Tabellen er liten (typisk <10 rader/term)
-      // og dette unngår å måtte diffe rolle/station per rad.
-      const { error: delErr } = await supabase
-        .from("pos_terminal_printers")
-        .delete()
-        .eq("terminal_id", terminalId);
-      if (delErr) throw delErr;
-
       const rows: Array<{
         terminal_id: string;
         printer_id: string;
@@ -146,10 +137,18 @@ export function TerminalPrintersDialog({ terminalId, terminalName, activeEntityI
           rows.push({ terminal_id: terminalId, printer_id, role: "station", station_id });
         }
       }
-      if (rows.length === 0) return;
-      const { error: insErr } = await supabase.from("pos_terminal_printers").insert(rows);
-      if (insErr) throw insErr;
+
+      // Slett + sett inn i ÉN transaksjon, slik at en feil aldri etterlater
+      // terminalen uten skrivermapping.
+      const { error } = await (supabase as any).rpc("replace_child_rows", {
+        p_table: "pos_terminal_printers",
+        p_parent_column: "terminal_id",
+        p_parent_id: terminalId,
+        p_rows: rows,
+      });
+      if (error) throw error;
     },
+
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["pos_terminal_printers", terminalId] });
       toast.success("Skriver-mapping lagret");
