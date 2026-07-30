@@ -525,13 +525,26 @@ export default function CakeImageEditor() {
     const dataUrl = c.toDataURL({ format: "png", multiplier: 2 });
     const w = window.open("", "_blank", "width=900,height=700");
     if (!w) return;
-    w.document.write(`<html><head><title>${image?.title ?? "Kakebilde"}</title>
-<style>
+
+    // Bygg dokumentet med DOM-API — aldri string-interpolering av brukerdata
+    // (en tittel som «</title><script>…» ville ellers kjørt kode i vår origin).
+    const doc = w.document;
+    doc.title = image?.title ?? "Kakebilde";
+    const style = doc.createElement("style");
+    style.textContent = `
 @page { size: auto; margin: 10mm; }
 body { margin:0; display:flex; align-items:center; justify-content:center; min-height:100vh; }
-img { max-width:100%; max-height:100vh; }
-</style></head><body><img src="${dataUrl}" onload="window.focus();window.print();" /></body></html>`);
-    w.document.close();
+img { max-width:100%; max-height:100vh; }`;
+    doc.head.appendChild(style);
+    const img = doc.createElement("img");
+    img.src = dataUrl;
+    img.alt = image?.title ?? "Kakebilde";
+    img.onload = () => {
+      w.focus();
+      w.print();
+    };
+    doc.body.appendChild(img);
+
     if (image) {
       await markPrinted([image.id]);
       qc.invalidateQueries({ queryKey: ["cake-images"] });
@@ -549,7 +562,9 @@ img { max-width:100%; max-height:100vh; }
     const drawW = tpl.w * ratio;
     const drawH = tpl.h * ratio;
     pdf.addImage(dataUrl, "PNG", (pageW - drawW) / 2, (pageH - drawH) / 2, drawW, drawH);
-    pdf.save(`${image?.title ?? "kakebilde"}.pdf`);
+    const safeName = (image?.title ?? "kakebilde").replace(/[^\p{L}\p{N} _-]/gu, "_").slice(0, 80) || "kakebilde";
+    pdf.save(`${safeName}.pdf`);
+
     if (image) {
       await markPrinted([image.id]);
       qc.invalidateQueries({ queryKey: ["cake-images"] });
