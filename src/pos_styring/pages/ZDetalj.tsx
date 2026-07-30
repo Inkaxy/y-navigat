@@ -295,14 +295,19 @@ export default function ZDetalj() {
             {z.report_hash && (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Badge variant="outline" className="border-success/30 bg-success/10 text-success gap-1">
-                    <ShieldCheck className="h-3 w-3" /> Hash verifisert
+                  <Badge variant="outline" className="gap-1">
+                    <ShieldCheck className="h-3 w-3" /> Hash registrert
                   </Badge>
                 </TooltipTrigger>
                 <TooltipContent>
                   <span className="font-mono text-xs">{z.report_hash}</span>
+                  <p className="mt-1 max-w-xs text-xs text-muted-foreground">
+                    Rapporthash lagret ved dagsavslutning. Verifisering av hash-kjeden
+                    kjøres i journalkontrollen (Kassehelse), ikke her.
+                  </p>
                 </TooltipContent>
               </Tooltip>
+
             )}
             <Badge variant="outline" className="gap-1">
               <Lock className="h-3 w-3" /> Sesjoner låst
