@@ -113,6 +113,7 @@ function SelfServiceFlow({ data, loading, loadError }: FlowProps) {
 
   const [submitting, setSubmitting] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
+  const [printing, setPrinting] = useState(false);
   const [receipt, setReceipt] = useState<{
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     tx: any;
