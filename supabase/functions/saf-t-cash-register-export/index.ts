@@ -357,15 +357,27 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    void accessCheck;
-    void accessErr;
 
-    // Hent selskap
-    const { data: entity, error: entErr } = await admin
+    // Hent selskap (kolonnenavn iht. legal_entities-skjemaet)
+    const { data: entityRow, error: entErr } = await admin
       .from("legal_entities")
-      .select("id, name, org_number, address_line1, address_line2, postal_code, city, country")
+      .select(
+        "id, legal_name, display_name, org_number, invoice_address_line1, invoice_address_line2, invoice_postal_code, invoice_city, invoice_country",
+      )
       .eq("id", body.legal_entity_id)
       .maybeSingle();
+    const entity: Company | null = entityRow
+      ? {
+          id: entityRow.id,
+          name: entityRow.legal_name ?? entityRow.display_name ?? "",
+          org_number: entityRow.org_number,
+          address_line1: entityRow.invoice_address_line1,
+          address_line2: entityRow.invoice_address_line2,
+          postal_code: entityRow.invoice_postal_code,
+          city: entityRow.invoice_city,
+          country: entityRow.invoice_country,
+        }
+      : null;
     if (entErr || !entity) {
       return new Response(JSON.stringify({ error: "entity_not_found" }), {
         status: 404,
