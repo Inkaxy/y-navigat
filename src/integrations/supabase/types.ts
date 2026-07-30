@@ -11134,6 +11134,7 @@ export type Database = {
           p_dining_mode?: string
           p_is_training?: boolean
           p_lines: Json
+          p_operator_id?: string
           p_payment_summary: Json
           p_reference_transaction_id?: string
           p_session_id: string
