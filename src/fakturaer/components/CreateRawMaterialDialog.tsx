@@ -36,7 +36,9 @@ export function CreateRawMaterialDialog({ open, onOpenChange, line }: Props) {
     setName(line.description ?? "");
     const inferred = UNIT_TO_BASE[(line.unit ?? "").toLowerCase()] ?? "kg";
     setBaseUnit(inferred);
-    setPackageSize(line.quantity != null ? String(line.quantity) : "");
+    // NB: line.quantity er ANTALL pakninger på fakturaen — ikke pakningsstørrelsen.
+    // Pakningsstørrelsen må fylles inn manuelt (f.eks. 25 kg pr sekk).
+    setPackageSize("");
     setPackageUnit(line.unit ?? "");
     setCategory("");
   }, [line, open]);
@@ -56,8 +58,16 @@ export function CreateRawMaterialDialog({ open, onOpenChange, line }: Props) {
     setBusy(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      const factor = toBaseFactor((line.unit ?? "").toLowerCase(), baseUnit);
-      const pricePerBase = line.unit_price != null && factor !== 0 ? Number(line.unit_price) / factor : null;
+      // Kostpris pr baseenhet = pris pr pakning / pakningsstørrelse omregnet til baseenhet.
+      // («10 sekker à 25 kg» til 450 kr/sekk => 18 kr/kg, ikke 450 kr/kg.)
+      const sizeNum = packageSize ? Number(packageSize) : null;
+      const unitForSize = (packageUnit || line.unit || "").toLowerCase();
+      const sizeInBase =
+        sizeNum && sizeNum > 0 ? sizeNum * toBaseFactor(unitForSize, baseUnit) : null;
+      const fallbackFactor = toBaseFactor((line.unit ?? "").toLowerCase(), baseUnit);
+      const divisor = sizeInBase && sizeInBase > 0 ? sizeInBase : fallbackFactor;
+      const pricePerBase =
+        line.unit_price != null && divisor > 0 ? Number(line.unit_price) / divisor : null;
       const nowIso = new Date().toISOString();
 
       // 1) Raw material
@@ -119,6 +129,20 @@ export function CreateRawMaterialDialog({ open, onOpenChange, line }: Props) {
     } finally { setBusy(false); }
   }
 
+  const previewPricePerBase = (() => {
+    if (!line || line.unit_price == null) return null;
+    const sizeNum = packageSize ? Number(packageSize) : null;
+    const sizeInBase =
+      sizeNum && sizeNum > 0
+        ? sizeNum * toBaseFactor((packageUnit || line.unit || "").toLowerCase(), baseUnit)
+        : null;
+    const divisor =
+      sizeInBase && sizeInBase > 0
+        ? sizeInBase
+        : toBaseFactor((line.unit ?? "").toLowerCase(), baseUnit);
+    return divisor > 0 ? Number(line.unit_price) / divisor : null;
+  })();
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
@@ -146,7 +170,11 @@ export function CreateRawMaterialDialog({ open, onOpenChange, line }: Props) {
             <Field label="Pakke enhet"><Input value={packageUnit} onChange={(e) => setPackageUnit(e.target.value)} /></Field>
           </div>
           <div className="rounded-lg bg-muted/30 p-3 text-sm">
-            Beregnet kostpris/{baseUnit}: <strong>{formatNok(line && line.unit_price != null ? Number(line.unit_price) / toBaseFactor((line.unit ?? "").toLowerCase(), baseUnit) : null)}</strong>
+            Beregnet kostpris/{baseUnit}: <strong>{formatNok(previewPricePerBase)}</strong>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Pakke størrelse = innhold pr pakning (f.eks. 25 kg pr sekk), ikke antall pakninger på fakturaen
+              {line?.quantity != null ? ` (fakturaen har ${line.quantity} stk)` : ""}.
+            </p>
           </div>
         </div>
         <DialogFooter>

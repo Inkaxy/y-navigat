@@ -27,24 +27,35 @@ export function addBusinessHours(from: Date, hours: number, bh: BusinessHours): 
   const remainingMs = hours * 3600_000;
   let cur = new Date(from);
   let remaining = remainingMs;
+
+  // Ugyldig konfigurasjon (ingen arbeidsdager eller null-lang dag) ⇒ enkel kalenderberegning
   const dayLen = (bh.end_hour - bh.start_hour) * 3600_000;
+  if (!bh.workdays?.length || dayLen <= 0) {
+    return new Date(from.getTime() + remainingMs);
+  }
 
   // Klemme starttid til nærmeste åpningstid
   const clampToOpen = (d: Date) => {
-    while (!isWorkday(d, bh.workdays)) {
-      d.setDate(d.getDate() + 1);
-      d.setHours(bh.start_hour, 0, 0, 0);
-    }
-    if (d.getHours() < bh.start_hour) d.setHours(bh.start_hour, 0, 0, 0);
-    if (d.getHours() >= bh.end_hour) {
-      d.setDate(d.getDate() + 1);
-      d.setHours(bh.start_hour, 0, 0, 0);
-      clampToOpen(d);
+    let guard = 0;
+    while (guard++ < 400) {
+      if (!isWorkday(d, bh.workdays)) {
+        d.setDate(d.getDate() + 1);
+        d.setHours(bh.start_hour, 0, 0, 0);
+        continue;
+      }
+      if (d.getHours() < bh.start_hour) d.setHours(bh.start_hour, 0, 0, 0);
+      if (d.getHours() >= bh.end_hour) {
+        d.setDate(d.getDate() + 1);
+        d.setHours(bh.start_hour, 0, 0, 0);
+        continue;
+      }
+      break;
     }
   };
   clampToOpen(cur);
 
-  while (remaining > 0) {
+  let guard = 0;
+  while (remaining > 0 && guard++ < 2000) {
     const endOfDay = new Date(cur);
     endOfDay.setHours(bh.end_hour, 0, 0, 0);
     const avail = endOfDay.getTime() - cur.getTime();
@@ -58,6 +69,7 @@ export function addBusinessHours(from: Date, hours: number, bh: BusinessHours): 
       cur.setHours(bh.start_hour, 0, 0, 0);
       clampToOpen(cur);
     }
+
     if (dayLen <= 0) break; // safeguard
   }
   return cur;

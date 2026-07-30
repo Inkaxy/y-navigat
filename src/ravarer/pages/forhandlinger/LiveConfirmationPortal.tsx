@@ -179,26 +179,34 @@ export default function LiveConfirmationPortal() {
   }
 
   async function submitAll() {
+    // Allerede låste linjer kan ikke redigeres — de skal hverken valideres eller sendes på nytt.
+    const editable = (bundle.items as Item[]).filter((it) => it.live_status !== "confirmed");
+
     // Validate
-    for (const it of bundle.items as Item[]) {
+    for (const it of editable) {
       const s = states[it.id];
-      if (s.confirmed && !s.datasheet_path && !s.datasheet_skipped) {
+      if (s?.confirmed && !s.datasheet_path && !s.datasheet_skipped) {
         toast.error(
           `Last opp datablad eller huk av "sendes separat" for ${it.raw_materials?.name ?? "linje"}`,
         );
         return;
       }
     }
+    if (!editable.length) {
+      toast.info("Alle linjer er allerede bekreftet og låst.");
+      return;
+    }
     if (!confirm("Send bekreftelsen? Bekreftede linjer låses.")) return;
     setLoading(true);
     try {
-      const items = (bundle.items as Item[]).map((it) => ({
+      const items = editable.map((it) => ({
         negotiation_item_id: it.id,
         confirmed: states[it.id].confirmed,
         supplier_note: states[it.id].supplier_note || null,
         datasheet_path: states[it.id].datasheet_path,
         datasheet_skipped: states[it.id].datasheet_skipped,
       }));
+
       const res = await fetch(`${FN_BASE}/submit-live-confirmation`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

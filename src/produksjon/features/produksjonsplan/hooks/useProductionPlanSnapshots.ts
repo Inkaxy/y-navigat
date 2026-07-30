@@ -12,24 +12,26 @@ export interface SnapshotItem {
 }
 
 /**
- * Stabil rad-nøkkel som speiler aggregeringen i useProductionPlan.
- * Må brukes både ved lagring og ved oppslag/diff for å sammenligne riktig rad.
+ * Stabil rad-nøkkel som MÅ speile aggregeringsnøkkelen i useProductionPlan
+ * (`${tourKey}::p:${product_id}`). Brukes både ved lagring av snapshot og ved
+ * diff i korreksjonslista — ulik logikk gir falske +/- på grupperte visninger.
  */
+export function productionRowKey(
+  tourNumber: number | null,
+  productId: string,
+  criteria: Pick<ProduksjonsplanCriteria, "sum_tours">,
+): string {
+  const tourKey = criteria.sum_tours ? "ALL" : `t${tourNumber ?? "x"}`;
+  return `${tourKey}::p:${productId}`;
+}
+
 export function buildRowKey(
-  row: Pick<ProductionPlanRow, "product_id" | "production_group_id" | "main_category_id" | "tour_number">,
+  row: Pick<ProductionPlanRow, "product_id" | "tour_number">,
   criteria: ProduksjonsplanCriteria,
 ): string {
-  const tourKey = criteria.sum_tours ? "ALL" : `t${row.tour_number ?? "x"}`;
-  let aggKey: string;
-  if (criteria.aggregation === "per_product") {
-    aggKey = `p:${row.product_id}`;
-  } else if (criteria.aggregation === "per_production_group") {
-    aggKey = `pg:${row.production_group_id ?? `_${row.product_id}`}`;
-  } else {
-    aggKey = `mp:${row.main_category_id ?? "_"}::${row.production_group_id ?? `_${row.product_id}`}`;
-  }
-  return `${tourKey}::${aggKey}`;
+  return productionRowKey(row.tour_number ?? null, row.product_id, criteria);
 }
+
 
 /**
  * Sammenligner kun de kriterie-feltene som påvirker hvilke rader som dukker opp og hvordan de aggregeres.

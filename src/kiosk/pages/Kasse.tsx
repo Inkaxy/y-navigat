@@ -37,7 +37,7 @@ import {
 } from "@/kiosk/hooks/useProductLookup";
 import { kioskSupabase } from "@/kiosk/integrations/supabase/client";
 import { broadcastSaleComplete } from "@/kiosk/lib/realtime";
-import { effectiveDining, isFoodItem, type CartItem } from "@/kiosk/lib/cart";
+import { calcLine, effectiveDining, effectiveUnitPriceExclMva, isFoodItem, type CartItem } from "@/kiosk/lib/cart";
 import {
   KioskRender,
   type RenderButton,
@@ -70,7 +70,7 @@ export function toLinePayload(
     product_id: item.product_id,
     product_snapshot: item.product_snapshot,
     quantity: item.quantity,
-    unit_price_excl_mva: item.unit_price_excl_mva,
+    unit_price_excl_mva: effectiveUnitPriceExclMva(item, cartDining),
     line_discount: item.line_discount ?? 0,
     mva_rate: effectiveRate,
     dining_mode_override: item.dining_mode_override ?? null,
@@ -186,6 +186,7 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
           mva_rate: p.mva_rate,
         },
         unit_price_excl_mva: p.unit_price_excl_mva,
+        unit_price_incl_mva: p.unit_price_incl_mva,
         base_mva_rate: p.mva_rate,
         eatin_mva_rate: p.eatin_mva_rate,
         quantity: 1,
@@ -557,12 +558,7 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
       label: it.product_snapshot.display_name,
       qty: it.quantity,
       unit: it.product_snapshot.unit ?? null,
-      line_total:
-        Math.round(
-          (it.quantity * it.unit_price_excl_mva - it.line_discount) *
-            (1 + effRate / 100) *
-            100,
-        ) / 100,
+      line_total: calcLine(it, cart.diningMode).gross,
       image_url: signed ?? fallback ?? null,
       dining_mode: effectiveDining(it, cart.diningMode),
       is_food: isFoodItem(it),
