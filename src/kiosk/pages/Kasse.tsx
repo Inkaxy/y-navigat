@@ -413,7 +413,8 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
         "Nøtterø Bakeri",
       ];
 
-      // 1) Legg print-jobben inn på vent (status='hold') før journalføring.
+      // 1) Legg print-jobben inn på vent før journalføring. Status 'printing'
+      //    brukes som hold — pollerne plukker kun opp 'queued'.
       const { data: job, error: jErr } = await kioskSupabase
         .from("pos_print_jobs")
         .insert({
@@ -431,7 +432,7 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
             outlet: receiptHeader.outlet,
             footer_lines,
           } as unknown as never,
-          status: "hold",
+          status: "printing",
         })
         .select("id")
         .single();
@@ -453,7 +454,7 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
       } catch (e) {
         await kioskSupabase
           .from("pos_print_jobs")
-          .update({ status: "cancelled", error_message: (e as Error).message })
+          .update({ status: "failed", last_error: (e as Error).message })
           .eq("id", job.id);
         throw e;
       }
