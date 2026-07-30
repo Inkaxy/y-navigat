@@ -30,7 +30,7 @@ interface LineRow {
 }
 
 export function PreviewDrawer({ open, onOpenChange, entityId, runDate, selectedGroups }: Props) {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
     queryKey: ["fakturering", "preview-lines", entityId, runDate, [...selectedGroups].sort()],
     enabled: open && !!entityId,
     staleTime: 30 * 1000,
@@ -99,7 +99,23 @@ export function PreviewDrawer({ open, onOpenChange, entityId, runDate, selectedG
 
         <div className="mt-6">
           {isLoading && <div className="text-sm text-muted-foreground">Laster…</div>}
-          {!isLoading && data && data.length === 0 && (
+          {isError && (
+            <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm">
+              <div className="font-medium text-destructive">Kunne ikke hente grunnlaget</div>
+              <div className="mt-1 text-muted-foreground">
+                {(error as Error)?.message ?? "Ukjent feil"}
+              </div>
+              <button
+                type="button"
+                onClick={() => refetch()}
+                disabled={isFetching}
+                className="mt-3 text-sm font-medium text-[hsl(var(--app-primary))] hover:underline disabled:opacity-60"
+              >
+                Prøv igjen
+              </button>
+            </div>
+          )}
+          {!isLoading && !isError && data && data.length === 0 && (
             <div className="rounded-lg border border-line-subtle bg-surface-sunken p-6 text-center text-sm text-muted-foreground">
               Ingen ordrer klare for de valgte gruppene.
             </div>

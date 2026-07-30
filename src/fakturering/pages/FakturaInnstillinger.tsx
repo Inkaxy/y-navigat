@@ -193,7 +193,14 @@ function TripletexSection({ entityId, entityName, canWrite }: { entityId: string
 
         {mode === "standard" && (
           <div className="space-y-2">
-            <Label>Consumer token</Label>
+            <div className="flex items-center gap-2">
+              <Label>Consumer token</Label>
+              {cred?.has_consumer_token && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
+                  <CheckCircle2 className="h-3 w-3" /> Token lagret ✓
+                </span>
+              )}
+            </div>
             <Input
               type="password"
               autoComplete="off"
@@ -205,7 +212,14 @@ function TripletexSection({ entityId, entityName, canWrite }: { entityId: string
           </div>
         )}
         <div className="space-y-2">
-          <Label>Employee token</Label>
+          <div className="flex items-center gap-2">
+            <Label>Employee token</Label>
+            {cred?.has_employee_token && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
+                <CheckCircle2 className="h-3 w-3" /> Token lagret ✓
+              </span>
+            )}
+          </div>
           <Input
             type="password"
             autoComplete="off"
@@ -215,6 +229,7 @@ function TripletexSection({ entityId, entityName, canWrite }: { entityId: string
             onChange={(e) => setEmployeeToken(e.target.value)}
           />
         </div>
+
 
         {testResult && (
           <Alert variant={testResult.ok ? "default" : "destructive"}>
