@@ -51,7 +51,7 @@ Deno.serve(async (req) => {
     // Verify caller has admin invoice access on this entity (RLS enforces too).
     const { data: hasAccess, error: accessErr } = await userClient.rpc(
       "has_ravarer_invoice_access",
-      { _legal_entity_id: body.legal_entity_id, _level: "admin" },
+      { _legal_entity_id: body.legal_entity_id, _required_level: "admin" },
     );
     if (accessErr || !hasAccess) {
       return new Response(JSON.stringify({ error: "Forbidden" }), {

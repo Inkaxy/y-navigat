@@ -49,7 +49,7 @@ Deno.serve(async (req) => {
       });
     }
     const { data: hasAccess } = await userClient.rpc("has_ravarer_invoice_access", {
-      _legal_entity_id: body.legal_entity_id, _level: "admin",
+      _legal_entity_id: body.legal_entity_id, _required_level: "admin",
     });
     if (!hasAccess) {
       return new Response(JSON.stringify({ error: "Forbidden" }), {
