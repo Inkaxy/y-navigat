@@ -525,9 +525,30 @@ export function DeliveryRuleFormDialog({ open, onOpenChange, rule, template, onS
         priority: form.priority,
         weekdays: form.weekdays.length > 0 ? form.weekdays : null,
         tour_filter: form.tour_filter.length > 0 ? form.tour_filter : null,
-        product_ids: form.product_ids.length > 0 ? form.product_ids : null,
+        // «Tillatte produkter»: utvalget MÅ lagres i allowed_*-kolonnene —
+        // det er dem evaluate_delivery_rules håndhever. product_*-kolonnene
+        // er scope-filter og skal da stå tomme.
+        product_ids:
+          form.rule_type === "available_products"
+            ? null
+            : form.product_ids.length > 0
+              ? form.product_ids
+              : null,
         product_group_ids:
-          form.product_group_ids.length > 0 ? form.product_group_ids : null,
+          form.rule_type === "available_products"
+            ? null
+            : form.product_group_ids.length > 0
+              ? form.product_group_ids
+              : null,
+        allowed_product_ids:
+          form.rule_type === "available_products" && form.product_ids.length > 0
+            ? form.product_ids
+            : null,
+        allowed_product_group_ids:
+          form.rule_type === "available_products" && form.product_group_ids.length > 0
+            ? form.product_group_ids
+            : null,
+
         customer_ids: form.customer_ids.length > 0 ? form.customer_ids : null,
         customer_group_ids:
           form.customer_group_ids.length > 0 ? form.customer_group_ids : null,
