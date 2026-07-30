@@ -15,6 +15,7 @@ import { FIELD_LABELS } from "@/produksjon/features/utskriftsprofiler/types";
 import { fitFontSizePt } from "@/produksjon/features/utskriftsprofiler/lib/fitText";
 import type { LabelProductRow } from "../types";
 import type { Merknad } from "@/ordre/lib/merknad";
+import { code128Modules } from "./code128";
 
 const MM_TO_PT = 2.83465;
 const mm = (v: number) => v * MM_TO_PT;
@@ -44,6 +45,16 @@ export interface LabelPdfData {
   pickupTime?: string | null;
   /** Om kundeordren er betalt. */
   isPaid?: boolean | null;
+  /** Distribusjonsmåte (orders.distribution). */
+  distribution?: string | null;
+  /** Kjørerute fra pakkseddelen. */
+  routeLabel?: string | null;
+  /** Pakkseddelnummer. */
+  deliveryNoteNumber?: string | null;
+  /** Melding på pakkseddelen. */
+  deliveryNoteMessage?: string | null;
+  /** Verdi som skal kodes i strekkoden. Default: etikettnummer, ellers varenr. */
+  barcodeValue?: string | null;
 }
 
 
@@ -56,7 +67,7 @@ function valueFor(
   type: FieldType,
   data: LabelPdfData,
 ): { text?: string; image?: string | null } {
-  const { profile, row, labelNumber, quantity, merknad, tourLabel, pickupLabel, customerName, deliveryAddress, phone, deliveryDate, pickupTime, isPaid } = data;
+  const { profile, row, labelNumber, quantity, merknad, tourLabel, pickupLabel, customerName, deliveryAddress, phone, deliveryDate, pickupTime, isPaid, distribution, routeLabel, deliveryNoteNumber, deliveryNoteMessage } = data;
   switch (type) {
     case "logo":
       return { image: profile.logo_url };
@@ -88,6 +99,16 @@ function valueFor(
       return { text: pickupTime || "" };
     case "er_betalt":
       return { text: isPaid ? "Ja" : "Nei" };
+    case "distribusjon":
+      return { text: distribution || "" };
+    case "kjorerute":
+      return { text: routeLabel || tourLabel || "" };
+    case "pakkseddelnr":
+      return { text: deliveryNoteNumber || "" };
+    case "melding_pakkseddel":
+      return { text: deliveryNoteMessage || "" };
+    case "strekkode":
+      return { text: barcodeText(data) };
 
     case "sist_endret":
       return { text: new Date().toLocaleString("nb-NO") };
@@ -119,6 +140,38 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
 });
+
+function barcodeText(data: LabelPdfData): string {
+  return (
+    data.barcodeValue ||
+    data.labelNumber ||
+    (data.row?.display_number != null ? String(data.row.display_number) : "")
+  );
+}
+
+function BarcodeView({ value, heightMm }: { value: string; heightMm: number }) {
+  const modules = code128Modules(value);
+  const totalUnits = modules.reduce((acc, m) => acc + m.width, 0) || 1;
+  const barsHeight = Math.max(mm(heightMm) - 8, 6);
+  return (
+    <View style={{ width: "100%", height: "100%", alignItems: "center", justifyContent: "center" }}>
+      <View style={{ flexDirection: "row", height: barsHeight, width: "100%" }}>
+        {modules.map((m, i) => (
+          <View
+            key={i}
+            style={{
+              flexGrow: m.width,
+              flexBasis: `${(m.width / totalUnits) * 100}%`,
+              backgroundColor: m.dark ? "#000" : "#fff",
+              height: "100%",
+            }}
+          />
+        ))}
+      </View>
+      <Text style={{ fontSize: 5, marginTop: 1 }}>{value}</Text>
+    </View>
+  );
+}
 
 function renderField(field: ProfileField, data: LabelPdfData, key: string) {
   const v = valueFor(field.field_type, data);
@@ -171,7 +224,9 @@ function renderField(field: ProfileField, data: LabelPdfData, key: string) {
         overflow: "hidden",
       }}
     >
-      {field.field_type === "logo" && v.image ? (
+      {field.field_type === "strekkode" ? (
+        <BarcodeView value={barcodeText(data)} heightMm={field.height_mm} />
+      ) : field.field_type === "logo" && v.image ? (
         <Image
           src={v.image}
           style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
