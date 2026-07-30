@@ -11,7 +11,7 @@ export function useOrderLineTours(orderLineIds: string[] | undefined) {
   return useQuery({
     queryKey: ["order_line_tours", ids.join(",")],
     enabled: ids.length > 0,
-    queryFn: async (): Promise<Record<string, string | null>> => {
+    queryFn: () => fetchOrderLineTours(ids),
       const { data: lines, error } = await supabase
         .from("order_lines")
         .select("id, order_id")
