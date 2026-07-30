@@ -435,10 +435,26 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Terminaler i scope
+    // Terminaler i scope — terminal_id MÅ tilhøre selskapet, ellers kan en
+    // bruker i selskap A hente ut hele journalen til selskap B.
     let terminalIds: string[] = [];
     if (body.terminal_id) {
-      terminalIds = [body.terminal_id];
+      const { data: term, error: termErr } = await admin
+        .from("pos_terminals")
+        .select("id, legal_entity_id")
+        .eq("id", body.terminal_id)
+        .maybeSingle();
+      if (termErr) throw termErr;
+      if (!term || term.legal_entity_id !== body.legal_entity_id) {
+        return new Response(
+          JSON.stringify({
+            error: "forbidden",
+            message: "Terminalen tilhører ikke valgt selskap",
+          }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      terminalIds = [term.id];
     } else {
       const { data: terms } = await admin
         .from("pos_terminals")
@@ -452,6 +468,7 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
 
     // Opprett log-rad først (status=pending)
     const fileName = `saf-t-${entity.org_number ?? "org"}-${dateOnly(body.period_start)}_${dateOnly(
