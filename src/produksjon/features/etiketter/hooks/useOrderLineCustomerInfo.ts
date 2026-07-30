@@ -52,7 +52,18 @@ export function useOrderLineCustomerInfo(orderLineIds: string[] | undefined) {
   return useQuery({
     queryKey: ["order_line_customer_info", ids.join(",")],
     enabled: ids.length > 0,
-    queryFn: async (): Promise<Record<string, OrderLineCustomerInfo>> => {
+    queryFn: () => fetchOrderLineCustomerInfo(ids),
+    staleTime: 30_000,
+  });
+}
+
+/** Ikke-hook variant, for bruk i bulk-PDF-generering. */
+export async function fetchOrderLineCustomerInfo(
+  orderLineIds: string[],
+): Promise<Record<string, OrderLineCustomerInfo>> {
+  const ids = orderLineIds.filter(Boolean);
+  if (ids.length === 0) return {};
+  {
       const empty: OrderLineCustomerInfo = {
         pickupLabel: null,
         customerName: null,
@@ -299,7 +310,5 @@ export function useOrderLineCustomerInfo(orderLineIds: string[] | undefined) {
         out[row.id] = orderInfo[row.order_id] ?? { ...empty };
       }
       return out;
-    },
-    staleTime: 30_000,
-  });
+  }
 }

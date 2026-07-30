@@ -7,6 +7,8 @@ import {
   slugifyLabel,
   type LabelPdfData,
 } from "@/produksjon/features/etiketter/lib/labelPdf";
+import { fetchOrderLineTours } from "@/produksjon/features/etiketter/hooks/useOrderLineTours";
+import { fetchOrderLineCustomerInfo } from "@/produksjon/features/etiketter/hooks/useOrderLineCustomerInfo";
 import { fetchOrderLineMerknads } from "@/produksjon/features/etiketter/hooks/useOrderLineMerknads";
 
 import { Button } from "@/components/ui/button";
@@ -237,9 +239,13 @@ export default function EtiketterPage() {
       const allLineIds = Array.from(
         new Set(printableRows.flatMap((r) => r.order_line_ids ?? [])),
       );
-      const merknadMap = allLineIds.length > 0
-        ? await fetchOrderLineMerknads(allLineIds)
-        : {};
+      const [merknadMap, tourMap, customerInfoMap] = allLineIds.length > 0
+        ? await Promise.all([
+            fetchOrderLineMerknads(allLineIds),
+            fetchOrderLineTours(allLineIds),
+            fetchOrderLineCustomerInfo(allLineIds),
+          ])
+        : [{}, {}, {} as Record<string, Awaited<ReturnType<typeof fetchOrderLineCustomerInfo>>[string]>];
       const items: LabelPdfData[] = [];
       for (const r of printableRows) {
         const profileId = productProfiles[r.product_id];
@@ -267,6 +273,18 @@ export default function EtiketterPage() {
               quantity: totalCopies,
               copies: 1,
               merknad: merknadMap[id] ?? null,
+              tourLabel: tourMap[id] ?? null,
+              pickupLabel: customerInfoMap[id]?.pickupLabel ?? null,
+              customerName: customerInfoMap[id]?.customerName ?? null,
+              deliveryAddress: customerInfoMap[id]?.deliveryAddress ?? null,
+              phone: customerInfoMap[id]?.phone ?? null,
+              deliveryDate: customerInfoMap[id]?.deliveryDate ?? null,
+              pickupTime: customerInfoMap[id]?.pickupTime ?? null,
+              isPaid: customerInfoMap[id]?.isPaid ?? false,
+              distribution: customerInfoMap[id]?.distribution ?? null,
+              routeLabel: customerInfoMap[id]?.routeLabel ?? null,
+              deliveryNoteNumber: customerInfoMap[id]?.deliveryNoteNumber ?? null,
+              deliveryNoteMessage: customerInfoMap[id]?.deliveryNoteMessage ?? null,
             });
           }
           if (totalCopies > lineIds.length) {
@@ -277,6 +295,18 @@ export default function EtiketterPage() {
               quantity: totalCopies,
               copies: totalCopies - lineIds.length,
               merknad: merknadMap[lineIds[0]] ?? null,
+              tourLabel: tourMap[lineIds[0]] ?? null,
+              pickupLabel: customerInfoMap[lineIds[0]]?.pickupLabel ?? null,
+              customerName: customerInfoMap[lineIds[0]]?.customerName ?? null,
+              deliveryAddress: customerInfoMap[lineIds[0]]?.deliveryAddress ?? null,
+              phone: customerInfoMap[lineIds[0]]?.phone ?? null,
+              deliveryDate: customerInfoMap[lineIds[0]]?.deliveryDate ?? null,
+              pickupTime: customerInfoMap[lineIds[0]]?.pickupTime ?? null,
+              isPaid: customerInfoMap[lineIds[0]]?.isPaid ?? false,
+              distribution: customerInfoMap[lineIds[0]]?.distribution ?? null,
+              routeLabel: customerInfoMap[lineIds[0]]?.routeLabel ?? null,
+              deliveryNoteNumber: customerInfoMap[lineIds[0]]?.deliveryNoteNumber ?? null,
+              deliveryNoteMessage: customerInfoMap[lineIds[0]]?.deliveryNoteMessage ?? null,
             });
           }
         }
