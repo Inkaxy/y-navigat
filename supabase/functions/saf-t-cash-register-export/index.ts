@@ -502,7 +502,7 @@ Deno.serve(async (req) => {
       const xml =
         `<?xml version="1.0" encoding="UTF-8"?>\n` +
         `<AuditFile xmlns="${SAF_T_NS}">\n` +
-        buildHeader(entity as Company, body.period_start, body.period_end) +
+        buildHeader(entity, body.period_start, body.period_end) +
         buildMasterFiles([], Array.from(vatSet).sort((a, b) => a - b)) +
         registers +
         `</AuditFile>\n`;
