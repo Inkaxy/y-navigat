@@ -14,6 +14,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { ALL_ENTITIES, useSelectedEntity } from "@/kunder/state/SelectedEntityContext";
 
 interface PortalRow {
   user_id: string;
@@ -28,9 +29,11 @@ interface Props {
   user: PortalRow | null;
   onClose: () => void;
   onChanged: () => void;
+  canWrite?: boolean;
 }
 
-export function PortalUserDrawer({ user, onClose, onChanged }: Props) {
+export function PortalUserDrawer({ user, onClose, onChanged, canWrite = true }: Props) {
+  const { selected } = useSelectedEntity();
   const [displayName, setDisplayName] = useState("");
   const [role, setRole] = useState<"kunde" | "admin">("kunde");
   const [customerIds, setCustomerIds] = useState<string[]>([]);
@@ -47,15 +50,17 @@ export function PortalUserDrawer({ user, onClose, onChanged }: Props) {
   }, [user]);
 
   const { data: customers = [] } = useQuery({
-    queryKey: ["portal-drawer-customers"],
+    queryKey: ["portal-drawer-customers", selected],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let q = supabase
         .from("customers")
-        .select("id, customer_number, display_name")
+        .select("id, customer_number, display_name, legal_entity_id")
         .order("display_name")
         .limit(2000);
+      if (selected && selected !== ALL_ENTITIES) q = q.eq("legal_entity_id", selected);
+      const { data, error } = await q;
       if (error) throw error;
-      return (data ?? []) as unknown as { id: string; customer_number: string | number | null; display_name: string }[];
+      return (data ?? []) as unknown as { id: string; customer_number: string | number | null; display_name: string; legal_entity_id: string }[];
     },
     enabled: !!user,
   });
@@ -75,7 +80,7 @@ export function PortalUserDrawer({ user, onClose, onChanged }: Props) {
   }, [customers, customerIds, customerSearch]);
 
   const save = async () => {
-    if (!user) return;
+    if (!user || !canWrite) return;
     setSaving(true);
     const { data: p, error: pe } = await supabase.functions.invoke("portal-manage-user", {
       body: { action: "update_profile", user_id: user.user_id, display_name: displayName, role },
@@ -99,7 +104,7 @@ export function PortalUserDrawer({ user, onClose, onChanged }: Props) {
   };
 
   const deleteUser = async () => {
-    if (!user) return;
+    if (!user || !canWrite) return;
     const { data, error } = await supabase.functions.invoke("portal-manage-user", {
       body: { action: "delete", user_id: user.user_id },
     });
@@ -180,7 +185,10 @@ export function PortalUserDrawer({ user, onClose, onChanged }: Props) {
         <SheetFooter className="flex-row justify-between sm:justify-between">
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button variant="destructive" size="sm"><Trash2 className="h-4 w-4" /> Slett</Button>
+              <Button variant="destructive" size="sm" disabled={!canWrite}
+                title={canWrite ? undefined : "Du har kun lesetilgang til Kunder"}>
+                <Trash2 className="h-4 w-4" /> Slett
+              </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
@@ -197,7 +205,10 @@ export function PortalUserDrawer({ user, onClose, onChanged }: Props) {
           </AlertDialog>
           <div className="flex gap-2">
             <Button variant="outline" onClick={onClose} disabled={saving}>Avbryt</Button>
-            <Button onClick={save} disabled={saving}>{saving ? "Lagrer…" : "Lagre"}</Button>
+            <Button onClick={save} disabled={saving || !canWrite}
+              title={canWrite ? undefined : "Du har kun lesetilgang til Kunder"}>
+              {saving ? "Lagrer…" : "Lagre"}
+            </Button>
           </div>
         </SheetFooter>
       </SheetContent>
