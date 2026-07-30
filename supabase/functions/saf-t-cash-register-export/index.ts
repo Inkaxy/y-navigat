@@ -347,15 +347,11 @@ Deno.serve(async (req) => {
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
     // Verifiser at brukeren har tilgang til selskapet
-    const { data: accessCheck, error: accessErr } = await admin.rpc("has_position_in_entity", {
-      _entity_id: body.legal_entity_id,
+    // has_position_in_entity leser auth.uid(), så den må kalles med brukerens klient.
+    const { data: hasPos, error: accessErr } = await userClient.rpc("has_position_in_entity", {
+      p_legal_entity_id: body.legal_entity_id,
     });
-    // has_position_in_entity leser auth.uid() så vi bruker userClient til denne sjekken.
-    // Fallback: sjekk direkte i user_positions.
-    const { data: hasPos } = await userClient.rpc("has_position_in_entity", {
-      _entity_id: body.legal_entity_id,
-    });
-    if (!hasPos) {
+    if (accessErr || !hasPos) {
       return new Response(JSON.stringify({ error: "forbidden" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
