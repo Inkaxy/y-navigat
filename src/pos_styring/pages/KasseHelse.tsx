@@ -212,6 +212,40 @@ export default function KasseHelse() {
     },
   });
 
+  // Kvitteringsdekning siste 7 dager: hvert salg MÅ ha en receipt_delivered-
+  // hendelse. Dette måles faktisk — det holder ikke å påstå at kioskappen
+  // håndhever det.
+  const { data: receiptCoverage, isLoading: rcLoading } = useQuery({
+    queryKey: ["kasse-helse", "receipt-coverage", terminalIds.join(","), last7Cutoff],
+    enabled: terminalIds.length > 0,
+    queryFn: async () => {
+      const [{ data: txs, error: txErr }, { data: evs, error: evErr }] = await Promise.all([
+        supabase
+          .from("pos_transactions")
+          .select("id")
+          .in("terminal_id", terminalIds)
+          .eq("is_training", false)
+          .gte("created_at", last7Cutoff)
+          .limit(10000),
+        supabase
+          .from("pos_journal_events")
+          .select("transaction_id")
+          .in("terminal_id", terminalIds)
+          .eq("event_type", "receipt_delivered")
+          .gte("event_time", last7Cutoff)
+          .limit(10000),
+      ]);
+      if (txErr) throw txErr;
+      if (evErr) throw evErr;
+      const delivered = new Set(
+        (evs ?? []).map((e) => (e as { transaction_id: string | null }).transaction_id).filter(Boolean),
+      );
+      const total = (txs ?? []).length;
+      const missing = (txs ?? []).filter((t) => !delivered.has((t as { id: string }).id)).length;
+      return { total, missing };
+    },
+  });
+
   // Latest SAF-T export per terminal (and legal entity-wide)
   const { data: safT = [] } = useQuery({
     queryKey: ["kasse-helse", "saf-t", selectedEntityId],
@@ -375,22 +409,37 @@ export default function KasseHelse() {
         : `Sist eksportert ${relative(lastSafT)}`,
     });
 
-    // 7. Receipt production hard-lock (structural — always green when app is deployed)
+    // 7. Kvitteringsproduksjon — MÅLT, ikke antatt
+    const rc = receiptCoverage;
     items.push({
-      label: "Sperre mot salg uten kvitteringsproduksjon",
-      level: "green",
-      detail: "Håndhevet i kioskappen (receipt_delivered obligatorisk)",
+      label: "Alle salg har kvittering (receipt_delivered)",
+      level: !rc ? "amber" : rc.missing === 0 ? "green" : rc.missing / Math.max(rc.total, 1) > 0.02 ? "red" : "amber",
+      detail: !rc
+        ? "Måling ikke lastet"
+        : rc.total === 0
+          ? "Ingen salg siste 7 dager"
+          : rc.missing === 0
+            ? `${rc.total} salg siste 7 dager — alle journalført med kvittering`
+            : `${rc.missing} av ${rc.total} salg siste 7 dager mangler kvitteringshendelse`,
     });
 
-    // 8. Immutability of registrations (structural)
+    // 8. Uforanderlighet — målt via hash-kjedeverifiseringene
+    const verified = terminalHealth.filter((r) => r.journal === "green").length;
+    const broken = terminalHealth.filter((r) => r.journal === "red").length;
+    const unverified = terminalHealth.length - verified - broken;
     items.push({
-      label: "Registreringer kan ikke endres eller slettes",
-      level: "green",
-      detail: "RLS INSERT-only + hash-kjede på pos_journal_events",
+      label: "Registreringer kan ikke endres eller slettes (hash-kjede verifisert)",
+      level: broken > 0 ? "red" : unverified > 0 ? "amber" : "green",
+      detail:
+        terminalHealth.length === 0
+          ? "Ingen terminaler"
+          : `${verified} av ${terminalHealth.length} terminaler verifisert OK` +
+            (broken ? `, ${broken} med brutt kjede` : "") +
+            (unverified ? `, ${unverified} uten fersk verifisering` : ""),
     });
 
     return items;
-  }, [terminalHealth, journalCounts, zReports, latestSafTEntityWide]);
+  }, [terminalHealth, journalCounts, zReports, latestSafTEntityWide, receiptCoverage]);
 
   // KPIs
   const kpis = useMemo(() => {
@@ -407,7 +456,7 @@ export default function KasseHelse() {
     return { brokenChains, missingZ, drawerTotal, copyTotal };
   }, [terminalHealth, journalCounts]);
 
-  const loading = terminalsLoading || verLoading || zLoading || jLoading;
+  const loading = terminalsLoading || verLoading || zLoading || jLoading || rcLoading;
 
   if (!selectedEntityId) {
     return (
