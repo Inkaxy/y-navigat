@@ -330,39 +330,36 @@ function RecipeForm({ recipe, productName, canWrite }: { recipe: any; productNam
         }
       }
 
-      // 4) Slett fjernede linjer
-      const existingLineIds = lines.filter((l) => !l._new).map((l) => l.id);
-      const originalLineIds = (recipe.recipe_lines ?? []).map((l: any) => l.id);
-      const linesToDelete = originalLineIds.filter((id: string) => !existingLineIds.includes(id));
-      if (linesToDelete.length) {
-        await supabase.from("recipe_lines").delete().in("id", linesToDelete);
-      }
+      // 4+5) Erstatt alle linjer for oppskriften atomisk (delete + insert i én transaksjon)
+      const lineRows = lines
+        .map((l) => {
+          const partId = partIdMap[l.recipe_part_id] ?? l.recipe_part_id;
+          const qty = Number(l.quantity) || 0;
+          if (qty <= 0 && !l.raw_material_id && !l.ingredient_name) return null;
+          return {
+            recipe_id: recipe.id,
+            recipe_part_id: partId,
+            raw_material_id: l.raw_material_id,
+            ingredient_name: l.raw_material_id ? null : (l.ingredient_name || null),
+            quantity: qty,
+            unit: l.unit,
+            waste_percent: Number(l.waste_percent) || 0,
+            sort_order: l.sort_order,
+            notes: l.notes ?? null,
+            include_in_declaration: l.include_in_declaration !== false,
+            is_quid_relevant: !!l.is_quid_relevant,
+            custom_declaration_text: l.custom_declaration_text || null,
+          };
+        })
+        .filter((r): r is NonNullable<typeof r> => r !== null);
 
-      // 5) Upsert linjer
-      for (const l of lines) {
-        const partId = partIdMap[l.recipe_part_id] ?? l.recipe_part_id;
-        const qty = Number(l.quantity) || 0;
-        if (qty <= 0 && !l.raw_material_id && !l.ingredient_name) continue;
-        const payload = {
-          recipe_id: recipe.id,
-          recipe_part_id: partId,
-          raw_material_id: l.raw_material_id,
-          ingredient_name: l.raw_material_id ? null : (l.ingredient_name || null),
-          quantity: qty,
-          unit: l.unit,
-          waste_percent: Number(l.waste_percent) || 0,
-          sort_order: l.sort_order,
-          notes: l.notes ?? null,
-          include_in_declaration: l.include_in_declaration !== false,
-          is_quid_relevant: !!l.is_quid_relevant,
-          custom_declaration_text: l.custom_declaration_text || null,
-        };
-        if (l._new) {
-          await supabase.from("recipe_lines").insert(payload as never);
-        } else {
-          await supabase.from("recipe_lines").update(payload).eq("id", l.id);
-        }
-      }
+      const { error: linesReplaceErr } = await (supabase as any).rpc("replace_child_rows", {
+        p_table: "recipe_lines",
+        p_parent_column: "recipe_id",
+        p_parent_id: recipe.id,
+        p_rows: lineRows,
+      });
+      if (linesReplaceErr) throw linesReplaceErr;
 
       await logAudit({
         action: "update",

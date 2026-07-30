@@ -1,4 +1,5 @@
 // Norwegian relative-date label for the delivery-note dashboard date navigator.
+import { osloDateISO } from "@/lib/osloDate";
 // Returns { label, tone } where tone helps choose past/future colour.
 
 const WEEKDAYS_LONG = ["søndag", "mandag", "tirsdag", "onsdag", "torsdag", "fredag", "lørdag"];
@@ -39,5 +40,5 @@ export function relativeDateLabel(isoDate: string): { label: string; tone: "past
 export function shiftIsoDate(isoDate: string, days: number): string {
   const d = new Date(isoDate + "T12:00:00");
   d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
+  return osloDateISO(d);
 }

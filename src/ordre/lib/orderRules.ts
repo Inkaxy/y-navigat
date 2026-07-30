@@ -1,4 +1,5 @@
 // Deterministisk regelmotor: tar AI-forslag + DB-kontekst (outlets, åpningstider,
+import { osloDateISO } from "@/lib/osloDate";
 // avvikende åpningstider, produkter med lead_time_days, delivery_rules) og
 // produserer konkrete, forklarte varsler + forslag — uavhengig av AI-modellen.
 //
@@ -107,7 +108,7 @@ function effectivePeriods(
   date: Date,
   exceptions: OutletException[],
 ): { closed: boolean; periods: OutletPeriod[]; exceptionNote?: string | null } {
-  const dStr = date.toISOString().slice(0, 10);
+  const dStr = osloDateISO(date);
   const exc = exceptions.find((e) => e.outlet_id === outlet.id && e.date === dStr);
   if (exc) {
     return {
@@ -135,7 +136,7 @@ function nextOpenSuggestion(
     const eff = effectivePeriods(outlet, d, exceptions);
     if (eff.closed || eff.periods.length === 0) continue;
     const first = eff.periods[0];
-    return { date: d.toISOString().slice(0, 10), time: first.open };
+    return { date: osloDateISO(d), time: first.open };
   }
   return null;
 }
@@ -285,7 +286,7 @@ function startOfDay(d: Date): Date {
 function addDaysISO(from: Date, days: number): string {
   const d = startOfDay(from);
   d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
+  return osloDateISO(d);
 }
 
 export function summarizeRuleSeverity(checks: RuleCheck[]): RuleSeverity | null {

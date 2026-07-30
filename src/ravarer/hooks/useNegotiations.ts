@@ -205,19 +205,18 @@ export function useUpsertNegotiationItems() {
       negotiationId: string;
       items: Array<Partial<NegotiationItemRow> & { raw_material_id: string }>;
     }) => {
-      // Replace all items for this negotiation (simple, transactional enough for wizard)
-      const { error: delErr } = await supabase
-        .from("negotiation_items" as any)
-        .delete()
-        .eq("negotiation_id", input.negotiationId);
-      if (delErr) throw delErr;
-      if (input.items.length === 0) return [];
+      // Replace all items for this negotiation atomically (delete + insert in one transaction)
       const rows = input.items.map((it, idx) => ({
         ...it,
         negotiation_id: input.negotiationId,
         sort_order: it.sort_order ?? idx,
       }));
-      const { data, error } = await supabase.from("negotiation_items" as any).insert(rows as any).select();
+      const { data, error } = await (supabase as any).rpc("replace_child_rows", {
+        p_table: "negotiation_items",
+        p_parent_column: "negotiation_id",
+        p_parent_id: input.negotiationId,
+        p_rows: rows,
+      });
       if (error) throw error;
       return data;
     },
@@ -234,20 +233,52 @@ export function useUpsertNegotiationRecipients() {
       negotiationId: string;
       recipients: Array<{ supplier_id: string; contact_email?: string | null; contact_name?: string | null }>;
     }) => {
-      const { error: delErr } = await supabase
+      // IMPORTANT: recipients hold supplier access tokens (access_token, password_*).
+      // Do NOT wipe all rows and reinsert — that would destroy tokens for suppliers that
+      // are kept. Instead diff by supplier_id: remove suppliers no longer in the list,
+      // add new ones, and update contact info for suppliers that remain (tokens untouched).
+      const { data: existing, error: existErr } = await supabase
         .from("negotiation_recipients" as any)
-        .delete()
+        .select("id, supplier_id")
         .eq("negotiation_id", input.negotiationId);
-      if (delErr) throw delErr;
-      if (input.recipients.length === 0) return [];
-      const rows = input.recipients.map((r) => ({
-        ...r,
-        negotiation_id: input.negotiationId,
-      }));
+      if (existErr) throw existErr;
+      const existingRows = (existing ?? []) as unknown as Array<{ id: string; supplier_id: string }>;
+      const existingBySupplier = new Map(existingRows.map((r) => [r.supplier_id, r.id]));
+      const nextSupplierIds = new Set(input.recipients.map((r) => r.supplier_id));
+
+      const toRemove = existingRows.filter((r) => !nextSupplierIds.has(r.supplier_id)).map((r) => r.id);
+      if (toRemove.length > 0) {
+        const { error: rmErr } = await supabase
+          .from("negotiation_recipients" as any)
+          .delete()
+          .in("id", toRemove);
+        if (rmErr) throw rmErr;
+      }
+
+      const toInsert = input.recipients.filter((r) => !existingBySupplier.has(r.supplier_id));
+      if (toInsert.length > 0) {
+        const insertRows = toInsert.map((r) => ({
+          ...r,
+          negotiation_id: input.negotiationId,
+        }));
+        const { error: insErr } = await supabase.from("negotiation_recipients" as any).insert(insertRows as any);
+        if (insErr) throw insErr;
+      }
+
+      for (const r of input.recipients) {
+        const existingId = existingBySupplier.get(r.supplier_id);
+        if (!existingId) continue;
+        const { error: updErr } = await supabase
+          .from("negotiation_recipients" as any)
+          .update({ contact_email: r.contact_email ?? null, contact_name: r.contact_name ?? null })
+          .eq("id", existingId);
+        if (updErr) throw updErr;
+      }
+
       const { data, error } = await supabase
         .from("negotiation_recipients" as any)
-        .insert(rows as any)
-        .select("id, negotiation_id, supplier_id, contact_email, contact_name, status, expires_at, created_at");
+        .select("id, negotiation_id, supplier_id, contact_email, contact_name, status, expires_at, created_at")
+        .eq("negotiation_id", input.negotiationId);
       if (error) throw error;
       return data;
     },

@@ -37,6 +37,7 @@ import {
 } from "@/ordre/hooks/useDeliveryRules";
 import { evaluateDraftRule } from "@/ordre/lib/evaluateDraftRule";
 import { cn } from "@/lib/utils";
+import { osloTodayISO, osloDateISO } from "@/lib/osloDate";
 
 const WEEKDAY_NB_LONG = ["søndag", "mandag", "tirsdag", "onsdag", "torsdag", "fredag", "lørdag"];
 
@@ -156,7 +157,7 @@ const EMPTY: Form = {
   customer_ids: [],
   customer_group_ids: [],
   specific_delivery_date: "",
-  valid_from: new Date().toISOString().slice(0, 10),
+  valid_from: osloTodayISO(),
   valid_until: "",
   is_active: true,
   enforce_weekdays: false,
@@ -220,7 +221,7 @@ function nextMonday(): string {
   const d = new Date();
   const diff = (8 - d.getDay()) % 7 || 7;
   d.setDate(d.getDate() + diff);
-  return d.toISOString().slice(0, 10);
+  return osloDateISO(d);
 }
 
 const TEMPLATES: Template[] = [
@@ -1221,7 +1222,7 @@ export function DeliveryRuleFormDialog({ open, onOpenChange, rule, template, onS
 
 // ── Test-panel ────────────────────────────────────────────────────────────
 function RuleTestPanel({ form }: { form: Form }) {
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(osloTodayISO());
   const [now, setNow] = useState(new Date().toISOString().slice(0, 16));
   const [customerId, setCustomerId] = useState<string | null>(null);
   const [customerLabel, setCustomerLabel] = useState<string>("");

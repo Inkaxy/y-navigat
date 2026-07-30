@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { APP_CODE, NB_LEGAL_ENTITY_ID } from "@/varer/lib/constants";
 import { useSelection } from "@/providers/SelectionProvider";
 import { setAppThemeFromHex } from "@/varer/lib/theme";
+import { osloTodayISO } from "@/lib/osloDate";
 
 export type AccessLevel = "none" | "read" | "write" | "approve" | "admin";
 
@@ -75,7 +76,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     queryKey: ["my-positions", session?.user.id],
     enabled: !!session?.user.id,
     queryFn: async () => {
-      const today = new Date().toISOString().slice(0, 10);
+      const today = osloTodayISO();
       const { data, error } = await supabase
         .from("user_positions")
         .select("legal_entity_id, valid_from, valid_to")

@@ -11234,6 +11234,15 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      replace_child_rows: {
+        Args: {
+          p_parent_column: string
+          p_parent_id: string
+          p_rows?: Json
+          p_table: string
+        }
+        Returns: number
+      }
       rm_can_read: { Args: { _rm_id: string }; Returns: boolean }
       rm_can_write: { Args: { _rm_id: string }; Returns: boolean }
       save_matrix_changes: {

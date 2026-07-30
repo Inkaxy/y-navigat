@@ -1,4 +1,5 @@
 // Forhåndsdefinerte periode-snarveier for periode-velger.
+import { osloDateISO } from "@/lib/osloDate";
 // Datoer returneres som ISO yyyy-mm-dd.
 
 export type PeriodPreset =
@@ -21,7 +22,7 @@ export interface DateRange {
   end: string;
 }
 
-const iso = (d: Date) => d.toISOString().slice(0, 10);
+const iso = (d: Date) => osloDateISO(d);
 
 function startOfYear(year: number) { return new Date(Date.UTC(year, 0, 1)); }
 

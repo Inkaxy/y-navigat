@@ -40,6 +40,7 @@ import { ProductSearchSelect, type ProductOption } from "@/varer/components/prod
 import { CustomerSearchSelect, type CustomerOption } from "./CustomerSearchSelect";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { osloTodayISO } from "@/lib/osloDate";
 
 const NONE = "__none__";
 const LOCK_KEY = "varer_specialprice_locks";
@@ -86,7 +87,7 @@ type LockState = Partial<Record<keyof SpecialPriceFormValues, boolean>>;
 type LockValues = Partial<SpecialPriceFormValues>;
 
 function emptyForm(): SpecialPriceFormValues {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = osloTodayISO();
   return {
     product_id: null,
     price_list_id: NONE,
@@ -156,7 +157,7 @@ export function SpecialPriceDialog({
         product_id: editing.product_id,
         price_list_id: editing.price_list_id ?? NONE,
         customer_id: editing.customer_id,
-        valid_from: editing.valid_from ?? new Date().toISOString().slice(0, 10),
+        valid_from: editing.valid_from ?? osloTodayISO(),
         valid_to: editing.valid_to ?? "",
         weekday: editing.weekday == null ? NONE : String(editing.weekday),
         precedence_over_weekday: editing.precedence_over_weekday,

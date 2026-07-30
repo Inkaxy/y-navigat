@@ -16,6 +16,7 @@ import {
   PeriodPreset,
   rangeForPreset,
 } from "@/ravarer/lib/periodPresets";
+import { osloDateISO } from "@/lib/osloDate";
 
 interface Props {
   preset: PeriodPreset;
@@ -126,7 +127,7 @@ function DateButton({
         <Calendar
           mode="single"
           selected={parseISO(value)}
-          onSelect={(d) => { if (d) { onChange(d.toISOString().slice(0, 10)); setOpen(false); } }}
+          onSelect={(d) => { if (d) { onChange(osloDateISO(d)); setOpen(false); } }}
           initialFocus
           className={cn("p-3 pointer-events-auto")}
         />

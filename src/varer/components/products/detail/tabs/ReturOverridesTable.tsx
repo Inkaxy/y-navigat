@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Info, RotateCcw, Pencil, X, Check } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { osloTodayISO } from "@/lib/osloDate";
 
 interface Props {
   productId: string;
@@ -37,7 +38,7 @@ export function ReturOverridesTable({
 }: Props) {
   const { legalEntityId } = useAppContext();
   const qc = useQueryClient();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = osloTodayISO();
 
   const dataQuery = useQuery({
     queryKey: ["return-overrides-tab", productId, today],

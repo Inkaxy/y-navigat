@@ -19,6 +19,7 @@ import { usePendingRecurringOrderRows } from "@/ordre/hooks/usePendingRecurringO
 import { formatNOK, todayISO, tomorrow, formatDateLong } from "@/ordre/lib/format";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { osloDateISO } from "@/lib/osloDate";
 
 export default function Dashboard() {
   const today = todayISO();
@@ -183,7 +184,7 @@ function PendingRecurringCard({
   const dayAfter = (() => {
     const d = new Date(`${today}T12:00:00`);
     d.setDate(d.getDate() + 2);
-    return d.toISOString().slice(0, 10);
+    return osloDateISO(d);
   })();
 
   const VISIBLE = 12;

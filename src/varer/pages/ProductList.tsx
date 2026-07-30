@@ -18,6 +18,7 @@ import { PRODUCT_STATUS_LABEL, ProductStatus, CAKE_ROLE_LABEL, CakeRole, LABEL_M
 import { useAppContext } from "@/varer/context/AppContext";
 import { useUiPreference } from "@/hooks/useUiPreference";
 import { toast } from "sonner";
+import { osloTodayISO } from "@/lib/osloDate";
 
 type ProductRow = {
   id: string;
@@ -174,7 +175,7 @@ export default function ProductList() {
     },
   });
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = osloTodayISO();
   const priceMap = useMemo(() => {
     const m = new Map<string, number>();
     (priceItems.data ?? []).forEach((it: any) => {

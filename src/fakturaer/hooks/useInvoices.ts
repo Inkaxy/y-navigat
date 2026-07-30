@@ -19,14 +19,20 @@ export interface InvoiceListRow {
   review_count: number;
 }
 
+export interface InvoiceListResult {
+  rows: InvoiceListRow[];
+  totalCount: number;
+}
+
 export function useInvoices(filters: { legalEntityId?: string | null; status?: string | null; supplierId?: string | null; search?: string }) {
   return useQuery({
     queryKey: ["fakturaer", filters],
-    queryFn: async () => {
+    queryFn: async (): Promise<InvoiceListResult> => {
       let q = supabase
         .from("invoices")
         .select(
           "id, legal_entity_id, supplier_id, invoice_number, invoice_date, due_date, total_amount, currency, status, source, imported_at, suppliers(name), legal_entities(legal_name, short_code), invoice_lines(id, requires_review)",
+          { count: "exact" },
         )
         .order("invoice_date", { ascending: false })
         .limit(500);
@@ -36,9 +42,9 @@ export function useInvoices(filters: { legalEntityId?: string | null; status?: s
       if (filters.supplierId) q = q.eq("supplier_id", filters.supplierId);
       if (filters.search) q = q.ilike("invoice_number", `%${filters.search}%`);
 
-      const { data, error } = await q;
+      const { data, error, count } = await q;
       if (error) throw error;
-      return (data ?? []).map((r: any) => ({
+      const rows = (data ?? []).map((r: any) => ({
         id: r.id,
         legal_entity_id: r.legal_entity_id,
         supplier_id: r.supplier_id,
@@ -55,6 +61,7 @@ export function useInvoices(filters: { legalEntityId?: string | null; status?: s
         line_count: (r.invoice_lines ?? []).length,
         review_count: (r.invoice_lines ?? []).filter((l: any) => l.requires_review).length,
       })) as InvoiceListRow[];
+      return { rows, totalCount: count ?? rows.length };
     },
   });
 }

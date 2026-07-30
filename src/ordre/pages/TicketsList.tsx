@@ -30,6 +30,7 @@ import {
 } from "@/ordre/lib/aiSuggestion";
 import { cn } from "@/lib/utils";
 import { UnreadMentionsBanner } from "@/ordre/components/orders/UnreadMentionsBanner";
+import { osloDateISO } from "@/lib/osloDate";
 
 const STATUS_LABELS: Record<TicketStatus, string> = {
   new: "Ny", in_progress: "Pågår", resolved: "Løst", closed: "Lukket", spam: "Spam",
@@ -118,7 +119,7 @@ const QUICK_FILTERS: { key: QuickFilter; label: string; icon?: React.ReactNode }
 ];
 
 function isoDate(d: Date) {
-  return d.toISOString().slice(0, 10);
+  return osloDateISO(d);
 }
 function todayIso() { return isoDate(new Date()); }
 function tomorrowIso() {

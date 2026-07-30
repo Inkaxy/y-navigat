@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
 import type { OrderStatus } from "@/ordre/lib/orderStatus";
+import { osloTodayISO } from "@/lib/osloDate";
 
 export type OrderListRow = {
   id: string;
@@ -150,7 +151,7 @@ export function useActionQueueCounts() {
         .in("status", ["awaiting_confirmation", "on_hold", "draft", "packed"]);
       if (error) throw error;
       const rows = data ?? [];
-      const today = new Date().toISOString().slice(0, 10);
+      const today = osloTodayISO();
       return {
         awaiting: rows.filter((r) => r.status === "awaiting_confirmation").length,
         onHold: rows.filter((r) => r.status === "on_hold").length,

@@ -100,17 +100,19 @@ export default function RegistrerLinjerPage() {
     if (lines.some((l) => !l.description.trim())) { toast.error("Alle linjer må ha beskrivelse"); return; }
     setBusy(true);
     try {
-      // Replace strategy: delete existing, insert new
-      const { error: delErr } = await supabase.from("invoice_lines").delete().eq("invoice_id", id);
-      if (delErr) throw delErr;
-
+      // Replace strategy: atomic delete + insert via RPC
       const payload = lines.map((l, idx) => ({
         invoice_id: id, line_number: idx + 1, description: l.description,
         supplier_sku: l.supplier_sku, quantity: l.quantity, unit: l.unit,
         unit_price: l.unit_price, total_amount: l.total_amount, vat_rate: l.vat_rate,
       }));
-      const { error: insErr } = await supabase.from("invoice_lines").insert(payload);
-      if (insErr) throw insErr;
+      const { error: replaceErr } = await (supabase as any).rpc("replace_child_rows", {
+        p_table: "invoice_lines",
+        p_parent_column: "invoice_id",
+        p_parent_id: id,
+        p_rows: payload,
+      });
+      if (replaceErr) throw replaceErr;
 
       const { error: invErr } = await supabase
         .from("invoices")

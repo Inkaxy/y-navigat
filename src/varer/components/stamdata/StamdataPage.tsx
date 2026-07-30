@@ -371,6 +371,10 @@ export function StamdataPage({
       }
       qc.invalidateQueries({ queryKey: ["stamdata", tableName] });
       qc.invalidateQueries({ queryKey: ["stamdata-lookups"] });
+      qc.invalidateQueries({ queryKey: ["main-categories"] });
+      qc.invalidateQueries({ queryKey: ["produksjonsplan", "main-categories"] });
+      qc.invalidateQueries({ queryKey: ["produksjonsplan", "sub-categories"] });
+      qc.invalidateQueries({ queryKey: ["products"] });
       closeForm();
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Ukjent feil";
@@ -418,6 +422,10 @@ export function StamdataPage({
     toast.success("Slettet");
     qc.invalidateQueries({ queryKey: ["stamdata", tableName] });
     qc.invalidateQueries({ queryKey: ["stamdata-lookups"] });
+    qc.invalidateQueries({ queryKey: ["main-categories"] });
+    qc.invalidateQueries({ queryKey: ["produksjonsplan", "main-categories"] });
+    qc.invalidateQueries({ queryKey: ["produksjonsplan", "sub-categories"] });
+    qc.invalidateQueries({ queryKey: ["products"] });
     setDeleting(null);
   }
 

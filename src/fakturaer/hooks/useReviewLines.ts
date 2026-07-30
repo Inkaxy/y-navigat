@@ -61,7 +61,8 @@ export function useReviewLines(filters: Filters) {
              legal_entity:legal_entities(legal_name, short_code)),
            suggestions:invoice_line_match_suggestions(raw_material_id, confidence, match_reason, rank,
              raw_material:raw_materials(name, sku, category, current_cost_price)),
-           matched_raw_material:raw_materials!invoice_lines_raw_material_id_fkey(name, sku, category)`
+           matched_raw_material:raw_materials!invoice_lines_raw_material_id_fkey(name, sku, category)`,
+          { count: "exact" },
         )
         .eq("requires_review", true)
         .order("invoice_id")
@@ -69,12 +70,12 @@ export function useReviewLines(filters: Filters) {
 
       if (filters.legalEntityId) q = q.eq("invoice.legal_entity_id", filters.legalEntityId);
       if (filters.supplierId) q = q.eq("invoice.supplier_id", filters.supplierId);
-      const { data, error } = await q;
+      const { data, error, count } = await q;
       if (error) throw error;
       const rows = (data ?? []) as any[];
       // Sort suggestions by rank
       rows.forEach((r) => r.suggestions?.sort((a: any, b: any) => a.rank - b.rank));
-      return rows as ReviewLineRow[];
+      return { rows: rows as ReviewLineRow[], totalCount: count ?? rows.length };
     },
     refetchInterval: 30000,
   });

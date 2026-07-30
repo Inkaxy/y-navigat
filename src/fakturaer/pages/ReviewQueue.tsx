@@ -38,10 +38,12 @@ export default function FakturaerReviewQueuePage() {
 
   const { data: suppliers = [] } = useSuppliersFor(legalEntityId === "all" ? null : legalEntityId);
 
-  const { data: lines = [], isLoading } = useReviewLines({
+  const { data: reviewData, isLoading } = useReviewLines({
     legalEntityId: legalEntityId === "all" ? null : legalEntityId,
     supplierId: supplierId === "all" ? null : supplierId,
   });
+  const lines = reviewData?.rows ?? [];
+  const totalCount = reviewData?.totalCount ?? lines.length;
 
   const counts = useMemo(() => {
     const c: Record<ReviewReason, number> = { unmatched: 0, low_confidence: 0, price_variance: 0, sku_collision: 0 };
@@ -88,7 +90,7 @@ export default function FakturaerReviewQueuePage() {
               {suppliers.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
             </SelectContent>
           </Select>
-          <span className="text-sm text-ink-secondary">Totalt {lines.length} linjer til behandling</span>
+          <span className="text-sm text-ink-secondary">Totalt {lines.length}{totalCount > lines.length ? ` av ${totalCount}` : ""} linjer til behandling</span>
         </div>
       </Card>
 

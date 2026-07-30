@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { kioskSupabase } from "@/kiosk/integrations/supabase/client";
+import { osloTodayISO } from "@/lib/osloDate";
 
 export type ProductLookup = {
   id: string;
@@ -46,7 +47,7 @@ export function useProductLookup(
       queryKey: ["kiosk-product-lookup", priceListId, productId, pricesIncludeMva],
       staleTime: 5 * 60_000,
       queryFn: async (): Promise<ProductLookup | null> => {
-        const today = new Date().toISOString().slice(0, 10);
+        const today = osloTodayISO();
         const [pRes, pliRes] = await Promise.all([
           kioskSupabase
             .from("products")

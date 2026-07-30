@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
+import { osloDateISO } from "@/lib/osloDate";
 
 const PERIODS = [
   { value: "7", label: "Siste 7 dager" },
@@ -247,8 +248,8 @@ function computeMetrics(tickets: TicketRow[], events: EventRow[], group: Group) 
   for (const t of tickets) {
     const d = new Date(t.created_at);
     const key = group === "day"
-      ? startOfDay(d).toISOString().slice(0, 10)
-      : startOfWeek(d, { weekStartsOn: 1 }).toISOString().slice(0, 10);
+      ? osloDateISO(startOfDay(d))
+      : osloDateISO(startOfWeek(d, { weekStartsOn: 1 }));
     buckets.set(key, (buckets.get(key) ?? 0) + 1);
   }
   const timeline = Array.from(buckets.entries())
