@@ -79,9 +79,10 @@ export function PrintLabelDialog({
   const { data: customerInfoMap } = useOrderLineCustomerInfo(orderLineIds);
 
   /** Bygg en LabelPdfData per ordrelinje, padder/trimmer til ønsket `quantity`. */
-  function buildItems(): CombinedLabelItem[] {
+  function buildItems(overrideLabelNumber?: string | null): CombinedLabelItem[] {
     if (!profile || !row) return [];
-    const base = { profile, row, labelNumber };
+    const activeLabelNumber = overrideLabelNumber ?? labelNumber;
+    const base = { profile, row, labelNumber: activeLabelNumber };
     const isOrigPlusCopy = row.label_print_model === "orig_plus_copy";
 
     let base_items: LabelPdfData[];
@@ -105,6 +106,10 @@ export function PrintLabelDialog({
         deliveryDate: customerInfoMap?.[id]?.deliveryDate ?? null,
         pickupTime: customerInfoMap?.[id]?.pickupTime ?? null,
         isPaid: customerInfoMap?.[id]?.isPaid ?? false,
+        distribution: customerInfoMap?.[id]?.distribution ?? null,
+        routeLabel: customerInfoMap?.[id]?.routeLabel ?? null,
+        deliveryNoteNumber: customerInfoMap?.[id]?.deliveryNoteNumber ?? null,
+        deliveryNoteMessage: customerInfoMap?.[id]?.deliveryNoteMessage ?? null,
       }));
       if (quantity <= perLine.length) {
         base_items = perLine.slice(0, quantity);
@@ -125,6 +130,10 @@ export function PrintLabelDialog({
             deliveryDate: perLine[0]?.deliveryDate ?? null,
             pickupTime: perLine[0]?.pickupTime ?? null,
             isPaid: perLine[0]?.isPaid ?? false,
+            distribution: perLine[0]?.distribution ?? null,
+            routeLabel: perLine[0]?.routeLabel ?? null,
+            deliveryNoteNumber: perLine[0]?.deliveryNoteNumber ?? null,
+            deliveryNoteMessage: perLine[0]?.deliveryNoteMessage ?? null,
           },
         ];
       }
@@ -146,6 +155,12 @@ export function PrintLabelDialog({
     ];
   }
 
+  async function generateBlob(overrideLabelNumber?: string | null): Promise<Blob> {
+    const { pdf } = await import("@react-pdf/renderer");
+    const items = buildItems(overrideLabelNumber);
+    return pdf(<CombinedLabelPdfDocument items={items} />).toBlob();
+  }
+
   const handleDownloadPdf = async () => {
     if (!row) return;
     if (!profile) {
@@ -154,9 +169,7 @@ export function PrintLabelDialog({
     }
     setDownloading(true);
     try {
-      const { pdf } = await import("@react-pdf/renderer");
-      const items = buildItems();
-      const blob = await pdf(<CombinedLabelPdfDocument items={items} />).toBlob();
+      const blob = await generateBlob();
       const url = URL.createObjectURL(blob);
       const fileName = `etikett_${row.display_number}_${slugifyLabel(row.display_name)}${labelNumber ? `_${labelNumber}` : ""}.pdf`;
       const a = document.createElement("a");
@@ -200,6 +213,45 @@ export function PrintLabelDialog({
       const msg = e instanceof Error ? e.message : "Kunne ikke tildele nummer";
       setErrorMessage(msg);
       toast.error(msg);
+      return;
+    }
+
+    // Generer selve etiketten (PDF) og åpne utskriftsdialogen før jobben logges.
+    try {
+      if (!profile) throw new Error("Mangler etikett-profil for varen — sett profil først.");
+      const blob = await generateBlob(assignedNumber);
+      const url = URL.createObjectURL(blob);
+      const win = window.open(url, "_blank");
+      if (win) {
+        win.addEventListener("load", () => {
+          try { win.focus(); win.print(); } catch { /* nettleser kan blokkere */ }
+        });
+      } else {
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `etikett_${row.display_number}_${slugifyLabel(row.display_name)}_${assignedNumber}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Kunne ikke generere etikett-PDF";
+      setErrorMessage(`${msg} (nummer ${assignedNumber} er brent)`);
+      toast.error(msg);
+      try {
+        await insertJob.mutateAsync({
+          label_number: assignedNumber,
+          product_id: row.product_id,
+          order_line_id: row.order_line_ids[0] ?? null,
+          legal_entity_id: legalEntityId,
+          production_department_id: deptId,
+          profile_id: profileId ?? null,
+          quantity,
+          printer_name: null,
+          status: "failed",
+        });
+      } catch { /* ignorer dobbel-feil */ }
       return;
     }
 
