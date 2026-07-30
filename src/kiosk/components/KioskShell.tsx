@@ -74,8 +74,8 @@ function KioskAuthGate({ children }: { children: ReactNode }) {
     return (
       <ErrorFullScreen
         title="Kiosk-konfigurasjon mangler"
-        message="VITE_KIOSK_EMAIL og/eller VITE_KIOSK_PASSWORD er ikke satt for dette miljøet."
-        details="Legg inn begge variablene i Lovable Workspace Build Secrets (eller .env) og last inn på nytt."
+        message="Kiosk-brukeren er ikke satt opp for dette miljøet."
+        details="Sett secrets KIOSK_EMAIL og KIOSK_PASSWORD i prosjektinnstillingene og last inn på nytt."
       />
     );
   }
