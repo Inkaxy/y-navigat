@@ -491,43 +491,70 @@ Deno.serve(async (req) => {
     const exportId = logRow.id as string;
 
     try {
-      // Hent transaksjoner
-      const { data: transactions, error: txErr } = await admin
-        .from("pos_transactions")
-        .select(
-          "id, terminal_id, session_id, operator_id, receipt_number, transaction_type, subtotal_excl_mva, total_mva, total_incl_mva, payment_summary, created_at, is_training",
-        )
-        .in("terminal_id", terminalIds)
-        .gte("created_at", body.period_start)
-        .lt("created_at", body.period_end)
-        .eq("is_training", false)
-        .order("created_at", { ascending: true });
-      if (txErr) throw txErr;
+      // Hent transaksjoner (paginert — PostgREST kapper stille på 1000 rader)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const transactions = await fetchAllPaged<any>(() =>
+        admin
+          .from("pos_transactions")
+          .select(
+            "id, terminal_id, session_id, operator_id, receipt_number, transaction_type, subtotal_excl_mva, total_mva, total_incl_mva, payment_summary, created_at, is_training",
+          )
+          .in("terminal_id", terminalIds)
+          .gte("created_at", body.period_start)
+          .lt("created_at", body.period_end)
+          .eq("is_training", false)
+          .order("created_at", { ascending: true })
+          .order("id", { ascending: true }),
+      );
 
-      const txIds = (transactions ?? []).map((t) => t.id);
-      let linesByTx = new Map<string, unknown[]>();
-      if (txIds.length > 0) {
-        const { data: lines, error: linesErr } = await admin
-          .from("pos_transaction_lines")
-          .select("*")
-          .in("transaction_id", txIds);
-        if (linesErr) throw linesErr;
-        for (const l of lines ?? []) {
+      const txIds = transactions.map((t) => t.id as string);
+      const linesByTx = new Map<string, unknown[]>();
+      // Chunk på transaksjons-id for å unngå for lange URL-er, og paginer hver chunk.
+      for (let i = 0; i < txIds.length; i += 200) {
+        const chunk = txIds.slice(i, i + 200);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const lines = await fetchAllPaged<any>(() =>
+          admin
+            .from("pos_transaction_lines")
+            .select(
+              "id, transaction_id, line_number, product_id, product_snapshot, quantity, unit_price_excl_mva, line_discount, mva_rate, line_subtotal_excl_mva, line_mva, line_total_incl_mva",
+            )
+            .in("transaction_id", chunk)
+            .order("transaction_id", { ascending: true })
+            .order("line_number", { ascending: true }),
+        );
+        for (const l of lines) {
           const arr = linesByTx.get(l.transaction_id) ?? [];
           arr.push(l);
           linesByTx.set(l.transaction_id, arr);
         }
       }
 
-      // Hent hendelser
-      const { data: events, error: evErr } = await admin
-        .from("pos_journal_events")
-        .select("id, terminal_id, operator_id, event_type, event_time, payload")
-        .in("terminal_id", terminalIds)
-        .gte("event_time", body.period_start)
-        .lt("event_time", body.period_end)
-        .order("event_time", { ascending: true });
-      if (evErr) throw evErr;
+      // Hent hendelser (paginert)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const events = await fetchAllPaged<any>(() =>
+        admin
+          .from("pos_journal_events")
+          .select("id, terminal_id, operator_id, event_type, event_time, payload, transaction_id")
+          .in("terminal_id", terminalIds)
+          .gte("event_time", body.period_start)
+          .lt("event_time", body.period_end)
+          .order("event_time", { ascending: true })
+          .order("id", { ascending: true }),
+      );
+
+      // Kopi/proforma pr. transaksjon utledes fra journalen (ReceiptType)
+      const copyTxIds = new Set<string>();
+      const proformaTxIds = new Set<string>();
+      for (const ev of events) {
+        if (!ev.transaction_id) continue;
+        if (ev.event_type === "receipt_copy") copyTxIds.add(ev.transaction_id);
+        if (ev.event_type === "proforma_view") proformaTxIds.add(ev.transaction_id);
+      }
+      for (const tx of transactions) {
+        tx._is_copy = copyTxIds.has(tx.id);
+        tx._is_proforma = proformaTxIds.has(tx.id);
+      }
 
       // Hent terminaler for metadata
       const { data: terminals } = await admin
@@ -535,20 +562,57 @@ Deno.serve(async (req) => {
         .select("id, terminal_code, display_name")
         .in("id", terminalIds);
 
-      // Distinkte MVA-satser
+      // Distinkte MVA-satser + produkt-masterdata fra linjene
       const vatSet = new Set<number>();
+      const productMap = new Map<
+        string,
+        { code: string; name: string; vat_rate: number; group_name: string | null; product_id: string | null }
+      >();
       for (const [, arr] of linesByTx) {
-        for (const l of arr as Array<{ mva_rate: number }>) {
-          const r = Number(l.mva_rate ?? 0);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        for (const l of arr as any[]) {
+          const snap = (l.product_snapshot ?? {}) as Record<string, unknown>;
+          const r = Number(l.mva_rate ?? snap.mva_rate ?? 0);
           if (!Number.isNaN(r)) vatSet.add(r);
+          const code = String(snap.display_number ?? l.product_id ?? "MISC");
+          if (!productMap.has(code)) {
+            productMap.set(code, {
+              code,
+              name: String(snap.display_name ?? "Ukjent"),
+              vat_rate: r,
+              group_name: null,
+              product_id: (l.product_id as string) ?? null,
+            });
+          }
         }
       }
+      // Berik med varegruppe fra products der vi har product_id
+      const productIds = Array.from(productMap.values())
+        .map((p) => p.product_id)
+        .filter((x): x is string => !!x);
+      if (productIds.length > 0) {
+        for (let i = 0; i < productIds.length; i += 200) {
+          const { data: prods } = await admin
+            .from("products")
+            .select("id, display_number, display_name, product_category")
+            .in("id", productIds.slice(i, i + 200));
+          const byId = new Map((prods ?? []).map((p) => [p.id, p]));
+          for (const p of productMap.values()) {
+            const row = p.product_id ? byId.get(p.product_id) : null;
+            if (row) {
+              p.group_name = row.product_category ?? null;
+              if (!p.name || p.name === "Ukjent") p.name = row.display_name ?? p.name;
+            }
+          }
+        }
+      }
+      const products = Array.from(productMap.values()).sort((a, b) => a.code.localeCompare(b.code));
 
       // Bygg XML
       const registers = (terminals ?? [])
         .map((t) => {
-          const txForTerm = (transactions ?? []).filter((x) => x.terminal_id === t.id);
-          const evForTerm = (events ?? []).filter((x) => x.terminal_id === t.id);
+          const txForTerm = transactions.filter((x) => x.terminal_id === t.id);
+          const evForTerm = events.filter((x) => x.terminal_id === t.id);
           const txXml = txForTerm
             .map((tx, i) =>
               buildTransaction(tx, (linesByTx.get(tx.id) ?? []) as Array<Record<string, unknown>>, i),
@@ -570,7 +634,8 @@ Deno.serve(async (req) => {
         `<?xml version="1.0" encoding="UTF-8"?>\n` +
         `<AuditFile xmlns="${SAF_T_NS}">\n` +
         buildHeader(entity, body.period_start, body.period_end) +
-        buildMasterFiles([], Array.from(vatSet).sort((a, b) => a - b)) +
+        buildMasterFiles(products, Array.from(vatSet).sort((a, b) => a - b)) +
+
         registers +
         `</AuditFile>\n`;
 
