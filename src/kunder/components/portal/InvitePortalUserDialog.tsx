@@ -12,6 +12,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { X } from "lucide-react";
+import { ALL_ENTITIES, useSelectedEntity } from "@/kunder/state/SelectedEntityContext";
 
 interface Props {
   open: boolean;
@@ -21,6 +22,7 @@ interface Props {
 }
 
 export function InvitePortalUserDialog({ open, onOpenChange, onInvited, defaultCustomerId }: Props) {
+  const { selected } = useSelectedEntity();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -38,13 +40,15 @@ export function InvitePortalUserDialog({ open, onOpenChange, onInvited, defaultC
   }, [open, defaultCustomerId]);
 
   const { data: customers = [] } = useQuery({
-    queryKey: ["portal-invite-customers"],
+    queryKey: ["portal-invite-customers", selected],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let q = supabase
         .from("customers")
-        .select("id, customer_number, display_name, primary_contact_name, primary_contact_email, invoice_email")
+        .select("id, customer_number, display_name, primary_contact_name, primary_contact_email, invoice_email, legal_entity_id")
         .order("display_name")
         .limit(2000);
+      if (selected && selected !== ALL_ENTITIES) q = q.eq("legal_entity_id", selected);
+      const { data, error } = await q;
       if (error) throw error;
       return (data ?? []) as unknown as {
         id: string;
@@ -53,6 +57,7 @@ export function InvitePortalUserDialog({ open, onOpenChange, onInvited, defaultC
         primary_contact_name: string | null;
         primary_contact_email: string | null;
         invoice_email: string | null;
+        legal_entity_id: string;
       }[];
     },
     enabled: open,

@@ -64,14 +64,6 @@ export default function PortalUsers() {
     },
   });
 
-  const roleOptions = useMemo(
-    () => Array.from(new Set(scopedData.map((r) => r.role).filter(Boolean))).sort(),
-    [scopedData],
-  );
-  const statusOptions = useMemo(
-    () => Array.from(new Set(scopedData.map((r) => r.status).filter(Boolean))).sort(),
-    [scopedData],
-  );
   // Kun kunder/portal-brukere tilhørende valgt selskap vises — hindrer at
   // brukere ser andre selskapers kunder/portal-brukere.
   const scopedData = useMemo(() => {
@@ -80,6 +72,16 @@ export default function PortalUsers() {
       .map((r) => ({ ...r, customers: r.customers.filter((c) => c.legal_entity_id === selected) }))
       .filter((r) => r.customers.length > 0);
   }, [data, selected]);
+
+  const roleOptions = useMemo(
+    () => Array.from(new Set(scopedData.map((r) => r.role).filter(Boolean))).sort(),
+    [scopedData],
+  );
+  const statusOptions = useMemo(
+    () => Array.from(new Set(scopedData.map((r) => r.status).filter(Boolean))).sort(),
+    [scopedData],
+  );
+
 
   const customerOptions = useMemo(() => {
     const map = new Map<string, { id: string; label: string; num: string | number | null }>();
