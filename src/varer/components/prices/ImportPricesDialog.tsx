@@ -54,6 +54,7 @@ import {
   type ParseResult,
   type RowAction,
 } from "@/varer/lib/tedebeImport";
+import { osloTodayISO } from "@/lib/osloDate";
 
 interface Props {
   open: boolean;
@@ -868,7 +869,7 @@ function Step4Report({
     const blob = new Blob(["\uFEFF" + header + body], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    const date = new Date().toISOString().slice(0, 10);
+    const date = osloTodayISO();
     a.href = url;
     a.download = `feilrapport_${date}.csv`;
     a.click();

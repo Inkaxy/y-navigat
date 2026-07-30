@@ -40,6 +40,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllRows } from "@/lib/supabasePaging";
 import { useLegalEntity } from "@/pos_styring/contexts/LegalEntityContext";
 
 import RapportSummary, {
@@ -203,20 +204,21 @@ async function fetchTerminals(entityId: string): Promise<TerminalOption[]> {
 }
 
 async function fetchZ(entityId: string, from: string, to: string, terminalId: string | null): Promise<ZRow[]> {
-  let q = supabase
-    .from("pos_z_reports")
-    .select(
-      "id, z_number, closed_at, period_start, period_end, total_sales_incl_mva, transaction_count, refund_count, terminal_id, terminal:pos_terminals!inner(legal_entity_id, terminal_code, display_name)",
-    )
-    .eq("terminal.legal_entity_id", entityId)
-    .gte("closed_at", `${from}T00:00:00`)
-    .lte("closed_at", `${to}T23:59:59.999`)
-    .order("closed_at", { ascending: false })
-    .limit(500);
-  if (terminalId) q = q.eq("terminal_id", terminalId);
-  const { data, error } = await q;
-  if (error) throw error;
-  return ((data ?? []) as any[]).map((r) => ({
+  const data = await fetchAllRows<any>((rFrom, rTo) => {
+    let q = supabase
+      .from("pos_z_reports")
+      .select(
+        "id, z_number, closed_at, period_start, period_end, total_sales_incl_mva, transaction_count, refund_count, terminal_id, terminal:pos_terminals!inner(legal_entity_id, terminal_code, display_name)",
+      )
+      .eq("terminal.legal_entity_id", entityId)
+      .gte("closed_at", `${from}T00:00:00`)
+      .lte("closed_at", `${to}T23:59:59.999`)
+      .order("closed_at", { ascending: false })
+      .range(rFrom, rTo);
+    if (terminalId) q = q.eq("terminal_id", terminalId);
+    return q;
+  });
+  return data.map((r) => ({
     id: r.id,
     z_number: Number(r.z_number),
     closed_at: r.closed_at,

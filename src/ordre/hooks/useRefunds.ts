@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { osloTodayISO } from "@/lib/osloDate";
 
 export type RefundRoute = "utsalg" | "okonomi";
 export type RefundStatus = "pending" | "approved" | "paid" | "rejected";
@@ -88,7 +89,7 @@ export function useMyOrdreScope() {
           .eq("user_id", uid),
         supabase.from("user_team_memberships").select("team").eq("user_id", uid),
       ]);
-      const today = new Date().toISOString().slice(0, 10);
+      const today = osloTodayISO();
       const outletIds = new Set<string>();
       for (const p of (positions ?? []) as Array<{
         outlet_ids: string[] | null;

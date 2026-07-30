@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { osloDateISO } from "@/lib/osloDate";
 
 export type MatrixProduct = {
   id: string;
@@ -169,13 +170,13 @@ export function isoWeekMonday(isoDate: string): string {
   const d = new Date(isoDate + "T12:00:00");
   const dow = isoDow(isoDate);
   d.setDate(d.getDate() - (dow - 1));
-  return d.toISOString().slice(0, 10);
+  return osloDateISO(d);
 }
 
 export function addDays(isoDate: string, days: number): string {
   const d = new Date(isoDate + "T12:00:00");
   d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
+  return osloDateISO(d);
 }
 
 export function buildWeek(monday: string): string[] {

@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllRows } from "@/lib/supabasePaging";
 import { logAudit } from "@/kunder/lib/audit";
 import { useCustomerProfiles, useProfilePriceLists } from "@/kunder/hooks/useCustomerProfiles";
 import { usePriceLists } from "@/kunder/hooks/useCustomers";
@@ -173,13 +174,15 @@ export function NewCustomerDialog({
     (async () => {
       setReservingNumber(true);
       try {
-        const { data: existing, error } = await supabase
-          .from("customers")
-          .select("customer_number")
-          .eq("legal_entity_id", legalEntityId);
-        if (error) throw error;
+        const existing = await fetchAllRows((from, to) =>
+          supabase
+            .from("customers")
+            .select("customer_number")
+            .eq("legal_entity_id", legalEntityId)
+            .range(from, to),
+        );
         const used = new Set<number>();
-        for (const row of existing ?? []) {
+        for (const row of existing) {
           const n = parseInt(row.customer_number, 10);
           if (!Number.isNaN(n)) used.add(n);
         }

@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { osloTodayISO } from "@/lib/osloDate";
 
 interface Props {
   open: boolean;
@@ -35,7 +36,7 @@ export function NewAgreementDialog({ open, onOpenChange, defaultRawMaterialId, d
   const [packageUnit, setPackageUnit] = useState<string>("kg");
   const [pricePerBaseUnit, setPricePerBaseUnit] = useState<string>("");
   const [pricePerBaseUnitTouched, setPricePerBaseUnitTouched] = useState(false);
-  const [validFrom, setValidFrom] = useState<string>(new Date().toISOString().slice(0, 10));
+  const [validFrom, setValidFrom] = useState<string>(osloTodayISO());
   const [validTo, setValidTo] = useState<string>("");
   const [setPrimary, setSetPrimary] = useState(true);
   const [docFile, setDocFile] = useState<File | null>(null);
@@ -47,7 +48,7 @@ export function NewAgreementDialog({ open, onOpenChange, defaultRawMaterialId, d
       setSupplierSku(""); setSupplierProductName("");
       setAgreedPrice(""); setPackageSize(""); setPackageUnit("kg");
       setPricePerBaseUnit(""); setPricePerBaseUnitTouched(false);
-      setValidFrom(new Date().toISOString().slice(0, 10)); setValidTo("");
+      setValidFrom(osloTodayISO()); setValidTo("");
       setSetPrimary(true); setDocFile(null);
     }
   }, [open, defaultRawMaterialId, defaultSupplierId]);

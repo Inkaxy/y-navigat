@@ -27,6 +27,7 @@ import { useLegalEntity } from "@/pos_styring/contexts/LegalEntityContext";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { osloDayStartIso, osloDayEndIso } from "@/pos_styring/lib/osloTime";
+import { fetchAllRows } from "@/lib/supabasePaging";
 
 type SessionStatus = "open" | "closed";
 
@@ -120,35 +121,39 @@ interface SessionFilters {
 
 async function fetchSessions(entityId: string, f: SessionFilters): Promise<SessionRow[]> {
   // Inner-join på pos_terminals for å filtrere på legal_entity_id (pos_sessions
-  // har ikke kolonnen selv per recon).
-  let query = supabase
-    .from("pos_sessions")
-    .select(
-      "id, session_number, status, opened_at, closed_at, opening_float, closing_float, counted_cash, expected_cash, terminal_id, operator_id, terminal:pos_terminals!inner(legal_entity_id, terminal_code, display_name), operator:pos_operators(display_name)",
-    )
-    .eq("terminal.legal_entity_id", entityId)
-    .gte("opened_at", osloDayStartIso(f.from))
-    .lte("opened_at", osloDayEndIso(f.to))
-    .order("opened_at", { ascending: false })
-    .limit(500);
+  // har ikke kolonnen selv per recon). Sider gjennom ALLE rader — sum-kolonnene
+  // under avhenger av at vi har hele settet, ikke bare de første 500.
+  const sessions = await fetchAllRows<any>((from, to) => {
+    let query = supabase
+      .from("pos_sessions")
+      .select(
+        "id, session_number, status, opened_at, closed_at, opening_float, closing_float, counted_cash, expected_cash, terminal_id, operator_id, terminal:pos_terminals!inner(legal_entity_id, terminal_code, display_name), operator:pos_operators(display_name)",
+      )
+      .eq("terminal.legal_entity_id", entityId)
+      .gte("opened_at", osloDayStartIso(f.from))
+      .lte("opened_at", osloDayEndIso(f.to))
+      .order("opened_at", { ascending: false })
+      .range(from, to);
 
-  if (f.status !== "all") query = query.eq("status", f.status);
-  if (f.terminalIds.length > 0) query = query.in("terminal_id", f.terminalIds);
-  if (f.operatorIds.length > 0) query = query.in("operator_id", f.operatorIds);
+    if (f.status !== "all") query = query.eq("status", f.status);
+    if (f.terminalIds.length > 0) query = query.in("terminal_id", f.terminalIds);
+    if (f.operatorIds.length > 0) query = query.in("operator_id", f.operatorIds);
+    return query;
+  });
 
-  const { data, error } = await query;
-  if (error) throw error;
-
-  const sessions = (data ?? []) as any[];
   if (sessions.length === 0) return [];
 
-  // Batch-aggregat per side (read-only) — F3.2.5(b)
+  // Batch-aggregat per side (read-only) — F3.2.5(b). Sider gjennom alle
+  // transaksjoner for de valgte sesjonene, ellers blir summen feil for store
+  // sesjonssett.
   const sessionIds = sessions.map((s) => s.id as string);
-  const { data: txData, error: txErr } = await supabase
-    .from("pos_transactions")
-    .select("session_id, total_incl_mva")
-    .in("session_id", sessionIds);
-  if (txErr) throw txErr;
+  const txData = await fetchAllRows<any>((from, to) =>
+    supabase
+      .from("pos_transactions")
+      .select("session_id, total_incl_mva")
+      .in("session_id", sessionIds)
+      .range(from, to),
+  );
 
   const agg = new Map<string, { count: number; total: number }>();
   for (const t of txData ?? []) {

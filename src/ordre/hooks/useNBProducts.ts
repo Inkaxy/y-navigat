@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
+import { osloTodayISO } from "@/lib/osloDate";
 
 export type ProductOption = {
   id: string;
@@ -27,7 +28,7 @@ export function useNBProducts(search?: string, priceListId?: string | null) {
       // Hvis kunden ikke har prisliste → ingen produkter (unngå å vise alt).
       if (!priceListId) return [];
 
-      const today = new Date().toISOString().slice(0, 10);
+      const today = osloTodayISO();
       // Join via embedded relation slik at vi slipper å sende hundrevis av IDs i URL-en (→ 414/400).
       let q = supabase
         .from("price_list_items")

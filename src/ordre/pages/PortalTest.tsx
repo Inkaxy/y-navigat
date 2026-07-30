@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useNBCustomers } from "@/ordre/hooks/useNBCustomers";
 import { useNBProducts } from "@/ordre/hooks/useNBProducts";
+import { osloDateISO } from "@/lib/osloDate";
 
 type RpcResult = {
   order_id?: string;
@@ -32,7 +33,7 @@ export default function PortalTest() {
   const [deliveryDate, setDeliveryDate] = useState<string>(() => {
     const d = new Date();
     d.setDate(d.getDate() + 2);
-    return d.toISOString().slice(0, 10);
+    return osloDateISO(d);
   });
   const [distribution, setDistribution] = useState<"pickup" | "delivery">("pickup");
   const [externalId, setExternalId] = useState("");

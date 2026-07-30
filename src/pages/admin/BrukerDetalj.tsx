@@ -26,12 +26,13 @@ import { toast } from "sonner";
 import { useState } from "react";
 import { useIsPlatformOwner } from "@/hooks/useIsPlatformOwner";
 import { useAuth } from "@/hooks/useAuth";
+import { osloTodayISO } from "@/lib/osloDate";
 
 export default function BrukerDetalj() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = osloTodayISO();
   const { data: isOwner = false } = useIsPlatformOwner();
   const { user: authUser } = useAuth();
   const [deleting, setDeleting] = useState(false);
@@ -216,7 +217,7 @@ function ReadOnly({ label, value }: { label: string; value: string }) {
 
 function AddPositionDialog({ userId, assignedBy }: { userId: string; assignedBy: string | null }) {
   const qc = useQueryClient();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = osloTodayISO();
   const [open, setOpen] = useState(false);
   const [positionId, setPositionId] = useState<string>("");
   const [legalEntityId, setLegalEntityId] = useState<string>("");

@@ -9,6 +9,7 @@ import type {
   ProductForRules,
   DeliveryRule,
 } from "@/ordre/lib/orderRules";
+import { osloDateISOPlusDays } from "@/lib/osloDate";
 
 export type OrderRulesContext = {
   outlets: Outlet[];
@@ -31,8 +32,8 @@ export function useOrderRulesContext(productIds: string[] = []) {
         supabase
           .from("outlet_opening_exceptions")
           .select("outlet_id, date, closed, periods, note")
-          .gte("date", new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10))
-          .lte("date", new Date(Date.now() + 120 * 86_400_000).toISOString().slice(0, 10)),
+          .gte("date", osloDateISOPlusDays(-7))
+          .lte("date", osloDateISOPlusDays(120)),
         ids.length
           ? supabase
               .from("products")

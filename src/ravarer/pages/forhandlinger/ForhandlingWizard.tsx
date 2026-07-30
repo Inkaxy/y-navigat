@@ -27,6 +27,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { formatNok, formatNumber } from "@/ravarer/lib/constants";
+import { osloDateISO } from "@/lib/osloDate";
 
 type Step = 1 | 2 | 3 | 4 | 5;
 
@@ -53,7 +54,7 @@ export default function ForhandlingWizard() {
     const end = new Date();
     const start = new Date();
     start.setFullYear(end.getFullYear() - 1);
-    return { start: start.toISOString().slice(0, 10), end: end.toISOString().slice(0, 10) };
+    return { start: osloDateISO(start), end: osloDateISO(end) };
   }, []);
   const [baselineStart, setBaselineStart] = useState(baselineDefaults.start);
   const [baselineEnd, setBaselineEnd] = useState(baselineDefaults.end);

@@ -131,6 +131,9 @@ export function QuickCreateProductDialog({ open, onOpenChange, productOptions }:
       description: "Fyll inn detaljer i de andre tabbene.",
     });
     qc.invalidateQueries({ queryKey: ["products"] });
+    qc.invalidateQueries({ queryKey: ["price-lists-full"] });
+    qc.invalidateQueries({ queryKey: ["return-products"] });
+    qc.invalidateQueries({ queryKey: ["all-products-for-link"] });
     onOpenChange(false);
     form.reset();
     setCodeTouched(false);

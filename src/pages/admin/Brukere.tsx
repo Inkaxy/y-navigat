@@ -19,6 +19,7 @@ import { useIsPlatformOwner } from "@/hooks/useIsPlatformOwner";
 import { InviteUserDialog } from "./components/InviteUserDialog";
 import { CreateUserDialog } from "./components/CreateUserDialog";
 import { toast } from "sonner";
+import { osloTodayISO } from "@/lib/osloDate";
 
 type Row = {
   id: string;
@@ -81,7 +82,7 @@ export default function Brukere() {
   const { data = [], isLoading } = useQuery({
     queryKey: ["admin-users"],
     queryFn: async (): Promise<Row[]> => {
-      const today = new Date().toISOString().slice(0, 10);
+      const today = osloTodayISO();
       const [{ data: users, error: e1 }, { data: positions, error: e2 }] = await Promise.all([
         supabase.from("users").select("id, display_name, email, status, last_login_at").neq("status", "deleted").order("display_name"),
         supabase.from("user_positions").select("user_id, legal_entity_id, valid_from, valid_to"),

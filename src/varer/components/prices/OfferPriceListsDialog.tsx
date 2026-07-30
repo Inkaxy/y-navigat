@@ -226,6 +226,8 @@ export function OfferPriceListsDialog({ open, onOpenChange }: Props) {
         toast.success(`${changes} endring(er) lagret`);
         qc.invalidateQueries({ queryKey: ["price-lists-full"] });
         qc.invalidateQueries({ queryKey: ["offer-price-lists"] });
+        qc.invalidateQueries({ queryKey: ["price-lists"] });
+        qc.invalidateQueries({ queryKey: ["price-lists-for-profile"] });
         onOpenChange(false);
       } else {
         toast.info("Ingen endringer å lagre");

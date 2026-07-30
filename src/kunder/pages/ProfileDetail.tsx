@@ -305,29 +305,20 @@ export default function ProfileDetail() {
         .single();
       if (error) throw error;
 
-      // Synk prislister
+      // Synk prislister atomisk (delete + insert i én transaksjon)
       if (priceListsDirty) {
-        const existing = (linkedPriceLists ?? []).map((r: any) => r.price_list_id);
-        const toAdd = selectedPriceListIds.filter((x) => !existing.includes(x));
-        const toRemove = existing.filter(
-          (x: string) => !selectedPriceListIds.includes(x),
-        );
-        if (toRemove.length > 0) {
-          await supabase
-            .from("customer_profile_price_lists")
-            .delete()
-            .eq("customer_profile_id", profile.id)
-            .in("price_list_id", toRemove);
-        }
-        if (toAdd.length > 0) {
-          await supabase.from("customer_profile_price_lists").insert(
-            toAdd.map((pid, i) => ({
-              customer_profile_id: profile.id,
-              price_list_id: pid,
-              sort_order: i,
-            })),
-          );
-        }
+        const rows = selectedPriceListIds.map((pid, i) => ({
+          customer_profile_id: profile.id,
+          price_list_id: pid,
+          sort_order: i,
+        }));
+        const { error: replaceErr } = await (supabase as any).rpc("replace_child_rows", {
+          p_table: "customer_profile_price_lists",
+          p_parent_column: "customer_profile_id",
+          p_parent_id: profile.id,
+          p_rows: rows,
+        });
+        if (replaceErr) throw replaceErr;
       }
 
       await logAudit({
@@ -346,6 +337,8 @@ export default function ProfileDetail() {
       queryClient.invalidateQueries({
         queryKey: ["customer-profile-price-lists", id],
       });
+      queryClient.invalidateQueries({ queryKey: ["customer-effective-settings"] });
+      queryClient.invalidateQueries({ queryKey: ["customer-effective-price-list"] });
       toast.success("Lagret");
       form.reset(form.getValues());
       setPriceListsDirty(false);
@@ -375,6 +368,8 @@ export default function ProfileDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["customer-profile", id] });
       queryClient.invalidateQueries({ queryKey: ["customer-profiles"] });
+      queryClient.invalidateQueries({ queryKey: ["customer-effective-settings"] });
+      queryClient.invalidateQueries({ queryKey: ["customer-effective-price-list"] });
       toast.success("Profil deaktivert");
     },
   });
@@ -404,6 +399,8 @@ export default function ProfileDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["customer-profiles"] });
       queryClient.invalidateQueries({ queryKey: ["customer-profile-usage"] });
+      queryClient.invalidateQueries({ queryKey: ["customer-effective-settings"] });
+      queryClient.invalidateQueries({ queryKey: ["customer-effective-price-list"] });
       toast.success("Profil slettet");
       navigate("/kunder/profiler");
     },

@@ -36,11 +36,13 @@ export default function FakturaerListPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params]);
 
-  const { data: rows = [], isLoading } = useInvoices({
+  const { data: invoicesResult, isLoading } = useInvoices({
     legalEntityId: legalEntityId === "all" ? null : legalEntityId,
     status: status === "all" ? null : status,
     search: search.trim() || undefined,
   });
+  const rows = invoicesResult?.rows ?? [];
+  const totalCount = invoicesResult?.totalCount ?? 0;
 
   const totalReview = useMemo(() => rows.reduce((sum, r) => sum + r.review_count, 0), [rows]);
 
@@ -102,7 +104,7 @@ export default function FakturaerListPage() {
               ))}
             </SelectContent>
           </Select>
-          <span className="text-sm text-ink-secondary">{rows.length} fakturaer</span>
+          <span className="text-sm text-ink-secondary">{rows.length < totalCount ? `Viser ${rows.length} av ${totalCount} fakturaer` : `${rows.length} fakturaer`}</span>
         </div>
       </Card>
 

@@ -3,6 +3,7 @@ import { useAppContext } from "@/varer/context/AppContext";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllRows } from "@/lib/supabasePaging";
 
 import { formatKr, roundPrice } from "@/varer/lib/pricing";
 import { Card } from "@/components/ui/card";
@@ -54,12 +55,14 @@ export function ReturView({ priceDate, search }: Props) {
   const pricesQuery = useQuery({
     queryKey: ["return-prices", legalEntityId, priceDate],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("price_list_items")
-        .select("price_list_id, product_id, price, valid_from, valid_to")
-        .lte("valid_from", priceDate);
-      if (error) throw error;
-      const filtered = (data ?? []).filter(
+      const data = await fetchAllRows((from, to) =>
+        supabase
+          .from("price_list_items")
+          .select("price_list_id, product_id, price, valid_from, valid_to")
+          .lte("valid_from", priceDate)
+          .range(from, to),
+      );
+      const filtered = data.filter(
         (it) => it.valid_to == null || it.valid_to >= priceDate,
       );
       const map = new Map<string, { price: number; valid_from: string }>();
@@ -79,15 +82,17 @@ export function ReturView({ priceDate, search }: Props) {
   const overridesQuery = useQuery({
     queryKey: ["return-overrides"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("product_return_price_overrides")
-        .select("product_id, price_list_id, override_type, override_value");
-      if (error) throw error;
+      const data = await fetchAllRows((from, to) =>
+        supabase
+          .from("product_return_price_overrides")
+          .select("product_id, price_list_id, override_type, override_value")
+          .range(from, to),
+      );
       const map = new Map<
         string,
         { type: "percent" | "amount"; value: number }
       >();
-      for (const o of data ?? []) {
+      for (const o of data) {
         map.set(`${o.product_id}::${o.price_list_id}`, {
           type: o.override_type as "percent" | "amount",
           value: Number(o.override_value),

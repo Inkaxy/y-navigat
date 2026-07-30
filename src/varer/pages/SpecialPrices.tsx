@@ -17,6 +17,7 @@ import {
   Check,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllRows } from "@/lib/supabasePaging";
 
 import { logAudit } from "@/varer/lib/audit";
 import { useAppContext } from "@/varer/context/AppContext";
@@ -54,6 +55,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { toast } from "sonner";
 import { formatKr, downloadCsv, toCsv } from "@/varer/lib/pricing";
 import { SpecialPriceDialog, type SpecialPriceRow } from "@/varer/components/prices/SpecialPriceDialog";
+import { osloTodayISO, osloDateISO } from "@/lib/osloDate";
 
 type ProductLite = { id: string; display_number: number; display_name: string; code: string };
 type CustomerLite = { id: string; customer_number: string; display_name: string };
@@ -125,15 +127,17 @@ export default function SpecialPrices() {
   const specialPricesQuery = useQuery({
     queryKey: ["special-prices", legalEntityId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("special_prices")
-        .select(
-          "id, product_id, customer_id, price_list_id, valid_from, valid_to, weekday, precedence_over_weekday, price, is_net_price, notes, created_at",
-        )
-        .eq("legal_entity_id", legalEntityId)
-        .order("valid_from", { ascending: false, nullsFirst: false });
-      if (error) throw error;
-      return (data ?? []) as (SpecialPriceRow & { created_at: string })[];
+      const data = await fetchAllRows((from, to) =>
+        supabase
+          .from("special_prices")
+          .select(
+            "id, product_id, customer_id, price_list_id, valid_from, valid_to, weekday, precedence_over_weekday, price, is_net_price, notes, created_at",
+          )
+          .eq("legal_entity_id", legalEntityId)
+          .order("valid_from", { ascending: false, nullsFirst: false })
+          .range(from, to),
+      );
+      return data as (SpecialPriceRow & { created_at: string })[];
     },
   });
 
@@ -157,10 +161,10 @@ export default function SpecialPrices() {
 
   // Filtrert visning
   const filtered = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = osloTodayISO();
     const oneYearAgo = new Date();
     oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-    const cutoff = oneYearAgo.toISOString().slice(0, 10);
+    const cutoff = osloDateISO(oneYearAgo);
 
     return (specialPricesQuery.data ?? []).filter((sp) => {
       // Status-filter
@@ -293,7 +297,7 @@ export default function SpecialPrices() {
         sp.notes ?? "",
       ];
     });
-    downloadCsv(`spesialpriser_${new Date().toISOString().slice(0, 10)}.csv`, toCsv([header, ...rows]));
+    downloadCsv(`spesialpriser_${osloTodayISO()}.csv`, toCsv([header, ...rows]));
     toast.success("CSV eksportert");
   }
 

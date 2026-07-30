@@ -33,6 +33,7 @@ import {
   type TransactionType,
 } from "@/pos_styring/lib/pos-types";
 import { osloDayStartIso, osloDayEndIso } from "@/pos_styring/lib/osloTime";
+import { fetchAllRows } from "@/lib/supabasePaging";
 
 interface TxRow {
   id: string;
@@ -125,25 +126,26 @@ interface TxFilters {
 }
 
 async function fetchTransactions(entityId: string, f: TxFilters): Promise<TxRow[]> {
-  let query = supabase
-    .from("pos_transactions")
-    .select(
-      "id, receipt_number, receipt_sequence, transaction_type, is_training, created_at, total_incl_mva, payment_summary, terminal_id, operator_id, terminal:pos_terminals!inner(legal_entity_id, terminal_code, display_name), operator:pos_operators(display_name)",
-    )
-    .eq("terminal.legal_entity_id", entityId)
-    .gte("created_at", osloDayStartIso(f.from))
-    .lte("created_at", osloDayEndIso(f.to))
-    .order("created_at", { ascending: false })
-    .limit(500);
+  const data = await fetchAllRows<any>((from, to) => {
+    let query = supabase
+      .from("pos_transactions")
+      .select(
+        "id, receipt_number, receipt_sequence, transaction_type, is_training, created_at, total_incl_mva, payment_summary, terminal_id, operator_id, terminal:pos_terminals!inner(legal_entity_id, terminal_code, display_name), operator:pos_operators(display_name)",
+      )
+      .eq("terminal.legal_entity_id", entityId)
+      .gte("created_at", osloDayStartIso(f.from))
+      .lte("created_at", osloDayEndIso(f.to))
+      .order("created_at", { ascending: false })
+      .range(from, to);
 
-  if (f.terminalIds.length > 0) query = query.in("terminal_id", f.terminalIds);
-  if (f.operatorIds.length > 0) query = query.in("operator_id", f.operatorIds);
-  if (f.types.length > 0 && f.types.length < TX_TYPES.length) query = query.in("transaction_type", f.types);
-  if (!f.includeTraining) query = query.eq("is_training", false);
+    if (f.terminalIds.length > 0) query = query.in("terminal_id", f.terminalIds);
+    if (f.operatorIds.length > 0) query = query.in("operator_id", f.operatorIds);
+    if (f.types.length > 0 && f.types.length < TX_TYPES.length) query = query.in("transaction_type", f.types);
+    if (!f.includeTraining) query = query.eq("is_training", false);
 
-  const { data, error } = await query;
-  if (error) throw error;
-  return (data ?? []).map((r: any) => ({
+    return query;
+  });
+  return data.map((r: any) => ({
     id: r.id,
     receipt_number: r.receipt_number ?? null,
     receipt_sequence: Number(r.receipt_sequence),

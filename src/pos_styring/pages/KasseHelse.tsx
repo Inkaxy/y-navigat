@@ -33,6 +33,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { fetchAllRows } from "@/lib/supabasePaging";
 
 // ── Types ─────────────────────────────────────────────────────────────────
 type Traffic = "green" | "amber" | "red";
@@ -127,14 +128,15 @@ export default function KasseHelse() {
     queryKey: ["kasse-helse", "verifications", terminalIds.join(",")],
     enabled: terminalIds.length > 0,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("pos_journal_verifications")
-        .select("terminal_id, verified_at, is_valid, error_message, total_events, broken_at_id")
-        .in("terminal_id", terminalIds)
-        .order("verified_at", { ascending: false })
-        .limit(500);
-      if (error) throw error;
-      return data as JournalVerification[];
+      const data = await fetchAllRows<JournalVerification>((from, to) =>
+        supabase
+          .from("pos_journal_verifications")
+          .select("terminal_id, verified_at, is_valid, error_message, total_events, broken_at_id")
+          .in("terminal_id", terminalIds)
+          .order("verified_at", { ascending: false })
+          .range(from, to),
+      );
+      return data;
     },
   });
   const latestVerByTerminal = useMemo(() => {
@@ -150,14 +152,15 @@ export default function KasseHelse() {
     queryKey: ["kasse-helse", "z-reports", terminalIds.join(",")],
     enabled: terminalIds.length > 0,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("pos_z_reports")
-        .select("terminal_id, z_number, closed_at, cash_variance_total, variance_flagged, variance_threshold")
-        .in("terminal_id", terminalIds)
-        .order("closed_at", { ascending: false })
-        .limit(1000);
-      if (error) throw error;
-      return data as ZReport[];
+      const data = await fetchAllRows<ZReport>((from, to) =>
+        supabase
+          .from("pos_z_reports")
+          .select("terminal_id, z_number, closed_at, cash_variance_total, variance_flagged, variance_threshold")
+          .in("terminal_id", terminalIds)
+          .order("closed_at", { ascending: false })
+          .range(from, to),
+      );
+      return data;
     },
   });
   const latestZByTerminal = useMemo(() => {
@@ -190,14 +193,15 @@ export default function KasseHelse() {
     queryKey: ["kasse-helse", "journal-counts", terminalIds.join(","), last7Cutoff],
     enabled: terminalIds.length > 0,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("pos_journal_events")
-        .select("terminal_id, event_type")
-        .in("terminal_id", terminalIds)
-        .in("event_type", ["drawer_open_outside_sale", "receipt_copy"])
-        .gte("event_time", last7Cutoff)
-        .limit(10000);
-      if (error) throw error;
+      const data = await fetchAllRows<any>((from, to) =>
+        supabase
+          .from("pos_journal_events")
+          .select("terminal_id, event_type")
+          .in("terminal_id", terminalIds)
+          .in("event_type", ["drawer_open_outside_sale", "receipt_copy"])
+          .gte("event_time", last7Cutoff)
+          .range(from, to),
+      );
       const drawer = new Map<string, number>();
       const receiptCopy = new Map<string, number>();
       for (const r of data ?? []) {
@@ -219,29 +223,29 @@ export default function KasseHelse() {
     queryKey: ["kasse-helse", "receipt-coverage", terminalIds.join(","), last7Cutoff],
     enabled: terminalIds.length > 0,
     queryFn: async () => {
-      const [{ data: txs, error: txErr }, { data: evs, error: evErr }] = await Promise.all([
-        supabase
-          .from("pos_transactions")
-          .select("id")
-          .in("terminal_id", terminalIds)
-          .eq("is_training", false)
-          .gte("created_at", last7Cutoff)
-          .limit(10000),
-        supabase
-          .from("pos_journal_events")
-          .select("transaction_id")
-          .in("terminal_id", terminalIds)
-          .eq("event_type", "receipt_delivered")
-          .gte("event_time", last7Cutoff)
-          .limit(10000),
+      const [txs, evs] = await Promise.all([
+        fetchAllRows<{ id: string }>((from, to) =>
+          supabase
+            .from("pos_transactions")
+            .select("id")
+            .in("terminal_id", terminalIds)
+            .eq("is_training", false)
+            .gte("created_at", last7Cutoff)
+            .range(from, to),
+        ),
+        fetchAllRows<{ transaction_id: string | null }>((from, to) =>
+          supabase
+            .from("pos_journal_events")
+            .select("transaction_id")
+            .in("terminal_id", terminalIds)
+            .eq("event_type", "receipt_delivered")
+            .gte("event_time", last7Cutoff)
+            .range(from, to),
+        ),
       ]);
-      if (txErr) throw txErr;
-      if (evErr) throw evErr;
-      const delivered = new Set(
-        (evs ?? []).map((e) => (e as { transaction_id: string | null }).transaction_id).filter(Boolean),
-      );
-      const total = (txs ?? []).length;
-      const missing = (txs ?? []).filter((t) => !delivered.has((t as { id: string }).id)).length;
+      const delivered = new Set(evs.map((e) => e.transaction_id).filter(Boolean));
+      const total = txs.length;
+      const missing = txs.filter((t) => !delivered.has(t.id)).length;
       return { total, missing };
     },
   });
@@ -251,15 +255,16 @@ export default function KasseHelse() {
     queryKey: ["kasse-helse", "saf-t", selectedEntityId],
     enabled: !!selectedEntityId,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("pos_saf_t_exports")
-        .select("terminal_id, period_end, status, created_at")
-        .eq("legal_entity_id", selectedEntityId!)
-        .eq("status", "ready")
-        .order("period_end", { ascending: false })
-        .limit(200);
-      if (error) throw error;
-      return data as (SafTExport & { created_at: string })[];
+      const data = await fetchAllRows<SafTExport & { created_at: string }>((from, to) =>
+        supabase
+          .from("pos_saf_t_exports")
+          .select("terminal_id, period_end, status, created_at")
+          .eq("legal_entity_id", selectedEntityId!)
+          .eq("status", "ready")
+          .order("period_end", { ascending: false })
+          .range(from, to),
+      );
+      return data;
     },
   });
   const latestSafTByTerminal = useMemo(() => {

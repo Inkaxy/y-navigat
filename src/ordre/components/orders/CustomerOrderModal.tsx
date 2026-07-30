@@ -65,6 +65,7 @@ import {
   createCakeImageFromTicketAttachment,
   findCakeLineForOrder,
 } from "@/ordre/lib/cakeImages";
+import { osloTodayISO } from "@/lib/osloDate";
 
 
 export type FieldConfidenceHint =
@@ -515,7 +516,7 @@ export function CustomerOrderModal({
 
   const deliveryTimeStr = hour === "--" ? null : `${hour}:${minute}:00`;
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = osloTodayISO();
 
   // ----- Håndhevelse av leveringsregler (DB-motor) -----
   const { user } = useAuth();

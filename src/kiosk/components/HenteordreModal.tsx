@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Loader2, Package, Search, X } from "lucide-react";
 import { kioskSupabase } from "@/kiosk/integrations/supabase/client";
 import { toast } from "sonner";
+import { osloTodayISO } from "@/lib/osloDate";
 
 export interface PickupOrderRow {
   id: string;
@@ -57,7 +58,7 @@ export function HenteordreModal({
 
     const fetchRows = async (showSpinner: boolean) => {
       if (showSpinner) setLoading(true);
-      const today = new Date().toISOString().slice(0, 10);
+      const today = osloTodayISO();
       const { data, error } = await kioskSupabase.rpc(
         "pos_list_pickup_orders" as never,
         {
@@ -122,7 +123,7 @@ export function HenteordreModal({
     }
   };
 
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = osloTodayISO();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

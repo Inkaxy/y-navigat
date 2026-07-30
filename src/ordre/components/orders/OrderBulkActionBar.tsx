@@ -25,6 +25,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { ORDER_STATUSES, type OrderStatus } from "@/ordre/lib/orderStatus";
 import { logAudit } from "@/ordre/lib/audit";
 import type { OrderListRow } from "@/ordre/hooks/useOrders";
+import { osloTodayISO } from "@/lib/osloDate";
 
 interface Props {
   selected: OrderListRow[];
@@ -156,7 +157,7 @@ export function OrderBulkActionBar({ selected, onClear, onMutated, csvHeaders }:
     // BOM så Excel oppdager UTF-8
     const csv = "\uFEFF" + [headerRow, ...dataRows].join("\r\n");
 
-    const today = new Date().toISOString().slice(0, 10);
+    const today = osloTodayISO();
     const filename = `Ordrer_${today}_${count}valgte.csv`;
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);

@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllRows } from "@/lib/supabasePaging";
 import { isoDayOfWeek } from "@/ordre/hooks/useDeliveryTours";
 import type { ProductionPlanRow, ProductionPlanRowDetail, ProduksjonsplanCriteria } from "../types";
 
@@ -60,13 +61,15 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
       if (!legalEntityId) return { rows: [], orderCounts: { fast: 0, datert: 0, pakkseddel: 0 } };
 
       // 1) Hent ordrer for dato + selskap
-      const { data: orders, error: ordersErr } = await supabase
-        .from("orders")
-        .select("id, delivery_tour_id, customer_id, status, source")
-        .eq("legal_entity_id", legalEntityId)
-        .eq("delivery_date", date)
-        .neq("status", "cancelled");
-      if (ordersErr) throw ordersErr;
+      const orders = await fetchAllRows((from, to) =>
+        supabase
+          .from("orders")
+          .select("id, delivery_tour_id, customer_id, status, source")
+          .eq("legal_entity_id", legalEntityId)
+          .eq("delivery_date", date)
+          .neq("status", "cancelled")
+          .range(from, to),
+      );
 
       // Hent alle aktive turer for selskapet (trenger info for ekspandering av fastordre uten tur).
       const { data: allTours } = await supabase
@@ -124,11 +127,14 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
       const customerProductOverride = new Set<string>(); // `${customer_id}|${product_id}`
       const orderIdToCustomer = new Map(finalOrders.map((o) => [o.id, o.customer_id]));
       if (finalOrders.length > 0) {
-        const { data: preLines } = await supabase
-          .from("order_lines")
-          .select("order_id, product_id")
-          .in("order_id", finalOrders.map((o) => o.id));
-        for (const l of preLines ?? []) {
+        const preLines = await fetchAllRows((from, to) =>
+          supabase
+            .from("order_lines")
+            .select("order_id, product_id")
+            .in("order_id", finalOrders.map((o) => o.id))
+            .range(from, to),
+        );
+        for (const l of preLines) {
           const cid = orderIdToCustomer.get(l.order_id);
           if (cid && l.product_id) customerProductOverride.add(`${cid}|${l.product_id}`);
         }
@@ -145,15 +151,18 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
       };
       const recurringLines: RecurringLine[] = [];
       {
-        const { data: schedules } = await supabase
-          .from("recurring_order_schedules")
-          .select(
-            "id, customer_id, valid_from, valid_to, is_active, recurring_order_items(product_id, weekday, tour_id, quantity)",
-          )
-          .eq("legal_entity_id", legalEntityId)
-          .eq("is_active", true);
+        const schedules = await fetchAllRows((from, to) =>
+          supabase
+            .from("recurring_order_schedules")
+            .select(
+              "id, customer_id, valid_from, valid_to, is_active, recurring_order_items(product_id, weekday, tour_id, quantity)",
+            )
+            .eq("legal_entity_id", legalEntityId)
+            .eq("is_active", true)
+            .range(from, to),
+        );
 
-        for (const sched of (schedules ?? []) as Array<{
+        for (const sched of schedules as Array<{
           customer_id: string;
           valid_from: string | null;
           valid_to: string | null;
@@ -231,12 +240,13 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
       const orderIds = finalOrders.map((o) => o.id);
       let lines: OrderLineRow[] = [];
       if (orderIds.length > 0) {
-        const { data, error: linesErr } = await supabase
-          .from("order_lines")
-          .select("order_id, product_id, quantity")
-          .in("order_id", orderIds);
-        if (linesErr) throw linesErr;
-        lines = (data ?? []) as OrderLineRow[];
+        lines = (await fetchAllRows((from, to) =>
+          supabase
+            .from("order_lines")
+            .select("order_id, product_id, quantity")
+            .in("order_id", orderIds)
+            .range(from, to),
+        )) as OrderLineRow[];
       }
 
       const productIds = Array.from(
@@ -356,11 +366,14 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
         { number: string | null; name: string; address: string | null }
       >();
       if (allCustomerIds.length > 0) {
-        const { data: cs } = await supabase
-          .from("customers")
-          .select("id, customer_number, display_name, delivery_address_line1, delivery_postal_code, delivery_city")
-          .in("id", allCustomerIds);
-        for (const c of cs ?? []) {
+        const cs = await fetchAllRows((from, to) =>
+          supabase
+            .from("customers")
+            .select("id, customer_number, display_name, delivery_address_line1, delivery_postal_code, delivery_city")
+            .in("id", allCustomerIds)
+            .range(from, to),
+        );
+        for (const c of cs) {
           const addrParts = [
             c.delivery_address_line1,
             [c.delivery_postal_code, c.delivery_city].filter(Boolean).join(" "),

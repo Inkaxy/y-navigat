@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
 import { isoDayOfWeek } from "@/ordre/hooks/useDeliveryTours";
 import { pickEffectiveSchedulesForDate } from "@/ordre/lib/recurringOverrides";
+import { osloDateISO } from "@/lib/osloDate";
 
 export type RecurringGhostMap = Map<string, number>; // key: `${date}|${tourId}|${productId}`
 
@@ -110,7 +111,7 @@ function enumerateDates(from: string, to: string): string[] {
   const d = new Date(from + "T12:00:00");
   const end = new Date(to + "T12:00:00");
   while (d.getTime() <= end.getTime()) {
-    out.push(d.toISOString().slice(0, 10));
+    out.push(osloDateISO(d));
     d.setDate(d.getDate() + 1);
   }
   return out;

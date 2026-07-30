@@ -197,51 +197,22 @@ export function useSaveRecurringSchedule() {
         scheduleId = data.id;
       }
 
-      // Hent eksisterende linjer for diff
-      const { data: existing, error: eErr } = await supabase
-        .from("recurring_order_items")
-        .select("id")
-        .eq("schedule_id", scheduleId!);
-      if (eErr) throw eErr;
-
-      const existingIds = new Set((existing ?? []).map((r) => r.id));
-      const keptIds = new Set(payload.items.filter((i) => i.id).map((i) => i.id!));
-      const toDelete = [...existingIds].filter((id) => !keptIds.has(id));
-
-      if (toDelete.length > 0) {
-        const { error } = await supabase
-          .from("recurring_order_items")
-          .delete()
-          .in("id", toDelete);
-        if (error) throw error;
-      }
-
-      // Upsert linjer (en og en for å gi gode feilmeldinger ved unique-konflikt)
-      for (const item of payload.items) {
-        if (item.id) {
-          const { error } = await supabase
-            .from("recurring_order_items")
-            .update({
-              product_id: item.product_id,
-              weekday: item.weekday,
-              tour_id: item.tour_id,
-              quantity: item.quantity,
-              notes: item.notes,
-            })
-            .eq("id", item.id);
-          if (error) throw error;
-        } else {
-          const { error } = await supabase.from("recurring_order_items").insert({
-            schedule_id: scheduleId,
-            product_id: item.product_id,
-            weekday: item.weekday,
-            tour_id: item.tour_id,
-            quantity: item.quantity,
-            notes: item.notes,
-          });
-          if (error) throw error;
-        }
-      }
+      // Erstatt alle linjer atomisk (delete + insert i én transaksjon)
+      const rows = payload.items.map((item) => ({
+        schedule_id: scheduleId,
+        product_id: item.product_id,
+        weekday: item.weekday,
+        tour_id: item.tour_id,
+        quantity: item.quantity,
+        notes: item.notes,
+      }));
+      const { error: replaceErr } = await (supabase as any).rpc("replace_child_rows", {
+        p_table: "recurring_order_items",
+        p_parent_column: "schedule_id",
+        p_parent_id: scheduleId,
+        p_rows: rows,
+      });
+      if (replaceErr) throw replaceErr;
 
       return { scheduleId };
     },

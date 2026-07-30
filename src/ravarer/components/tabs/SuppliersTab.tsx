@@ -16,6 +16,7 @@ import type { RawMaterialRow } from "@/ravarer/hooks/useRawMaterials";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Legend } from "recharts";
 import { Link } from "react-router-dom";
 import { PurchaseStatsCard } from "@/ravarer/components/PurchaseStatsCard";
+import { osloTodayISO } from "@/lib/osloDate";
 
 interface Props { rm: RawMaterialRow; }
 
@@ -311,7 +312,7 @@ function RmSupplierDialog({ open, onOpenChange, rawMaterialId, existing }: any) 
 function AddPriceDialog({ open, onOpenChange, rm, suppliers }: any) {
   const add = useAddPriceHistory();
   const [price, setPrice] = useState("");
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(osloTodayISO());
   const [supplierId, setSupplierId] = useState<string>("_none");
   const [source, setSource] = useState("manual");
   const [notes, setNotes] = useState("");

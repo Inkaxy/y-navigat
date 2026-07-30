@@ -249,39 +249,41 @@ export function CalculationTab({ productId, productName, canWrite }: Props) {
         .eq("id", recipe.id);
       if (e1) throw e1;
 
-      // labor: full replace strategi
-      await supabase.from("recipe_labor_lines").delete().eq("recipe_id", recipe.id);
-      if (labor.length) {
-        const payload = labor
-          .filter((l) => Number(l.hours) > 0 || l.labor_type)
-          .map((l, i) => ({
-            recipe_id: recipe.id,
-            labor_type: l.labor_type,
-            hours: Number(l.hours) || 0,
-            hourly_rate: l.hourly_rate !== null && l.hourly_rate !== "" ? Number(l.hourly_rate) : null,
-            sort_order: i,
-          }));
-        if (payload.length) {
-          const { error } = await supabase.from("recipe_labor_lines").insert(payload as never);
-          if (error) throw error;
-        }
-      }
-
-      // packaging: full replace
-      await supabase.from("recipe_packaging_lines").delete().eq("recipe_id", recipe.id);
-      if (packaging.length) {
-        const payload = packaging.map((p, i) => ({
+      // labor: full replace strategi (atomisk via RPC)
+      const laborPayload = labor
+        .filter((l) => Number(l.hours) > 0 || l.labor_type)
+        .map((l, i) => ({
           recipe_id: recipe.id,
-          raw_material_id: p.raw_material_id,
-          name: p.name || null,
-          quantity: Number(p.quantity) || 0,
-          unit_price_override:
-            p.unit_price_override !== null && p.unit_price_override !== "" ? Number(p.unit_price_override) : null,
+          labor_type: l.labor_type,
+          hours: Number(l.hours) || 0,
+          hourly_rate: l.hourly_rate !== null && l.hourly_rate !== "" ? Number(l.hourly_rate) : null,
           sort_order: i,
         }));
-        const { error } = await supabase.from("recipe_packaging_lines").insert(payload as never);
-        if (error) throw error;
-      }
+      const { error: laborErr } = await (supabase as any).rpc("replace_child_rows", {
+        p_table: "recipe_labor_lines",
+        p_parent_column: "recipe_id",
+        p_parent_id: recipe.id,
+        p_rows: laborPayload,
+      });
+      if (laborErr) throw laborErr;
+
+      // packaging: full replace (atomisk via RPC)
+      const packagingPayload = packaging.map((p, i) => ({
+        recipe_id: recipe.id,
+        raw_material_id: p.raw_material_id,
+        name: p.name || null,
+        quantity: Number(p.quantity) || 0,
+        unit_price_override:
+          p.unit_price_override !== null && p.unit_price_override !== "" ? Number(p.unit_price_override) : null,
+        sort_order: i,
+      }));
+      const { error: packagingErr } = await (supabase as any).rpc("replace_child_rows", {
+        p_table: "recipe_packaging_lines",
+        p_parent_column: "recipe_id",
+        p_parent_id: recipe.id,
+        p_rows: packagingPayload,
+      });
+      if (packagingErr) throw packagingErr;
 
       toast.success("Kalkyle lagret");
       qc.invalidateQueries({ queryKey: ["recipe-calc", productId] });

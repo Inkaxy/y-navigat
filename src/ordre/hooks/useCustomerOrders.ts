@@ -342,6 +342,11 @@ export function useCreateCustomerOrder() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["customer-orders"] });
+      qc.invalidateQueries({ queryKey: ["orders"] });
+      qc.invalidateQueries({ queryKey: ["order-status-counts"] });
+      qc.invalidateQueries({ queryKey: ["orders-lite"] });
+      qc.invalidateQueries({ queryKey: ["action-queue-counts"] });
+      qc.invalidateQueries({ queryKey: ["delivery-day-stats"] });
     },
   });
 }
@@ -373,11 +378,9 @@ export function useUpdateCustomerOrder() {
         .eq("id", orderId);
       if (updErr) throw updErr;
 
-      // 2. Replace lines (simple strategy: delete + insert)
-      const { error: delErr } = await supabase.from("order_lines").delete().eq("order_id", orderId);
-      if (delErr) throw delErr;
-
+      // 2. Replace lines atomically via RPC (delete + insert in one transaction)
       const fallbackLineIndices: number[] = [];
+      let lineRows: unknown[] = [];
       if (input.lines.length > 0) {
         const priceMap = await fetchEffectivePricesBatch({
           productIds: Array.from(new Set(input.lines.map((l) => l.product_id))),
@@ -386,7 +389,7 @@ export function useUpdateCustomerOrder() {
           caller: "customer_order_update" as PriceCaller,
         });
 
-        const lineRows = input.lines.map((l, idx) => {
+        lineRows = input.lines.map((l, idx) => {
           const ep = priceMap.get(l.product_id);
           const unitPrice = ep ? ep.price : 0;
           const vatRate = ep?.vat_rate ?? l.product_mva_rate ?? 15;
@@ -420,16 +423,29 @@ export function useUpdateCustomerOrder() {
 
           };
         });
-        const { error: insErr } = await supabase.from("order_lines").insert(lineRows as never);
-
-        if (insErr) throw insErr;
       }
+
+      // Atomic replace: delete existing order_lines and insert the new set in one transaction.
+      const { error: replaceErr } = await (supabase as any).rpc("replace_child_rows", {
+        p_table: "order_lines",
+        p_parent_column: "order_id",
+        p_parent_id: orderId,
+        p_rows: lineRows,
+      });
+      if (replaceErr) throw replaceErr;
 
       return { orderId, has_zero_fallback_lines: fallbackLineIndices };
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ["customer-orders"] });
       qc.invalidateQueries({ queryKey: ["customer-order-detail"] });
+      qc.invalidateQueries({ queryKey: ["orders"] });
+      qc.invalidateQueries({ queryKey: ["order", data.orderId] });
+      qc.invalidateQueries({ queryKey: ["order-lines", data.orderId] });
+      qc.invalidateQueries({ queryKey: ["order-status-counts"] });
+      qc.invalidateQueries({ queryKey: ["orders-lite"] });
+      qc.invalidateQueries({ queryKey: ["action-queue-counts"] });
+      qc.invalidateQueries({ queryKey: ["delivery-day-stats"] });
     },
   });
 }
@@ -446,6 +462,10 @@ export function useDeleteCustomerOrder() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["customer-orders"] });
+      qc.invalidateQueries({ queryKey: ["orders"] });
+      qc.invalidateQueries({ queryKey: ["order-status-counts"] });
+      qc.invalidateQueries({ queryKey: ["orders-lite"] });
+      qc.invalidateQueries({ queryKey: ["action-queue-counts"] });
     },
   });
 }

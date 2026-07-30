@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { AlertCircle, Calendar, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ProductFormValues } from "@/varer/lib/productSchema";
+import { osloTodayISO } from "@/lib/osloDate";
 
 interface Props {
   canWrite: boolean;
@@ -16,7 +17,7 @@ export function LeveranseTab({ canWrite }: Props) {
   const from = watch("pause_delivery_from");
   const to = watch("pause_delivery_to");
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = osloTodayISO();
   let banner: { tone: "destructive" | "warning" | "muted"; text: string; icon: typeof AlertCircle } | null = null;
   if (from) {
     const ended = to && to < today;

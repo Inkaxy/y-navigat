@@ -1,4 +1,5 @@
 export const APP_CODE = "fakturaer" as const;
+import { osloTodayISO } from "@/lib/osloDate";
 
 // Status-modell etter Tripletex-omlegging: NBhub validerer kun pris.
 // Lifecycle (mottak, godkjenning, attestering, betaling) eies av Tripletex.
@@ -30,5 +31,5 @@ export function formatDate(value: string | Date | null | undefined): string {
   return new Intl.DateTimeFormat("nb-NO", { dateStyle: "medium" }).format(d);
 }
 export function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
+  return osloTodayISO();
 }

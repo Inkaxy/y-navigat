@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { User } from "@supabase/supabase-js";
 import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
+import { osloTodayISO } from "@/lib/osloDate";
 
 export type AccessInfo = {
   hasOrdreAccess: boolean;
@@ -16,7 +17,7 @@ export function useUserAccess(user: User | null) {
     queryKey: ["user-access", user?.id],
     enabled: !!user,
     queryFn: async (): Promise<AccessInfo> => {
-      const today = new Date().toISOString().slice(0, 10);
+      const today = osloTodayISO();
 
       const { data: positions, error: posErr } = await supabase
         .from("user_positions")

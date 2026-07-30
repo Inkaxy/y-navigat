@@ -1,3 +1,4 @@
+import { osloTodayISO, osloDateISO } from "@/lib/osloDate";
 export function formatNOK(value: number | string | null | undefined): string {
   if (value === null || value === undefined || value === "") return "—";
   const n = typeof value === "string" ? Number(value) : value;
@@ -118,9 +119,9 @@ export function darkenHsl(hsl: string, amount = 10): string {
 export function tomorrow(): string {
   const d = new Date();
   d.setDate(d.getDate() + 1);
-  return d.toISOString().slice(0, 10);
+  return osloDateISO(d);
 }
 
 export function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
+  return osloTodayISO();
 }
