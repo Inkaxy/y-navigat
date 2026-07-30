@@ -21,6 +21,10 @@ Deno.serve(async (req) => {
     const { data: { user } } = await userClient.auth.getUser();
     if (!user) return json({ error: "Unauthorized" }, 401);
 
+    const { data: hasSettingsAccess } = await userClient.rpc("has_ordre_settings_access");
+    if (!hasSettingsAccess) return json({ error: "Ingen tilgang" }, 403);
+    console.log("microsoft-graph-subscription-create called by", user.id, user.email);
+
     const admin = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,

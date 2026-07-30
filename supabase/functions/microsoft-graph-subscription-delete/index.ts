@@ -19,11 +19,15 @@ Deno.serve(async (req) => {
     const { data: { user } } = await userClient.auth.getUser();
     if (!user) return json({ error: "Unauthorized" }, 401);
 
+    const { data: hasSettingsAccess } = await userClient.rpc("has_ordre_settings_access");
+    if (!hasSettingsAccess) return json({ error: "Ingen tilgang" }, 403);
+    console.log("microsoft-graph-subscription-delete called by", user.id, user.email);
+
     const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
     const { subscription_id } = await req.json().catch(() => ({}));
-    let query = admin.from("ticket_subscriptions").select("*");
-    if (subscription_id) query = query.eq("microsoft_subscription_id", subscription_id);
+    if (!subscription_id) return json({ error: "subscription_id er påkrevd" }, 400);
+    const query = admin.from("ticket_subscriptions").select("*").eq("microsoft_subscription_id", subscription_id);
     const { data: subs, error } = await query;
     if (error) throw new Error(error.message);
     if (!subs?.length) return json({ success: true, deleted: 0 });

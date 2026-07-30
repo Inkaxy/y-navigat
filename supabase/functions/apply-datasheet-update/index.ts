@@ -34,6 +34,16 @@ Deno.serve(async (req) => {
     const { data: rm } = await service.from("raw_materials").select("*").eq("id", body.raw_material_id).maybeSingle();
     if (!rm) return json({ error: "Raw material not found" }, 404);
 
+    if (!ds.legal_entity_id || !rm.legal_entity_id || ds.legal_entity_id !== rm.legal_entity_id) {
+      return json({ error: "Datablad og råvare tilhører ikke samme selskap" }, 403);
+    }
+    const { data: hasWrite } = await userClient.rpc("has_ravarer_access", {
+      _user_id: userId,
+      _legal_entity_id: rm.legal_entity_id,
+      _min_level: "write",
+    });
+    if (!hasWrite) return json({ error: "Ingen tilgang" }, 403);
+
     const accepts = new Set(body.accepted_fields ?? []);
     const changelogRows: any[] = [];
 
