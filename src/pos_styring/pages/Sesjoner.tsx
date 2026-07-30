@@ -26,6 +26,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { useLegalEntity } from "@/pos_styring/contexts/LegalEntityContext";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
+import { osloDayStartIso, osloDayEndIso } from "@/pos_styring/lib/osloTime";
 
 type SessionStatus = "open" | "closed";
 
@@ -126,8 +127,8 @@ async function fetchSessions(entityId: string, f: SessionFilters): Promise<Sessi
       "id, session_number, status, opened_at, closed_at, opening_float, closing_float, counted_cash, expected_cash, terminal_id, operator_id, terminal:pos_terminals!inner(legal_entity_id, terminal_code, display_name), operator:pos_operators(display_name)",
     )
     .eq("terminal.legal_entity_id", entityId)
-    .gte("opened_at", `${f.from}T00:00:00`)
-    .lte("opened_at", `${f.to}T23:59:59.999`)
+    .gte("opened_at", osloDayStartIso(f.from))
+    .lte("opened_at", osloDayEndIso(f.to))
     .order("opened_at", { ascending: false })
     .limit(500);
 
