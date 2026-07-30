@@ -36,6 +36,9 @@ Deno.serve(async (req) => {
       );
       const { data: { user } } = await userClient.auth.getUser();
       if (!user) return json({ error: "Unauthorized" }, 401);
+
+      const { data: canWrite } = await userClient.rpc("has_app_write_access", { p_app_code: "ordre" });
+      if (!canWrite) return json({ error: "Ingen tilgang" }, 403);
     }
 
     const body = (await req.json()) as Body;
