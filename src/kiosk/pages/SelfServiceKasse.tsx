@@ -184,7 +184,9 @@ function SelfServiceFlow({ data, loading, loadError }: FlowProps) {
     setSubmitting(true);
     try {
       const summary = buildPaymentSummary({
-        method: "card",
+        // Selvbetjening har ingen integrert terminaltransaksjon — vi vet kun
+        // at kunden betalte på en ekstern kortterminal. Marker ærlig.
+        method: "card_external",
         totalIncl: cart.totals.total_incl_mva,
       });
       const linesPayload = cart.items.map((it) => toLinePayload(it, cart.diningMode));
@@ -195,6 +197,7 @@ function SelfServiceFlow({ data, loading, loadError }: FlowProps) {
           p_lines: linesPayload,
           p_payment_summary: summary,
           p_dining_mode: cart.diningMode,
+          p_operator_id: operator?.id ?? null,
         } as never,
       );
       if (error) throw error;
@@ -221,7 +224,11 @@ function SelfServiceFlow({ data, loading, loadError }: FlowProps) {
       if (linesErr) throw linesErr;
       if (!tx) throw new Error("Fant ikke transaksjonen");
 
-      setReceipt({ tx, lines: lines ?? [] });
+      const r = { tx, lines: lines ?? [] };
+      setReceipt(r);
+      // Kassasystemforskrifta: kvittering MÅ produseres for hvert salg — også
+      // i selvbetjening. Legg print-jobb i kø og journalfør leveransen.
+      void deliverReceipt(r);
       void broadcastSaleComplete(channel, {
         receipt_number: (tx as { receipt_number: string | null }).receipt_number ?? null,
         total_incl_mva: Number((tx as { total_incl_mva: number }).total_incl_mva),
@@ -234,6 +241,120 @@ function SelfServiceFlow({ data, loading, loadError }: FlowProps) {
       setSubmitting(false);
     }
   };
+
+  /**
+   * Legger kvitteringen i utskriftskøen og journalfører `receipt_delivered`.
+   * Samme flyt som kassererkassa: print-jobben legges inn FØR
+   * `pos_record_receipt_print`, så originalen aldri «brennes» uten utskrift.
+   */
+  const deliverReceipt = useCallback(
+    async (r: { tx: Record<string, unknown>; lines: unknown[] }) => {
+      if (!terminal) return;
+      setPrinting(true);
+      try {
+        const [{ data: mapping, error: mErr }, { data: entity, error: eErr }] = await Promise.all([
+          kioskSupabase
+            .from("pos_terminal_printers")
+            .select("printer_id")
+            .eq("terminal_id", terminal.id)
+            .eq("role", "receipt")
+            .maybeSingle(),
+          kioskSupabase
+            .from("legal_entities")
+            .select(
+              "legal_name, display_name, org_number, mva_registered, invoice_address_line1, invoice_address_line2, invoice_postal_code, invoice_city, contact_phone, contact_email",
+            )
+            .eq("id", terminal.legal_entity_id)
+            .maybeSingle(),
+        ]);
+        if (mErr) throw mErr;
+        if (eErr) throw eErr;
+
+        const company = entity
+          ? {
+              name: entity.display_name ?? entity.legal_name,
+              org_number: entity.org_number,
+              vat_registered: !!entity.mva_registered,
+              address: [
+                entity.invoice_address_line1,
+                entity.invoice_address_line2,
+                [entity.invoice_postal_code, entity.invoice_city].filter(Boolean).join(" "),
+              ]
+                .filter((x) => x && String(x).trim().length > 0)
+                .join(", "),
+              phone: entity.contact_phone,
+              email: entity.contact_email,
+            }
+          : null;
+
+        let printed = false;
+        if (mapping?.printer_id) {
+          const { data: job, error: jErr } = await kioskSupabase
+            .from("pos_print_jobs")
+            .insert({
+              printer_id: mapping.printer_id,
+              terminal_id: terminal.id,
+              job_type: "receipt",
+              payload: {
+                transaction: r.tx,
+                lines: r.lines,
+                terminal_name: terminal.display_name,
+                terminal_id: terminal.id,
+                company,
+                outlet: receiptHeader.outlet,
+                self_service: true,
+              } as unknown as never,
+              status: "printing",
+            })
+            .select("id")
+            .single();
+          if (jErr) throw jErr;
+
+          try {
+            const { error: pkErr } = await kioskSupabase.rpc("pos_record_receipt_print" as never, {
+              p_terminal_id: terminal.id,
+              p_transaction_id: r.tx.id as string,
+            } as never);
+            if (pkErr) throw pkErr;
+          } catch (e) {
+            await kioskSupabase
+              .from("pos_print_jobs")
+              .update({ status: "failed", last_error: (e as Error).message })
+              .eq("id", job.id);
+            throw e;
+          }
+
+          const { error: relErr } = await kioskSupabase
+            .from("pos_print_jobs")
+            .update({ status: "queued" })
+            .eq("id", job.id);
+          if (relErr) throw relErr;
+          printed = true;
+        }
+
+        const { error: evErr } = await kioskSupabase.rpc("pos_journal_append", {
+          p_terminal_id: terminal.id,
+          p_event_type: "receipt_delivered",
+          p_operator_id: operator?.id ?? null,
+          p_session_id: session?.id ?? null,
+          p_transaction_id: r.tx.id as string,
+          p_payload: { channel: printed ? "printer" : "screen", self_service: true },
+        } as never);
+        if (evErr) throw evErr;
+
+        if (!printed) {
+          toast.warning("Ingen kvitteringsskriver koblet til terminalen", {
+            description: "Kvittering vises kun på skjerm — konfigurer skriver i POS Styring.",
+          });
+        }
+      } catch (e) {
+        toast.error("Kvittering kunne ikke leveres", { description: (e as Error).message });
+      } finally {
+        setPrinting(false);
+      }
+    },
+    [terminal, operator?.id, session?.id, receiptHeader.outlet],
+  );
 
   const handleNewSale = () => {
     setReceipt(null);
@@ -423,11 +544,12 @@ function SelfServiceFlow({ data, loading, loadError }: FlowProps) {
         outlet={receiptHeader.outlet}
         onNewSale={handleNewSale}
 
-        // Selvbetjent: ingen kvitterings-print her, antas autoprint senere
+        // Kvitteringen skrives ut automatisk ved salg; knappen kjører samme
+        // flyt på nytt hvis den første leveransen feilet.
         onPrintReceipt={async () => {
-          toast.info("Kvittering sendes automatisk i selvbetjent modus");
+          if (receipt) await deliverReceipt(receipt);
         }}
-        printingReceipt={false}
+        printingReceipt={printing}
       />
 
       <AlertDialog open={cancelOpen} onOpenChange={setCancelOpen}>

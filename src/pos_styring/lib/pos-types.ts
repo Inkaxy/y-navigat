@@ -5,6 +5,9 @@
 export type PaymentMethod =
   | "cash"
   | "card"
+  // Kort betalt på frittstående/ekstern terminal uten integrert
+  // terminaltransaksjon (f.eks. selvbetjening). Skal vises ærlig i Z.
+  | "card_external"
   | "vipps"
   | "invoice"
   | "gift_card"
@@ -44,6 +47,7 @@ export type DiningMode = "takeaway" | "eatin";
 export const PAYMENT_METHOD_LABEL: Record<PaymentMethod, string> = {
   cash: "Kontant",
   card: "Kort",
+  card_external: "Kort (ekstern terminal)",
   vipps: "Vipps",
   invoice: "Faktura",
   gift_card: "Gavekort",
