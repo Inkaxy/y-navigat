@@ -223,7 +223,8 @@ export default function DeliveryNoteDashboard() {
         let totalLines = 0;
         let datesProcessed = 0;
         for (const d of uniqueDates) {
-          const r = await generate.mutateAsync({ date: d, tourFilter });
+          // Etterslep på historiske datoer: tilleggskjøring, ikke hovedkjøring
+          const r = await generate.mutateAsync({ date: d, tourFilter, n: "additional" });
           totalNotes += r.notes_generated;
           totalLines += r.lines_generated;
           datesProcessed += 1;
