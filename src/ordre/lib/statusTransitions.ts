@@ -19,7 +19,7 @@ export type StatusAction = {
 
 /**
  * Standard fremover-handlinger basert på nåværende status.
- * For returordrer hoppes produksjon/pakking over — «Godkjenn» går rett til fakturert.
+ * Returordrer godkjennes til «confirmed» — kreditering skjer i faktureringsmodulen.
  */
 export function getStatusActions(current: OrderStatus, isReturn = false): StatusAction[] {
   if (isReturn) {
