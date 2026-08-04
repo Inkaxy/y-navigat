@@ -25,10 +25,10 @@ export function getStatusActions(current: OrderStatus, isReturn = false): Status
   if (isReturn) {
     switch (current) {
       case "draft":
-        return [{ label: "Godkjenn og fakturer", to: "invoiced" }];
+        return [{ label: "Godkjenn retur", to: "confirmed" }];
       case "awaiting_confirmation":
         return [
-          { label: "Godkjenn og fakturer", to: "invoiced" },
+          { label: "Godkjenn retur", to: "confirmed" },
           {
             label: "Avvis",
             to: "cancelled",
@@ -38,15 +38,15 @@ export function getStatusActions(current: OrderStatus, isReturn = false): Status
           },
         ];
       case "confirmed":
-        return [{ label: "Marker som fakturert", to: "invoiced" }];
       case "on_hold":
       case "invoiced":
       case "cancelled":
         return [];
       default:
-        return [{ label: "Marker som fakturert", to: "invoiced" }];
+        return [];
     }
   }
+
 
   switch (current) {
     case "draft":

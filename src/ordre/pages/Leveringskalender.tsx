@@ -595,7 +595,7 @@ export default function MatrixPage() {
       code: "",
       display_name: p.display_name,
       sales_unit: p.sales_unit,
-      mva_rate: 0,
+      mva_rate: mvaRateFor(p.id),
       unit_price: p.unit_price,
       price_source: p.unit_price == null ? "none" : "default",
     };
@@ -891,7 +891,7 @@ export default function MatrixPage() {
               code: "",
               display_name: p.display_name,
               sales_unit: p.sales_unit,
-              mva_rate: 0,
+              mva_rate: mvaRateFor(p.id),
               unit_price: p.unit_price,
               price_source: p.unit_price == null ? "none" : "default",
             } as MatrixProduct));
