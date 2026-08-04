@@ -3855,6 +3855,74 @@ export type Database = {
         }
         Relationships: []
       }
+      nettside_sync_settings: {
+        Row: {
+          id: number
+          last_push_at: string | null
+          last_push_request_id: number | null
+          last_push_summary: Json | null
+          price_list_code: string
+          push_enabled: boolean
+          site_order_callback_url: string | null
+          site_sync_url: string
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          last_push_at?: string | null
+          last_push_request_id?: number | null
+          last_push_summary?: Json | null
+          price_list_code?: string
+          push_enabled?: boolean
+          site_order_callback_url?: string | null
+          site_sync_url: string
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          last_push_at?: string | null
+          last_push_request_id?: number | null
+          last_push_summary?: Json | null
+          price_list_code?: string
+          push_enabled?: boolean
+          site_order_callback_url?: string | null
+          site_sync_url?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      nettside_sync_state: {
+        Row: {
+          delete_attempts: number
+          first_pushed_at: string
+          last_pushed_at: string
+          product_id: string
+          status: string
+        }
+        Insert: {
+          delete_attempts?: number
+          first_pushed_at?: string
+          last_pushed_at?: string
+          product_id: string
+          status?: string
+        }
+        Update: {
+          delete_attempts?: number
+          first_pushed_at?: string
+          last_pushed_at?: string
+          product_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nettside_sync_state_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: true
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           body: string | null
@@ -9993,6 +10061,105 @@ export type Database = {
         }
         Relationships: []
       }
+      website_orders: {
+        Row: {
+          business_name: string | null
+          business_org_no: string | null
+          callback_at: string | null
+          callback_status: string | null
+          created_at: string
+          customer_email: string | null
+          customer_name: string | null
+          customer_note: string | null
+          customer_phone: string | null
+          id: string
+          is_business_order: boolean
+          lines: Json
+          payment_method: string | null
+          payment_status: string | null
+          pickup_date: string | null
+          pickup_location_name: string | null
+          pickup_nbhub_customer_id: string | null
+          pickup_window_end: string | null
+          pickup_window_start: string | null
+          processed_at: string | null
+          raw_payload: Json
+          received_at: string
+          site_order_id: string
+          site_order_number: string
+          status: string
+          status_message: string | null
+          total_gross: number | null
+          total_mva: number | null
+          total_net: number | null
+          updated_at: string
+        }
+        Insert: {
+          business_name?: string | null
+          business_org_no?: string | null
+          callback_at?: string | null
+          callback_status?: string | null
+          created_at?: string
+          customer_email?: string | null
+          customer_name?: string | null
+          customer_note?: string | null
+          customer_phone?: string | null
+          id?: string
+          is_business_order?: boolean
+          lines?: Json
+          payment_method?: string | null
+          payment_status?: string | null
+          pickup_date?: string | null
+          pickup_location_name?: string | null
+          pickup_nbhub_customer_id?: string | null
+          pickup_window_end?: string | null
+          pickup_window_start?: string | null
+          processed_at?: string | null
+          raw_payload: Json
+          received_at?: string
+          site_order_id: string
+          site_order_number: string
+          status?: string
+          status_message?: string | null
+          total_gross?: number | null
+          total_mva?: number | null
+          total_net?: number | null
+          updated_at?: string
+        }
+        Update: {
+          business_name?: string | null
+          business_org_no?: string | null
+          callback_at?: string | null
+          callback_status?: string | null
+          created_at?: string
+          customer_email?: string | null
+          customer_name?: string | null
+          customer_note?: string | null
+          customer_phone?: string | null
+          id?: string
+          is_business_order?: boolean
+          lines?: Json
+          payment_method?: string | null
+          payment_status?: string | null
+          pickup_date?: string | null
+          pickup_location_name?: string | null
+          pickup_nbhub_customer_id?: string | null
+          pickup_window_end?: string | null
+          pickup_window_start?: string | null
+          processed_at?: string | null
+          raw_payload?: Json
+          received_at?: string
+          site_order_id?: string
+          site_order_number?: string
+          status?: string
+          status_message?: string | null
+          total_gross?: number | null
+          total_mva?: number | null
+          total_net?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       widget_registry: {
         Row: {
           code: string
@@ -10465,6 +10632,7 @@ export type Database = {
         Args: { p_category_id: string; p_price_list_id: string }
         Returns: Json
       }
+      get_cake_cleanup_secret: { Args: never; Returns: string }
       get_customer_effective_settings: {
         Args: { p_customer_id: string }
         Returns: Json
@@ -10613,6 +10781,7 @@ export type Database = {
           status: string
         }[]
       }
+      get_nettside_channel_secret: { Args: never; Returns: string }
       get_ordrekontor_assignees: {
         Args: never
         Returns: {
@@ -10744,6 +10913,14 @@ export type Database = {
           image_url: string
           name: string
           sort_order: number
+        }[]
+      }
+      list_expired_cake_images: {
+        Args: never
+        Returns: {
+          edited_path: string
+          id: string
+          original_path: string
         }[]
       }
       list_monthly_purchases: {
@@ -11252,6 +11429,7 @@ export type Database = {
           total_events: number
         }[]
       }
+      push_products_to_nettside: { Args: never; Returns: Json }
       refresh_purchase_stats: { Args: never; Returns: undefined }
       rename_raw_material: {
         Args: { p_id: string; p_name: string }

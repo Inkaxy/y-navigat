@@ -19,16 +19,16 @@ export type StatusAction = {
 
 /**
  * Standard fremover-handlinger basert på nåværende status.
- * For returordrer hoppes produksjon/pakking over — «Godkjenn» går rett til fakturert.
+ * Returordrer godkjennes til «confirmed» — kreditering skjer i faktureringsmodulen.
  */
 export function getStatusActions(current: OrderStatus, isReturn = false): StatusAction[] {
   if (isReturn) {
     switch (current) {
       case "draft":
-        return [{ label: "Godkjenn og fakturer", to: "invoiced" }];
+        return [{ label: "Godkjenn retur", to: "confirmed" }];
       case "awaiting_confirmation":
         return [
-          { label: "Godkjenn og fakturer", to: "invoiced" },
+          { label: "Godkjenn retur", to: "confirmed" },
           {
             label: "Avvis",
             to: "cancelled",
@@ -38,15 +38,15 @@ export function getStatusActions(current: OrderStatus, isReturn = false): Status
           },
         ];
       case "confirmed":
-        return [{ label: "Marker som fakturert", to: "invoiced" }];
       case "on_hold":
       case "invoiced":
       case "cancelled":
         return [];
       default:
-        return [{ label: "Marker som fakturert", to: "invoiced" }];
+        return [];
     }
   }
+
 
   switch (current) {
     case "draft":
@@ -100,7 +100,8 @@ export function getStatusActions(current: OrderStatus, isReturn = false): Status
     case "partial_delivery":
       return [{ label: "Marker som fullført", to: "delivered" }];
     case "delivered":
-      return [{ label: "Marker som fakturert", to: "invoiced" }];
+      // Ordre blir KUN fakturert via faktureringsmodulen — ingen manuell overgang her
+      return [];
     case "on_hold":
       // "Frigi" returnerer til previous_status_before_hold — håndteres dynamisk
       return [];
