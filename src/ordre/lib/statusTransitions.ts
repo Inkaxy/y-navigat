@@ -100,7 +100,8 @@ export function getStatusActions(current: OrderStatus, isReturn = false): Status
     case "partial_delivery":
       return [{ label: "Marker som fullført", to: "delivered" }];
     case "delivered":
-      return [{ label: "Marker som fakturert", to: "invoiced" }];
+      // Ordre blir KUN fakturert via faktureringsmodulen — ingen manuell overgang her
+      return [];
     case "on_hold":
       // "Frigi" returnerer til previous_status_before_hold — håndteres dynamisk
       return [];
