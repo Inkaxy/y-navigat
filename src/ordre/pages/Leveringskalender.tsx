@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect, useCallback } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import {
   Grid3x3,
@@ -168,6 +168,29 @@ export default function MatrixPage() {
     customerId && customerSchedules.length > 0 ? customerSchedules[0] : null;
   const { data: matrix, isLoading } = useMatrixData(customerId, dateFrom, dateTo);
   const { data: addableProducts } = useAddableProducts(customerId, !!customerId);
+  // MVA-sats per produkt for varer som legges til lokalt (RPC-en returnerer ikke mva_rate)
+  const addableIds = useMemo(() => (addableProducts ?? []).map((p) => p.id).sort(), [addableProducts]);
+  const { data: addableMvaRates } = useQuery({
+    queryKey: ["matrix", "addable-mva", addableIds],
+    enabled: addableIds.length > 0,
+    staleTime: 5 * 60_000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("products")
+        .select("id, mva_rate")
+        .in("id", addableIds);
+      if (error) throw error;
+      const map = new Map<string, number>();
+      for (const r of (data ?? []) as { id: string; mva_rate: number | null }[]) {
+        map.set(r.id, Number(r.mva_rate ?? 0));
+      }
+      return map;
+    },
+  });
+  const mvaRateFor = useCallback(
+    (productId: string) => addableMvaRates?.get(productId) ?? 0,
+    [addableMvaRates],
+  );
   const saveMatrix = useSaveMatrix();
   const upsertColumnComment = useUpsertColumnComment();
   const deleteMatrixColumn = useDeleteMatrixColumn();
