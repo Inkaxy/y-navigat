@@ -443,7 +443,7 @@ export default function MatrixPage() {
           product_id,
           quantity: Number(qty),
           unit_price: unitPrice,
-          line_total_incl_vat: Number(qty) * unitPrice * (1 + mvaRate),
+          line_total_incl_vat: Number(qty) * unitPrice * (1 + mvaRate / 100),
         });
       }
     }
@@ -467,7 +467,7 @@ export default function MatrixPage() {
         product_id,
         quantity: qty,
         unit_price: unitPrice,
-        line_total_incl_vat: qty * unitPrice * (1 + mvaRate),
+        line_total_incl_vat: qty * unitPrice * (1 + mvaRate / 100),
         isDraft: true,
       });
     }
