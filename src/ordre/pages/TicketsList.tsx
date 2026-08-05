@@ -20,7 +20,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  useTickets, useLatestReplyByTicket,
+  useTickets, useLatestReplyByTicket, useLatestInboundByTicket, isAwaitingCustomer,
   type Ticket, type TicketStatus, type TicketPriority,
 } from "@/ordre/hooks/useTickets";
 import { useOrdrekontorAssignees } from "@/ordre/hooks/useTicketReplies";
