@@ -22,6 +22,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { TicketPresenceBanner } from "@/ordre/components/shell/TicketPresenceBanner";
+
 import {
   useTicket,
   useUpdateTicket,
