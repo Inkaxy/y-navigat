@@ -197,6 +197,32 @@ export function PrintLabelDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, row?.product_id]);
 
+  /** Logger én print-jobb per ordrelinje (ikke bare den første) slik at
+   *  nummer-gjenbruk/logging dekker alle linjene bak etiketten. */
+  async function logJobs(
+    assignedNumber: string,
+    status: "printed" | "failed",
+  ) {
+    if (!row || !deptId) return;
+    const ids = orderLineIds.length > 0 ? orderLineIds : [null];
+    // Fordel antall: første linje får resten, øvrige 1 hver.
+    const extra = Math.max(ids.length - 1, 0);
+    const firstQty = Math.max(quantity - extra, 1);
+    for (let i = 0; i < ids.length; i++) {
+      await insertJob.mutateAsync({
+        label_number: assignedNumber,
+        product_id: row.product_id,
+        order_line_id: ids[i],
+        legal_entity_id: legalEntityId,
+        production_department_id: deptId,
+        profile_id: profileId ?? null,
+        quantity: i === 0 ? firstQty : 1,
+        printer_name: null,
+        status,
+      });
+    }
+  }
+
   const handlePrint = async () => {
     if (!row || !deptId) return;
     setErrorMessage(null);
@@ -240,49 +266,19 @@ export function PrintLabelDialog({
       setErrorMessage(`${msg} (nummer ${assignedNumber} er brent)`);
       toast.error(msg);
       try {
-        await insertJob.mutateAsync({
-          label_number: assignedNumber,
-          product_id: row.product_id,
-          order_line_id: row.order_line_ids[0] ?? null,
-          legal_entity_id: legalEntityId,
-          production_department_id: deptId,
-          profile_id: profileId ?? null,
-          quantity,
-          printer_name: null,
-          status: "failed",
-        });
+        await logJobs(assignedNumber, "failed");
       } catch { /* ignorer dobbel-feil */ }
       return;
     }
 
     try {
-      await insertJob.mutateAsync({
-        label_number: assignedNumber,
-        product_id: row.product_id,
-        order_line_id: row.order_line_ids[0] ?? null,
-        legal_entity_id: legalEntityId,
-        production_department_id: deptId,
-        profile_id: profileId ?? null,
-        quantity,
-        printer_name: null,
-        status: "printed",
-      });
+      await logJobs(assignedNumber, "printed");
       toast.success(`Etikett ${assignedNumber} skrevet ut`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Kunne ikke logge print-jobb";
       // Brent nummer — logg som failed (best effort)
       try {
-        await insertJob.mutateAsync({
-          label_number: assignedNumber,
-          product_id: row.product_id,
-          order_line_id: row.order_line_ids[0] ?? null,
-          legal_entity_id: legalEntityId,
-          production_department_id: deptId,
-          profile_id: profileId ?? null,
-          quantity,
-          printer_name: null,
-          status: "failed",
-        });
+        await logJobs(assignedNumber, "failed");
       } catch {
         // ignorer dobbel-feil
       }

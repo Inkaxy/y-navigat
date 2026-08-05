@@ -79,14 +79,19 @@ export default function EtiketterPage() {
   const { data: tours } = useDeliveryTours(legalEntityId || undefined);
   const { data: departments } = useLabelDepartments(legalEntityId || undefined);
 
-  const filter: LabelScreenFilter | null = legalEntityId
-    ? {
-        date,
-        legalEntityId,
-        tourIds: tourId === ALL ? null : [tourId],
-        departmentIds: departmentId === ALL ? null : [departmentId],
-      }
-    : null;
+  // Memoisert så realtime-kanalen ikke rives/gjenopprettes ved hver render.
+  const filter: LabelScreenFilter | null = useMemo(
+    () =>
+      legalEntityId
+        ? {
+            date,
+            legalEntityId,
+            tourIds: tourId === ALL ? null : [tourId],
+            departmentIds: departmentId === ALL ? null : [departmentId],
+          }
+        : null,
+    [legalEntityId, date, tourId, departmentId],
+  );
 
   const { data: rawRows, isLoading: rowsLoading } = useLabelProducts(filter);
 
@@ -196,17 +201,24 @@ export default function EtiketterPage() {
             productId: r.product_id,
             orderLineId: r.order_line_ids[0] ?? null,
           });
-          await insertJob.mutateAsync({
-            label_number: labelNumber,
-            product_id: r.product_id,
-            order_line_id: r.order_line_ids[0] ?? null,
-            legal_entity_id: legalEntityId,
-            production_department_id: deptId,
-            profile_id: profileId,
-            quantity: r.total_labels || 1,
-            printer_name: null,
-            status: "printed",
-          });
+          // Logg én jobb per ordrelinje, ikke bare den første.
+          const lineIds: (string | null)[] =
+            r.order_line_ids.length > 0 ? r.order_line_ids : [null];
+          const totalQty = r.total_labels || 1;
+          const firstQty = Math.max(totalQty - Math.max(lineIds.length - 1, 0), 1);
+          for (let i = 0; i < lineIds.length; i++) {
+            await insertJob.mutateAsync({
+              label_number: labelNumber,
+              product_id: r.product_id,
+              order_line_id: lineIds[i],
+              legal_entity_id: legalEntityId,
+              production_department_id: deptId,
+              profile_id: profileId,
+              quantity: i === 0 ? firstQty : 1,
+              printer_name: null,
+              status: "printed",
+            });
+          }
           ok++;
         } catch {
           failed++;

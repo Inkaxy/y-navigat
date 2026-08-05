@@ -23,6 +23,9 @@ export function useLabelRealtime(filter: LabelScreenFilter | null): {
   useEffect(() => {
     if (!filter) return;
 
+    // Guard mot at polling startes etter unmount/cleanup.
+    let active = true;
+
     const invalidate = () => {
       queryClient.invalidateQueries({ queryKey: labelProductsQueryKey(filter) });
       setLastUpdateAt(Date.now());
@@ -34,7 +37,7 @@ export function useLabelRealtime(filter: LabelScreenFilter | null): {
     };
 
     const startPolling = () => {
-      if (pollRef.current) return;
+      if (!active || pollRef.current) return;
       setStatus("polling");
       pollRef.current = setInterval(invalidate, POLL_INTERVAL_MS);
     };
@@ -64,6 +67,7 @@ export function useLabelRealtime(filter: LabelScreenFilter | null): {
         scheduleInvalidate,
       )
       .subscribe((subStatus) => {
+        if (!active) return;
         if (subStatus === "SUBSCRIBED") {
           stopPolling();
           setStatus("live");
@@ -77,6 +81,7 @@ export function useLabelRealtime(filter: LabelScreenFilter | null): {
       });
 
     return () => {
+      active = false;
       if (debounceRef.current) clearTimeout(debounceRef.current);
       stopPolling();
       supabase.removeChannel(channel);
