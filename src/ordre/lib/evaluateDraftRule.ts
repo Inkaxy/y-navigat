@@ -144,11 +144,17 @@ function evaluateType(rule: DeliveryRule, ctx: EvaluateContext): { matched: bool
       return { matched: false, message: "Tur tillatt" };
     }
     case "available_products": {
-      const allowedProducts = rule.allowed_product_ids ?? rule.product_ids ?? [];
-      const allowedGroups = rule.allowed_product_group_ids ?? rule.product_group_ids ?? [];
+      // Speiler evaluate_delivery_rules: kun allowed_*-kolonnene, ingen fallback til product_ids.
+      const allowedProducts = rule.allowed_product_ids ?? [];
+      const allowedGroups = rule.allowed_product_group_ids ?? [];
+      if (allowedProducts.length === 0 && allowedGroups.length === 0) {
+        return { matched: false, message: "Ingen tillatte varer definert" };
+      }
+      const groupAllowed =
+        allowedGroups.length > 0 && allowedGroups.some((g) => ctx.productGroupIds.includes(g));
       const bad: string[] = [];
       for (const pid of ctx.productIds) {
-        const ok = allowedProducts.includes(pid) || anyOverlap([pid], ctx.productIds) && allowedGroups.some((g) => ctx.productGroupIds.includes(g));
+        const ok = allowedProducts.includes(pid) || groupAllowed;
         if (!ok) bad.push(pid);
       }
       if (bad.length > 0) {
@@ -156,6 +162,7 @@ function evaluateType(rule: DeliveryRule, ctx: EvaluateContext): { matched: bool
       }
       return { matched: false, message: "Alle varer tillatt" };
     }
+
     case "no_delivery": {
       if (rule.blackout_from && rule.blackout_until && date >= rule.blackout_from && date <= rule.blackout_until) {
         return { matched: true, message: `Ingen leveranse ${rule.blackout_from} – ${rule.blackout_until}.` };
