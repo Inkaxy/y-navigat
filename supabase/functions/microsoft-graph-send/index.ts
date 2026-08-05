@@ -79,11 +79,11 @@ Deno.serve(async (req) => {
       if (!tpl.is_active) return json({ error: `Mal er deaktivert: ${body.template_key}` }, 400);
 
       const vars = body.variables ?? {};
-      subject = body.subject_override ?? renderTemplate(tpl.subject_template ?? "", vars);
-      htmlBody = renderTemplate(tpl.body_html_template ?? "", vars) +
+      subject = body.subject_override ?? renderTemplate(tpl.subject_template ?? "", vars, "text");
+      htmlBody = renderTemplate(tpl.body_html_template ?? "", vars, "html") +
         (signatureHtml ? `<br/><br/>${signatureHtml}` : "");
       textBody = tpl.body_text_template
-        ? renderTemplate(tpl.body_text_template, vars)
+        ? renderTemplate(tpl.body_text_template, vars, "text")
         : null;
     }
 
@@ -162,11 +162,27 @@ Deno.serve(async (req) => {
   }
 });
 
-/** Erstatter {{var}}-plassholdere i en streng. */
-function renderTemplate(tpl: string, vars: Record<string, string>): string {
-  return tpl.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (_, k: string) => {
-    const v = vars[k];
-    return v === undefined || v === null ? "" : String(v);
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+/**
+ * Erstatter {{var}}-plassholdere i en streng.
+ * Variabler HTML-escapes i html-modus. Bevisst HTML må bruke
+ * «raw»-konvensjonen: {{&var}} eller {{var_html}}.
+ */
+function renderTemplate(tpl: string, vars: Record<string, string>, mode: "html" | "text" = "text"): string {
+  return tpl.replace(/\{\{\s*(&?)([\w.]+)\s*\}\}/g, (_m, raw: string, k: string) => {
+    const v = vars[k] ?? vars[`${raw}${k}`];
+    if (v === undefined || v === null) return "";
+    const str = String(v);
+    const isRaw = raw === "&" || k.endsWith("_html");
+    return mode === "html" && !isRaw ? escapeHtml(str) : str;
   });
 }
 
