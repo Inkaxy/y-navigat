@@ -229,8 +229,29 @@ Deno.serve(async (req) => {
     const isNb = detectedLang === "nb";
 
     // --- Bygg variabler ---
-    const deadlines = computeDeadlines(order.delivery_date);
-    const isDelivery = (order.delivery_address_line1 ?? "").trim().length > 0;
+    // Frister: foretrekk aktive delivery_rules for kunden, ellers 72/48t (Oslo-tid).
+    let changeRule: DeadlineRule = null;
+    let cancelRule: DeadlineRule = null;
+    {
+      const { data: rules } = await admin.from("delivery_rules")
+        .select("rule_type,deadline_days_before,deadline_time,priority,customer_ids,is_active")
+        .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
+        .eq("is_active", true)
+        .in("rule_type", ["order_deadline", "change_deadline", "cancellation_deadline"])
+        .order("priority", { ascending: false });
+      const scoped = (rules ?? []).filter((r: any) =>
+        !r.customer_ids || r.customer_ids.length === 0 || r.customer_ids.includes(order.customer_id)
+      );
+      const pick = (types: string[]): DeadlineRule => {
+        const r = scoped.find((x: any) => types.includes(x.rule_type) && x.deadline_days_before != null);
+        return r ? { days_before: Number(r.deadline_days_before), time: String(r.deadline_time ?? "12:00") } : null;
+      };
+      changeRule = pick(["change_deadline", "order_deadline"]);
+      cancelRule = pick(["cancellation_deadline"]) ?? changeRule;
+    }
+    const deadlines = computeDeadlines(order.delivery_date, changeRule, cancelRule);
+    // Levering vs. henting styres av order.distribution, ikke adressefelt.
+    const isDelivery = (order.distribution ?? "delivery") !== "pickup";
     const pickupOrDeliveryLabel = isNb
       ? (isDelivery ? "Levering" : "Henting")
       : (isDelivery ? "Delivery" : "Pickup");
