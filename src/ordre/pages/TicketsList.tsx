@@ -210,6 +210,8 @@ export default function TicketsList() {
   // Hent siste utgående svar — for "venter på kunde"-flagget.
   const ticketIds = useMemo(() => tickets.map((t) => t.id), [tickets]);
   const { data: latestReply = new Map<string, string>() } = useLatestReplyByTicket(ticketIds);
+  const { data: latestInbound = new Map<string, string>() } = useLatestInboundByTicket(ticketIds);
+
 
   // Pre-derive AI + flags per ticket.
   type Row = {
