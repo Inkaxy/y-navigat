@@ -228,19 +228,29 @@ function computeMetrics(tickets: TicketRow[], events: EventRow[], group: Group) 
     }
   }
 
-  // Avg handling time = ticket.received → ticket.resolved (per ticket)
+  // Avg behandlingstid = mottatt → løst. `ticket.resolved`-hendelser skrives kun
+  // fra apply-ticket-change, så vi faller tilbake på ticketens egen
+  // resolved/closed-status (updated_at) når hendelsen mangler.
   const receivedMap = new Map<string, Date>();
   const resolvedMap = new Map<string, Date>();
   for (const t of tickets) receivedMap.set(t.id, new Date(t.created_at));
+  for (const t of tickets) {
+    if ((t.status === "resolved" || t.status === "closed") && t.updated_at) {
+      resolvedMap.set(t.id, new Date(t.updated_at));
+    }
+  }
   for (const e of events) {
     if (!e.ticket_id) continue;
-    if (e.event_type === "ticket.resolved") resolvedMap.set(e.ticket_id, new Date(e.occurred_at));
+    if (e.event_type === "ticket.resolved" || e.event_type === "ticket.closed") {
+      resolvedMap.set(e.ticket_id, new Date(e.occurred_at));
+    }
   }
   const handlingMins: number[] = [];
   for (const [tid, recv] of receivedMap) {
     const res = resolvedMap.get(tid);
-    if (res) handlingMins.push(differenceInMinutes(res, recv));
+    if (res) handlingMins.push(Math.max(0, differenceInMinutes(res, recv)));
   }
+
   const avgMin = handlingMins.length ? Math.round(handlingMins.reduce((a, b) => a + b, 0) / handlingMins.length) : null;
 
   // Timeline
