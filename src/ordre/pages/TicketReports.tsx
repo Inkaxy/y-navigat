@@ -183,7 +183,8 @@ function pct(part: number, total: number): string | undefined {
 function computeMetrics(tickets: TicketRow[], events: EventRow[], group: Group) {
   const totalTickets = tickets.length;
   const linkedExisting = tickets.filter((t) => t.related_order_id).length;
-  const aiCompleted = tickets.filter((t) => t.ai_status === "completed").length;
+  // `ai_status` settes til 'success' av analyse-funksjonen (aldri 'completed').
+  const aiCompleted = tickets.filter((t) => t.ai_status === "success").length;
 
   // Events
   const evByType = new Map<string, number>();
@@ -191,7 +192,9 @@ function computeMetrics(tickets: TicketRow[], events: EventRow[], group: Group) 
 
   const becameOrder = evByType.get("order.created_from_ticket") ?? 0;
   const aiEdited = evByType.get("ai.suggestion_edited") ?? 0;
-  const repliesSent = (evByType.get("reply.sent") ?? 0) + (evByType.get("confirmation.sent") ?? 0);
+  // «reply.sent» logges ikke i ticket_events — tell faktiske sendte svar.
+  const repliesSent = sentReplies + (evByType.get("confirmation.sent") ?? 0);
+
 
   // AI used = ticket linked to order AND had ai_suggestion
   const aiUsed = tickets.filter((t) => t.ai_suggestion && (t.related_order_id || hasOrderCreatedEvent(t.id, events))).length;
