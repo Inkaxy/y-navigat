@@ -376,23 +376,34 @@ export function useUpdateCustomerOrder() {
 
       const { data: prevLines, error: prevLinesErr } = await supabase
         .from("order_lines")
-        .select("product_id, quantity, unit_price, unit_price_source, unit_price_source_id, vat_rate, merknad")
+        .select("id, product_id, quantity, unit_price, unit_price_source, unit_price_source_id, vat_rate, merknad")
         .eq("order_id", orderId);
       if (prevLinesErr) throw prevLinesErr;
 
       const merknadKey = (m: unknown) => (m ? JSON.stringify(m) : "");
-      const existingByKey = new Map<
-        string,
-        { unit_price: number; unit_price_source: string | null; unit_price_source_id: string | null; vat_rate: number | null }
-      >();
+      type PrevPrice = {
+        unit_price: number;
+        unit_price_source: string | null;
+        unit_price_source_id: string | null;
+        vat_rate: number | null;
+      };
+      const existingByKey = new Map<string, PrevPrice>();
+      // Kakelinjer prises av kakebyggeren. Merknaden (cake_config m.m.) kan endres
+      // uten at prisen skal reprises, så vi matcher dem også kun på produkt.
+      const cakePriceByProduct = new Map<string, PrevPrice>();
       for (const pl of prevLines ?? []) {
-        existingByKey.set(`${pl.product_id}|${merknadKey(pl.merknad)}`, {
+        const entry: PrevPrice = {
           unit_price: Number(pl.unit_price),
           unit_price_source: (pl.unit_price_source as string | null) ?? null,
           unit_price_source_id: (pl.unit_price_source_id as string | null) ?? null,
           vat_rate: pl.vat_rate == null ? null : Number(pl.vat_rate),
-        });
+        };
+        existingByKey.set(`${pl.product_id}|${merknadKey(pl.merknad)}`, entry);
+        if (entry.unit_price_source === "cake_builder") {
+          cakePriceByProduct.set(pl.product_id, entry);
+        }
       }
+
 
       // 1. Update order header
       const updatePayload = {
