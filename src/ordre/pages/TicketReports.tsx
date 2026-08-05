@@ -83,9 +83,26 @@ export default function TicketReports() {
     },
   });
 
+  // «Svar sendt» finnes ikke som ticket_events-hendelse — tell faktiske svar.
+  const { data: sentReplies = 0 } = useQuery({
+    queryKey: ["ticket-reports-replies", since],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("ticket_replies")
+        .select("id", { count: "exact", head: true })
+        .eq("send_status", "sent")
+        .gte("created_at", since);
+      if (error) throw error;
+      return count ?? 0;
+    },
+  });
+
   const isLoading = tLoading || eLoading;
 
-  const metrics = useMemo(() => computeMetrics(tickets ?? [], events ?? [], group), [tickets, events, group]);
+  const metrics = useMemo(
+    () => computeMetrics(tickets ?? [], events ?? [], group, sentReplies ?? 0),
+    [tickets, events, group, sentReplies],
+  );
 
   return (
     <>
@@ -180,7 +197,7 @@ function pct(part: number, total: number): string | undefined {
   return `${Math.round((part / total) * 100)}%`;
 }
 
-function computeMetrics(tickets: TicketRow[], events: EventRow[], group: Group) {
+function computeMetrics(tickets: TicketRow[], events: EventRow[], group: Group, sentReplies: number) {
   const totalTickets = tickets.length;
   const linkedExisting = tickets.filter((t) => t.related_order_id).length;
   // `ai_status` settes til 'success' av analyse-funksjonen (aldri 'completed').
@@ -300,12 +317,13 @@ function hasOrderCreatedEvent(ticketId: string, events: EventRow[]): boolean {
 function detectMissingFields(s: any): string[] {
   if (!s) return [];
   const missing: string[] = [];
-  if (!s.delivery_date) missing.push("Hentedato");
+  const of = s.order_fields ?? {};
+  if (!of.delivery_date && !s.delivery_date) missing.push("Hentedato");
   if (!s.customer_match?.customer_id) missing.push("Kunde");
   const products = Array.isArray(s.products) ? s.products : [];
   if (products.length === 0) missing.push("Produkt");
   else if (products.some((p: any) => !p?.product_id)) missing.push("Produkt-match");
-  if (!s.tour && !s.pickup_location_hint && !s.outlet_id) missing.push("Hentested");
+  if (!s.tour?.tour_id && !of.pickup_location_hint && !of.outlet_id) missing.push("Hentested");
   return missing;
 }
 
