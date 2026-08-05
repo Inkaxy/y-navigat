@@ -251,6 +251,56 @@ export async function updateCakeImage(
   if (error) throw error;
 }
 
+export class CakeImageConflictError extends Error {
+  constructor() {
+    super("Kakebildet ble endret av noen andre");
+    this.name = "CakeImageConflictError";
+  }
+}
+
+/**
+ * Optimistisk låsing: oppdaterer kun hvis `updated_at` fortsatt er som da
+ * redaktøren lastet raden. Returnerer den oppdaterte raden (med forrige
+ * edited_path fra DB, ikke lokal state).
+ */
+export async function updateCakeImageGuarded(
+  id: string,
+  expectedUpdatedAt: string,
+  patch: Partial<
+    Pick<
+      CakeImage,
+      "title" | "customer_name" | "order_ref" | "notes" | "edited_path" | "editor_state" | "status" | "delivery_date"
+    >
+  >,
+): Promise<{ updated: CakeImage; previousEditedPath: string | null }> {
+  // Les DB-verdien først, slik at opprydding av gammel fil bruker sannheten i DB.
+  const { data: current, error: readErr } = await supabase
+    .from("cake_images")
+    .select("edited_path, updated_at")
+    .eq("id", id)
+    .maybeSingle();
+  if (readErr) throw readErr;
+  if (!current || (current as { updated_at: string }).updated_at !== expectedUpdatedAt) {
+    throw new CakeImageConflictError();
+  }
+
+  const { data, error } = await supabase
+    .from("cake_images")
+    .update(patch as never)
+    .eq("id", id)
+    .eq("updated_at", expectedUpdatedAt)
+    .select("*");
+  if (error) throw error;
+  const rows = (data ?? []) as CakeImage[];
+  if (rows.length === 0) throw new CakeImageConflictError();
+  return {
+    updated: rows[0],
+    previousEditedPath: (current as { edited_path: string | null }).edited_path ?? null,
+  };
+}
+
+
+
 export async function deleteCakeImage(image: CakeImage) {
   const paths = [image.original_path, image.edited_path].filter(
     Boolean,
