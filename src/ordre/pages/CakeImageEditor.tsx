@@ -59,6 +59,8 @@ import {
   updateCakeImage,
   uploadEditedPng,
   uploadOriginal,
+  updateCakeImageGuarded,
+  CakeImageConflictError,
 } from "@/ordre/lib/cakeImages";
 import { supabase } from "@/integrations/supabase/client";
 import { CakeFontPicker } from "@/ordre/components/cake-images/CakeFontPicker";
@@ -482,19 +484,24 @@ export default function CakeImageEditor() {
     try {
       const blob = await renderPng();
       const editedPath = await uploadEditedPng(blob, image.delivery_date);
-      // Slett tidligere edited-fil for å unngå opphopning
-      const prevEdited = image.edited_path;
-      await updateCakeImage(image.id, {
-        edited_path: editedPath,
-        editor_state: JSON.parse(canvasSnapshot(fabRef.current)) as never,
-        status: markFerdig
-          ? "ferdig_redigert"
-          : image.status === "skrevet_ut"
-            ? image.status
-            : "venter",
-      });
-      if (prevEdited && prevEdited !== editedPath) {
-        await supabase.storage.from(CAKE_BUCKET).remove([prevEdited]);
+      // Optimistisk låsing mot raden slik den ble lastet — hindrer at to
+      // redaktører overskriver hverandre.
+      const { previousEditedPath } = await updateCakeImageGuarded(
+        image.id,
+        image.updated_at,
+        {
+          edited_path: editedPath,
+          editor_state: JSON.parse(canvasSnapshot(fabRef.current)) as never,
+          status: markFerdig
+            ? "ferdig_redigert"
+            : image.status === "skrevet_ut"
+              ? image.status
+              : "venter",
+        },
+      );
+      // Rydd forrige edited-fil basert på DB-verdien (ikke lokal state)
+      if (previousEditedPath && previousEditedPath !== editedPath) {
+        await supabase.storage.from(CAKE_BUCKET).remove([previousEditedPath]);
       }
       await Promise.all([
         qc.invalidateQueries({ queryKey: ["cake-images"] }),
@@ -510,6 +517,14 @@ export default function CakeImageEditor() {
       }
       return true;
     } catch (e) {
+      if (e instanceof CakeImageConflictError) {
+        // Rydd opp den nye filen vi nettopp lastet opp forgjeves
+        await qc.invalidateQueries({ queryKey: ["cake-image", image.id] });
+        toast.error("Noen andre lagret dette kakebildet", {
+          description: "Bildet er lastet på nytt — gjør endringene om igjen.",
+        });
+        return false;
+      }
       console.error("[CakeImageEditor] save failed", e);
       toast.error("Kunne ikke lagre", {
         description: String((e as Error).message ?? e),
@@ -539,17 +554,21 @@ img { max-width:100%; max-height:100vh; }`;
     const img = doc.createElement("img");
     img.src = dataUrl;
     img.alt = image?.title ?? "Kakebilde";
+    const imageId = image?.id ?? null;
+    w.addEventListener("afterprint", () => {
+      if (!imageId) return;
+      // Marker først NÅR utskriften faktisk er utført
+      markPrinted([imageId])
+        .then(() => qc.invalidateQueries({ queryKey: ["cake-images"] }))
+        .catch((e) => console.error("[CakeImageEditor] markPrinted feilet", e));
+    });
     img.onload = () => {
       w.focus();
       w.print();
     };
     doc.body.appendChild(img);
-
-    if (image) {
-      await markPrinted([image.id]);
-      qc.invalidateQueries({ queryKey: ["cake-images"] });
-    }
   };
+
 
   const downloadPdf = async () => {
     const c = fabRef.current!;

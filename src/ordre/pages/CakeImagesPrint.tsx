@@ -56,12 +56,41 @@ export default function CakeImagesPrint() {
     };
   }, [ids]);
 
+  // Marker som skrevet ut FØRST etter at nettleseren faktisk har printet.
+  const runPrint = async () => {
+    if (!items || items.length === 0) return;
+    // Vent til alle bildene er lastet — ellers printes tomme sider.
+    await Promise.all(
+      items
+        .filter((i) => i.url)
+        .map(
+          (i) =>
+            new Promise<void>((resolve) => {
+              const img = new Image();
+              img.onload = () => resolve();
+              img.onerror = () => resolve();
+              img.src = i.url;
+            }),
+        ),
+    );
+    const ids = items.map((i) => i.image.id);
+    const onAfterPrint = () => {
+      window.removeEventListener("afterprint", onAfterPrint);
+      markPrinted(ids).catch((e) =>
+        console.error("[CakeImagesPrint] markPrinted feilet", e),
+      );
+    };
+    window.addEventListener("afterprint", onAfterPrint);
+    window.print();
+  };
+
   useEffect(() => {
     if (auto && items && items.length > 0) {
-      setTimeout(() => window.print(), 600);
-      markPrinted(items.map((i) => i.image.id));
+      void runPrint();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auto, items]);
+
 
   const downloadPdf = async () => {
     if (!items) return;
@@ -116,7 +145,7 @@ export default function CakeImagesPrint() {
           {items.length} kakebilde(r) — utskrift
         </div>
         <div className="ml-auto flex gap-2">
-          <Button onClick={() => { window.print(); markPrinted(items.map(i=>i.image.id)); }}>
+          <Button onClick={() => void runPrint()}>
             <Printer className="mr-2 h-4 w-4" />
             Skriv ut
           </Button>

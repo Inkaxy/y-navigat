@@ -44,6 +44,30 @@ export async function changeOrderStatus(input: ChangeStatusInput) {
     .eq("id", input.orderId);
   if (error) throw error;
 
+  // Kansellert ordre → flagg kakebildene så de ikke printes/telles videre.
+  if (input.isCancel || input.toStatus === "cancelled") {
+    try {
+      const { data: imgs } = await supabase
+        .from("cake_images")
+        .select("id, notes")
+        .eq("order_id", input.orderId);
+      for (const img of (imgs ?? []) as Array<{ id: string; notes: string | null }>) {
+        const flag = `⚠️ Ordre ${input.orderNumber} er kansellert — skal ikke produseres`;
+        await supabase
+          .from("cake_images")
+          .update({
+            status: "venter",
+            notes: img.notes?.includes(flag) ? img.notes : [flag, img.notes].filter(Boolean).join("\n"),
+          } as never)
+          .eq("id", img.id);
+      }
+    } catch (cakeErr) {
+      console.warn("[changeOrderStatus] kunne ikke flagge kakebilder", cakeErr);
+    }
+  }
+
+
+
   // Lagre kommentar på siste status_history-rad (best effort)
   if (input.comment) {
     const { data: latest } = await supabase

@@ -10986,6 +10986,39 @@ export type Database = {
         }
         Returns: Json
       }
+      increment_cake_image_print: {
+        Args: { p_ids: string[] }
+        Returns: {
+          created_at: string
+          created_by: string | null
+          customer_name: string | null
+          delivery_date: string
+          edited_path: string | null
+          editor_state: Json | null
+          id: string
+          label_number: string | null
+          legal_entity_id: string
+          notes: string | null
+          order_id: string | null
+          order_line_id: string | null
+          order_ref: string | null
+          original_path: string
+          print_count: number
+          printed_at: string | null
+          production_department_id: string | null
+          source: string
+          status: string
+          ticket_id: string | null
+          title: string
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "cake_images"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       is_internal_user: { Args: never; Returns: boolean }
       is_kiosk_user: { Args: never; Returns: boolean }
       is_kiosk_user_in_entity: { Args: { p_entity: string }; Returns: boolean }

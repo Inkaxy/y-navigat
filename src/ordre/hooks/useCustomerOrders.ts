@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
 import { fetchEffectivePricesBatch, type PriceCaller } from "@/ordre/hooks/useNBProducts";
 import { parseMerknad, type Merknad } from "@/ordre/lib/merknad";
+import { deleteCakeImage, type CakeImage } from "@/ordre/lib/cakeImages";
 
 export type CustomerOrderRow = {
   id: string;
@@ -376,23 +377,34 @@ export function useUpdateCustomerOrder() {
 
       const { data: prevLines, error: prevLinesErr } = await supabase
         .from("order_lines")
-        .select("product_id, quantity, unit_price, unit_price_source, unit_price_source_id, vat_rate, merknad")
+        .select("id, product_id, quantity, unit_price, unit_price_source, unit_price_source_id, vat_rate, merknad")
         .eq("order_id", orderId);
       if (prevLinesErr) throw prevLinesErr;
 
       const merknadKey = (m: unknown) => (m ? JSON.stringify(m) : "");
-      const existingByKey = new Map<
-        string,
-        { unit_price: number; unit_price_source: string | null; unit_price_source_id: string | null; vat_rate: number | null }
-      >();
+      type PrevPrice = {
+        unit_price: number;
+        unit_price_source: string | null;
+        unit_price_source_id: string | null;
+        vat_rate: number | null;
+      };
+      const existingByKey = new Map<string, PrevPrice>();
+      // Kakelinjer prises av kakebyggeren. Merknaden (cake_config m.m.) kan endres
+      // uten at prisen skal reprises, så vi matcher dem også kun på produkt.
+      const cakePriceByProduct = new Map<string, PrevPrice>();
       for (const pl of prevLines ?? []) {
-        existingByKey.set(`${pl.product_id}|${merknadKey(pl.merknad)}`, {
+        const entry: PrevPrice = {
           unit_price: Number(pl.unit_price),
           unit_price_source: (pl.unit_price_source as string | null) ?? null,
           unit_price_source_id: (pl.unit_price_source_id as string | null) ?? null,
           vat_rate: pl.vat_rate == null ? null : Number(pl.vat_rate),
-        });
+        };
+        existingByKey.set(`${pl.product_id}|${merknadKey(pl.merknad)}`, entry);
+        if (entry.unit_price_source === "cake_builder") {
+          cakePriceByProduct.set(pl.product_id, entry);
+        }
       }
+
 
       // 1. Update order header
       const updatePayload = {
@@ -425,7 +437,11 @@ export function useUpdateCustomerOrder() {
           const newProductIds = Array.from(
             new Set(
               input.lines
-                .filter((l) => !existingByKey.has(`${l.product_id}|${merknadKey(l.merknad ?? null)}`))
+                .filter(
+                  (l) =>
+                    !existingByKey.has(`${l.product_id}|${merknadKey(l.merknad ?? null)}`) &&
+                    !cakePriceByProduct.has(l.product_id),
+                )
                 .map((l) => l.product_id),
             ),
           );
@@ -440,7 +456,10 @@ export function useUpdateCustomerOrder() {
               : new Map<string, { price: number; vat_rate: number; source: string; special_price_id: string | null; price_list_id: string | null; is_fallback: boolean }>();
 
           lineRows = input.lines.map((l, idx) => {
-            const existing = existingByKey.get(`${l.product_id}|${merknadKey(l.merknad ?? null)}`);
+            const existing =
+              existingByKey.get(`${l.product_id}|${merknadKey(l.merknad ?? null)}`) ??
+              // Kakelinje: behold kakebygger-prisen selv om merknaden er endret.
+              cakePriceByProduct.get(l.product_id);
             let unitPrice: number;
             let vatRate: number;
             let source: string;
@@ -459,6 +478,7 @@ export function useUpdateCustomerOrder() {
               sourceId = ep?.special_price_id ?? ep?.price_list_id ?? null;
               if (!ep || ep.is_fallback) fallbackLineIndices.push(idx);
             }
+
             const subtotal = l.quantity * unitPrice;
             const vat = subtotal * (vatRate / 100);
             return {
@@ -504,6 +524,45 @@ export function useUpdateCustomerOrder() {
         throw e;
       }
 
+      // 3. Kakebilder: linjene ble byttet ut, så order_line_id peker på slettede
+      //    rader. Koble bildene til den nye linjen for samme produkt, og hold
+      //    leveringsdatoen i synk så bildet printes på riktig dag.
+      try {
+        const { data: cakeImgs } = await supabase
+          .from("cake_images")
+          .select("id, order_line_id, delivery_date")
+          .eq("order_id", orderId);
+        if ((cakeImgs ?? []).length > 0) {
+          const { data: newLines } = await supabase
+            .from("order_lines")
+            .select("id, product_id, line_number")
+            .eq("order_id", orderId)
+            .order("line_number", { ascending: true });
+          const prevProductByLineId = new Map(
+            (prevLines ?? []).map((pl) => [pl.id as string, pl.product_id as string]),
+          );
+          const availableByProduct = new Map<string, string[]>();
+          for (const nl of newLines ?? []) {
+            const list = availableByProduct.get(nl.product_id as string) ?? [];
+            list.push(nl.id as string);
+            availableByProduct.set(nl.product_id as string, list);
+          }
+          for (const img of cakeImgs ?? []) {
+            const productId = img.order_line_id
+              ? prevProductByLineId.get(img.order_line_id as string)
+              : undefined;
+            const candidates = productId ? availableByProduct.get(productId) : undefined;
+            const newLineId = candidates?.shift() ?? null;
+            const patch: Record<string, unknown> = { delivery_date: input.deliveryDate };
+            if (newLineId) patch.order_line_id = newLineId;
+            await supabase.from("cake_images").update(patch as never).eq("id", img.id);
+          }
+        }
+      } catch (cakeErr) {
+        console.warn("[useUpdateCustomerOrder] kunne ikke synke kakebilder", cakeErr);
+      }
+
+
       return { orderId, has_zero_fallback_lines: fallbackLineIndices };
     },
     onSuccess: (data) => {
@@ -524,12 +583,26 @@ export function useDeleteCustomerOrder() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (orderId: string) => {
+      // Kakebilder knyttet til ordren slettes med (inkl. filene i bucketen),
+      // ellers blir de liggende foreldreløse og telles i dashboardet.
+      const { data: cakeImgs } = await supabase
+        .from("cake_images")
+        .select("*")
+        .eq("order_id", orderId);
+      for (const img of (cakeImgs ?? []) as CakeImage[]) {
+        try {
+          await deleteCakeImage(img);
+        } catch (err) {
+          console.warn("[useDeleteCustomerOrder] kunne ikke slette kakebilde", err);
+        }
+      }
       // Delete lines first (no FK CASCADE configured, do it explicitly)
       const { error: lineErr } = await supabase.from("order_lines").delete().eq("order_id", orderId);
       if (lineErr) throw lineErr;
       const { error } = await supabase.from("orders").delete().eq("id", orderId);
       if (error) throw error;
     },
+
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["customer-orders"] });
       qc.invalidateQueries({ queryKey: ["orders"] });
