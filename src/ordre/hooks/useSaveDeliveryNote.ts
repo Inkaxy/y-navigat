@@ -253,10 +253,11 @@ export function useSaveDeliveryNote() {
       );
       await Promise.all(
         orderIds.map(async (oid) => {
-          const { data: ols } = await supabase
+          const { data: ols, error: olsErr } = await supabase
             .from("order_lines")
             .select("line_subtotal_excl_vat, line_vat, line_total_incl_vat")
             .eq("order_id", oid);
+          if (olsErr) throw olsErr;
           const sums = (ols ?? []).reduce(
             (acc: any, r: any) => ({
               s: acc.s + Number(r.line_subtotal_excl_vat ?? 0),
@@ -265,7 +266,7 @@ export function useSaveDeliveryNote() {
             }),
             { s: 0, v: 0, t: 0 }
           );
-          await supabase
+          const { error: oUpdErr } = await supabase
             .from("orders")
             .update({
               subtotal_excl_vat: round(sums.s, 2),
@@ -273,6 +274,7 @@ export function useSaveDeliveryNote() {
               total_incl_vat: round(sums.t, 2),
             })
             .eq("id", oid);
+          if (oUpdErr) throw oUpdErr;
         })
       );
 
