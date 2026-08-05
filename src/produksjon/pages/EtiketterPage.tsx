@@ -79,14 +79,19 @@ export default function EtiketterPage() {
   const { data: tours } = useDeliveryTours(legalEntityId || undefined);
   const { data: departments } = useLabelDepartments(legalEntityId || undefined);
 
-  const filter: LabelScreenFilter | null = legalEntityId
-    ? {
-        date,
-        legalEntityId,
-        tourIds: tourId === ALL ? null : [tourId],
-        departmentIds: departmentId === ALL ? null : [departmentId],
-      }
-    : null;
+  // Memoisert så realtime-kanalen ikke rives/gjenopprettes ved hver render.
+  const filter: LabelScreenFilter | null = useMemo(
+    () =>
+      legalEntityId
+        ? {
+            date,
+            legalEntityId,
+            tourIds: tourId === ALL ? null : [tourId],
+            departmentIds: departmentId === ALL ? null : [departmentId],
+          }
+        : null,
+    [legalEntityId, date, tourId, departmentId],
+  );
 
   const { data: rawRows, isLoading: rowsLoading } = useLabelProducts(filter);
 
