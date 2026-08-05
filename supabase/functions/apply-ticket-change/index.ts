@@ -73,13 +73,41 @@ Deno.serve(async (req) => {
     if (!parsed.success) return jsonErr("Ugyldig input", 400, { details: parsed.error.flatten() });
     const { ticket_id, order_id, action, changes, line_changes, cancellation_reason, mark_resolved } = parsed.data;
 
-    const { data: ticket } = await admin.from("tickets").select("id,subject,internal_notes,related_order_id").eq("id", ticket_id).maybeSingle();
+    const { data: ticket } = await admin.from("tickets")
+      .select("id,subject,internal_notes,related_order_id,ai_suggestion")
+      .eq("id", ticket_id).maybeSingle();
     if (!ticket) return jsonErr("Ticket ikke funnet", 404);
 
+    // (b) order_id må være en bekreftet ticket↔ordre-kobling — ikke vilkårlig id.
+    let linked = ticket.related_order_id === order_id;
+    if (!linked) {
+      const { data: link } = await admin.from("ticket_order_links")
+        .select("order_id").eq("ticket_id", ticket_id).eq("order_id", order_id).maybeSingle();
+      linked = !!link;
+    }
+    if (!linked) return jsonErr("Ordren er ikke koblet til denne saken", 403);
+
     const { data: order } = await admin.from("orders")
-      .select("id,order_number,status,delivery_date,delivery_time,customer_notes,internal_notes,delivery_address_line1,delivery_address_line2,delivery_postal_code,delivery_city,legal_entity_id")
+      .select("id,order_number,status,customer_id,delivery_date,delivery_time,customer_notes,internal_notes,delivery_address_line1,delivery_address_line2,delivery_postal_code,delivery_city,legal_entity_id")
       .eq("id", order_id).maybeSingle();
     if (!order) return jsonErr("Ordre ikke funnet", 404);
+
+    // (a) Låste ordrestatuser kan ikke endres fra ticket-flyten.
+    const LOCKED = new Set(["delivered", "invoiced", "cancelled"]);
+    if (LOCKED.has(String(order.status))) {
+      return jsonErr(`Ordren har status "${order.status}" og kan ikke endres`, 409);
+    }
+
+    // (d) AI-genererte UUID-er må finnes i sakens egne kandidatlister.
+    const ai = (ticket.ai_suggestion ?? {}) as Record<string, any>;
+    const allowedProductIds = new Set<string>(
+      [
+        ...(Array.isArray(ai.products) ? ai.products : []),
+        ...(Array.isArray(ai.change_intent?.line_changes) ? ai.change_intent.line_changes : []),
+      ]
+        .map((p: any) => p?.product_id)
+        .filter((x: unknown): x is string => typeof x === "string"),
+    );
 
     const nowISO = new Date().toISOString();
     const before: Record<string, unknown> = {};
@@ -124,6 +152,9 @@ Deno.serve(async (req) => {
           if (!lc.product_id || !lc.new_quantity) {
             return jsonErr("add=true krever product_id og new_quantity", 400);
           }
+          if (!allowedProductIds.has(lc.product_id)) {
+            return jsonErr("Produktet finnes ikke i sakens AI-forslag", 400);
+          }
           const { data: prod, error: pErr } = await admin
             .from("products")
             .select("id, display_name, unit_of_sale, mva_rate")
@@ -139,7 +170,18 @@ Deno.serve(async (req) => {
             .maybeSingle();
           const nextLineNo = ((maxRow?.line_number as number | undefined) ?? 0) + 1;
           const vatRate = Number((prod as any).mva_rate ?? 0);
-          // Pris settes til 0 her; ordreredigering fastsetter riktig pris via prislister.
+          // (c) Pris må hentes fra kundens prisgrunnlag — aldri 0 uten grunnlag.
+          const { data: priceRow, error: prErr } = await admin.rpc("get_customer_unit_price", {
+            p_customer_id: order.customer_id,
+            p_product_id: prod.id,
+            p_date: (order as any).delivery_date ?? new Date().toISOString().slice(0, 10),
+            p_caller: "apply-ticket-change",
+          });
+          const unitPrice = Number(priceRow ?? 0);
+          if (prErr || !(unitPrice > 0)) {
+            return jsonErr(`Fant ingen gyldig pris for produktet "${(prod as any).display_name}" — legg til linjen manuelt`, 409);
+          }
+          const addSubtotal = unitPrice * lc.new_quantity;
           const { error: iErr } = await admin.from("order_lines").insert({
             order_id,
             line_number: nextLineNo,
@@ -147,16 +189,16 @@ Deno.serve(async (req) => {
             product_snapshot: { name: (prod as any).display_name } as never,
             quantity: lc.new_quantity,
             sales_unit: (prod as any).unit_of_sale ?? "stk",
-            unit_price: 0,
-            unit_price_source: "ticket_apply",
-            line_subtotal_excl_vat: 0,
+            unit_price: unitPrice,
+            unit_price_source: "price_list",
+            line_subtotal_excl_vat: addSubtotal,
             vat_rate: vatRate,
-            line_vat: 0,
-            line_total_incl_vat: 0,
-            notes: "Lagt til via ticket — pris må bekreftes",
+            line_vat: addSubtotal * (vatRate / 100),
+            line_total_incl_vat: addSubtotal * (1 + vatRate / 100),
+            notes: "Lagt til via ticket",
           } as never);
           if (iErr) return jsonErr(`Kunne ikke legge til linje: ${iErr.message}`, 500);
-          lineChangesLog.push({ op: "add", product_id: prod.id, product_name: (prod as any).display_name, quantity: lc.new_quantity });
+          lineChangesLog.push({ op: "add", product_id: prod.id, product_name: (prod as any).display_name, quantity: lc.new_quantity, unit_price: unitPrice });
         } else {
           if (!lc.order_line_id || lc.new_quantity == null) {
             return jsonErr("Endring krever order_line_id og new_quantity", 400);
