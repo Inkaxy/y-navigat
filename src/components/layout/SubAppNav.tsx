@@ -46,6 +46,7 @@ import {
   ListChecks,
   KeyRound,
   Printer,
+  Globe,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -91,6 +92,7 @@ const STATIC_SUBMENUS: Record<string, { prefix: string; appSlug: string; items: 
       { kind: "link", to: "/ordre/ordrer", label: "Bestillinger", icon: ClipboardList },
       { kind: "link", to: "/ordre/pakksedler", label: "Pakksedler", icon: Package },
       { kind: "link", to: "/ordre/kakebilder", label: "Kakebilder", icon: CakeSlice },
+      { kind: "link", to: "/ordre/nettbutikk", label: "Nettbutikk-ordre", icon: Globe },
       { kind: "link", to: "/ordre/turer", label: "Turer", icon: Truck },
       { kind: "link", to: "/ordre/leveringsregler", label: "Leveringsregler", icon: Route },
       { kind: "link", to: "/ordre/faste-rutiner", label: "Fastordre", icon: Repeat },
@@ -168,8 +170,11 @@ export function SubAppNav() {
   const isRavarer = pathname === "/ravarer" || pathname.startsWith("/ravarer/");
   const isVarer = pathname === "/varer" || pathname.startsWith("/varer/");
 
+  const isOrdreNav = pathname === "/ordre" || pathname.startsWith("/ordre/");
+
   if (isRavarer) return <RavarerNav />;
   if (isVarer) return <VarerNav />;
+  if (isOrdreNav) return <OrdreNav />;
 
   const staticMatch = Object.values(STATIC_SUBMENUS).find(
     (s) => pathname === s.prefix || pathname.startsWith(s.prefix + "/"),
@@ -259,6 +264,31 @@ function RavarerNav() {
   }
 
   return <NavBar appSlug="ravarer" items={items} />;
+}
+
+function OrdreNav() {
+  const { data: pendingWebOrders = 0 } = useQuery({
+    queryKey: ["website-orders", "pending-count"],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("website_orders")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "received");
+      if (error) return 0;
+      return count ?? 0;
+    },
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+  });
+
+  const base = STATIC_SUBMENUS.ordre.items;
+  const items: NavItem[] = base.map((item) =>
+    item.kind === "link" && item.to === "/ordre/nettbutikk"
+      ? { ...item, badge: pendingWebOrders }
+      : item,
+  );
+
+  return <NavBar appSlug="ordre" items={items} />;
 }
 
 function VarerNav() {

@@ -158,6 +158,7 @@ const OrdreAiForslag = lazy(() => import("@/ordre/pages/AiForslag"));
 const OrdreTicketReports = lazy(() => import("@/ordre/pages/TicketReports"));
 const OrdreRefundsQueue = lazy(() => import("@/ordre/pages/RefundsQueue"));
 const OrdrePakkesystem = lazy(() => import("@/ordre/pages/Pakkesystem"));
+const OrdreWebsiteOrders = lazy(() => import("@/ordre/pages/WebsiteOrders"));
 const RavarerVareliste = lazy(() => import("@/ravarer/pages/Vareliste"));
 const RavarerDetail = lazy(() => import("@/ravarer/pages/RawMaterialDetail"));
 const FakturaerList = lazy(() => import("@/fakturaer/pages/FakturaerList"));
@@ -377,6 +378,7 @@ const App = () => (
               <Route path="/ordre/leveringskalender" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreLeveringskalender /></AppAccessGuard></Shell>} />
               <Route path="/ordre/ticket" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreTicketsList /></AppAccessGuard></Shell>} />
               <Route path="/ordre/ticket/:id" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreTicketDetail /></AppAccessGuard></Shell>} />
+              <Route path="/ordre/nettbutikk" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreWebsiteOrders /></AppAccessGuard></Shell>} />
               <Route path="/ordre/tilbakebetalinger" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreRefundsQueue /></AppAccessGuard></Shell>} />
               <Route path="/ordre/ai-forslag" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreAiForslag /></AppAccessGuard></Shell>} />
               <Route path="/ordre/ticket-rapporter" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreTicketReports /></AppAccessGuard></Shell>} />
