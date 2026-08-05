@@ -15,6 +15,12 @@ import {
 } from "@/ordre/lib/aiSuggestion";
 import { TEAMS, TEAM_LABEL, type TicketTeam } from "@/ordre/lib/teams";
 import { useSlaSettings } from "@/ordre/hooks/useSlaSettings";
+import {
+  useLatestReplyByTicket,
+  useLatestInboundByTicket,
+  isAwaitingCustomer,
+} from "@/ordre/hooks/useTickets";
+
 import { computeDeadline, formatCountdown } from "@/ordre/lib/sla";
 
 type TicketRow = {
