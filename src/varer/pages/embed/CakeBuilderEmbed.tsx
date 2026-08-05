@@ -1,7 +1,12 @@
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { CakeBuilder } from "@/varer/features/cakeBuilder/CakeBuilder";
-import { listenFromParent, postToParent } from "@/varer/features/cakeBuilder/protocol";
+import {
+  listenFromParent,
+  postToParent,
+  CAKE_BUILDER_SOURCE,
+  CAKE_BUILDER_PROTOCOL_VERSION,
+} from "@/varer/features/cakeBuilder/protocol";
 import { isAllowedOrigin } from "@/varer/features/cakeBuilder/origins";
 import { supabase } from "@/integrations/supabase/client";
 import type { CakeResult, PriceBreakdown } from "@/varer/features/cakeBuilder/types";
@@ -120,17 +125,28 @@ export default function CakeBuilderEmbed() {
   useEffect(() => {
     postToParent({ type: "cake-builder/ready" });
     const onSetSession = (event: MessageEvent) => {
+      // Origin må være allowlistet, og meldingen må komme fra parent-vinduet.
       if (!isAllowedOrigin(event.origin)) return;
-      const payload = (event.data as { source?: string; payload?: { type?: string; access_token?: string; refresh_token?: string } } | undefined)?.payload;
+      if (event.source !== window.parent) return;
+      const data = event.data as
+        | {
+            source?: string;
+            version?: number;
+            payload?: { type?: string; access_token?: string; refresh_token?: string };
+          }
+        | undefined;
+      if (!data || typeof data !== "object") return;
+      if (data.source !== CAKE_BUILDER_SOURCE) return;
+      if (data.version !== CAKE_BUILDER_PROTOCOL_VERSION) return;
+      const payload = data.payload;
       if (!payload || payload.type !== "cake-builder/set-session") return;
+      if (typeof payload.access_token !== "string" || typeof payload.refresh_token !== "string") return;
       (async () => {
         try {
-          if (payload.access_token && payload.refresh_token) {
-            await supabase.auth.setSession({
-              access_token: payload.access_token,
-              refresh_token: payload.refresh_token,
-            });
-          }
+          await supabase.auth.setSession({
+            access_token: payload.access_token!,
+            refresh_token: payload.refresh_token!,
+          });
         } catch {
           /* ignore */
         } finally {
