@@ -10082,6 +10082,7 @@ export type Database = {
           business_org_no: string | null
           callback_at: string | null
           callback_status: string | null
+          converted_order_id: string | null
           created_at: string
           customer_email: string | null
           customer_name: string | null
@@ -10114,6 +10115,7 @@ export type Database = {
           business_org_no?: string | null
           callback_at?: string | null
           callback_status?: string | null
+          converted_order_id?: string | null
           created_at?: string
           customer_email?: string | null
           customer_name?: string | null
@@ -10146,6 +10148,7 @@ export type Database = {
           business_org_no?: string | null
           callback_at?: string | null
           callback_status?: string | null
+          converted_order_id?: string | null
           created_at?: string
           customer_email?: string | null
           customer_name?: string | null
@@ -10173,7 +10176,15 @@ export type Database = {
           total_net?: number | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "website_orders_converted_order_id_fkey"
+            columns: ["converted_order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       widget_registry: {
         Row: {
@@ -10435,6 +10446,10 @@ export type Database = {
           resolved_unit_price: number
         }[]
       }
+      alert_email_subscription_failure: {
+        Args: { p_detail?: string }
+        Returns: undefined
+      }
       app_access_level: {
         Args: { p_app_code: string }
         Returns: Database["public"]["Enums"]["access_level"]
@@ -10571,6 +10586,10 @@ export type Database = {
         Args: { p_legal_entity_id: string }
         Returns: Json
       }
+      convert_website_order: {
+        Args: { p_website_order_id: string }
+        Returns: string
+      }
       create_invoice_run: {
         Args: {
           p_groups: string[]
@@ -10635,6 +10654,7 @@ export type Database = {
         Args: { path: string }
         Returns: string
       }
+      find_ticket_by_short_id: { Args: { p_short: string }; Returns: string }
       gen_rfq_password: { Args: never; Returns: string }
       gen_rfq_token: { Args: never; Returns: string }
       generate_delivery_notes: {
