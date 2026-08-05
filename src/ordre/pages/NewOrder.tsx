@@ -434,6 +434,8 @@ export default function NewOrder() {
   const enforcedRefMissing = enforceRef && !enforcedRefValue;
   const [manualTourId, setManualTourId] = useState<string | null>(null);
   const [lines, setLines] = useState<LineDraft[]>([newLine()]);
+  const linesRef = useRef<LineDraft[]>(lines);
+  linesRef.current = lines;
   const [submitting, setSubmitting] = useState(false);
   const [copyDialogOpen, setCopyDialogOpen] = useState(false);
   const submittingRef = useRef(submitting);
