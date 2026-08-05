@@ -554,17 +554,21 @@ img { max-width:100%; max-height:100vh; }`;
     const img = doc.createElement("img");
     img.src = dataUrl;
     img.alt = image?.title ?? "Kakebilde";
+    const imageId = image?.id ?? null;
+    w.addEventListener("afterprint", () => {
+      if (!imageId) return;
+      // Marker først NÅR utskriften faktisk er utført
+      markPrinted([imageId])
+        .then(() => qc.invalidateQueries({ queryKey: ["cake-images"] }))
+        .catch((e) => console.error("[CakeImageEditor] markPrinted feilet", e));
+    });
     img.onload = () => {
       w.focus();
       w.print();
     };
     doc.body.appendChild(img);
-
-    if (image) {
-      await markPrinted([image.id]);
-      qc.invalidateQueries({ queryKey: ["cake-images"] });
-    }
   };
+
 
   const downloadPdf = async () => {
     const c = fabRef.current!;
