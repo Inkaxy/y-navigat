@@ -145,7 +145,7 @@ export default function CakeImagesPrint() {
           {items.length} kakebilde(r) — utskrift
         </div>
         <div className="ml-auto flex gap-2">
-          <Button onClick={() => { window.print(); markPrinted(items.map(i=>i.image.id)); }}>
+          <Button onClick={() => void runPrint()}>
             <Printer className="mr-2 h-4 w-4" />
             Skriv ut
           </Button>
