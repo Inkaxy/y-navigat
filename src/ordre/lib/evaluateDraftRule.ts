@@ -73,15 +73,19 @@ function scopeMatches(rule: DeliveryRule, ctx: EvaluateContext): boolean {
   if (rule.tour_filter && rule.tour_filter.length > 0 && rule.rule_type !== "available_tours") {
     if (!ctx.deliveryTourId || !rule.tour_filter.includes(ctx.deliveryTourId)) return false;
   }
-  // Varer (kun som scope-filter, ikke available_products)
+  // Varer (kun som scope-filter, ikke available_products).
+  // Regelen er i scope hvis den IKKE har produkt-scope, ELLER ordrens varer/
+  // varegrupper faktisk overlapper regelens produkt- eller gruppesett.
   if (rule.rule_type !== "available_products") {
-    if (rule.product_ids && rule.product_ids.length > 0) {
-      if (!anyOverlap(rule.product_ids, ctx.productIds)) return false;
-    }
-    if (rule.product_group_ids && rule.product_group_ids.length > 0) {
-      if (!anyOverlap(rule.product_group_ids, ctx.productGroupIds)) return false;
+    const hasProductScope = !!(rule.product_ids && rule.product_ids.length > 0);
+    const hasGroupScope = !!(rule.product_group_ids && rule.product_group_ids.length > 0);
+    if (hasProductScope || hasGroupScope) {
+      const productHit = hasProductScope && anyOverlap(rule.product_ids, ctx.productIds);
+      const groupHit = hasGroupScope && anyOverlap(rule.product_group_ids, ctx.productGroupIds);
+      if (!productHit && !groupHit) return false;
     }
   }
+
   // Spesifikk dato
   if (rule.specific_delivery_date && ctx.deliveryDate !== rule.specific_delivery_date) return false;
   return true;
