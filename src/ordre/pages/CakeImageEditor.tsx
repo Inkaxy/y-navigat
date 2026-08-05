@@ -59,6 +59,8 @@ import {
   updateCakeImage,
   uploadEditedPng,
   uploadOriginal,
+  updateCakeImageGuarded,
+  CakeImageConflictError,
 } from "@/ordre/lib/cakeImages";
 import { supabase } from "@/integrations/supabase/client";
 import { CakeFontPicker } from "@/ordre/components/cake-images/CakeFontPicker";
