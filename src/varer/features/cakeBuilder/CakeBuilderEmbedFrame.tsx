@@ -18,7 +18,7 @@
 // den eneste tillatte iframe-veien.
 // ============================================================================
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   buildCakeBuilderEmbedUrl,
   createCakeBuilderListener,
@@ -89,6 +89,8 @@ export function CakeBuilderEmbedFrame({
   onError,
 }: CakeBuilderEmbedFrameProps) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const [frameWindow, setFrameWindow] = useState<Window | null>(null);
+
 
   const src = useMemo(
     () =>
@@ -105,39 +107,37 @@ export function CakeBuilderEmbedFrame({
   );
 
   useEffect(() => {
-    const off = createCakeBuilderListener((msg: EmbedToParentMessage) => {
-      // Begrens til meldinger fra _vår_ iframe (hvis flere instanser på siden).
-      // event.source-sjekken gjøres ved å slå opp i contentWindow her, men
-      // createCakeBuilderListener gir oss kun payload — den filtrerer allerede
-      // på source+version, og duplikate cake-builder-iframes på samme side er
-      // svært sjeldent. Hvis det blir et reelt problem kan vi utvide kontrakten
-      // med en instance_id i v2.
-      switch (msg.type) {
-        case "cake-builder/ready":
-          onReady?.();
-          break;
-        case "cake-builder/step-changed":
-          onStepChange?.(msg.step_index, msg.step_name);
-          break;
-        case "cake-builder/price-changed":
-          onPriceChange?.(msg.total_ex_mva, msg.total_inc_mva);
-          break;
-        case "cake-builder/config-updated":
-          onConfigUpdated?.();
-          break;
-        case "cake-builder/done":
-          onComplete?.(msg.result);
-          break;
-        case "cake-builder/cancel":
-          onCancel?.();
-          break;
-        case "cake-builder/error":
-          onError?.(msg.message);
-          break;
-      }
-    });
+    const off = createCakeBuilderListener(
+      (msg: EmbedToParentMessage) => {
+        switch (msg.type) {
+          case "cake-builder/ready":
+            onReady?.();
+            break;
+          case "cake-builder/step-changed":
+            onStepChange?.(msg.step_index, msg.step_name);
+            break;
+          case "cake-builder/price-changed":
+            onPriceChange?.(msg.total_ex_mva, msg.total_inc_mva);
+            break;
+          case "cake-builder/config-updated":
+            onConfigUpdated?.();
+            break;
+          case "cake-builder/done":
+            onComplete?.(msg.result);
+            break;
+          case "cake-builder/cancel":
+            onCancel?.();
+            break;
+          case "cake-builder/error":
+            onError?.(msg.message);
+            break;
+        }
+      },
+      // Kun meldinger fra _vår_ iframe, og kun fra allowlistede origins.
+      { expectedSource: frameWindow },
+    );
     return off;
-  }, [onReady, onStepChange, onPriceChange, onConfigUpdated, onComplete, onCancel, onError]);
+  }, [frameWindow, onReady, onStepChange, onPriceChange, onConfigUpdated, onComplete, onCancel, onError]);
 
   return (
     <iframe
@@ -147,6 +147,8 @@ export function CakeBuilderEmbedFrame({
       className={className}
       style={{ border: 0, width: "100%", height: "100%", ...style }}
       allow="clipboard-write"
+      onLoad={() => setFrameWindow(iframeRef.current?.contentWindow ?? null)}
     />
   );
+
 }

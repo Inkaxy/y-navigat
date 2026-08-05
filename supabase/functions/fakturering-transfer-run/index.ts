@@ -372,7 +372,11 @@ Deno.serve(async (req) => {
             const allOrdersOnNote = (allNoteLinks ?? []).map((r: any) => r.order_id);
             const allInvoiced = allOrdersOnNote.every((oid: string) => orderIds.includes(oid));
             if (allInvoiced) {
-              await admin.from("delivery_notes").update({ status: "invoiced" }).eq("id", noteId);
+              const { error: dnErr } = await admin
+                .from("delivery_notes").update({ status: "invoiced" }).eq("id", noteId);
+              if (dnErr) {
+                console.error(`Kunne ikke flagge pakkseddel ${noteId} som fakturert:`, dnErr.message);
+              }
             }
           }
         }

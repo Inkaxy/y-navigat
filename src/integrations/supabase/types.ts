@@ -2886,6 +2886,21 @@ export type Database = {
           },
         ]
       }
+      kiosk_session_attempts: {
+        Row: {
+          attempted_at: string
+          ip: string
+        }
+        Insert: {
+          attempted_at?: string
+          ip: string
+        }
+        Update: {
+          attempted_at?: string
+          ip?: string
+        }
+        Relationships: []
+      }
       label_number_sequences: {
         Row: {
           last_number: number
@@ -10499,6 +10514,52 @@ export type Database = {
           rule_name: string
         }[]
       }
+      claim_email_outbox_batch: {
+        Args: { p_limit?: number }
+        Returns: {
+          attempt_count: number
+          created_at: string
+          error_message: string | null
+          id: string
+          last_attempt_at: string | null
+          recipient_email: string
+          related_entity_id: string | null
+          related_entity_type: string | null
+          sent_at: string | null
+          status: string
+          template_key: string
+          variables: Json
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "email_outbox"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      claim_email_outbox_one: {
+        Args: { p_id: string }
+        Returns: {
+          attempt_count: number
+          created_at: string
+          error_message: string | null
+          id: string
+          last_attempt_at: string | null
+          recipient_email: string
+          related_entity_id: string | null
+          related_entity_type: string | null
+          sent_at: string | null
+          status: string
+          template_key: string
+          variables: Json
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "email_outbox"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       cleanup_old_printed_cake_images: {
         Args: never
         Returns: {
@@ -10633,6 +10694,7 @@ export type Database = {
         Returns: Json
       }
       get_cake_cleanup_secret: { Args: never; Returns: string }
+      get_cron_secret: { Args: never; Returns: string }
       get_customer_effective_settings: {
         Args: { p_customer_id: string }
         Returns: Json
@@ -10745,6 +10807,13 @@ export type Database = {
           sum_excl_vat: number
           sum_incl_vat: number
           tour_number: number
+        }[]
+      }
+      get_kiosk_provision_token: {
+        Args: never
+        Returns: {
+          enforce: boolean
+          token: string
         }[]
       }
       get_label_products_for_date: {
@@ -10904,6 +10973,7 @@ export type Database = {
       is_platform_admin: { Args: never; Returns: boolean }
       is_platform_owner: { Args: { _user_id: string }; Returns: boolean }
       is_ravarer_owner: { Args: { _user_id: string }; Returns: boolean }
+      kiosk_session_rate_ok: { Args: { p_ip: string }; Returns: boolean }
       list_active_cake_categories: {
         Args: { p_legal_entity_id: string }
         Returns: {

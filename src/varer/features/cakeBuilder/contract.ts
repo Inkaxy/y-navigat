@@ -64,6 +64,7 @@ import {
   type EmbedToParentMessage,
   type WrappedMessage,
 } from "./protocol";
+import { isAllowedOrigin } from "./origins";
 
 /**
  * Lager en `message`-event-listener som filtrerer på NBOS Cake Builder-protokollen
@@ -88,9 +89,20 @@ import {
  */
 export function createCakeBuilderListener(
   handler: (msg: EmbedToParentMessage) => void,
+  options?: {
+    /** Kun godta meldinger fra dette vinduet (typisk iframe.contentWindow). */
+    expectedSource?: Window | null;
+    /** Ekstra origin som skal godtas (i tillegg til allowlisten). */
+    expectedOrigin?: string;
+  },
 ): () => void {
   if (typeof window === "undefined") return () => {};
   const listener = (event: MessageEvent) => {
+    // 1) Origin må være på allowlisten (eller eksplisitt forventet origin).
+    if (!isAllowedOrigin(event.origin)) return;
+    if (options?.expectedOrigin && event.origin !== options.expectedOrigin) return;
+    // 2) Hvis vi vet hvilket vindu meldingen skal komme fra, krev match.
+    if (options?.expectedSource && event.source !== options.expectedSource) return;
     const data = event.data as WrappedMessage<EmbedToParentMessage> | undefined;
     if (!data || typeof data !== "object") return;
     if (data.source !== CAKE_BUILDER_SOURCE) return;
@@ -101,6 +113,7 @@ export function createCakeBuilderListener(
   window.addEventListener("message", listener);
   return () => window.removeEventListener("message", listener);
 }
+
 
 /**
  * Bygger en korrekt embed-URL for v1-kontrakten. Bruk denne i stedet for å
