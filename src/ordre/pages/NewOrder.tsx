@@ -533,7 +533,10 @@ export default function NewOrder() {
           }
         }),
       );
-      const byUid = new Map(results.filter(Boolean).map((r) => [r!.uid, r!]));
+      type PriceUpdate = NonNullable<(typeof results)[number]>;
+      const byUid = new Map<string, PriceUpdate>(
+        results.filter((r): r is PriceUpdate => r !== null).map((r) => [r.uid, r]),
+      );
       if (byUid.size === 0) return;
       setLines((prev) =>
         prev.map((l) => {
