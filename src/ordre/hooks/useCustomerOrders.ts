@@ -436,7 +436,11 @@ export function useUpdateCustomerOrder() {
           const newProductIds = Array.from(
             new Set(
               input.lines
-                .filter((l) => !existingByKey.has(`${l.product_id}|${merknadKey(l.merknad ?? null)}`))
+                .filter(
+                  (l) =>
+                    !existingByKey.has(`${l.product_id}|${merknadKey(l.merknad ?? null)}`) &&
+                    !cakePriceByProduct.has(l.product_id),
+                )
                 .map((l) => l.product_id),
             ),
           );
@@ -451,7 +455,10 @@ export function useUpdateCustomerOrder() {
               : new Map<string, { price: number; vat_rate: number; source: string; special_price_id: string | null; price_list_id: string | null; is_fallback: boolean }>();
 
           lineRows = input.lines.map((l, idx) => {
-            const existing = existingByKey.get(`${l.product_id}|${merknadKey(l.merknad ?? null)}`);
+            const existing =
+              existingByKey.get(`${l.product_id}|${merknadKey(l.merknad ?? null)}`) ??
+              // Kakelinje: behold kakebygger-prisen selv om merknaden er endret.
+              cakePriceByProduct.get(l.product_id);
             let unitPrice: number;
             let vatRate: number;
             let source: string;
@@ -470,6 +477,7 @@ export function useUpdateCustomerOrder() {
               sourceId = ep?.special_price_id ?? ep?.price_list_id ?? null;
               if (!ep || ep.is_fallback) fallbackLineIndices.push(idx);
             }
+
             const subtotal = l.quantity * unitPrice;
             const vat = subtotal * (vatRate / 100);
             return {
