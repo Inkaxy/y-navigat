@@ -36,7 +36,7 @@ export function useSaveSlaSettings() {
       for (const r of rows) {
         const { error } = await supabase
           .from("platform_settings")
-          .upsert(r as never, { onConflict: "category,key" });
+          .upsert(r as never, { onConflict: "key" });
         if (error) throw error;
       }
     },

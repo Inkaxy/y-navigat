@@ -20,7 +20,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  useTickets, useLatestReplyByTicket,
+  useTickets, useLatestReplyByTicket, useLatestInboundByTicket, isAwaitingCustomer,
   type Ticket, type TicketStatus, type TicketPriority,
 } from "@/ordre/hooks/useTickets";
 import { useOrdrekontorAssignees } from "@/ordre/hooks/useTicketReplies";
@@ -210,6 +210,8 @@ export default function TicketsList() {
   // Hent siste utgående svar — for "venter på kunde"-flagget.
   const ticketIds = useMemo(() => tickets.map((t) => t.id), [tickets]);
   const { data: latestReply = new Map<string, string>() } = useLatestReplyByTicket(ticketIds);
+  const { data: latestInbound = new Map<string, string>() } = useLatestInboundByTicket(ticketIds);
+
 
   // Pre-derive AI + flags per ticket.
   type Row = {
@@ -232,10 +234,13 @@ export default function TicketsList() {
       const pickupDate = getPickupDate(ai);
       const pickupHint = getPickupHint(ai);
       const requestType = ai?.request_type ?? null;
-      const lastOut = latestReply.get(t.id);
-      const awaitingCustomer = !!lastOut
-        && new Date(lastOut).getTime() > new Date(t.received_at).getTime()
-        && (t.status === "new" || t.status === "in_progress");
+      const awaitingCustomer =
+        isAwaitingCustomer({
+          receivedAt: t.received_at,
+          lastOutgoing: latestReply.get(t.id),
+          lastInbound: latestInbound.get(t.id),
+        }) && (t.status === "new" || t.status === "in_progress");
+
       const missingInfo = hasMissingInfo(ai);
       const redRisk = hasRedRisk(ai);
       const linked = !!t.related_order_id;
@@ -250,7 +255,7 @@ export default function TicketsList() {
         awaitingCustomer, missingInfo, redRisk, linked, aiReady, readyForOrder,
       };
     });
-  }, [tickets, latestReply]);
+  }, [tickets, latestReply, latestInbound]);
 
   const filtered: Row[] = useMemo(() => {
     const today = todayIso();

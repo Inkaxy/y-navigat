@@ -15,6 +15,12 @@ import {
 } from "@/ordre/lib/aiSuggestion";
 import { TEAMS, TEAM_LABEL, type TicketTeam } from "@/ordre/lib/teams";
 import { useSlaSettings } from "@/ordre/hooks/useSlaSettings";
+import {
+  useLatestReplyByTicket,
+  useLatestInboundByTicket,
+  isAwaitingCustomer,
+} from "@/ordre/hooks/useTickets";
+
 import { computeDeadline, formatCountdown } from "@/ordre/lib/sla";
 
 type TicketRow = {
@@ -211,11 +217,16 @@ export default function TicketsInbox() {
 
   const { data: sla } = useSlaSettings();
 
+  const ticketIds = useMemo(() => tickets.map((t) => t.id), [tickets]);
+  const { data: latestReply = new Map<string, string>() } = useLatestReplyByTicket(ticketIds);
+  const { data: latestInbound = new Map<string, string>() } = useLatestInboundByTicket(ticketIds);
+
   type Row = TicketRow & {
     intent: RequestType | null;
     deadline: Date | null;
     overdue: boolean;
     countdown: string | null;
+    awaitingCustomer: boolean;
   };
 
   const rows: Row[] = useMemo(
@@ -232,11 +243,18 @@ export default function TicketsInbox() {
           deadline,
           overdue: cd?.overdue ?? false,
           countdown: cd?.text ?? null,
+          // «Venter på kunde» = siste utgående er nyere enn siste inngående.
+          awaitingCustomer: isAwaitingCustomer({
+            receivedAt: t.received_at,
+            lastOutgoing: latestReply.get(t.id),
+            lastInbound: latestInbound.get(t.id),
+          }),
         };
       });
     },
-    [tickets, sla],
+    [tickets, sla, latestReply, latestInbound],
   );
+
 
   const isOpen = (t: Row) => t.status === "new" || t.status === "in_progress";
 
@@ -244,7 +262,7 @@ export default function TicketsInbox() {
     const open = rows.filter(isOpen);
     const c = {
       all: open.length,
-      awaiting_customer: rows.filter((r) => r.awaiting_internal && isOpen(r)).length,
+      awaiting_customer: rows.filter((r) => r.awaitingCustomer && isOpen(r)).length,
       resolved: rows.filter((r) => r.status === "resolved").length,
       mine: rows.filter((r) => r.assigned_to === user?.id && isOpen(r)).length,
       intent: {} as Record<RequestType, number>,
@@ -290,7 +308,7 @@ export default function TicketsInbox() {
     else if (queue === "mine")
       out = rows.filter((r) => r.assigned_to === user?.id && isOpen(r));
     else if (queue === "awaiting_customer")
-      out = rows.filter((r) => r.awaiting_internal && isOpen(r));
+      out = rows.filter((r) => r.awaitingCustomer && isOpen(r));
     else if (queue === "resolved") out = rows.filter((r) => r.status === "resolved");
     else if (queue.startsWith("intent:")) {
       const k = queue.slice("intent:".length) as RequestType;

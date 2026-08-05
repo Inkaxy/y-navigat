@@ -83,9 +83,26 @@ export default function TicketReports() {
     },
   });
 
+  // «Svar sendt» finnes ikke som ticket_events-hendelse — tell faktiske svar.
+  const { data: sentReplies = 0 } = useQuery({
+    queryKey: ["ticket-reports-replies", since],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("ticket_replies")
+        .select("id", { count: "exact", head: true })
+        .eq("send_status", "sent")
+        .gte("created_at", since);
+      if (error) throw error;
+      return count ?? 0;
+    },
+  });
+
   const isLoading = tLoading || eLoading;
 
-  const metrics = useMemo(() => computeMetrics(tickets ?? [], events ?? [], group), [tickets, events, group]);
+  const metrics = useMemo(
+    () => computeMetrics(tickets ?? [], events ?? [], group, sentReplies ?? 0),
+    [tickets, events, group, sentReplies],
+  );
 
   return (
     <>
@@ -180,10 +197,11 @@ function pct(part: number, total: number): string | undefined {
   return `${Math.round((part / total) * 100)}%`;
 }
 
-function computeMetrics(tickets: TicketRow[], events: EventRow[], group: Group) {
+function computeMetrics(tickets: TicketRow[], events: EventRow[], group: Group, sentReplies: number) {
   const totalTickets = tickets.length;
   const linkedExisting = tickets.filter((t) => t.related_order_id).length;
-  const aiCompleted = tickets.filter((t) => t.ai_status === "completed").length;
+  // `ai_status` settes til 'success' av analyse-funksjonen (aldri 'completed').
+  const aiCompleted = tickets.filter((t) => t.ai_status === "success").length;
 
   // Events
   const evByType = new Map<string, number>();
@@ -191,7 +209,9 @@ function computeMetrics(tickets: TicketRow[], events: EventRow[], group: Group) 
 
   const becameOrder = evByType.get("order.created_from_ticket") ?? 0;
   const aiEdited = evByType.get("ai.suggestion_edited") ?? 0;
-  const repliesSent = (evByType.get("reply.sent") ?? 0) + (evByType.get("confirmation.sent") ?? 0);
+  // «reply.sent» logges ikke i ticket_events — tell faktiske sendte svar.
+  const repliesSent = sentReplies + (evByType.get("confirmation.sent") ?? 0);
+
 
   // AI used = ticket linked to order AND had ai_suggestion
   const aiUsed = tickets.filter((t) => t.ai_suggestion && (t.related_order_id || hasOrderCreatedEvent(t.id, events))).length;
@@ -228,19 +248,29 @@ function computeMetrics(tickets: TicketRow[], events: EventRow[], group: Group) 
     }
   }
 
-  // Avg handling time = ticket.received → ticket.resolved (per ticket)
+  // Avg behandlingstid = mottatt → løst. `ticket.resolved`-hendelser skrives kun
+  // fra apply-ticket-change, så vi faller tilbake på ticketens egen
+  // resolved/closed-status (updated_at) når hendelsen mangler.
   const receivedMap = new Map<string, Date>();
   const resolvedMap = new Map<string, Date>();
   for (const t of tickets) receivedMap.set(t.id, new Date(t.created_at));
+  for (const t of tickets) {
+    if ((t.status === "resolved" || t.status === "closed") && t.updated_at) {
+      resolvedMap.set(t.id, new Date(t.updated_at));
+    }
+  }
   for (const e of events) {
     if (!e.ticket_id) continue;
-    if (e.event_type === "ticket.resolved") resolvedMap.set(e.ticket_id, new Date(e.occurred_at));
+    if (e.event_type === "ticket.resolved" || e.event_type === "ticket.closed") {
+      resolvedMap.set(e.ticket_id, new Date(e.occurred_at));
+    }
   }
   const handlingMins: number[] = [];
   for (const [tid, recv] of receivedMap) {
     const res = resolvedMap.get(tid);
-    if (res) handlingMins.push(differenceInMinutes(res, recv));
+    if (res) handlingMins.push(Math.max(0, differenceInMinutes(res, recv)));
   }
+
   const avgMin = handlingMins.length ? Math.round(handlingMins.reduce((a, b) => a + b, 0) / handlingMins.length) : null;
 
   // Timeline
@@ -287,12 +317,13 @@ function hasOrderCreatedEvent(ticketId: string, events: EventRow[]): boolean {
 function detectMissingFields(s: any): string[] {
   if (!s) return [];
   const missing: string[] = [];
-  if (!s.delivery_date) missing.push("Hentedato");
+  const of = s.order_fields ?? {};
+  if (!of.delivery_date && !s.delivery_date) missing.push("Hentedato");
   if (!s.customer_match?.customer_id) missing.push("Kunde");
   const products = Array.isArray(s.products) ? s.products : [];
   if (products.length === 0) missing.push("Produkt");
   else if (products.some((p: any) => !p?.product_id)) missing.push("Produkt-match");
-  if (!s.tour && !s.pickup_location_hint && !s.outlet_id) missing.push("Hentested");
+  if (!s.tour?.tour_id && !of.pickup_location_hint && !of.outlet_id) missing.push("Hentested");
   return missing;
 }
 

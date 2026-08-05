@@ -119,6 +119,49 @@ export function useLatestReplyByTicket(ticketIds: string[]) {
   });
 }
 
+// Hent siste INNGÅENDE melding per ticket (utover selve opprinnelses-e-posten).
+export function useLatestInboundByTicket(ticketIds: string[]) {
+  const ids = [...ticketIds].sort();
+  return useQuery({
+    enabled: ids.length > 0,
+    queryKey: ["tickets-latest-inbound", ids],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("ticket_inbound_messages")
+        .select("ticket_id, received_at")
+        .in("ticket_id", ids)
+        .order("received_at", { ascending: false });
+      if (error) throw error;
+      const map = new Map<string, string>();
+      for (const r of (data ?? []) as Array<{ ticket_id: string; received_at: string | null }>) {
+        if (!r.received_at) continue;
+        if (!map.has(r.ticket_id)) map.set(r.ticket_id, r.received_at);
+      }
+      return map;
+    },
+    staleTime: 30_000,
+  });
+}
+
+/**
+ * «Venter på kunde» = siste utgående svar er nyere enn siste INNGÅENDE melding
+ * (opprinnelig e-post eller senere kundesvar). `awaiting_internal` er intern
+ * venting og skal IKKE brukes her.
+ */
+export function isAwaitingCustomer(args: {
+  receivedAt: string;
+  lastOutgoing: string | undefined;
+  lastInbound: string | undefined;
+}): boolean {
+  if (!args.lastOutgoing) return false;
+  const inbound = Math.max(
+    new Date(args.receivedAt).getTime(),
+    args.lastInbound ? new Date(args.lastInbound).getTime() : 0,
+  );
+  return new Date(args.lastOutgoing).getTime() > inbound;
+}
+
+
 export function useTicketCounts() {
   return useQuery({
     queryKey: ["tickets-counts"],

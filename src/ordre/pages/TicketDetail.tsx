@@ -22,6 +22,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { TicketPresenceBanner } from "@/ordre/components/shell/TicketPresenceBanner";
+
 import {
   useTicket,
   useUpdateTicket,
@@ -619,7 +621,9 @@ export default function TicketDetail() {
 
   return (
     <div className="mx-auto max-w-[1400px] px-4 py-6 md:px-6">
+      {id && <TicketPresenceBanner ticketId={id} />}
       {/* Header */}
+
       <div className="mb-4 flex items-start gap-3">
         <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-[hsl(var(--brand-cream))] text-xl">
           ✏️
