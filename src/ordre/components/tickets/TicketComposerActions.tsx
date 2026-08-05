@@ -186,9 +186,7 @@ export default function TicketComposerActions({
     if (!forwardEmail.trim() || !forwardMessage.trim()) return;
     setSending(true);
     try {
-      const parts: string[] = [`T-${shortId(ticket.id)}`];
-      if (linkedOrderNumber) parts.push(`Ordre ${linkedOrderNumber}`);
-      const tag = `[${parts.join(" · ")}]`;
+      const tag = `[T-${shortId(ticket.id)}]${linkedOrderNumber ? ` [Ordre ${linkedOrderNumber}]` : ""}`;
       const subject = `Fwd: ${ticket.subject ?? "(uten emne)"} ${tag}`;
       const html =
         `<p>${escapeHtml(forwardMessage).replace(/\n/g, "<br/>")}</p>` +

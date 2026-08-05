@@ -64,3 +64,24 @@ verify_jwt = true
 
 [functions.fakturering-generate-vedlegg]
 verify_jwt = true
+
+[functions.pakkesystem-api]
+verify_jwt = false
+
+[functions.pakkesystem-export]
+verify_jwt = false
+
+[functions.pakkesystem-create-key]
+verify_jwt = false
+
+[functions.pakkesystem-push-cron]
+verify_jwt = false
+
+[functions.nettside-order-in]
+verify_jwt = false
+
+[functions.nettside-sync-request]
+verify_jwt = false
+
+[functions.cleanup-printed-cake-images]
+verify_jwt = false
