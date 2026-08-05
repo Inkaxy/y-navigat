@@ -264,27 +264,21 @@ export async function deleteCakeImage(image: CakeImage) {
 
 export async function markPrinted(ids: string[]) {
   if (ids.length === 0) return;
-  // Hent gjeldende rader for å øke print_count og finne ticket-koblinger
-  const { data: rows } = await supabase
-    .from("cake_images")
-    .select("id, print_count, title, ticket_id, order_id")
-    .in("id", ids);
-  const now = new Date().toISOString();
+  // Tellingen skjer i SQL (print_count = print_count + 1) for å unngå at to
+  // samtidige utskrifter overskriver hverandres teller.
+  const { data: rows, error } = await supabase.rpc(
+    "increment_cake_image_print",
+    { p_ids: ids } as never,
+  );
+  if (error) throw error;
   const { data: u } = await supabase.auth.getUser();
   const userId = u.user?.id ?? null;
   const userLabel = u.user?.email ?? null;
 
   await Promise.all(
-    (rows ?? []).map(async (row) => {
-      const nextCount = (row.print_count ?? 0) + 1;
-      await supabase
-        .from("cake_images")
-        .update({
-          status: "skrevet_ut",
-          printed_at: now,
-          print_count: nextCount,
-        } as never)
-        .eq("id", row.id);
+    ((rows ?? []) as CakeImage[]).map(async (row) => {
+      const nextCount = row.print_count ?? 1;
+
 
       // Skriv ticket-hendelse + systeminnslag i tråden hvis raden er koblet til en ticket
       if (row.ticket_id) {
