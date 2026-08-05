@@ -262,7 +262,7 @@ export default function TicketsInbox() {
     const open = rows.filter(isOpen);
     const c = {
       all: open.length,
-      awaiting_customer: rows.filter((r) => r.awaiting_internal && isOpen(r)).length,
+      awaiting_customer: rows.filter((r) => r.awaitingCustomer && isOpen(r)).length,
       resolved: rows.filter((r) => r.status === "resolved").length,
       mine: rows.filter((r) => r.assigned_to === user?.id && isOpen(r)).length,
       intent: {} as Record<RequestType, number>,
@@ -308,7 +308,7 @@ export default function TicketsInbox() {
     else if (queue === "mine")
       out = rows.filter((r) => r.assigned_to === user?.id && isOpen(r));
     else if (queue === "awaiting_customer")
-      out = rows.filter((r) => r.awaiting_internal && isOpen(r));
+      out = rows.filter((r) => r.awaitingCustomer && isOpen(r));
     else if (queue === "resolved") out = rows.filter((r) => r.status === "resolved");
     else if (queue.startsWith("intent:")) {
       const k = queue.slice("intent:".length) as RequestType;
