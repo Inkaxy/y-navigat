@@ -86,7 +86,7 @@ export function PendingOrderRowActions({ row }: Props) {
             .maybeSingle(),
           supabase
             .from("order_lines")
-            .select("id, line_number, quantity, sales_unit, product_snapshot, unit_price_incl_vat, line_total_incl_vat")
+            .select("id, line_number, quantity, sales_unit, product_snapshot, unit_price, vat_rate, line_total_incl_vat")
             .eq("order_id", row.id)
             .order("line_number", { ascending: true }),
         ]);
