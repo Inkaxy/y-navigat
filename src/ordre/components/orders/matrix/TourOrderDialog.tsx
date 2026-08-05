@@ -326,39 +326,16 @@ export function TourOrderDialog({
     if (!p || !customer || !date || !tour) return;
     if (readOnly) return;
     try {
-      let orderId = order?.id;
-      if (!orderId) {
-        const { data: newOrder, error: oe } = await supabase
-          .from("orders")
-          .insert({
-            customer_id: customer.id,
-            delivery_date: date,
-            delivery_tour_id: tour.id,
-            status: "draft",
-          } as never)
-          .select("id")
-          .single();
-        if (oe) throw oe;
-        orderId = (newOrder as any).id;
-      }
-      const nextLineNumber =
-        ((order?.lines ?? []).reduce((max, l) => Math.max(max, l.line_number), 0) || 0) + 1;
-      const { error } = await supabase.from("order_lines").insert({
-        order_id: orderId,
-        line_number: nextLineNumber,
-        product_id: p.id,
-        quantity,
-        sales_unit: p.sales_unit,
-        unit_price: p.unit_price ?? 0,
-        unit_price_source: p.unit_price == null ? "manual" : p.price_source ?? "manual",
-        vat_rate: p.mva_rate,
-        product_snapshot: {
-          display_number: p.display_number,
-          display_name: p.display_name,
-          code: p.code,
-        },
-      } as never);
+      // Bruk samme transaksjonelle RPC som ordrematrisen: den oppretter ordrehodet
+      // med alle påkrevde felter (legal_entity_id, ordrenummer, source) og setter pris.
+      const { error } = await supabase.rpc("save_matrix_changes", {
+        p_customer_id: customer.id,
+        p_changes: [
+          { date, tour_id: tour.id, product_id: p.id, quantity },
+        ] as unknown as never,
+      });
       if (error) throw error;
+
       toast.success(`La til ${p.display_name} fra fastordre`);
       qc.invalidateQueries({ queryKey: ["tour-order"] });
       qc.invalidateQueries({ queryKey: ["matrix"] });

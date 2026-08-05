@@ -16,7 +16,25 @@ export type EvaluateContext = {
   orderedAt: string; // ISO
 };
 
-const OSLO_TZ_OFFSET_MIN = 60; // grov offset — testpanelet gir tilnærmet visning.
+/** Faktisk Oslo-offset (minutter foran UTC) for et gitt UTC-tidspunkt — håndterer DST. */
+function osloOffsetMinutes(utcDate: Date): number {
+  const dtf = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Europe/Oslo",
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+  const parts = Object.fromEntries(
+    dtf.formatToParts(utcDate).filter((p) => p.type !== "literal").map((p) => [p.type, Number(p.value)]),
+  ) as Record<string, number>;
+  const asUTC = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second);
+  return Math.round((asUTC - utcDate.getTime()) / 60000);
+}
+
 
 function isoWeekday(dateStr: string): number {
   // 1=man..7=søn
@@ -55,15 +73,19 @@ function scopeMatches(rule: DeliveryRule, ctx: EvaluateContext): boolean {
   if (rule.tour_filter && rule.tour_filter.length > 0 && rule.rule_type !== "available_tours") {
     if (!ctx.deliveryTourId || !rule.tour_filter.includes(ctx.deliveryTourId)) return false;
   }
-  // Varer (kun som scope-filter, ikke available_products)
+  // Varer (kun som scope-filter, ikke available_products).
+  // Regelen er i scope hvis den IKKE har produkt-scope, ELLER ordrens varer/
+  // varegrupper faktisk overlapper regelens produkt- eller gruppesett.
   if (rule.rule_type !== "available_products") {
-    if (rule.product_ids && rule.product_ids.length > 0) {
-      if (!anyOverlap(rule.product_ids, ctx.productIds)) return false;
-    }
-    if (rule.product_group_ids && rule.product_group_ids.length > 0) {
-      if (!anyOverlap(rule.product_group_ids, ctx.productGroupIds)) return false;
+    const hasProductScope = !!(rule.product_ids && rule.product_ids.length > 0);
+    const hasGroupScope = !!(rule.product_group_ids && rule.product_group_ids.length > 0);
+    if (hasProductScope || hasGroupScope) {
+      const productHit = hasProductScope && anyOverlap(rule.product_ids, ctx.productIds);
+      const groupHit = hasGroupScope && anyOverlap(rule.product_group_ids, ctx.productGroupIds);
+      if (!productHit && !groupHit) return false;
     }
   }
+
   // Spesifikk dato
   if (rule.specific_delivery_date && ctx.deliveryDate !== rule.specific_delivery_date) return false;
   return true;
@@ -93,19 +115,23 @@ function evaluateType(rule: DeliveryRule, ctx: EvaluateContext): { matched: bool
     case "order_deadline": {
       const daysBefore = rule.deadline_days_before ?? 1;
       const [hh = 12, mm = 0] = (rule.deadline_time ?? "12:00").split(":").map(Number);
-      const dl = new Date(`${date}T00:00:00Z`);
-      dl.setUTCDate(dl.getUTCDate() - daysBefore);
-      dl.setUTCHours(hh, mm - OSLO_TZ_OFFSET_MIN, 0, 0);
+      const base = new Date(`${date}T00:00:00Z`);
+      base.setUTCDate(base.getUTCDate() - daysBefore);
+      base.setUTCHours(hh, mm, 0, 0);
+      // base er lokal Oslo-veggklokke tolket som UTC — trekk fra faktisk offset (DST-sikkert)
+      let dl = new Date(base.getTime() - osloOffsetMinutes(base) * 60000);
+      // juster én gang til for tilfeller nær DST-skiftet
+      dl = new Date(base.getTime() - osloOffsetMinutes(dl) * 60000);
       const ordered = new Date(ctx.orderedAt);
       if (ordered.getTime() > dl.getTime()) {
-        const dlNb = new Date(dl.getTime() + OSLO_TZ_OFFSET_MIN * 60000);
         return {
           matched: true,
-          message: `Fristen var ${dlNb.toLocaleString("nb-NO", { weekday: "long", hour: "2-digit", minute: "2-digit" })}.`,
+          message: `Fristen var ${dl.toLocaleString("nb-NO", { timeZone: "Europe/Oslo", weekday: "long", hour: "2-digit", minute: "2-digit" })}.`,
         };
       }
       return { matched: false, message: "Innenfor frist" };
     }
+
     case "delivery_weekdays": {
       const wd = isoWeekday(date);
       if (rule.weekdays && rule.weekdays.length > 0 && !rule.weekdays.includes(wd)) {
@@ -122,11 +148,17 @@ function evaluateType(rule: DeliveryRule, ctx: EvaluateContext): { matched: bool
       return { matched: false, message: "Tur tillatt" };
     }
     case "available_products": {
-      const allowedProducts = rule.allowed_product_ids ?? rule.product_ids ?? [];
-      const allowedGroups = rule.allowed_product_group_ids ?? rule.product_group_ids ?? [];
+      // Speiler evaluate_delivery_rules: kun allowed_*-kolonnene, ingen fallback til product_ids.
+      const allowedProducts = rule.allowed_product_ids ?? [];
+      const allowedGroups = rule.allowed_product_group_ids ?? [];
+      if (allowedProducts.length === 0 && allowedGroups.length === 0) {
+        return { matched: false, message: "Ingen tillatte varer definert" };
+      }
+      const groupAllowed =
+        allowedGroups.length > 0 && allowedGroups.some((g) => ctx.productGroupIds.includes(g));
       const bad: string[] = [];
       for (const pid of ctx.productIds) {
-        const ok = allowedProducts.includes(pid) || anyOverlap([pid], ctx.productIds) && allowedGroups.some((g) => ctx.productGroupIds.includes(g));
+        const ok = allowedProducts.includes(pid) || groupAllowed;
         if (!ok) bad.push(pid);
       }
       if (bad.length > 0) {
@@ -134,6 +166,7 @@ function evaluateType(rule: DeliveryRule, ctx: EvaluateContext): { matched: bool
       }
       return { matched: false, message: "Alle varer tillatt" };
     }
+
     case "no_delivery": {
       if (rule.blackout_from && rule.blackout_until && date >= rule.blackout_from && date <= rule.blackout_until) {
         return { matched: true, message: `Ingen leveranse ${rule.blackout_from} – ${rule.blackout_until}.` };

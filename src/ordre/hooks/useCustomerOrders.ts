@@ -335,8 +335,13 @@ export function useCreateCustomerOrder() {
         });
         const { error: linesErr } = await supabase.from("order_lines").insert(lineRows as never);
 
-        if (linesErr) throw linesErr;
+        if (linesErr) {
+          // Rull tilbake ordrehodet — ingen bekreftet ordre uten linjer
+          await supabase.from("orders").delete().eq("id", orderRow.id);
+          throw linesErr;
+        }
       }
+
 
       return { ...orderRow, has_zero_fallback_lines: fallbackLineIndices };
     },

@@ -838,8 +838,13 @@ export default function NewOrder() {
           };
         });
         const { error: lineErr } = await supabase.from("order_lines").insert(lineRows);
-        if (lineErr) throw lineErr;
+        if (lineErr) {
+          // Rull tilbake ordrehodet så vi aldri etterlater en bekreftet ordre uten linjer
+          await supabase.from("orders").delete().eq("id", orderRow.id);
+          throw lineErr;
+        }
       }
+
 
       await logAudit({
         action: "created",
