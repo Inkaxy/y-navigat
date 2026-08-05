@@ -255,7 +255,7 @@ export default function TicketsList() {
         awaitingCustomer, missingInfo, redRisk, linked, aiReady, readyForOrder,
       };
     });
-  }, [tickets, latestReply]);
+  }, [tickets, latestReply, latestInbound]);
 
   const filtered: Row[] = useMemo(() => {
     const today = todayIso();
