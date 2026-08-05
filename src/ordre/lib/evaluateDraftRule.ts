@@ -16,7 +16,25 @@ export type EvaluateContext = {
   orderedAt: string; // ISO
 };
 
-const OSLO_TZ_OFFSET_MIN = 60; // grov offset — testpanelet gir tilnærmet visning.
+/** Faktisk Oslo-offset (minutter foran UTC) for et gitt UTC-tidspunkt — håndterer DST. */
+function osloOffsetMinutes(utcDate: Date): number {
+  const dtf = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Europe/Oslo",
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+  const parts = Object.fromEntries(
+    dtf.formatToParts(utcDate).filter((p) => p.type !== "literal").map((p) => [p.type, Number(p.value)]),
+  ) as Record<string, number>;
+  const asUTC = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second);
+  return Math.round((asUTC - utcDate.getTime()) / 60000);
+}
+
 
 function isoWeekday(dateStr: string): number {
   // 1=man..7=søn
