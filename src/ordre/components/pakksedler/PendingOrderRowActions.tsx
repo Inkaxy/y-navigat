@@ -94,6 +94,15 @@ export function PendingOrderRowActions({ row }: Props) {
       if (linesErr) throw linesErr;
       if (!order) throw new Error("Fant ikke ordren");
 
+      // unit_price er eks. mva i databasen — beregn inkl. mva her for visning.
+      const pdfLines = ((lines ?? []) as any[]).map((l) => ({
+        ...l,
+        unit_price_incl_vat:
+          l.unit_price == null
+            ? null
+            : Math.round(Number(l.unit_price) * (1 + Number(l.vat_rate ?? 0) / 100) * 100) / 100,
+      }));
+
       const [{ pdf }, { OrderPreviewPDFDocument }] = await Promise.all([
         import("@react-pdf/renderer"),
         import("./OrderPreviewPDFDocument"),
@@ -101,7 +110,7 @@ export function PendingOrderRowActions({ row }: Props) {
       const blob = await pdf(
         <OrderPreviewPDFDocument
           order={order as any}
-          lines={(lines ?? []) as any}
+          lines={pdfLines as any}
           tourLabel={row.tour_label}
         />,
       ).toBlob();
