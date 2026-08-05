@@ -533,8 +533,6 @@ export default function CakeImageEditor() {
     }
   };
 
-  };
-
   const printNow = async () => {
     const c = fabRef.current!;
     const dataUrl = c.toDataURL({ format: "png", multiplier: 2 });
