@@ -13,7 +13,9 @@ export const merknadSchema = z.object({
   sendes_med: z.string().default(""),
   tid: z.string().default(""),
   antall_etiketter: z.number().int().nonnegative().nullable().default(null),
-});
+  // Ukjente nøkler (bl.a. `cake_config` fra kakebyggeren) MÅ bevares — ellers
+  // mister en helt vanlig ordreredigering kakeoppsettet.
+}).passthrough();
 
 export type Merknad = z.infer<typeof merknadSchema>;
 
