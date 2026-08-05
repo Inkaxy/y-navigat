@@ -241,24 +241,13 @@ export function TourOrderDialog({
   }
 
   async function addProduct(p: MatrixProduct) {
-    if (!order || readOnly) return;
-    const nextLineNumber =
-      (order.lines.reduce((max, l) => Math.max(max, l.line_number), 0) || 0) + 1;
-    const { error } = await supabase.from("order_lines").insert({
-      order_id: order.id,
-      line_number: nextLineNumber,
-      product_id: p.id,
-      quantity: 1,
-      sales_unit: p.sales_unit,
-      unit_price: p.unit_price ?? 0,
-      unit_price_source: p.unit_price == null ? "manual" : p.price_source ?? "manual",
-      vat_rate: p.mva_rate,
-      product_snapshot: {
-        display_number: p.display_number,
-        display_name: p.display_name,
-        code: p.code,
-      },
-    } as never);
+    if (!order || readOnly || !customer || !date || !tour) return;
+    // Bruk samme transaksjonelle RPC som ordrematrisen — den henter sentral pris
+    // (get_customer_unit_price) for kunde/produkt/dato og setter unit_price_source.
+    const { error } = await supabase.rpc("save_matrix_changes", {
+      p_customer_id: customer.id,
+      p_changes: [{ date, tour_id: tour.id, product_id: p.id, quantity: 1 }] as unknown as never,
+    });
     if (error) {
       toast.error("Kunne ikke legge til linje", { description: error.message });
       return;
