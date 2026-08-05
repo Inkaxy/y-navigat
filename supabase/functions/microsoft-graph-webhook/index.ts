@@ -136,6 +136,24 @@ async function processMessage(
     if (prior) parentTicket = prior as typeof parentTicket;
   }
 
+  // Fallback: [T-xxxxxxxx] tag in subject (replies after external forward get a new conversationId)
+  if (!parentTicket && msg.subject) {
+    const match = /\[T-([0-9a-fA-F]{8})\]/i.exec(msg.subject);
+    if (match) {
+      const { data: shortId } = await admin.rpc("find_ticket_by_short_id", {
+        p_short: match[1].toLowerCase(),
+      });
+      if (shortId) {
+        const { data: tagged } = await admin
+          .from("tickets")
+          .select("id, awaiting_external, awaiting_external_email, assigned_to, subject, related_order_id")
+          .eq("id", shortId)
+          .maybeSingle();
+        if (tagged) parentTicket = tagged as typeof parentTicket;
+      }
+    }
+  }
+
   if (parentTicket) {
     // Detect if this is a reply from the external we forwarded to
     const isFromExternalForward =
