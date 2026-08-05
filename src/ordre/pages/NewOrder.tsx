@@ -434,6 +434,8 @@ export default function NewOrder() {
   const enforcedRefMissing = enforceRef && !enforcedRefValue;
   const [manualTourId, setManualTourId] = useState<string | null>(null);
   const [lines, setLines] = useState<LineDraft[]>([newLine()]);
+  const linesRef = useRef<LineDraft[]>(lines);
+  linesRef.current = lines;
   const [submitting, setSubmitting] = useState(false);
   const [copyDialogOpen, setCopyDialogOpen] = useState(false);
   const submittingRef = useRef(submitting);
@@ -500,36 +502,61 @@ export default function NewOrder() {
   // Re-trekk priser hvis kunde eller dato endres
   useEffect(() => {
     if (!customer) return;
+    const cust = customer;
+    const date = deliveryDate;
     setLines((prev) => prev.map((l) => (l.product ? { ...l, _refetch: Date.now() } as LineDraft : l)));
-    // For hver linje med produkt: hent ny pris
+    // For hver linje med produkt: hent ny pris, og flett KUN prisfeltene inn
+    // med funksjonell oppdatering (brukerens mengde/rabatt/notat bevares).
     void (async () => {
-      const updates = await Promise.all(
-        lines.map(async (l) => {
-          if (!l.product || l.unit_price_source === "manual_override") return l;
+      const snapshot = linesRef.current;
+      const results = await Promise.all(
+        snapshot.map(async (l) => {
+          if (!l.product || l.unit_price_source === "manual_override") return null;
           try {
             const ep = await fetchEffectivePrice({
               productId: l.product.id,
-              customerId: customer.id,
-              date: deliveryDate,
+              customerId: cust.id,
+              date,
               caller: "new_order_form",
             });
-            if (!ep) return l;
+            if (!ep) return null;
             return {
-              ...l,
+              uid: l.uid,
+              productId: l.product.id,
               unit_price: String(ep.price ?? 0),
               unit_price_source: ep.source,
               unit_price_source_id: ep.special_price_id ?? ep.price_list_id ?? null,
               effective_price: ep.price,
             };
           } catch {
-            return l;
+            return null;
           }
         }),
       );
-      setLines(updates);
+      type PriceUpdate = NonNullable<(typeof results)[number]>;
+      const byUid = new Map<string, PriceUpdate>(
+        results.filter((r): r is PriceUpdate => r !== null).map((r) => [r.uid, r]),
+      );
+      if (byUid.size === 0) return;
+      setLines((prev) =>
+        prev.map((l) => {
+          const upd = byUid.get(l.uid);
+          // Ikke overskriv hvis brukeren har byttet produkt eller låst prisen i mellomtiden
+          if (!upd || !l.product || l.product.id !== upd.productId) return l;
+          if (l.unit_price_source === "manual_override") return l;
+          return {
+            ...l,
+            unit_price: upd.unit_price,
+            unit_price_source: upd.unit_price_source,
+            unit_price_source_id: upd.unit_price_source_id,
+            effective_price: upd.effective_price,
+          };
+        }),
+      );
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [customer?.id, deliveryDate]);
+
 
   // 6.4 Keyboard shortcut: Cmd/Ctrl+Enter = opprett ordre
   // (A.5.5.8: interne ordre opprettes alltid som confirmed; ingen "lagre som utkast")

@@ -361,6 +361,39 @@ export function useUpdateCustomerOrder() {
   return useMutation({
     mutationFn: async (params: { orderId: string; input: CustomerOrderInput }) => {
       const { orderId, input } = params;
+
+      // 0. Snapshot av hode + eksisterende linjer (for rollback og prisbevaring)
+      const { data: prevOrder, error: prevErr } = await supabase
+        .from("orders")
+        .select(
+          `source, delivery_date, delivery_time, delivery_tour_id, distribution,
+           final_customer_name, final_customer_email, final_customer_phone,
+           send_sms_confirm, send_email_confirm, is_paid, rule_override_reason`,
+        )
+        .eq("id", orderId)
+        .maybeSingle();
+      if (prevErr) throw prevErr;
+
+      const { data: prevLines, error: prevLinesErr } = await supabase
+        .from("order_lines")
+        .select("product_id, quantity, unit_price, unit_price_source, unit_price_source_id, vat_rate, merknad")
+        .eq("order_id", orderId);
+      if (prevLinesErr) throw prevLinesErr;
+
+      const merknadKey = (m: unknown) => (m ? JSON.stringify(m) : "");
+      const existingByKey = new Map<
+        string,
+        { unit_price: number; unit_price_source: string | null; unit_price_source_id: string | null; vat_rate: number | null }
+      >();
+      for (const pl of prevLines ?? []) {
+        existingByKey.set(`${pl.product_id}|${merknadKey(pl.merknad)}`, {
+          unit_price: Number(pl.unit_price),
+          unit_price_source: (pl.unit_price_source as string | null) ?? null,
+          unit_price_source_id: (pl.unit_price_source_id as string | null) ?? null,
+          vat_rate: pl.vat_rate == null ? null : Number(pl.vat_rate),
+        });
+      }
+
       // 1. Update order header
       const updatePayload = {
         source: input.source,
@@ -383,61 +416,93 @@ export function useUpdateCustomerOrder() {
         .eq("id", orderId);
       if (updErr) throw updErr;
 
-      // 2. Replace lines atomically via RPC (delete + insert in one transaction)
+      // 2. Bygg linjer: reprise KUN nye linjer. Eksisterende linjer beholder
+      //    avtalt/manuell pris (og alle priser med låst kilde røres aldri).
       const fallbackLineIndices: number[] = [];
       let lineRows: unknown[] = [];
-      if (input.lines.length > 0) {
-        const priceMap = await fetchEffectivePricesBatch({
-          productIds: Array.from(new Set(input.lines.map((l) => l.product_id))),
-          customerId: input.customerId,
-          date: input.deliveryDate,
-          caller: "customer_order_update" as PriceCaller,
-        });
+      try {
+        if (input.lines.length > 0) {
+          const newProductIds = Array.from(
+            new Set(
+              input.lines
+                .filter((l) => !existingByKey.has(`${l.product_id}|${merknadKey(l.merknad ?? null)}`))
+                .map((l) => l.product_id),
+            ),
+          );
+          const priceMap =
+            newProductIds.length > 0
+              ? await fetchEffectivePricesBatch({
+                  productIds: newProductIds,
+                  customerId: input.customerId,
+                  date: input.deliveryDate,
+                  caller: "customer_order_update" as PriceCaller,
+                })
+              : new Map<string, { price: number; vat_rate: number; source: string; special_price_id: string | null; price_list_id: string | null; is_fallback: boolean }>();
 
-        lineRows = input.lines.map((l, idx) => {
-          const ep = priceMap.get(l.product_id);
-          const unitPrice = ep ? ep.price : 0;
-          const vatRate = ep?.vat_rate ?? l.product_mva_rate ?? 15;
-          const source = ep?.source ?? "fallback_zero";
-          const sourceId = ep?.special_price_id ?? ep?.price_list_id ?? null;
-          if (!ep || ep.is_fallback) fallbackLineIndices.push(idx);
-          const subtotal = l.quantity * unitPrice;
-          const vat = subtotal * (vatRate / 100);
-          return {
-            order_id: orderId,
-            line_number: idx + 1,
-            product_id: l.product_id,
-            product_snapshot: {
-              display_number: l.product_display_number,
-              display_name: l.product_display_name,
-              code: l.product_code ?? null,
-              unit_of_sale: l.product_unit_of_sale,
-              mva_rate: vatRate,
-            },
-            quantity: l.quantity,
-            sales_unit: l.product_unit_of_sale,
-            unit_price: unitPrice,
-            unit_price_source: source,
-            unit_price_source_id: sourceId,
-            discount_percent: 0,
-            line_subtotal_excl_vat: Number(subtotal.toFixed(2)),
-            vat_rate: vatRate,
-            line_vat: Number(vat.toFixed(2)),
-            line_total_incl_vat: Number((subtotal + vat).toFixed(2)),
-            merknad: l.merknad ? (l.merknad as unknown as Record<string, unknown>) : null,
+          lineRows = input.lines.map((l, idx) => {
+            const existing = existingByKey.get(`${l.product_id}|${merknadKey(l.merknad ?? null)}`);
+            let unitPrice: number;
+            let vatRate: number;
+            let source: string;
+            let sourceId: string | null;
+            if (existing) {
+              // Uendret linje — behold pris og kilde nøyaktig som bestilt.
+              unitPrice = existing.unit_price;
+              vatRate = existing.vat_rate ?? l.product_mva_rate ?? 15;
+              source = existing.unit_price_source ?? "unchanged";
+              sourceId = existing.unit_price_source_id;
+            } else {
+              const ep = priceMap.get(l.product_id);
+              unitPrice = ep ? ep.price : 0;
+              vatRate = ep?.vat_rate ?? l.product_mva_rate ?? 15;
+              source = ep?.source ?? "fallback_zero";
+              sourceId = ep?.special_price_id ?? ep?.price_list_id ?? null;
+              if (!ep || ep.is_fallback) fallbackLineIndices.push(idx);
+            }
+            const subtotal = l.quantity * unitPrice;
+            const vat = subtotal * (vatRate / 100);
+            return {
+              order_id: orderId,
+              line_number: idx + 1,
+              product_id: l.product_id,
+              product_snapshot: {
+                display_number: l.product_display_number,
+                display_name: l.product_display_name,
+                code: l.product_code ?? null,
+                unit_of_sale: l.product_unit_of_sale,
+                mva_rate: vatRate,
+              },
+              quantity: l.quantity,
+              sales_unit: l.product_unit_of_sale,
+              unit_price: unitPrice,
+              unit_price_source: source,
+              unit_price_source_id: sourceId,
+              discount_percent: 0,
+              line_subtotal_excl_vat: Number(subtotal.toFixed(2)),
+              vat_rate: vatRate,
+              line_vat: Number(vat.toFixed(2)),
+              line_total_incl_vat: Number((subtotal + vat).toFixed(2)),
+              merknad: l.merknad ? (l.merknad as unknown as Record<string, unknown>) : null,
+            };
+          });
+        }
 
-          };
+        // Atomic replace: delete existing order_lines and insert the new set in one transaction.
+        const { error: replaceErr } = await (supabase as any).rpc("replace_child_rows", {
+          p_table: "order_lines",
+          p_parent_column: "order_id",
+          p_parent_id: orderId,
+          p_rows: lineRows,
         });
+        if (replaceErr) throw replaceErr;
+      } catch (e) {
+        // Rull tilbake hode-endringen slik at ordren ikke blir stående med ny
+        // dato/tur men gamle linjer.
+        if (prevOrder) {
+          await supabase.from("orders").update(prevOrder as never).eq("id", orderId);
+        }
+        throw e;
       }
-
-      // Atomic replace: delete existing order_lines and insert the new set in one transaction.
-      const { error: replaceErr } = await (supabase as any).rpc("replace_child_rows", {
-        p_table: "order_lines",
-        p_parent_column: "order_id",
-        p_parent_id: orderId,
-        p_rows: lineRows,
-      });
-      if (replaceErr) throw replaceErr;
 
       return { orderId, has_zero_fallback_lines: fallbackLineIndices };
     },
