@@ -18,7 +18,7 @@
 // den eneste tillatte iframe-veien.
 // ============================================================================
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   buildCakeBuilderEmbedUrl,
   createCakeBuilderListener,
@@ -89,6 +89,8 @@ export function CakeBuilderEmbedFrame({
   onError,
 }: CakeBuilderEmbedFrameProps) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const [frameWindow, setFrameWindow] = useState<Window | null>(null);
+
 
   const src = useMemo(
     () =>
