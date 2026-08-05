@@ -56,6 +56,8 @@ Deno.serve(async (req) => {
     }
 
     let renewed = 0;
+    let recreated = 0;
+    const failed: string[] = [];
     for (const s of subs) {
       const newExp = new Date(Date.now() + 4200 * 60 * 1000).toISOString();
       const res = await fetch(`https://graph.microsoft.com/v1.0/subscriptions/${s.microsoft_subscription_id}`, {
@@ -70,11 +72,44 @@ Deno.serve(async (req) => {
           last_renewed_at: new Date().toISOString(),
         }).eq("id", s.id);
         renewed++;
+        continue;
+      }
+
+      console.warn("Renew failed", s.microsoft_subscription_id, res.status, await res.text());
+
+      // Try to re-create the subscription
+      const createRes = await fetch("https://graph.microsoft.com/v1.0/subscriptions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          changeType: "created",
+          notificationUrl: s.notification_url,
+          resource: s.resource,
+          expirationDateTime: newExp,
+          clientState: s.client_state ?? undefined,
+        }),
+      });
+      if (createRes.ok) {
+        const created = await createRes.json();
+        await admin.from("ticket_subscriptions").update({
+          microsoft_subscription_id: created.id,
+          expiration_date_time: created.expirationDateTime ?? newExp,
+          last_renewed_at: new Date().toISOString(),
+        }).eq("id", s.id);
+        recreated++;
       } else {
-        console.warn("Renew failed", s.microsoft_subscription_id, res.status, await res.text());
+        console.error("Re-create failed", s.microsoft_subscription_id, createRes.status, await createRes.text());
+        failed.push(s.microsoft_subscription_id);
       }
     }
-    return json({ success: true, renewed });
+
+    if (failed.length > 0) {
+      await admin.rpc("alert_email_subscription_failure", {
+        p_detail: `Kunne ikke fornye/reetablere ${failed.length} e-post-abonnement. Koble Microsoft 365 til på nytt i Innstillinger.`,
+      });
+    }
+
+    return json({ success: true, renewed, recreated, failed: failed.length });
   } catch (e) {
     console.error("subscription-renew error", e);
     return json({ error: e instanceof Error ? e.message : String(e) }, 500);
