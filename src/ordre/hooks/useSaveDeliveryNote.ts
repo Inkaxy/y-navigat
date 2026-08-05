@@ -62,12 +62,12 @@ export function useSaveDeliveryNote() {
       });
 
       // 1) Slett DN-linjer som er fjernet (og tilhørende order_lines)
-      const deleteWork = (async () => {
-        if (toDelete.length === 0) return;
-        const { data: orphanOL } = await supabase
+      if (toDelete.length > 0) {
+        const { data: orphanOL, error: selErr } = await supabase
           .from("delivery_note_lines")
           .select("order_line_id")
           .in("id", toDelete);
+        if (selErr) throw selErr;
         const olIds = (orphanOL ?? [])
           .map((r: any) => r.order_line_id)
           .filter((x: string | null): x is string => !!x);
@@ -77,9 +77,10 @@ export function useSaveDeliveryNote() {
           .in("id", toDelete);
         if (dErr) throw dErr;
         if (olIds.length > 0) {
-          await supabase.from("order_lines").delete().in("id", olIds);
+          const { error: dOlErr } = await supabase.from("order_lines").delete().in("id", olIds);
+          if (dOlErr) throw dOlErr;
         }
-      })();
+      }
 
       // 2) Split into existing-update vs new-insert
       const existing: Array<{ l: EditableLine; c: ReturnType<typeof computeLine>; idx: number }> = [];
@@ -90,91 +91,90 @@ export function useSaveDeliveryNote() {
         else fresh.push(entry);
       });
 
-      // Parallel updates for existing lines (order_lines + delivery_note_lines)
-      const updateWork = Promise.all(
-        existing.flatMap(({ l, c, idx }) => {
-          const line_number = idx + 1;
-          const tasks: PromiseLike<any>[] = [
-            supabase
-              .from("delivery_note_lines")
-              .update({
-                line_number,
-                quantity: l.quantity,
-                unit_price: l.unit_price,
-                discount_percent: l.discount_percent,
-                vat_rate: l.vat_rate,
-                line_subtotal_excl_vat: c.subtotal,
-                line_vat: c.vat,
-                line_total_incl_vat: c.total,
-                notes: l.notes,
-                product_snapshot: l.product_snapshot as any,
-                sales_unit: l.sales_unit,
-              } as any)
-              .eq("id", l.id as string)
-              .then(({ error }) => {
-                if (error) throw error;
-              }),
-          ];
-          if (l.order_line_id) {
-            tasks.push(
-              supabase
-                .from("order_lines")
-                .update({
-                  quantity: l.quantity,
-                  unit_price: l.unit_price,
-                  discount_percent: l.discount_percent,
-                  vat_rate: l.vat_rate,
-                  line_subtotal_excl_vat: c.subtotal,
-                  line_vat: c.vat,
-                  line_total_incl_vat: c.total,
-                  notes: l.notes,
-                  product_snapshot: l.product_snapshot as any,
-                  sales_unit: l.sales_unit,
-                })
-                .eq("id", l.order_line_id)
-                .then(({ error }) => {
-                  if (error) throw error;
-                })
-            );
-          }
-          return tasks;
-        })
-      );
+      // Ingen pakkseddellinje uten ordrekobling — slike linjer ville aldri blitt fakturert.
+      const orphanNew = fresh.filter((f) => !(f.l.order_id ?? fallbackOrderId));
+      if (orphanNew.length > 0) {
+        throw new Error(
+          "Nye linjer mangler ordrekobling og kan ikke lagres på pakkseddelen. Koble linjen til en ordre først.",
+        );
+      }
+
+      // 2a) Fase 1 av re-nummerering: flytt eksisterende linjer til midlertidige,
+      // høye linjenumre slik at endelige numre ikke kolliderer mot UNIQUE-indeksen.
+      for (let i = 0; i < existing.length; i++) {
+        const { l } = existing[i];
+        const { error } = await supabase
+          .from("delivery_note_lines")
+          .update({ line_number: 100000 + i } as any)
+          .eq("id", l.id as string);
+        if (error) throw error;
+      }
+
+      // 2b) Fase 2: oppdater alle felter inkl. endelig linjenummer
+      for (const { l, c, idx } of existing) {
+        const line_number = idx + 1;
+        const { error } = await supabase
+          .from("delivery_note_lines")
+          .update({
+            line_number,
+            quantity: l.quantity,
+            unit_price: l.unit_price,
+            discount_percent: l.discount_percent,
+            vat_rate: l.vat_rate,
+            line_subtotal_excl_vat: c.subtotal,
+            line_vat: c.vat,
+            line_total_incl_vat: c.total,
+            notes: l.notes,
+            product_snapshot: l.product_snapshot as any,
+            sales_unit: l.sales_unit,
+          } as any)
+          .eq("id", l.id as string);
+        if (error) throw error;
+
+        if (l.order_line_id) {
+          const { error: olErr } = await supabase
+            .from("order_lines")
+            .update({
+              quantity: l.quantity,
+              unit_price: l.unit_price,
+              discount_percent: l.discount_percent,
+              vat_rate: l.vat_rate,
+              line_subtotal_excl_vat: c.subtotal,
+              line_vat: c.vat,
+              line_total_incl_vat: c.total,
+              notes: l.notes,
+              product_snapshot: l.product_snapshot as any,
+              sales_unit: l.sales_unit,
+            })
+            .eq("id", l.order_line_id);
+          if (olErr) throw olErr;
+        }
+      }
 
       // 3) Nye linjer: batch-insert order_lines per ordre, så batch-insert DN-lines
-      const insertWork = (async () => {
-        if (fresh.length === 0) return;
-
+      if (fresh.length > 0) {
         // Grupper etter target order_id
         const byOrder = new Map<string, typeof fresh>();
-        const noOrder: typeof fresh = [];
         for (const f of fresh) {
-          const oid = f.l.order_id ?? fallbackOrderId;
-          if (!oid) {
-            noOrder.push(f);
-            continue;
-          }
+          const oid = (f.l.order_id ?? fallbackOrderId) as string;
           if (!byOrder.has(oid)) byOrder.set(oid, []);
           byOrder.get(oid)!.push(f);
         }
 
-        // Hent max line_number for hver ordre parallelt
-        const orderIds = [...byOrder.keys()];
-        const maxRows = await Promise.all(
-          orderIds.map((oid) =>
-            supabase
-              .from("order_lines")
-              .select("line_number")
-              .eq("order_id", oid)
-              .order("line_number", { ascending: false })
-              .limit(1)
-              .maybeSingle()
-          )
-        );
+        // Hent max line_number for hver ordre
+        const orderIdsForInsert = [...byOrder.keys()];
         const nextNoByOrder = new Map<string, number>();
-        orderIds.forEach((oid, i) => {
-          nextNoByOrder.set(oid, ((maxRows[i].data as any)?.line_number ?? 0) + 1);
-        });
+        for (const oid of orderIdsForInsert) {
+          const { data, error } = await supabase
+            .from("order_lines")
+            .select("line_number")
+            .eq("order_id", oid)
+            .order("line_number", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (error) throw error;
+          nextNoByOrder.set(oid, ((data as any)?.line_number ?? 0) + 1);
+        }
 
         // Bygg order_lines insert-payloads og hold rekkefølge for å mappe id-er tilbake
         const orderLineInserts: any[] = [];
@@ -211,11 +211,9 @@ export function useSaveDeliveryNote() {
           createdOlIds = ((newOLs ?? []) as any[]).map((r) => r.id);
         }
 
-        // Bygg DN-line insert-payloads (også noOrder)
-        const dnInserts: any[] = [];
-        insertRefs.forEach((ref, i) => {
+        const dnInserts: any[] = insertRefs.map((ref, i) => {
           const { entry, order_id } = ref;
-          dnInserts.push({
+          return {
             delivery_note_id: deliveryNoteId,
             line_number: entry.idx + 1,
             product_id: entry.l.product_id,
@@ -231,27 +229,8 @@ export function useSaveDeliveryNote() {
             notes: entry.l.notes,
             order_line_id: createdOlIds[i] ?? null,
             order_id,
-          });
+          };
         });
-        for (const f of noOrder) {
-          dnInserts.push({
-            delivery_note_id: deliveryNoteId,
-            line_number: f.idx + 1,
-            product_id: f.l.product_id,
-            product_snapshot: f.l.product_snapshot as any,
-            quantity: f.l.quantity,
-            sales_unit: f.l.sales_unit,
-            unit_price: f.l.unit_price,
-            discount_percent: f.l.discount_percent,
-            vat_rate: f.l.vat_rate,
-            line_subtotal_excl_vat: f.c.subtotal,
-            line_vat: f.c.vat,
-            line_total_incl_vat: f.c.total,
-            notes: f.l.notes,
-            order_line_id: null,
-            order_id: null,
-          });
-        }
 
         if (dnInserts.length > 0) {
           const { error: iErr } = await supabase
@@ -259,18 +238,14 @@ export function useSaveDeliveryNote() {
             .insert(dnInserts as any);
           if (iErr) throw iErr;
         }
-      })();
+      }
 
-      // 4) DN-totaler kan oppdateres parallelt med linje-arbeidet
-      const dnUpdateWork = supabase
+      // 4) DN-totaler
+      const { error: dnUpdErr } = await supabase
         .from("delivery_notes")
         .update({ subtotal_excl_vat, total_vat, total_incl_vat, notes })
-        .eq("id", deliveryNoteId)
-        .then(({ error }) => {
-          if (error) throw error;
-        });
-
-      await Promise.all([deleteWork, updateWork, insertWork, dnUpdateWork]);
+        .eq("id", deliveryNoteId);
+      if (dnUpdErr) throw dnUpdErr;
 
       // 5) Oppdater totaler på berørte ordre — parallelt
       const orderIds = Array.from(
@@ -278,10 +253,11 @@ export function useSaveDeliveryNote() {
       );
       await Promise.all(
         orderIds.map(async (oid) => {
-          const { data: ols } = await supabase
+          const { data: ols, error: olsErr } = await supabase
             .from("order_lines")
             .select("line_subtotal_excl_vat, line_vat, line_total_incl_vat")
             .eq("order_id", oid);
+          if (olsErr) throw olsErr;
           const sums = (ols ?? []).reduce(
             (acc: any, r: any) => ({
               s: acc.s + Number(r.line_subtotal_excl_vat ?? 0),
@@ -290,7 +266,7 @@ export function useSaveDeliveryNote() {
             }),
             { s: 0, v: 0, t: 0 }
           );
-          await supabase
+          const { error: oUpdErr } = await supabase
             .from("orders")
             .update({
               subtotal_excl_vat: round(sums.s, 2),
@@ -298,6 +274,7 @@ export function useSaveDeliveryNote() {
               total_incl_vat: round(sums.t, 2),
             })
             .eq("id", oid);
+          if (oUpdErr) throw oUpdErr;
         })
       );
 

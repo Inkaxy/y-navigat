@@ -62,7 +62,9 @@ export function useDeliveryNoteCounts(
         let q = supabase
           .from("orders")
           .select("id", { count: "exact", head: true })
-          .eq("legal_entity_id", NB_LEGAL_ENTITY_ID);
+          .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
+          // Samme statusfilter som generate_delivery_notes bruker.
+          .in("status", ["awaiting_confirmation", "confirmed", "in_production", "packed"]);
         q = isCorrection ? q.lte("delivery_date", date) : q.eq("delivery_date", date);
         if (tourId === NULL_TOUR_KEY) q = q.is("delivery_tour_id", null);
         else if (tourId !== "all") q = q.eq("delivery_tour_id", tourId);
