@@ -54,17 +54,16 @@ export function usePrintedLabelCount(
       !!filter && !!filter.legalEntityId && !!filter.date && productIds.length > 0,
     queryFn: async (): Promise<number> => {
       if (!filter) return 0;
-      // Bruk lokal (browser = Oslo) døgnvindu for valgt dato.
-      const start = new Date(`${filter.date}T00:00:00`);
-      const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
-
+      // Tell etter ordrens leveringsdato (ikke print-tidspunkt): etiketter for
+      // i morgen printes ofte i dag.
       let q = supabase
         .from("label_print_jobs")
-        .select("product_id")
+        .select(
+          "product_id, order_line:order_lines!inner(order:orders!inner(delivery_date))",
+        )
         .eq("legal_entity_id", filter.legalEntityId)
         .in("product_id", productIds)
-        .gte("printed_at", start.toISOString())
-        .lt("printed_at", end.toISOString());
+        .eq("order_line.order.delivery_date", filter.date);
 
       if (filter.departmentIds && filter.departmentIds.length > 0) {
         q = q.in("production_department_id", filter.departmentIds);
