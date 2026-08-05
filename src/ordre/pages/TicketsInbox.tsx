@@ -217,11 +217,16 @@ export default function TicketsInbox() {
 
   const { data: sla } = useSlaSettings();
 
+  const ticketIds = useMemo(() => tickets.map((t) => t.id), [tickets]);
+  const { data: latestReply = new Map<string, string>() } = useLatestReplyByTicket(ticketIds);
+  const { data: latestInbound = new Map<string, string>() } = useLatestInboundByTicket(ticketIds);
+
   type Row = TicketRow & {
     intent: RequestType | null;
     deadline: Date | null;
     overdue: boolean;
     countdown: string | null;
+    awaitingCustomer: boolean;
   };
 
   const rows: Row[] = useMemo(
@@ -238,11 +243,18 @@ export default function TicketsInbox() {
           deadline,
           overdue: cd?.overdue ?? false,
           countdown: cd?.text ?? null,
+          // «Venter på kunde» = siste utgående er nyere enn siste inngående.
+          awaitingCustomer: isAwaitingCustomer({
+            receivedAt: t.received_at,
+            lastOutgoing: latestReply.get(t.id),
+            lastInbound: latestInbound.get(t.id),
+          }),
         };
       });
     },
-    [tickets, sla],
+    [tickets, sla, latestReply, latestInbound],
   );
+
 
   const isOpen = (t: Row) => t.status === "new" || t.status === "in_progress";
 
