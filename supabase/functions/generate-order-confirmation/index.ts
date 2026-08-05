@@ -87,7 +87,37 @@ function detectLanguageFromText(text: string | null | undefined): "nb" | "en" {
   return en >= 3 ? "en" : "nb";
 }
 
-function computeDeadlines(deliveryIso: string | null | undefined): {
+/** Oslo-offset (minutter foran UTC) for et gitt UTC-tidspunkt — DST-sikkert. */
+function osloOffsetMinutes(utc: Date): number {
+  const dtf = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Europe/Oslo", hourCycle: "h23",
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
+  });
+  const p = Object.fromEntries(
+    dtf.formatToParts(utc).filter((x) => x.type !== "literal").map((x) => [x.type, Number(x.value)]),
+  ) as Record<string, number>;
+  const asUTC = Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second);
+  return Math.round((asUTC - utc.getTime()) / 60000);
+}
+
+/** Oslo vegg-klokke (dato + HH:mm) → korrekt UTC-instans. */
+function osloWallToUtc(dateIso: string, time: string): Date {
+  const [hh = 0, mm = 0] = time.split(":").map(Number);
+  const naive = new Date(`${dateIso}T00:00:00Z`);
+  naive.setUTCHours(hh, mm, 0, 0);
+  let out = new Date(naive.getTime() - osloOffsetMinutes(naive) * 60000);
+  out = new Date(naive.getTime() - osloOffsetMinutes(out) * 60000);
+  return out;
+}
+
+type DeadlineRule = { days_before: number; time: string } | null;
+
+function computeDeadlines(
+  deliveryIso: string | null | undefined,
+  changeRule: DeadlineRule = null,
+  cancelRule: DeadlineRule = null,
+): {
   change_deadline_iso: string | null;
   cancel_deadline_iso: string | null;
   change_deadline_human_nb: string;
@@ -102,11 +132,22 @@ function computeDeadlines(deliveryIso: string | null | undefined): {
       change_deadline_human_en: "—", cancel_deadline_human_en: "—",
     };
   }
-  const dt = new Date(deliveryIso + "T08:00:00+01:00");
-  const change = new Date(dt.getTime() - 72 * 3600 * 1000); // 72t før
-  const cancel = new Date(dt.getTime() - 48 * 3600 * 1000); // 48t før
+  // Leveringsdagen kl 08:00 Oslo-tid (DST-korrekt), minus frist.
+  const base = osloWallToUtc(deliveryIso, "08:00");
+  const fromRule = (r: DeadlineRule) => {
+    if (!r) return null;
+    const d = new Date(`${deliveryIso}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() - (r.days_before ?? 0));
+    const dateStr = d.toISOString().slice(0, 10);
+    return osloWallToUtc(dateStr, (r.time ?? "12:00").slice(0, 5));
+  };
+  const change = fromRule(changeRule) ?? new Date(base.getTime() - 72 * 3600 * 1000);
+  const cancel = fromRule(cancelRule) ?? new Date(base.getTime() - 48 * 3600 * 1000);
   const fmt = (d: Date, locale: string) =>
-    d.toLocaleString(locale, { weekday: "long", day: "2-digit", month: "long", hour: "2-digit", minute: "2-digit" });
+    d.toLocaleString(locale, {
+      timeZone: "Europe/Oslo",
+      weekday: "long", day: "2-digit", month: "long", hour: "2-digit", minute: "2-digit",
+    });
   return {
     change_deadline_iso: change.toISOString(),
     cancel_deadline_iso: cancel.toISOString(),
