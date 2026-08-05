@@ -111,19 +111,23 @@ function evaluateType(rule: DeliveryRule, ctx: EvaluateContext): { matched: bool
     case "order_deadline": {
       const daysBefore = rule.deadline_days_before ?? 1;
       const [hh = 12, mm = 0] = (rule.deadline_time ?? "12:00").split(":").map(Number);
-      const dl = new Date(`${date}T00:00:00Z`);
-      dl.setUTCDate(dl.getUTCDate() - daysBefore);
-      dl.setUTCHours(hh, mm - OSLO_TZ_OFFSET_MIN, 0, 0);
+      const base = new Date(`${date}T00:00:00Z`);
+      base.setUTCDate(base.getUTCDate() - daysBefore);
+      base.setUTCHours(hh, mm, 0, 0);
+      // base er lokal Oslo-veggklokke tolket som UTC — trekk fra faktisk offset (DST-sikkert)
+      let dl = new Date(base.getTime() - osloOffsetMinutes(base) * 60000);
+      // juster én gang til for tilfeller nær DST-skiftet
+      dl = new Date(base.getTime() - osloOffsetMinutes(dl) * 60000);
       const ordered = new Date(ctx.orderedAt);
       if (ordered.getTime() > dl.getTime()) {
-        const dlNb = new Date(dl.getTime() + OSLO_TZ_OFFSET_MIN * 60000);
         return {
           matched: true,
-          message: `Fristen var ${dlNb.toLocaleString("nb-NO", { weekday: "long", hour: "2-digit", minute: "2-digit" })}.`,
+          message: `Fristen var ${dl.toLocaleString("nb-NO", { timeZone: "Europe/Oslo", weekday: "long", hour: "2-digit", minute: "2-digit" })}.`,
         };
       }
       return { matched: false, message: "Innenfor frist" };
     }
+
     case "delivery_weekdays": {
       const wd = isoWeekday(date);
       if (rule.weekdays && rule.weekdays.length > 0 && !rule.weekdays.includes(wd)) {
