@@ -582,12 +582,26 @@ export function useDeleteCustomerOrder() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (orderId: string) => {
+      // Kakebilder knyttet til ordren slettes med (inkl. filene i bucketen),
+      // ellers blir de liggende foreldreløse og telles i dashboardet.
+      const { data: cakeImgs } = await supabase
+        .from("cake_images")
+        .select("*")
+        .eq("order_id", orderId);
+      for (const img of (cakeImgs ?? []) as CakeImage[]) {
+        try {
+          await deleteCakeImage(img);
+        } catch (err) {
+          console.warn("[useDeleteCustomerOrder] kunne ikke slette kakebilde", err);
+        }
+      }
       // Delete lines first (no FK CASCADE configured, do it explicitly)
       const { error: lineErr } = await supabase.from("order_lines").delete().eq("order_id", orderId);
       if (lineErr) throw lineErr;
       const { error } = await supabase.from("orders").delete().eq("id", orderId);
       if (error) throw error;
     },
+
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["customer-orders"] });
       qc.invalidateQueries({ queryKey: ["orders"] });
