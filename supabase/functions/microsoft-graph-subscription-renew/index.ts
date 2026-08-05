@@ -35,7 +35,12 @@ Deno.serve(async (req) => {
     const { data: tokenRow } = await admin.from("microsoft_oauth_tokens")
       .select("id, access_token_encrypted, refresh_token_encrypted, expires_at")
       .order("updated_at", { ascending: false }).limit(1).maybeSingle();
-    if (!tokenRow) return json({ error: "Microsoft 365 ikke koblet" }, 412);
+    if (!tokenRow) {
+      await admin.rpc("alert_email_subscription_failure", {
+        p_detail: "Microsoft 365 er ikke koblet til — e-post-abonnement kan ikke fornyes. Koble til på nytt i Innstillinger.",
+      });
+      return json({ error: "Microsoft 365 ikke koblet" }, 412);
+    }
 
     let accessToken = await decryptToken(tokenRow.access_token_encrypted);
     if (new Date(tokenRow.expires_at).getTime() - Date.now() < 5 * 60 * 1000) {
