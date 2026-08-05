@@ -523,6 +523,45 @@ export function useUpdateCustomerOrder() {
         throw e;
       }
 
+      // 3. Kakebilder: linjene ble byttet ut, så order_line_id peker på slettede
+      //    rader. Koble bildene til den nye linjen for samme produkt, og hold
+      //    leveringsdatoen i synk så bildet printes på riktig dag.
+      try {
+        const { data: cakeImgs } = await supabase
+          .from("cake_images")
+          .select("id, order_line_id, delivery_date")
+          .eq("order_id", orderId);
+        if ((cakeImgs ?? []).length > 0) {
+          const { data: newLines } = await supabase
+            .from("order_lines")
+            .select("id, product_id, line_number")
+            .eq("order_id", orderId)
+            .order("line_number", { ascending: true });
+          const prevProductByLineId = new Map(
+            (prevLines ?? []).map((pl) => [pl.id as string, pl.product_id as string]),
+          );
+          const availableByProduct = new Map<string, string[]>();
+          for (const nl of newLines ?? []) {
+            const list = availableByProduct.get(nl.product_id as string) ?? [];
+            list.push(nl.id as string);
+            availableByProduct.set(nl.product_id as string, list);
+          }
+          for (const img of cakeImgs ?? []) {
+            const productId = img.order_line_id
+              ? prevProductByLineId.get(img.order_line_id as string)
+              : undefined;
+            const candidates = productId ? availableByProduct.get(productId) : undefined;
+            const newLineId = candidates?.shift() ?? null;
+            const patch: Record<string, unknown> = { delivery_date: input.deliveryDate };
+            if (newLineId) patch.order_line_id = newLineId;
+            await supabase.from("cake_images").update(patch as never).eq("id", img.id);
+          }
+        }
+      } catch (cakeErr) {
+        console.warn("[useUpdateCustomerOrder] kunne ikke synke kakebilder", cakeErr);
+      }
+
+
       return { orderId, has_zero_fallback_lines: fallbackLineIndices };
     },
     onSuccess: (data) => {
