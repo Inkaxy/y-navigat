@@ -61,10 +61,12 @@ export function useSendTicketReply() {
     }) => {
       const text = body_text.trim();
       if (!text) throw new Error("Tomt svar");
+      // Saksbehandlerteksten er ren tekst — escape før den settes inn i HTML.
       const html = text
         .split(/\n{2,}/)
-        .map((p) => `<p>${p.replace(/\n/g, "<br/>")}</p>`)
+        .map((p) => `<p>${escapeHtml(p).replace(/\n/g, "<br/>")}</p>`)
         .join("");
+
       // Idempotens-nøkkel: hindrer duplikate rader dersom to kall slipper gjennom.
       const idempotencyKey = crypto.randomUUID();
 
