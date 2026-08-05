@@ -234,10 +234,13 @@ export default function TicketsList() {
       const pickupDate = getPickupDate(ai);
       const pickupHint = getPickupHint(ai);
       const requestType = ai?.request_type ?? null;
-      const lastOut = latestReply.get(t.id);
-      const awaitingCustomer = !!lastOut
-        && new Date(lastOut).getTime() > new Date(t.received_at).getTime()
-        && (t.status === "new" || t.status === "in_progress");
+      const awaitingCustomer =
+        isAwaitingCustomer({
+          receivedAt: t.received_at,
+          lastOutgoing: latestReply.get(t.id),
+          lastInbound: latestInbound.get(t.id),
+        }) && (t.status === "new" || t.status === "in_progress");
+
       const missingInfo = hasMissingInfo(ai);
       const redRisk = hasRedRisk(ai);
       const linked = !!t.related_order_id;
