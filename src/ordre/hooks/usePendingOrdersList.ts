@@ -75,9 +75,9 @@ export function usePendingOrdersList(
           "id, order_number, customer_id, customer_snapshot, delivery_tour_id, delivery_date, total_incl_vat, internal_notes, customer_notes, is_customer_order, is_return, order_lines(id)"
         )
         .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
-        // Speiler statusfilteret i generate_delivery_notes — kansellerte/leverte/
-        // fakturerte ordre skal ikke ligge i "venter på pakkseddel"-køen.
-        .in("status", ["awaiting_confirmation", "confirmed", "in_production", "packed"]);
+        // Speiler order_is_production_scope(status) i generate_delivery_notes —
+        // awaiting_confirmation venter på godkjenning og skal ikke pakkes.
+        .in("status", ["confirmed", "in_production", "packed"]);
 
       q = mode === "correction" ? q.lte("delivery_date", date) : q.eq("delivery_date", date);
 

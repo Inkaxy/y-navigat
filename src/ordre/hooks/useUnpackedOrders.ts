@@ -66,9 +66,9 @@ export async function fetchUnpackedOrders(
     )
     .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
     .eq("delivery_date", date)
-    // Samme statusfilter som generate_delivery_notes — kansellerte/utkast/leverte
-    // ordre skal ikke ligge permanent i «venter»-køene.
-    .in("status", ["awaiting_confirmation", "confirmed", "in_production", "packed"]);
+    // Speiler order_is_production_scope(status) i generate_delivery_notes —
+    // awaiting_confirmation venter på godkjenning og skal ikke pakkes.
+    .in("status", ["confirmed", "in_production", "packed"]);
 
   if (tourId === NULL_TOUR_KEY) ordersQ = ordersQ.is("delivery_tour_id", null);
   else if (tourId !== "all") ordersQ = ordersQ.eq("delivery_tour_id", tourId);

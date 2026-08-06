@@ -168,6 +168,12 @@ export default function WebsiteOrders() {
         </div>
       </div>
 
+      <div className="rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+        Ordre som validerer automatisk legges rett i ordrelisten under{" "}
+        <span className="font-medium text-foreground">Til godkjenning</span>. Her ligger kun
+        ordre som trenger manuell håndtering.
+      </div>
+
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">
