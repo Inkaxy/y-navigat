@@ -63,6 +63,8 @@ import { useLabelPrintProfiles } from "@/produksjon/features/utskriftsprofiler/h
 import type { LabelProductRow, LabelScreenFilter } from "@/produksjon/features/etiketter/types";
 
 const ALL = "all" as const;
+/** Pseudo-verdi for ordre uten tur (henteordre, delivery_tour_id IS NULL). */
+const NO_TOUR = "__no_tour__" as const;
 
 export default function EtiketterPage() {
   const today = useMemo(() => format(new Date(), "yyyy-MM-dd"), []);
@@ -86,7 +88,8 @@ export default function EtiketterPage() {
         ? {
             date,
             legalEntityId,
-            tourIds: tourId === ALL ? null : [tourId],
+            // Tom liste = kun ordre uten tur (RPC-en tar alltid med NULL-tur).
+            tourIds: tourId === ALL ? null : tourId === NO_TOUR ? [] : [tourId],
             departmentIds: departmentId === ALL ? null : [departmentId],
           }
         : null,
