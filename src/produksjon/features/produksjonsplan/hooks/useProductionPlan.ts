@@ -105,7 +105,10 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
         }))
         .filter((o) => {
           if (criteria.tour_numbers.length === 0) return true;
-          return o.tour_number !== null && criteria.tour_numbers.includes(o.tour_number);
+          // Ordre uten tur (henteordre) er sin egen bøtte og skal aldri
+          // forsvinne fordi det filtreres på turer.
+          if (o.tour_number === null) return true;
+          return criteria.tour_numbers.includes(o.tour_number);
         });
 
       // Kundegruppe-filter
