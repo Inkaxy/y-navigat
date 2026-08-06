@@ -431,6 +431,12 @@ export default function EtiketterPage() {
                 onClick={() => setTourId(t.id)}
               />
             ))}
+            <TourChip
+              label="Henting / uten tur"
+              title="Ordre uten tur (henteordre)"
+              active={tourId === NO_TOUR}
+              onClick={() => setTourId(NO_TOUR)}
+            />
           </div>
         </div>
 
