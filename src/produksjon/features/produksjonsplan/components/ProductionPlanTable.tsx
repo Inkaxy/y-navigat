@@ -237,12 +237,14 @@ export function ProductionPlanTable({ rows, showByMainGroup, showTraysWithPlus, 
                               <td className="font-mono py-1 pr-3">{d.customer_number ?? ""}</td>
                               <td className="py-1 pr-3">{d.customer_name}</td>
                               <td className="py-1 pr-3 text-muted-foreground">
-                                {d.tour_number != null ? `tur ${d.tour_number}` : ""}
+                                {d.tour_number != null ? `tur ${d.tour_number}` : "henting"}
                               </td>
                               <td className="font-mono py-1 pr-3">{d.product_code ?? ""}</td>
                               <td className="text-right tabular-nums py-1 pr-3">{fmtNum(d.quantity)}</td>
                               <td className="py-1 pr-3 text-muted-foreground">{d.unit_of_sale ?? ""}</td>
-                              <td className="py-1 pr-3 text-muted-foreground">{d.tour_name ?? ""}</td>
+                              <td className="py-1 pr-3 text-muted-foreground">
+                                {d.tour_name ?? (d.tour_number == null ? "Henting / uten tur" : "")}
+                              </td>
                               <td className="py-1 text-muted-foreground">{d.address ?? ""}</td>
                             </tr>
                           ))}
