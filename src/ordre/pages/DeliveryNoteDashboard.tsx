@@ -107,6 +107,12 @@ export default function DeliveryNoteDashboard() {
 
   const rel = useMemo(() => relativeDateLabel(date), [date]);
 
+  /** Antall ordre uten tur (henteordre) for valgt dato. */
+  const nullTourCount = useMemo(
+    () => tourStatus.rows.find((r) => r.isNullTour)?.order_count ?? 0,
+    [tourStatus.rows],
+  );
+
   // ---- Smart Hovedkjøring-knapp-logikk (B2) ----
   // Når tur-filter er valgt: knappens semantikk gjelder kun valgt tur (uuid eller NULL_TOUR_KEY).
   // Når "all": knappen gjelder alle turer med ordre.
@@ -463,6 +469,12 @@ export default function DeliveryNoteDashboard() {
                     onClick={() => setTourId(t.id)}
                   />
                 ))}
+                {/* Henteordre uten tur — egen bøtte, så de ikke blir usynlige */}
+                <TourChip
+                  active={tourId === NULL_TOUR_KEY}
+                  label={`Henting / uten tur${nullTourCount > 0 ? ` (${nullTourCount})` : ""}`}
+                  onClick={() => setTourId(NULL_TOUR_KEY)}
+                />
               </div>
             </div>
 
