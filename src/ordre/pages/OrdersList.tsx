@@ -194,7 +194,7 @@ export default function OrdersList() {
       row,
       intent: {
         to: "confirmed",
-        label: "Aksepter",
+        label: "Godkjenn",
       },
     });
   }
@@ -277,7 +277,7 @@ export default function OrdersList() {
             className="ml-2 h-7 gap-1.5 px-2 text-caption"
           >
             <Inbox className="h-3.5 w-3.5" />
-            Aksept-kø
+            Til godkjenning
             {queueCount > 0 && (
               <Badge
                 variant={acceptanceOnly ? "secondary" : "default"}
@@ -722,7 +722,7 @@ export default function OrdersList() {
                                   onClick={() => openAccept(r)}
                                 >
                                   <Check className="h-3.5 w-3.5" />
-                                  Aksepter
+                                  Godkjenn
                                 </Button>
                                 <Button
                                   size="sm"
@@ -869,7 +869,7 @@ export default function OrdersList() {
                             onClick={() => openAccept(r)}
                           >
                             <Check className="h-4 w-4" />
-                            Aksepter
+                            Godkjenn
                           </Button>
                           <Button
                             size="sm"
