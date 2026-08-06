@@ -10,32 +10,11 @@ import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { AppShell } from "@/components/layout/AppShell";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
-import AcceptInvite from "./pages/auth/AcceptInvite";
-import SetPortalPassword from "./pages/auth/SetPortalPassword";
 import Hjem from "./pages/Hjem";
 
-import MinProfil from "./pages/MinProfil";
-import Varsler from "./pages/Varsler";
-import Hjelp from "./pages/Hjelp";
 import NotFound from "./pages/NotFound";
-import AppPlaceholder from "./pages/apps/AppPlaceholder";
 import { AppAccessGuard } from "./components/auth/AppAccessGuard";
 import { PlatformAdminGuard } from "./components/auth/PlatformAdminGuard";
-import AdminIndex from "./pages/admin/AdminIndex";
-import AdminPlaceholder from "./pages/admin/AdminPlaceholder";
-import Integrasjoner from "./pages/admin/Integrasjoner";
-import IntegrasjonDetalj from "./pages/admin/IntegrasjonDetalj";
-import TripletexIntegrasjon from "./pages/admin/TripletexIntegrasjon";
-import Helsesenter from "./pages/admin/Helsesenter";
-import Audit from "./pages/admin/Audit";
-import Selskaper from "./pages/admin/Selskaper";
-import Brukere from "./pages/admin/Brukere";
-import BrukerDetalj from "./pages/admin/BrukerDetalj";
-import Tilganger from "./pages/admin/Tilganger";
-import Outlets from "./pages/admin/Outlets";
-import Stillinger from "./pages/admin/Stillinger";
-import StillingDetalj from "./pages/admin/StillingDetalj";
-import Apper from "./pages/admin/Apper";
 import { Navigate } from "react-router-dom";
 import { AppProvider as VarerAppProvider } from "@/varer/context/AppContext";
 import { SelectionProvider } from "@/providers/SelectionProvider";
@@ -48,7 +27,6 @@ import { AppColorProvider } from "@/providers/AppColorProvider";
 import { LegalEntityProvider as PosStyringEntityProvider } from "@/pos_styring/contexts/LegalEntityContext";
 
 // Kiosk-ruter — bypass NBhub-shell + auth-guard, egen Supabase-klient
-import { KioskOperatorRoute, KioskCustomerRoute, KioskSelfServiceRoute } from "@/kiosk/routes";
 
 
 
@@ -76,6 +54,30 @@ const KunderEntityProvider = ({ children }: { children: React.ReactNode }) => {
 
 
 // Kodesplitting: hver app-side lastes først når ruten treffes.
+const AdminIndex = lazy(() => import("./pages/admin/AdminIndex"));
+const AdminPlaceholder = lazy(() => import("./pages/admin/AdminPlaceholder"));
+const Integrasjoner = lazy(() => import("./pages/admin/Integrasjoner"));
+const IntegrasjonDetalj = lazy(() => import("./pages/admin/IntegrasjonDetalj"));
+const TripletexIntegrasjon = lazy(() => import("./pages/admin/TripletexIntegrasjon"));
+const Helsesenter = lazy(() => import("./pages/admin/Helsesenter"));
+const Audit = lazy(() => import("./pages/admin/Audit"));
+const Selskaper = lazy(() => import("./pages/admin/Selskaper"));
+const Brukere = lazy(() => import("./pages/admin/Brukere"));
+const BrukerDetalj = lazy(() => import("./pages/admin/BrukerDetalj"));
+const Tilganger = lazy(() => import("./pages/admin/Tilganger"));
+const Outlets = lazy(() => import("./pages/admin/Outlets"));
+const Stillinger = lazy(() => import("./pages/admin/Stillinger"));
+const StillingDetalj = lazy(() => import("./pages/admin/StillingDetalj"));
+const Apper = lazy(() => import("./pages/admin/Apper"));
+const MinProfil = lazy(() => import("./pages/MinProfil"));
+const Varsler = lazy(() => import("./pages/Varsler"));
+const Hjelp = lazy(() => import("./pages/Hjelp"));
+const AppPlaceholder = lazy(() => import("./pages/apps/AppPlaceholder"));
+const AcceptInvite = lazy(() => import("./pages/auth/AcceptInvite"));
+const SetPortalPassword = lazy(() => import("./pages/auth/SetPortalPassword"));
+const KioskOperatorRoute = lazy(() => import("@/kiosk/routes").then((m) => ({ default: m.KioskOperatorRoute })));
+const KioskCustomerRoute = lazy(() => import("@/kiosk/routes").then((m) => ({ default: m.KioskCustomerRoute })));
+const KioskSelfServiceRoute = lazy(() => import("@/kiosk/routes").then((m) => ({ default: m.KioskSelfServiceRoute })));
 const VarerProductList = lazy(() => import("@/varer/pages/ProductList"));
 const VarerProductDetail = lazy(() => import("@/varer/pages/ProductDetail"));
 const VarerPriceLists = lazy(() => import("@/varer/pages/PriceLists"));
