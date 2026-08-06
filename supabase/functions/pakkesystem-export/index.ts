@@ -281,8 +281,15 @@ Deno.serve(async (req) => {
     `)
     .eq("legal_entity_id", legalEntityId)
     .eq("delivery_date", dateParam)
-    .neq("status", "draft");
-  if (allowedTourIds) ordersQ = ordersQ.in("delivery_tour_id", allowedTourIds);
+    // Speiler order_is_production_scope(status) — kansellerte/utkast skal aldri
+    // sendes til pakkerne.
+    .in("status", ["confirmed", "in_production", "packed"]);
+  // Tur-filter tar alltid med henteordre (delivery_tour_id IS NULL).
+  if (allowedTourIds) {
+    ordersQ = ordersQ.or(
+      `delivery_tour_id.in.(${allowedTourIds.join(",")}),delivery_tour_id.is.null`,
+    );
+  }
   if (allowedCustomerIds) ordersQ = ordersQ.in("customer_id", allowedCustomerIds);
   const { data: ordersRaw, error: ordErr } = await ordersQ;
   if (ordErr) return jsonRes({ error: ordErr.message, code: "orders_failed" }, 500);

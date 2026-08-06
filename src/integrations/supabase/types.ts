@@ -10587,7 +10587,7 @@ export type Database = {
         Returns: Json
       }
       convert_website_order: {
-        Args: { p_website_order_id: string }
+        Args: { p_initial_status?: string; p_website_order_id: string }
         Returns: string
       }
       create_invoice_run: {
@@ -11182,6 +11182,10 @@ export type Database = {
           order_sequence: number
           order_year: number
         }[]
+      }
+      order_is_production_scope: {
+        Args: { p_status: string }
+        Returns: boolean
       }
       pakkesystem_hash_key: { Args: { p_key: string }; Returns: string }
       portal_can_bake_own: { Args: never; Returns: boolean }

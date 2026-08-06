@@ -94,11 +94,10 @@ export function useDeliveryTours(opts?: { activeOnly?: boolean }) {
 }
 
 /**
- * Status-whitelist som speiler RPC generate_delivery_notes:
+ * Status-whitelist som speiler order_is_production_scope(status) i databasen:
  * kun ordre som vil bli plukket opp av Hovedkjøring teller.
  */
 export const TOUR_COUNT_STATUS_WHITELIST = [
-  "awaiting_confirmation",
   "confirmed",
   "in_production",
   "packed",

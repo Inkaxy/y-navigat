@@ -72,7 +72,9 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
           .eq("delivery_date", date)
           .range(from, to),
       );
-      const ACTIVE_STATUSES = ["awaiting_confirmation", "confirmed", "in_production", "packed"];
+      // Speiler order_is_production_scope(status) i databasen —
+      // awaiting_confirmation er godkjenningsporten og skal IKKE produseres.
+      const ACTIVE_STATUSES = ["confirmed", "in_production", "packed"];
       const cancelledOrders = (allOrders ?? []).filter((o) => o.status === "cancelled");
       // Kun statuser som også havner på pakksedler/etiketter — utkast og på-vent teller ikke.
       const orders = (allOrders ?? []).filter((o) => ACTIVE_STATUSES.includes(o.status));
@@ -103,7 +105,10 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
         }))
         .filter((o) => {
           if (criteria.tour_numbers.length === 0) return true;
-          return o.tour_number !== null && criteria.tour_numbers.includes(o.tour_number);
+          // Ordre uten tur (henteordre) er sin egen bøtte og skal aldri
+          // forsvinne fordi det filtreres på turer.
+          if (o.tour_number === null) return true;
+          return criteria.tour_numbers.includes(o.tour_number);
         });
 
       // Kundegruppe-filter

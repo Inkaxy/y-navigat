@@ -14,7 +14,7 @@ export type OrderSource = "manual" | "website" | "email" | "edi" | "subscription
 
 export const ORDER_STATUSES: { value: OrderStatus; label: string; tokenVar: string }[] = [
   { value: "draft", label: "Utkast", tokenVar: "--status-draft" },
-  { value: "awaiting_confirmation", label: "Venter bekreftelse", tokenVar: "--status-awaiting" },
+  { value: "awaiting_confirmation", label: "Venter godkjenning", tokenVar: "--status-awaiting" },
   { value: "confirmed", label: "Bekreftet", tokenVar: "--status-confirmed" },
   { value: "in_production", label: "I produksjon", tokenVar: "--status-in-production" },
   { value: "packed", label: "Pakket", tokenVar: "--status-packed" },

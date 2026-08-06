@@ -71,6 +71,11 @@ verify_jwt = false
 [functions.pakkesystem-export]
 verify_jwt = false
 
+[functions.nettside-order-in]
+verify_jwt = false
+
+
+
 [functions.pakkesystem-create-key]
 verify_jwt = false
 
