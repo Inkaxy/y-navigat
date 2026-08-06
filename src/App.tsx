@@ -190,7 +190,15 @@ const Kjoringer = lazy(() => import("@/fakturering/pages/Kjoringer"));
 const KjoringDetalj = lazy(() => import("@/fakturering/pages/KjoringDetalj"));
 const FakturaInnstillinger = lazy(() => import("@/fakturering/pages/FakturaInnstillinger"));
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000,
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
 
 const RedirectFakturaer = () => {
   const { id } = useParams();
