@@ -9,7 +9,7 @@ import {
 } from "@/produksjon/features/etiketter/lib/labelPdf";
 import { fetchOrderLineTours } from "@/produksjon/features/etiketter/hooks/useOrderLineTours";
 import { fetchOrderLineCustomerInfo } from "@/produksjon/features/etiketter/hooks/useOrderLineCustomerInfo";
-import { fetchOrderLineMerknads } from "@/produksjon/features/etiketter/hooks/useOrderLineMerknads";
+import { fetchLabelFields, useLabelFields } from "@/produksjon/features/etiketter/hooks/useLabelFields";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -142,6 +142,26 @@ export default function EtiketterPage() {
 
   const { data: printedCount = 0 } = usePrintedLabelCount(filter, productIds);
 
+  // Manglende etikettfelter per vare (fra resolve_label_fields).
+  const allOrderLineIds = useMemo(
+    () => Array.from(new Set((filteredRows ?? []).flatMap((r) => r.order_line_ids ?? []))),
+    [filteredRows],
+  );
+  const { data: labelFieldsByLine } = useLabelFields(allOrderLineIds);
+  const missingFieldsByProduct = useMemo(() => {
+    const out: Record<string, string[]> = {};
+    if (!labelFieldsByLine) return out;
+    for (const r of filteredRows ?? []) {
+      const set = new Set<string>();
+      for (const id of r.order_line_ids ?? []) {
+        for (const f of labelFieldsByLine[id]?.mangler ?? []) set.add(f);
+      }
+      if (set.size > 0) out[r.product_id] = Array.from(set);
+    }
+    return out;
+  }, [filteredRows, labelFieldsByLine]);
+
+
   // Bulk-print
   const nextNumber = useNextLabelNumber();
   const insertJob = useInsertLabelPrintJob();
@@ -254,9 +274,9 @@ export default function EtiketterPage() {
       const allLineIds = Array.from(
         new Set(printableRows.flatMap((r) => r.order_line_ids ?? [])),
       );
-      const [merknadMap, tourMap, customerInfoMap] = allLineIds.length > 0
+      const [labelFieldsMap, tourMap, customerInfoMap] = allLineIds.length > 0
         ? await Promise.all([
-            fetchOrderLineMerknads(allLineIds),
+            fetchLabelFields(allLineIds),
             fetchOrderLineTours(allLineIds),
             fetchOrderLineCustomerInfo(allLineIds),
           ])
@@ -276,7 +296,7 @@ export default function EtiketterPage() {
             labelNumber: null,
             quantity: totalCopies,
             copies: totalCopies,
-            merknad: null,
+            labelFields: null,
           });
         } else {
           // Én side per ordrelinje (med dens merknad); padder ved behov.
@@ -287,7 +307,7 @@ export default function EtiketterPage() {
               labelNumber: null,
               quantity: totalCopies,
               copies: 1,
-              merknad: merknadMap[id] ?? null,
+              labelFields: labelFieldsMap[id] ?? null,
               tourLabel: tourMap[id] ?? null,
               pickupLabel: customerInfoMap[id]?.pickupLabel ?? null,
               customerName: customerInfoMap[id]?.customerName ?? null,
@@ -309,7 +329,7 @@ export default function EtiketterPage() {
               labelNumber: null,
               quantity: totalCopies,
               copies: totalCopies - lineIds.length,
-              merknad: merknadMap[lineIds[0]] ?? null,
+              labelFields: labelFieldsMap[lineIds[0]] ?? null,
               tourLabel: tourMap[lineIds[0]] ?? null,
               pickupLabel: customerInfoMap[lineIds[0]]?.pickupLabel ?? null,
               customerName: customerInfoMap[lineIds[0]]?.customerName ?? null,
@@ -499,6 +519,7 @@ export default function EtiketterPage() {
         departments={departments}
         productProfiles={productProfiles}
         profiles={profiles}
+        missingFieldsByProduct={missingFieldsByProduct}
         onPrint={(row) => {
           setPrintRow(row);
           setPrintOpen(true);

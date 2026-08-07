@@ -14,7 +14,7 @@ import type {
 import { FIELD_LABELS } from "@/produksjon/features/utskriftsprofiler/types";
 import { fitFontSizePt } from "@/produksjon/features/utskriftsprofiler/lib/fitText";
 import type { LabelProductRow } from "../types";
-import type { Merknad } from "@/ordre/lib/merknad";
+import type { LabelFields } from "../hooks/useLabelFields";
 import { code128Modules } from "./code128";
 
 const MM_TO_PT = 2.83465;
@@ -27,8 +27,8 @@ export interface LabelPdfData {
   quantity: number;
   /** Hvor mange etiketter som skal genereres (ofte = quantity). Default 1. */
   copies?: number;
-  /** Merknad lagret på order_lines.merknad for denne ordrelinjen. Fyller etikett-felt. */
-  merknad?: Merknad | null;
+  /** Oppløste etikettfelter fra RPC `resolve_label_fields`. Fyller etikett-felt. */
+  labelFields?: LabelFields | null;
   /** Tur-etikett (f.eks. "Tur 1") for ordrelinjen. */
   tourLabel?: string | null;
   /** Hentested-navn (pickup_locations.display_name) for ordrelinjen. */
@@ -67,7 +67,7 @@ function valueFor(
   type: FieldType,
   data: LabelPdfData,
 ): { text?: string; image?: string | null } {
-  const { profile, row, labelNumber, quantity, merknad, tourLabel, pickupLabel, customerName, deliveryAddress, phone, deliveryDate, pickupTime, isPaid, distribution, routeLabel, deliveryNoteNumber, deliveryNoteMessage } = data;
+  const { profile, row, labelNumber, quantity, labelFields, tourLabel, pickupLabel, customerName, deliveryAddress, phone, deliveryDate, pickupTime, isPaid, distribution, routeLabel, deliveryNoteNumber, deliveryNoteMessage } = data;
   switch (type) {
     case "logo":
       return { image: profile.logo_url };
@@ -113,19 +113,19 @@ function valueFor(
     case "sist_endret":
       return { text: new Date().toLocaleString("nb-NO") };
     case "bestilt_av":
-      return { text: merknad?.bestilt_av || "" };
+      return { text: labelFields?.bestilt_av || "" };
     case "fyll":
-      return { text: merknad?.fyll || "" };
+      return { text: labelFields?.fyll || "" };
     case "tekst":
-      return { text: merknad?.tekst || "" };
+      return { text: labelFields?.tekst || "" };
     case "pynt":
-      return { text: merknad?.pynt || "" };
+      return { text: labelFields?.pynt || "" };
     case "sukkerbilde":
       return {
-        text: merknad?.sukkerbilde === true ? "+ BILDE" : "",
+        text: labelFields?.sukkerbilde === true ? "+ BILDE" : "",
       };
     case "kommentar":
-      return { text: merknad?.fritekst_1 || "" };
+      return { text: labelFields?.kommentar || "" };
     default:
       return { text: `[${FIELD_LABELS[type]}]` };
   }

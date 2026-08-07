@@ -30,6 +30,8 @@ interface Props {
   productProfiles?: Record<string, string | null>;
   /** Aktive profiler for valgt selskap (slik at vi kan vise navn) */
   profiles?: LabelPrintProfile[];
+  /** product_id -> liste med etikettfelter som mangler verdi. */
+  missingFieldsByProduct?: Record<string, string[]>;
   onPrint?: (row: LabelProductRow) => void;
   onPickProfile?: (row: LabelProductRow) => void;
 }
@@ -108,6 +110,7 @@ export function LabelProductsTable({
   departments,
   productProfiles,
   profiles,
+  missingFieldsByProduct,
   onPrint,
   onPickProfile,
 }: Props) {
@@ -161,7 +164,12 @@ export function LabelProductsTable({
               <TableCell className="tabular-nums text-muted-foreground">
                 {row.display_number}
               </TableCell>
-              <TableCell className="font-medium">{row.display_name}</TableCell>
+              <TableCell className="font-medium">
+                <span className="inline-flex items-center gap-1.5">
+                  {row.display_name}
+                  <MissingFieldsBadge fields={missingFieldsByProduct?.[row.product_id]} />
+                </span>
+              </TableCell>
               <TableCell>
                 <ModeBadge mode={row.label_mode} />
               </TableCell>
@@ -221,6 +229,24 @@ export function LabelProductsTable({
         </TableBody>
       </Table>
     </Card>
+  );
+}
+
+function MissingFieldsBadge({ fields }: { fields?: string[] }) {
+  if (!fields || fields.length === 0) return null;
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          className="inline-flex items-center gap-1 rounded-full border border-amber-500/50 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400"
+          aria-label={`Mangler etikettinfo: ${fields.join(", ")}`}
+        >
+          <AlertTriangle className="h-3 w-3" />
+          Mangler
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>Mangler etikettinfo: {fields.join(", ")}</TooltipContent>
+    </Tooltip>
   );
 }
 
