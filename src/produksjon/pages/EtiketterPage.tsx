@@ -519,6 +519,7 @@ export default function EtiketterPage() {
         departments={departments}
         productProfiles={productProfiles}
         profiles={profiles}
+        missingFieldsByProduct={missingFieldsByProduct}
         onPrint={(row) => {
           setPrintRow(row);
           setPrintOpen(true);
