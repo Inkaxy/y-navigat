@@ -10076,6 +10076,36 @@ export type Database = {
         }
         Relationships: []
       }
+      website_order_rejects: {
+        Row: {
+          code: string
+          http_status: number
+          id: string
+          raw_body: string | null
+          raw_payload: Json | null
+          reason: string | null
+          received_at: string
+        }
+        Insert: {
+          code: string
+          http_status: number
+          id?: string
+          raw_body?: string | null
+          raw_payload?: Json | null
+          reason?: string | null
+          received_at?: string
+        }
+        Update: {
+          code?: string
+          http_status?: number
+          id?: string
+          raw_body?: string | null
+          raw_payload?: Json | null
+          reason?: string | null
+          received_at?: string
+        }
+        Relationships: []
+      }
       website_orders: {
         Row: {
           business_name: string | null
@@ -11710,6 +11740,7 @@ export type Database = {
         }
         Returns: Json
       }
+      verify_cron_secret: { Args: { p_secret: string }; Returns: boolean }
       verify_gtin: { Args: { p_gtin: string }; Returns: boolean }
     }
     Enums: {

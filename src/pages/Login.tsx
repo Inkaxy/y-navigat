@@ -100,10 +100,10 @@ export default function Login() {
 
   return (
     <div
-      className="flex min-h-screen items-start justify-center px-4 pt-4 pb-4"
+      className="flex min-h-screen items-start justify-center bg-surface-canvas px-4 pt-4 pb-4"
       style={{
         background:
-          "radial-gradient(ellipse at top, hsl(var(--brand-ink)) 0%, hsl(24 24% 6%) 70%)",
+          "radial-gradient(ellipse at top, hsl(var(--surface-raised)) 0%, hsl(var(--surface-canvas)) 70%)",
       }}
     >
       <div className="w-full max-w-3xl space-y-2 animate-fade-in">
@@ -111,7 +111,7 @@ export default function Login() {
           <LoginLogo
             role="img"
             aria-label="Nøtterø Bakeri"
-            className="h-[24rem] w-auto sm:h-[28rem] md:h-[34rem] lg:h-[40rem] text-brand-cream drop-shadow-[0_8px_30px_hsl(var(--brand-bronze)/0.25)]"
+            className="h-[24rem] w-auto sm:h-[28rem] md:h-[34rem] lg:h-[40rem] text-brand-ink drop-shadow-[0_8px_30px_hsl(var(--brand-bronze)/0.18)]"
           />
         </div>
 
