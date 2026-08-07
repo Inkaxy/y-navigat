@@ -58,6 +58,11 @@ import { logAudit } from "@/ordre/lib/audit";
 import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
 import { MerknadDialog } from "@/ordre/components/orders/MerknadDialog";
 import { type Merknad, isMerknadEmpty } from "@/ordre/lib/merknad";
+import {
+  PENDING_CAKE_IMAGE_KEY,
+  flushPendingCakeImages,
+} from "@/ordre/lib/orderLineCakeImage";
+
 import { useProductLabelProfiles } from "@/produksjon/features/etiketter/hooks/useProductLabelProfiles";
 import { useLabelPrintProfiles } from "@/produksjon/features/utskriftsprofiler/hooks/useLabelPrintProfiles";
 import { supabase } from "@/integrations/supabase/client";
@@ -123,6 +128,9 @@ type Props = {
 
 type LineDraft = {
   uid: string;
+  /** Id på lagret ordrelinje (kun i redigeringsmodus). */
+  id?: string;
+
   product: ProductOption | null;
   product_display_name?: string;
   product_display_number?: number | null;
@@ -347,6 +355,8 @@ export function CustomerOrderModal({
         existing.lines.length > 0
           ? existing.lines.map((l) => ({
               uid: crypto.randomUUID(),
+              id: l.id,
+
               product_display_name: l.product_display_name,
               product_display_number: l.product_display_number,
               product_unit_of_sale: l.product_unit_of_sale,
@@ -672,9 +682,11 @@ export function CustomerOrderModal({
     setSubmitting(true);
     try {
       let fallbackCount = 0;
+      let savedOrderId: string | null = null;
       if (isEdit && orderId) {
         const res = await updateMut.mutateAsync({ orderId, input });
         fallbackCount = res?.has_zero_fallback_lines?.length ?? 0;
+        savedOrderId = orderId;
         await logAudit({
           action: "updated",
           entity_type: "order",
@@ -687,6 +699,8 @@ export function CustomerOrderModal({
       } else {
         const row = await createMut.mutateAsync(input);
         fallbackCount = row?.has_zero_fallback_lines?.length ?? 0;
+        savedOrderId = row.id;
+
         await logAudit({
           action: "created",
           entity_type: "order",
@@ -775,8 +789,38 @@ export function CustomerOrderModal({
           `${fallbackCount} linje(r) fikk pris 0 — mangler prisliste-rad eller spesialpris`,
         );
       }
+
+      // Kakebilder lastet opp i etikett-dialogen før linjene hadde id:
+      // koble dem til de nå lagrede ordrelinjene.
+      const hasPending = lines.some(
+        (l) =>
+          typeof (l.merknad as Record<string, unknown> | null)?.[
+            PENDING_CAKE_IMAGE_KEY
+          ] === "string",
+      );
+      if (savedOrderId && hasPending) {
+        const { ok, failed } = await flushPendingCakeImages(savedOrderId);
+        if (ok > 0) {
+          toast.success(
+            `Kakebildet er lagt i utskriftskøen for ${input.deliveryDate}`,
+            {
+              action: {
+                label: "Åpne Kakebilder",
+                onClick: () => window.open("/ordre/kakebilder", "_blank"),
+              },
+            },
+          );
+        }
+        if (failed > 0) {
+          toast.error("Ordren er lagret, men kakebildet ble ikke lagt i køen", {
+            description: "Prøv på nytt fra ordredetaljene.",
+          });
+        }
+      }
+
       setDirty(false);
       onOpenChange(false);
+
     } catch (e) {
       console.error(e);
       toast.error(e instanceof Error ? e.message : "Kunne ikke lagre");
@@ -1359,6 +1403,9 @@ export function CustomerOrderModal({
           <MerknadDialog
             open={!!merknadFor}
             onOpenChange={(v) => { if (!v) setMerknadFor(null); }}
+            orderLineId={activeLine.id ?? null}
+            deliveryDate={deliveryDate}
+
             productName={activeLine.product.display_name}
             quantity={Number(activeLine.quantity) || 0}
             profile={profile}

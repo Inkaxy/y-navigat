@@ -11678,6 +11678,15 @@ export type Database = {
         Args: { p_ids: string[]; p_reason?: string }
         Returns: Json
       }
+      upload_cake_image_for_order_line: {
+        Args: {
+          p_notes?: string
+          p_order_line_id: string
+          p_original_path: string
+          p_title?: string
+        }
+        Returns: string
+      }
       upsert_matrix_column_comment: {
         Args: {
           p_comment: string

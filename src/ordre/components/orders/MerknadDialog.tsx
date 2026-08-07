@@ -26,6 +26,9 @@ import { type Merknad, emptyMerknad, isMerknadEmpty, merknadSchema } from "@/ord
 import type { FieldType, LabelPrintProfile } from "@/produksjon/features/utskriftsprofiler/types";
 import { FIELD_LABELS } from "@/produksjon/features/utskriftsprofiler/types";
 import { toast } from "sonner";
+import { CakeImageUploadField } from "@/ordre/components/orders/CakeImageUploadField";
+import { PENDING_CAKE_IMAGE_KEY } from "@/ordre/lib/orderLineCakeImage";
+
 
 /**
  * Felter som er manuelt utfyllbare pr ordrelinje (inputs).
@@ -68,6 +71,8 @@ export function MerknadDialog({
   onSave,
   onClear,
   autoValues,
+  orderLineId,
+  deliveryDate,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -83,15 +88,24 @@ export function MerknadDialog({
   /** Allerede kjente verdier (kundenavn, tur, leveringsadresse, telefon, …)
    *  som vises som låste rader. Mangler en verdi vises «(hentes fra ordre)». */
   autoValues?: MerknadAutoValues;
+  /** Ordrelinjens id — finnes kun for allerede lagrede linjer. */
+  orderLineId?: string | null;
+  /** Leveringsdato fra ordreskjemaet. Settes for å aktivere kakebilde-opplasting. */
+  deliveryDate?: string;
 }) {
   const [form, setForm] = useState<Merknad>(emptyMerknad);
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);
+  const [pendingPath, setPendingPath] = useState<string | null>(null);
 
   useEffect(() => {
     if (open) {
       setForm(initial ?? emptyMerknad);
+      const p = (initial as Record<string, unknown> | null)?.[PENDING_CAKE_IMAGE_KEY];
+      setPendingPath(typeof p === "string" && p ? p : null);
     }
   }, [open, initial]);
+
+
 
   function update<K extends keyof Merknad>(key: K, value: Merknad[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -132,7 +146,14 @@ export function MerknadDialog({
       toast.error("Ugyldig skjema", { description: parsed.error.issues[0]?.message });
       return;
     }
-    const merknad = isMerknadEmpty(parsed.data) ? null : parsed.data;
+    // Et opplastet, ennå ikke koblet, kakebilde må overleve selv om resten er tomt.
+    const withPending: Merknad = pendingPath
+      ? ({ ...parsed.data, [PENDING_CAKE_IMAGE_KEY]: pendingPath } as Merknad)
+      : (Object.fromEntries(
+          Object.entries(parsed.data).filter(([k]) => k !== PENDING_CAKE_IMAGE_KEY),
+        ) as Merknad);
+    const merknad = !pendingPath && isMerknadEmpty(parsed.data) ? null : withPending;
+
     await onSave(merknad);
   }
 
@@ -238,26 +259,41 @@ export function MerknadDialog({
                     return (
                       <div key={ft} className="contents">
                         <Label className="self-center">Bilde</Label>
-                        <RadioGroup
-                          className="flex gap-4"
-                          value={form.sukkerbilde === true ? "ja" : form.sukkerbilde === false ? "nei" : "null"}
-                          onValueChange={(v) =>
-                            update("sukkerbilde", v === "ja" ? true : v === "nei" ? false : null)
-                          }
-                          disabled={!canEdit}
-                        >
-                          <label className="flex items-center gap-2 text-sm">
-                            <RadioGroupItem value="ja" /> Ja
-                          </label>
-                          <label className="flex items-center gap-2 text-sm">
-                            <RadioGroupItem value="nei" /> Nei
-                          </label>
-                          <label className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <RadioGroupItem value="null" /> Ikke spesifisert
-                          </label>
-                        </RadioGroup>
+                        <div className="space-y-2">
+                          <RadioGroup
+                            className="flex gap-4"
+                            value={form.sukkerbilde === true ? "ja" : form.sukkerbilde === false ? "nei" : "null"}
+                            onValueChange={(v) =>
+                              update("sukkerbilde", v === "ja" ? true : v === "nei" ? false : null)
+                            }
+                            disabled={!canEdit}
+                          >
+                            <label className="flex items-center gap-2 text-sm">
+                              <RadioGroupItem value="ja" /> Ja
+                            </label>
+                            <label className="flex items-center gap-2 text-sm">
+                              <RadioGroupItem value="nei" /> Nei
+                            </label>
+                            <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <RadioGroupItem value="null" /> Ikke spesifisert
+                            </label>
+                          </RadioGroup>
+                          {deliveryDate != null && (
+                            <CakeImageUploadField
+                              orderLineId={orderLineId ?? null}
+                              deliveryDate={deliveryDate}
+                              productName={productName}
+                              canEdit={canEdit}
+                              pendingPath={pendingPath}
+                              onPendingPathChange={setPendingPath}
+                              onUploaded={() => update("sukkerbilde", true)}
+                              onRemoved={() => update("sukkerbilde", null)}
+                            />
+                          )}
+                        </div>
                       </div>
                     );
+
                   case "kommentar":
                     if (!showKommentar) return null;
                     return (
