@@ -355,6 +355,8 @@ export function CustomerOrderModal({
         existing.lines.length > 0
           ? existing.lines.map((l) => ({
               uid: crypto.randomUUID(),
+              id: l.id,
+
               product_display_name: l.product_display_name,
               product_display_number: l.product_display_number,
               product_unit_of_sale: l.product_unit_of_sale,
@@ -1401,6 +1403,9 @@ export function CustomerOrderModal({
           <MerknadDialog
             open={!!merknadFor}
             onOpenChange={(v) => { if (!v) setMerknadFor(null); }}
+            orderLineId={activeLine.id ?? null}
+            deliveryDate={deliveryDate}
+
             productName={activeLine.product.display_name}
             quantity={Number(activeLine.quantity) || 0}
             profile={profile}
