@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react";
-import { Plus, Pencil, Trash2, Loader2, ListChecks, Search, Copy, ShieldAlert, TrendingUp, Ban, AlertTriangle, Info } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, ListChecks, Search, Copy, ShieldAlert, TrendingUp, Ban, AlertTriangle, Info, Check } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { AppBanner } from "@/ordre/components/shell/AppBanner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Select,
@@ -45,6 +46,14 @@ import {
 import { useDeliveryTours, sortToursByPriority } from "@/ordre/hooks/useDeliveryTours";
 import { DeliveryRuleFormDialog } from "@/ordre/components/orders/DeliveryRuleFormDialog";
 import { cn } from "@/lib/utils";
+
+const ALL_RULE_TYPES: DeliveryRuleType[] = [
+  "order_deadline",
+  "delivery_weekdays",
+  "available_tours",
+  "available_products",
+  "no_delivery",
+];
 
 const TYPE_BADGE: Record<DeliveryRuleType, string> = {
   order_deadline: "bg-primary/10 text-primary",
@@ -128,9 +137,30 @@ export default function DeliveryRules() {
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<NonNullable<DeliveryRuleFilter["status"]>>("active");
-  const [ruleType, setRuleType] = useState<NonNullable<DeliveryRuleFilter["ruleType"]>>("all");
+  const [typeFilter, setTypeFilter] = useState<DeliveryRuleType[]>([]);
+  const [showExpired, setShowExpired] = useState(false);
 
-  const { data: rules = [], isLoading } = useDeliveryRules({ search, status, ruleType });
+  const { data: rawRules = [], isLoading } = useDeliveryRules({
+    search,
+    status,
+    ruleType: "all",
+  });
+
+  const todayISO = new Date().toISOString().slice(0, 10);
+  const rules = useMemo(
+    () =>
+      rawRules.filter((r) => {
+        if (typeFilter.length > 0 && !typeFilter.includes(r.rule_type)) return false;
+        const expired = !!r.valid_until && r.valid_until < todayISO;
+        if (expired && !showExpired) return false;
+        return true;
+      }),
+    [rawRules, typeFilter, showExpired, todayISO],
+  );
+  const expiredCount = useMemo(
+    () => rawRules.filter((r) => !!r.valid_until && r.valid_until < todayISO).length,
+    [rawRules, todayISO],
+  );
   const { data: allActiveRules = [] } = useDeliveryRules({ status: "active", ruleType: "all" });
 
   const { data: tours = [] } = useDeliveryTours();
@@ -370,19 +400,40 @@ export default function DeliveryRules() {
               className="pl-8"
             />
           </div>
-          <Select value={ruleType} onValueChange={(v) => setRuleType(v as typeof ruleType)}>
-            <SelectTrigger className="w-[220px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Alle regeltyper</SelectItem>
-              <SelectItem value="order_deadline">{RULE_TYPE_LABEL.order_deadline}</SelectItem>
-              <SelectItem value="delivery_weekdays">{RULE_TYPE_LABEL.delivery_weekdays}</SelectItem>
-              <SelectItem value="available_tours">{RULE_TYPE_LABEL.available_tours}</SelectItem>
-              <SelectItem value="available_products">{RULE_TYPE_LABEL.available_products}</SelectItem>
-              <SelectItem value="no_delivery">{RULE_TYPE_LABEL.no_delivery}</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex flex-wrap items-center gap-1">
+            {ALL_RULE_TYPES.map((t) => {
+              const active = typeFilter.includes(t);
+              return (
+                <button
+                  key={t}
+                  type="button"
+                  aria-pressed={active}
+                  title={RULE_TYPE_LABEL[t]}
+                  onClick={() =>
+                    setTypeFilter((prev) =>
+                      prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t],
+                    )
+                  }
+                  className={cn(
+                    "flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
+                    active
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-border text-muted-foreground hover:bg-accent",
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "flex h-3.5 w-3.5 items-center justify-center rounded-[3px] border",
+                      active ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground/40",
+                    )}
+                  >
+                    {active && <Check className="h-2.5 w-2.5" />}
+                  </span>
+                  {RULE_TYPE_SHORT_LABEL[t]}
+                </button>
+              );
+            })}
+          </div>
           <Select value={status} onValueChange={(v) => setStatus(v as typeof status)}>
             <SelectTrigger className="w-[140px]">
               <SelectValue />
@@ -393,6 +444,10 @@ export default function DeliveryRules() {
               <SelectItem value="all">Alle</SelectItem>
             </SelectContent>
           </Select>
+          <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+            <Switch checked={showExpired} onCheckedChange={setShowExpired} />
+            Vis også utgåtte regler{expiredCount > 0 ? ` (${expiredCount})` : ""}
+          </label>
         </Card>
 
         {/* Kort-liste */}
@@ -506,11 +561,21 @@ export default function DeliveryRules() {
                         )}
                       </div>
 
-                      <p className="text-xs leading-relaxed text-foreground/80">
-                        {describeRule(r, nameLookup)}
-                      </p>
+                      <div className="space-y-0.5">
+                        <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                          Definerer
+                        </div>
+                        <p className="text-xs leading-relaxed text-foreground/80">
+                          {describeRule(r, nameLookup)}
+                        </p>
+                      </div>
 
-                      <ScopeChips rule={r} lookup={nameLookup} />
+                      <div className="space-y-1">
+                        <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                          Gjelder for
+                        </div>
+                        <ScopeChips rule={r} lookup={nameLookup} />
+                      </div>
 
                       <div className="text-[11px] text-muted-foreground">
                         {r.valid_until ? (

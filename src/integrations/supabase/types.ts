@@ -10586,6 +10586,7 @@ export type Database = {
         Args: { p_legal_entity_id: string }
         Returns: Json
       }
+      close_delivered_orders: { Args: { p_until?: string }; Returns: number }
       convert_website_order: {
         Args: { p_initial_status?: string; p_website_order_id: string }
         Returns: string
@@ -10759,6 +10760,10 @@ export type Database = {
           vat_rate: number
         }[]
       }
+      get_delivery_day_status: {
+        Args: { p_date: string; p_legal_entity_id: string }
+        Returns: Json
+      }
       get_effective_price: {
         Args: {
           p_customer_id?: string
@@ -10925,6 +10930,29 @@ export type Database = {
         Returns: {
           invoiced_count: number
           run_id: string
+        }[]
+      }
+      get_weekly_delivery_plan: {
+        Args: {
+          p_customer_id?: string
+          p_legal_entity_id: string
+          p_rule_types?: string[]
+          p_week_start: string
+        }
+        Returns: {
+          antall_varer: number
+          beskrivelse: string
+          dato: string
+          effect: string
+          gjelder_alle_turer: boolean
+          kunde_scope: string
+          rule_id: string
+          rule_name: string
+          rule_type: string
+          tour_id: string
+          tour_name: string
+          tour_number: number
+          weekday: number
         }[]
       }
       gtin_check_digit: { Args: { p_base12: string }; Returns: number }

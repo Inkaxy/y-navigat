@@ -31,6 +31,7 @@ export const ordreRoutes = {
   leveringsregler: `${ORDRE_BASE}/leveringsregler`,
   fasteRutiner: `${ORDRE_BASE}/faste-rutiner`,
   leveringskalender: `${ORDRE_BASE}/leveringskalender`,
+  leveranseplan: `${ORDRE_BASE}/leveranseplan`,
   ticket: `${ORDRE_BASE}/ticket`,
   nettbutikk: `${ORDRE_BASE}/nettbutikk`,
   aiForslag: `${ORDRE_BASE}/ai-forslag`,
