@@ -1,5 +1,5 @@
 import { useMemo, useState, useCallback } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ChevronLeft, ChevronRight, CalendarIcon, ChevronDown, Play, Loader2, CalendarCheck2, CalendarClock } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -31,8 +31,8 @@ import { todayISO, formatDate } from "@/ordre/lib/format";
 import { relativeDateLabel, shiftIsoDate } from "@/ordre/lib/relativeDate";
 import { format as fmt } from "date-fns";
 import { nb } from "date-fns/locale";
-import { RunStatusBanner } from "@/ordre/components/pakksedler/RunStatusBanner";
-import { ActivePausesPanel } from "@/ordre/components/pakksedler/ActivePausesPanel";
+import { DeliveryDayStatusPanel } from "@/ordre/components/pakksedler/DeliveryDayStatusPanel";
+import { useDeliveryDayStatus } from "@/ordre/hooks/useDeliveryDayStatus";
 import { TourRunStatus } from "@/ordre/components/pakksedler/TourRunStatus";
 import { useTourRunStatus, NULL_TOUR_KEY } from "@/ordre/hooks/useTourRunStatus";
 import { BulkPakkseddelPDFButton } from "@/ordre/components/pakksedler/BulkPakkseddelPDFButton";
@@ -101,6 +101,7 @@ export default function DeliveryNoteDashboard() {
 
   const { data: tours = [] } = useDeliveryTours({ activeOnly: true });
   const { data: counts, isLoading } = useDeliveryNoteCounts(date, tourId, mode);
+  const { data: dayStatus } = useDeliveryDayStatus(NB_LEGAL_ENTITY_ID, date);
   const generate = useGenerateDeliveryNotes();
   const undoRuns = useUndoDeliveryRuns();
   const tourStatus = useTourRunStatus(date);
@@ -365,6 +366,13 @@ export default function DeliveryNoteDashboard() {
   return (
     <TooltipProvider>
       <div className="mx-auto w-full max-w-7xl px-4 py-8 space-y-8">
+        {/* Dagsstatus — over kjøre-knappene */}
+        <DeliveryDayStatusPanel
+          legalEntityId={NB_LEGAL_ENTITY_ID}
+          date={date}
+          className="mx-auto w-full max-w-4xl"
+        />
+
         {/* Toppseksjon — modus venstre, dato sentrert, handlinger høyre */}
         <div className="relative flex items-start justify-between gap-6">
           {/* Venstre: modus-toggle */}
@@ -647,11 +655,29 @@ export default function DeliveryNoteDashboard() {
           })}
         </div>
 
+        {/* Ekstra flagg under kortene */}
+        {(dayStatus?.tellere.venter_godkjenning ?? 0) > 0 ||
+        (dayStatus?.tellere.uten_tur ?? 0) > 0 ? (
+          <div className="mx-auto flex w-full max-w-4xl flex-wrap justify-center gap-2">
+            {(dayStatus?.tellere.venter_godkjenning ?? 0) > 0 && (
+              <Link
+                to="/ordre/ordrer?status=awaiting_confirmation"
+                className="inline-flex items-center gap-1.5 rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-900 hover:bg-amber-100"
+              >
+                {dayStatus?.tellere.venter_godkjenning} venter godkjenning
+              </Link>
+            )}
+            {(dayStatus?.tellere.uten_tur ?? 0) > 0 && (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted px-3 py-1 text-xs font-semibold text-muted-foreground">
+                {dayStatus?.tellere.uten_tur} henting / uten tur
+              </span>
+            )}
+          </div>
+        ) : null}
+
         {/* Status-info under kortene */}
         <div className="mx-auto w-full max-w-4xl space-y-3">
-          <RunStatusBanner legalEntityId={NB_LEGAL_ENTITY_ID} date={date} />
           <TourRunStatus date={date} />
-          <ActivePausesPanel legalEntityId={NB_LEGAL_ENTITY_ID} date={date} />
         </div>
       </div>
 

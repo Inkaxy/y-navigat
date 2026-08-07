@@ -7,6 +7,7 @@ import { UserMenu } from "./UserMenu";
 import { OutletSelector } from "./OutletSelector";
 import { AppSwitcher } from "./AppSwitcher";
 import { MobileMenu } from "./MobileMenu";
+import { HelpButton } from "./HelpButton";
 import { Logo } from "@/components/brand/Logo";
 
 export function Topbar() {
@@ -46,6 +47,7 @@ export function Topbar() {
         <div className="hidden shrink-0 items-center justify-end gap-2 md:flex">
           <CommandTrigger onClick={() => setPaletteOpen(true)} />
           <OutletSelector />
+          <HelpButton />
           <UserMenu />
         </div>
       </header>

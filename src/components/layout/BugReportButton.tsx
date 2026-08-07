@@ -24,7 +24,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 
-export function BugReportButton() {
+export function BugReportButton({ trigger }: { trigger?: React.ReactNode } = {}) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -66,14 +66,16 @@ export function BugReportButton() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button
-          size="sm"
-          variant="outline"
-          className="fixed bottom-4 right-4 z-30 gap-2 shadow-elevated bg-card"
-        >
-          <Bug className="h-4 w-4" />
-          <span className="hidden sm:inline">Rapporter feil</span>
-        </Button>
+        {trigger ?? (
+          <Button
+            size="sm"
+            variant="outline"
+            className="fixed bottom-4 right-4 z-30 gap-2 shadow-elevated bg-card"
+          >
+            <Bug className="h-4 w-4" />
+            <span className="hidden sm:inline">Rapporter feil</span>
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>

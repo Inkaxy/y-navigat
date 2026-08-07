@@ -140,6 +140,7 @@ const OrdreLeveringskalender = lazy(() => import("@/ordre/pages/Leveringskalende
 const OrdreCustomerOrders = lazy(() => import("@/ordre/pages/CustomerOrders"));
 const OrdreTours = lazy(() => import("@/ordre/pages/Tours"));
 const OrdreDeliveryRules = lazy(() => import("@/ordre/pages/DeliveryRules"));
+const OrdreWeeklyDeliveryPlan = lazy(() => import("@/ordre/pages/WeeklyDeliveryPlan"));
 const OrdreRecurringOrders = lazy(() => import("@/ordre/pages/RecurringOrders"));
 const OrdreDeliveryNoteDashboard = lazy(() => import("@/ordre/pages/DeliveryNoteDashboard"));
 const OrdreDeliveryNotesList = lazy(() => import("@/ordre/pages/DeliveryNotesList"));
@@ -375,6 +376,7 @@ const App = () => (
               <Route path="/ordre/kundeordrer" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreCustomerOrders /></AppAccessGuard></Shell>} />
               <Route path="/ordre/turer" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreTours /></AppAccessGuard></Shell>} />
               <Route path="/ordre/leveringsregler" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreDeliveryRules /></AppAccessGuard></Shell>} />
+              <Route path="/ordre/leveranseplan" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreWeeklyDeliveryPlan /></AppAccessGuard></Shell>} />
               <Route path="/ordre/faste-rutiner" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreRecurringOrders /></AppAccessGuard></Shell>} />
               <Route path="/ordre/pakksedler" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreDeliveryNoteDashboard /></AppAccessGuard></Shell>} />
               <Route path="/ordre/pakksedler/liste" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreDeliveryNotesList /></AppAccessGuard></Shell>} />

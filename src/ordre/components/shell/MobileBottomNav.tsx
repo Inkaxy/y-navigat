@@ -28,10 +28,10 @@ const SECONDARY = [
   { to: "/ordre/kakebilder", label: "Kakebilder" },
   { to: "/ordre/turer", label: "Turer" },
   { to: "/ordre/leveringsregler", label: "Leveringsregler" },
+  { to: "/ordre/leveranseplan", label: "Leveranseplan" },
   { to: "/ordre/faste-rutiner", label: "Fastordre" },
   { to: "/ordre/ai-forslag", label: "AI-forslag" },
   { to: "/ordre/ticket-rapporter", label: "Rapporter" },
-  { to: "/ordre/avvik", label: "Avvik" },
   { to: "/ordre/innstillinger", label: "Innstillinger" },
 ];
 
