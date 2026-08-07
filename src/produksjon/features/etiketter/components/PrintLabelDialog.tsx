@@ -7,7 +7,7 @@ import {
   type LabelPdfData,
   type CombinedLabelItem,
 } from "../lib/labelPdf";
-import { useOrderLineMerknads } from "../hooks/useOrderLineMerknads";
+import { useLabelFields } from "../hooks/useLabelFields";
 import { useOrderLineTours } from "../hooks/useOrderLineTours";
 import { useOrderLineCustomerInfo } from "../hooks/useOrderLineCustomerInfo";
 import {
@@ -74,7 +74,7 @@ export function PrintLabelDialog({
   const [downloading, setDownloading] = useState(false);
 
   const orderLineIds = useMemo(() => row?.order_line_ids ?? [], [row]);
-  const { data: merknadMap } = useOrderLineMerknads(orderLineIds);
+  const { data: labelFieldsMap } = useLabelFields(orderLineIds);
   const { data: tourMap } = useOrderLineTours(orderLineIds);
   const { data: customerInfoMap } = useOrderLineCustomerInfo(orderLineIds);
 
@@ -88,7 +88,7 @@ export function PrintLabelDialog({
     let base_items: LabelPdfData[];
     if (orderLineIds.length === 0) {
       base_items = [{
-        ...base, quantity, copies: quantity, merknad: null, tourLabel: null,
+        ...base, quantity, copies: quantity, labelFields: null, tourLabel: null,
         pickupLabel: null, customerName: null, deliveryAddress: null,
         phone: null, deliveryDate: null, pickupTime: null, isPaid: false,
       }];
@@ -97,7 +97,7 @@ export function PrintLabelDialog({
         ...base,
         quantity,
         copies: 1,
-        merknad: merknadMap?.[id] ?? null,
+        labelFields: labelFieldsMap?.[id] ?? null,
         tourLabel: tourMap?.[id] ?? null,
         pickupLabel: customerInfoMap?.[id]?.pickupLabel ?? null,
         customerName: customerInfoMap?.[id]?.customerName ?? null,
@@ -121,7 +121,7 @@ export function PrintLabelDialog({
             ...base,
             quantity,
             copies: extras,
-            merknad: perLine[0]?.merknad ?? null,
+            labelFields: perLine[0]?.labelFields ?? null,
             tourLabel: perLine[0]?.tourLabel ?? null,
             pickupLabel: perLine[0]?.pickupLabel ?? null,
             customerName: perLine[0]?.customerName ?? null,

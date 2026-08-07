@@ -9,7 +9,7 @@ import {
 } from "@/produksjon/features/etiketter/lib/labelPdf";
 import { fetchOrderLineTours } from "@/produksjon/features/etiketter/hooks/useOrderLineTours";
 import { fetchOrderLineCustomerInfo } from "@/produksjon/features/etiketter/hooks/useOrderLineCustomerInfo";
-import { fetchOrderLineMerknads } from "@/produksjon/features/etiketter/hooks/useOrderLineMerknads";
+import { fetchLabelFields, useLabelFields } from "@/produksjon/features/etiketter/hooks/useLabelFields";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -254,9 +254,9 @@ export default function EtiketterPage() {
       const allLineIds = Array.from(
         new Set(printableRows.flatMap((r) => r.order_line_ids ?? [])),
       );
-      const [merknadMap, tourMap, customerInfoMap] = allLineIds.length > 0
+      const [labelFieldsMap, tourMap, customerInfoMap] = allLineIds.length > 0
         ? await Promise.all([
-            fetchOrderLineMerknads(allLineIds),
+            fetchLabelFields(allLineIds),
             fetchOrderLineTours(allLineIds),
             fetchOrderLineCustomerInfo(allLineIds),
           ])
@@ -276,7 +276,7 @@ export default function EtiketterPage() {
             labelNumber: null,
             quantity: totalCopies,
             copies: totalCopies,
-            merknad: null,
+            labelFields: null,
           });
         } else {
           // Én side per ordrelinje (med dens merknad); padder ved behov.
@@ -287,7 +287,7 @@ export default function EtiketterPage() {
               labelNumber: null,
               quantity: totalCopies,
               copies: 1,
-              merknad: merknadMap[id] ?? null,
+              labelFields: labelFieldsMap[id] ?? null,
               tourLabel: tourMap[id] ?? null,
               pickupLabel: customerInfoMap[id]?.pickupLabel ?? null,
               customerName: customerInfoMap[id]?.customerName ?? null,
@@ -309,7 +309,7 @@ export default function EtiketterPage() {
               labelNumber: null,
               quantity: totalCopies,
               copies: totalCopies - lineIds.length,
-              merknad: merknadMap[lineIds[0]] ?? null,
+              labelFields: labelFieldsMap[lineIds[0]] ?? null,
               tourLabel: tourMap[lineIds[0]] ?? null,
               pickupLabel: customerInfoMap[lineIds[0]]?.pickupLabel ?? null,
               customerName: customerInfoMap[lineIds[0]]?.customerName ?? null,
