@@ -58,6 +58,11 @@ import { logAudit } from "@/ordre/lib/audit";
 import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
 import { MerknadDialog } from "@/ordre/components/orders/MerknadDialog";
 import { type Merknad, isMerknadEmpty } from "@/ordre/lib/merknad";
+import {
+  PENDING_CAKE_IMAGE_KEY,
+  flushPendingCakeImages,
+} from "@/ordre/lib/orderLineCakeImage";
+
 import { useProductLabelProfiles } from "@/produksjon/features/etiketter/hooks/useProductLabelProfiles";
 import { useLabelPrintProfiles } from "@/produksjon/features/utskriftsprofiler/hooks/useLabelPrintProfiles";
 import { supabase } from "@/integrations/supabase/client";
@@ -123,6 +128,9 @@ type Props = {
 
 type LineDraft = {
   uid: string;
+  /** Id på lagret ordrelinje (kun i redigeringsmodus). */
+  id?: string;
+
   product: ProductOption | null;
   product_display_name?: string;
   product_display_number?: number | null;
