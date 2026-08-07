@@ -672,9 +672,11 @@ export function CustomerOrderModal({
     setSubmitting(true);
     try {
       let fallbackCount = 0;
+      let savedOrderId: string | null = null;
       if (isEdit && orderId) {
         const res = await updateMut.mutateAsync({ orderId, input });
         fallbackCount = res?.has_zero_fallback_lines?.length ?? 0;
+        savedOrderId = orderId;
         await logAudit({
           action: "updated",
           entity_type: "order",
@@ -687,6 +689,8 @@ export function CustomerOrderModal({
       } else {
         const row = await createMut.mutateAsync(input);
         fallbackCount = row?.has_zero_fallback_lines?.length ?? 0;
+        savedOrderId = row.id;
+
         await logAudit({
           action: "created",
           entity_type: "order",
@@ -775,8 +779,38 @@ export function CustomerOrderModal({
           `${fallbackCount} linje(r) fikk pris 0 — mangler prisliste-rad eller spesialpris`,
         );
       }
+
+      // Kakebilder lastet opp i etikett-dialogen før linjene hadde id:
+      // koble dem til de nå lagrede ordrelinjene.
+      const hasPending = lines.some(
+        (l) =>
+          typeof (l.merknad as Record<string, unknown> | null)?.[
+            PENDING_CAKE_IMAGE_KEY
+          ] === "string",
+      );
+      if (savedOrderId && hasPending) {
+        const { ok, failed } = await flushPendingCakeImages(savedOrderId);
+        if (ok > 0) {
+          toast.success(
+            `Kakebildet er lagt i utskriftskøen for ${input.deliveryDate}`,
+            {
+              action: {
+                label: "Åpne Kakebilder",
+                onClick: () => window.open("/ordre/kakebilder", "_blank"),
+              },
+            },
+          );
+        }
+        if (failed > 0) {
+          toast.error("Ordren er lagret, men kakebildet ble ikke lagt i køen", {
+            description: "Prøv på nytt fra ordredetaljene.",
+          });
+        }
+      }
+
       setDirty(false);
       onOpenChange(false);
+
     } catch (e) {
       console.error(e);
       toast.error(e instanceof Error ? e.message : "Kunne ikke lagre");
