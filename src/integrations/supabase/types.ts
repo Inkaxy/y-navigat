@@ -11085,6 +11085,7 @@ export type Database = {
       is_platform_owner: { Args: { _user_id: string }; Returns: boolean }
       is_ravarer_owner: { Args: { _user_id: string }; Returns: boolean }
       kiosk_session_rate_ok: { Args: { p_ip: string }; Returns: boolean }
+      label_field_for_role: { Args: { p_role: string }; Returns: string }
       list_active_cake_categories: {
         Args: { p_legal_entity_id: string }
         Returns: {
@@ -11171,6 +11172,7 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      map_order_status_for_site: { Args: { p_status: string }; Returns: string }
       mark_refund_paid: {
         Args: { p_refund_id: string }
         Returns: {
@@ -11661,6 +11663,21 @@ export type Database = {
           p_table: string
         }
         Returns: number
+      }
+      resolve_label_fields: {
+        Args: { p_order_line_ids: string[] }
+        Returns: {
+          bestilt_av: string
+          fyll: string
+          kilde: Json
+          kommentar: string
+          mangler: string[]
+          order_line_id: string
+          pynt: string
+          sukkerbilde: boolean
+          tekst: string
+          ukjente_nokler: string[]
+        }[]
       }
       rm_can_read: { Args: { _rm_id: string }; Returns: boolean }
       rm_can_write: { Args: { _rm_id: string }; Returns: boolean }
