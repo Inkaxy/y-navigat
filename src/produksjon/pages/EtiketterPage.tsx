@@ -142,6 +142,26 @@ export default function EtiketterPage() {
 
   const { data: printedCount = 0 } = usePrintedLabelCount(filter, productIds);
 
+  // Manglende etikettfelter per vare (fra resolve_label_fields).
+  const allOrderLineIds = useMemo(
+    () => Array.from(new Set((filteredRows ?? []).flatMap((r) => r.order_line_ids ?? []))),
+    [filteredRows],
+  );
+  const { data: labelFieldsByLine } = useLabelFields(allOrderLineIds);
+  const missingFieldsByProduct = useMemo(() => {
+    const out: Record<string, string[]> = {};
+    if (!labelFieldsByLine) return out;
+    for (const r of filteredRows ?? []) {
+      const set = new Set<string>();
+      for (const id of r.order_line_ids ?? []) {
+        for (const f of labelFieldsByLine[id]?.mangler ?? []) set.add(f);
+      }
+      if (set.size > 0) out[r.product_id] = Array.from(set);
+    }
+    return out;
+  }, [filteredRows, labelFieldsByLine]);
+
+
   // Bulk-print
   const nextNumber = useNextLabelNumber();
   const insertJob = useInsertLabelPrintJob();
