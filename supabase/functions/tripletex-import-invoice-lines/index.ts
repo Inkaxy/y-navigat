@@ -21,6 +21,7 @@ interface Body {
   legal_entity_id?: string;
   limit?: number;
   invoice_id?: string;
+  retry_failed?: boolean;
 }
 
 async function authorize(
@@ -99,6 +100,7 @@ Deno.serve(async (req) => {
       .order("invoice_date", { ascending: false })
       .limit(limit);
     if (body.invoice_id) q = q.eq("id", body.invoice_id);
+    else if (body.retry_failed) q = q.in("line_extraction_status", ["pending", "failed"]);
     else q = q.eq("line_extraction_status", "pending");
 
     const { data: invoices, error: invErr } = await q;
@@ -118,7 +120,7 @@ Deno.serve(async (req) => {
           // 1) Hent PDF
           const url = `${baseUrl()}/v2/supplierInvoice/${ttId}/pdf`;
           const res = await fetch(url, {
-            headers: { Authorization: authHeader(sessionToken), Accept: "application/pdf" },
+            headers: { Authorization: authHeader(sessionToken), Accept: "application/octet-stream" },
           });
           if (!res.ok) {
             const text = await res.text().catch(() => "");
