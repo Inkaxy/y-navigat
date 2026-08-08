@@ -115,7 +115,7 @@ export function parsePackageFromDescription(desc: string | null | undefined): Pa
     const each = toNumber(m[2]);
     const unit = normalizeUnit(m[3]);
     if (count && each && unit) {
-      return { size: count * each, unit, count, matched: m[0] };
+      return { size: each, unit, count, matched: m[0] };
     }
   }
 
