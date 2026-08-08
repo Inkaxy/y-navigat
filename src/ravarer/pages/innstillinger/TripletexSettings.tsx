@@ -161,7 +161,12 @@ function EntityConfig({ legalEntityId }: { legalEntityId: string }) {
       });
       if (error) throw new Error(await edgeErrorMessage(error, "Test feilet"));
       if (data?.ok) {
-        setTestResult({ ok: true, message: `OK – tilkoblet ${data.company?.name ?? "Tripletex"}` });
+        const navn = data.company?.name ?? "Tripletex";
+        const orgnr = data.company?.organization_number;
+        setTestResult({
+          ok: true,
+          message: `OK – tilkoblet ${navn}${orgnr ? ` (org.nr ${orgnr})` : ""}`,
+        });
       } else {
         setTestResult({ ok: false, message: data?.error ?? "Test feilet" });
       }
