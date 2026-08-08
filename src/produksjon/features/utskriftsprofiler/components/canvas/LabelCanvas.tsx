@@ -298,6 +298,8 @@ export function LabelCanvas(props: Props) {
     return () => window.removeEventListener("keydown", onKey);
   }, [readOnly, selectedLineId, lines, inner.w, inner.h, onUpdateLine, onRemoveLine]);
 
+  const catalog = useLabelFieldCatalog();
+
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
@@ -404,6 +406,7 @@ export function LabelCanvas(props: Props) {
                     companyName={companyName}
                     logoUrl={logoUrl}
                     includeFieldLabels={includeFieldLabels}
+                    catalog={catalog}
                     onPointerDownMove={(e) => {
                       if (readOnly) return;
                       e.stopPropagation();
@@ -586,11 +589,13 @@ function CoordinateBar({
   maxW,
   maxH,
   onChange,
+  catalog,
 }: {
   field: ProfileField;
   maxW: number;
   maxH: number;
   onChange: (patch: Partial<ProfileField>) => void;
+  catalog: LabelFieldCatalog;
 }) {
   return (
     <div className="flex items-center gap-3 text-xs">
@@ -637,6 +642,7 @@ interface CanvasFieldBoxProps {
   companyName: string;
   logoUrl: string | null;
   includeFieldLabels: boolean;
+  catalog: LabelFieldCatalog;
   onPointerDownMove: (e: React.PointerEvent) => void;
   onPointerDownResize: (handle: ResizeHandle, e: React.PointerEvent) => void;
 }
@@ -650,6 +656,7 @@ function CanvasFieldBox({
   companyName,
   logoUrl,
   includeFieldLabels,
+  catalog,
   onPointerDownMove,
   onPointerDownResize,
 }: CanvasFieldBoxProps) {
