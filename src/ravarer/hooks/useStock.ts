@@ -172,6 +172,7 @@ export function useCreateStockMovement() {
     },
     onSuccess: (_d, vars) => {
       qc.invalidateQueries({ queryKey: ["stock-items"] });
+      qc.invalidateQueries({ queryKey: ["resale-stock-status"] });
       qc.invalidateQueries({ queryKey: ["stock-movements", vars.raw_material_id] });
       qc.invalidateQueries({ queryKey: ["stock-has-movements", vars.raw_material_id] });
       qc.invalidateQueries({ queryKey: ["raw_materials"] });

@@ -10,6 +10,7 @@ import { categorizePriceSource } from "@/ordre/hooks/useNBProducts";
 import { useDeliveryTours, trimSec } from "@/ordre/hooks/useDeliveryTours";
 import { ChangeTourDialog } from "@/ordre/components/orders/ChangeTourDialog";
 import type { OrderDetail, OrderLineDetail } from "@/ordre/hooks/useOrderDetail";
+import { StockAvailabilityWarning } from "@/ordre/components/orders/StockAvailabilityWarning";
 
 const KUNDER_APP_BASE = "https://kunder.nbos.app"; // ekstern app — kommer som env-konfig senere
 
@@ -233,6 +234,12 @@ export function OrderDetailsTab({ order, lines }: { order: OrderDetail; lines: O
                           {ps.code} {ps.display_number ? `· #${ps.display_number}` : ""}
                         </div>
                         {l.notes && <div className="mt-1 text-xs italic text-muted-foreground">{l.notes}</div>}
+                        <StockAvailabilityWarning
+                          productId={l.product_id}
+                          quantity={Number(l.quantity) || 0}
+                          className="mt-1"
+                        />
+
                       </TableCell>
                       <TableCell className="text-right">
                         {formatNumber(l.quantity, 3)} <span className="text-xs text-muted-foreground">{l.sales_unit}</span>
