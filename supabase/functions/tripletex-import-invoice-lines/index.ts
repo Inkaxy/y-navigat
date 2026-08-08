@@ -21,6 +21,7 @@ interface Body {
   legal_entity_id?: string;
   limit?: number;
   invoice_id?: string;
+  retry_failed?: boolean;
 }
 
 async function authorize(
