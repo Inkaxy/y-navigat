@@ -21,6 +21,7 @@ export function StatusBar({
   onZoomOut,
   onZoomReset,
 }: Props) {
+  const catalog = useLabelFieldCatalog();
   return (
     <div className="flex h-8 items-center gap-4 border-t border-border bg-muted/30 px-4 text-[11px] text-muted-foreground">
       <span className="flex items-center gap-1.5">
