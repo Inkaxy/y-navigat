@@ -63,10 +63,10 @@ export async function getSessionToken(supabase: any, legalEntityId: string): Pro
     return row.session_token as string;
   }
   const employeeToken = await decryptToken(row.employee_token_encrypted);
-  const consumerToken = row.mode === "private"
-    ? employeeToken
-    : await decryptToken(row.consumer_token_encrypted);
-  const session = await createSessionToken(consumerToken, employeeToken);
+  const consumerToken = row.consumer_token_encrypted
+    ? await decryptToken(row.consumer_token_encrypted)
+    : undefined;
+  const session = await createSessionForMode(row.mode ?? "standard", consumerToken, employeeToken);
   const expiresAtIso = new Date(`${session.expirationDate}T23:59:59Z`).toISOString();
   await supabase
     .from("tripletex_credentials")
