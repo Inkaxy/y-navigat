@@ -10,10 +10,14 @@ interface SingleSelectStepProps {
 
 export function SingleSelectStep({ step, selectedOptionId, onSelect, showVat }: SingleSelectStepProps) {
   if (step.options.length === 0) {
-    return <div className="text-sm text-muted-foreground py-8 text-center">Ingen valg er konfigurert for dette steget.</div>;
+    return (
+      <div className="rounded-xl border border-dashed border-line-subtle py-10 text-center text-sm text-ink-tertiary">
+        Ingen valg er konfigurert for dette steget.
+      </div>
+    );
   }
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3.5">
       {step.options.map((opt) => (
         <OptionCard
           key={opt.option_id}
