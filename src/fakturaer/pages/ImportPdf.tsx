@@ -15,6 +15,7 @@ import { useFakturaer } from "@/fakturaer/context/FakturaerContext";
 import { useFakturaerLegalEntities } from "@/fakturaer/hooks/useFakturaerLegalEntities";
 import { useSuppliersFor } from "@/fakturaer/hooks/useSuppliersFor";
 import { todayIso } from "@/fakturaer/lib/constants";
+import { computeLinesSum } from "@/fakturaer/lib/linesSum";
 import { cn } from "@/lib/utils";
 
 interface ExtractedLine {
@@ -25,6 +26,9 @@ interface ExtractedLine {
   unit_price: number | null;
   total_amount: number | null;
   vat_rate: number | null;
+  package_size: number | null;
+  package_unit: string | null;
+  count_per_package: number | null;
 }
 
 interface ExtractedData {
@@ -144,7 +148,18 @@ export default function ImportPdfPage({ embedded = false }: { embedded?: boolean
       if (e.currency) setCurrency(e.currency);
       if (e.kid_number) setKid(e.kid_number);
       if (e.account_number) setAccountNumber(e.account_number);
-      setLines(e.lines ?? []);
+      setLines((e.lines ?? []).map((l) => ({
+        description: l.description ?? null,
+        sku: l.sku ?? null,
+        quantity: l.quantity ?? null,
+        unit: l.unit ?? null,
+        unit_price: l.unit_price ?? null,
+        total_amount: l.total_amount ?? null,
+        vat_rate: l.vat_rate ?? null,
+        package_size: l.package_size ?? null,
+        package_unit: l.package_unit ?? null,
+        count_per_package: l.count_per_package ?? null,
+      })));
 
       const match = result.matched_supplier ?? result.name_matched_supplier;
       if (match) {
@@ -171,7 +186,7 @@ export default function ImportPdfPage({ embedded = false }: { embedded?: boolean
   };
   const removeLine = (idx: number) => setLines((prev) => prev.filter((_, i) => i !== idx));
   const addLine = () =>
-    setLines((prev) => [...prev, { description: "", sku: null, quantity: null, unit: null, unit_price: null, total_amount: null, vat_rate: null }]);
+    setLines((prev) => [...prev, { description: "", sku: null, quantity: null, unit: null, unit_price: null, total_amount: null, vat_rate: null, package_size: null, package_unit: null, count_per_package: null }]);
 
   const resetFormForNext = () => {
     setParseResult(null);
@@ -281,6 +296,9 @@ export default function ImportPdfPage({ embedded = false }: { embedded?: boolean
           unit_price: l.unit_price,
           total_amount: l.total_amount,
           vat_rate: l.vat_rate,
+          package_size: l.package_size,
+          package_unit: l.package_unit,
+          count_per_package: l.count_per_package,
         }));
         const { error: linesErr } = await supabase.from("invoice_lines").insert(linesPayload);
         if (linesErr) throw linesErr;
