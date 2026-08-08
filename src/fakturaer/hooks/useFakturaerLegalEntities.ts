@@ -28,12 +28,12 @@ export function useFakturaerLegalEntities() {
 
       const isOwner = (ups ?? []).some((up: any) => up.positions?.is_owner);
 
-      const mapRow = (r: any): LegalEntityRow => ({ id: r.id, name: r.legal_name, short_code: r.short_code });
+      const mapRow = (r: any): LegalEntityRow => ({ id: r.id, name: r.legal_name, short_code: r.short_code, status: r.status ?? null });
 
       if (isOwner) {
         const { data: all, error } = await supabase
           .from("legal_entities")
-          .select("id, legal_name, short_code")
+          .select("id, legal_name, short_code, status")
           .order("legal_name");
         if (error) throw error;
         return (all ?? []).map(mapRow);
@@ -58,7 +58,7 @@ export function useFakturaerLegalEntities() {
       if (entityIds.length === 0) return [];
       const { data, error } = await supabase
         .from("legal_entities")
-        .select("id, legal_name, short_code")
+        .select("id, legal_name, short_code, status")
         .in("id", entityIds)
         .order("legal_name");
       if (error) throw error;
