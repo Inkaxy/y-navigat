@@ -169,9 +169,10 @@ export function quantityToBase(input: {
   /** Pakke-størrelse fra raw_material_suppliers (per "pakke" / "eske"). */
   rmsPackageSize?: number | null;
   rmsPackageUnit?: string | null;
-  /** AI-utledede felt på linjen. */
+  /** AI-utledede felt på linjen. package_size er PER sub-enhet. */
   linePackageSize?: number | null;
   linePackageUnit?: string | null;
+  lineCountPerPackage?: number | null;
 }): { baseQty: number; factor: number; source: string } | null {
   const { quantity, baseUnit } = input;
   if (!Number.isFinite(quantity) || !baseUnit) return null;
@@ -185,13 +186,18 @@ export function quantityToBase(input: {
     // u=stk og base=stk håndteres i toBaseFactor (=1). Mismatch (stk vs kg) trenger pakke.
   }
 
-  // Pakke-enhet eller ukjent enhet → bruk pakke-størrelse
+  // Pakke-enhet eller ukjent enhet → bruk pakke-størrelse.
+  // size er per sub-enhet; total pakningsstørrelse = size * (count ?? 1).
   const pkgSources: Array<{ size: number; unit: string; src: string }> = [];
   if (input.linePackageSize && input.linePackageUnit) {
-    pkgSources.push({ size: input.linePackageSize, unit: input.linePackageUnit, src: "ai_line" });
+    const cnt = Number(input.lineCountPerPackage);
+    const count = Number.isFinite(cnt) && cnt > 0 ? cnt : 1;
+    pkgSources.push({ size: input.linePackageSize * count, unit: input.linePackageUnit, src: "ai_line" });
   }
   const fromDesc = parsePackageFromDescription(input.description);
-  if (fromDesc) pkgSources.push({ size: fromDesc.size, unit: fromDesc.unit, src: "description" });
+  if (fromDesc) {
+    pkgSources.push({ size: fromDesc.size * (fromDesc.count || 1), unit: fromDesc.unit, src: "description" });
+  }
   if (input.rmsPackageSize && input.rmsPackageUnit) {
     pkgSources.push({ size: input.rmsPackageSize, unit: input.rmsPackageUnit, src: "rms" });
   }
@@ -206,3 +212,4 @@ export function quantityToBase(input: {
   }
   return null;
 }
+
