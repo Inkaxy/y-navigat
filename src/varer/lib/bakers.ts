@@ -120,6 +120,7 @@ export interface BakersRawMaterial {
   category?: string | null;
   grain_classification?: string | null;
   water_content_pct?: number | null;
+  current_cost_price?: number | null;
 }
 
 export interface BakersLine {
@@ -134,6 +135,8 @@ export interface BakersLine {
   water_content_pct_override?: number | string | null;
   entry_mode?: string;
   _rm?: BakersRawMaterial | null;
+  /** Låst bakerprosent for visning — brukes i skalert visning så prosenten aldri flytter seg. */
+  _displayPercent?: number | null;
 }
 
 /** Alt korn unntatt `not_grain` teller som mel. Linjeoverstyring vinner. */
@@ -280,6 +283,128 @@ export function calcWaterTemp(input: DoughTempInput): DoughTempResult {
   return { factors, waterTemp, feasible, message };
 }
 
+// ===== Skalering =====
+
+/**
+ * Avrunder til noe en baker faktisk kan veie.
+ * > 1000 g → nærmeste 10 g · 100–1000 g → nærmeste 5 g
+ * < 100 g → nærmeste 1 g · < 10 g → én desimal
+ */
+export function roundBakerGrams(grams: number): number {
+  const g = Number(grams) || 0;
+  const sign = g < 0 ? -1 : 1;
+  const a = Math.abs(g);
+  if (a === 0) return 0;
+  if (a > 1000) return sign * Math.round(a / 10) * 10;
+  if (a >= 100) return sign * Math.round(a / 5) * 5;
+  if (a >= 10) return sign * Math.round(a);
+  return sign * Math.round(a * 10) / 10;
+}
+
+/** Skaleringsfaktor = ønsket antall / units_per_batch (aldri 0 eller negativ). */
+export function scaleFactor(desiredUnits: number, unitsPerBatch: number | null | undefined): number {
+  const base = Number(unitsPerBatch) || 0;
+  const want = Number(desiredUnits) || 0;
+  if (base <= 0 || want <= 0) return 1;
+  return want / base;
+}
+
+export interface ScaledLine extends BakersLine {
+  /** Uavrundet gramvekt etter skalering. */
+  exactGrams: number;
+  /** Bakervennlig avrundet gramvekt. */
+  roundedGrams: number;
+  /** Bakerprosent — uendret av skalering. */
+  percent: number;
+}
+
+/**
+ * Skalerer linjer til gram. Bakerprosenten regnes fra den USKALERTE oppskriften
+ * og er dermed identisk før og etter skalering — den er oppskriftens fingeravtrykk.
+ */
+export function scaleLines(lines: BakersLine[], factor: number, baseFlourG: number): ScaledLine[] {
+  return lines.map((l) => {
+    const base = toGrams(l.quantity, l.unit);
+    const exactGrams = base * factor;
+    return {
+      ...l,
+      exactGrams,
+      roundedGrams: roundBakerGrams(exactGrams),
+      percent: baseFlourG > 0 ? (base / baseFlourG) * 100 : 0,
+    };
+  });
+}
+
+export interface ScaledSummary {
+  factor: number;
+  /** Nøkkeltall regnet på uavrundede gram — prosentene er identiske med basisoppskriften. */
+  totals: BakersTotals;
+  exactDoughG: number;
+  roundedDoughG: number;
+  exactFlourG: number;
+  roundedFlourG: number;
+  unitCount: number | null;
+  batchCount: number | null;
+}
+
+/** Nøkkeltall for en skalert visning. Prosenter er skala-invariante. */
+export function scaledSummary(
+  lines: BakersLine[],
+  factor: number,
+  unitWeightGrams: number | null | undefined,
+  desiredUnits: number,
+  mixerCapacityG?: number | null,
+): ScaledSummary {
+  const baseTotals = computeTotals(lines, unitWeightGrams);
+  const scaled = scaleLines(lines, factor, baseTotals.totalFlourG);
+  const exactDoughG = baseTotals.totalDoughG * factor;
+  const exactFlourG = baseTotals.totalFlourG * factor;
+  const roundedDoughG = scaled.reduce((s, l) => s + l.roundedGrams, 0);
+  const roundedFlourG = scaled.filter(isFlourLine).reduce((s, l) => s + l.roundedGrams, 0);
+  const cap = Number(mixerCapacityG) || 0;
+  const uw = Number(unitWeightGrams) || 0;
+
+  return {
+    factor,
+    // Prosentene beholdes fra basisoppskriften — skalering endrer dem aldri.
+    totals: {
+      ...baseTotals,
+      totalFlourG: exactFlourG,
+      totalWaterG: baseTotals.totalWaterG * factor,
+      totalDoughG: exactDoughG,
+      unitCount: uw > 0 ? Math.floor(exactDoughG / uw) : null,
+      doughPerUnitG: uw > 0 ? uw : null,
+    },
+    exactDoughG,
+    roundedDoughG,
+    exactFlourG,
+    roundedFlourG,
+    unitCount: uw > 0 ? Math.floor(exactDoughG / uw) : Math.round(Number(desiredUnits) || 0) || null,
+    batchCount: cap > 0 && exactDoughG > 0 ? Math.ceil(exactDoughG / cap) : null,
+  };
+}
+
+/**
+ * Veierekkefølge: mel først, deretter væske, så resten.
+ * Dette er rekkefølgen bakeren faktisk veier i — ikke skjermens sortering.
+ */
+export function weighingOrder<T extends BakersLine>(lines: T[]): T[] {
+  const rank = (l: T) => {
+    if (isFlourLine(l)) return 0;
+    if (waterPctForLine(l) >= 50 || l.unit === "ml" || l.unit === "liter") return 1;
+    return 2;
+  };
+  return [...lines].sort((a, b) => {
+    const d = rank(a) - rank(b);
+    if (d !== 0) return d;
+    return toGrams(b.quantity, b.unit) - toGrams(a.quantity, a.unit);
+  });
+}
+
+export function lineDisplayName(line: BakersLine): string {
+  return line._rm?.name ?? line.ingredient_name ?? "Uten navn";
+}
+
 // ===== Formatering =====
 
 export function fmtG(n: number | null | undefined, decimals = 0): string {
@@ -291,3 +416,30 @@ export function fmtPercent(n: number | null | undefined, decimals = 1): string {
   if (n == null || Number.isNaN(Number(n))) return "—";
   return `${Number(n).toFixed(decimals).replace(".", ",")} %`;
 }
+
+/** Norsk tallformat med komma — brukes i PDF-ene (Intl er tilgjengelig i nettleseren). */
+export function fmtNum(n: number | null | undefined, decimals = 0): string {
+  if (n == null || Number.isNaN(Number(n))) return "—";
+  return Number(n).toLocaleString("nb-NO", {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+}
+
+/** Gram med bakervennlig presisjon: under 10 g vises med én desimal. */
+export function fmtGrams(n: number | null | undefined): string {
+  if (n == null || Number.isNaN(Number(n))) return "—";
+  const v = Number(n);
+  return fmtNum(v, Math.abs(v) < 10 && v !== 0 ? 1 : 0);
+}
+
+export function fmtDuration(minutes: number | null | undefined): string {
+  const m = Number(minutes) || 0;
+  if (!m) return "—";
+  const h = Math.floor(m / 60);
+  const rest = m % 60;
+  if (h && rest) return `${h} t ${rest} min`;
+  if (h) return `${h} t`;
+  return `${rest} min`;
+}
+

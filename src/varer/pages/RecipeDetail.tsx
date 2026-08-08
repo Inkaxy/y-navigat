@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { arrayMove } from "@dnd-kit/sortable";
@@ -12,16 +12,22 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Loader2, Plus, Save } from "lucide-react";
+import { ArrowLeft, FileText, Loader2, Lock, Plus, Printer, Save } from "lucide-react";
 import { logAudit } from "@/varer/lib/audit";
 import { RecipeProductLinks } from "@/varer/components/products/RecipeProductLinks";
 import { RecipeStatsBar } from "@/varer/components/recipes/RecipeStatsBar";
 import { DoughTempPanel } from "@/varer/components/recipes/DoughTempPanel";
 import { RecipeStepsEditor, type EditorStep } from "@/varer/components/recipes/RecipeStepsEditor";
 import { RecipePartCard, type EditorLine, type EditorPart } from "@/varer/components/recipes/RecipePartCard";
+import { ScalePanel } from "@/varer/components/recipes/ScalePanel";
+import { PrintRecipeCardDialog } from "@/varer/components/recipes/PrintRecipeCardDialog";
 import {
-  RECIPE_STATUS_OPTIONS, computeTotals, type BakersRawMaterial,
+  RECIPE_STATUS_OPTIONS, computeTotals, roundBakerGrams, scaleFactor, scaleLines, scaledSummary,
+  type BakersRawMaterial,
 } from "@/varer/lib/bakers";
+import {
+  buildRecipePDFData, useRecipePDF, type BuildRecipePDFInput, type RecipeCardOptions,
+} from "@/varer/hooks/useRecipePDF";
 import { useUnsavedChangesWarning } from "@/varer/hooks/useUnsavedChangesWarning";
 
 export default function RecipeDetail() {
@@ -49,7 +55,7 @@ export default function RecipeDetail() {
     queryFn: async () => {
       const { data } = await supabase
         .from("raw_materials")
-        .select("id, name, category, grain_classification, water_content_pct")
+        .select("id, name, category, grain_classification, water_content_pct, current_cost_price")
         .limit(2000);
       const map: Record<string, BakersRawMaterial> = {};
       for (const r of (data ?? []) as any[]) map[r.id] = r;
@@ -123,12 +129,101 @@ export default function RecipeDetail() {
     [hydratedLines, header.unit_weight_grams],
   );
 
+  // ===== Skalering (kun visning — basen røres ikke) =====
+  const baseUnits = useMemo(() => {
+    const u = Number(header.units_per_batch) || 0;
+    if (u > 0) return u;
+    return totals.unitCount && totals.unitCount > 0 ? totals.unitCount : 1;
+  }, [header.units_per_batch, totals.unitCount]);
+
+  const [scaleInput, setScaleInput] = useState("");
+  const [mixerCapacity, setMixerCapacity] = useState("");
+
+  useEffect(() => {
+    setScaleInput(String(baseUnits));
+  }, [baseUnits, recipe?.id]);
+
+  const desiredUnits = Number(scaleInput) || 0;
+  const factor = scaleFactor(desiredUnits, baseUnits);
+  const isScaled = Math.abs(factor - 1) > 0.0001;
+
+  const scaleSummary = useMemo(
+    () =>
+      scaledSummary(
+        hydratedLines,
+        factor,
+        Number(header.unit_weight_grams) || null,
+        desiredUnits || baseUnits,
+        Number(mixerCapacity) || null,
+      ),
+    [hydratedLines, factor, header.unit_weight_grams, desiredUnits, baseUnits, mixerCapacity],
+  );
+
+  /**
+   * Linjene slik de vises. Ved skalering byttes gram ut med den avrundede
+   * skalerte vekten, mens bakerprosenten låses til basisoppskriftens verdi.
+   */
+  const displayLines = useMemo<EditorLine[]>(() => {
+    if (!isScaled) return hydratedLines;
+    const scaled = scaleLines(hydratedLines, factor, totals.totalFlourG);
+    return hydratedLines.map((l, i) => ({
+      ...l,
+      quantity: roundBakerGrams(scaled[i].exactGrams),
+      unit: "g",
+      _displayPercent: scaled[i].percent,
+    }));
+  }, [hydratedLines, isScaled, factor, totals.totalFlourG]);
+
+  const displayTotals = isScaled ? scaleSummary.totals : totals;
+  /** Skalert visning låser redigering — man skal ikke kunne lagre en skalert utgave. */
+  const editable = canWrite && !isScaled;
+
   const prefermentTemp = useMemo(() => {
     const p = parts.find((x) => x.part_type === "preferment" && x.target_temp_celsius != null);
     return p?.target_temp_celsius ?? null;
   }, [parts]);
 
+  // ===== PDF =====
+  const { generating, printProductionSheet, printRecipeCard } = useRecipePDF();
+  const [cardDialogOpen, setCardDialogOpen] = useState(false);
+
+  const buildPdfInput = useCallback(
+    (includeCosts: boolean): BuildRecipePDFInput => ({
+      name: header.name || recipe?.name || "Oppskrift",
+      category: header.category || null,
+      version: recipe?.version ?? null,
+      description: header.description || null,
+      imageUrl: recipe?.image_url ?? null,
+      unitWeightGrams: Number(header.unit_weight_grams) || null,
+      targetDoughTemp: header.target_dough_temp_celsius ?? null,
+      frictionFactor: header.friction_factor_celsius ?? null,
+      scaledUnits: scaleSummary.unitCount ?? desiredUnits ?? baseUnits,
+      factor,
+      parts: parts.map((p) => ({
+        id: p.id,
+        name: p.name,
+        part_type: p.part_type,
+        preferment_kind: p.preferment_kind,
+        target_temp_celsius: p.target_temp_celsius,
+        ripe_time_hours: p.ripe_time_hours,
+        instructions: p.instructions,
+      })),
+      lines: hydratedLines,
+      steps: steps.map((s) => ({
+        step_type: s.step_type,
+        title: s.title,
+        instruction: s.instruction,
+        duration_minutes: s.duration_minutes,
+        temp_celsius: s.temp_celsius,
+        humidity_pct: s.humidity_pct,
+      })),
+      includeCosts,
+    }),
+    [header, recipe, parts, hydratedLines, steps, factor, scaleSummary.unitCount, desiredUnits, baseUnits],
+  );
+
   useUnsavedChangesWarning(dirty && canWrite);
+
 
   function patchHeader(patch: Record<string, any>) {
     setHeader((h: any) => ({ ...h, ...patch }));
@@ -387,32 +482,66 @@ export default function RecipeDetail() {
           </Button>
           <Badge variant="outline">{RECIPE_STATUS_OPTIONS.find((s) => s.value === header.status)?.label ?? "Utkast"}</Badge>
           <div className="flex-1" />
+          <Button
+            variant="outline"
+            onClick={() => printProductionSheet(buildRecipePDFData(buildPdfInput(false)))}
+            disabled={generating !== null}
+          >
+            {generating === "production" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Printer className="mr-2 h-4 w-4" />}
+            Skriv ut produksjonsark
+          </Button>
+          <Button variant="outline" onClick={() => setCardDialogOpen(true)} disabled={generating !== null}>
+            <FileText className="mr-2 h-4 w-4" /> Oppskriftskort
+          </Button>
           {canWrite && (
-            <Button onClick={save} disabled={saving || !dirty}>
+            <Button onClick={save} disabled={saving || !dirty || isScaled}>
               {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
               Lagre
             </Button>
           )}
         </div>
 
-        <RecipeStatsBar totals={totals} />
+        <ScalePanel
+          value={scaleInput}
+          onChange={setScaleInput}
+          baseUnits={baseUnits}
+          mixerCapacity={mixerCapacity}
+          onMixerCapacityChange={setMixerCapacity}
+          summary={scaleSummary}
+          isScaled={isScaled}
+          onReset={() => setScaleInput(String(baseUnits))}
+        />
+
+        {isScaled && (
+          <div className="flex items-center gap-2 rounded-md border border-app/40 bg-app/[0.06] px-3 py-2 text-sm">
+            <Lock className="h-4 w-4 shrink-0 text-app" />
+            <span>
+              Du ser en <b>skalert utgave</b> ({scaleSummary.factor.toFixed(2).replace(".", ",")} ×). Bakerprosent,
+              hydrering og saltprosent er uendret — bare gramvektene flytter seg. Oppskriften i basen er urørt, og
+              redigering er låst til du tilbakestiller.
+            </span>
+          </div>
+        )}
+
+        <RecipeStatsBar totals={displayTotals} />
+
 
         <Card>
           <CardHeader className="pb-3"><CardTitle className="text-base">Oppskriftsinfo</CardTitle></CardHeader>
           <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div className="sm:col-span-2">
               <Label className="text-xs">Navn</Label>
-              <Input value={header.name ?? ""} disabled={!canWrite} onChange={(e) => patchHeader({ name: e.target.value })} />
+              <Input value={header.name ?? ""} disabled={!editable} onChange={(e) => patchHeader({ name: e.target.value })} />
             </div>
             <div>
               <Label className="text-xs">Kategori</Label>
-              <Input value={header.category ?? ""} disabled={!canWrite} placeholder="f.eks. Surdeigsbrød"
+              <Input value={header.category ?? ""} disabled={!editable} placeholder="f.eks. Surdeigsbrød"
                 onChange={(e) => patchHeader({ category: e.target.value })} />
             </div>
             <div>
               <Label className="text-xs">Status</Label>
               <select
-                value={header.status ?? "draft"} disabled={!canWrite}
+                value={header.status ?? "draft"} disabled={!editable}
                 onChange={(e) => patchHeader({ status: e.target.value })}
                 className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
               >
@@ -421,34 +550,34 @@ export default function RecipeDetail() {
             </div>
             <div>
               <Label className="text-xs">Vekt per enhet (g)</Label>
-              <Input type="number" value={header.unit_weight_grams ?? ""} disabled={!canWrite}
+              <Input type="number" value={header.unit_weight_grams ?? ""} disabled={!editable}
                 onChange={(e) => patchHeader({ unit_weight_grams: e.target.value })} />
             </div>
             <div>
               <Label className="text-xs">Antall per batch</Label>
-              <Input type="number" value={header.units_per_batch ?? ""} disabled={!canWrite}
+              <Input type="number" value={header.units_per_batch ?? ""} disabled={!editable}
                 onChange={(e) => patchHeader({ units_per_batch: e.target.value })} />
             </div>
             <div>
               <Label className="text-xs">Autolyse (min)</Label>
-              <Input type="number" value={header.autolyse_minutes ?? ""} disabled={!canWrite}
+              <Input type="number" value={header.autolyse_minutes ?? ""} disabled={!editable}
                 onChange={(e) => patchHeader({ autolyse_minutes: e.target.value })} />
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <Label className="text-xs">Elting 1. gir (min)</Label>
-                <Input type="number" value={header.mixing_speed1_minutes ?? ""} disabled={!canWrite}
+                <Input type="number" value={header.mixing_speed1_minutes ?? ""} disabled={!editable}
                   onChange={(e) => patchHeader({ mixing_speed1_minutes: e.target.value })} />
               </div>
               <div>
                 <Label className="text-xs">2. gir (min)</Label>
-                <Input type="number" value={header.mixing_speed2_minutes ?? ""} disabled={!canWrite}
+                <Input type="number" value={header.mixing_speed2_minutes ?? ""} disabled={!editable}
                   onChange={(e) => patchHeader({ mixing_speed2_minutes: e.target.value })} />
               </div>
             </div>
             <div className="sm:col-span-2 lg:col-span-4">
               <Label className="text-xs">Beskrivelse</Label>
-              <Textarea rows={2} value={header.description ?? ""} disabled={!canWrite}
+              <Textarea rows={2} value={header.description ?? ""} disabled={!editable}
                 onChange={(e) => patchHeader({ description: e.target.value })} />
             </div>
           </CardContent>
@@ -467,9 +596,9 @@ export default function RecipeDetail() {
             <RecipePartCard
               key={p.id}
               part={p}
-              lines={hydratedLines.filter((l) => l.recipe_part_id === p.id)}
-              canWrite={canWrite}
-              totalFlourG={totals.totalFlourG}
+              lines={displayLines.filter((l) => l.recipe_part_id === p.id)}
+              canWrite={editable}
+              totalFlourG={isScaled ? displayTotals.totalFlourG : totals.totalFlourG}
               rmMap={rmMap}
               isFirst={i === 0}
               isLast={i === parts.length - 1}
@@ -483,7 +612,7 @@ export default function RecipeDetail() {
               onReorderLines={reorderLines}
             />
           ))}
-          {canWrite && (
+          {editable && (
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={() => addPart("dough")}>
                 <Plus className="mr-1 h-3.5 w-3.5" /> Legg til del
@@ -497,20 +626,33 @@ export default function RecipeDetail() {
 
         <RecipeStepsEditor
           steps={steps}
-          canWrite={canWrite}
+          canWrite={editable}
           onChange={(s) => { setSteps(s); setDirty(true); }}
         />
+
 
         <RecipeProductLinks recipeId={recipe.id} currentProductId={recipe.product_id ?? undefined} canWrite={canWrite} />
 
         <Card>
           <CardHeader className="pb-3"><CardTitle className="text-base">Notater</CardTitle></CardHeader>
           <CardContent>
-            <Textarea rows={3} value={header.notes ?? ""} disabled={!canWrite}
+            <Textarea rows={3} value={header.notes ?? ""} disabled={!editable}
               onChange={(e) => patchHeader({ notes: e.target.value })} />
           </CardContent>
         </Card>
       </div>
+
+      <PrintRecipeCardDialog
+        open={cardDialogOpen}
+        onOpenChange={setCardDialogOpen}
+        hasImage={!!recipe.image_url}
+        generating={generating === "card"}
+        onPrint={(opts: RecipeCardOptions) => {
+          printRecipeCard(buildRecipePDFData(buildPdfInput(opts.includeCosts)), opts);
+          setCardDialogOpen(false);
+        }}
+      />
     </>
+
   );
 }
