@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { useFakturaerLegalEntities } from "@/fakturaer/hooks/useFakturaerLegalEntities";
 import { useTripletexCredentials, useTripletexSyncLog } from "@/ravarer/hooks/useTripletex";
 import { supabase } from "@/integrations/supabase/client";
