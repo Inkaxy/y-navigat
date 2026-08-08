@@ -309,10 +309,15 @@ Deno.serve(async (req) => {
       }
 
       lastCompletedChunkTo = chunk.to;
-      await admin
-        .from("tripletex_credentials")
-        .update({ last_invoice_synced_date: chunk.to })
-        .eq("legal_entity_id", legalEntityId);
+      // Manuelle kall med eksplisitt `from` skal ikke flytte den løpende posisjonen,
+      // og posisjonen skal aldri gå bakover.
+      if (!body.from && (!cred.last_invoice_synced_date || chunk.to > cred.last_invoice_synced_date)) {
+        cred.last_invoice_synced_date = chunk.to;
+        await admin
+          .from("tripletex_credentials")
+          .update({ last_invoice_synced_date: chunk.to })
+          .eq("legal_entity_id", legalEntityId);
+      }
     }
 
     // --- Leverandørstatistikk ---
