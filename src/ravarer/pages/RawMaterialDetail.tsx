@@ -9,6 +9,9 @@ import { ArrowLeft, Loader2, Pencil, Check, X } from "lucide-react";
 import { OverviewTab } from "@/ravarer/components/tabs/OverviewTab";
 import { NutritionTab } from "@/ravarer/components/tabs/NutritionTab";
 import { SuppliersTab } from "@/ravarer/components/tabs/SuppliersTab";
+import { ResaleSettingsCard } from "@/ravarer/components/stock/ResaleSettingsCard";
+import { SellsAsSection } from "@/ravarer/components/stock/SellsAsSection";
+
 
 export default function RawMaterialDetail() {
   const { id } = useParams();
