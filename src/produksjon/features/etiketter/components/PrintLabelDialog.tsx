@@ -8,6 +8,7 @@ import {
   type CombinedLabelItem,
 } from "../lib/labelPdf";
 import { useLabelData } from "../hooks/useLabelData";
+import { useLabelFieldCatalog } from "@/produksjon/features/utskriftsprofiler/hooks/useLabelFieldCatalog";
 import { useOrderLineTours } from "../hooks/useOrderLineTours";
 import { useOrderLineCustomerInfo } from "../hooks/useOrderLineCustomerInfo";
 import {
@@ -75,6 +76,10 @@ export function PrintLabelDialog({
 
   const orderLineIds = useMemo(() => row?.order_line_ids ?? [], [row]);
   const { data: labelDataMap } = useLabelData(orderLineIds);
+  const catalog = useLabelFieldCatalog();
+  const fieldLabels = Object.fromEntries(
+    catalog.entries.map((e) => [e.field_key, e.display_name]),
+  );
   const { data: tourMap } = useOrderLineTours(orderLineIds);
   const { data: customerInfoMap } = useOrderLineCustomerInfo(orderLineIds);
 
@@ -88,7 +93,7 @@ export function PrintLabelDialog({
     let base_items: LabelPdfData[];
     if (orderLineIds.length === 0) {
       base_items = [{
-        ...base, quantity, copies: quantity, felter: null, tourLabel: null,
+        ...base, quantity, copies: quantity, felter: null, fieldLabels, tourLabel: null,
         pickupLabel: null, customerName: null, deliveryAddress: null,
         phone: null, deliveryDate: null, pickupTime: null, isPaid: false,
       }];
@@ -98,6 +103,7 @@ export function PrintLabelDialog({
         quantity,
         copies: 1,
         felter: labelDataMap?.[id]?.felter ?? null,
+        fieldLabels,
         tourLabel: tourMap?.[id] ?? null,
         pickupLabel: customerInfoMap?.[id]?.pickupLabel ?? null,
         customerName: customerInfoMap?.[id]?.customerName ?? null,
@@ -122,6 +128,7 @@ export function PrintLabelDialog({
             quantity,
             copies: extras,
             felter: perLine[0]?.felter ?? null,
+            fieldLabels,
             tourLabel: perLine[0]?.tourLabel ?? null,
             pickupLabel: perLine[0]?.pickupLabel ?? null,
             customerName: perLine[0]?.customerName ?? null,
