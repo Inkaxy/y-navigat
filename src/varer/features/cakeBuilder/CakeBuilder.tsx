@@ -415,8 +415,8 @@ export function CakeBuilder({
 
   if (isLoading) {
     return (
-      <div className="flex flex-col h-full bg-background">
-        <div className="border-b p-4">
+      <div className="flex flex-col h-full bg-surface-canvas">
+        <div className="border-b border-line-subtle p-4">
           <Skeleton className="h-6 w-1/3" />
         </div>
         <div className="flex-1 p-4 space-y-3">
@@ -433,10 +433,10 @@ export function CakeBuilder({
 
   if (isError || !wizard?.category) {
     return (
-      <div className="flex flex-col items-center justify-center h-full p-8 text-center">
+      <div className="flex flex-col items-center justify-center h-full p-8 text-center bg-surface-canvas">
         <AlertTriangle className="h-10 w-10 text-destructive mb-3" />
-        <h2 className="text-lg font-semibold mb-1">Kunne ikke laste kakebygger</h2>
-        <p className="text-sm text-muted-foreground">
+        <h2 className="font-display text-xl text-ink-primary mb-1">Kunne ikke laste kakebygger</h2>
+        <p className="text-sm text-ink-tertiary">
           {(error as Error | undefined)?.message ?? "Kategorien finnes ikke eller er ikke aktiv."}
         </p>
       </div>
@@ -445,13 +445,14 @@ export function CakeBuilder({
 
   if (steps.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-full p-8 text-center">
+      <div className="flex flex-col items-center justify-center h-full p-8 text-center bg-surface-canvas">
         <Cake className="h-10 w-10 text-muted-foreground/40 mb-3" />
-        <h2 className="text-lg font-semibold mb-1">{wizard.category.name}</h2>
-        <p className="text-sm text-muted-foreground">Denne kake-typen er ikke konfigurert ennå.</p>
+        <h2 className="font-display text-xl text-ink-primary mb-1">{wizard.category.name}</h2>
+        <p className="text-sm text-ink-tertiary">Denne kake-typen er ikke konfigurert ennå.</p>
       </div>
     );
   }
+
 
   /**
  * Bygger selections-arrayet (input til både RPC og CakeResult).
@@ -604,41 +605,41 @@ export function CakeBuilder({
     ];
     const filledLabelEntries = labelEntries.filter(([, v]) => v && v.trim().length > 0);
     return (
-      <div className="flex flex-col h-full bg-background">
-        <div className="border-b bg-card px-4 py-3 flex items-center gap-3">
+      <div className="flex flex-col h-full bg-surface-canvas">
+        <div className="border-b border-line-subtle bg-surface-raised px-4 py-3.5 flex items-center gap-3">
           <CheckCircle2 className="h-6 w-6 text-success" />
           <div>
-            <h1 className="text-lg font-semibold">Bestilling bekreftet</h1>
-            <p className="text-xs text-muted-foreground">
+            <h1 className="font-display text-xl text-ink-primary">Bestilling bekreftet</h1>
+            <p className="text-xs text-ink-tertiary">
               Gjennomgå bestillingen før den sendes inn.
             </p>
           </div>
         </div>
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          <div className="rounded-md border-2 border-app/30 bg-app/5 px-4 py-3">
+        <div className="flex-1 overflow-y-auto px-4 py-5 space-y-5 md:px-6">
+          <div className="rounded-2xl border border-brand-gold/40 bg-brand-gold/10 px-5 py-4 dark:bg-brand-gold/15">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                <div className="text-[11px] uppercase tracking-[0.16em] text-ink-tertiary">
                   Varenummer (til produksjon)
                 </div>
-                <div className="text-2xl font-bold tabular-nums text-app-dark">
+                <div className="font-display text-3xl text-ink-primary tabular-nums">
                   #{ol.display_number ?? "—"}
                 </div>
-                <div className="text-sm text-foreground">{ol.display_name}</div>
+                <div className="text-sm text-ink-primary">{ol.display_name}</div>
               </div>
               <div className="text-right">
-                <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                <div className="text-[11px] uppercase tracking-[0.16em] text-ink-tertiary">
                   Total inkl. mva
                 </div>
-                <div className="text-xl font-bold tabular-nums">
+                <div className="font-display text-xl text-ink-primary tabular-nums">
                   {confirmedResult.total_inc_mva.toFixed(2)} kr
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="rounded-md border bg-card">
-            <div className="px-4 py-2 border-b text-xs uppercase tracking-wide text-muted-foreground">
+          <div className="rounded-2xl border border-line-subtle bg-surface-raised shadow-card overflow-hidden">
+            <div className="border-b border-line-subtle bg-surface-sunken/40 px-4 py-2.5 text-[11px] uppercase tracking-[0.16em] text-ink-tertiary">
               Etikett (forhåndsvisning) — skrives ut i Produksjon
             </div>
             <div className="px-4 py-3 space-y-2">
@@ -663,8 +664,8 @@ export function CakeBuilder({
                 </div>
               )}
               {lp.components.length > 0 && (
-                <div className="pt-2 border-t mt-2">
-                  <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
+                <div className="pt-2 border-t border-line-subtle mt-2">
+                  <div className="text-[11px] uppercase tracking-[0.16em] text-ink-tertiary mb-1">
                     Inneholder
                   </div>
                   <ul className="text-sm space-y-0.5">
@@ -688,11 +689,11 @@ export function CakeBuilder({
           </div>
 
           {confirmedResult.accessory_lines.length > 0 && (
-            <div className="rounded-md border bg-card">
-              <div className="px-4 py-2 border-b text-xs uppercase tracking-wide text-muted-foreground">
+            <div className="rounded-2xl border border-line-subtle bg-surface-raised shadow-card overflow-hidden">
+              <div className="border-b border-line-subtle bg-surface-sunken/40 px-4 py-2.5 text-[11px] uppercase tracking-[0.16em] text-ink-tertiary">
                 Tilbehør-linjer (kun for fakturering)
               </div>
-              <div className="divide-y">
+              <div className="divide-y divide-line-subtle">
                 {confirmedResult.accessory_lines.map((al, i) => (
                   <div key={i} className="flex items-center justify-between px-4 py-2 text-sm">
                     <div>
@@ -708,14 +709,14 @@ export function CakeBuilder({
             </div>
           )}
 
-          <div className="rounded-md border bg-card">
-            <div className="px-4 py-3 border-b">
-              <div className="text-xs uppercase tracking-wide text-muted-foreground">
+          <div className="rounded-2xl border border-line-subtle bg-surface-raised shadow-card overflow-hidden">
+            <div className="border-b border-line-subtle bg-surface-sunken/40 px-4 py-2.5">
+              <div className="text-[11px] uppercase tracking-[0.16em] text-ink-tertiary">
                 Kategori
               </div>
-              <div className="text-base font-semibold">{confirmedResult.category_name}</div>
+              <div className="font-display text-base text-ink-primary">{confirmedResult.category_name}</div>
             </div>
-            <div className="divide-y">
+            <div className="divide-y divide-line-subtle">
               {confirmedResult.selections.map((sel) => {
                 let value = "—";
                 if (sel.selection_type === "single" || sel.selection_type === "multi") {
@@ -729,21 +730,21 @@ export function CakeBuilder({
                 }
                 return (
                   <div key={sel.step_id} className="flex items-start justify-between gap-4 px-4 py-3">
-                    <div className="text-sm font-medium text-muted-foreground min-w-[140px]">
+                    <div className="text-sm text-ink-tertiary min-w-[130px]">
                       {sel.step_name}
                     </div>
-                    <div className="text-sm text-foreground text-right flex-1">{value}</div>
+                    <div className="text-sm font-medium text-ink-primary text-right flex-1">{value}</div>
                   </div>
                 );
               })}
             </div>
           </div>
 
-          <div className="rounded-md border bg-card">
-            <div className="px-4 py-2 border-b text-xs uppercase tracking-wide text-muted-foreground">
+          <div className="rounded-2xl border border-line-subtle bg-surface-raised shadow-card overflow-hidden">
+            <div className="border-b border-line-subtle bg-surface-sunken/40 px-4 py-2.5 text-[11px] uppercase tracking-[0.16em] text-ink-tertiary">
               Prislinjer
             </div>
-            <div className="divide-y">
+            <div className="divide-y divide-line-subtle">
               <div className="flex items-center justify-between px-4 py-2 text-sm">
                 <span className="text-muted-foreground">Grunnpris</span>
                 <span>{confirmedResult.price_breakdown.base_price.toFixed(2)} kr</span>
@@ -765,22 +766,35 @@ export function CakeBuilder({
             </div>
           </div>
 
-          <div className="rounded-md border bg-muted/30 px-4 py-3 space-y-1">
+          <div className="rounded-2xl border border-line-subtle bg-surface-sunken/50 px-5 py-4 space-y-1.5">
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Sum eks. mva</span>
-              <span className="font-medium">{confirmedResult.total_ex_mva.toFixed(2)} kr</span>
+              <span className="text-ink-tertiary">Sum eks. mva</span>
+              <span className="font-medium text-ink-primary tabular-nums">
+                {confirmedResult.total_ex_mva.toFixed(2)} kr
+              </span>
             </div>
-            <div className="flex justify-between text-base">
-              <span className="font-semibold">Total inkl. mva</span>
-              <span className="font-bold">{confirmedResult.total_inc_mva.toFixed(2)} kr</span>
+            <div className="mt-2 border-t border-line-subtle pt-3 flex justify-between items-baseline">
+              <span className="font-display text-base text-ink-primary">Total inkl. mva</span>
+              <span className="font-display text-2xl text-ink-primary tabular-nums">
+                {confirmedResult.total_inc_mva.toFixed(2)} kr
+              </span>
             </div>
           </div>
         </div>
-        <div className="border-t bg-card px-4 py-3 flex items-center justify-between gap-2">
-          <Button variant="outline" size="sm" onClick={() => setConfirmedResult(null)}>
+        <div className="border-t border-line-subtle bg-surface-raised px-4 py-3 flex items-center justify-between gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setConfirmedResult(null)}
+            className="rounded-full border-line-subtle bg-surface-raised hover:border-brand-gold hover:bg-surface-sunken"
+          >
             Tilbake til oppsummering
           </Button>
-          <Button size="sm" onClick={handleFinalConfirm}>
+          <Button
+            size="sm"
+            onClick={handleFinalConfirm}
+            className="rounded-full px-6 bg-brand-ink text-brand-cream hover:bg-brand-ink-deep dark:bg-brand-gold dark:text-brand-ink-deep dark:hover:bg-brand-bronze-soft"
+          >
             Bekreft bestilling
           </Button>
         </div>
@@ -808,7 +822,7 @@ export function CakeBuilder({
           : stepIndex + 2;
 
   return (
-    <div className="flex flex-col h-full bg-background">
+    <div className="flex flex-col h-full bg-surface-canvas">
       <StepHeader
         categoryName={wizard.category.name}
         stepIndex={headerStepIndex}
@@ -821,7 +835,7 @@ export function CakeBuilder({
         isCalculating={isCalculating}
       />
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto px-4 py-5 space-y-5 md:px-6">
         {isCustomer ? (
           <CustomerStartStep
             legalEntityId={legalEntityId}
@@ -838,8 +852,9 @@ export function CakeBuilder({
         ) : isSummary ? (
           <div className="space-y-4">
             <div>
-              <h2 className="text-xl font-semibold">Oppsummering</h2>
-              <p className="text-sm text-muted-foreground mt-1">
+              <p className="eyebrow">Siste sjekk</p>
+              <h2 className="mt-1.5 font-display text-2xl text-ink-primary">Oppsummering</h2>
+              <p className="mt-1.5 text-sm leading-relaxed text-ink-tertiary">
                 Sjekk at alt stemmer før du velger betaling.
               </p>
             </div>
@@ -848,42 +863,46 @@ export function CakeBuilder({
               <RuleList rules={activeRules} onAction={handleRuleAction} />
             )}
 
-            <div className="rounded-md border bg-card divide-y">
+            <div className="rounded-2xl border border-line-subtle bg-surface-raised shadow-card overflow-hidden divide-y divide-line-subtle">
               <div className="px-4 py-3 grid grid-cols-[140px_1fr] gap-x-4 gap-y-1 text-sm">
-                <div className="text-muted-foreground">Hentedato</div>
-                <div>{customerMeta.pickup_date ?? "—"}</div>
-                <div className="text-muted-foreground">Kunde</div>
-                <div>{customerMeta.name || "—"}</div>
-                <div className="text-muted-foreground">Telefon</div>
-                <div>{customerMeta.phone || "—"}</div>
+                <div className="text-ink-tertiary">Hentedato</div>
+                <div className="text-ink-primary">{customerMeta.pickup_date ?? "—"}</div>
+                <div className="text-ink-tertiary">Kunde</div>
+                <div className="text-ink-primary">{customerMeta.name || "—"}</div>
+                <div className="text-ink-tertiary">Telefon</div>
+                <div className="text-ink-primary">{customerMeta.phone || "—"}</div>
                 {customerMeta.email && (
                   <>
-                    <div className="text-muted-foreground">E-post</div>
-                    <div>{customerMeta.email}</div>
+                    <div className="text-ink-tertiary">E-post</div>
+                    <div className="text-ink-primary">{customerMeta.email}</div>
                   </>
                 )}
               </div>
             </div>
 
-            <div className="rounded-md border divide-y bg-card">
+            <div className="rounded-2xl border border-line-subtle bg-surface-raised shadow-card overflow-hidden divide-y divide-line-subtle">
               {summaryLines.map((line, i) => (
                 <div key={i} className="flex items-start justify-between gap-4 px-4 py-3">
-                  <div className="text-sm font-medium text-muted-foreground min-w-[120px]">
+                  <div className="text-sm text-ink-tertiary min-w-[130px]">
                     {line.step}
                   </div>
-                  <div className="text-sm text-foreground text-right flex-1">{line.value}</div>
+                  <div className="text-sm font-medium text-ink-primary text-right flex-1">{line.value}</div>
                 </div>
               ))}
             </div>
             {price && (
-              <div className="rounded-md border bg-muted/30 px-4 py-3 space-y-1">
+              <div className="rounded-2xl border border-line-subtle bg-surface-sunken/50 px-5 py-4 space-y-1.5">
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Sum eks. mva</span>
-                  <span className="font-medium">{price.total_ex_mva.toFixed(2)} kr</span>
+                  <span className="text-ink-tertiary">Sum eks. mva</span>
+                  <span className="font-medium text-ink-primary tabular-nums">
+                    {price.total_ex_mva.toFixed(2)} kr
+                  </span>
                 </div>
-                <div className="flex justify-between text-base">
-                  <span className="font-semibold">Total inkl. mva</span>
-                  <span className="font-bold">{price.total_inc_mva.toFixed(2)} kr</span>
+                <div className="mt-2 border-t border-line-subtle pt-3 flex justify-between items-baseline">
+                  <span className="font-display text-base text-ink-primary">Total inkl. mva</span>
+                  <span className="font-display text-2xl text-ink-primary tabular-nums">
+                    {price.total_inc_mva.toFixed(2)} kr
+                  </span>
                 </div>
               </div>
             )}
@@ -891,9 +910,10 @@ export function CakeBuilder({
         ) : (
           <>
             <div>
-              <h2 className="text-xl font-semibold">{currentStep.name}</h2>
+              <p className="eyebrow">Ditt valg</p>
+              <h2 className="mt-1.5 font-display text-2xl text-ink-primary">{currentStep.name}</h2>
               {currentStep.description && (
-                <p className="text-sm text-muted-foreground mt-1">{currentStep.description}</p>
+                <p className="mt-1.5 text-sm leading-relaxed text-ink-tertiary">{currentStep.description}</p>
               )}
             </div>
 
@@ -1002,7 +1022,7 @@ export function CakeBuilder({
         }}
       >
         <DialogContent
-          className="max-w-md"
+          className="max-w-md rounded-2xl"
           onEscapeKeyDown={(e) => {
             if (popupRule?.severity === "block") e.preventDefault();
           }}
@@ -1013,7 +1033,7 @@ export function CakeBuilder({
           {popupRule && (
             <>
               <DialogHeader>
-                <DialogTitle className="flex items-center gap-2">
+                <DialogTitle className="flex items-center gap-2 font-display text-lg">
                   {popupRule.severity === "block" ? (
                     <Ban className="h-5 w-5 text-destructive" />
                   ) : (
@@ -1028,6 +1048,7 @@ export function CakeBuilder({
               <DialogFooter className="flex-wrap gap-2">
                 {(popupRule.response_options ?? []).length === 0 ? (
                   <Button
+                    className="rounded-full px-6 bg-brand-ink text-brand-cream hover:bg-brand-ink-deep dark:bg-brand-gold dark:text-brand-ink-deep dark:hover:bg-brand-bronze-soft"
                     onClick={() => {
                       if (popupRule.severity !== "block") {
                         setDismissedRuleIds((prev) => new Set(prev).add(popupRule.id));
@@ -1043,6 +1064,11 @@ export function CakeBuilder({
                     <Button
                       key={opt.id ?? idx}
                       variant={opt.is_primary ? "default" : "outline"}
+                      className={
+                        opt.is_primary
+                          ? "rounded-full px-6 bg-brand-ink text-brand-cream hover:bg-brand-ink-deep dark:bg-brand-gold dark:text-brand-ink-deep dark:hover:bg-brand-bronze-soft"
+                          : "rounded-full border-line-subtle bg-surface-raised hover:border-brand-gold hover:bg-surface-sunken"
+                      }
                       onClick={() => handleRuleAction(popupRule, opt)}
                     >
                       {opt.label}
@@ -1072,15 +1098,15 @@ function RuleList({
         const Icon = r.severity === "block" ? Ban : r.severity === "warning" ? AlertTriangle : Info;
         const cls =
           r.severity === "block"
-            ? "border-destructive/30 bg-destructive/10 text-destructive"
+            ? "border-danger/30 bg-danger/8 text-danger"
             : r.severity === "warning"
-              ? "border-warning/30 bg-warning/10 text-foreground"
-              : "border-app/20 bg-app/5 text-app-dark";
+              ? "border-warning/40 bg-warning/10 text-ink-primary"
+              : "border-brand-gold/30 bg-brand-gold/8 text-ink-primary";
         const opts = r.response_options ?? [];
         return (
           <div
             key={r.id}
-            className={cn("flex flex-col gap-2 rounded-md border px-3 py-2 text-xs", cls)}
+            className={cn("flex flex-col gap-2 rounded-xl border px-3.5 py-2.5 text-xs", cls)}
           >
             <div className="flex items-start gap-2">
               <Icon className="h-4 w-4 mt-0.5 shrink-0" />
@@ -1093,6 +1119,7 @@ function RuleList({
                     key={opt.id ?? idx}
                     size="sm"
                     variant={opt.is_primary ? "default" : "outline"}
+                    className="rounded-full"
                     onClick={() => onAction(r, opt)}
                   >
                     {opt.label}
