@@ -48,10 +48,13 @@ export default function VarelistePage() {
     const arr = rows.filter(r => {
       if (active === "active" && !r.is_active) return false;
       if (active === "inactive" && r.is_active) return false;
+      if (kind === "resale" && !r.is_resale_item) return false;
+      if (kind === "raw" && r.is_resale_item) return false;
       if (cat !== "all" && !allCatsOf(r).includes(cat)) return false;
       if (needle && !`${r.name} ${r.sku}`.toLowerCase().includes(needle)) return false;
       return true;
     });
+
     arr.sort((a, b) => {
       if (sortKey === "volume_12m") {
         const va = statsMap?.get(a.id)?.quantity_12m ?? 0;
