@@ -3,7 +3,7 @@
 // - authHeader(token): "Basic base64('0:'+token)"
 // - baseUrl(): TRIPLETEX_BASE_URL env, default https://tripletex.no (test env: https://api-test.tripletex.tech)
 // - tripletexFetch(path, opts): retry with backoff on 429/5xx, throws TripletexError with parsed validation messages
-import { decryptToken, createSessionToken } from "./tripletex-crypto.ts";
+import { decryptToken, createSessionForMode } from "./tripletex-crypto.ts";
 
 export function baseUrl(): string {
   return (Deno.env.get("TRIPLETEX_BASE_URL") || "https://tripletex.no").replace(/\/+$/, "");
