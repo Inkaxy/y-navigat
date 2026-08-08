@@ -12,6 +12,12 @@ export interface SupplierRow {
   contact_phone: string | null;
   is_active: boolean;
   notes: string | null;
+  track_invoice_lines: boolean;
+  tripletex_is_inactive: boolean | null;
+  tripletex_supplier_number: string | null;
+  tripletex_synced_at: string | null;
+  last_invoice_date: string | null;
+  invoice_count: number | null;
 }
 
 export function useSuppliers() {
@@ -25,7 +31,7 @@ export function useSuppliers() {
         .eq("legal_entity_id", legalEntityId)
         .order("name");
       if (error) throw error;
-      return (data ?? []) as SupplierRow[];
+      return (data ?? []) as unknown as SupplierRow[];
     },
   });
 }
@@ -41,12 +47,57 @@ export function useCreateSupplier() {
         .select()
         .single();
       if (error) throw error;
-      return data as SupplierRow;
+      return data as unknown as SupplierRow;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["suppliers"] });
       toast.success("Leverandør opprettet");
     },
     onError: (e: any) => toast.error(`Kunne ikke opprette: ${e.message ?? e}`),
+  });
+}
+
+/** Slår «følg fakturalinjer» av/på for en leverandør. */
+export function useSetTrackInvoiceLines() {
+  const qc = useQueryClient();
+  const { user } = useRavarer();
+  return useMutation({
+    mutationFn: async ({ id, value }: { id: string; value: boolean }) => {
+      const { error } = await supabase
+        .from("suppliers")
+        .update({
+          track_invoice_lines: value,
+          line_tracking_changed_at: new Date().toISOString(),
+          line_tracking_changed_by: user?.id ?? null,
+        })
+        .eq("id", id);
+      if (error) throw error;
+      return value;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["suppliers"] });
+    },
+    onError: (e: any) => toast.error(`Kunne ikke lagre: ${e.message ?? e}`),
+  });
+}
+
+/** Speiler leverandører fra Tripletex til suppliers-tabellen. */
+export function useSyncSuppliersFromTripletex() {
+  const qc = useQueryClient();
+  const { legalEntityId } = useRavarer();
+  return useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke("tripletex-sync-suppliers", {
+        body: { legal_entity_id: legalEntityId },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      return data as { hentet: number; opprettet: number; oppdatert: number; uendret: number };
+    },
+    onSuccess: (r) => {
+      qc.invalidateQueries({ queryKey: ["suppliers"] });
+      toast.success(`${r.hentet} hentet – ${r.opprettet} nye, ${r.oppdatert} oppdatert`);
+    },
+    onError: (e: any) => toast.error(`Synk feilet: ${e.message ?? e}`),
   });
 }

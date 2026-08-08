@@ -89,3 +89,7 @@ verify_jwt = false
 [functions.cleanup-printed-cake-images]
 verify_jwt = false
 
+[functions.tripletex-sync-suppliers]
+verify_jwt = false
+
+
