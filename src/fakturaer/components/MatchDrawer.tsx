@@ -427,6 +427,17 @@ export function MatchDrawer({ open, onOpenChange, line }: Props) {
             </div>
           </div>
         </div>
+
+        <CreateRawMaterialDialog
+          open={createOpen}
+          onOpenChange={setCreateOpen}
+          line={line}
+          onCreated={() => {
+            qc.invalidateQueries({ queryKey: ["fakturaer-review-lines"] });
+            qc.invalidateQueries({ queryKey: ["fakturaer-review-count"] });
+            onOpenChange(false);
+          }}
+        />
       </SheetContent>
     </Sheet>
   );
