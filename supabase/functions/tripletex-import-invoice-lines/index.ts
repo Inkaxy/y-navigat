@@ -120,7 +120,7 @@ Deno.serve(async (req) => {
           // 1) Hent PDF
           const url = `${baseUrl()}/v2/supplierInvoice/${ttId}/pdf`;
           const res = await fetch(url, {
-            headers: { Authorization: authHeader(sessionToken), Accept: "application/pdf" },
+            headers: { Authorization: authHeader(sessionToken), Accept: "application/octet-stream" },
           });
           if (!res.ok) {
             const text = await res.text().catch(() => "");
