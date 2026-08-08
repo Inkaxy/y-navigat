@@ -523,26 +523,39 @@ async function insertSuggestions(svc: any, rows: AnyRec[]) {
   await svc.from("invoice_line_match_suggestions").insert(rows);
 }
 
-async function syncRegisteredPrices(svc: any, inv: AnyRec, line: AnyRec, rm: AnyRec | undefined, rmsRow: AnyRec | undefined, actual: number | null, update: AnyRec) {
+async function syncRegisteredPrices(svc: any, inv: AnyRec, line: AnyRec, rm: AnyRec | undefined, rmsRow: AnyRec | undefined, actual: number | null, update: AnyRec, tolPct = 2) {
   if (!rm || actual == null || !Number.isFinite(actual)) return;
 
   const registered = rm.current_cost_price != null ? Number(rm.current_cost_price) : null;
   const supplierRegistered = rmsRow?.agreed_price_per_base_unit != null ? Number(rmsRow.agreed_price_per_base_unit) : null;
-  if ((registered != null && actual > registered) || (supplierRegistered != null && actual > supplierRegistered)) {
+  const overTol = (base: number | null) =>
+    base != null && base !== 0 && ((actual - base) / base) * 100 > tolPct;
+  if (overTol(registered) || overTol(supplierRegistered)) {
     update.requires_review = true;
     update.review_reason = update.review_reason
       ? Array.from(new Set(`${update.review_reason},price_increase`.split(","))).join(",")
       : "price_increase";
   }
 
-  await svc.from("raw_material_suppliers").upsert({
-    raw_material_id: rm.id,
-    supplier_id: inv.supplier_id,
-    supplier_sku: line.supplier_sku,
-    supplier_product_name: line.description,
-    agreed_price_per_base_unit: actual,
-    updated_at: new Date().toISOString(),
-  }, { onConflict: "raw_material_id,supplier_id" });
+  const nowIso = new Date().toISOString();
+  if (rmsRow?.id) {
+    // Eksisterende kobling: rør kun fakturapris/-dato — aldri avtalepris eller brukerens sku/navn.
+    await svc.from("raw_material_suppliers").update({
+      last_invoice_price: actual,
+      last_invoice_date: inv.invoice_date ?? null,
+      updated_at: nowIso,
+    }).eq("id", rmsRow.id);
+  } else {
+    await svc.from("raw_material_suppliers").upsert({
+      raw_material_id: rm.id,
+      supplier_id: inv.supplier_id,
+      supplier_sku: line.supplier_sku,
+      supplier_product_name: line.description,
+      last_invoice_price: actual,
+      last_invoice_date: inv.invoice_date ?? null,
+      updated_at: nowIso,
+    }, { onConflict: "raw_material_id,supplier_id" });
+  }
 
   if (!rm.primary_supplier_id || rm.primary_supplier_id === inv.supplier_id || registered == null) {
     await svc.from("raw_materials").update({
