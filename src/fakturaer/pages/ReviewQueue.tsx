@@ -67,6 +67,8 @@ export default function FakturaerReviewQueuePage() {
   const { data: entities = [] } = useFakturaerLegalEntities();
   const [legalEntityId, setLegalEntityId] = useState<string>("all");
   const [supplierId, setSupplierId] = useState<string>("all");
+  const [supplierOpen, setSupplierOpen] = useState(false);
+
   const [tab, setTab] = useState<ReviewReason>("unmatched");
 
   const { data: suppliers = [] } = useSuppliersFor(legalEntityId === "all" ? null : legalEntityId);
