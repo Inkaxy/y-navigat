@@ -9,7 +9,6 @@ import {
 } from "../lib/labelPdf";
 import { useLabelData } from "../hooks/useLabelData";
 import { useLabelFieldCatalog } from "@/produksjon/features/utskriftsprofiler/hooks/useLabelFieldCatalog";
-import { useOrderLineTours } from "../hooks/useOrderLineTours";
 import { useOrderLineCustomerInfo } from "../hooks/useOrderLineCustomerInfo";
 import {
   Dialog,
@@ -80,7 +79,6 @@ export function PrintLabelDialog({
   const fieldLabels = Object.fromEntries(
     catalog.entries.map((e) => [e.field_key, e.display_name]),
   );
-  const { data: tourMap } = useOrderLineTours(orderLineIds);
   const { data: customerInfoMap } = useOrderLineCustomerInfo(orderLineIds);
 
   /** Bygg en LabelPdfData per ordrelinje, padder/trimmer til ønsket `quantity`. */
@@ -95,7 +93,6 @@ export function PrintLabelDialog({
       base_items = [{
         ...base, quantity, copies: quantity, felter: null, fieldLabels, tourLabel: null,
         pickupLabel: null, customerName: null, deliveryAddress: null,
-        phone: null, deliveryDate: null, pickupTime: null, isPaid: false,
       }];
     } else {
       const perLine: LabelPdfData[] = orderLineIds.map((id) => ({
@@ -104,18 +101,7 @@ export function PrintLabelDialog({
         copies: 1,
         felter: labelDataMap?.[id]?.felter ?? null,
         fieldLabels,
-        tourLabel: tourMap?.[id] ?? null,
         pickupLabel: customerInfoMap?.[id]?.pickupLabel ?? null,
-        customerName: customerInfoMap?.[id]?.customerName ?? null,
-        deliveryAddress: customerInfoMap?.[id]?.deliveryAddress ?? null,
-        phone: customerInfoMap?.[id]?.phone ?? null,
-        deliveryDate: customerInfoMap?.[id]?.deliveryDate ?? null,
-        pickupTime: customerInfoMap?.[id]?.pickupTime ?? null,
-        isPaid: customerInfoMap?.[id]?.isPaid ?? false,
-        distribution: customerInfoMap?.[id]?.distribution ?? null,
-        routeLabel: customerInfoMap?.[id]?.routeLabel ?? null,
-        deliveryNoteNumber: customerInfoMap?.[id]?.deliveryNoteNumber ?? null,
-        deliveryNoteMessage: customerInfoMap?.[id]?.deliveryNoteMessage ?? null,
       }));
       if (quantity <= perLine.length) {
         base_items = perLine.slice(0, quantity);
@@ -129,18 +115,7 @@ export function PrintLabelDialog({
             copies: extras,
             felter: perLine[0]?.felter ?? null,
             fieldLabels,
-            tourLabel: perLine[0]?.tourLabel ?? null,
             pickupLabel: perLine[0]?.pickupLabel ?? null,
-            customerName: perLine[0]?.customerName ?? null,
-            deliveryAddress: perLine[0]?.deliveryAddress ?? null,
-            phone: perLine[0]?.phone ?? null,
-            deliveryDate: perLine[0]?.deliveryDate ?? null,
-            pickupTime: perLine[0]?.pickupTime ?? null,
-            isPaid: perLine[0]?.isPaid ?? false,
-            distribution: perLine[0]?.distribution ?? null,
-            routeLabel: perLine[0]?.routeLabel ?? null,
-            deliveryNoteNumber: perLine[0]?.deliveryNoteNumber ?? null,
-            deliveryNoteMessage: perLine[0]?.deliveryNoteMessage ?? null,
           },
         ];
       }
