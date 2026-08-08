@@ -97,9 +97,16 @@ export function UtskriftsprofilDialog({
   const updateMut = useUpdateLabelPrintProfile();
   const isSubmitting = createMut.isPending || updateMut.isPending;
 
-  // Initialize / reset on open
+  // Initialize / reset on open — kun én gang per åpning, slik at en sen
+  // katalog-lasting aldri overskriver det brukeren har begynt å redigere.
+  const initializedForOpenRef = useRef(false);
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      initializedForOpenRef.current = false;
+      return;
+    }
+    if (initializedForOpenRef.current) return;
+    initializedForOpenRef.current = true;
     if (mode === "edit" && existing) {
       setName(existing.name);
       setPaperWidth(Number(existing.paper_width_mm));
