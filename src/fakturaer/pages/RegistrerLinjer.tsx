@@ -123,11 +123,13 @@ export default function RegistrerLinjerPage() {
       });
       if (replaceErr) throw replaceErr;
 
+      const header = invoiceQ.data as any;
       const sumCheck = computeLinesSum({
         lineTotals: lines.map((l) => l.total_amount),
-        totalAmount: inv.total_amount,
-        totalVat: (inv as any).total_vat,
+        totalAmount: header?.total_amount ?? null,
+        totalVat: header?.total_vat ?? null,
       });
+
       const { error: invErr } = await supabase
         .from("invoices")
         .update({
