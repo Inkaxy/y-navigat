@@ -48,9 +48,18 @@ export default function LeverandorerPage() {
   const [newOpen, setNewOpen] = useState(false);
   const [view, setView] = useState<ViewFilter>("alle");
   const [showInactive, setShowInactive] = useState(false);
+  const [confirmOn, setConfirmOn] = useState<SupplierRow | null>(null);
 
   const setTracking = useSetTrackInvoiceLines();
   const sync = useSyncSuppliersFromTripletex();
+  const backfill = useBackfillSupplierInvoices();
+
+  async function enableTracking(row: SupplierRow) {
+    setConfirmOn(null);
+    await setTracking.mutateAsync({ id: row.id, value: true });
+    toast.info(`Henter 12 måneder med fakturaer fra ${row.name}…`);
+    backfill.mutate({ supplierId: row.id, months: 12 });
+  }
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
