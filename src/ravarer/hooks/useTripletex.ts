@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 export interface TripletexCredentialRow {
   legal_entity_id: string;
-  mode: "standard" | "private";
+  mode: "jwt" | "standard" | "private";
   has_consumer_token: boolean;
   has_employee_token: boolean;
   sync_enabled: boolean;
@@ -35,7 +35,7 @@ export function useTripletexCredentials(legalEntityId: string | null | undefined
       const status = Array.isArray(tokenStatus) ? tokenStatus[0] : tokenStatus;
       return {
         legal_entity_id: data.legal_entity_id,
-        mode: (data.mode as "standard" | "private") ?? "standard",
+        mode: (data.mode as "jwt" | "standard" | "private") ?? "standard",
         has_consumer_token: !!status?.has_consumer_token,
         has_employee_token: !!status?.has_employee_token,
         sync_enabled: data.sync_enabled,

@@ -9742,6 +9742,7 @@ export type Database = {
           consumer_token_encrypted: string | null
           created_at: string
           employee_token_encrypted: string | null
+          jwt_token_encrypted: string | null
           last_sync_error: string | null
           last_sync_status: string | null
           last_synced_at: string | null
@@ -9758,6 +9759,7 @@ export type Database = {
           consumer_token_encrypted?: string | null
           created_at?: string
           employee_token_encrypted?: string | null
+          jwt_token_encrypted?: string | null
           last_sync_error?: string | null
           last_sync_status?: string | null
           last_synced_at?: string | null
@@ -9774,6 +9776,7 @@ export type Database = {
           consumer_token_encrypted?: string | null
           created_at?: string
           employee_token_encrypted?: string | null
+          jwt_token_encrypted?: string | null
           last_sync_error?: string | null
           last_sync_status?: string | null
           last_synced_at?: string | null
