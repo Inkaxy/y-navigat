@@ -23,6 +23,8 @@ export default function LagerPage() {
   const [q, setQ] = useState("");
   const [selected, setSelected] = useState<StockItem | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+
   const [dialogOpen, setDialogOpen] = useState(false);
   const [mode, setMode] = useState<AdjustMode>("count");
 
