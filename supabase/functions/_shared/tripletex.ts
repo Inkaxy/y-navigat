@@ -71,7 +71,10 @@ export async function getSessionToken(
     ? await decryptToken(row.consumer_token_encrypted)
     : undefined;
   const session = await createSessionForMode(row.mode ?? "standard", consumerToken, employeeToken);
-  const expiresAtIso = new Date(`${session.expirationDate}T23:59:59Z`).toISOString();
+  const expiresAtIso = session.expirationDate.includes("T")
+    ? new Date(session.expirationDate).toISOString()
+    : new Date(`${session.expirationDate}T23:59:59Z`).toISOString();
+
   await supabase
     .from("tripletex_credentials")
     .update({ session_token: session.token, session_expires_at: expiresAtIso })
