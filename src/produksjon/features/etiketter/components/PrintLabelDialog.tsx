@@ -91,8 +91,8 @@ export function PrintLabelDialog({
     let base_items: LabelPdfData[];
     if (orderLineIds.length === 0) {
       base_items = [{
-        ...base, quantity, copies: quantity, felter: null, fieldLabels, tourLabel: null,
-        pickupLabel: null, customerName: null, deliveryAddress: null,
+        ...base, quantity, copies: quantity, felter: null, fieldLabels,
+        pickupLabel: null,
       }];
     } else {
       const perLine: LabelPdfData[] = orderLineIds.map((id) => ({
