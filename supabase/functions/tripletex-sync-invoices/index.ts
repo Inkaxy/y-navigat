@@ -1,7 +1,7 @@
 // Pulls supplier invoices ("vouchers") from Tripletex for a given legal_entity_id.
 // Skips silently if Tripletex is not configured.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { getSessionToken, tripletexFetch } from "../_shared/tripletex.ts";
+import { getSessionToken, tripletexFetch, TripletexError } from "../_shared/tripletex.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
