@@ -97,6 +97,7 @@ const VarerSettingsProductPages = lazy(() => import("@/varer/pages/settings/Sett
 const VarerSettingsSalesGroups = lazy(() => import("@/varer/pages/settings/SettingsSalesGroups"));
 const VarerSettingsProductionGroups = lazy(() => import("@/varer/pages/settings/SettingsProductionGroups"));
 const VarerSettingsAI = lazy(() => import("@/varer/pages/settings/SettingsAI"));
+const VarerSettingsLabelMarks = lazy(() => import("@/varer/pages/settings/SettingsLabelMarks"));
 const VarerCakeBuilderEmbed = lazy(() => import("@/varer/pages/embed/CakeBuilderEmbed"));
 const KunderCustomerList = lazy(() => import("@/kunder/pages/CustomerList"));
 const KunderCustomerDetail = lazy(() => import("@/kunder/pages/CustomerDetail"));
@@ -321,6 +322,7 @@ const App = () => (
                 <Route path="varesider" element={<VarerSettingsProductPages />} />
                 <Route path="salgsgrupper" element={<VarerSettingsSalesGroups />} />
                 <Route path="produksjonsgrupper" element={<VarerSettingsProductionGroups />} />
+                <Route path="merking" element={<VarerSettingsLabelMarks />} />
                 <Route path="ai" element={<VarerSettingsAI />} />
               </Route>
               {/* Kunder sub-routes */}

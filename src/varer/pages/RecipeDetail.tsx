@@ -31,6 +31,9 @@ import {
 } from "@/varer/hooks/useRecipePDF";
 import { useUnsavedChangesWarning } from "@/varer/hooks/useUnsavedChangesWarning";
 import { useComputeRecipeLabel } from "@/varer/hooks/useRecipeLabel";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { LabelTab } from "@/varer/components/recipes/label/LabelTab";
+import { COARSE_CLASSIFICATIONS, SIFTED_CLASSIFICATIONS, type FlourLine } from "@/varer/lib/breadscale";
 
 export default function RecipeDetail() {
   const { id } = useParams<{ id: string }>();
@@ -127,6 +130,25 @@ export default function RecipeDetail() {
   const hydratedLines = useMemo(
     () => lines.map((l) => ({ ...l, _rm: l._rm ?? (l.raw_material_id ? rmMap[l.raw_material_id] ?? null : null) })),
     [lines, rmMap],
+  );
+
+  /** Melinjer med kornklassifisering — brukes til bytteforslaget på Brødskala'n. */
+  const flourLines = useMemo<FlourLine[]>(
+    () =>
+      hydratedLines
+        .map((l: any) => ({
+          raw_material_id: l.raw_material_id ?? null,
+          name: l._rm?.name ?? l.ingredient_name ?? "Ukjent",
+          grams: Number(l.quantity) || 0,
+          classification: l._rm?.grain_classification ?? null,
+          cereal_type: null,
+        }))
+        .filter(
+          (l) =>
+            l.classification &&
+            [...SIFTED_CLASSIFICATIONS, ...COARSE_CLASSIFICATIONS].includes(l.classification),
+        ),
+    [hydratedLines],
   );
 
   const totals = useMemo(
@@ -529,6 +551,24 @@ export default function RecipeDetail() {
           )}
         </div>
 
+        <Tabs defaultValue="oppskrift" className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="oppskrift">Oppskrift</TabsTrigger>
+            <TabsTrigger value="merking">Merking</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="merking" className="space-y-4">
+            <LabelTab
+              recipeId={recipe.id}
+              recipeName={header.name || recipe.name || "Oppskrift"}
+              recipe={recipe}
+              flourLines={flourLines}
+              legalEntityId={legalEntityId ?? undefined}
+              canWrite={canWrite}
+            />
+          </TabsContent>
+
+          <TabsContent value="oppskrift" className="space-y-4">
         <ScalePanel
           value={scaleInput}
           onChange={setScaleInput}
@@ -668,6 +708,8 @@ export default function RecipeDetail() {
               onChange={(e) => patchHeader({ notes: e.target.value })} />
           </CardContent>
         </Card>
+          </TabsContent>
+        </Tabs>
       </div>
 
       <PrintRecipeCardDialog
