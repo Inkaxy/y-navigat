@@ -531,17 +531,17 @@ export default function RecipeDetail() {
           <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div className="sm:col-span-2">
               <Label className="text-xs">Navn</Label>
-              <Input value={header.name ?? ""} disabled={!canWrite} onChange={(e) => patchHeader({ name: e.target.value })} />
+              <Input value={header.name ?? ""} disabled={!editable} onChange={(e) => patchHeader({ name: e.target.value })} />
             </div>
             <div>
               <Label className="text-xs">Kategori</Label>
-              <Input value={header.category ?? ""} disabled={!canWrite} placeholder="f.eks. Surdeigsbrød"
+              <Input value={header.category ?? ""} disabled={!editable} placeholder="f.eks. Surdeigsbrød"
                 onChange={(e) => patchHeader({ category: e.target.value })} />
             </div>
             <div>
               <Label className="text-xs">Status</Label>
               <select
-                value={header.status ?? "draft"} disabled={!canWrite}
+                value={header.status ?? "draft"} disabled={!editable}
                 onChange={(e) => patchHeader({ status: e.target.value })}
                 className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
               >
@@ -550,34 +550,34 @@ export default function RecipeDetail() {
             </div>
             <div>
               <Label className="text-xs">Vekt per enhet (g)</Label>
-              <Input type="number" value={header.unit_weight_grams ?? ""} disabled={!canWrite}
+              <Input type="number" value={header.unit_weight_grams ?? ""} disabled={!editable}
                 onChange={(e) => patchHeader({ unit_weight_grams: e.target.value })} />
             </div>
             <div>
               <Label className="text-xs">Antall per batch</Label>
-              <Input type="number" value={header.units_per_batch ?? ""} disabled={!canWrite}
+              <Input type="number" value={header.units_per_batch ?? ""} disabled={!editable}
                 onChange={(e) => patchHeader({ units_per_batch: e.target.value })} />
             </div>
             <div>
               <Label className="text-xs">Autolyse (min)</Label>
-              <Input type="number" value={header.autolyse_minutes ?? ""} disabled={!canWrite}
+              <Input type="number" value={header.autolyse_minutes ?? ""} disabled={!editable}
                 onChange={(e) => patchHeader({ autolyse_minutes: e.target.value })} />
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <Label className="text-xs">Elting 1. gir (min)</Label>
-                <Input type="number" value={header.mixing_speed1_minutes ?? ""} disabled={!canWrite}
+                <Input type="number" value={header.mixing_speed1_minutes ?? ""} disabled={!editable}
                   onChange={(e) => patchHeader({ mixing_speed1_minutes: e.target.value })} />
               </div>
               <div>
                 <Label className="text-xs">2. gir (min)</Label>
-                <Input type="number" value={header.mixing_speed2_minutes ?? ""} disabled={!canWrite}
+                <Input type="number" value={header.mixing_speed2_minutes ?? ""} disabled={!editable}
                   onChange={(e) => patchHeader({ mixing_speed2_minutes: e.target.value })} />
               </div>
             </div>
             <div className="sm:col-span-2 lg:col-span-4">
               <Label className="text-xs">Beskrivelse</Label>
-              <Textarea rows={2} value={header.description ?? ""} disabled={!canWrite}
+              <Textarea rows={2} value={header.description ?? ""} disabled={!editable}
                 onChange={(e) => patchHeader({ description: e.target.value })} />
             </div>
           </CardContent>
@@ -636,7 +636,7 @@ export default function RecipeDetail() {
         <Card>
           <CardHeader className="pb-3"><CardTitle className="text-base">Notater</CardTitle></CardHeader>
           <CardContent>
-            <Textarea rows={3} value={header.notes ?? ""} disabled={!canWrite}
+            <Textarea rows={3} value={header.notes ?? ""} disabled={!editable}
               onChange={(e) => patchHeader({ notes: e.target.value })} />
           </CardContent>
         </Card>
