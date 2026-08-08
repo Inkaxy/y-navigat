@@ -56,6 +56,9 @@ interface ParseResult {
 }
 
 const LOW_CONF = 0.8;
+/** Under denne lesesikkerheten må fakturaen gjennomgås manuelt. */
+const LOW_EXTRACTION_CONF = 0.7;
+
 
 async function fileToBase64(file: File): Promise<string> {
   const buf = await file.arrayBuffer();
