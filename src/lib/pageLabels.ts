@@ -54,6 +54,8 @@ const RULES: PageRule[] = [
 
   // Råvarer
   { test: (p) => p.startsWith("/ravarer/vareliste"), label: "Vareliste" },
+  { test: (p) => p.startsWith("/ravarer/lager"), label: "Lager" },
+
   { test: (p) => p.startsWith("/ravarer/leverandorer"), label: "Leverandører" },
   { test: (p) => p.startsWith("/ravarer/avtaler"), label: "Avtaler" },
   { test: (p) => p.startsWith("/ravarer/datablad-endringer"), label: "Datablad-endringer" },

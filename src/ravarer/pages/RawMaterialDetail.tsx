@@ -9,6 +9,9 @@ import { ArrowLeft, Loader2, Pencil, Check, X } from "lucide-react";
 import { OverviewTab } from "@/ravarer/components/tabs/OverviewTab";
 import { NutritionTab } from "@/ravarer/components/tabs/NutritionTab";
 import { SuppliersTab } from "@/ravarer/components/tabs/SuppliersTab";
+import { ResaleSettingsCard } from "@/ravarer/components/stock/ResaleSettingsCard";
+import { SellsAsSection } from "@/ravarer/components/stock/SellsAsSection";
+
 
 export default function RawMaterialDetail() {
   const { id } = useParams();
@@ -77,7 +80,12 @@ export default function RawMaterialDetail() {
           <TabsTrigger value="recipes" disabled>Brukt i oppskrifter</TabsTrigger>
           <TabsTrigger value="invoices" disabled>Fakturahistorikk</TabsTrigger>
         </TabsList>
-        <TabsContent value="overview" className="mt-5"><OverviewTab rm={rm} /></TabsContent>
+        <TabsContent value="overview" className="mt-5 space-y-5">
+          <OverviewTab rm={rm} />
+          <ResaleSettingsCard rm={rm} />
+          {rm.is_resale_item && <SellsAsSection rm={rm} />}
+        </TabsContent>
+
         {!rm.is_packaging && <TabsContent value="nutrition" className="mt-5"><NutritionTab rawMaterialId={rm.id} /></TabsContent>}
         <TabsContent value="suppliers" className="mt-5"><SuppliersTab rm={rm} /></TabsContent>
       </Tabs>

@@ -25,6 +25,8 @@ export default function VarelistePage() {
   const [q, setQ] = useState("");
   const [cat, setCat] = useState("all");
   const [active, setActive] = useState("active");
+  const [kind, setKind] = useState("all");
+
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
@@ -46,10 +48,13 @@ export default function VarelistePage() {
     const arr = rows.filter(r => {
       if (active === "active" && !r.is_active) return false;
       if (active === "inactive" && r.is_active) return false;
+      if (kind === "resale" && !r.is_resale_item) return false;
+      if (kind === "raw" && r.is_resale_item) return false;
       if (cat !== "all" && !allCatsOf(r).includes(cat)) return false;
       if (needle && !`${r.name} ${r.sku}`.toLowerCase().includes(needle)) return false;
       return true;
     });
+
     arr.sort((a, b) => {
       if (sortKey === "volume_12m") {
         const va = statsMap?.get(a.id)?.quantity_12m ?? 0;
@@ -59,7 +64,7 @@ export default function VarelistePage() {
       return sortDir === "asc" ? a.name.localeCompare(b.name, "nb") : b.name.localeCompare(a.name, "nb");
     });
     return arr;
-  }, [rows, q, cat, active, sortKey, sortDir, statsMap]);
+  }, [rows, q, cat, active, kind, sortKey, sortDir, statsMap]);
 
   const toggleSort = (k: SortKey) => {
     if (sortKey === k) setSortDir(d => (d === "asc" ? "desc" : "asc"));
@@ -85,6 +90,15 @@ export default function VarelistePage() {
               {categories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
             </SelectContent>
           </Select>
+          <Select value={kind} onValueChange={setKind}>
+            <SelectTrigger className="w-[170px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Alle varer</SelectItem>
+              <SelectItem value="raw">Kun råvarer</SelectItem>
+              <SelectItem value="resale">Kun handelsvarer</SelectItem>
+            </SelectContent>
+          </Select>
+
           <Select value={active} onValueChange={setActive}>
             <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -127,7 +141,9 @@ export default function VarelistePage() {
                       Volum 12mnd <ArrowUpDown className="h-3 w-3" />
                     </button>
                   </th>
+                  <th className="px-4 py-3 text-right">Beholdning</th>
                   <th className="px-4 py-3">Sist oppdatert</th>
+
                   <th className="px-4 py-3">Status</th>
                 </tr>
               </thead>
@@ -157,9 +173,19 @@ export default function VarelistePage() {
                         ? <>{formatNumber(s.quantity_12m, 0)} <span className="text-xs text-ink-secondary">{r.base_unit}</span></>
                         : <span className="text-ink-secondary">—</span>}
                     </td>
+                    <td className="px-4 py-3 text-right tabular-nums">
+                      {r.stock_tracking
+                        ? <span className={r.current_stock < 0 ? "font-semibold text-destructive" : r.min_stock != null && r.current_stock <= r.min_stock ? "font-semibold text-warning" : ""}>
+                            {formatNumber(r.current_stock, 2)} <span className="text-xs font-normal text-ink-secondary">{r.base_unit}</span>
+                          </span>
+                        : <span className="text-ink-secondary">—</span>}
+                    </td>
                     <td className="px-4 py-3 text-ink-secondary">{formatDate(r.price_updated_at)}</td>
+
                     <td className="px-4 py-3">
                       {r.is_packaging && <Badge variant="outline" className="mr-1">Emballasje</Badge>}
+                      {r.is_resale_item && <Badge variant="outline" className="mr-1">Handelsvare</Badge>}
+
                       {r.is_active ? (
                         <Badge className="bg-success/15 text-success border-success/30">Aktiv</Badge>
                       ) : (

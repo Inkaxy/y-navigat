@@ -12,7 +12,10 @@ export interface RawMaterialRow {
   category: string | null;
   categories: string[];
   is_packaging: boolean;
+  is_resale_item: boolean;
+  stock_tracking: boolean;
   base_unit: string;
+
   package_size: number | null;
   package_unit: string | null;
   current_cost_price: number | null;
