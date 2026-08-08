@@ -462,7 +462,34 @@ Deno.serve(async (req) => {
           update.variance_status = "no_baseline";
         }
 
-        await syncRegisteredPrices(svc, inv, line, rm, rmsRow, actual, update);
+        await syncRegisteredPrices(svc, inv, line, rm, rmsRow, actual, update, catTolMap.get(rm?.category ?? "") ?? tolDefault);
+      }
+
+      // Lær av vellykket fuzzy-match: skriv pending alias (aldri degrader bekreftede)
+      if (matchedRmId && (confidenceLabel === "auto_medium" || confidenceLabel === "auto_low")) {
+        const learnRms = fuzzyMatchRmsRow ?? rmsList.find((r: AnyRec) => r.raw_material_id === matchedRmId);
+        if (learnRms) {
+          const nowIso = new Date().toISOString();
+          const aliasRows: AnyRec[] = [];
+          if (line.supplier_sku) aliasRows.push({
+            raw_material_supplier_id: learnRms.id, alias_type: "supplier_sku",
+            alias_value: line.supplier_sku, status: "pending",
+            first_seen_invoice_id: inv.id, match_count: 1, last_seen_at: nowIso,
+            confirmed_by: null, confirmed_at: null,
+          });
+          if (line.description) aliasRows.push({
+            raw_material_supplier_id: learnRms.id, alias_type: "product_name",
+            alias_value: line.description, status: "pending",
+            first_seen_invoice_id: inv.id, match_count: 1, last_seen_at: nowIso,
+            confirmed_by: null, confirmed_at: null,
+          });
+          for (const row of aliasRows) {
+            await svc.from("raw_material_supplier_aliases").upsert(row, {
+              onConflict: "alias_type,alias_value_normalized,raw_material_supplier_id",
+              ignoreDuplicates: true,
+            });
+          }
+        }
       }
 
       await applyUpdate(svc, line.id, update);
