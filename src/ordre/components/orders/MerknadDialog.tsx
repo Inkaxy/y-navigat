@@ -93,6 +93,7 @@ export function MerknadDialog({
   /** Leveringsdato fra ordreskjemaet. Settes for å aktivere kakebilde-opplasting. */
   deliveryDate?: string;
 }) {
+  const catalog = useLabelFieldCatalog();
   const [form, setForm] = useState<Merknad>(emptyMerknad);
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);
   const [pendingPath, setPendingPath] = useState<string | null>(null);
