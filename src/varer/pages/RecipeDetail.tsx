@@ -658,7 +658,16 @@ export default function RecipeDetail() {
           setCardDialogOpen(false);
         }}
       />
+
+      <ShareRecipeDialog
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        recipeId={recipe.id}
+        recipeName={header.name || recipe.name || "Oppskrift"}
+        canWrite={canWrite}
+      />
     </>
+
 
   );
 }
