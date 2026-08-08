@@ -1022,7 +1022,7 @@ export function CakeBuilder({
         }}
       >
         <DialogContent
-          className="max-w-md"
+          className="max-w-md rounded-2xl"
           onEscapeKeyDown={(e) => {
             if (popupRule?.severity === "block") e.preventDefault();
           }}
@@ -1033,7 +1033,7 @@ export function CakeBuilder({
           {popupRule && (
             <>
               <DialogHeader>
-                <DialogTitle className="flex items-center gap-2">
+                <DialogTitle className="flex items-center gap-2 font-display text-lg">
                   {popupRule.severity === "block" ? (
                     <Ban className="h-5 w-5 text-destructive" />
                   ) : (
@@ -1048,6 +1048,7 @@ export function CakeBuilder({
               <DialogFooter className="flex-wrap gap-2">
                 {(popupRule.response_options ?? []).length === 0 ? (
                   <Button
+                    className="rounded-full px-6 bg-brand-ink text-brand-cream hover:bg-brand-ink-deep dark:bg-brand-gold dark:text-brand-ink-deep dark:hover:bg-brand-bronze-soft"
                     onClick={() => {
                       if (popupRule.severity !== "block") {
                         setDismissedRuleIds((prev) => new Set(prev).add(popupRule.id));
@@ -1063,6 +1064,11 @@ export function CakeBuilder({
                     <Button
                       key={opt.id ?? idx}
                       variant={opt.is_primary ? "default" : "outline"}
+                      className={
+                        opt.is_primary
+                          ? "rounded-full px-6 bg-brand-ink text-brand-cream hover:bg-brand-ink-deep dark:bg-brand-gold dark:text-brand-ink-deep dark:hover:bg-brand-bronze-soft"
+                          : "rounded-full border-line-subtle bg-surface-raised hover:border-brand-gold hover:bg-surface-sunken"
+                      }
                       onClick={() => handleRuleAction(popupRule, opt)}
                     >
                       {opt.label}
