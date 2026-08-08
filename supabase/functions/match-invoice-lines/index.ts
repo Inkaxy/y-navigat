@@ -295,6 +295,7 @@ Deno.serve(async (req) => {
       }
 
       // STEG 4 — pending alias match (only if not yet matched)
+      let pendingHit = false;
       if (!matchedRmId) {
         const pendingHits = aliases.filter((a) => a.status === "pending" && (
           (a.alias_type === "supplier_sku" && skuN && a.alias_value_normalized === skuN) ||
@@ -311,12 +312,14 @@ Deno.serve(async (req) => {
             update.match_confidence = "unmatched";
             update.requires_review = true;
             update.review_reason = "low_confidence";
+            pendingHit = true;
           }
         }
       }
 
       // STEG 5 — fuzzy match
-      if (!matchedRmId && update.review_reason !== "low_confidence") {
+      let fuzzyMatchRmsRow: AnyRec | undefined;
+      if (!matchedRmId) {
         const candidates = new Map<string, { score: number; reason: string }>();
         const update_cand = (rmId: string, score: number, reason: string) => {
           const prev = candidates.get(rmId);
@@ -340,7 +343,7 @@ Deno.serve(async (req) => {
           const score = Math.max(
             similarity(r.supplier_product_name, descN),
             skuN ? similarity(r.supplier_product_name, skuN) : 0,
-          ) * 0.95;
+          ) * 0.97;
           if (score > fuzzyThreshold) update_cand(r.raw_material_id, score, "Leverandør-produktnavn");
         }
         // (3) raw_material name
@@ -348,7 +351,7 @@ Deno.serve(async (req) => {
           const score = Math.max(
             similarity(r.name, descN),
             skuN ? similarity(r.name, skuN) : 0,
-          ) * 0.85;
+          ) * 0.92;
           if (score > fuzzyThreshold) update_cand(r.id, score, "Råvarenavn");
         }
 
@@ -359,17 +362,21 @@ Deno.serve(async (req) => {
         if (sorted.length > 0) {
           const top = sorted[0];
           const second = sorted[1];
-          const dominance = second ? (top.score - second.score) >= fuzzyDom : true;
+          // Forhold, ikke differanse: nest beste må være under fuzzyDom av beste.
+          const dominance = second ? (second.score / top.score) <= fuzzyDom : true;
 
-          // Suggestions: top 3
+          // Suggestions: top 3 (etter et eventuelt pending-forslag)
+          const rankOffset = suggestionsToInsert.length;
           sorted.slice(0, 3).forEach((c, idx) => {
             suggestionsToInsert.push({
               invoice_line_id: line.id, raw_material_id: c.rmId,
-              confidence: Number(c.score.toFixed(3)), match_reason: c.reason, rank: idx + 1,
+              confidence: Number(c.score.toFixed(3)), match_reason: c.reason, rank: rankOffset + idx + 1,
             });
           });
 
-          if (top.score >= fuzzyAuto && dominance) {
+          if (pendingHit) {
+            // Pending-alias forblir det foreslåtte valget; fuzzy gir kun flere forslag.
+          } else if (top.score >= fuzzyAuto && dominance) {
             matchedRmId = top.rmId;
             confidenceLabel = "auto_medium";
             update.match_confidence = "auto_medium";
@@ -386,12 +393,17 @@ Deno.serve(async (req) => {
             update.requires_review = true;
             update.review_reason = "unmatched";
           }
+
+          if (matchedRmId) {
+            fuzzyMatchRmsRow = rmsList.find((r: AnyRec) => r.raw_material_id === matchedRmId);
+          }
         }
       } else if (matchedRmId) {
         update.match_confidence = confidenceLabel;
         update.requires_review = false;
         update.review_reason = null;
       }
+
 
       // Normaliser enheten alltid (også for unmatched linjer)
       const normalizedUnit = normalizeUnit(line.unit);
