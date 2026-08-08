@@ -29,7 +29,11 @@ export const FIELD_TYPES = [
 ] as const;
 
 
-export type FieldType = (typeof FIELD_TYPES)[number];
+/**
+ * Feltnøkler er dynamiske og kommer fra tabellen `label_field_catalog`.
+ * Konstantene i denne filen brukes kun som reserve hvis katalogen ikke kan hentes.
+ */
+export type FieldType = string;
 
 export const FIELD_LABELS: Record<FieldType, string> = {
   logo: "Logo",
@@ -62,7 +66,14 @@ export const FIELD_LABELS: Record<FieldType, string> = {
 
 };
 
-export type FieldGroup = "bestilling" | "vare" | "pakkseddel" | "firma" | "system";
+export type FieldGroup =
+  | "bestilling"
+  | "kunde"
+  | "vare"
+  | "produksjon"
+  | "pakkseddel"
+  | "firma"
+  | "system";
 
 export const FIELD_GROUPS: Record<FieldType, FieldGroup> = {
   kundenavn: "bestilling",
@@ -97,6 +108,8 @@ export const FIELD_GROUPS: Record<FieldType, FieldGroup> = {
 
 export const GROUP_LABELS: Record<FieldGroup, string> = {
   bestilling: "Bestilling",
+  kunde: "Kunde",
+  produksjon: "Produksjon",
   vare: "Vare",
   pakkseddel: "Pakkseddel",
   firma: "Firma",
@@ -140,6 +153,11 @@ export interface ProfileField {
   show_border: boolean;
   /** Vis felt-tittel (f.eks. "Kundenavn: ") foran verdien. Default true. */
   show_label?: boolean;
+  /**
+   * Tegn feltet selv om verdien mangler (blank linje å skrive på for hånd).
+   * Default false: tomme felter hoppes helt over ved utskrift.
+   */
+  always_show?: boolean;
   /** @deprecated Use y_mm */
   print_at_bottom: boolean;
   // New canvas-coordinate model (in mm, relative to label margin box)
@@ -259,13 +277,34 @@ const DEFAULT_SIZES: Record<FieldType, { w: number; h: number }> = {
 };
 
 export function defaultFieldSize(type: FieldType): { w: number; h: number } {
-  return DEFAULT_SIZES[type];
+  return DEFAULT_SIZES[type] ?? { w: 40, h: 5 };
 }
 
-/** Default-felt for ny profil — alle 21, alle off, sensible defaults. */
-export function defaultFields(): ProfileField[] {
-  return FIELD_TYPES.map((field_type, idx) => {
-    const size = DEFAULT_SIZES[field_type] ?? { w: 40, h: 5 };
+/**
+ * Default-felt for ny profil — alle av, sensible defaults.
+ * `entries` kommer normalt fra `label_field_catalog`; uten den brukes reserve-lista.
+ */
+export function defaultFields(
+  entries?: ReadonlyArray<{
+    field_key: string;
+    default_width_mm?: number | null;
+    default_height_mm?: number | null;
+  }>,
+): ProfileField[] {
+  const keys: string[] =
+    entries && entries.length > 0
+      ? entries.map((e) => e.field_key)
+      : (FIELD_TYPES as readonly string[]).slice();
+  const sizeByKey = new Map<string, { w: number; h: number }>();
+  for (const e of entries ?? []) {
+    sizeByKey.set(e.field_key, {
+      w: Number(e.default_width_mm) || DEFAULT_SIZES[e.field_key]?.w || 40,
+      h: Number(e.default_height_mm) || DEFAULT_SIZES[e.field_key]?.h || 5,
+    });
+  }
+  return keys.map((field_type, idx) => {
+    const size =
+      sizeByKey.get(field_type) ?? DEFAULT_SIZES[field_type] ?? { w: 40, h: 5 };
     return {
       field_type,
       include: false,
