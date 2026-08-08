@@ -237,6 +237,25 @@ export default function LeverandorerPage() {
           </div>
         )}
       </Card>
+
+      <AlertDialog open={!!confirmOn} onOpenChange={(o) => !o && setConfirmOn(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Følg fakturaer fra {confirmOn?.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Det siste årets fakturaer hentes inn fra Tripletex, PDF-ene lastes ned og
+              varelinjene leses ut med AI. Nye fakturaer hentes automatisk framover. Skrur du
+              den av igjen, slettes ingenting — det slutter bare å komme nye.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Avbryt</AlertDialogCancel>
+            <AlertDialogAction onClick={() => confirmOn && enableTracking(confirmOn)}>
+              Slå på og hent 12 måneder
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
