@@ -8,6 +8,8 @@ import { TagsInput } from "../TagsInput";
 import { FileText } from "lucide-react";
 import type { ProductFormValues } from "@/varer/lib/productSchema";
 import { ProductImageUpload } from "@/varer/components/products/ProductImageUpload";
+import { StockLinkNote } from "@/varer/components/products/StockLinkNote";
+
 
 interface Props {
   canWrite: boolean;
