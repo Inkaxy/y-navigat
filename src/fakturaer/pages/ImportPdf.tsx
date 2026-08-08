@@ -262,6 +262,19 @@ export default function ImportPdfPage({ embedded = false }: { embedded?: boolean
       if (upErr) throw upErr;
 
       // 3. Insert invoice
+      const extractionConfidence = typeof parseResult?.confidence === "number" ? parseResult.confidence : null;
+      const lowConfidence = extractionConfidence != null && extractionConfidence < LOW_EXTRACTION_CONF;
+      const sumCheck = computeLinesSum({
+        lineTotals: lines.map((l) => l.total_amount),
+        totalAmount: totalAmount ? Number(totalAmount) : null,
+        totalVat: totalVat ? Number(totalVat) : null,
+      });
+      const noteParts = [
+        kid && `KID: ${kid}`,
+        accountNumber && `Konto: ${accountNumber}`,
+        lowConfidence && `Lav lesesikkerhet (${Math.round(extractionConfidence! * 100)} %) — krever gjennomgang`,
+      ].filter(Boolean) as string[];
+
       const { data: invoice, error: invErr } = await supabase
         .from("invoices")
         .insert({
@@ -276,13 +289,16 @@ export default function ImportPdfPage({ embedded = false }: { embedded?: boolean
           source: "pdf_upload",
           lines_source: lines.length > 0 ? "pdf_extracted" : "pending_manual",
           source_document_url: path,
-          status: "imported",
-          notes: kid || accountNumber
-            ? [kid && `KID: ${kid}`, accountNumber && `Konto: ${accountNumber}`].filter(Boolean).join(" · ")
-            : null,
+          status: lowConfidence ? "needs_review" : "imported",
+          extraction_confidence: extractionConfidence,
+          lines_sum_excl_vat: sumCheck.lines_sum_excl_vat,
+          lines_sum_variance_pct: sumCheck.lines_sum_variance_pct,
+          lines_sum_status: sumCheck.lines_sum_status,
+          notes: noteParts.length > 0 ? noteParts.join(" · ") : null,
         })
         .select("id").single();
       if (invErr) throw invErr;
+
 
       // 4. Insert lines
       if (lines.length > 0) {
