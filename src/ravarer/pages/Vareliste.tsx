@@ -141,7 +141,9 @@ export default function VarelistePage() {
                       Volum 12mnd <ArrowUpDown className="h-3 w-3" />
                     </button>
                   </th>
+                  <th className="px-4 py-3 text-right">Beholdning</th>
                   <th className="px-4 py-3">Sist oppdatert</th>
+
                   <th className="px-4 py-3">Status</th>
                 </tr>
               </thead>
