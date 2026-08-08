@@ -47,7 +47,11 @@ function parseValidationMessages(text: string): string[] {
   }
 }
 
-export async function getSessionToken(supabase: any, legalEntityId: string): Promise<string> {
+export async function getSessionToken(
+  supabase: any,
+  legalEntityId: string,
+  forceNew = false,
+): Promise<string> {
   const { data: row, error } = await supabase
     .from("tripletex_credentials")
     .select("*")
@@ -59,7 +63,7 @@ export async function getSessionToken(supabase: any, legalEntityId: string): Pro
   }
   const now = Date.now();
   const expiresAt = row.session_expires_at ? new Date(row.session_expires_at).getTime() : 0;
-  if (row.session_token && expiresAt - now > 30 * 60 * 1000) {
+  if (!forceNew && row.session_token && expiresAt - now > 30 * 60 * 1000) {
     return row.session_token as string;
   }
   const employeeToken = await decryptToken(row.employee_token_encrypted);

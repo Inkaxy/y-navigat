@@ -1,7 +1,7 @@
 // Pulls supplier invoices ("vouchers") from Tripletex for a given legal_entity_id.
 // Skips silently if Tripletex is not configured.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { getSessionToken, tripletexFetch } from "../_shared/tripletex.ts";
+import { getSessionToken, tripletexFetch, TripletexError } from "../_shared/tripletex.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -52,17 +52,26 @@ Deno.serve(async (req) => {
       .single();
     logId = logRow?.id ?? null;
 
-    const sessionToken = await getSessionToken(supabase, legalEntityId);
+    let sessionToken = await getSessionToken(supabase, legalEntityId);
 
     const today = new Date();
     const defaultFrom = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
     const fromDate = body.from ?? (cred.last_synced_voucher_date ?? defaultFrom.toISOString().slice(0, 10));
     const toDate = body.to ?? today.toISOString().slice(0, 10);
 
-    const json = await tripletexFetch("/v2/ledger/voucher", {
-      sessionToken,
-      query: { dateFrom: fromDate, dateTo: toDate, count: 1000, fields: "id,date,number,description,attachment" },
-    });
+    const query = { dateFrom: fromDate, dateTo: toDate, count: 1000, fields: "id,date,number,description,attachment" };
+    let json: any;
+    try {
+      json = await tripletexFetch("/v2/ledger/voucher", { sessionToken, query });
+    } catch (e) {
+      // Lagret sesjonsnøkkel kan være ugyldig (utløpt/byttet modus) → hent ny og prøv én gang til.
+      if (e instanceof TripletexError && (e.status === 401 || e.status === 403)) {
+        sessionToken = await getSessionToken(supabase, legalEntityId, true);
+        json = await tripletexFetch("/v2/ledger/voucher", { sessionToken, query });
+      } else {
+        throw e;
+      }
+    }
     const vouchers: any[] = json?.values ?? [];
     const fetched = vouchers.length;
 
