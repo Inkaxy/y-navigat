@@ -1098,15 +1098,15 @@ function RuleList({
         const Icon = r.severity === "block" ? Ban : r.severity === "warning" ? AlertTriangle : Info;
         const cls =
           r.severity === "block"
-            ? "border-destructive/30 bg-destructive/10 text-destructive"
+            ? "border-danger/30 bg-danger/8 text-danger"
             : r.severity === "warning"
-              ? "border-warning/30 bg-warning/10 text-foreground"
-              : "border-app/20 bg-app/5 text-app-dark";
+              ? "border-warning/40 bg-warning/10 text-ink-primary"
+              : "border-brand-gold/30 bg-brand-gold/8 text-ink-primary";
         const opts = r.response_options ?? [];
         return (
           <div
             key={r.id}
-            className={cn("flex flex-col gap-2 rounded-md border px-3 py-2 text-xs", cls)}
+            className={cn("flex flex-col gap-2 rounded-xl border px-3.5 py-2.5 text-xs", cls)}
           >
             <div className="flex items-start gap-2">
               <Icon className="h-4 w-4 mt-0.5 shrink-0" />
@@ -1119,6 +1119,7 @@ function RuleList({
                     key={opt.id ?? idx}
                     size="sm"
                     variant={opt.is_primary ? "default" : "outline"}
+                    className="rounded-full"
                     onClick={() => onAction(r, opt)}
                   >
                     {opt.label}
