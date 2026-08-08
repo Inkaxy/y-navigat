@@ -216,10 +216,34 @@ export function UtskriftsprofilDialog({
   const addFieldAt = (type: FieldType, x: number, y: number) => {
     zCounterRef.current += 1;
     const z = zCounterRef.current;
-    setFields((prev) =>
-      prev.map((f) => {
+    const sz = catalog.size(type);
+    setFields((prev) => {
+      const exists = prev.some((f) => f.field_type === type);
+      if (!exists) {
+        // Feltet finnes bare i katalogen — opprett det og legg det bakerst.
+        const [base] = defaultFields([
+          {
+            field_key: type,
+            default_width_mm: sz.w,
+            default_height_mm: sz.h,
+          },
+        ]);
+        return [
+          ...prev,
+          {
+            ...base,
+            row_number: prev.length + 1,
+            include: true,
+            x_mm: clamp(x, 0, Math.max(0, inner.w - sz.w)),
+            y_mm: clamp(y, 0, Math.max(0, inner.h - sz.h)),
+            width_mm: Math.min(sz.w, inner.w),
+            height_mm: Math.min(sz.h, inner.h),
+            z_index: z,
+          },
+        ];
+      }
+      return prev.map((f) => {
         if (f.field_type !== type) return f;
-        const sz = catalog.size(type);
         const w = f.width_mm > 0 ? f.width_mm : sz.w;
         const h = f.height_mm > 0 ? f.height_mm : sz.h;
         return {
@@ -231,10 +255,11 @@ export function UtskriftsprofilDialog({
           height_mm: Math.min(h, inner.h),
           z_index: z,
         };
-      }),
-    );
+      });
+    });
     setSelectedFieldType(type);
   };
+
 
   const handleAddByClick = (type: FieldType) => {
     const sz = catalog.size(type);
