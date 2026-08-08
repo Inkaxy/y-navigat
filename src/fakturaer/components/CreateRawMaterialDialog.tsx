@@ -26,6 +26,7 @@ export function CreateRawMaterialDialog({ open, onOpenChange, line }: Props) {
   const qc = useQueryClient();
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
+  const [newCategory, setNewCategory] = useState(false);
   const [baseUnit, setBaseUnit] = useState("kg");
   const [packageSize, setPackageSize] = useState<string>("");
   const [packageUnit, setPackageUnit] = useState<string>("");
