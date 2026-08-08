@@ -177,7 +177,7 @@ export function UtskriftsprofilDialog({
     setEditorMode("design");
     setZoom(4);
     zCounterRef.current = 100;
-  }, [open, mode, existing, legalEntity]);
+  }, [open, mode, existing, legalEntity, catalog]);
 
   const inner = useMemo(
     () =>
