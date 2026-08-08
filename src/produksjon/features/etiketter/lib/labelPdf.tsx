@@ -26,30 +26,8 @@ export interface LabelPdfData {
   quantity: number;
   /** Hvor mange etiketter som skal genereres (ofte = quantity). Default 1. */
   copies?: number;
-  /** Tur-etikett (f.eks. "Tur 1") for ordrelinjen. */
-  tourLabel?: string | null;
   /** Hentested-navn (pickup_locations.display_name) for ordrelinjen. */
   pickupLabel?: string | null;
-  /** Navn på kunden / mottakeren av kaken. */
-  customerName?: string | null;
-  /** Formatert leveringsadresse. */
-  deliveryAddress?: string | null;
-  /** Kundens telefonnummer for ordrelinjen. */
-  phone?: string | null;
-  /** Formatert leveringsdato for ordrelinjen. */
-  deliveryDate?: string | null;
-  /** Formatert hentetidspunkt (f.eks. "Hentes kl 10:00"). */
-  pickupTime?: string | null;
-  /** Om kundeordren er betalt. */
-  isPaid?: boolean | null;
-  /** Distribusjonsmåte (orders.distribution). */
-  distribution?: string | null;
-  /** Kjørerute fra pakkseddelen. */
-  routeLabel?: string | null;
-  /** Pakkseddelnummer. */
-  deliveryNoteNumber?: string | null;
-  /** Melding på pakkseddelen. */
-  deliveryNoteMessage?: string | null;
   /** Verdi som skal kodes i strekkoden. Default: etikettnummer, ellers varenr. */
   barcodeValue?: string | null;
   /** Oppløste feltverdier fra RPC `resolve_label_data` — nøkkel = field_key. */
