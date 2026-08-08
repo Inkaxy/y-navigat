@@ -30,6 +30,7 @@ export interface ReviewLineRow {
   price_variance_pct: number | null;
   variance_status: string | null;
   review_reason: string | null;
+  requires_review: boolean | null;
   invoice: {
     id: string;
     invoice_number: string;
@@ -66,7 +67,7 @@ export function useReviewLines(filters: Filters) {
           `id, invoice_id, line_number, supplier_sku, description, quantity, unit, unit_price, total_amount,
            package_size, package_unit, count_per_package,
            match_confidence, raw_material_id, price_per_base_unit, expected_price_per_base_unit, price_variance_pct,
-           variance_status, review_reason,
+           variance_status, review_reason, requires_review,
            invoice:invoices!inner(id, invoice_number, invoice_date, legal_entity_id, supplier_id, source, source_document_url,
              supplier:suppliers(name, contact_email),
              legal_entity:legal_entities(legal_name, short_code)),
@@ -75,7 +76,9 @@ export function useReviewLines(filters: Filters) {
            matched_raw_material:raw_materials!invoice_lines_raw_material_id_fkey(name, sku, category)`,
           { count: "exact" },
         )
-        .eq("requires_review", true)
+        // Ta også med matchede linjer uten avtalepris — de utgjør arbeidslisten
+        // «Uten avtalepris», selv om de ikke er merket for gjennomgang.
+        .or("requires_review.eq.true,variance_status.eq.no_baseline")
         .order("invoice_id")
         .limit(500);
 

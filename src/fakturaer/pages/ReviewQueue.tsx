@@ -55,7 +55,7 @@ function matchesTab(line: ReviewLineRow, tab: ReviewReason): boolean {
   const reasons = reasonsOf(line);
   if (reasons.includes(tab)) return true;
   // Linjer uten kjent årsak vises under «Umatchet» slik at ingenting forsvinner.
-  if (tab === "unmatched" && reasons.every((r) => !TABS.some((t) => t.value === r))) return true;
+  if (tab === "unmatched" && line.requires_review && reasons.every((r) => !TABS.some((t) => t.value === r))) return true;
   return false;
 }
 
