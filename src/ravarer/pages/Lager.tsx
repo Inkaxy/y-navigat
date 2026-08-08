@@ -69,10 +69,34 @@ export default function LagerPage() {
             <Input value={q} onChange={e => setQ(e.target.value)} placeholder="Søk navn eller SKU…" className="pl-9" />
           </div>
           {canWrite && rows.length > 0 && (
-            <Button variant="outline" size="sm" onClick={() => openDialog(rows[0], "count")}>
-              <ClipboardCheck className="mr-1.5 h-4 w-4" /> Registrer telling
-            </Button>
+            <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <ClipboardCheck className="mr-1.5 h-4 w-4" /> Registrer telling
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[320px] p-0" align="end">
+                <Command>
+                  <CommandInput placeholder="Velg vare…" />
+                  <CommandList>
+                    <CommandEmpty>Ingen treff.</CommandEmpty>
+                    <CommandGroup>
+                      {rows.map(r => (
+                        <CommandItem
+                          key={r.id}
+                          value={`${r.name} ${r.sku}`}
+                          onSelect={() => { setPickerOpen(false); openDialog(r, "count"); }}
+                        >
+                          {r.name}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           )}
+
         </div>
       </Card>
 
