@@ -105,19 +105,48 @@ Deno.serve(async (req) => {
       return json({ skipped: true, reason: "Tripletex ikke konfigurert" });
     }
 
+    // --- Etterhenting for én leverandør? ---
+    // Brukes når «følg fakturalinjer» skrus på: da finnes det ingen lagrede
+    // fakturahoder å vekke, så vi må hente historikken på nytt.
+    const isBackfill = !!body.supplier_id;
+    let ttSupplierFilterId: string | null = null;
+    if (isBackfill) {
+      const { data: sup } = await admin
+        .from("suppliers")
+        .select("id, name, tripletex_supplier_id")
+        .eq("id", body.supplier_id!)
+        .eq("legal_entity_id", legalEntityId)
+        .maybeSingle();
+      if (!sup) return json({ error: "Ukjent leverandør" }, 400);
+      if (!sup.tripletex_supplier_id) {
+        return json({ skipped: true, reason: "Leverandøren er ikke koblet til Tripletex" });
+      }
+      ttSupplierFilterId = String(sup.tripletex_supplier_id);
+    }
+
     // --- Vindu ---
     const today = iso(new Date());
     const fallbackStart = cred.initial_import_done
       ? addDays(today, -30)
       : addDays(today, -365);
-    const windowFrom = body.from ?? cred.last_invoice_synced_date ?? fallbackStart;
-    let windowTo = body.to ?? addDays(today, 1);
+    let windowFrom: string;
+    let windowTo: string;
+    if (isBackfill) {
+      const months = Math.max(1, Math.min(60, Number(body.backfill_months ?? 12) || 12));
+      const start = new Date(`${today}T00:00:00Z`);
+      start.setUTCMonth(start.getUTCMonth() - months);
+      windowFrom = iso(start);
+      windowTo = addDays(today, 1);
+    } else {
+      windowFrom = body.from ?? cred.last_invoice_synced_date ?? fallbackStart;
+      windowTo = body.to ?? addDays(today, 1);
+    }
     if (windowTo <= windowFrom) windowTo = addDays(windowFrom, 1);
 
-    // Del i biter på maks 31 dager, maks 3 biter per kjøring.
+    // Del i biter på maks 31 dager, maks 3 biter per kjøring (alle biter ved etterhenting).
     const chunks: Array<{ from: string; to: string }> = [];
     let cursor = windowFrom;
-    while (cursor < windowTo && chunks.length < MAX_CHUNKS_PER_RUN) {
+    while (cursor < windowTo && (isBackfill || chunks.length < MAX_CHUNKS_PER_RUN)) {
       const next =
         daysBetween(cursor, windowTo) > MAX_CHUNK_DAYS ? addDays(cursor, MAX_CHUNK_DAYS) : windowTo;
       chunks.push({ from: cursor, to: next });
