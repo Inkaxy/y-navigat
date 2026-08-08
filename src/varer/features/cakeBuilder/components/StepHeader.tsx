@@ -28,7 +28,6 @@ export function StepHeader({
   isCalculating,
 }: StepHeaderProps) {
   const total = showVat ? totalIncMva : totalExMva;
-  const progress = totalSteps > 0 ? ((stepIndex + 1) / totalSteps) * 100 : 0;
 
   return (
     <div className="border-b border-line-subtle bg-surface-raised sticky top-0 z-20">
@@ -53,7 +52,7 @@ export function StepHeader({
             </div>
           )}
           <div className="flex items-center gap-2">
-            {isCalculating && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
+            {isCalculating && <Loader2 className="h-3.5 w-3.5 animate-spin text-ink-tertiary" />}
             <div className="text-right">
               <div className="text-[11px] uppercase tracking-[0.14em] text-ink-tertiary">Sum</div>
               <span className="font-display text-lg text-ink-primary tabular-nums">
