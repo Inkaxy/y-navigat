@@ -77,7 +77,12 @@ export default function RawMaterialDetail() {
           <TabsTrigger value="recipes" disabled>Brukt i oppskrifter</TabsTrigger>
           <TabsTrigger value="invoices" disabled>Fakturahistorikk</TabsTrigger>
         </TabsList>
-        <TabsContent value="overview" className="mt-5"><OverviewTab rm={rm} /></TabsContent>
+        <TabsContent value="overview" className="mt-5 space-y-5">
+          <OverviewTab rm={rm} />
+          <ResaleSettingsCard rm={rm} />
+          {rm.is_resale_item && <SellsAsSection rm={rm} />}
+        </TabsContent>
+
         {!rm.is_packaging && <TabsContent value="nutrition" className="mt-5"><NutritionTab rawMaterialId={rm.id} /></TabsContent>}
         <TabsContent value="suppliers" className="mt-5"><SuppliersTab rm={rm} /></TabsContent>
       </Tabs>
