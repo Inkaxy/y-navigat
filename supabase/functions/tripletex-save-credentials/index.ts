@@ -8,10 +8,13 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+type Mode = "standard" | "private" | "jwt";
+
 interface Body {
   legal_entity_id: string;
-  mode: "standard" | "private";
-  consumer_token?: string | null; // omit/null = keep existing; empty string = clear (only valid for private mode)
+  mode: Mode;
+  jwt_token?: string | null; // API-nøkkel (jwt-modus). Omit = behold eksisterende
+  consumer_token?: string | null; // omit/null = keep existing
   employee_token?: string | null;
   sync_enabled?: boolean;
   sync_frequency_minutes?: number;
@@ -48,6 +51,11 @@ Deno.serve(async (req) => {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+    if (!["standard", "private", "jwt"].includes(body.mode)) {
+      return new Response(JSON.stringify({ error: "Ugyldig modus" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
     const { data: hasAccess } = await userClient.rpc("has_ravarer_invoice_access", {
       _legal_entity_id: body.legal_entity_id, _required_level: "admin",
     });
@@ -59,30 +67,36 @@ Deno.serve(async (req) => {
 
     const { data: existing } = await admin
       .from("tripletex_credentials")
-      .select("legal_entity_id, consumer_token_encrypted, employee_token_encrypted")
+      .select("legal_entity_id, mode, consumer_token_encrypted, employee_token_encrypted")
       .eq("legal_entity_id", body.legal_entity_id)
       .maybeSingle();
 
-    const empPlain = body.employee_token?.trim();
+    // API-nøkkelen lagres i employee_token_encrypted (samme kolonne, jwt-modus).
+    const secretPlain = body.mode === "jwt"
+      ? body.jwt_token?.trim()
+      : body.employee_token?.trim();
     const conPlain = body.consumer_token?.trim();
+    const keepExistingSecret = existing?.mode === body.mode ? existing?.employee_token_encrypted : undefined;
 
-    if (!existing && !empPlain) {
-      return new Response(JSON.stringify({ error: "Employee token er påkrevd ved første oppsett" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    if (!secretPlain && !keepExistingSecret) {
+      return new Response(JSON.stringify({
+        error: body.mode === "jwt"
+          ? "API-nøkkel er påkrevd ved første oppsett"
+          : "Employee token er påkrevd ved første oppsett",
+      }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
-    if (!existing && body.mode === "standard" && !conPlain) {
+    if (body.mode === "standard" && !conPlain && !existing?.consumer_token_encrypted) {
       return new Response(JSON.stringify({ error: "Consumer token er påkrevd i standard-modus" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const employee_token_encrypted = empPlain
-      ? await encryptToken(empPlain)
-      : existing?.employee_token_encrypted;
-    const consumer_token_encrypted = body.mode === "private"
-      ? null
-      : (conPlain ? await encryptToken(conPlain) : existing?.consumer_token_encrypted);
+    const employee_token_encrypted = secretPlain
+      ? await encryptToken(secretPlain)
+      : keepExistingSecret;
+    const consumer_token_encrypted = body.mode === "standard"
+      ? (conPlain ? await encryptToken(conPlain) : existing?.consumer_token_encrypted)
+      : null;
 
     const payload: Record<string, unknown> = {
       legal_entity_id: body.legal_entity_id,
@@ -106,7 +120,8 @@ Deno.serve(async (req) => {
     });
   } catch (err) {
     console.error("tripletex-save-credentials", err);
-    return new Response(JSON.stringify({ error: "internal_error" }), {
+    const msg = err instanceof Error ? err.message : String(err);
+    return new Response(JSON.stringify({ error: msg }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }

@@ -3,7 +3,7 @@
 // - authHeader(token): "Basic base64('0:'+token)"
 // - baseUrl(): TRIPLETEX_BASE_URL env, default https://tripletex.no (test env: https://api-test.tripletex.tech)
 // - tripletexFetch(path, opts): retry with backoff on 429/5xx, throws TripletexError with parsed validation messages
-import { decryptToken, createSessionToken } from "./tripletex-crypto.ts";
+import { decryptToken, createSessionForMode } from "./tripletex-crypto.ts";
 
 export function baseUrl(): string {
   return (Deno.env.get("TRIPLETEX_BASE_URL") || "https://tripletex.no").replace(/\/+$/, "");
@@ -63,10 +63,10 @@ export async function getSessionToken(supabase: any, legalEntityId: string): Pro
     return row.session_token as string;
   }
   const employeeToken = await decryptToken(row.employee_token_encrypted);
-  const consumerToken = row.mode === "private"
-    ? employeeToken
-    : await decryptToken(row.consumer_token_encrypted);
-  const session = await createSessionToken(consumerToken, employeeToken);
+  const consumerToken = row.consumer_token_encrypted
+    ? await decryptToken(row.consumer_token_encrypted)
+    : undefined;
+  const session = await createSessionForMode(row.mode ?? "standard", consumerToken, employeeToken);
   const expiresAtIso = new Date(`${session.expirationDate}T23:59:59Z`).toISOString();
   await supabase
     .from("tripletex_credentials")
