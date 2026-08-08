@@ -21,12 +21,42 @@ const TABS: { value: ReviewReason; label: string }[] = [
   { value: "unmatched", label: "Umatchet" },
   { value: "low_confidence", label: "Lav tillit" },
   { value: "price_variance", label: "Prisavvik" },
+  { value: "price_increase", label: "Prisøkning" },
+  { value: "unknown_package_size", label: "Ukjent pakningsstørrelse" },
   { value: "sku_collision", label: "Konflikter" },
+  { value: "no_baseline", label: "Uten avtalepris" },
 ];
 
-function reasonOf(line: ReviewLineRow): ReviewReason {
-  const r = (line.review_reason ?? "").split(",")[0]?.trim() as ReviewReason;
-  return (TABS.find((t) => t.value === r)?.value ?? "unmatched");
+const REASON_LABELS: Record<string, string> = {
+  unmatched: "Umatchet",
+  low_confidence: "Lav tillit",
+  price_variance: "Prisavvik",
+  price_increase: "Prisøkning",
+  unknown_package_size: "Ukjent pakningsstørrelse",
+  sku_collision: "Konflikt",
+  no_baseline: "Uten avtalepris",
+};
+
+/** Alle årsakene på en linje — review_reason er kommaseparert. */
+function reasonsOf(line: ReviewLineRow): string[] {
+  return (line.review_reason ?? "")
+    .split(",")
+    .map((r) => r.trim())
+    .filter(Boolean);
+}
+
+/**
+ * Hører linjen hjemme under fanen? Vi sjekker om årsaken FINNES blant verdiene,
+ * ikke bare den første. «Uten avtalepris» er en egen arbeidsliste basert på
+ * variance_status for linjer som allerede er matchet.
+ */
+function matchesTab(line: ReviewLineRow, tab: ReviewReason): boolean {
+  if (tab === "no_baseline") return line.variance_status === "no_baseline" && !!line.raw_material_id;
+  const reasons = reasonsOf(line);
+  if (reasons.includes(tab)) return true;
+  // Linjer uten kjent årsak vises under «Umatchet» slik at ingenting forsvinner.
+  if (tab === "unmatched" && line.requires_review && reasons.every((r) => !TABS.some((t) => t.value === r))) return true;
+  return false;
 }
 
 export default function FakturaerReviewQueuePage() {
@@ -46,12 +76,12 @@ export default function FakturaerReviewQueuePage() {
   const totalCount = reviewData?.totalCount ?? lines.length;
 
   const counts = useMemo(() => {
-    const c: Record<ReviewReason, number> = { unmatched: 0, low_confidence: 0, price_variance: 0, sku_collision: 0 };
-    lines.forEach((l) => { c[reasonOf(l)] = (c[reasonOf(l)] ?? 0) + 1; });
+    const c = {} as Record<ReviewReason, number>;
+    TABS.forEach((t) => { c[t.value] = lines.filter((l) => matchesTab(l, t.value)).length; });
     return c;
   }, [lines]);
 
-  const filteredLines = useMemo(() => lines.filter((l) => reasonOf(l) === tab), [lines, tab]);
+  const filteredLines = useMemo(() => lines.filter((l) => matchesTab(l, tab)), [lines, tab]);
 
   // Action dialogs
   const [activeLine, setActiveLine] = useState<ReviewLineRow | null>(null);
@@ -146,11 +176,13 @@ function ReviewTable({ lines, reason, onAction, onOpenInvoice }: {
             <th className="px-3 py-3">Leverandør</th>
             <th className="px-3 py-3">SKU</th>
             <th className="px-3 py-3">Beskrivelse</th>
+            <th className="px-3 py-3">Årsaker</th>
             <th className="px-3 py-3 text-right">Antall</th>
             <th className="px-3 py-3 text-right">Pris/enhet</th>
             <th className="px-3 py-3 text-right">Sum</th>
             {reason === "low_confidence" && <th className="px-3 py-3">Forslag</th>}
-            {reason === "price_variance" && <th className="px-3 py-3 text-right">Avvik</th>}
+            {(reason === "price_variance" || reason === "price_increase") && <th className="px-3 py-3 text-right">Avvik</th>}
+            {reason === "no_baseline" && <th className="px-3 py-3">Råvare</th>}
             {reason === "sku_collision" && <th className="px-3 py-3">Tidligere</th>}
             <th className="px-3 py-3 text-right">Handlinger</th>
           </tr>
@@ -181,6 +213,24 @@ function ReviewTable({ lines, reason, onAction, onOpenInvoice }: {
                     </Tooltip>
                   </TooltipProvider>
                 </td>
+                <td className="px-3 py-3">
+                  <div className="flex flex-wrap gap-1">
+                    {reasonsOf(l).length === 0 ? (
+                      <span className="text-xs text-ink-secondary">—</span>
+                    ) : (
+                      reasonsOf(l).map((r) => (
+                        <Badge key={r} variant="outline" className="text-[10px]">
+                          {REASON_LABELS[r] ?? r}
+                        </Badge>
+                      ))
+                    )}
+                    {l.variance_status === "no_baseline" && l.raw_material_id && (
+                      <Badge variant="outline" className="border-warning/40 bg-warning/10 text-[10px] text-warning">
+                        Uten avtalepris
+                      </Badge>
+                    )}
+                  </div>
+                </td>
                 <td className="px-3 py-3 text-right tabular-nums">{l.quantity ?? "—"} {l.unit ?? ""}</td>
                 <td className="px-3 py-3 text-right tabular-nums">{formatNok(l.unit_price)}</td>
                 <td className="px-3 py-3 text-right tabular-nums">{formatNok(l.total_amount)}</td>
@@ -194,7 +244,10 @@ function ReviewTable({ lines, reason, onAction, onOpenInvoice }: {
                     ) : <span className="text-ink-secondary">—</span>}
                   </td>
                 )}
-                {reason === "price_variance" && (
+                {reason === "no_baseline" && (
+                  <td className="px-3 py-3">{l.matched_raw_material?.name ?? "—"}</td>
+                )}
+                {(reason === "price_variance" || reason === "price_increase") && (
                   <td className={`px-3 py-3 text-right tabular-nums font-medium ${varColor}`}>
                     {variance > 0 ? "+" : ""}{variance.toFixed(1)}%
                   </td>

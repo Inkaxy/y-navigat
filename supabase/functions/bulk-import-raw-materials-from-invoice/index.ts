@@ -25,8 +25,10 @@ interface ItemInput {
   base_unit: string;
   package_size?: number | null;
   package_unit?: string | null;
+  /** Pris per pakke fra fakturaen. */
   agreed_price?: number | null;
-  agreed_price_per_base_unit?: number | null;
+  /** Pris per baseenhet regnet ut fra fakturalinjen. Ikke en framforhandlet avtalepris. */
+  price_per_base_unit?: number | null;
   set_primary?: boolean;
   supplier_sku?: string | null;
   supplier_product_name?: string | null;
@@ -91,7 +93,9 @@ Deno.serve(async (req) => {
         }
 
         // Insert raw_material
-        const cost = item.agreed_price_per_base_unit ?? null;
+        // Pris fra fakturaen brukes som kostpris og siste fakturapris —
+        // agreed_price_per_base_unit er forbeholdt framforhandlede priser og røres ikke.
+        const cost = item.price_per_base_unit ?? null;
         const { data: rm, error: rmErr } = await admin
           .from("raw_materials")
           .insert({
@@ -124,7 +128,6 @@ Deno.serve(async (req) => {
             package_size: item.package_size ?? null,
             package_unit: item.package_unit ?? null,
             agreed_price: item.agreed_price ?? null,
-            agreed_price_per_base_unit: cost,
             is_primary: item.set_primary !== false,
             last_invoice_price: cost,
             last_invoice_date: invoice.invoice_date,
@@ -178,7 +181,9 @@ Deno.serve(async (req) => {
           .update({
             raw_material_id: rm.id,
             match_confidence: "manual",
-            requires_review: false,
+            // Bare linjer der prisen faktisk ble beregnet er ferdigbehandlet.
+            requires_review: cost == null,
+            review_reason: cost == null ? "unknown_package_size" : null,
             resolved_at: new Date().toISOString(),
             resolved_by: user.id,
           })

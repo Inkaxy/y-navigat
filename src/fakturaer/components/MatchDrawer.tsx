@@ -7,10 +7,12 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, ExternalLink, Search } from "lucide-react";
 import { toast } from "sonner";
 import { formatNok, formatDate } from "@/fakturaer/lib/constants";
 import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
+import { isBaseUnit, normalizeUnit, parsePackageFromDescription, quantityToBase } from "@/fakturaer/lib/units";
 
 interface Props {
   open: boolean;
@@ -36,6 +38,9 @@ export function MatchDrawer({ open, onOpenChange, line }: Props) {
   const [rememberName, setRememberName] = useState(true);
   const [setAsPrimary, setSetAsPrimary] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [agreedPrice, setAgreedPrice] = useState("");
+  const [packageSize, setPackageSize] = useState("");
+  const [packageUnit, setPackageUnit] = useState("");
 
   useEffect(() => {
     if (!open) return;
@@ -44,6 +49,11 @@ export function MatchDrawer({ open, onOpenChange, line }: Props) {
     setRememberSku(!!line?.supplier_sku);
     setRememberName(!!line?.description && line?.description !== line?.supplier_sku);
     setSetAsPrimary(false);
+    setAgreedPrice("");
+    // Forhåndsutfyll pakning fra linjens lagrede felter, ellers fra beskrivelsen.
+    const pkg = derivePackage(line);
+    setPackageSize(pkg ? String(pkg.size) : "");
+    setPackageUnit(pkg?.unit ?? "");
   }, [open, line?.id]);
 
   const legalEntityId = line?.invoice.legal_entity_id;
@@ -94,7 +104,33 @@ export function MatchDrawer({ open, onOpenChange, line }: Props) {
   const linkExists = useMemo(() => existingRms?.find((r: any) => r.supplier_id === supplierId), [existingRms, supplierId]);
   const anyPrimary = useMemo(() => existingRms?.some((r: any) => r.is_primary), [existingRms]);
 
+  // Når koblingen finnes fra før: forhåndsutfyll avtaleprisen slik at brukeren ser den.
+  useEffect(() => {
+    const existing = linkExists as any;
+    if (existing?.agreed_price_per_base_unit != null) setAgreedPrice(String(existing.agreed_price_per_base_unit));
+  }, [linkExists]);
+
   const suggestions = line?.suggestions ?? [];
+
+  /** Pris per baseenhet regnet ut fra denne fakturalinjen — kun til sammenligning. */
+  const linePricePerBaseUnit = useMemo(() => {
+    const baseUnit = selectedRm?.base_unit;
+    if (!line || !baseUnit || line.unit_price == null) return null;
+    const conv = quantityToBase({
+      quantity: 1,
+      unit: line.unit,
+      description: line.description,
+      baseUnit,
+      rmsPackageSize: packageSize ? Number(packageSize.replace(",", ".")) : null,
+      rmsPackageUnit: packageUnit || null,
+      linePackageSize: line.package_size,
+      linePackageUnit: line.package_unit,
+      lineCountPerPackage: line.count_per_package,
+    });
+    if (!conv?.factor || conv.factor <= 0) return null;
+    const p = Number(line.unit_price) / conv.factor;
+    return Number.isFinite(p) ? p : null;
+  }, [line, selectedRm?.base_unit, packageSize, packageUnit]);
 
   async function performMatch(applyToAll: boolean) {
     if (!line || !selectedRmId) return;
@@ -102,6 +138,10 @@ export function MatchDrawer({ open, onOpenChange, line }: Props) {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Ikke innlogget");
+
+      const pkgSize = packageSize.trim() ? Number(packageSize.replace(",", ".")) : null;
+      const pkgUnit = packageUnit.trim() || null;
+      const agreed = agreedPrice.trim() ? Number(agreedPrice.replace(",", ".")) : null;
 
       // 1) Ensure raw_material_suppliers link
       let rmsRow = linkExists as any;
@@ -111,10 +151,26 @@ export function MatchDrawer({ open, onOpenChange, line }: Props) {
           supplier_id: supplierId!,
           supplier_sku: line.supplier_sku,
           supplier_product_name: line.description,
+          package_size: pkgSize,
+          package_unit: pkgUnit,
+          // Avtaleprisen skrives KUN når brukeren faktisk har fylt den ut.
+          ...(agreed != null && Number.isFinite(agreed) ? { agreed_price_per_base_unit: agreed } : {}),
           is_primary: setAsPrimary && !anyPrimary ? true : false,
         }).select().single();
         if (error) throw error;
         rmsRow = ins;
+      } else {
+        const upd: {
+          package_size?: number;
+          package_unit?: string;
+          agreed_price_per_base_unit?: number;
+        } = {};
+        if (pkgSize != null) upd.package_size = pkgSize;
+        if (pkgUnit) upd.package_unit = pkgUnit;
+        if (agreed != null && Number.isFinite(agreed)) upd.agreed_price_per_base_unit = agreed;
+        if (Object.keys(upd).length > 0) {
+          await supabase.from("raw_material_suppliers").update(upd).eq("id", rmsRow.id);
+        }
       }
 
       if (setAsPrimary && !anyPrimary) {
@@ -178,8 +234,13 @@ export function MatchDrawer({ open, onOpenChange, line }: Props) {
           .eq("invoice_id", line.invoice_id);
         (sib ?? []).forEach((s: any) => {
           if (s.id === line.id) return;
-          if ((line.supplier_sku && s.supplier_sku === line.supplier_sku) ||
-              (line.description && s.description === line.description)) lineIds.push(s.id);
+          // Krev lik SKU når begge linjene har SKU. Beskrivelse alene er bare trygt
+          // når SKU mangler — ellers blir to ulike varer matchet til samme råvare.
+          const bothHaveSku = !!line.supplier_sku && !!s.supplier_sku;
+          const same = bothHaveSku
+            ? s.supplier_sku === line.supplier_sku
+            : !line.supplier_sku && !s.supplier_sku && !!line.description && s.description === line.description;
+          if (same) lineIds.push(s.id);
         });
       }
       await supabase.from("invoice_lines")
@@ -292,6 +353,43 @@ export function MatchDrawer({ open, onOpenChange, line }: Props) {
                     <div className="text-warning">⚠️ Ny leverandørkobling vil opprettes</div>
                   )}
                 </div>
+                <div className="mt-4 space-y-3 rounded-md border border-line-subtle bg-muted/20 p-3">
+                  <div>
+                    <Label className="text-xs">
+                      Avtalepris pr {selectedRm.base_unit ?? "baseenhet"} hos denne leverandøren
+                    </Label>
+                    <Input
+                      className="mt-1 h-8"
+                      value={agreedPrice}
+                      onChange={(e) => setAgreedPrice(e.target.value)}
+                      placeholder="tom = ingen avtale registrert"
+                    />
+                    <p className="mt-1 text-xs text-ink-secondary">tom = ingen avtale registrert</p>
+                  </div>
+                  <div className="text-xs text-ink-secondary">
+                    Pris pr {selectedRm.base_unit ?? "baseenhet"} fra denne fakturalinjen:{" "}
+                    <span className="font-medium text-ink">
+                      {linePricePerBaseUnit != null ? formatNok(linePricePerBaseUnit) : "kunne ikke beregnes"}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label className="text-xs">Pakningsstørrelse</Label>
+                      <Input className="mt-1 h-8" value={packageSize} onChange={(e) => setPackageSize(e.target.value)} />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Pakningsenhet</Label>
+                      <Select value={packageUnit} onValueChange={setPackageUnit}>
+                        <SelectTrigger className="mt-1 h-8"><SelectValue placeholder="Velg" /></SelectTrigger>
+                        <SelectContent>
+                          {["g", "kg", "ml", "cl", "dl", "l", "stk"].map((u) => (
+                            <SelectItem key={u} value={u}>{u}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
                 <div className="mt-3 space-y-2 text-sm">
                   <label className="flex items-start gap-2">
                     <Checkbox checked={rememberSku} onCheckedChange={(v) => setRememberSku(!!v)} disabled={!line.supplier_sku} />
@@ -325,6 +423,21 @@ export function MatchDrawer({ open, onOpenChange, line }: Props) {
       </SheetContent>
     </Sheet>
   );
+}
+
+/** Pakning fra linjens lagrede felter, ellers tolket fra beskrivelsen. */
+function derivePackage(line: ReviewLineRow | null): { size: number; unit: string } | null {
+  if (!line) return null;
+  const ps = line.package_size;
+  const pu = line.package_unit;
+  if (ps && pu && isBaseUnit(normalizeUnit(pu))) {
+    const cnt = Number(line.count_per_package);
+    const mult = Number.isFinite(cnt) && cnt > 0 ? cnt : 1;
+    return { size: Number(ps) * mult, unit: normalizeUnit(pu)! };
+  }
+  const parsed = parsePackageFromDescription(line.description);
+  if (parsed) return { size: parsed.size * (parsed.count || 1), unit: parsed.unit };
+  return null;
 }
 
 function KV({ k, v, mono }: { k: string; v: string; mono?: boolean }) {

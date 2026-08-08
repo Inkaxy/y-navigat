@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -8,8 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Sparkles } from "lucide-react";
+import { Loader2, Sparkles, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
+import { isBaseUnit, normalizeUnit, parsePackageFromDescription, quantityToBase } from "@/fakturaer/lib/units";
 
 export interface BulkLine {
   id: string;
@@ -19,6 +19,9 @@ export interface BulkLine {
   unit: string | null;
   unit_price: number | null;
   total_amount: number | null;
+  package_size?: number | null;
+  package_unit?: string | null;
+  count_per_package?: number | null;
 }
 
 interface Suggestion {
@@ -38,6 +41,8 @@ interface RowState {
   package_size: string;
   package_unit: string;
   price_per_base_unit: string;
+  /** Hvor pakningsinformasjonen kom fra, for å forklare verdien i grensesnittet. */
+  package_source: "line" | "description" | null;
   set_primary: boolean;
   ai_sku: boolean;
   ai_category: boolean;
@@ -60,24 +65,68 @@ interface Props {
   onComplete?: () => void;
 }
 
+function num(v: string): number | null {
+  if (!v?.trim()) return null;
+  const n = Number(v.replace(",", "."));
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Finn total pakningsstørrelse for en linje.
+ * Prioritet: lagrede felter på linjen (package_size × count_per_package),
+ * deretter tolkning av beskrivelsen. Enheten skal alltid være en BASEENHET.
+ */
+function derivePackage(l: BulkLine): { size: number; unit: string; source: "line" | "description" } | null {
+  if (l.package_size && l.package_unit && isBaseUnit(normalizeUnit(l.package_unit))) {
+    const count = Number(l.count_per_package);
+    const mult = Number.isFinite(count) && count > 0 ? count : 1;
+    return { size: Number(l.package_size) * mult, unit: normalizeUnit(l.package_unit)!, source: "line" };
+  }
+  const parsed = parsePackageFromDescription(l.description);
+  if (parsed) return { size: parsed.size * (parsed.count || 1), unit: parsed.unit, source: "description" };
+  return null;
+}
+
+/** Pris per baseenhet for linjen, eller null hvis den ikke kan regnes ut. */
+function derivePricePerBaseUnit(l: BulkLine, baseUnit: string, pkgSize: number | null, pkgUnit: string | null): number | null {
+  if (!baseUnit || l.unit_price == null || !Number.isFinite(Number(l.unit_price))) return null;
+  const conv = quantityToBase({
+    quantity: 1,
+    unit: l.unit,
+    description: l.description,
+    baseUnit,
+    rmsPackageSize: pkgSize,
+    rmsPackageUnit: pkgUnit,
+    linePackageSize: l.package_size ?? null,
+    linePackageUnit: l.package_unit ?? null,
+    lineCountPerPackage: l.count_per_package ?? null,
+  });
+  if (!conv || !conv.factor || !Number.isFinite(conv.factor) || conv.factor <= 0) return null;
+  const price = Number(l.unit_price) / conv.factor;
+  return Number.isFinite(price) ? Number(price.toFixed(4)) : null;
+}
+
 export function BulkImportRawMaterialsDrawer({ open, onOpenChange, invoiceId, legalEntityId, lines, onComplete }: Props) {
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [rows, setRows] = useState<Record<string, RowState>>({});
+  const [skipped, setSkipped] = useState<Array<{ line_id: string; reason: string }>>([]);
 
   useEffect(() => {
     if (!open) return;
     const init: Record<string, RowState> = {};
     for (const l of lines) {
-      const ppbu = l.quantity && l.unit_price ? (l.unit_price).toString() : "";
+      const pkg = derivePackage(l);
       init[l.id] = {
         selected: true,
         name: l.description ?? "",
         sku: l.supplier_sku ?? "",
         category: "",
         base_unit: "",
-        package_size: l.quantity ? String(l.quantity) : "",
-        package_unit: l.unit ?? "",
-        price_per_base_unit: ppbu,
+        package_size: pkg ? String(pkg.size) : "",
+        package_unit: pkg?.unit ?? "",
+        // Pris per baseenhet kan først regnes ut når baseenhet er valgt (AI-forslag eller manuelt).
+        price_per_base_unit: "",
+        package_source: pkg?.source ?? null,
         set_primary: true,
         ai_sku: false,
         ai_category: false,
@@ -85,6 +134,7 @@ export function BulkImportRawMaterialsDrawer({ open, onOpenChange, invoiceId, le
       };
     }
     setRows(init);
+    setSkipped([]);
     void fetchSuggestions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, invoiceId]);
@@ -118,12 +168,12 @@ export function BulkImportRawMaterialsDrawer({ open, onOpenChange, invoiceId, le
           if (!r.sku && s.sku) { r.sku = s.sku; r.ai_sku = true; }
           if (!r.category) { r.category = cat; r.ai_category = !lowConf && !!s.category; }
           if (!r.base_unit && s.base_unit) { r.base_unit = s.base_unit; r.ai_base_unit = true; }
-          // Beregn pris pr base unit fra pakningsstr (heuristikk)
+
+          // Regn ut pris per baseenhet — aldri gjett. Klarer vi det ikke, lar vi feltet stå tomt.
           const line = lines.find((l) => l.id === s.line_id);
-          if (line && line.quantity && line.unit_price && s.base_unit) {
-            // unit_price er pris pr enhet på fakturalinja; antar at base unit er samme som unit
-            // Hvis ikke, bruker vi unit_price direkte
-            r.price_per_base_unit = String(line.unit_price);
+          if (line && r.base_unit && !r.price_per_base_unit) {
+            const ppbu = derivePricePerBaseUnit(line, r.base_unit, num(r.package_size), r.package_unit || null);
+            r.price_per_base_unit = ppbu != null ? String(ppbu) : "";
           }
         }
         return next;
@@ -136,7 +186,24 @@ export function BulkImportRawMaterialsDrawer({ open, onOpenChange, invoiceId, le
   }
 
   function patch(lineId: string, p: Partial<RowState>) {
-    setRows((prev) => ({ ...prev, [lineId]: { ...prev[lineId], ...p } }));
+    setRows((prev) => {
+      const cur = prev[lineId];
+      const merged = { ...cur, ...p };
+      // Regn prisen på nytt når enhet eller pakning endres, men aldri over en verdi
+      // brukeren selv har skrevet inn.
+      const priceTouched = Object.prototype.hasOwnProperty.call(p, "price_per_base_unit");
+      const recalcTrigger = ["base_unit", "package_size", "package_unit"].some((k) =>
+        Object.prototype.hasOwnProperty.call(p, k),
+      );
+      if (!priceTouched && recalcTrigger) {
+        const line = lines.find((l) => l.id === lineId);
+        if (line && merged.base_unit) {
+          const ppbu = derivePricePerBaseUnit(line, merged.base_unit, num(merged.package_size), merged.package_unit || null);
+          merged.price_per_base_unit = ppbu != null ? String(ppbu) : "";
+        }
+      }
+      return { ...prev, [lineId]: merged };
+    });
   }
 
   function applyToAll(field: "category" | "base_unit", value: string) {
@@ -144,12 +211,24 @@ export function BulkImportRawMaterialsDrawer({ open, onOpenChange, invoiceId, le
       const next = { ...prev };
       for (const id of Object.keys(next)) {
         next[id] = { ...next[id], [field]: value, ...(field === "category" ? { ai_category: false } : { ai_base_unit: false }) };
+        if (field === "base_unit") {
+          const line = lines.find((l) => l.id === id);
+          if (line) {
+            const r = next[id];
+            const ppbu = derivePricePerBaseUnit(line, value, num(r.package_size), r.package_unit || null);
+            next[id] = { ...r, price_per_base_unit: ppbu != null ? String(ppbu) : "" };
+          }
+        }
       }
       return next;
     });
   }
 
   const selectedCount = useMemo(() => Object.values(rows).filter((r) => r.selected).length, [rows]);
+  const missingPriceCount = useMemo(
+    () => Object.values(rows).filter((r) => r.selected && !r.price_per_base_unit.trim()).length,
+    [rows],
+  );
 
   const importMutation = useMutation({
     mutationFn: async (onlySelected: boolean) => {
@@ -157,16 +236,21 @@ export function BulkImportRawMaterialsDrawer({ open, onOpenChange, invoiceId, le
         .filter((l) => (onlySelected ? rows[l.id]?.selected : true))
         .map((l) => {
           const r = rows[l.id];
+          const pkgSize = num(r.package_size);
+          const ppbu = num(r.price_per_base_unit);
+          // Avtalepris på leverandørkoblingen = pris per PAKKE, ikke linjens totalbeløp.
+          const pricePerPackage = ppbu != null && pkgSize != null ? Number((ppbu * pkgSize).toFixed(4)) : l.unit_price ?? null;
           return {
             line_id: l.id,
             name: r.name.trim(),
             sku: r.sku.trim(),
             category: r.category || FALLBACK_CATEGORY,
             base_unit: r.base_unit,
-            package_size: r.package_size ? parseFloat(r.package_size.replace(",", ".")) : null,
+            package_size: pkgSize,
             package_unit: r.package_unit || null,
-            agreed_price: l.unit_price && r.package_size ? parseFloat(r.package_size.replace(",", ".")) * l.unit_price : l.unit_price ?? null,
-            agreed_price_per_base_unit: r.price_per_base_unit ? parseFloat(r.price_per_base_unit.replace(",", ".")) : null,
+            agreed_price: pricePerPackage,
+            /** Pris per baseenhet fra denne fakturaen — IKKE en framforhandlet avtalepris. */
+            price_per_base_unit: ppbu,
             set_primary: r.set_primary,
             supplier_sku: l.supplier_sku,
             supplier_product_name: l.description,
@@ -176,23 +260,31 @@ export function BulkImportRawMaterialsDrawer({ open, onOpenChange, invoiceId, le
         body: { invoice_id: invoiceId, items },
       });
       if (error) throw error;
-      return data as { created: any[]; skipped: any[] };
+      return data as { created: any[]; skipped: Array<{ line_id: string; reason: string }> };
     },
     onSuccess: (res) => {
       const created = res.created?.length ?? 0;
-      const skipped = res.skipped?.length ?? 0;
+      const skippedRows = res.skipped ?? [];
       if (created > 0) {
         toast.success(`${created} nye råvarer opprettet og koblet til fakturaen. Husk å fylle inn næringsinnhold senere.`, {
           action: { label: "Vis", onClick: () => window.location.assign("/ravarer/vareliste") },
         });
       }
-      if (skipped > 0) toast.warning(`${skipped} linjer ble hoppet over (se konsoll).`);
-      console.log("bulk-import skipped:", res.skipped);
+      setSkipped(skippedRows);
+      if (skippedRows.length > 0) {
+        toast.warning(`${skippedRows.length} linjer ble hoppet over — se årsakene i skuffen.`);
+      }
       onComplete?.();
-      onOpenChange(false);
+      if (skippedRows.length === 0) onOpenChange(false);
     },
     onError: (e: any) => toast.error(`Import feilet: ${e.message ?? e}`),
   });
+
+  const skippedByLine = useMemo(() => {
+    const m: Record<string, string> = {};
+    skipped.forEach((s) => { m[s.line_id] = s.reason; });
+    return m;
+  }, [skipped]);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -214,6 +306,31 @@ export function BulkImportRawMaterialsDrawer({ open, onOpenChange, invoiceId, le
 
         {!loadingSuggestions && (
           <>
+            {skipped.length > 0 && (
+              <div className="my-4 rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm">
+                <div className="mb-1 flex items-center gap-1.5 font-medium text-warning">
+                  <AlertTriangle className="h-4 w-4" /> {skipped.length} linjer ble hoppet over
+                </div>
+                <ul className="space-y-1 text-xs text-ink-secondary">
+                  {skipped.map((s) => {
+                    const line = lines.find((l) => l.id === s.line_id);
+                    return (
+                      <li key={s.line_id}>
+                        <span className="font-medium">{line?.description ?? s.line_id}</span> — {s.reason}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+
+            {missingPriceCount > 0 && (
+              <div className="my-4 rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm text-warning">
+                {missingPriceCount} av de valgte linjene mangler pris per baseenhet. De importeres uten pris og blir
+                liggende til gjennomgang.
+              </div>
+            )}
+
             <div className="my-4 flex flex-wrap items-center gap-3 border-b border-line-subtle pb-4">
               <div className="flex items-center gap-2">
                 <Label className="text-xs text-ink-secondary">Kategori for alle:</Label>
@@ -242,16 +359,29 @@ export function BulkImportRawMaterialsDrawer({ open, onOpenChange, invoiceId, le
               {lines.map((l) => {
                 const r = rows[l.id];
                 if (!r) return null;
+                const noPrice = !r.price_per_base_unit.trim();
                 return (
-                  <div key={l.id} className="rounded-lg border border-line-subtle p-3">
+                  <div
+                    key={l.id}
+                    className={`rounded-lg border p-3 ${noPrice ? "border-warning/50 bg-warning/5" : "border-line-subtle"}`}
+                  >
                     <div className="mb-2 flex items-start gap-2">
                       <Checkbox checked={r.selected} onCheckedChange={(c) => patch(l.id, { selected: !!c })} className="mt-1" />
                       <div className="flex-1 text-xs text-ink-secondary">
                         <div className="font-mono">{l.supplier_sku ?? "—"}</div>
                         <div>{l.description}</div>
                         <div>Antall: {l.quantity} {l.unit} · Pris: {l.unit_price}</div>
+                        {skippedByLine[l.id] && (
+                          <div className="mt-1 font-medium text-warning">Hoppet over: {skippedByLine[l.id]}</div>
+                        )}
                       </div>
                     </div>
+                    {noPrice && (
+                      <div className="mb-2 flex items-center gap-1.5 rounded border border-warning/40 bg-warning/10 px-2 py-1 text-xs font-medium text-warning">
+                        <AlertTriangle className="h-3.5 w-3.5" />
+                        Pris per baseenhet kunne ikke beregnes — fyll inn manuelt
+                      </div>
+                    )}
                     <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                       <div className="col-span-2">
                         <Label className="text-xs">Navn</Label>
@@ -289,16 +419,33 @@ export function BulkImportRawMaterialsDrawer({ open, onOpenChange, invoiceId, le
                         </Select>
                       </div>
                       <div>
-                        <Label className="text-xs">Pakn.str</Label>
+                        <Label className="text-xs">
+                          Pakn.str
+                          {r.package_source === "description" && (
+                            <span className="ml-1 text-[10px] text-ink-secondary">(fra beskrivelse)</span>
+                          )}
+                        </Label>
                         <Input className="h-8" value={r.package_size} onChange={(e) => patch(l.id, { package_size: e.target.value })} />
                       </div>
                       <div>
-                        <Label className="text-xs">Pakn.enhet</Label>
-                        <Input className="h-8" value={r.package_unit} onChange={(e) => patch(l.id, { package_unit: e.target.value })} />
+                        <Label className="text-xs">Pakn.enhet (baseenhet)</Label>
+                        <Select value={r.package_unit} onValueChange={(v) => patch(l.id, { package_unit: v })}>
+                          <SelectTrigger className="h-8"><SelectValue placeholder="Velg" /></SelectTrigger>
+                          <SelectContent>
+                            {["g", "kg", "ml", "cl", "dl", "l", "stk"].map((u) => (
+                              <SelectItem key={u} value={u}>{u}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                       <div className="col-span-2">
-                        <Label className="text-xs">Pris pr {r.base_unit || "base unit"}</Label>
-                        <Input className="h-8" value={r.price_per_base_unit} onChange={(e) => patch(l.id, { price_per_base_unit: e.target.value })} />
+                        <Label className="text-xs">Pris pr {r.base_unit || "baseenhet"}</Label>
+                        <Input
+                          className={`h-8 ${noPrice ? "border-warning" : ""}`}
+                          value={r.price_per_base_unit}
+                          placeholder="Kunne ikke beregnes"
+                          onChange={(e) => patch(l.id, { price_per_base_unit: e.target.value })}
+                        />
                       </div>
                       <div className="col-span-2 flex items-center gap-2">
                         <Checkbox checked={r.set_primary} onCheckedChange={(c) => patch(l.id, { set_primary: !!c })} />
@@ -313,7 +460,7 @@ export function BulkImportRawMaterialsDrawer({ open, onOpenChange, invoiceId, le
         )}
 
         <SheetFooter className="mt-6 flex-row justify-end gap-2">
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={importMutation.isPending}>Avbryt</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={importMutation.isPending}>Lukk</Button>
           <Button variant="outline" onClick={() => importMutation.mutate(true)} disabled={importMutation.isPending || selectedCount === 0}>
             Importer kun valgte ({selectedCount})
           </Button>
