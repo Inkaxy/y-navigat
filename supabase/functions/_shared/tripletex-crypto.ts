@@ -41,6 +41,36 @@ export async function decryptToken(payload: string): Promise<string> {
   return new TextDecoder().decode(plain);
 }
 
+function sessionBaseUrl(): string {
+  return (Deno.env.get("TRIPLETEX_BASE_URL") || "https://tripletex.no").replace(/\/+$/, "");
+}
+
+async function requestSession(
+  consumerToken: string | undefined,
+  employeeToken: string,
+  exp: string,
+): Promise<{ ok: boolean; status: number; text: string; token?: string; expirationDate?: string }> {
+  const url = new URL(sessionBaseUrl() + "/v2/token/session/:create");
+  if (consumerToken) url.searchParams.set("consumerToken", consumerToken);
+  url.searchParams.set("employeeToken", employeeToken);
+  url.searchParams.set("expirationDate", exp);
+  const res = await fetch(url.toString(), { method: "PUT" });
+  const text = await res.text();
+  if (!res.ok) return { ok: false, status: res.status, text };
+  try {
+    const parsed = JSON.parse(text);
+    return {
+      ok: true,
+      status: res.status,
+      text,
+      token: parsed?.value?.token,
+      expirationDate: parsed?.value?.expirationDate ?? exp,
+    };
+  } catch {
+    return { ok: false, status: res.status, text: `Invalid Tripletex response: ${text}` };
+  }
+}
+
 /** Calls Tripletex /v2/token/session/:create to validate and return a session token. */
 export async function createSessionToken(
   consumerToken: string,
@@ -48,19 +78,37 @@ export async function createSessionToken(
   expirationDate?: string,
 ): Promise<{ token: string; expirationDate: string }> {
   const exp = expirationDate ?? new Date(Date.now() + 23 * 60 * 60 * 1000).toISOString().slice(0, 10);
-  const url = new URL("https://tripletex.no/v2/token/session/:create");
-  url.searchParams.set("consumerToken", consumerToken);
-  url.searchParams.set("employeeToken", employeeToken);
-  url.searchParams.set("expirationDate", exp);
-  const res = await fetch(url.toString(), { method: "PUT" });
-  const text = await res.text();
-  if (!res.ok) throw new Error(`Tripletex auth failed (${res.status}): ${text}`);
-  let parsed: any;
-  try { parsed = JSON.parse(text); } catch { throw new Error(`Invalid Tripletex response: ${text}`); }
-  const token = parsed?.value?.token;
-  const expirationDateOut = parsed?.value?.expirationDate ?? exp;
-  if (!token) throw new Error("Tripletex returned no session token");
-  return { token, expirationDate: expirationDateOut };
+  const r = await requestSession(consumerToken, employeeToken, exp);
+  if (!r.ok) throw new Error(`Tripletex auth failed (${r.status}): ${r.text}`);
+  if (!r.token) throw new Error("Tripletex returned no session token");
+  return { token: r.token, expirationDate: r.expirationDate! };
+}
+
+/**
+ * JWT/API-nøkkel-modus: én nøkkel per selskap (Selskap → API-tokens).
+ * Tripletex tar imot nøkkelen som employeeToken uten consumerToken;
+ * enkelte kontoer krever samme nøkkel i begge felt, derfor fallback.
+ */
+export async function createSessionTokenFromApiKey(
+  apiKey: string,
+  expirationDate?: string,
+): Promise<{ token: string; expirationDate: string }> {
+  const exp = expirationDate ?? new Date(Date.now() + 23 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  let r = await requestSession(undefined, apiKey, exp);
+  if (!r.ok) r = await requestSession(apiKey, apiKey, exp);
+  if (!r.ok) throw new Error(`Tripletex auth failed (${r.status}): ${r.text}`);
+  if (!r.token) throw new Error("Tripletex returned no session token");
+  return { token: r.token, expirationDate: r.expirationDate! };
+}
+
+/** Velger riktig innloggingsmåte ut fra lagret modus. */
+export async function createSessionForMode(
+  mode: string,
+  consumerToken: string | undefined,
+  employeeToken: string,
+): Promise<{ token: string; expirationDate: string }> {
+  if (mode === "jwt") return createSessionTokenFromApiKey(employeeToken);
+  return createSessionToken(mode === "private" ? employeeToken : consumerToken!, employeeToken);
 }
 
 export function basicAuthHeader(sessionToken: string): string {
