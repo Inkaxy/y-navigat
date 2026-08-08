@@ -108,6 +108,7 @@ export default function InvoiceDetailPage() {
         price_variance_pct: matchLineRaw.price_variance_pct,
         variance_status: matchLineRaw.variance_status,
         review_reason: matchLineRaw.review_reason,
+        requires_review: matchLineRaw.requires_review ?? null,
         invoice: {
           id: data.id,
           invoice_number: data.invoice_number,
