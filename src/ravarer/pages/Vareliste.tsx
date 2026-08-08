@@ -25,6 +25,8 @@ export default function VarelistePage() {
   const [q, setQ] = useState("");
   const [cat, setCat] = useState("all");
   const [active, setActive] = useState("active");
+  const [kind, setKind] = useState("all");
+
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
