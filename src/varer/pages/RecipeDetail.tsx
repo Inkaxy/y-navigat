@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, FileText, Loader2, Lock, Plus, Printer, Save } from "lucide-react";
+import { ArrowLeft, FileText, Loader2, Lock, Plus, Printer, Save, Share2 } from "lucide-react";
 import { logAudit } from "@/varer/lib/audit";
 import { RecipeProductLinks } from "@/varer/components/products/RecipeProductLinks";
 import { RecipeStatsBar } from "@/varer/components/recipes/RecipeStatsBar";
@@ -21,6 +21,7 @@ import { RecipeStepsEditor, type EditorStep } from "@/varer/components/recipes/R
 import { RecipePartCard, type EditorLine, type EditorPart } from "@/varer/components/recipes/RecipePartCard";
 import { ScalePanel } from "@/varer/components/recipes/ScalePanel";
 import { PrintRecipeCardDialog } from "@/varer/components/recipes/PrintRecipeCardDialog";
+import { ShareRecipeDialog } from "@/varer/components/recipes/ShareRecipeDialog";
 import {
   RECIPE_STATUS_OPTIONS, computeTotals, roundBakerGrams, scaleFactor, scaleLines, scaledSummary,
   type BakersRawMaterial,
@@ -186,6 +187,7 @@ export default function RecipeDetail() {
   // ===== PDF =====
   const { generating, printProductionSheet, printRecipeCard } = useRecipePDF();
   const [cardDialogOpen, setCardDialogOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
 
   const buildPdfInput = useCallback(
     (includeCosts: boolean): BuildRecipePDFInput => ({
