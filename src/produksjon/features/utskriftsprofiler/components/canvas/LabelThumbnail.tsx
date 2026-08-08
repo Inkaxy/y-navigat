@@ -1,6 +1,8 @@
 import { useLayoutEffect, useRef, useState } from "react";
-import { FALLBACK_FIELD_LABELS, type ProfileField, type ProfileLine } from "../../types";
+import type { ProfileField, ProfileLine } from "../../types";
+import { useLabelFieldCatalog } from "../../hooks/useLabelFieldCatalog";
 import { fitFontSizePt } from "../../lib/fitText";
+
 
 interface Props {
   paperWidth: number;
