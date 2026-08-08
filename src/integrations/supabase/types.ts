@@ -2792,8 +2792,12 @@ export type Database = {
           invoice_number: string
           is_credit_note: boolean
           legal_entity_id: string
+          line_extraction_at: string | null
+          line_extraction_error: string | null
+          line_extraction_status: string
           lines_source: string | null
           notes: string | null
+          pdf_status: string
           reconciled_at: string | null
           reconciled_by: string | null
           source: string | null
@@ -2803,6 +2807,7 @@ export type Database = {
           total_amount: number | null
           total_vat: number | null
           tripletex_supplier_id: string | null
+          tripletex_supplier_invoice_id: string | null
           tripletex_voucher_id: string | null
           tripletex_voucher_number: string | null
           updated_at: string | null
@@ -2823,8 +2828,12 @@ export type Database = {
           invoice_number: string
           is_credit_note?: boolean
           legal_entity_id: string
+          line_extraction_at?: string | null
+          line_extraction_error?: string | null
+          line_extraction_status?: string
           lines_source?: string | null
           notes?: string | null
+          pdf_status?: string
           reconciled_at?: string | null
           reconciled_by?: string | null
           source?: string | null
@@ -2834,6 +2843,7 @@ export type Database = {
           total_amount?: number | null
           total_vat?: number | null
           tripletex_supplier_id?: string | null
+          tripletex_supplier_invoice_id?: string | null
           tripletex_voucher_id?: string | null
           tripletex_voucher_number?: string | null
           updated_at?: string | null
@@ -2854,8 +2864,12 @@ export type Database = {
           invoice_number?: string
           is_credit_note?: boolean
           legal_entity_id?: string
+          line_extraction_at?: string | null
+          line_extraction_error?: string | null
+          line_extraction_status?: string
           lines_source?: string | null
           notes?: string | null
+          pdf_status?: string
           reconciled_at?: string | null
           reconciled_by?: string | null
           source?: string | null
@@ -2865,6 +2879,7 @@ export type Database = {
           total_amount?: number | null
           total_vat?: number | null
           tripletex_supplier_id?: string | null
+          tripletex_supplier_invoice_id?: string | null
           tripletex_voucher_id?: string | null
           tripletex_voucher_number?: string | null
           updated_at?: string | null
@@ -9185,13 +9200,20 @@ export type Database = {
           contact_phone: string | null
           created_at: string
           id: string
+          invoice_count: number
           is_active: boolean
+          last_invoice_date: string | null
           legal_entity_id: string
+          line_tracking_changed_at: string | null
+          line_tracking_changed_by: string | null
           name: string
           notes: string | null
           org_number: string | null
+          track_invoice_lines: boolean
+          tripletex_is_inactive: boolean
           tripletex_supplier_id: string | null
           tripletex_supplier_number: string | null
+          tripletex_synced_at: string | null
           updated_at: string
         }
         Insert: {
@@ -9199,13 +9221,20 @@ export type Database = {
           contact_phone?: string | null
           created_at?: string
           id?: string
+          invoice_count?: number
           is_active?: boolean
+          last_invoice_date?: string | null
           legal_entity_id: string
+          line_tracking_changed_at?: string | null
+          line_tracking_changed_by?: string | null
           name: string
           notes?: string | null
           org_number?: string | null
+          track_invoice_lines?: boolean
+          tripletex_is_inactive?: boolean
           tripletex_supplier_id?: string | null
           tripletex_supplier_number?: string | null
+          tripletex_synced_at?: string | null
           updated_at?: string
         }
         Update: {
@@ -9213,13 +9242,20 @@ export type Database = {
           contact_phone?: string | null
           created_at?: string
           id?: string
+          invoice_count?: number
           is_active?: boolean
+          last_invoice_date?: string | null
           legal_entity_id?: string
+          line_tracking_changed_at?: string | null
+          line_tracking_changed_by?: string | null
           name?: string
           notes?: string | null
           org_number?: string | null
+          track_invoice_lines?: boolean
+          tripletex_is_inactive?: boolean
           tripletex_supplier_id?: string | null
           tripletex_supplier_number?: string | null
+          tripletex_synced_at?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -9742,7 +9778,10 @@ export type Database = {
           consumer_token_encrypted: string | null
           created_at: string
           employee_token_encrypted: string | null
+          initial_import_done: boolean
           jwt_token_encrypted: string | null
+          last_invoice_synced_date: string | null
+          last_supplier_sync_at: string | null
           last_sync_error: string | null
           last_sync_status: string | null
           last_synced_at: string | null
@@ -9759,7 +9798,10 @@ export type Database = {
           consumer_token_encrypted?: string | null
           created_at?: string
           employee_token_encrypted?: string | null
+          initial_import_done?: boolean
           jwt_token_encrypted?: string | null
+          last_invoice_synced_date?: string | null
+          last_supplier_sync_at?: string | null
           last_sync_error?: string | null
           last_sync_status?: string | null
           last_synced_at?: string | null
@@ -9776,7 +9818,10 @@ export type Database = {
           consumer_token_encrypted?: string | null
           created_at?: string
           employee_token_encrypted?: string | null
+          initial_import_done?: boolean
           jwt_token_encrypted?: string | null
+          last_invoice_synced_date?: string | null
+          last_supplier_sync_at?: string | null
           last_sync_error?: string | null
           last_sync_status?: string | null
           last_synced_at?: string | null
