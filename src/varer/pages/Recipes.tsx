@@ -9,7 +9,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Search, Loader2, ChefHat, Plus } from "lucide-react";
+import { Search, Loader2, ChefHat, Plus, Link2 } from "lucide-react";
 import {
   computeTotals, fmtG, fmtPercent, RECIPE_STATUS_LABEL, type BakersRawMaterial,
 } from "@/varer/lib/bakers";
