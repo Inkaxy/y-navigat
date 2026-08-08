@@ -30,6 +30,7 @@ import {
   buildRecipePDFData, useRecipePDF, type BuildRecipePDFInput, type RecipeCardOptions,
 } from "@/varer/hooks/useRecipePDF";
 import { useUnsavedChangesWarning } from "@/varer/hooks/useUnsavedChangesWarning";
+import { useComputeRecipeLabel } from "@/varer/hooks/useRecipeLabel";
 
 export default function RecipeDetail() {
   const { id } = useParams<{ id: string }>();
