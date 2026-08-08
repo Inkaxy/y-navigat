@@ -5,18 +5,31 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Search, Loader2, Truck, Plus, RefreshCw, Info } from "lucide-react";
+import { toast } from "sonner";
 import { RavarerHeaderBanner } from "@/ravarer/components/RavarerHeaderBanner";
 import {
   useSuppliers,
   useSetTrackInvoiceLines,
   useSyncSuppliersFromTripletex,
+  useBackfillSupplierInvoices,
+  type SupplierRow,
 } from "@/ravarer/hooks/useSuppliers";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { NewSupplierDialog } from "@/ravarer/components/NewSupplierDialog";
 
 const TRACK_HELP =
-  "Er denne på, hentes fakturaens PDF fra Tripletex og varelinjene leses ut automatisk, slik at priser per råvare oppdateres. Er den av, lagres bare fakturahodet — leverandør, nummer, dato og beløp. Slå den på for råvareleverandører, og la den være av for strøm, forsikring og lignende.";
+  "Er denne på, hentes leverandørens fakturaer inn i NBhub: PDF-en lastes ned og varelinjene leses ut automatisk, slik at priser per råvare oppdateres. Er den av, hentes ingen fakturaer fra leverandøren i det hele tatt — leverandøren blir stående i listen, men uten fakturaer. Slå den på for råvareleverandører, og la den være av for strøm, forsikring og lignende.";
 
 type ViewFilter = "alle" | "folges" | "aktive";
 
@@ -35,9 +48,18 @@ export default function LeverandorerPage() {
   const [newOpen, setNewOpen] = useState(false);
   const [view, setView] = useState<ViewFilter>("alle");
   const [showInactive, setShowInactive] = useState(false);
+  const [confirmOn, setConfirmOn] = useState<SupplierRow | null>(null);
 
   const setTracking = useSetTrackInvoiceLines();
   const sync = useSyncSuppliersFromTripletex();
+  const backfill = useBackfillSupplierInvoices();
+
+  async function enableTracking(row: SupplierRow) {
+    setConfirmOn(null);
+    await setTracking.mutateAsync({ id: row.id, value: true });
+    toast.info(`Henter 12 måneder med fakturaer fra ${row.name}…`);
+    backfill.mutate({ supplierId: row.id, months: 12 });
+  }
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -195,8 +217,11 @@ export default function LeverandorerPage() {
                       <td className="px-4 py-3">
                         <Switch
                           checked={!!r.track_invoice_lines}
-                          disabled={!canWrite || setTracking.isPending}
-                          onCheckedChange={(value) => setTracking.mutate({ id: r.id, value })}
+                          disabled={!canWrite || setTracking.isPending || backfill.isPending}
+                          onCheckedChange={(value) => {
+                            if (value) setConfirmOn(r);
+                            else setTracking.mutate({ id: r.id, value: false });
+                          }}
                           aria-label={`Følg fakturalinjer for ${r.name}`}
                         />
                       </td>
@@ -212,6 +237,25 @@ export default function LeverandorerPage() {
           </div>
         )}
       </Card>
+
+      <AlertDialog open={!!confirmOn} onOpenChange={(o) => !o && setConfirmOn(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Følg fakturaer fra {confirmOn?.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Det siste årets fakturaer hentes inn fra Tripletex, PDF-ene lastes ned og
+              varelinjene leses ut med AI. Nye fakturaer hentes automatisk framover. Skrur du
+              den av igjen, slettes ingenting — det slutter bare å komme nye.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Avbryt</AlertDialogCancel>
+            <AlertDialogAction onClick={() => confirmOn && enableTracking(confirmOn)}>
+              Slå på og hent 12 måneder
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

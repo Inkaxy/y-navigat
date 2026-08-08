@@ -21,6 +21,10 @@ interface Body {
   legal_entity_id?: string;
   from?: string;
   to?: string;
+  /** Etterhenting: hent kun denne leverandørens fakturaer. */
+  supplier_id?: string;
+  /** Antall måneder bakover ved etterhenting (standard 12). */
+  backfill_months?: number;
 }
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -101,19 +105,48 @@ Deno.serve(async (req) => {
       return json({ skipped: true, reason: "Tripletex ikke konfigurert" });
     }
 
+    // --- Etterhenting for én leverandør? ---
+    // Brukes når «følg fakturalinjer» skrus på: da finnes det ingen lagrede
+    // fakturahoder å vekke, så vi må hente historikken på nytt.
+    const isBackfill = !!body.supplier_id;
+    let ttSupplierFilterId: string | null = null;
+    if (isBackfill) {
+      const { data: sup } = await admin
+        .from("suppliers")
+        .select("id, name, tripletex_supplier_id")
+        .eq("id", body.supplier_id!)
+        .eq("legal_entity_id", legalEntityId)
+        .maybeSingle();
+      if (!sup) return json({ error: "Ukjent leverandør" }, 400);
+      if (!sup.tripletex_supplier_id) {
+        return json({ skipped: true, reason: "Leverandøren er ikke koblet til Tripletex" });
+      }
+      ttSupplierFilterId = String(sup.tripletex_supplier_id);
+    }
+
     // --- Vindu ---
     const today = iso(new Date());
     const fallbackStart = cred.initial_import_done
       ? addDays(today, -30)
       : addDays(today, -365);
-    const windowFrom = body.from ?? cred.last_invoice_synced_date ?? fallbackStart;
-    let windowTo = body.to ?? addDays(today, 1);
+    let windowFrom: string;
+    let windowTo: string;
+    if (isBackfill) {
+      const months = Math.max(1, Math.min(60, Number(body.backfill_months ?? 12) || 12));
+      const start = new Date(`${today}T00:00:00Z`);
+      start.setUTCMonth(start.getUTCMonth() - months);
+      windowFrom = iso(start);
+      windowTo = addDays(today, 1);
+    } else {
+      windowFrom = body.from ?? cred.last_invoice_synced_date ?? fallbackStart;
+      windowTo = body.to ?? addDays(today, 1);
+    }
     if (windowTo <= windowFrom) windowTo = addDays(windowFrom, 1);
 
-    // Del i biter på maks 31 dager, maks 3 biter per kjøring.
+    // Del i biter på maks 31 dager, maks 3 biter per kjøring (alle biter ved etterhenting).
     const chunks: Array<{ from: string; to: string }> = [];
     let cursor = windowFrom;
-    while (cursor < windowTo && chunks.length < MAX_CHUNKS_PER_RUN) {
+    while (cursor < windowTo && (isBackfill || chunks.length < MAX_CHUNKS_PER_RUN)) {
       const next =
         daysBetween(cursor, windowTo) > MAX_CHUNK_DAYS ? addDays(cursor, MAX_CHUNK_DAYS) : windowTo;
       chunks.push({ from: cursor, to: next });
@@ -161,13 +194,15 @@ Deno.serve(async (req) => {
       "currency(code),voucher(id,number),supplier(id,name,organizationNumber,supplierNumber)";
 
     async function fetchPage(from: string, to: string, offset: number) {
-      const query = {
+      const query: Record<string, unknown> = {
         invoiceDateFrom: from,
         invoiceDateTo: to,
         from: offset,
         count: 1000,
         fields: FIELDS,
       };
+      // Ved etterhenting filtrerer vi på leverandør direkte i API-et.
+      if (ttSupplierFilterId) query.supplierId = ttSupplierFilterId;
       try {
         return await tripletexFetch("/v2/supplierInvoice", { sessionToken, query });
       } catch (e) {
@@ -184,6 +219,8 @@ Deno.serve(async (req) => {
     let skipped = 0;
     let updated = 0;
     let failed = 0;
+    // Fakturaer fra leverandører som ikke følges lagres ikke i det hele tatt.
+    let hoppetOverIkkeFulgt = 0;
     const touchedSupplierIds = new Set<string>();
     const nowIso = new Date().toISOString();
     let lastCompletedChunkTo: string | null = null;
@@ -231,6 +268,12 @@ Deno.serve(async (req) => {
             if (cErr) throw new Error(cErr.message);
             supplier = created;
             if (ttSupId) byTtId.set(ttSupId, supplier);
+          }
+          // 1b) Følges leverandøren? Hvis ikke: hopp over fakturaen helt.
+          // Leverandøren er likevel opprettet, slik at den kan skrus på senere.
+          if (!supplier.track_invoice_lines) {
+            hoppetOverIkkeFulgt++;
+            continue;
           }
           touchedSupplierIds.add(supplier.id);
 
@@ -291,7 +334,7 @@ Deno.serve(async (req) => {
             tripletex_supplier_id: ttSupId,
             imported_from_tripletex_at: nowIso,
             pdf_status: "none",
-            line_extraction_status: supplier.track_invoice_lines ? "pending" : "not_requested",
+            line_extraction_status: "pending",
           });
 
           if (insErr) {
@@ -309,9 +352,12 @@ Deno.serve(async (req) => {
       }
 
       lastCompletedChunkTo = chunk.to;
-      // Manuelle kall med eksplisitt `from` skal ikke flytte den løpende posisjonen,
-      // og posisjonen skal aldri gå bakover.
-      if (!body.from && (!cred.last_invoice_synced_date || chunk.to > cred.last_invoice_synced_date)) {
+      // Manuelle kall med eksplisitt `from`, og etterhenting for én leverandør,
+      // skal ikke flytte den løpende posisjonen — og den skal aldri gå bakover.
+      if (
+        !isBackfill && !body.from &&
+        (!cred.last_invoice_synced_date || chunk.to > cred.last_invoice_synced_date)
+      ) {
         cred.last_invoice_synced_date = chunk.to;
         await admin
           .from("tripletex_credentials")
@@ -345,6 +391,8 @@ Deno.serve(async (req) => {
       antall_biter: chunks.length,
       har_mer: harMer,
       oppdatert: updated,
+      hoppet_over_ikke_fulgt: hoppetOverIkkeFulgt,
+      etterhenting: isBackfill ? body.supplier_id : null,
     };
 
     if (logId) {
@@ -368,7 +416,7 @@ Deno.serve(async (req) => {
       last_sync_error: null,
     };
     // Kun et løpende kall (uten eksplisitt vindu) kan markere førsteimporten som ferdig.
-    if (!harMer && !body.from && !body.to) credPatch.initial_import_done = true;
+    if (!isBackfill && !harMer && !body.from && !body.to) credPatch.initial_import_done = true;
     await admin
       .from("tripletex_credentials")
       .update(credPatch)
@@ -381,6 +429,8 @@ Deno.serve(async (req) => {
       skipped,
       updated,
       failed,
+      hoppet_over_ikke_fulgt: hoppetOverIkkeFulgt,
+      etterhenting: isBackfill,
       from: windowFrom,
       to: windowTo,
       behandlet_til: lastCompletedChunkTo,
