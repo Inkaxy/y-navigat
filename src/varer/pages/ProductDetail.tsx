@@ -43,7 +43,7 @@ import { VaredetaljerTab } from "@/varer/components/products/detail/tabs/Varedet
 import { LeveranseTab } from "@/varer/components/products/detail/tabs/LeveranseTab";
 import { PakkeTab, type PackageItem } from "@/varer/components/products/detail/tabs/PakkeTab";
 import { ReturTab } from "@/varer/components/products/detail/tabs/ReturTab";
-import { RecipeEditor } from "@/varer/components/products/RecipeEditor";
+import { RecipeSummaryCard } from "@/varer/components/products/RecipeSummaryCard";
 import { SelvStekingCard } from "@/varer/components/products/detail/SelvStekingCard";
 import { DeclarationTab } from "@/varer/components/products/DeclarationTab";
 import { CalculationTab } from "@/varer/components/products/CalculationTab";
@@ -493,7 +493,12 @@ export default function ProductDetail() {
         {tab === "retur" && <ReturTab productId={product.id} canWrite={canWrite} />}
         {tab === "varianter" && <VariantsTab product={product} variants={variantsQuery.data ?? []} />}
         {tab === "oppskrift" && !product.variant_of_product_id && (
-          <RecipeEditor productId={product.id} productName={product.display_name} canWrite={canWrite} />
+          <RecipeSummaryCard
+            productId={product.id}
+            productName={product.display_name}
+            legalEntityId={legalEntityId}
+            canWrite={canWrite}
+          />
         )}
         {tab === "deklarasjon" && !product.variant_of_product_id && (
           <DeclarationTab productId={product.id} productName={product.display_name} canWrite={canWrite} />
