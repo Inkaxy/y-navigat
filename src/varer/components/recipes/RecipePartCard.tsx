@@ -224,9 +224,9 @@ function SortableLine({
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
   const unmatched = !line.raw_material_id;
   const flour = isFlourLine(line);
-  const computedPct = bakersPercentFor(line, totalFlourG);
+  const computedPct = line._displayPercent ?? bakersPercentFor(line, totalFlourG);
   const showPct =
-    line.entry_mode === "percent" && !flour && line.bakers_percent != null
+    line.entry_mode === "percent" && !flour && line.bakers_percent != null && line._displayPercent == null
       ? String(line.bakers_percent)
       : computedPct
         ? computedPct.toFixed(1)
