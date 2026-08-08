@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, FileText, Loader2, Lock, Plus, Printer, Save, Share2 } from "lucide-react";
+import { ArrowLeft, Calculator, FileText, Loader2, Lock, Plus, Printer, Save, Share2 } from "lucide-react";
 import { logAudit } from "@/varer/lib/audit";
 import { RecipeProductLinks } from "@/varer/components/products/RecipeProductLinks";
 import { RecipeStatsBar } from "@/varer/components/recipes/RecipeStatsBar";
@@ -30,12 +30,16 @@ import {
   buildRecipePDFData, useRecipePDF, type BuildRecipePDFInput, type RecipeCardOptions,
 } from "@/varer/hooks/useRecipePDF";
 import { useUnsavedChangesWarning } from "@/varer/hooks/useUnsavedChangesWarning";
+import { useComputeRecipeLabel } from "@/varer/hooks/useRecipeLabel";
 
 export default function RecipeDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const { canWrite, legalEntityId } = useAppContext();
+  const computeLabel = useComputeRecipeLabel();
+
+
 
   const recipeQuery = useQuery({
     queryKey: ["recipe-detail", id],
@@ -452,6 +456,9 @@ export default function RecipeDetail() {
       qc.invalidateQueries({ queryKey: ["recipe-detail", recipe.id] });
       qc.invalidateQueries({ queryKey: ["recipes-list"] });
       recipeQuery.refetch();
+      // Merkedata (deklarasjon, næring, grovhet, Nøkkelhull) beregnes automatisk ved lagring
+      computeLabel.mutate(recipe.id);
+
     } catch (err: any) {
       toast.error(err.message ?? "Kunne ikke lagre");
     } finally {
@@ -498,6 +505,21 @@ export default function RecipeDetail() {
           <Button variant="outline" onClick={() => setShareOpen(true)}>
             <Share2 className="mr-2 h-4 w-4" /> Del
           </Button>
+          <Button
+            variant="outline"
+            onClick={() =>
+              recipe &&
+              computeLabel.mutate(recipe.id, {
+                onSuccess: () => toast.success("Merkedata beregnet på nytt"),
+              })
+            }
+            disabled={computeLabel.isPending}
+          >
+            {computeLabel.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Calculator className="mr-2 h-4 w-4" />}
+            Beregn på nytt
+          </Button>
+
+
 
           {canWrite && (
             <Button onClick={save} disabled={saving || !dirty || isScaled}>
