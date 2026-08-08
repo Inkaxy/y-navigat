@@ -41,14 +41,30 @@ export default function TripletexSettings() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-6 p-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight" style={{ letterSpacing: "-0.02em" }}>
-          Tripletex-integrasjon
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Konfigurer automatisk import av betalte fakturaer fra Tripletex.
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight" style={{ letterSpacing: "-0.02em" }}>
+            Tripletex-integrasjon
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Konfigurer automatisk import av betalte fakturaer fra Tripletex.
+          </p>
+        </div>
+        {!entitiesLoading && entities.length > 0 && (
+          <div className="w-full sm:w-72">
+            <label className="text-xs font-medium text-muted-foreground">Selskap</label>
+            <Select value={selectedEntity ?? undefined} onValueChange={setSelectedEntity}>
+              <SelectTrigger className="mt-1"><SelectValue placeholder="Velg selskap" /></SelectTrigger>
+              <SelectContent>
+                {entities.map((e) => (
+                  <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
       </div>
+
 
       <Alert>
         <Info className="h-4 w-4" />
@@ -82,26 +98,9 @@ export default function TripletexSettings() {
       ) : entities.length === 0 ? (
         <Card><CardContent className="p-6 text-sm text-muted-foreground">Du har ikke admin-tilgang til noen selskaper.</CardContent></Card>
       ) : (
-        <>
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Selskap</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Select value={selectedEntity ?? undefined} onValueChange={setSelectedEntity}>
-                <SelectTrigger><SelectValue placeholder="Velg selskap" /></SelectTrigger>
-                <SelectContent>
-                  {entities.map((e) => (
-                    <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </CardContent>
-          </Card>
-
-          {selectedEntity && <EntityConfig legalEntityId={selectedEntity} />}
-        </>
+        selectedEntity && <EntityConfig legalEntityId={selectedEntity} />
       )}
+
     </div>
   );
 }
