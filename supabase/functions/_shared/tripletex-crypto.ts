@@ -46,13 +46,11 @@ function sessionBaseUrl(): string {
 }
 
 async function requestSession(
-  consumerToken: string | undefined,
-  employeeToken: string,
+  params: Record<string, string>,
   exp: string,
 ): Promise<{ ok: boolean; status: number; text: string; token?: string; expirationDate?: string }> {
   const url = new URL(sessionBaseUrl() + "/v2/token/session/:create");
-  if (consumerToken) url.searchParams.set("consumerToken", consumerToken);
-  url.searchParams.set("employeeToken", employeeToken);
+  for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
   url.searchParams.set("expirationDate", exp);
   const res = await fetch(url.toString(), { method: "PUT" });
   const text = await res.text();
