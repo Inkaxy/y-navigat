@@ -90,6 +90,15 @@ export default function VarelistePage() {
               {categories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
             </SelectContent>
           </Select>
+          <Select value={kind} onValueChange={setKind}>
+            <SelectTrigger className="w-[170px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Alle varer</SelectItem>
+              <SelectItem value="raw">Kun råvarer</SelectItem>
+              <SelectItem value="resale">Kun handelsvarer</SelectItem>
+            </SelectContent>
+          </Select>
+
           <Select value={active} onValueChange={setActive}>
             <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
             <SelectContent>
