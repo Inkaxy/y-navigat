@@ -493,6 +493,10 @@ export default function RecipeDetail() {
           <Button variant="outline" onClick={() => setCardDialogOpen(true)} disabled={generating !== null}>
             <FileText className="mr-2 h-4 w-4" /> Oppskriftskort
           </Button>
+          <Button variant="outline" onClick={() => setShareOpen(true)}>
+            <Share2 className="mr-2 h-4 w-4" /> Del
+          </Button>
+
           {canWrite && (
             <Button onClick={save} disabled={saving || !dirty || isScaled}>
               {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
