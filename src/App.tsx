@@ -341,6 +341,8 @@ const App = () => (
               <Route path="/ravarer" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><Navigate to="/ravarer/vareliste" replace /></RavarerProvider></AppAccessGuard></Shell>} />
               <Route path="/ravarer/vareliste" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><RavarerVareliste /></RavarerProvider></AppAccessGuard></Shell>} />
               <Route path="/ravarer/vareliste/:id" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><RavarerDetail /></RavarerProvider></AppAccessGuard></Shell>} />
+              <Route path="/ravarer/lager" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><RavarerLager /></RavarerProvider></AppAccessGuard></Shell>} />
+
 
               {/* Fakturaer flyttet inn under Råvarer-appen (granulær invoice_access) */}
               <Route path="/ravarer/fakturaer" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><InvoiceAccessGuard><FakturaerProvider><FakturaerList /></FakturaerProvider></InvoiceAccessGuard></RavarerProvider></AppAccessGuard></Shell>} />
