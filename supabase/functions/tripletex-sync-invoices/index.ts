@@ -367,7 +367,8 @@ Deno.serve(async (req) => {
       last_sync_status: "success",
       last_sync_error: null,
     };
-    if (!harMer) credPatch.initial_import_done = true;
+    // Kun et løpende kall (uten eksplisitt vindu) kan markere førsteimporten som ferdig.
+    if (!harMer && !body.from && !body.to) credPatch.initial_import_done = true;
     await admin
       .from("tripletex_credentials")
       .update(credPatch)

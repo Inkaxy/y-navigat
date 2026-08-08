@@ -13,6 +13,8 @@ export interface InvoiceListRow {
   status: string;
   source: string | null;
   imported_at: string;
+  line_extraction_status: string | null;
+  line_extraction_error: string | null;
   supplier?: { name: string } | null;
   legal_entity?: { legal_name: string; short_code: string | null } | null;
   line_count: number;
@@ -31,7 +33,7 @@ export function useInvoices(filters: { legalEntityId?: string | null; status?: s
       let q = supabase
         .from("invoices")
         .select(
-          "id, legal_entity_id, supplier_id, invoice_number, invoice_date, due_date, total_amount, currency, status, source, imported_at, suppliers(name), legal_entities(legal_name, short_code), invoice_lines(id, requires_review)",
+          "id, legal_entity_id, supplier_id, invoice_number, invoice_date, due_date, total_amount, currency, status, source, imported_at, line_extraction_status, line_extraction_error, suppliers(name), legal_entities(legal_name, short_code), invoice_lines(id, requires_review)",
           { count: "exact" },
         )
         .order("invoice_date", { ascending: false })
@@ -56,6 +58,8 @@ export function useInvoices(filters: { legalEntityId?: string | null; status?: s
         status: r.status,
         source: r.source,
         imported_at: r.imported_at,
+        line_extraction_status: r.line_extraction_status ?? null,
+        line_extraction_error: r.line_extraction_error ?? null,
         supplier: r.suppliers ? { name: r.suppliers.name } : null,
         legal_entity: r.legal_entities ? { legal_name: r.legal_entities.legal_name, short_code: r.legal_entities.short_code } : null,
         line_count: (r.invoice_lines ?? []).length,

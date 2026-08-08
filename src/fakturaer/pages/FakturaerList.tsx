@@ -162,7 +162,22 @@ export default function FakturaerListPage() {
                           </Badge>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-xs text-ink-secondary">{sourceMeta?.label ?? r.source ?? "—"}</td>
+                      <td className="px-4 py-3 text-xs text-ink-secondary">
+                        <div className="flex flex-col gap-1">
+                          <span>{sourceMeta?.label ?? r.source ?? "—"}</span>
+                          {r.source === "tripletex" && r.line_extraction_status === "pending" && (
+                            <span className="text-[11px] text-ink-secondary">Venter på linjer</span>
+                          )}
+                          {r.source === "tripletex" && r.line_extraction_status === "done" && (
+                            <span className="text-[11px] text-success">Linjer hentet</span>
+                          )}
+                          {r.source === "tripletex" && r.line_extraction_status === "failed" && (
+                            <span className="text-[11px] text-destructive" title={r.line_extraction_error ?? undefined}>
+                              Linjer feilet
+                            </span>
+                          )}
+                        </div>
+                      </td>
                       <td className="px-4 py-3"><InvoiceStatusBadge status={r.status} /></td>
                     </tr>
                   );

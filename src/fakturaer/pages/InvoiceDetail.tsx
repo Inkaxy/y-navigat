@@ -29,6 +29,7 @@ export default function InvoiceDetailPage() {
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [matchLineId, setMatchLineId] = useState<string | null>(null);
   const [rematching, setRematching] = useState(false);
+  const [fetchingLines, setFetchingLines] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["invoice", id],
@@ -136,6 +137,24 @@ export default function InvoiceDetailPage() {
     }
   }
 
+  async function fetchLinesFromPdf() {
+    setFetchingLines(true);
+    try {
+      const { data: res, error } = await supabase.functions.invoke("tripletex-import-invoice-lines", {
+        body: { legal_entity_id: data.legal_entity_id, invoice_id: data.id, limit: 1 },
+      });
+      if (error) throw error;
+      if ((res as any)?.feilet > 0) toast.error("Kunne ikke hente linjer fra PDF");
+      else toast.success("Linjer hentet fra PDF");
+      qc.invalidateQueries({ queryKey: ["invoice", id] });
+    } catch (e: any) {
+      toast.error(e.message ?? "Kunne ikke hente linjer");
+    } finally {
+      setFetchingLines(false);
+    }
+  }
+
+
 
 
   return (
@@ -150,6 +169,19 @@ export default function InvoiceDetailPage() {
         actions={
           <div className="flex items-center gap-2">
             <InvoiceStatusBadge status={data.status} />
+            {canWrite && ["pending", "failed"].includes(data.line_extraction_status ?? "") && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={fetchLinesFromPdf}
+                disabled={fetchingLines}
+                className="gap-1.5"
+                title={data.line_extraction_error ?? undefined}
+              >
+                {fetchingLines ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                Hent linjer fra PDF nå
+              </Button>
+            )}
             {!isFinal && canMatch && lines.length > 0 && (
               <Button variant="outline" size="sm" onClick={rerunAutoMatch} disabled={rematching} className="gap-1.5">
                 {rematching ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
