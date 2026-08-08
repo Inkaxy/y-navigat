@@ -169,6 +169,19 @@ export default function InvoiceDetailPage() {
         actions={
           <div className="flex items-center gap-2">
             <InvoiceStatusBadge status={data.status} />
+            {canWrite && ["pending", "failed"].includes(data.line_extraction_status ?? "") && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={fetchLinesFromPdf}
+                disabled={fetchingLines}
+                className="gap-1.5"
+                title={data.line_extraction_error ?? undefined}
+              >
+                {fetchingLines ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                Hent linjer fra PDF nå
+              </Button>
+            )}
             {!isFinal && canMatch && lines.length > 0 && (
               <Button variant="outline" size="sm" onClick={rerunAutoMatch} disabled={rematching} className="gap-1.5">
                 {rematching ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
