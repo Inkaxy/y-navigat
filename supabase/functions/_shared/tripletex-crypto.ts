@@ -82,27 +82,61 @@ export async function createSessionToken(
   return { token: r.token, expirationDate: r.expirationDate! };
 }
 
-/**
- * JWT/API-nøkkel-modus: én nøkkel per selskap (Selskap → API-tokens).
- * Nyere Tripletex-nøkler veksles inn som `refreshToken`; eldre oppsett
- * godtar samme nøkkel som `employeeToken` — derfor fallback-rekkefølge.
- */
-export async function createSessionTokenFromApiKey(
-  apiKey: string,
-  expirationDate?: string,
-): Promise<{ token: string; expirationDate: string }> {
-  const exp = expirationDate ?? new Date(Date.now() + 23 * 60 * 60 * 1000).toISOString().slice(0, 10);
-  const attempts: Record<string, string>[] = [
-    { refreshToken: apiKey },
-    { employeeToken: apiKey },
-    { consumerToken: apiKey, employeeToken: apiKey },
-  ];
-  let last: Awaited<ReturnType<typeof requestSession>> | null = null;
-  for (const params of attempts) {
-    last = await requestSession(params, exp);
-    if (last.ok && last.token) return { token: last.token, expirationDate: last.expirationDate! };
+/** Tripletex tillater maks 28800 sekunder (8 timer) på en sesjonsnøkkel. */
+export const MAX_TTL_SECONDS = 28800;
+
+function translateTripletexError(text: string, status: number): string {
+  let msgs: string[] = [];
+  try {
+    const j = JSON.parse(text);
+    if (j?.message) msgs.push(String(j.message));
+    if (Array.isArray(j?.validationMessages)) {
+      for (const m of j.validationMessages) msgs.push(String(m?.message ?? m));
+    }
+    if (Array.isArray(j?.developerMessage?.validationMessages)) {
+      for (const m of j.developerMessage.validationMessages) msgs.push(String(m?.message ?? m));
+    }
+    if (j?.developerMessage?.message) msgs.push(String(j.developerMessage.message));
+  } catch {
+    msgs = [text];
   }
-  throw new Error(`Tripletex auth failed (${last?.status}): ${last?.text}`);
+  const joined = msgs.join("; ");
+  const lower = joined.toLowerCase();
+  if (lower.includes("format")) {
+    return "Nøkkelen mangler prefikset — kopier hele nøkkelen inkludert tlxr_";
+  }
+  if (lower.includes("expired")) {
+    return "Tripletex kjenner ikke igjen nøkkelen. Den kan være slettet, utløpt, eller laget i et annet miljø. Lag en ny under Selskap → API-tokens.";
+  }
+  return `Tripletex auth failed (${status}): ${joined || text.slice(0, 400)}`;
+}
+
+/**
+ * JWT/API-nøkkel-modus (Selskap → API-tokens, nøkler som starter med tlxr_).
+ * Veksler nøkkelen inn via POST /v2/token/session/:createFromRefreshToken.
+ * Ett forsøk — ingen fallback-løkke, slik at den ekte feilen fra Tripletex vises.
+ */
+export async function createSessionFromJwt(
+  apiKey: string,
+  ttlSeconds = MAX_TTL_SECONDS,
+): Promise<{ token: string; expirationDate: string }> {
+  const ttl = Math.min(MAX_TTL_SECONDS, Math.max(60, Math.floor(ttlSeconds)));
+  const res = await fetch(sessionBaseUrl() + "/v2/token/session/:createFromRefreshToken", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    // Nøkkelen sendes NØYAKTIG som lagret — tlxr_-prefikset er påkrevd.
+    body: JSON.stringify({ refreshToken: apiKey, ttlSeconds: ttl }),
+  });
+  const text = await res.text();
+  if (!res.ok) throw new Error(translateTripletexError(text, res.status));
+  let token: string | undefined;
+  try {
+    token = JSON.parse(text)?.value?.token;
+  } catch {
+    throw new Error(`Invalid Tripletex response: ${text.slice(0, 400)}`);
+  }
+  if (!token) throw new Error("Tripletex returnerte ingen sesjonsnøkkel");
+  return { token, expirationDate: new Date(Date.now() + ttl * 1000).toISOString() };
 }
 
 /** Velger riktig innloggingsmåte ut fra lagret modus. */
@@ -111,9 +145,10 @@ export async function createSessionForMode(
   consumerToken: string | undefined,
   employeeToken: string,
 ): Promise<{ token: string; expirationDate: string }> {
-  if (mode === "jwt") return createSessionTokenFromApiKey(employeeToken);
+  if (mode === "jwt") return createSessionFromJwt(employeeToken);
   return createSessionToken(mode === "private" ? employeeToken : consumerToken!, employeeToken);
 }
+
 
 export function basicAuthHeader(sessionToken: string): string {
   // Tripletex bruker Basic auth med tom user og session token som passord
