@@ -505,6 +505,21 @@ export default function RecipeDetail() {
           <Button variant="outline" onClick={() => setShareOpen(true)}>
             <Share2 className="mr-2 h-4 w-4" /> Del
           </Button>
+          <Button
+            variant="outline"
+            onClick={() =>
+              recipe &&
+              computeLabel.mutate(recipe.id, {
+                onSuccess: () => toast.success("Merkedata beregnet på nytt"),
+              })
+            }
+            disabled={computeLabel.isPending}
+          >
+            {computeLabel.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Calculator className="mr-2 h-4 w-4" />}
+            Beregn på nytt
+          </Button>
+
+
 
           {canWrite && (
             <Button onClick={save} disabled={saving || !dirty || isScaled}>
