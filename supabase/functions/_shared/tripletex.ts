@@ -47,7 +47,11 @@ function parseValidationMessages(text: string): string[] {
   }
 }
 
-export async function getSessionToken(supabase: any, legalEntityId: string): Promise<string> {
+export async function getSessionToken(
+  supabase: any,
+  legalEntityId: string,
+  forceNew = false,
+): Promise<string> {
   const { data: row, error } = await supabase
     .from("tripletex_credentials")
     .select("*")
