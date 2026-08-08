@@ -209,7 +209,7 @@ export default function PublicRecipe() {
           {recipe.category && (
             <p className="text-xs uppercase tracking-wide text-muted-foreground">{recipe.category}</p>
           )}
-          <h1 className="mt-1 text-3xl font-semibold tracking-tight">{recipe.name}</h1>
+          <h1 className="mt-1 text-3xl font-semibold tracking-tight">{recipe.name || "Oppskrift"}</h1>
           {recipe.description && (
             <p className="mt-3 text-base leading-relaxed text-muted-foreground">{recipe.description}</p>
           )}
