@@ -73,6 +73,8 @@ export function VaredetaljerTab({ canWrite, keywords, onKeywordsChange, productI
 
         {/* Bilde + datasheet */}
         <div className="md:col-span-2 space-y-4">
+          <StockLinkNote productId={productId} />
+
           {productId ? (
             <ProductImageUpload
               productId={productId}
