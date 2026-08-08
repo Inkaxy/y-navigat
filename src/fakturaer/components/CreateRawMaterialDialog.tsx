@@ -28,7 +28,7 @@ function toBaseFactor(from: string | null, to: string): number {
   return e && e[0] === to ? e[1] : 1;
 }
 
-export function CreateRawMaterialDialog({ open, onOpenChange, line }: Props) {
+export function CreateRawMaterialDialog({ open, onOpenChange, line, onCreated }: Props) {
   const qc = useQueryClient();
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
@@ -135,6 +135,7 @@ export function CreateRawMaterialDialog({ open, onOpenChange, line }: Props) {
       qc.invalidateQueries({ queryKey: ["rm-categories"] });
       qc.invalidateQueries({ queryKey: ["raw-material-categories"] });
       qc.invalidateQueries({ queryKey: ["raw-materials"] });
+      onCreated?.(rm.id);
       onOpenChange(false);
     } catch (e: any) {
       toast.error(e.message ?? "Kunne ikke opprette");
