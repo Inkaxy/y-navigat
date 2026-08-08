@@ -82,7 +82,10 @@ Deno.serve(async (req) => {
 
     try {
       const session = await createSessionForMode(mode, consumerToken, secretToken!);
-      const probe = await fetch("https://tripletex.no/v2/company/>?fields=id,name", {
+      const probeUrl =
+        (Deno.env.get("TRIPLETEX_BASE_URL") || "https://tripletex.no").replace(/\/+$/, "") +
+        "/v2/company/%3E";
+      const probe = await fetch(probeUrl, {
         headers: {
           Authorization: "Basic " + btoa(`0:${session.token}`),
           Accept: "application/json",
@@ -90,9 +93,23 @@ Deno.serve(async (req) => {
       });
       const probeText = await probe.text();
       if (!probe.ok) {
+        let msg = probeText.slice(0, 300);
+        try {
+          const parsed = JSON.parse(probeText);
+          const parts: string[] = [];
+          if (parsed?.message) parts.push(String(parsed.message));
+          if (Array.isArray(parsed?.validationMessages)) {
+            for (const vm of parsed.validationMessages) {
+              if (vm?.message) parts.push(String(vm.message));
+            }
+          }
+          if (parts.length) msg = parts.join(" – ");
+        } catch {
+          /* behold rå-teksten */
+        }
         return json({
           ok: false,
-          error: `Session token avvist av Tripletex (${probe.status})`,
+          error: `Kontrollkallet mot Tripletex feilet (${probe.status}): ${msg}`,
           detail: probeText.slice(0, 400),
         });
       }
