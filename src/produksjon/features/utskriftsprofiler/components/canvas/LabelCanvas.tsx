@@ -703,11 +703,21 @@ function CanvasFieldBox({
   const alignItems =
     vAlign === "top" ? "flex-start" : vAlign === "bottom" ? "flex-end" : "center";
 
+  // Felter uten `always_show` forsvinner fra den ferdige etiketten når de er tomme.
+  const hidesWhenEmpty =
+    !(field.always_show ?? false) && field.field_type !== "logo";
+
   return (
     <div
       onPointerDown={onPointerDownMove}
+      title={
+        hidesWhenEmpty
+          ? "Skjules på etiketten når feltet er tomt. Slå på «Tomt felt» for å alltid vise plassen."
+          : "Vises alltid på etiketten, også når feltet er tomt."
+      }
       className={cn(
         "absolute select-none overflow-hidden",
+        hidesWhenEmpty && !readOnly && "opacity-70",
         readOnly ? "cursor-default" : "cursor-move",
         selected && !readOnly && "ring-2 ring-primary",
         !selected && !readOnly && overlapping && "ring-2 ring-destructive",
@@ -719,7 +729,11 @@ function CanvasFieldBox({
         width: field.width_mm * pxPerMm,
         height: field.height_mm * pxPerMm,
         zIndex: field.z_index,
-        border: field.show_border ? "1px solid #777" : undefined,
+        border: field.show_border
+          ? "1px solid #777"
+          : hidesWhenEmpty && !readOnly
+            ? "1px dashed hsl(var(--muted-foreground) / 0.45)"
+            : undefined,
         borderBottom:
           field.show_line && !field.show_border ? "1px solid #777" : undefined,
         background: selected && !readOnly
