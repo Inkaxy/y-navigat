@@ -81,6 +81,29 @@ export function useSetTrackInvoiceLines() {
   });
 }
 
+/** Etterhenter fakturaer for én leverandør (brukes når sporing skrus på). */
+export function useBackfillSupplierInvoices() {
+  const qc = useQueryClient();
+  const { legalEntityId } = useRavarer();
+  return useMutation({
+    mutationFn: async ({ supplierId, months = 12 }: { supplierId: string; months?: number }) => {
+      const { data, error } = await supabase.functions.invoke("tripletex-sync-invoices", {
+        body: { legal_entity_id: legalEntityId, supplier_id: supplierId, backfill_months: months },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      return data as { imported?: number; skipped?: number; fetched?: number; reason?: string };
+    },
+    onSuccess: (r) => {
+      qc.invalidateQueries({ queryKey: ["suppliers"] });
+      qc.invalidateQueries({ queryKey: ["fakturaer"] });
+      if (r?.reason) toast.info(r.reason);
+      else toast.success(`Hentet ${r?.imported ?? 0} nye fakturaer (${r?.fetched ?? 0} funnet)`);
+    },
+    onError: (e: any) => toast.error(`Etterhenting feilet: ${e.message ?? e}`),
+  });
+}
+
 /** Speiler leverandører fra Tripletex til suppliers-tabellen. */
 export function useSyncSuppliersFromTripletex() {
   const qc = useQueryClient();
