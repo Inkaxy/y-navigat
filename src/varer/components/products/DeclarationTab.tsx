@@ -49,7 +49,7 @@ export function DeclarationTab({ productId, productName, canWrite }: Props) {
     queryFn: async () => {
       const { data } = await supabase
         .from("product_recipe_links")
-        .select("id, recipe_id, declaration_mode, manual_ingredient_declaration, manual_nutrition, manual_allergen_summary, declaration_updated_at, recipes(declaration_mode, manual_ingredient_declaration, manual_nutrition, manual_allergen_summary)")
+        .select("id, recipe_id, extra_lines, declaration_mode, manual_ingredient_declaration, manual_nutrition, manual_allergen_summary, declaration_updated_at, recipes(name, declaration_mode, manual_ingredient_declaration, manual_nutrition, manual_allergen_summary)")
         .eq("product_id", productId)
         .order("is_primary", { ascending: false })
         .limit(1)
@@ -118,9 +118,25 @@ function DeclarationView({ link, productName, canWrite, qc }: { link: any; produ
   const [savingMode, setSavingMode] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
 
+  /**
+   * Overstyringer per vare (egne linjer eller manuell tekst) krever produktberegningen.
+   * Uten overstyringer bruker vi oppskriftens lagrede beregning — ett fasitsted for tallene.
+   */
+  const hasOverrides =
+    (Array.isArray(link.extra_lines) ? link.extra_lines.length > 0 : !!link.extra_lines) ||
+    !!link.manual_ingredient_declaration;
+
   const computeQuery = useQuery({
-    queryKey: ["compute-product-declaration", link.id],
+    queryKey: ["compute-product-declaration", link.id, hasOverrides],
     queryFn: async () => {
+      if (!hasOverrides && link.recipe_id) {
+        const { data: rl } = await supabase
+          .from("recipe_label_calculated")
+          .select("*")
+          .eq("recipe_id", link.recipe_id)
+          .maybeSingle();
+        if (rl) return recipeLabelToComputed(rl as any, link);
+      }
       const { data, error } = await supabase.functions.invoke("compute-product-declaration", {
         body: { product_recipe_link_id: link.id },
       });
@@ -130,6 +146,7 @@ function DeclarationView({ link, productName, canWrite, qc }: { link: any; produ
   });
 
   const computed = computeQuery.data;
+  const fromRecipe = computed?.mode_source === "recipe_label";
 
   async function changeMode(newMode: Mode | "inherit") {
     setSavingMode(true);
@@ -192,6 +209,24 @@ function DeclarationView({ link, productName, canWrite, qc }: { link: any; produ
 
       {computeQuery.isLoading && (
         <Card><CardContent className="py-12 text-center"><Loader2 className="mx-auto h-5 w-5 animate-spin text-muted-foreground" /></CardContent></Card>
+      )}
+
+      {link.recipe_id && (
+        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-md border bg-muted/30 px-3 py-2 text-xs">
+          <Link2 className="h-3.5 w-3.5 text-muted-foreground" />
+          <span>
+            {fromRecipe
+              ? "Tallene hentes fra oppskriftens beregning — de regnes ikke på nytt her."
+              : "Varen har egne overstyringer, så deklarasjonen beregnes for denne varen."}
+          </span>
+          {hasOverrides && <Badge variant="outline">Overstyrt per vare</Badge>}
+          <a
+            href={`/varer/oppskrifter/${link.recipe_id}`}
+            className="ml-auto font-medium underline"
+          >
+            Rediger i oppskriften
+          </a>
+        </div>
       )}
 
       {computed && <DataQualityBanner computed={computed} />}
@@ -468,7 +503,7 @@ function PreviewDialog({ open, onClose, productName, computed }: { open: boolean
 
 type ComputedDeclaration = {
   mode: Mode;
-  mode_source: "link" | "recipe" | "default";
+  mode_source: "link" | "recipe" | "default" | "recipe_label";
   product_recipe_link_id: string;
   product_id: string;
   recipe_id: string;
@@ -502,3 +537,35 @@ type ComputedDeclaration = {
     has_nutrition: boolean;
   }>;
 };
+
+/** Mapper oppskriftens lagrede beregning til visningsformatet på varekortet. */
+function recipeLabelToComputed(rl: any, link: any): ComputedDeclaration {
+  const missing = rl.missing_data ?? {};
+  return {
+    mode: "auto",
+    mode_source: "recipe_label",
+    product_recipe_link_id: link.id,
+    product_id: "",
+    recipe_id: link.recipe_id,
+    product_name: link.recipes?.name ?? "",
+    total_input_grams: rl.total_input_grams ?? 0,
+    final_weight_grams: rl.final_weight_grams ?? 0,
+    ingredient_declaration_html: rl.ingredient_declaration ?? "",
+    nutrition_per_100g: rl.nutrition_per_100g ?? {},
+    allergens_contains: rl.allergens?.contains ?? [],
+    allergens_may_contain: rl.allergens?.may_contain ?? [],
+    data_quality: {
+      lines_total: 0,
+      master_lines: 0,
+      extra_lines: 0,
+      master_lines_without_raw_material: missing.lines_without_raw_material ?? 0,
+      extra_lines_without_raw_material: 0,
+      master_lines_without_nutrition: (missing.nutrition ?? []).length,
+      extra_lines_without_nutrition: 0,
+      nutrition_coverage_pct: rl.coverage_by_weight_pct ?? 0,
+      yield_grams_set: (rl.final_weight_grams ?? 0) > 0,
+    },
+    warnings: rl.warnings ?? [],
+    computed_lines: [],
+  } as ComputedDeclaration;
+}
