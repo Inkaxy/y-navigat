@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Search, Loader2, FileText, Plus, FileUp, Upload, AlertCircle } from "lucide-react";
+import { Search, Loader2, FileText, Plus, FileUp, Upload, AlertCircle, AlertTriangle } from "lucide-react";
 import { FakturaerHeaderBanner } from "@/fakturaer/components/FakturaerHeaderBanner";
 import { InvoiceStatusBadge } from "@/fakturaer/components/InvoiceStatusBadge";
 import { useInvoices } from "@/fakturaer/hooks/useInvoices";
