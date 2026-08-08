@@ -334,7 +334,7 @@ Deno.serve(async (req) => {
             tripletex_supplier_id: ttSupId,
             imported_from_tripletex_at: nowIso,
             pdf_status: "none",
-            line_extraction_status: supplier.track_invoice_lines ? "pending" : "not_requested",
+            line_extraction_status: "pending",
           });
 
           if (insErr) {
@@ -352,9 +352,12 @@ Deno.serve(async (req) => {
       }
 
       lastCompletedChunkTo = chunk.to;
-      // Manuelle kall med eksplisitt `from` skal ikke flytte den løpende posisjonen,
-      // og posisjonen skal aldri gå bakover.
-      if (!body.from && (!cred.last_invoice_synced_date || chunk.to > cred.last_invoice_synced_date)) {
+      // Manuelle kall med eksplisitt `from`, og etterhenting for én leverandør,
+      // skal ikke flytte den løpende posisjonen — og den skal aldri gå bakover.
+      if (
+        !isBackfill && !body.from &&
+        (!cred.last_invoice_synced_date || chunk.to > cred.last_invoice_synced_date)
+      ) {
         cred.last_invoice_synced_date = chunk.to;
         await admin
           .from("tripletex_credentials")
