@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { useFakturaerLegalEntities } from "@/fakturaer/hooks/useFakturaerLegalEntities";
 import { useTripletexCredentials, useTripletexSyncLog } from "@/ravarer/hooks/useTripletex";
 import { supabase } from "@/integrations/supabase/client";
@@ -124,7 +124,12 @@ function EntityConfig({ legalEntityId }: { legalEntityId: string }) {
   const [syncing, setSyncing] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
 
+  // Initialiser skjemaet kun én gang per selskap — ellers overskriver en refetch
+  // brukerens valgte modus og innskrevne nøkler (ga «Consumer token er påkrevd»).
+  const initializedFor = useRef<string | null>(null);
   useEffect(() => {
+    if (isLoading || initializedFor.current === legalEntityId) return;
+    initializedFor.current = legalEntityId;
     if (cred) {
       setMode(cred.mode);
       setSyncEnabled(cred.sync_enabled);
@@ -138,7 +143,8 @@ function EntityConfig({ legalEntityId }: { legalEntityId: string }) {
     setConsumerToken("");
     setEmployeeToken("");
     setTestResult(null);
-  }, [cred, legalEntityId]);
+  }, [cred, isLoading, legalEntityId]);
+
 
   // Ved jwt-modus finnes ikke et eget token-flagg i status-RPC-en; en lagret rad
   // med mode='jwt' betyr at nøkkelen ligger kryptert i basen.
