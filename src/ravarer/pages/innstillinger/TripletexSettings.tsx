@@ -42,16 +42,17 @@ export default function TripletexSettings() {
             Med Tripletex-tilkobling importeres fakturaer automatisk etter at de er godkjent og betalt i Tripletex. Du trenger:
           </p>
           <div className="pl-2">
-            <p className="font-medium">Modus A – standard (anbefalt for produksjon):</p>
+            <p className="font-medium">API-nøkkel (anbefalt):</p>
             <ul className="list-disc pl-5 text-muted-foreground">
-              <li>En consumer token, fra Tripletex utviklerportal.</li>
-              <li>En employee token pr selskap (Selskap → Tilleggsfunksjoner → API-tilgang).</li>
+              <li>Én API-nøkkel per selskap, laget i Tripletex under Selskap → API-tokens.</li>
+              <li>Nøkkelen vises bare én gang i Tripletex — kopier den med en gang.</li>
             </ul>
           </div>
           <div className="pl-2">
-            <p className="font-medium">Modus B – privat API-bruk:</p>
+            <p className="font-medium">Eldre alternativer:</p>
             <ul className="list-disc pl-5 text-muted-foreground">
-              <li>Kun en employee token pr selskap. Krever direkte API-tilgang på kontoen.</li>
+              <li>Standard: consumer token fra Tripletex utviklerportal + employee token per selskap.</li>
+              <li>Privat API-bruk: kun employee token. Krever direkte API-tilgang på kontoen.</li>
             </ul>
           </div>
           <p className="text-muted-foreground">
