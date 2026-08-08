@@ -11301,6 +11301,10 @@ export type Database = {
         }
         Returns: number
       }
+      merge_raw_materials: {
+        Args: { p_dup: string; p_keep: string }
+        Returns: undefined
+      }
       negotiation_recipient_by_token: {
         Args: { p_password: string; p_token: string }
         Returns: {
