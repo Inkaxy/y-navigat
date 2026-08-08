@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import {
-  FIELD_LABELS,
   type FieldType,
   type ProfileField,
   type ProfileLine,
-  defaultFieldSize,
 } from "../../types";
+import {
+  useLabelFieldCatalog,
+  type LabelFieldCatalog,
+} from "../../hooks/useLabelFieldCatalog";
 import { clamp, getInnerArea, round1, snap } from "../../lib/canvasUtils";
 import { fitFontSizePt } from "../../lib/fitText";
 
@@ -296,6 +298,8 @@ export function LabelCanvas(props: Props) {
     return () => window.removeEventListener("keydown", onKey);
   }, [readOnly, selectedLineId, lines, inner.w, inner.h, onUpdateLine, onRemoveLine]);
 
+  const catalog = useLabelFieldCatalog();
+
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
@@ -304,12 +308,12 @@ export function LabelCanvas(props: Props) {
       if (!type) return;
       const rect = innerRef.current?.getBoundingClientRect();
       if (!rect) return;
-      const sz = defaultFieldSize(type);
+      const sz = catalog.size(type);
       const xMm = clamp((e.clientX - rect.left) / pxPerMm - sz.w / 2, 0, Math.max(0, inner.w - sz.w));
       const yMm = clamp((e.clientY - rect.top) / pxPerMm - sz.h / 2, 0, Math.max(0, inner.h - sz.h));
       onAddFieldAt(type, round1(xMm), round1(yMm));
     },
-    [pxPerMm, inner.w, inner.h, onAddFieldAt],
+    [pxPerMm, inner.w, inner.h, onAddFieldAt, catalog],
   );
 
   const selected = selectedFieldType
@@ -402,6 +406,7 @@ export function LabelCanvas(props: Props) {
                     companyName={companyName}
                     logoUrl={logoUrl}
                     includeFieldLabels={includeFieldLabels}
+                    catalog={catalog}
                     onPointerDownMove={(e) => {
                       if (readOnly) return;
                       e.stopPropagation();
@@ -584,15 +589,17 @@ function CoordinateBar({
   maxW,
   maxH,
   onChange,
+  catalog,
 }: {
   field: ProfileField;
   maxW: number;
   maxH: number;
   onChange: (patch: Partial<ProfileField>) => void;
+  catalog: LabelFieldCatalog;
 }) {
   return (
     <div className="flex items-center gap-3 text-xs">
-      <span className="font-medium">{FIELD_LABELS[field.field_type]}</span>
+      <span className="font-medium">{catalog.label(field.field_type)}</span>
       <span className="text-muted-foreground">·</span>
       <CoordInput label="X" value={field.x_mm} onChange={(v) => onChange({ x_mm: clamp(v, 0, maxW - field.width_mm) })} />
       <CoordInput label="Y" value={field.y_mm} onChange={(v) => onChange({ y_mm: clamp(v, 0, maxH - field.height_mm) })} />
@@ -635,6 +642,7 @@ interface CanvasFieldBoxProps {
   companyName: string;
   logoUrl: string | null;
   includeFieldLabels: boolean;
+  catalog: LabelFieldCatalog;
   onPointerDownMove: (e: React.PointerEvent) => void;
   onPointerDownResize: (handle: ResizeHandle, e: React.PointerEvent) => void;
 }
@@ -648,6 +656,7 @@ function CanvasFieldBox({
   companyName,
   logoUrl,
   includeFieldLabels,
+  catalog,
   onPointerDownMove,
   onPointerDownResize,
 }: CanvasFieldBoxProps) {
@@ -656,47 +665,28 @@ function CanvasFieldBox({
 
   let content: React.ReactNode;
   let measureString = "";
-  if (field.field_type === "logo" && logoUrl) {
-    content = (
+  if (field.field_type === "logo") {
+    content = logoUrl ? (
       <img
         src={logoUrl}
         alt=""
         className="pointer-events-none h-full w-full object-contain"
       />
+    ) : (
+      `[${catalog.label(field.field_type)}]`
     );
-  } else if (field.field_type === "firmanavn") {
-    measureString = companyName || FIELD_LABELS.firmanavn;
+  } else if (field.field_type === "firmanavn" && companyName) {
+    measureString = companyName;
     content = measureString;
-  } else if (field.field_type === "etikett_nr") {
-    measureString = "1000";
-    content = measureString;
-  } else if (field.field_type === "tur") {
-    measureString = "Tur 1";
-    content = measureString;
-  } else if (field.field_type === "hentested") {
-    measureString = "Teie";
-    content = measureString;
-  } else if (field.field_type === "telefon") {
-    measureString = "+47 999 99 999";
-    content = measureString;
-  } else if (field.field_type === "leveringsdato") {
-    measureString = "06.06.26";
-    content = measureString;
-  } else if (field.field_type === "hentetidspunkt") {
-    measureString = "Hentes kl 10:00";
-    content = measureString;
-  } else if (field.field_type === "er_betalt") {
-    measureString = "Nei";
-    content = measureString;
-
   } else {
-    measureString = `[${FIELD_LABELS[field.field_type]}]`;
+    // Alle datafelter vises som plassholder i designmodus — aldri oppdiktede verdier.
+    measureString = `[${catalog.label(field.field_type)}]`;
     content = measureString;
   }
 
   const labelPrefix =
     includeFieldLabels && (field.show_label ?? true) && field.field_type !== "logo"
-      ? `${FIELD_LABELS[field.field_type]}: `
+      ? `${catalog.label(field.field_type)}: `
       : "";
   const effectiveFontPt =
     autoFit && field.field_type !== "logo"
@@ -763,7 +753,7 @@ function CanvasFieldBox({
         >
           {includeFieldLabels && (field.show_label ?? true) && field.field_type !== "logo" && (
             <span className="text-muted-foreground">
-              {FIELD_LABELS[field.field_type]}:{" "}
+              {catalog.label(field.field_type)}:{" "}
             </span>
           )}
           {content}

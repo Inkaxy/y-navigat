@@ -24,7 +24,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { type Merknad, emptyMerknad, isMerknadEmpty, merknadSchema } from "@/ordre/lib/merknad";
 import type { FieldType, LabelPrintProfile } from "@/produksjon/features/utskriftsprofiler/types";
-import { FIELD_LABELS } from "@/produksjon/features/utskriftsprofiler/types";
+import { useLabelFieldCatalog } from "@/produksjon/features/utskriftsprofiler/hooks/useLabelFieldCatalog";
 import { toast } from "sonner";
 import { CakeImageUploadField } from "@/ordre/components/orders/CakeImageUploadField";
 import { PENDING_CAKE_IMAGE_KEY } from "@/ordre/lib/orderLineCakeImage";
@@ -93,6 +93,7 @@ export function MerknadDialog({
   /** Leveringsdato fra ordreskjemaet. Settes for å aktivere kakebilde-opplasting. */
   deliveryDate?: string;
 }) {
+  const catalog = useLabelFieldCatalog();
   const [form, setForm] = useState<Merknad>(emptyMerknad);
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);
   const [pendingPath, setPendingPath] = useState<string | null>(null);
@@ -166,7 +167,7 @@ export function MerknadDialog({
     const placeholder = "(hentes fra ordre)";
     return (
       <div key={ft} className="contents">
-        <Label className="self-center text-muted-foreground">{FIELD_LABELS[ft]}</Label>
+        <Label className="self-center text-muted-foreground">{catalog.label(ft)}</Label>
         <div className="flex items-center gap-2">
           <Input
             value={value}

@@ -18,11 +18,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useLabelFieldCatalog } from "../../hooks/useLabelFieldCatalog";
 import {
   ALIGNMENTS,
-  FIELD_GROUPS,
-  FIELD_LABELS,
-  GROUP_LABELS,
   VERTICAL_ALIGNMENTS,
   type Alignment,
   type ProfileField,
@@ -39,6 +37,8 @@ interface Props {
 }
 
 export function RightInspector({ selected, innerW, innerH, onChange, onRemove }: Props) {
+  const catalog = useLabelFieldCatalog();
+
   if (!selected) {
     return (
       <div className="flex h-full flex-col bg-card">
@@ -58,7 +58,7 @@ export function RightInspector({ selected, innerW, innerH, onChange, onRemove }:
     );
   }
 
-  const group = FIELD_GROUPS[selected.field_type];
+  const fieldLabel = catalog.label(selected.field_type);
 
   return (
     <div className="flex h-full flex-col bg-card">
@@ -66,10 +66,10 @@ export function RightInspector({ selected, innerW, innerH, onChange, onRemove }:
       <div className="flex items-start justify-between gap-2 border-b border-border px-4 py-3">
         <div className="min-w-0">
           <h3 className="truncate text-sm font-semibold tracking-tight">
-            {FIELD_LABELS[selected.field_type]}
+            {fieldLabel}
           </h3>
           <p className="text-[11px] text-muted-foreground">
-            Tekst-felt · bundet til {GROUP_LABELS[group]}
+            Tekst-felt · bundet til {catalog.groupLabel(selected.field_type)}
           </p>
         </div>
         <Button
@@ -286,7 +286,7 @@ export function RightInspector({ selected, innerW, innerH, onChange, onRemove }:
               >
                 <span>
                   {(selected.show_label ?? true)
-                    ? `Vis «${FIELD_LABELS[selected.field_type]}:»`
+                    ? `Vis «${fieldLabel}:»`
                     : "Kun verdi"}
                 </span>
                 <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
@@ -295,13 +295,38 @@ export function RightInspector({ selected, innerW, innerH, onChange, onRemove }:
               </button>
             </Row>
           )}
+
+          <Row label="Tomt felt">
+            <button
+              type="button"
+              onClick={() =>
+                onChange({ always_show: !(selected.always_show ?? false) })
+              }
+              className={cn(
+                "col-span-2 flex h-9 items-center justify-between rounded-[10px] border px-3 text-xs transition",
+                (selected.always_show ?? false)
+                  ? "border-brand-bronze bg-brand-bronze/10 text-foreground"
+                  : "border-border bg-background text-muted-foreground hover:text-foreground",
+              )}
+              title="Tegn feltet selv om verdien mangler — gir en blank linje å skrive på for hånd."
+            >
+              <span>
+                {(selected.always_show ?? false)
+                  ? "Vis alltid (blank linje)"
+                  : "Skjul når tomt"}
+              </span>
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                {(selected.always_show ?? false) ? "På" : "Av"}
+              </span>
+            </button>
+          </Row>
         </Section>
 
         {/* Field binding (informational) */}
         <Section title="Felt-binding">
           <Row label="Kilde">
             <div className="col-span-2 flex h-9 items-center rounded-[10px] border border-border bg-muted/40 px-3 text-xs text-muted-foreground">
-              {GROUP_LABELS[group]} → {FIELD_LABELS[selected.field_type]}
+              {catalog.sourceLabel(selected.field_type)}
             </div>
           </Row>
         </Section>

@@ -1,6 +1,7 @@
 import { Minus, Plus, Maximize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { FIELD_LABELS, type ProfileField } from "../../types";
+import { type ProfileField } from "../../types";
+import { useLabelFieldCatalog } from "../../hooks/useLabelFieldCatalog";
 import { round1 } from "../../lib/canvasUtils";
 
 interface Props {
@@ -20,6 +21,7 @@ export function StatusBar({
   onZoomOut,
   onZoomReset,
 }: Props) {
+  const catalog = useLabelFieldCatalog();
   return (
     <div className="flex h-8 items-center gap-4 border-t border-border bg-muted/30 px-4 text-[11px] text-muted-foreground">
       <span className="flex items-center gap-1.5">
@@ -30,7 +32,7 @@ export function StatusBar({
         <span className="flex items-center gap-1">
           <span className="text-muted-foreground/60">Valgt:</span>
           <span className="font-medium text-foreground">
-            {FIELD_LABELS[selected.field_type]}
+            {catalog.label(selected.field_type)}
           </span>
         </span>
       )}
