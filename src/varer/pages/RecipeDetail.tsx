@@ -456,6 +456,9 @@ export default function RecipeDetail() {
       qc.invalidateQueries({ queryKey: ["recipe-detail", recipe.id] });
       qc.invalidateQueries({ queryKey: ["recipes-list"] });
       recipeQuery.refetch();
+      // Merkedata (deklarasjon, næring, grovhet, Nøkkelhull) beregnes automatisk ved lagring
+      computeLabel.mutate(recipe.id);
+
     } catch (err: any) {
       toast.error(err.message ?? "Kunne ikke lagre");
     } finally {
