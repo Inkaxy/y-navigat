@@ -112,7 +112,6 @@ export const PRICING_FIELDS: ProfileFieldDef[] = [
 
 /** Utkjøring og utskrifter (Tab: Utkjøring) */
 export const DELIVERY_FIELDS: ProfileFieldDef[] = [
-  { key: "pickup_location_id", label: "Hentested", type: "select", dynamicSource: "pickup_locations" },
   { key: "order_confirmation_mode", label: "Ordrebekreftelse", type: "select", options: orderConfirmationOptions },
   { key: "order_confirmation_emails", label: "E-post for ordrebekreftelse", type: "text", placeholder: "komma-separert" },
   {
