@@ -185,6 +185,7 @@ const RavarerForhandlingerList = lazy(() => import("@/ravarer/pages/forhandlinge
 const RavarerForhandlingWizard = lazy(() => import("@/ravarer/pages/forhandlinger/ForhandlingWizard"));
 const RavarerForhandlingDetail = lazy(() => import("@/ravarer/pages/forhandlinger/ForhandlingDetail"));
 const RavarerSupplierPortal = lazy(() => import("@/ravarer/pages/forhandlinger/SupplierPortal"));
+const VarerPublicRecipe = lazy(() => import("@/varer/pages/PublicRecipe"));
 const RavarerLiveForhandlingSetup = lazy(() => import("@/ravarer/pages/forhandlinger/LiveForhandlingSetup"));
 const RavarerLiveForhandlingWorkspace = lazy(() => import("@/ravarer/pages/forhandlinger/LiveForhandlingWorkspace"));
 const RavarerLiveConfirmationPortal = lazy(() => import("@/ravarer/pages/forhandlinger/LiveConfirmationPortal"));
@@ -294,6 +295,9 @@ const App = () => (
               {/* Public supplier RFQ portal — no shell, no auth */}
               <Route path="/tilbud/:token" element={<RavarerSupplierPortal />} />
               <Route path="/bekreftelse/:token" element={<RavarerLiveConfirmationPortal />} />
+              {/* Public delt oppskrift — no shell, no auth */}
+              <Route path="/oppskrift/:token" element={<VarerPublicRecipe />} />
+
 
               {/* Varer sub-routes */}
               <Route path="/varer" element={<Shell><AppAccessGuard appCode="varer" appName="Varer"><VarerAppProvider><Navigate to="/varer/vareliste" replace /></VarerAppProvider></AppAccessGuard></Shell>} />

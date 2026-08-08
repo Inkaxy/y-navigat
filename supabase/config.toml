@@ -6,6 +6,11 @@ verify_jwt = false
 [functions.validate-rfq-access]
 verify_jwt = false
 
+[functions.validate-recipe-share]
+verify_jwt = false
+
+
+
 [functions.submit-negotiation-response]
 verify_jwt = false
 

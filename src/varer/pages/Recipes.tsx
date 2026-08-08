@@ -9,7 +9,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Search, Loader2, ChefHat, Plus } from "lucide-react";
+import { Search, Loader2, ChefHat, Plus, Link2 } from "lucide-react";
 import {
   computeTotals, fmtG, fmtPercent, RECIPE_STATUS_LABEL, type BakersRawMaterial,
 } from "@/varer/lib/bakers";
@@ -47,7 +47,27 @@ export default function Recipes() {
     },
   });
 
+  /** Antall aktive delingslenker per oppskrift — viser hva som ligger ute. */
+  const shareCountsQuery = useQuery({
+    queryKey: ["recipe-share-counts", legalEntityId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("recipe_share_links")
+        .select("recipe_id, expires_at, revoked_at")
+        .is("revoked_at", null);
+      const counts: Record<string, number> = {};
+      const now = Date.now();
+      for (const r of (data ?? []) as any[]) {
+        if (r.expires_at && new Date(r.expires_at).getTime() < now) continue;
+        counts[r.recipe_id] = (counts[r.recipe_id] ?? 0) + 1;
+      }
+      return counts;
+    },
+  });
+
   const rmMap = rmQuery.data ?? {};
+  const shareCounts = shareCountsQuery.data ?? {};
+
 
   const rows = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -137,9 +157,18 @@ export default function Recipes() {
                 {rows.map((r: any) => (
                   <tr key={r.id} onClick={() => navigate(`/varer/oppskrifter/${r.id}`)} className="cursor-pointer border-t border-border hover:bg-muted/30">
                     <td className="px-4 py-2.5">
-                      <div className="font-medium">{r.name || "Uten navn"}</div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{r.name || "Uten navn"}</span>
+                        {shareCounts[r.id] > 0 && (
+                          <Badge variant="outline" className="gap-1 px-1.5 py-0 text-[11px] font-normal">
+                            <Link2 className="h-3 w-3" />
+                            {shareCounts[r.id]}
+                          </Badge>
+                        )}
+                      </div>
                       <div className="text-xs text-muted-foreground">v{r.version}</div>
                     </td>
+
                     <td className="px-4 py-2.5">{r.category ?? "—"}</td>
                     <td className="px-4 py-2.5 text-right tabular-nums">{fmtPercent(r.totals.hydrationPct)}</td>
                     <td className="px-4 py-2.5 text-right tabular-nums">{fmtG(r.totals.totalDoughG)} g</td>
