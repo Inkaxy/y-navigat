@@ -1083,21 +1083,24 @@ export function CustomerOrderModal({
                               : undefined
                           }
                         >
-                          <div className="flex min-w-0 items-center gap-2">
-                            <span className="shrink-0 rounded border border-border bg-muted px-2 py-0.5 text-xs font-medium tabular-nums text-muted-foreground">
-                              {l.product!.display_number ?? "—"}
-                            </span>
-                            <span className="truncate text-sm font-medium">
-                              {l.product!.display_name}
-                            </span>
-                            <span className="shrink-0 text-xs text-muted-foreground">
-                              {l.product!.unit_of_sale}
-                            </span>
-                            {l.is_fallback && (
-                              <span className="shrink-0 text-xs font-medium text-destructive">
-                                · pris mangler
+                          <div className="min-w-0">
+                            <div className="flex min-w-0 items-center gap-2">
+                              <span className="shrink-0 rounded border border-border bg-muted px-2 py-0.5 text-xs font-medium tabular-nums text-muted-foreground">
+                                {l.product!.display_number ?? "—"}
                               </span>
-                            )}
+                              <span className="truncate text-sm font-medium">
+                                {l.product!.display_name}
+                              </span>
+                              <span className="shrink-0 text-xs text-muted-foreground">
+                                {l.product!.unit_of_sale}
+                              </span>
+                              {l.is_fallback && (
+                                <span className="shrink-0 text-xs font-medium text-destructive">
+                                  · pris mangler
+                                </span>
+                              )}
+                            </div>
+                            <StockAvailabilityWarning productId={l.product!.id} quantity={q} className="mt-0.5" />
                           </div>
                           <Input
                             type="text"
