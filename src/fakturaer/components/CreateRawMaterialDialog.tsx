@@ -125,6 +125,10 @@ export function CreateRawMaterialDialog({ open, onOpenChange, line }: Props) {
       toast.success(`Råvare «${name}» opprettet`, { description: "Husk å fylle inn næringsinnhold senere." });
       qc.invalidateQueries({ queryKey: ["fakturaer-review-lines"] });
       qc.invalidateQueries({ queryKey: ["fakturaer-review-count"] });
+      // Ny kategori skal dukke opp i velgeren og i innstillinger med én gang
+      qc.invalidateQueries({ queryKey: ["rm-categories"] });
+      qc.invalidateQueries({ queryKey: ["raw-material-categories"] });
+      qc.invalidateQueries({ queryKey: ["raw-materials"] });
       onOpenChange(false);
     } catch (e: any) {
       toast.error(e.message ?? "Kunne ikke opprette");
