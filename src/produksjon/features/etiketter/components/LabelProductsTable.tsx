@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils";
 import type { LabelMode, LabelPrintModel, LabelProductRow } from "../types";
 import type { ProductionDepartment } from "@/produksjon/features/produksjonsavdelinger/types";
 import type { LabelPrintProfile } from "@/produksjon/features/utskriftsprofiler/types";
+import { useLabelFieldCatalog } from "@/produksjon/features/utskriftsprofiler/hooks/useLabelFieldCatalog";
 
 interface Props {
   rows: LabelProductRow[] | undefined;
@@ -233,19 +234,21 @@ export function LabelProductsTable({
 }
 
 function MissingFieldsBadge({ fields }: { fields?: string[] }) {
+  const catalog = useLabelFieldCatalog();
   if (!fields || fields.length === 0) return null;
+  const names = fields.map((k) => catalog.label(k)).join(", ");
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <span
           className="inline-flex items-center gap-1 rounded-full border border-amber-500/50 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400"
-          aria-label={`Mangler etikettinfo: ${fields.join(", ")}`}
+          aria-label={`Mangler etikettinfo: ${names}`}
         >
           <AlertTriangle className="h-3 w-3" />
           Mangler
         </span>
       </TooltipTrigger>
-      <TooltipContent>Mangler etikettinfo: {fields.join(", ")}</TooltipContent>
+      <TooltipContent>Mangler etikettinfo: {names}</TooltipContent>
     </Tooltip>
   );
 }
