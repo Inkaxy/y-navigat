@@ -33,7 +33,7 @@ export function useInvoices(filters: { legalEntityId?: string | null; status?: s
       let q = supabase
         .from("invoices")
         .select(
-          "id, legal_entity_id, supplier_id, invoice_number, invoice_date, due_date, total_amount, currency, status, source, imported_at, line_extraction_status, line_extraction_error, suppliers(name), legal_entities(legal_name, short_code), invoice_lines(id, requires_review)",
+          "id, legal_entity_id, supplier_id, invoice_number, invoice_date, due_date, total_amount, currency, status, source, imported_at, line_extraction_status, line_extraction_error, extraction_confidence, lines_sum_status, suppliers(name), legal_entities(legal_name, short_code), invoice_lines(id, requires_review)",
           { count: "exact" },
         )
         .order("invoice_date", { ascending: false })
@@ -47,6 +47,8 @@ export function useInvoices(filters: { legalEntityId?: string | null; status?: s
       const { data, error, count } = await q;
       if (error) throw error;
       const rows = (data ?? []).map((r: any) => ({
+        extraction_confidence: r.extraction_confidence,
+        lines_sum_status: r.lines_sum_status,
         id: r.id,
         legal_entity_id: r.legal_entity_id,
         supplier_id: r.supplier_id,
