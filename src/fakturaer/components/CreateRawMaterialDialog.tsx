@@ -150,12 +150,37 @@ export function CreateRawMaterialDialog({ open, onOpenChange, line }: Props) {
         <div className="space-y-3">
           <Field label="Navn"><Input value={name} onChange={(e) => setName(e.target.value)} /></Field>
           <Field label="Kategori">
-            <Select value={category} onValueChange={setCategory}>
-              <SelectTrigger><SelectValue placeholder="Velg kategori…" /></SelectTrigger>
-              <SelectContent>
-                {categories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            {newCategory ? (
+              <div className="flex gap-2">
+                <Input
+                  autoFocus
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  placeholder="Navn på ny kategori…"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => { setNewCategory(false); setCategory(""); }}
+                >
+                  Avbryt
+                </Button>
+              </div>
+            ) : (
+              <Select
+                value={category}
+                onValueChange={(v) => {
+                  if (v === "__new__") { setNewCategory(true); setCategory(""); }
+                  else setCategory(v);
+                }}
+              >
+                <SelectTrigger><SelectValue placeholder="Velg kategori…" /></SelectTrigger>
+                <SelectContent>
+                  {categories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  <SelectItem value="__new__">+ Ny kategori…</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
           </Field>
           <div className="grid grid-cols-3 gap-3">
             <Field label="Basisenhet">
