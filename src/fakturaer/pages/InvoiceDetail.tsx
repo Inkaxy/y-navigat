@@ -234,6 +234,9 @@ export default function InvoiceDetailPage() {
             unit: l.unit,
             unit_price: l.unit_price,
             total_amount: l.total_amount,
+            package_size: l.package_size,
+            package_unit: l.package_unit,
+            count_per_package: l.count_per_package,
           }))}
           onComplete={() => { setSelected({}); qc.invalidateQueries({ queryKey: ["invoice", id] }); }}
         />
