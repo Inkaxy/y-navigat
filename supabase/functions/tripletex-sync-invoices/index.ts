@@ -55,9 +55,14 @@ Deno.serve(async (req) => {
     let sessionToken = await getSessionToken(supabase, legalEntityId);
 
     const today = new Date();
-    const defaultFrom = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const DAY = 24 * 60 * 60 * 1000;
+    const defaultFrom = new Date(today.getTime() - 30 * DAY);
     const fromDate = body.from ?? (cred.last_synced_voucher_date ?? defaultFrom.toISOString().slice(0, 10));
-    const toDate = body.to ?? today.toISOString().slice(0, 10);
+    // Tripletex' dateTo er eksklusiv — må være minst én dag etter dateFrom.
+    let toDate = body.to ?? new Date(today.getTime() + DAY).toISOString().slice(0, 10);
+    if (toDate <= fromDate) {
+      toDate = new Date(new Date(fromDate + "T00:00:00Z").getTime() + DAY).toISOString().slice(0, 10);
+    }
 
     const query = { dateFrom: fromDate, dateTo: toDate, count: 1000, fields: "id,date,number,description,attachment" };
     let json: any;
