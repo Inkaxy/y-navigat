@@ -95,7 +95,9 @@ function EntityConfig({ legalEntityId }: { legalEntityId: string }) {
   const { data: cred, isLoading } = useTripletexCredentials(legalEntityId);
   const { data: log = [] } = useTripletexSyncLog(legalEntityId);
 
-  const [mode, setMode] = useState<"standard" | "private">("standard");
+  type TripletexMode = "jwt" | "standard" | "private";
+  const [mode, setMode] = useState<TripletexMode>("jwt");
+  const [jwtToken, setJwtToken] = useState("");
   const [consumerToken, setConsumerToken] = useState("");
   const [employeeToken, setEmployeeToken] = useState("");
   const [syncEnabled, setSyncEnabled] = useState(false);
@@ -111,16 +113,20 @@ function EntityConfig({ legalEntityId }: { legalEntityId: string }) {
       setSyncEnabled(cred.sync_enabled);
       setFrequency(cred.sync_frequency_minutes);
     } else {
-      setMode("standard");
+      setMode("jwt");
       setSyncEnabled(false);
       setFrequency(60);
     }
+    setJwtToken("");
     setConsumerToken("");
     setEmployeeToken("");
     setTestResult(null);
   }, [cred, legalEntityId]);
 
-  const isConfigured = !!cred?.has_employee_token;
+  // Ved jwt-modus finnes ikke et eget token-flagg i status-RPC-en; en lagret rad
+  // med mode='jwt' betyr at nøkkelen ligger kryptert i basen.
+  const hasStoredJwt = cred?.mode === "jwt";
+  const isConfigured = mode === "jwt" ? hasStoredJwt : !!cred?.has_employee_token;
 
   const handleTest = async () => {
     setTesting(true); setTestResult(null);
