@@ -57,7 +57,6 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useCustomer, usePriceLists } from "@/kunder/hooks/useCustomers";
 import { useCustomerProfile } from "@/kunder/hooks/useCustomerProfiles";
-import { usePickupLocations } from "@/kunder/hooks/usePickupLocations";
 import { CustomerContactsCard } from "@/kunder/components/customers/CustomerContactsCard";
 import { useUserAccess } from "@/kunder/hooks/useUserAccess";
 import { useAuth } from "@/hooks/useAuth";
@@ -163,19 +162,7 @@ export default function CustomerDetail() {
   const { data: customer, isLoading } = useCustomer(id);
   const { data: priceLists } = usePriceLists(customer?.legal_entity_id ?? null);
   const { data: profile } = useCustomerProfile(customer?.customer_profile_id ?? undefined);
-  const { data: pickupLocations } = usePickupLocations(customer?.legal_entity_id ?? null, {
-    onlyActive: true,
-  });
-  const pickupOptions: SelectOption[] = useMemo(
-    () =>
-      (pickupLocations ?? []).map((p) => ({
-        value: p.id,
-        label: `${p.pickup_number} — ${p.display_name}`,
-      })),
-    [pickupLocations],
-  );
-  const dynamicOptionsForField = (key: string): SelectOption[] | undefined =>
-    key === "pickup_location_id" ? pickupOptions : undefined;
+  const dynamicOptionsForField = (_key: string): SelectOption[] | undefined => undefined;
 
   const canWrite = !!access?.hasKunderWrite;
 
