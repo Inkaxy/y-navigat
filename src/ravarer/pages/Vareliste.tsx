@@ -64,7 +64,7 @@ export default function VarelistePage() {
       return sortDir === "asc" ? a.name.localeCompare(b.name, "nb") : b.name.localeCompare(a.name, "nb");
     });
     return arr;
-  }, [rows, q, cat, active, sortKey, sortDir, statsMap]);
+  }, [rows, q, cat, active, kind, sortKey, sortDir, statsMap]);
 
   const toggleSort = (k: SortKey) => {
     if (sortKey === k) setSortDir(d => (d === "asc" ? "desc" : "asc"));
