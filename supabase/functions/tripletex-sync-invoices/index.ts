@@ -156,7 +156,8 @@ Deno.serve(async (req) => {
     }
 
     const FIELDS =
-      "id,invoiceNumber,invoiceDate,invoiceDueDate,amount,amountExcludingVat,isCreditNote," +
+      "id,invoiceNumber,invoiceDate,invoiceDueDate,amount,amountExcludingVat," +
+      "amountCurrency,amountExcludingVatCurrency,isCreditNote," +
       "currency(code),voucher(id,number),supplier(id,name,organizationNumber,supplierNumber)";
 
     async function fetchPage(from: string, to: string, offset: number) {
