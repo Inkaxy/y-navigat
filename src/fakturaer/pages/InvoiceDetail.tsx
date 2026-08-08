@@ -136,6 +136,24 @@ export default function InvoiceDetailPage() {
     }
   }
 
+  async function fetchLinesFromPdf() {
+    setFetchingLines(true);
+    try {
+      const { data: res, error } = await supabase.functions.invoke("tripletex-import-invoice-lines", {
+        body: { legal_entity_id: data.legal_entity_id, invoice_id: data.id, limit: 1 },
+      });
+      if (error) throw error;
+      if ((res as any)?.feilet > 0) toast.error("Kunne ikke hente linjer fra PDF");
+      else toast.success("Linjer hentet fra PDF");
+      qc.invalidateQueries({ queryKey: ["invoice", id] });
+    } catch (e: any) {
+      toast.error(e.message ?? "Kunne ikke hente linjer");
+    } finally {
+      setFetchingLines(false);
+    }
+  }
+
+
 
 
   return (
