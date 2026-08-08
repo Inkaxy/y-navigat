@@ -559,6 +559,26 @@ export default function ImportPdfPage({ embedded = false }: { embedded?: boolean
             <Plus className="h-3 w-3" /> Ny linje
           </Button>
         </div>
+        {(() => {
+          const check = computeLinesSum({
+            lineTotals: lines.map((l) => l.total_amount),
+            totalAmount: totalAmount ? Number(totalAmount) : null,
+            totalVat: totalVat ? Number(totalVat) : null,
+          });
+          if (check.lines_sum_status !== "mismatch") return null;
+          return (
+            <Alert className="mb-3 border-warning/40 bg-warning/5">
+              <AlertTriangle className="h-4 w-4 text-warning" />
+              <AlertTitle className="text-sm">Linjene stemmer ikke med fakturabeløpet</AlertTitle>
+              <AlertDescription className="text-xs">
+                Varelinjene summerer seg til {check.lines_sum_excl_vat?.toFixed(2)} (eks. mva), mens fakturaen er på{" "}
+                {Number(totalAmount).toFixed(2)}
+                {totalVat ? ` inkl. ${Number(totalVat).toFixed(2)} i mva` : ""}. Det kan mangle linjer.
+              </AlertDescription>
+            </Alert>
+          );
+        })()}
+
         {lines.length > 0 && (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
