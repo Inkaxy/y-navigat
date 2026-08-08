@@ -62,7 +62,7 @@ Deno.serve(async (req) => {
 
     // Fetch invoice + ensure caller has write
     const { data: inv, error: invErr } = await svc.from("invoices")
-      .select("id, legal_entity_id, supplier_id, total_amount")
+      .select("id, legal_entity_id, supplier_id, total_amount, invoice_date")
       .eq("id", invoiceId).single();
     if (invErr || !inv) return json({ error: "Invoice not found" }, 404);
 
@@ -107,7 +107,7 @@ Deno.serve(async (req) => {
 
     // Raw materials in legal entity (active) — for fuzzy
     const { data: rmList } = await svc.from("raw_materials")
-      .select("id, name, sku, category, base_unit, current_cost_price")
+      .select("id, name, sku, category, base_unit, current_cost_price, primary_supplier_id")
       .eq("legal_entity_id", inv.legal_entity_id).eq("is_active", true);
     const rmById = new Map<string, AnyRec>((rmList ?? []).map((r: AnyRec) => [r.id, r]));
 
@@ -174,7 +174,7 @@ Deno.serve(async (req) => {
           manualUpdate.variance_status = expected == null ? "no_baseline" : "no_baseline";
           manualUpdate.price_variance_pct = null;
         }
-        await syncRegisteredPrices(svc, inv, line, rm, rmsRow, actual, manualUpdate);
+        await syncRegisteredPrices(svc, inv, line, rm, rmsRow, actual, manualUpdate, catTolMap.get(rm?.category ?? "") ?? tolDefault);
         if (manualUpdate.requires_review) requiresReview = true;
         if (manualUpdate.review_reason) manualUpdate.review_reason.split(",").forEach((r: string) => reviewReasons.add(r));
         manualUpdate.requires_review = requiresReview;
