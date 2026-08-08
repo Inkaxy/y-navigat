@@ -345,21 +345,25 @@ function EntityConfig({ legalEntityId }: { legalEntityId: string }) {
             <p className="text-sm text-muted-foreground">Ingen sync-kjøringer ennå.</p>
           ) : (
             <ul className="divide-y">
-              {log.map((row: any) => (
-                <li key={row.id} className="flex items-center justify-between py-2 text-sm">
-                  <div>
-                    <div className="font-medium">{new Date(row.started_at).toLocaleString("nb-NO")}</div>
-                    {row.error_message && <div className="text-xs text-destructive">{row.error_message}</div>}
-                  </div>
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                    <span>hentet: {row.vouchers_fetched}</span>
-                    <span>importert: {row.vouchers_imported}</span>
-                    <Badge variant={row.status === "success" ? "secondary" : row.status === "error" ? "destructive" : "outline"}>
-                      {row.status}
-                    </Badge>
-                  </div>
-                </li>
-              ))}
+              {log.map((row: any) => {
+                const note = typeof row.details?.note === "string" ? row.details.note : null;
+                return (
+                  <li key={row.id} className="flex items-start justify-between gap-4 py-2 text-sm">
+                    <div>
+                      <div className="font-medium">{new Date(row.started_at).toLocaleString("nb-NO")}</div>
+                      {row.error_message && <div className="text-xs text-destructive">{row.error_message}</div>}
+                      {note && <div className="text-xs text-muted-foreground mt-0.5">{note}</div>}
+                    </div>
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                      <span>hentet: {row.vouchers_fetched}</span>
+                      <span>importert: {row.vouchers_imported}</span>
+                      <Badge variant={row.status === "success" ? "secondary" : row.status === "error" ? "destructive" : "outline"}>
+                        {row.status}
+                      </Badge>
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </CardContent>
