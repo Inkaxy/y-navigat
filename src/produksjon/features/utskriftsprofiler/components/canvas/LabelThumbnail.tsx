@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from "react";
-import { FIELD_LABELS, type ProfileField, type ProfileLine } from "../../types";
+import { FALLBACK_FIELD_LABELS, type ProfileField, type ProfileLine } from "../../types";
 import { fitFontSizePt } from "../../lib/fitText";
 
 interface Props {
@@ -95,10 +95,10 @@ export function LabelThumbnail({
                   />
                 );
               } else if (f.field_type === "firmanavn") {
-                measureString = companyName || FIELD_LABELS.firmanavn;
+                measureString = companyName || FALLBACK_FIELD_LABELS.firmanavn;
                 content = measureString;
               } else {
-                measureString = `[${FIELD_LABELS[f.field_type]}]`;
+                measureString = `[${FALLBACK_FIELD_LABELS[f.field_type]}]`;
                 content = measureString;
               }
               const effectivePt =

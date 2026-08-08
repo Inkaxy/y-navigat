@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   DEFAULT_SIZES_FALLBACK,
   FIELD_GROUPS,
-  FIELD_LABELS,
+  FALLBACK_FIELD_LABELS,
   FIELD_TYPES,
   GROUP_LABELS,
   defaultFieldSize,
@@ -72,7 +72,7 @@ function build(
   })).filter((g) => g.keys.length > 0);
 
   const label = (key: FieldType) =>
-    byKey[key]?.display_name ?? FIELD_LABELS[key] ?? key;
+    byKey[key]?.display_name ?? FALLBACK_FIELD_LABELS[key] ?? key;
   const group = (key: FieldType): FieldGroup =>
     byKey[key]?.field_group ?? FIELD_GROUPS[key] ?? "system";
 
@@ -107,9 +107,9 @@ export const FALLBACK_CATALOG: LabelFieldCatalog = build(
     const size = DEFAULT_SIZES_FALLBACK[key] ?? { w: 40, h: 5 };
     return {
       field_key: key,
-      display_name: FIELD_LABELS[key] ?? key,
+      display_name: FALLBACK_FIELD_LABELS[key] ?? key,
       field_group: g,
-      source_label: `${GROUP_LABELS[g]} → ${FIELD_LABELS[key] ?? key}`,
+      source_label: `${GROUP_LABELS[g]} → ${FALLBACK_FIELD_LABELS[key] ?? key}`,
       value_type:
         key === "logo"
           ? "image"
