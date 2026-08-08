@@ -217,8 +217,11 @@ export default function LeverandorerPage() {
                       <td className="px-4 py-3">
                         <Switch
                           checked={!!r.track_invoice_lines}
-                          disabled={!canWrite || setTracking.isPending}
-                          onCheckedChange={(value) => setTracking.mutate({ id: r.id, value })}
+                          disabled={!canWrite || setTracking.isPending || backfill.isPending}
+                          onCheckedChange={(value) => {
+                            if (value) setConfirmOn(r);
+                            else setTracking.mutate({ id: r.id, value: false });
+                          }}
                           aria-label={`Følg fakturalinjer for ${r.name}`}
                         />
                       </td>
