@@ -25,7 +25,7 @@ import { toast } from "sonner";
 
 interface Props {
   recipeId: string;
-  currentProductId: string;
+  currentProductId?: string;
   canWrite: boolean;
 }
 

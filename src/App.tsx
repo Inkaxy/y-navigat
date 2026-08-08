@@ -85,6 +85,7 @@ const VarerPriceListDetail = lazy(() => import("@/varer/pages/PriceListDetail"))
 const VarerSpecialPrices = lazy(() => import("@/varer/pages/SpecialPrices"));
 const VarerRecipes = lazy(() => import("@/varer/pages/Recipes"));
 const VarerRecipesCleanup = lazy(() => import("@/varer/pages/RecipesCleanup"));
+const VarerRecipeDetail = lazy(() => import("@/varer/pages/RecipeDetail"));
 const VarerPlaceholder = lazy(() => import("@/varer/pages/PlaceholderPage"));
 const VarerCakeBuilderList = lazy(() => import("@/varer/pages/cakebuilder/CakeBuilderList"));
 const VarerCakeBuilderDetail = lazy(() => import("@/varer/pages/cakebuilder/CakeBuilderDetail"));
@@ -303,6 +304,7 @@ const App = () => (
               <Route path="/varer/spesialpriser" element={<Shell><AppAccessGuard appCode="varer" appName="Varer"><VarerAppProvider><VarerSpecialPrices /></VarerAppProvider></AppAccessGuard></Shell>} />
               <Route path="/varer/oppskrifter" element={<Shell><AppAccessGuard appCode="varer" appName="Varer"><VarerAppProvider><VarerRecipes /></VarerAppProvider></AppAccessGuard></Shell>} />
               <Route path="/varer/oppskrifter/krever-opprydding" element={<Shell><AppAccessGuard appCode="varer" appName="Varer"><VarerAppProvider><VarerRecipesCleanup /></VarerAppProvider></AppAccessGuard></Shell>} />
+              <Route path="/varer/oppskrifter/:id" element={<Shell><AppAccessGuard appCode="varer" appName="Varer"><VarerAppProvider><VarerRecipeDetail /></VarerAppProvider></AppAccessGuard></Shell>} />
               <Route path="/varer/kakebygger" element={<Shell><AppAccessGuard appCode="varer" appName="Varer"><VarerAppProvider><VarerCakeBuilderList /></VarerAppProvider></AppAccessGuard></Shell>} />
               <Route path="/varer/kakebygger/:id" element={<Shell><AppAccessGuard appCode="varer" appName="Varer"><VarerAppProvider><VarerCakeBuilderDetail /></VarerAppProvider></AppAccessGuard></Shell>} />
               <Route path="/varer/sortiment" element={<Shell><AppAccessGuard appCode="varer" appName="Varer"><VarerAppProvider><VarerPlaceholder title="Sortiment" subtitle="Kanaler og kunder" body="Sortimentsstyring kommer når Kunder-appen er bygget." /></VarerAppProvider></AppAccessGuard></Shell>} />

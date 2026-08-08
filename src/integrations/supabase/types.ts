@@ -8383,6 +8383,7 @@ export type Database = {
           sku: string
           unit_weight_grams: number | null
           updated_at: string
+          water_content_pct: number | null
         }
         Insert: {
           agreed_price?: number | null
@@ -8411,6 +8412,7 @@ export type Database = {
           sku: string
           unit_weight_grams?: number | null
           updated_at?: string
+          water_content_pct?: number | null
         }
         Update: {
           agreed_price?: number | null
@@ -8439,6 +8441,7 @@ export type Database = {
           sku?: string
           unit_weight_grams?: number | null
           updated_at?: string
+          water_content_pct?: number | null
         }
         Relationships: [
           {
@@ -8558,12 +8561,15 @@ export type Database = {
       }
       recipe_lines: {
         Row: {
+          bakers_percent: number | null
           created_at: string
           custom_declaration_text: string | null
+          entry_mode: string
           id: string
           include_in_declaration: boolean
           ingredient_id: string | null
           ingredient_name: string | null
+          is_flour_override: boolean | null
           is_quid_relevant: boolean
           notes: string | null
           quantity: number
@@ -8575,14 +8581,18 @@ export type Database = {
           unit: string
           updated_at: string
           waste_percent: number | null
+          water_content_pct_override: number | null
         }
         Insert: {
+          bakers_percent?: number | null
           created_at?: string
           custom_declaration_text?: string | null
+          entry_mode?: string
           id?: string
           include_in_declaration?: boolean
           ingredient_id?: string | null
           ingredient_name?: string | null
+          is_flour_override?: boolean | null
           is_quid_relevant?: boolean
           notes?: string | null
           quantity: number
@@ -8594,14 +8604,18 @@ export type Database = {
           unit: string
           updated_at?: string
           waste_percent?: number | null
+          water_content_pct_override?: number | null
         }
         Update: {
+          bakers_percent?: number | null
           created_at?: string
           custom_declaration_text?: string | null
+          entry_mode?: string
           id?: string
           include_in_declaration?: boolean
           ingredient_id?: string | null
           ingredient_name?: string | null
+          is_flour_override?: boolean | null
           is_quid_relevant?: boolean
           notes?: string | null
           quantity?: number
@@ -8613,6 +8627,7 @@ export type Database = {
           unit?: string
           updated_at?: string
           waste_percent?: number | null
+          water_content_pct_override?: number | null
         }
         Relationships: [
           {
@@ -8709,10 +8724,14 @@ export type Database = {
           id: string
           instructions: string | null
           name: string
+          part_type: string
+          preferment_kind: string | null
           prep_time_minutes: number | null
           recipe_id: string
           rest_time_minutes: number | null
+          ripe_time_hours: number | null
           sort_order: number
+          target_temp_celsius: number | null
           updated_at: string
         }
         Insert: {
@@ -8720,10 +8739,14 @@ export type Database = {
           id?: string
           instructions?: string | null
           name: string
+          part_type?: string
+          preferment_kind?: string | null
           prep_time_minutes?: number | null
           recipe_id: string
           rest_time_minutes?: number | null
+          ripe_time_hours?: number | null
           sort_order?: number
+          target_temp_celsius?: number | null
           updated_at?: string
         }
         Update: {
@@ -8731,10 +8754,14 @@ export type Database = {
           id?: string
           instructions?: string | null
           name?: string
+          part_type?: string
+          preferment_kind?: string | null
           prep_time_minutes?: number | null
           recipe_id?: string
           rest_time_minutes?: number | null
+          ripe_time_hours?: number | null
           sort_order?: number
+          target_temp_celsius?: number | null
           updated_at?: string
         }
         Relationships: [
@@ -8754,23 +8781,144 @@ export type Database = {
           },
         ]
       }
+      recipe_share_links: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          expires_at: string | null
+          id: string
+          include_costs: boolean
+          label: string | null
+          last_viewed_at: string | null
+          recipe_id: string
+          revoked_at: string | null
+          token: string
+          view_count: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string | null
+          id?: string
+          include_costs?: boolean
+          label?: string | null
+          last_viewed_at?: string | null
+          recipe_id: string
+          revoked_at?: string | null
+          token: string
+          view_count?: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string | null
+          id?: string
+          include_costs?: boolean
+          label?: string | null
+          last_viewed_at?: string | null
+          recipe_id?: string
+          revoked_at?: string | null
+          token?: string
+          view_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recipe_share_links_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipe_nutrition_calculated"
+            referencedColumns: ["recipe_id"]
+          },
+          {
+            foreignKeyName: "recipe_share_links_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recipe_steps: {
+        Row: {
+          created_at: string
+          duration_minutes: number | null
+          humidity_pct: number | null
+          id: string
+          instruction: string | null
+          recipe_id: string
+          sort_order: number
+          step_type: string
+          temp_celsius: number | null
+          title: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          duration_minutes?: number | null
+          humidity_pct?: number | null
+          id?: string
+          instruction?: string | null
+          recipe_id: string
+          sort_order?: number
+          step_type?: string
+          temp_celsius?: number | null
+          title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          duration_minutes?: number | null
+          humidity_pct?: number | null
+          id?: string
+          instruction?: string | null
+          recipe_id?: string
+          sort_order?: number
+          step_type?: string
+          temp_celsius?: number | null
+          title?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recipe_steps_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipe_nutrition_calculated"
+            referencedColumns: ["recipe_id"]
+          },
+          {
+            foreignKeyName: "recipe_steps_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       recipes: {
         Row: {
+          autolyse_minutes: number | null
           bake_temp_celsius: number | null
           bake_time_minutes: number | null
           bulk_proof_minutes: number | null
+          category: string | null
           cooling_minutes: number | null
           created_at: string
           created_by: string | null
           declaration_mode: Database["public"]["Enums"]["declaration_mode"]
           declaration_updated_at: string | null
           declaration_updated_by: string | null
+          description: string | null
+          friction_factor_celsius: number | null
           hourly_rate: number
           id: string
+          image_url: string | null
           legal_entity_id: string | null
           manual_allergen_summary: Json | null
           manual_ingredient_declaration: string | null
           manual_nutrition: Json | null
+          mixing_speed1_minutes: number | null
+          mixing_speed2_minutes: number | null
           name: string | null
           notes: string | null
           price_egne_utsalg: number | null
@@ -8781,8 +8929,11 @@ export type Database = {
           production_notes: string | null
           requires_cleanup: boolean
           shape_proof_minutes: number | null
+          status: string
           steam_seconds: number | null
           target_db_pct: number
+          target_dough_temp_celsius: number | null
+          unit_weight_grams: number | null
           units_per_batch: number | null
           updated_at: string
           valid_from: string
@@ -8794,21 +8945,28 @@ export type Database = {
           yield_unit: string
         }
         Insert: {
+          autolyse_minutes?: number | null
           bake_temp_celsius?: number | null
           bake_time_minutes?: number | null
           bulk_proof_minutes?: number | null
+          category?: string | null
           cooling_minutes?: number | null
           created_at?: string
           created_by?: string | null
           declaration_mode?: Database["public"]["Enums"]["declaration_mode"]
           declaration_updated_at?: string | null
           declaration_updated_by?: string | null
+          description?: string | null
+          friction_factor_celsius?: number | null
           hourly_rate?: number
           id?: string
+          image_url?: string | null
           legal_entity_id?: string | null
           manual_allergen_summary?: Json | null
           manual_ingredient_declaration?: string | null
           manual_nutrition?: Json | null
+          mixing_speed1_minutes?: number | null
+          mixing_speed2_minutes?: number | null
           name?: string | null
           notes?: string | null
           price_egne_utsalg?: number | null
@@ -8819,8 +8977,11 @@ export type Database = {
           production_notes?: string | null
           requires_cleanup?: boolean
           shape_proof_minutes?: number | null
+          status?: string
           steam_seconds?: number | null
           target_db_pct?: number
+          target_dough_temp_celsius?: number | null
+          unit_weight_grams?: number | null
           units_per_batch?: number | null
           updated_at?: string
           valid_from?: string
@@ -8832,21 +8993,28 @@ export type Database = {
           yield_unit?: string
         }
         Update: {
+          autolyse_minutes?: number | null
           bake_temp_celsius?: number | null
           bake_time_minutes?: number | null
           bulk_proof_minutes?: number | null
+          category?: string | null
           cooling_minutes?: number | null
           created_at?: string
           created_by?: string | null
           declaration_mode?: Database["public"]["Enums"]["declaration_mode"]
           declaration_updated_at?: string | null
           declaration_updated_by?: string | null
+          description?: string | null
+          friction_factor_celsius?: number | null
           hourly_rate?: number
           id?: string
+          image_url?: string | null
           legal_entity_id?: string | null
           manual_allergen_summary?: Json | null
           manual_ingredient_declaration?: string | null
           manual_nutrition?: Json | null
+          mixing_speed1_minutes?: number | null
+          mixing_speed2_minutes?: number | null
           name?: string | null
           notes?: string | null
           price_egne_utsalg?: number | null
@@ -8857,8 +9025,11 @@ export type Database = {
           production_notes?: string | null
           requires_cleanup?: boolean
           shape_proof_minutes?: number | null
+          status?: string
           steam_seconds?: number | null
           target_db_pct?: number
+          target_dough_temp_celsius?: number | null
+          unit_weight_grams?: number | null
           units_per_batch?: number | null
           updated_at?: string
           valid_from?: string
@@ -10657,6 +10828,8 @@ export type Database = {
         }
         Returns: Json
       }
+      can_read_recipe: { Args: { _recipe_id: string }; Returns: boolean }
+      can_write_recipe: { Args: { _recipe_id: string }; Returns: boolean }
       cancel_invoice_run: { Args: { p_run_id: string }; Returns: Json }
       change_order_tour: {
         Args: { p_new_tour_id: string; p_order_id: string; p_reason?: string }
@@ -11772,6 +11945,7 @@ export type Database = {
           sku: string
           unit_weight_grams: number | null
           updated_at: string
+          water_content_pct: number | null
         }
         SetofOptions: {
           from: "*"
