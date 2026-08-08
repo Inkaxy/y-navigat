@@ -198,7 +198,8 @@ Deno.serve(async (req) => {
               };
             });
 
-          const confidence = num(extractJsonBody?.extracted?.confidence);
+          // confidence ligger på toppnivå i svaret, ikke inni `extracted`.
+          const confidence = num(extractJsonBody?.confidence);
           const lowConfidence = needsReviewFromConfidence(confidence);
 
           if (rows.length === 0) {
