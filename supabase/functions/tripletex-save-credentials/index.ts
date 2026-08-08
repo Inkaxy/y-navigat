@@ -72,9 +72,10 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     // API-nøkkelen lagres i employee_token_encrypted (samme kolonne, jwt-modus).
+    // Godta begge feltnavn slik at klienten kan sende enten jwt_token eller employee_token.
     const secretPlain = body.mode === "jwt"
-      ? body.jwt_token?.trim()
-      : body.employee_token?.trim();
+      ? (body.jwt_token?.trim() || body.employee_token?.trim())
+      : (body.employee_token?.trim() || body.jwt_token?.trim());
     const conPlain = body.consumer_token?.trim();
     const keepExistingSecret = existing?.mode === body.mode ? existing?.employee_token_encrypted : undefined;
 
