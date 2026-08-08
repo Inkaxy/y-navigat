@@ -45,9 +45,13 @@ Deno.serve(async (req) => {
   try {
     const auth = req.headers.get("Authorization");
     if (!auth) return json({ error: "Unauthorized" }, 401);
+    // Tjenestekall (cron/import) med service-role-nøkkelen hopper over brukersjekken.
+    const isServiceCall = auth.replace(/^Bearer\s+/i, "").trim() === SERVICE;
     const userClient = createClient(SUPABASE_URL, ANON, { global: { headers: { Authorization: auth } } });
-    const { data: userData, error: uerr } = await userClient.auth.getUser();
-    if (uerr || !userData.user) return json({ error: "Unauthorized" }, 401);
+    if (!isServiceCall) {
+      const { data: userData, error: uerr } = await userClient.auth.getUser();
+      if (uerr || !userData.user) return json({ error: "Unauthorized" }, 401);
+    }
 
     const body = await req.json().catch(() => ({}));
     const invoiceId: string | undefined = body?.invoice_id;
