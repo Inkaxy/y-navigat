@@ -28,6 +28,7 @@ export interface LabelPdfData {
   /** Hvor mange etiketter som skal genereres (ofte = quantity). Default 1. */
   copies?: number;
   /** Oppløste etikettfelter fra RPC `resolve_label_fields`. Fyller etikett-felt. */
+  /** @deprecated Bruk `felter` fra `resolve_label_data`. */
   labelFields?: LabelFields | null;
   /** Tur-etikett (f.eks. "Tur 1") for ordrelinjen. */
   tourLabel?: string | null;
@@ -89,6 +90,44 @@ function joinNonEmpty(parts: Array<string | undefined | null>, sep = " · "): st
   return parts.filter((s): s is string => !!s && s.trim().length > 0).join(sep);
 }
 
+/** Reserve for kall som ennå sender enkeltverdier i stedet for `felter`. */
+function legacyValue(type: FieldType, d: LabelPdfData): string {
+  switch (type) {
+    case "varenavn":
+      return d.row?.display_name ?? "";
+    case "varenr":
+      return d.row?.display_number != null ? String(d.row.display_number) : "";
+    case "antall":
+      return String(d.quantity ?? "");
+    case "tur":
+      return d.tourLabel ?? "";
+    case "hentested":
+      return d.pickupLabel ?? "";
+    case "kundenavn":
+      return d.customerName ?? "";
+    case "leveringsadresse":
+      return d.deliveryAddress ?? "";
+    case "telefon":
+      return d.phone ?? "";
+    case "leveringsdato":
+      return d.deliveryDate ?? "";
+    case "hentetidspunkt":
+      return d.pickupTime ?? "";
+    case "er_betalt":
+      return d.isPaid == null ? "" : d.isPaid ? "Ja" : "Nei";
+    case "distribusjon":
+      return d.distribution ?? "";
+    case "kjorerute":
+      return d.routeLabel ?? d.tourLabel ?? "";
+    case "pakkseddelnr":
+      return d.deliveryNoteNumber ?? "";
+    case "melding_pakkseddel":
+      return d.deliveryNoteMessage ?? "";
+    default:
+      return "";
+  }
+}
+
 /** Verdi for et felt: system-/profilfelt her, alt annet fra `felter`. */
 function valueFor(
   type: FieldType,
@@ -109,8 +148,11 @@ function valueFor(
     case "utskriftstidspunkt":
     case "sist_endret":
       return { text: new Date().toLocaleString("nb-NO") };
-    default:
-      return { text: formatValue(data.felter?.[type]) };
+    default: {
+      const fromRpc = data.felter?.[type];
+      if (fromRpc != null && fromRpc !== "") return { text: formatValue(fromRpc) };
+      return { text: legacyValue(type, data) };
+    }
   }
 }
 
