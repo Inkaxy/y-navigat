@@ -128,18 +128,21 @@ function EntityConfig({ legalEntityId }: { legalEntityId: string }) {
   const hasStoredJwt = cred?.mode === "jwt";
   const isConfigured = mode === "jwt" ? hasStoredJwt : !!cred?.has_employee_token;
 
+  const buildTokenPayload = () => ({
+    legal_entity_id: legalEntityId,
+    mode,
+    jwt_token: mode === "jwt" ? (jwtToken || undefined) : undefined,
+    consumer_token: mode === "standard" ? (consumerToken || undefined) : undefined,
+    employee_token: mode === "jwt" ? undefined : (employeeToken || undefined),
+  });
+
   const handleTest = async () => {
     setTesting(true); setTestResult(null);
     try {
       const { data, error } = await supabase.functions.invoke("tripletex-test-connection", {
-        body: {
-          legal_entity_id: legalEntityId,
-          mode,
-          consumer_token: consumerToken || undefined,
-          employee_token: employeeToken || undefined,
-        },
+        body: buildTokenPayload(),
       });
-      if (error) throw error;
+      if (error) throw new Error(await edgeErrorMessage(error, "Test feilet"));
       if (data?.ok) {
         setTestResult({ ok: true, message: `OK – tilkoblet ${data.company?.name ?? "Tripletex"}` });
       } else {
@@ -157,18 +160,15 @@ function EntityConfig({ legalEntityId }: { legalEntityId: string }) {
     try {
       const { data, error } = await supabase.functions.invoke("tripletex-save-credentials", {
         body: {
-          legal_entity_id: legalEntityId,
-          mode,
-          consumer_token: mode === "standard" ? (consumerToken || undefined) : undefined,
-          employee_token: employeeToken || undefined,
+          ...buildTokenPayload(),
           sync_enabled: syncEnabled,
           sync_frequency_minutes: frequency,
         },
       });
-      if (error) throw error;
+      if (error) throw new Error(await edgeErrorMessage(error, "Lagring feilet"));
       if ((data as any)?.error) throw new Error((data as any).error);
       toast.success("Tripletex-konfigurasjon lagret");
-      setConsumerToken(""); setEmployeeToken("");
+      setJwtToken(""); setConsumerToken(""); setEmployeeToken("");
       qc.invalidateQueries({ queryKey: ["tripletex-credentials", legalEntityId] });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Lagring feilet");
