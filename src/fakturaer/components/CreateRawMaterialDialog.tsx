@@ -42,6 +42,7 @@ export function CreateRawMaterialDialog({ open, onOpenChange, line }: Props) {
     setPackageSize("");
     setPackageUnit(line.unit ?? "");
     setCategory("");
+    setNewCategory(false);
   }, [line, open]);
 
   const { data: categories = [] } = useQuery({
@@ -55,7 +56,7 @@ export function CreateRawMaterialDialog({ open, onOpenChange, line }: Props) {
   });
 
   async function submit() {
-    if (!line || !name.trim() || !category) { toast.error("Navn og kategori er påkrevd"); return; }
+    if (!line || !name.trim() || !category.trim()) { toast.error("Navn og kategori er påkrevd"); return; }
     setBusy(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -76,7 +77,7 @@ export function CreateRawMaterialDialog({ open, onOpenChange, line }: Props) {
       const { data: rm, error: rmErr } = await supabase.from("raw_materials").insert({
         legal_entity_id: line.invoice.legal_entity_id,
         sku: skuGen,
-        name: name.trim(), category, base_unit: baseUnit,
+        name: name.trim(), category: category.trim(), base_unit: baseUnit,
         package_size: packageSize ? Number(packageSize) : null,
         package_unit: packageUnit || null,
         current_cost_price: pricePerBase ?? 0, price_source: "invoice", price_updated_at: nowIso,
