@@ -29,6 +29,7 @@ export default function InvoiceDetailPage() {
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [matchLineId, setMatchLineId] = useState<string | null>(null);
   const [rematching, setRematching] = useState(false);
+  const [fetchingLines, setFetchingLines] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["invoice", id],
