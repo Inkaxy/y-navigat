@@ -5,8 +5,11 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Loader2, AlertTriangle } from "lucide-react";
+import { Loader2, AlertTriangle, Check, ChevronsUpDown } from "lucide-react";
+
 import { FakturaerHeaderBanner } from "@/fakturaer/components/FakturaerHeaderBanner";
 import { useReviewLines, type ReviewLineRow, type ReviewReason } from "@/fakturaer/hooks/useReviewLines";
 import { useFakturaerLegalEntities } from "@/fakturaer/hooks/useFakturaerLegalEntities";
