@@ -90,3 +90,10 @@ verify_jwt = false
 
 [functions.cleanup-printed-cake-images]
 verify_jwt = false
+
+[functions.nettside-order-in]
+verify_jwt = false
+
+[functions.fakturering-sync-status]
+verify_jwt = false
+

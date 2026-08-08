@@ -22,13 +22,17 @@ function json(status: number, body: unknown) {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
-  const expected = Deno.env.get("CRON_SECRET");
-  const provided = req.headers.get("x-cron-secret");
-  if (!expected || provided !== expected) {
-    return json(401, { error: "Unauthorized" });
-  }
-
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
+  const provided = (req.headers.get("x-cron-secret") ?? "").trim();
+  const expectedEnv = Deno.env.get("CRON_SECRET");
+  let authorized = Boolean(expectedEnv) && provided === expectedEnv;
+  if (!authorized && provided.length >= 16) {
+    const { data, error } = await admin.rpc("verify_cron_secret", { p_secret: provided });
+    if (error) console.error("verify_cron_secret feilet", error.message);
+    authorized = data === true;
+  }
+  if (!authorized) return json(401, { error: "Unauthorized" });
+
 
   try {
     const { data: rows, error } = await admin
