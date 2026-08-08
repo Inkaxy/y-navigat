@@ -37,6 +37,9 @@ export default function RecipeDetail() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const { canWrite, legalEntityId } = useAppContext();
+  const computeLabel = useComputeRecipeLabel();
+
+
 
   const recipeQuery = useQuery({
     queryKey: ["recipe-detail", id],
