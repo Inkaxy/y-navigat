@@ -15,6 +15,22 @@ import { Badge } from "@/components/ui/badge";
 import { Info, CheckCircle2, AlertTriangle, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
+/** Henter feilmeldingen fra edge-funksjonens svar ordrett (f.eks. manglende krypteringsnøkkel). */
+async function edgeErrorMessage(error: unknown, fallback: string): Promise<string> {
+  const res = (error as { context?: Response })?.context;
+  if (res && typeof res.text === "function") {
+    try {
+      const body = await res.clone().text();
+      const parsed = JSON.parse(body);
+      if (parsed?.error) return String(parsed.error);
+      if (body.trim()) return body.slice(0, 500);
+    } catch {
+      /* ignore parse issues, fall through */
+    }
+  }
+  return error instanceof Error ? error.message : fallback;
+}
+
 export default function TripletexSettings() {
   const { data: entities = [], isLoading: entitiesLoading } = useFakturaerLegalEntities();
   const [selectedEntity, setSelectedEntity] = useState<string | null>(null);
