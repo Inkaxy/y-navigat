@@ -116,24 +116,31 @@ Deno.serve(async (req) => {
     const auth = req.headers.get("Authorization");
     if (!auth) return jsonErr("Missing Authorization", 401);
 
+    // Tjenestekall (cron/import) med service-role-nøkkelen hopper over brukersjekken.
+    const isServiceCall = auth.replace(/^Bearer\s+/i, "").trim() === serviceKey;
+
     const userClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: auth } },
     });
     const admin = createClient(supabaseUrl, serviceKey);
 
-    const { data: userRes } = await userClient.auth.getUser();
-    const user = userRes?.user;
-    if (!user) return jsonErr("Not authenticated", 401);
+    if (!isServiceCall) {
+      const { data: userRes } = await userClient.auth.getUser();
+      const user = userRes?.user;
+      if (!user) return jsonErr("Not authenticated", 401);
+    }
 
     const body = await req.json().catch(() => ({}));
     const { legal_entity_id, pdf_base64, pdf_text } = body;
     if (!legal_entity_id) return jsonErr("legal_entity_id påkrevd", 400);
     if (!pdf_base64 && !pdf_text) return jsonErr("pdf_base64 eller pdf_text påkrevd", 400);
 
-    const { data: hasAccess } = await userClient.rpc("has_ravarer_invoice_access", {
-      _legal_entity_id: legal_entity_id, _required_level: "write",
-    });
-    if (!hasAccess) return jsonErr("Mangler skrivetilgang til fakturaer", 403);
+    if (!isServiceCall) {
+      const { data: hasAccess } = await userClient.rpc("has_ravarer_invoice_access", {
+        _legal_entity_id: legal_entity_id, _required_level: "write",
+      });
+      if (!hasAccess) return jsonErr("Mangler skrivetilgang til fakturaer", 403);
+    }
 
     // Get active AI config
     const { data: cfg } = await admin
