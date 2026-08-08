@@ -2901,6 +2901,48 @@ export type Database = {
         }
         Relationships: []
       }
+      label_field_catalog: {
+        Row: {
+          default_height_mm: number
+          default_width_mm: number
+          description: string | null
+          display_name: string
+          field_group: string
+          field_key: string
+          multiline: boolean
+          sort_order: number
+          source_label: string
+          status: string
+          value_type: string
+        }
+        Insert: {
+          default_height_mm?: number
+          default_width_mm?: number
+          description?: string | null
+          display_name: string
+          field_group: string
+          field_key: string
+          multiline?: boolean
+          sort_order?: number
+          source_label: string
+          status?: string
+          value_type?: string
+        }
+        Update: {
+          default_height_mm?: number
+          default_width_mm?: number
+          description?: string | null
+          display_name?: string
+          field_group?: string
+          field_key?: string
+          multiline?: boolean
+          sort_order?: number
+          source_label?: string
+          status?: string
+          value_type?: string
+        }
+        Relationships: []
+      }
       label_number_sequences: {
         Row: {
           last_number: number
@@ -11086,6 +11128,7 @@ export type Database = {
       is_ravarer_owner: { Args: { _user_id: string }; Returns: boolean }
       kiosk_session_rate_ok: { Args: { p_ip: string }; Returns: boolean }
       label_field_for_role: { Args: { p_role: string }; Returns: string }
+      label_format_qty: { Args: { p_qty: number }; Returns: string }
       list_active_cake_categories: {
         Args: { p_legal_entity_id: string }
         Returns: {
@@ -11663,6 +11706,14 @@ export type Database = {
           p_table: string
         }
         Returns: number
+      }
+      resolve_label_data: {
+        Args: { p_order_line_ids: string[] }
+        Returns: {
+          felter: Json
+          mangler: string[]
+          order_line_id: string
+        }[]
       }
       resolve_label_fields: {
         Args: { p_order_line_ids: string[] }
