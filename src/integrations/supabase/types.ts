@@ -2518,6 +2518,7 @@ export type Database = {
       }
       invoice_lines: {
         Row: {
+          base_quantity: number | null
           count_per_package: number | null
           created_at: string | null
           description: string | null
@@ -2546,6 +2547,7 @@ export type Database = {
           vat_rate: number | null
         }
         Insert: {
+          base_quantity?: number | null
           count_per_package?: number | null
           created_at?: string | null
           description?: string | null
@@ -2574,6 +2576,7 @@ export type Database = {
           vat_rate?: number | null
         }
         Update: {
+          base_quantity?: number | null
           count_per_package?: number | null
           created_at?: string | null
           description?: string | null
@@ -8166,6 +8169,54 @@ export type Database = {
           },
         ]
       }
+      raw_material_products: {
+        Row: {
+          base_units_per_sold_unit: number
+          created_at: string
+          created_by: string | null
+          id: string
+          is_primary: boolean
+          note: string | null
+          product_id: string
+          raw_material_id: string
+        }
+        Insert: {
+          base_units_per_sold_unit?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_primary?: boolean
+          note?: string | null
+          product_id: string
+          raw_material_id: string
+        }
+        Update: {
+          base_units_per_sold_unit?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_primary?: boolean
+          note?: string | null
+          product_id?: string
+          raw_material_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "raw_material_products_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "raw_material_products_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "raw_materials"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       raw_material_purchases: {
         Row: {
           created_at: string
@@ -8406,6 +8457,7 @@ export type Database = {
           is_active: boolean
           is_composite: boolean
           is_packaging: boolean
+          is_resale_item: boolean
           legal_entity_id: string
           min_stock: number | null
           name: string
@@ -8415,6 +8467,7 @@ export type Database = {
           price_updated_at: string | null
           primary_supplier_id: string | null
           sku: string
+          stock_tracking: boolean
           unit_weight_grams: number | null
           updated_at: string
           water_content_pct: number | null
@@ -8436,6 +8489,7 @@ export type Database = {
           is_active?: boolean
           is_composite?: boolean
           is_packaging?: boolean
+          is_resale_item?: boolean
           legal_entity_id: string
           min_stock?: number | null
           name: string
@@ -8445,6 +8499,7 @@ export type Database = {
           price_updated_at?: string | null
           primary_supplier_id?: string | null
           sku: string
+          stock_tracking?: boolean
           unit_weight_grams?: number | null
           updated_at?: string
           water_content_pct?: number | null
@@ -8466,6 +8521,7 @@ export type Database = {
           is_active?: boolean
           is_composite?: boolean
           is_packaging?: boolean
+          is_resale_item?: boolean
           legal_entity_id?: string
           min_stock?: number | null
           name?: string
@@ -8475,6 +8531,7 @@ export type Database = {
           price_updated_at?: string | null
           primary_supplier_id?: string | null
           sku?: string
+          stock_tracking?: boolean
           unit_weight_grams?: number | null
           updated_at?: string
           water_content_pct?: number | null
@@ -9529,6 +9586,59 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stock_movements: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          legal_entity_id: string
+          movement_type: string
+          note: string | null
+          occurred_at: string
+          product_id: string | null
+          quantity_base: number
+          raw_material_id: string
+          source_id: string | null
+          source_table: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          legal_entity_id: string
+          movement_type: string
+          note?: string | null
+          occurred_at?: string
+          product_id?: string | null
+          quantity_base: number
+          raw_material_id: string
+          source_id?: string | null
+          source_table?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          legal_entity_id?: string
+          movement_type?: string
+          note?: string | null
+          occurred_at?: string
+          product_id?: string | null
+          quantity_base?: number
+          raw_material_id?: string
+          source_id?: string | null
+          source_table?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_movements_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "raw_materials"
             referencedColumns: ["id"]
           },
         ]
@@ -12073,6 +12183,7 @@ export type Database = {
           is_active: boolean
           is_composite: boolean
           is_packaging: boolean
+          is_resale_item: boolean
           legal_entity_id: string
           min_stock: number | null
           name: string
@@ -12082,6 +12193,7 @@ export type Database = {
           price_updated_at: string | null
           primary_supplier_id: string | null
           sku: string
+          stock_tracking: boolean
           unit_weight_grams: number | null
           updated_at: string
           water_content_pct: number | null
