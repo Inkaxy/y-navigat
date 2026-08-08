@@ -12,7 +12,7 @@ export interface LegalEntityRow {
 /** Returnerer alle legal_entities brukeren har faktura-tilgang til (via posisjon eller eier-flagg). */
 export function useFakturaerLegalEntities() {
   return useQuery({
-    queryKey: ["fakturaer-legal-entities"],
+    queryKey: ["fakturaer-legal-entities", "v2"],
     queryFn: async () => {
       // Hent posisjoner brukeren har, sammen med tilgang til fakturaer-app
       const { data: { user } } = await supabase.auth.getUser();

@@ -34,7 +34,7 @@ async function edgeErrorMessage(error: unknown, fallback: string): Promise<strin
 export default function TripletexSettings() {
   const { data: allEntities = [], isLoading: entitiesLoading } = useFakturaerLegalEntities();
   // Kun aktive selskaper — hindrer at API-nøkler lagres på inaktive placeholder-selskaper.
-  const entities = useMemo(() => allEntities.filter((e) => e.status === "active"), [allEntities]);
+  const entities = useMemo(() => allEntities.filter((e) => e.status !== "inactive"), [allEntities]);
   const [selectedEntity, setSelectedEntity] = useState<string | null>(null);
 
   useEffect(() => {
