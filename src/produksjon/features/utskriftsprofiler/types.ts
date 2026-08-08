@@ -245,7 +245,7 @@ export interface LabelPrintProfileUpdate
 }
 
 /** Standard-størrelser per felt-type i mm. */
-const DEFAULT_SIZES: Record<FieldType, { w: number; h: number }> = {
+export const DEFAULT_SIZES_FALLBACK: Record<FieldType, { w: number; h: number }> = {
   logo: { w: 30, h: 15 },
   firmanavn: { w: 60, h: 6 },
   firmamerknad: { w: 60, h: 5 },
@@ -277,7 +277,7 @@ const DEFAULT_SIZES: Record<FieldType, { w: number; h: number }> = {
 };
 
 export function defaultFieldSize(type: FieldType): { w: number; h: number } {
-  return DEFAULT_SIZES[type] ?? { w: 40, h: 5 };
+  return DEFAULT_SIZES_FALLBACK[type] ?? { w: 40, h: 5 };
 }
 
 /**
@@ -298,13 +298,13 @@ export function defaultFields(
   const sizeByKey = new Map<string, { w: number; h: number }>();
   for (const e of entries ?? []) {
     sizeByKey.set(e.field_key, {
-      w: Number(e.default_width_mm) || DEFAULT_SIZES[e.field_key]?.w || 40,
-      h: Number(e.default_height_mm) || DEFAULT_SIZES[e.field_key]?.h || 5,
+      w: Number(e.default_width_mm) || DEFAULT_SIZES_FALLBACK[e.field_key]?.w || 40,
+      h: Number(e.default_height_mm) || DEFAULT_SIZES_FALLBACK[e.field_key]?.h || 5,
     });
   }
   return keys.map((field_type, idx) => {
     const size =
-      sizeByKey.get(field_type) ?? DEFAULT_SIZES[field_type] ?? { w: 40, h: 5 };
+      sizeByKey.get(field_type) ?? DEFAULT_SIZES_FALLBACK[field_type] ?? { w: 40, h: 5 };
     return {
       field_type,
       include: false,
