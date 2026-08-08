@@ -416,7 +416,7 @@ Deno.serve(async (req) => {
       last_sync_error: null,
     };
     // Kun et løpende kall (uten eksplisitt vindu) kan markere førsteimporten som ferdig.
-    if (!harMer && !body.from && !body.to) credPatch.initial_import_done = true;
+    if (!isBackfill && !harMer && !body.from && !body.to) credPatch.initial_import_done = true;
     await admin
       .from("tripletex_credentials")
       .update(credPatch)
@@ -429,6 +429,8 @@ Deno.serve(async (req) => {
       skipped,
       updated,
       failed,
+      hoppet_over_ikke_fulgt: hoppetOverIkkeFulgt,
+      etterhenting: isBackfill,
       from: windowFrom,
       to: windowTo,
       behandlet_til: lastCompletedChunkTo,
