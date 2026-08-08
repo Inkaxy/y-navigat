@@ -9,7 +9,7 @@ import {
 } from "@/produksjon/features/etiketter/lib/labelPdf";
 import { fetchOrderLineTours } from "@/produksjon/features/etiketter/hooks/useOrderLineTours";
 import { fetchOrderLineCustomerInfo } from "@/produksjon/features/etiketter/hooks/useOrderLineCustomerInfo";
-import { fetchLabelFields, useLabelFields } from "@/produksjon/features/etiketter/hooks/useLabelFields";
+import { fetchLabelData, useLabelData } from "@/produksjon/features/etiketter/hooks/useLabelData";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -147,7 +147,7 @@ export default function EtiketterPage() {
     () => Array.from(new Set((filteredRows ?? []).flatMap((r) => r.order_line_ids ?? []))),
     [filteredRows],
   );
-  const { data: labelFieldsByLine } = useLabelFields(allOrderLineIds);
+  const { data: labelFieldsByLine } = useLabelData(allOrderLineIds);
   const missingFieldsByProduct = useMemo(() => {
     const out: Record<string, string[]> = {};
     if (!labelFieldsByLine) return out;
@@ -274,9 +274,9 @@ export default function EtiketterPage() {
       const allLineIds = Array.from(
         new Set(printableRows.flatMap((r) => r.order_line_ids ?? [])),
       );
-      const [labelFieldsMap, tourMap, customerInfoMap] = allLineIds.length > 0
+      const [labelDataMap, tourMap, customerInfoMap] = allLineIds.length > 0
         ? await Promise.all([
-            fetchLabelFields(allLineIds),
+            fetchLabelData(allLineIds),
             fetchOrderLineTours(allLineIds),
             fetchOrderLineCustomerInfo(allLineIds),
           ])
@@ -296,7 +296,7 @@ export default function EtiketterPage() {
             labelNumber: null,
             quantity: totalCopies,
             copies: totalCopies,
-            labelFields: null,
+            felter: null,
           });
         } else {
           // Én side per ordrelinje (med dens merknad); padder ved behov.
@@ -307,7 +307,7 @@ export default function EtiketterPage() {
               labelNumber: null,
               quantity: totalCopies,
               copies: 1,
-              labelFields: labelFieldsMap[id] ?? null,
+              felter: labelDataMap[id]?.felter ?? null,
               tourLabel: tourMap[id] ?? null,
               pickupLabel: customerInfoMap[id]?.pickupLabel ?? null,
               customerName: customerInfoMap[id]?.customerName ?? null,
@@ -329,7 +329,7 @@ export default function EtiketterPage() {
               labelNumber: null,
               quantity: totalCopies,
               copies: totalCopies - lineIds.length,
-              labelFields: labelFieldsMap[lineIds[0]] ?? null,
+              felter: labelDataMap[lineIds[0]]?.felter ?? null,
               tourLabel: tourMap[lineIds[0]] ?? null,
               pickupLabel: customerInfoMap[lineIds[0]]?.pickupLabel ?? null,
               customerName: customerInfoMap[lineIds[0]]?.customerName ?? null,
