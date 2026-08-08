@@ -160,7 +160,11 @@ export function MatchDrawer({ open, onOpenChange, line }: Props) {
         if (error) throw error;
         rmsRow = ins;
       } else {
-        const upd: Record<string, unknown> = {};
+        const upd: {
+          package_size?: number;
+          package_unit?: string;
+          agreed_price_per_base_unit?: number;
+        } = {};
         if (pkgSize != null) upd.package_size = pkgSize;
         if (pkgUnit) upd.package_unit = pkgUnit;
         if (agreed != null && Number.isFinite(agreed)) upd.agreed_price_per_base_unit = agreed;
