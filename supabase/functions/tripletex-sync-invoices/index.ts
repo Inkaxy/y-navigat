@@ -156,7 +156,8 @@ Deno.serve(async (req) => {
     }
 
     const FIELDS =
-      "id,invoiceNumber,invoiceDate,invoiceDueDate,amount,amountExcludingVat,isCreditNote," +
+      "id,invoiceNumber,invoiceDate,invoiceDueDate,amount,amountExcludingVat," +
+      "amountCurrency,amountExcludingVatCurrency,isCreditNote," +
       "currency(code),voucher(id,number),supplier(id,name,organizationNumber,supplierNumber)";
 
     async function fetchPage(from: string, to: string, offset: number) {
@@ -257,8 +258,18 @@ Deno.serve(async (req) => {
           }
 
           // 3) Ny rad
-          const amount = Number(inv.amount ?? 0);
-          const exVat = Number(inv.amountExcludingVat ?? 0);
+          // Tripletex returnerer 0 når verdien mangler; da ligger beløpet i valutafeltene.
+          const rawAmount = Number(inv.amount ?? 0);
+          const rawExVat = Number(inv.amountExcludingVat ?? 0);
+          const usedCurrencyAmount = rawAmount === 0;
+          const amount = usedCurrencyAmount ? Number(inv.amountCurrency ?? 0) : rawAmount;
+          const exVat = usedCurrencyAmount
+            ? Number(inv.amountExcludingVatCurrency ?? 0)
+            : rawExVat;
+          // Fortegn bærer ingen betydning i NBhub; is_credit_note gjør den jobben.
+          const absAmount = round2(Math.abs(amount));
+          const vatUnknown = exVat === 0 && amount !== 0;
+          const totalVat = vatUnknown ? null : round2(Math.abs(amount - exVat));
           const invoiceNumber = String(inv.invoiceNumber ?? "").trim() || `TT-${ttInvoiceId}`;
 
           const { error: insErr } = await admin.from("invoices").insert({
@@ -267,9 +278,9 @@ Deno.serve(async (req) => {
             invoice_number: invoiceNumber,
             invoice_date: inv.invoiceDate ?? null,
             due_date: inv.invoiceDueDate ?? null,
-            total_amount: amount,
-            total_vat: round2(amount - exVat),
-            currency: inv?.currency?.code ?? "NOK",
+            total_amount: absAmount,
+            total_vat: totalVat,
+            currency: usedCurrencyAmount ? (inv?.currency?.code ?? "NOK") : "NOK",
             is_credit_note: !!inv.isCreditNote,
             status: "imported",
             source: "tripletex",
@@ -298,10 +309,15 @@ Deno.serve(async (req) => {
       }
 
       lastCompletedChunkTo = chunk.to;
-      await admin
-        .from("tripletex_credentials")
-        .update({ last_invoice_synced_date: chunk.to })
-        .eq("legal_entity_id", legalEntityId);
+      // Manuelle kall med eksplisitt `from` skal ikke flytte den løpende posisjonen,
+      // og posisjonen skal aldri gå bakover.
+      if (!body.from && (!cred.last_invoice_synced_date || chunk.to > cred.last_invoice_synced_date)) {
+        cred.last_invoice_synced_date = chunk.to;
+        await admin
+          .from("tripletex_credentials")
+          .update({ last_invoice_synced_date: chunk.to })
+          .eq("legal_entity_id", legalEntityId);
+      }
     }
 
     // --- Leverandørstatistikk ---
