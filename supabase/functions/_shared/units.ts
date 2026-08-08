@@ -75,7 +75,10 @@ export function toBaseFactor(
 }
 
 export interface PackageInfo {
-  /** Antall base-enhet per pakke (f.eks. 10 for "10l", 3240 for "36X90G"). */
+  /**
+   * Størrelse per sub-enhet i base-enhet (f.eks. 10 for "10l", 90 for "36X90G").
+   * Total pakningsstørrelse = size * count.
+   */
   size: number;
   /** Base-enhet pakken er uttrykt i (kg/g/l/ml/dl/cl/stk). */
   unit: CanonicalUnit;
@@ -87,15 +90,18 @@ export interface PackageInfo {
 
 /**
  * Trekk ut pakke-størrelse fra norsk fakturabeskrivelse.
+ * Definisjonen er identisk med AI-prompten: `size` er størrelsen PER sub-enhet,
+ * og `count` er antall sub-enheter. Total = size * count.
  * Eksempler:
  *   "10l"          -> { size: 10,    unit: "l",  count: 1 }
  *   "2 kg"         -> { size: 2,     unit: "kg", count: 1 }
  *   "500ml"        -> { size: 500,   unit: "ml", count: 1 }
  *   "1/4l"         -> { size: 0.25,  unit: "l",  count: 1 }
- *   "36X90G"       -> { size: 3240,  unit: "g",  count: 36 }
- *   "12 x 500 ML"  -> { size: 6000,  unit: "ml", count: 12 }
- *   "6X1L"         -> { size: 6,     unit: "l",  count: 6 }
+ *   "36X90G"       -> { size: 90,    unit: "g",  count: 36 }
+ *   "12 x 500 ML"  -> { size: 500,   unit: "ml", count: 12 }
+ *   "6X1L"         -> { size: 1,     unit: "l",  count: 6 }
  */
+
 export function parsePackageFromDescription(desc: string | null | undefined): PackageInfo | null {
   if (!desc) return null;
   const text = String(desc).replace(/\s+/g, " ").trim();
@@ -109,7 +115,7 @@ export function parsePackageFromDescription(desc: string | null | undefined): Pa
     const each = toNumber(m[2]);
     const unit = normalizeUnit(m[3]);
     if (count && each && unit) {
-      return { size: count * each, unit, count, matched: m[0] };
+      return { size: each, unit, count, matched: m[0] };
     }
   }
 
@@ -163,9 +169,10 @@ export function quantityToBase(input: {
   /** Pakke-størrelse fra raw_material_suppliers (per "pakke" / "eske"). */
   rmsPackageSize?: number | null;
   rmsPackageUnit?: string | null;
-  /** AI-utledede felt på linjen. */
+  /** AI-utledede felt på linjen. package_size er PER sub-enhet. */
   linePackageSize?: number | null;
   linePackageUnit?: string | null;
+  lineCountPerPackage?: number | null;
 }): { baseQty: number; factor: number; source: string } | null {
   const { quantity, baseUnit } = input;
   if (!Number.isFinite(quantity) || !baseUnit) return null;
@@ -179,13 +186,18 @@ export function quantityToBase(input: {
     // u=stk og base=stk håndteres i toBaseFactor (=1). Mismatch (stk vs kg) trenger pakke.
   }
 
-  // Pakke-enhet eller ukjent enhet → bruk pakke-størrelse
+  // Pakke-enhet eller ukjent enhet → bruk pakke-størrelse.
+  // size er per sub-enhet; total pakningsstørrelse = size * (count ?? 1).
   const pkgSources: Array<{ size: number; unit: string; src: string }> = [];
   if (input.linePackageSize && input.linePackageUnit) {
-    pkgSources.push({ size: input.linePackageSize, unit: input.linePackageUnit, src: "ai_line" });
+    const cnt = Number(input.lineCountPerPackage);
+    const count = Number.isFinite(cnt) && cnt > 0 ? cnt : 1;
+    pkgSources.push({ size: input.linePackageSize * count, unit: input.linePackageUnit, src: "ai_line" });
   }
   const fromDesc = parsePackageFromDescription(input.description);
-  if (fromDesc) pkgSources.push({ size: fromDesc.size, unit: fromDesc.unit, src: "description" });
+  if (fromDesc) {
+    pkgSources.push({ size: fromDesc.size * (fromDesc.count || 1), unit: fromDesc.unit, src: "description" });
+  }
   if (input.rmsPackageSize && input.rmsPackageUnit) {
     pkgSources.push({ size: input.rmsPackageSize, unit: input.rmsPackageUnit, src: "rms" });
   }
@@ -200,3 +212,4 @@ export function quantityToBase(input: {
   }
   return null;
 }
+

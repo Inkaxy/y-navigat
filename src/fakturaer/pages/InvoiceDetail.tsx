@@ -17,6 +17,8 @@ import { MatchDrawer } from "@/fakturaer/components/MatchDrawer";
 import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
 import { useFakturaer } from "@/fakturaer/context/FakturaerContext";
 import { formatNok, formatDate, INVOICE_SOURCES } from "@/fakturaer/lib/constants";
+import { formatVariancePct, recheckInvoiceLinesSum } from "@/fakturaer/lib/linesSum";
+import { LinesSumMismatchAlert } from "@/fakturaer/components/LinesSumMismatchAlert";
 
 export default function InvoiceDetailPage() {
   const { id } = useParams();
@@ -76,6 +78,8 @@ export default function InvoiceDetailPage() {
   const lines = (data.invoice_lines ?? []) as any[];
   const reviewLineCount = lines.filter((l) => l.requires_review).length;
   const isFinal = ["reconciled", "flagged"].includes(data.status);
+  const sumMismatch = data.lines_sum_status === "mismatch";
+  const lowConfidence = data.extraction_confidence != null && Number(data.extraction_confidence) < 0.7;
   const unmatchedLines = lines.filter((l) => !l.raw_material_id);
   const selectedIds = Object.keys(selected).filter((k) => selected[k]);
   const selectedLines = unmatchedLines.filter((l) => selected[l.id]);
@@ -194,7 +198,13 @@ export default function InvoiceDetailPage() {
               </Button>
             )}
             {!isFinal && canReconcile && (
-              <Button size="sm" onClick={() => setConfirmOpen(true)} disabled={reviewLineCount > 0} className="gap-1.5">
+              <Button
+                size="sm"
+                onClick={() => setConfirmOpen(true)}
+                disabled={reviewLineCount > 0 || sumMismatch}
+                title={sumMismatch ? "Varelinjene stemmer ikke med fakturabeløpet" : undefined}
+                className="gap-1.5"
+              >
                 <CheckCircle2 className="h-4 w-4" /> Bekreft prismatch
               </Button>
             )}
@@ -238,6 +248,29 @@ export default function InvoiceDetailPage() {
         </div>
       )}
 
+      {lowConfidence && (
+        <div className="rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-warning">
+          <span className="font-medium">Lest med lav sikkerhet ({Math.round(Number(data.extraction_confidence) * 100)} %).</span>{" "}
+          Kontroller beløp, dato og varelinjer mot PDF-en før du bekrefter.
+        </div>
+      )}
+
+      {sumMismatch && (
+        <LinesSumMismatchAlert
+          invoiceId={data.id}
+          linesSum={data.lines_sum_excl_vat}
+          totalAmount={data.total_amount}
+          totalVat={data.total_vat}
+          variancePct={data.lines_sum_variance_pct}
+          canOverride={canWrite && !isFinal}
+          onRecheck={async () => {
+            await recheckInvoiceLinesSum(data.id);
+            qc.invalidateQueries({ queryKey: ["invoice", id] });
+          }}
+          onOverridden={() => qc.invalidateQueries({ queryKey: ["invoice", id] })}
+        />
+      )}
+
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         <Card className="p-6 lg:col-span-1">
           <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-ink-secondary">Detaljer</h3>
@@ -249,6 +282,24 @@ export default function InvoiceDetailPage() {
             <div><dt className="text-ink-secondary">Beløp</dt><dd className="font-semibold">{formatNok(data.total_amount)}</dd></div>
             <div><dt className="text-ink-secondary">MVA</dt><dd>{formatNok(data.total_vat)}</dd></div>
             <div><dt className="text-ink-secondary">Kilde</dt><dd>{sourceMeta?.label ?? data.source}</dd></div>
+            {data.extraction_confidence != null && (
+              <div>
+                <dt className="text-ink-secondary">Lesesikkerhet</dt>
+                <dd className={lowConfidence ? "font-medium text-warning" : ""}>
+                  {Math.round(Number(data.extraction_confidence) * 100)} %
+                  {lowConfidence && " — krever gjennomgang"}
+                </dd>
+              </div>
+            )}
+            {data.lines_sum_excl_vat != null && (
+              <div>
+                <dt className="text-ink-secondary">Sum varelinjer (eks. mva)</dt>
+                <dd className={sumMismatch ? "font-medium text-warning" : ""}>
+                  {formatNok(data.lines_sum_excl_vat)}
+                  {data.lines_sum_variance_pct != null && ` (${formatVariancePct(Number(data.lines_sum_variance_pct))})`}
+                </dd>
+              </div>
+            )}
           </dl>
         </Card>
 

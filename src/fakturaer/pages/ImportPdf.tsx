@@ -15,6 +15,7 @@ import { useFakturaer } from "@/fakturaer/context/FakturaerContext";
 import { useFakturaerLegalEntities } from "@/fakturaer/hooks/useFakturaerLegalEntities";
 import { useSuppliersFor } from "@/fakturaer/hooks/useSuppliersFor";
 import { todayIso } from "@/fakturaer/lib/constants";
+import { computeLinesSum } from "@/fakturaer/lib/linesSum";
 import { cn } from "@/lib/utils";
 
 interface ExtractedLine {
@@ -25,6 +26,9 @@ interface ExtractedLine {
   unit_price: number | null;
   total_amount: number | null;
   vat_rate: number | null;
+  package_size: number | null;
+  package_unit: string | null;
+  count_per_package: number | null;
 }
 
 interface ExtractedData {
@@ -52,6 +56,9 @@ interface ParseResult {
 }
 
 const LOW_CONF = 0.8;
+/** Under denne lesesikkerheten må fakturaen gjennomgås manuelt. */
+const LOW_EXTRACTION_CONF = 0.7;
+
 
 async function fileToBase64(file: File): Promise<string> {
   const buf = await file.arrayBuffer();
@@ -144,7 +151,18 @@ export default function ImportPdfPage({ embedded = false }: { embedded?: boolean
       if (e.currency) setCurrency(e.currency);
       if (e.kid_number) setKid(e.kid_number);
       if (e.account_number) setAccountNumber(e.account_number);
-      setLines(e.lines ?? []);
+      setLines((e.lines ?? []).map((l) => ({
+        description: l.description ?? null,
+        sku: l.sku ?? null,
+        quantity: l.quantity ?? null,
+        unit: l.unit ?? null,
+        unit_price: l.unit_price ?? null,
+        total_amount: l.total_amount ?? null,
+        vat_rate: l.vat_rate ?? null,
+        package_size: l.package_size ?? null,
+        package_unit: l.package_unit ?? null,
+        count_per_package: l.count_per_package ?? null,
+      })));
 
       const match = result.matched_supplier ?? result.name_matched_supplier;
       if (match) {
@@ -171,7 +189,7 @@ export default function ImportPdfPage({ embedded = false }: { embedded?: boolean
   };
   const removeLine = (idx: number) => setLines((prev) => prev.filter((_, i) => i !== idx));
   const addLine = () =>
-    setLines((prev) => [...prev, { description: "", sku: null, quantity: null, unit: null, unit_price: null, total_amount: null, vat_rate: null }]);
+    setLines((prev) => [...prev, { description: "", sku: null, quantity: null, unit: null, unit_price: null, total_amount: null, vat_rate: null, package_size: null, package_unit: null, count_per_package: null }]);
 
   const resetFormForNext = () => {
     setParseResult(null);
@@ -247,6 +265,19 @@ export default function ImportPdfPage({ embedded = false }: { embedded?: boolean
       if (upErr) throw upErr;
 
       // 3. Insert invoice
+      const extractionConfidence = typeof parseResult?.confidence === "number" ? parseResult.confidence : null;
+      const lowConfidence = extractionConfidence != null && extractionConfidence < LOW_EXTRACTION_CONF;
+      const sumCheck = computeLinesSum({
+        lineTotals: lines.map((l) => l.total_amount),
+        totalAmount: totalAmount ? Number(totalAmount) : null,
+        totalVat: totalVat ? Number(totalVat) : null,
+      });
+      const noteParts = [
+        kid && `KID: ${kid}`,
+        accountNumber && `Konto: ${accountNumber}`,
+        lowConfidence && `Lav lesesikkerhet (${Math.round(extractionConfidence! * 100)} %) — krever gjennomgang`,
+      ].filter(Boolean) as string[];
+
       const { data: invoice, error: invErr } = await supabase
         .from("invoices")
         .insert({
@@ -261,13 +292,16 @@ export default function ImportPdfPage({ embedded = false }: { embedded?: boolean
           source: "pdf_upload",
           lines_source: lines.length > 0 ? "pdf_extracted" : "pending_manual",
           source_document_url: path,
-          status: "imported",
-          notes: kid || accountNumber
-            ? [kid && `KID: ${kid}`, accountNumber && `Konto: ${accountNumber}`].filter(Boolean).join(" · ")
-            : null,
+          status: lowConfidence ? "needs_review" : "imported",
+          extraction_confidence: extractionConfidence,
+          lines_sum_excl_vat: sumCheck.lines_sum_excl_vat,
+          lines_sum_variance_pct: sumCheck.lines_sum_variance_pct,
+          lines_sum_status: sumCheck.lines_sum_status,
+          notes: noteParts.length > 0 ? noteParts.join(" · ") : null,
         })
         .select("id").single();
       if (invErr) throw invErr;
+
 
       // 4. Insert lines
       if (lines.length > 0) {
@@ -281,6 +315,9 @@ export default function ImportPdfPage({ embedded = false }: { embedded?: boolean
           unit_price: l.unit_price,
           total_amount: l.total_amount,
           vat_rate: l.vat_rate,
+          package_size: l.package_size,
+          package_unit: l.package_unit,
+          count_per_package: l.count_per_package,
         }));
         const { error: linesErr } = await supabase.from("invoice_lines").insert(linesPayload);
         if (linesErr) throw linesErr;
@@ -513,13 +550,35 @@ export default function ImportPdfPage({ embedded = false }: { embedded?: boolean
           <div>
             <h3 className="font-medium">Linjer ({lines.length})</h3>
             <p className="text-xs text-ink-secondary">
-              {lines.length === 0 ? "Ingen linjer ekstrahert — legg til manuelt eller lagre uten." : "Rediger ved behov."}
+              {lines.length === 0
+                ? "Ingen linjer ekstrahert — legg til manuelt eller lagre uten."
+                : "Rediger ved behov. Pk.str er størrelsen per sub-enhet (90 for «36X90G»), Ant./pk er antallet (36)."}
             </p>
           </div>
           <Button size="sm" variant="outline" onClick={addLine} className="gap-1">
             <Plus className="h-3 w-3" /> Ny linje
           </Button>
         </div>
+        {(() => {
+          const check = computeLinesSum({
+            lineTotals: lines.map((l) => l.total_amount),
+            totalAmount: totalAmount ? Number(totalAmount) : null,
+            totalVat: totalVat ? Number(totalVat) : null,
+          });
+          if (check.lines_sum_status !== "mismatch") return null;
+          return (
+            <Alert className="mb-3 border-warning/40 bg-warning/5">
+              <AlertTriangle className="h-4 w-4 text-warning" />
+              <AlertTitle className="text-sm">Linjene stemmer ikke med fakturabeløpet</AlertTitle>
+              <AlertDescription className="text-xs">
+                Varelinjene summerer seg til {check.lines_sum_excl_vat?.toFixed(2)} (eks. mva), mens fakturaen er på{" "}
+                {Number(totalAmount).toFixed(2)}
+                {totalVat ? ` inkl. ${Number(totalVat).toFixed(2)} i mva` : ""}. Det kan mangle linjer.
+              </AlertDescription>
+            </Alert>
+          );
+        })()}
+
         {lines.length > 0 && (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -532,6 +591,9 @@ export default function ImportPdfPage({ embedded = false }: { embedded?: boolean
                   <th className="p-2 w-24">Stk.pris</th>
                   <th className="p-2 w-24">Sum</th>
                   <th className="p-2 w-16">Mva%</th>
+                  <th className="p-2 w-20" title="Pakningsstørrelse per sub-enhet">Pk.str</th>
+                  <th className="p-2 w-16" title="Base-enhet for pakningsstørrelsen">Pk.enhet</th>
+                  <th className="p-2 w-16" title="Antall sub-enheter per pakke (36 for 36X90G)">Ant./pk</th>
                   <th className="p-2 w-8"></th>
                 </tr>
               </thead>
@@ -545,6 +607,9 @@ export default function ImportPdfPage({ embedded = false }: { embedded?: boolean
                     <td className="p-1"><Input type="number" step="0.01" value={l.unit_price ?? ""} onChange={(e) => updateLine(i, { unit_price: e.target.value ? Number(e.target.value) : null })} className="h-8" /></td>
                     <td className="p-1"><Input type="number" step="0.01" value={l.total_amount ?? ""} onChange={(e) => updateLine(i, { total_amount: e.target.value ? Number(e.target.value) : null })} className="h-8" /></td>
                     <td className="p-1"><Input type="number" step="0.1" value={l.vat_rate ?? ""} onChange={(e) => updateLine(i, { vat_rate: e.target.value ? Number(e.target.value) : null })} className="h-8" /></td>
+                    <td className="p-1"><Input type="number" step="0.001" value={l.package_size ?? ""} onChange={(e) => updateLine(i, { package_size: e.target.value ? Number(e.target.value) : null })} className="h-8" /></td>
+                    <td className="p-1"><Input value={l.package_unit ?? ""} onChange={(e) => updateLine(i, { package_unit: e.target.value || null })} className="h-8" /></td>
+                    <td className="p-1"><Input type="number" step="1" value={l.count_per_package ?? ""} onChange={(e) => updateLine(i, { count_per_package: e.target.value ? Number(e.target.value) : null })} className="h-8" /></td>
                     <td className="p-1 text-center">
                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeLine(i)}>
                         <Trash2 className="h-3 w-3 text-destructive" />

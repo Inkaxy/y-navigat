@@ -24,6 +24,9 @@ const lineSchema = z.object({
   unit: z.string().min(1, "Velg enhet"),
   unit_price: z.coerce.number().nonnegative(),
   vat_rate: z.coerce.number().nonnegative().default(15),
+  package_size: z.union([z.coerce.number().positive(), z.literal("")]).optional(),
+  package_unit: z.string().optional(),
+  count_per_package: z.union([z.coerce.number().positive(), z.literal("")]).optional(),
 });
 
 const schema = z.object({
@@ -55,7 +58,7 @@ export default function NewInvoicePage({ embedded = false }: { embedded?: boolea
       due_date: "",
       currency: "NOK",
       notes: "",
-      lines: [{ supplier_sku: "", description: "", quantity: 1, unit: "stk", unit_price: 0, vat_rate: 15 }],
+      lines: [{ supplier_sku: "", description: "", quantity: 1, unit: "stk", unit_price: 0, vat_rate: 15, package_size: "", package_unit: "", count_per_package: "" }],
     },
   });
 
@@ -109,6 +112,9 @@ export default function NewInvoicePage({ embedded = false }: { embedded?: boolea
           status: "imported",
           total_amount: totals.total,
           total_vat: totals.vat,
+          lines_sum_excl_vat: Number(totals.net.toFixed(2)),
+          lines_sum_variance_pct: 0,
+          lines_sum_status: "ok",
         })
         .select()
         .single();
@@ -127,6 +133,9 @@ export default function NewInvoicePage({ embedded = false }: { embedded?: boolea
           unit_price: l.unit_price,
           vat_rate: l.vat_rate,
           total_amount: lineNet,
+          package_size: l.package_size === "" || l.package_size == null ? null : Number(l.package_size),
+          package_unit: l.package_unit?.trim() || null,
+          count_per_package: l.count_per_package === "" || l.count_per_package == null ? null : Number(l.count_per_package),
         };
       });
       const { error: linErr } = await supabase.from("invoice_lines").insert(lineRows);
@@ -240,7 +249,7 @@ export default function NewInvoicePage({ embedded = false }: { embedded?: boolea
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => append({ supplier_sku: "", description: "", quantity: 1, unit: "stk", unit_price: 0, vat_rate: 15 })}
+              onClick={() => append({ supplier_sku: "", description: "", quantity: 1, unit: "stk", unit_price: 0, vat_rate: 15, package_size: "", package_unit: "", count_per_package: "" })}
               className="gap-1"
             >
               <Plus className="h-4 w-4" /> Legg til linje
@@ -257,6 +266,9 @@ export default function NewInvoicePage({ embedded = false }: { embedded?: boolea
                   <th className="pb-2 pr-2 w-[100px]">Enhet *</th>
                   <th className="pb-2 pr-2 w-[110px]">Pris/enhet</th>
                   <th className="pb-2 pr-2 w-[80px]">MVA %</th>
+                  <th className="pb-2 pr-2 w-[90px]" title="Pakningsstørrelse per sub-enhet">Pk.str</th>
+                  <th className="pb-2 pr-2 w-[90px]">Pk.enhet</th>
+                  <th className="pb-2 pr-2 w-[80px]" title="Antall sub-enheter per pakke">Ant./pk</th>
                   <th className="pb-2 pr-2 w-[110px] text-right">Sum</th>
                   <th className="pb-2 w-[40px]"></th>
                 </tr>
@@ -286,6 +298,9 @@ export default function NewInvoicePage({ embedded = false }: { embedded?: boolea
                       </td>
                       <td className="py-2 pr-2"><Input type="number" step="0.01" {...form.register(`lines.${idx}.unit_price`)} className="h-8 tabular-nums" /></td>
                       <td className="py-2 pr-2"><Input type="number" step="0.1" {...form.register(`lines.${idx}.vat_rate`)} className="h-8 tabular-nums" /></td>
+                      <td className="py-2 pr-2"><Input type="number" step="0.001" {...form.register(`lines.${idx}.package_size`)} className="h-8 tabular-nums" /></td>
+                      <td className="py-2 pr-2"><Input {...form.register(`lines.${idx}.package_unit`)} className="h-8" /></td>
+                      <td className="py-2 pr-2"><Input type="number" step="1" {...form.register(`lines.${idx}.count_per_package`)} className="h-8 tabular-nums" /></td>
                       <td className="py-2 pr-2 text-right tabular-nums">{sum.toFixed(2)}</td>
                       <td className="py-2">
                         <Button type="button" variant="ghost" size="icon" onClick={() => remove(idx)} disabled={fields.length === 1}>
@@ -298,17 +313,17 @@ export default function NewInvoicePage({ embedded = false }: { embedded?: boolea
               </tbody>
               <tfoot>
                 <tr className="border-t-2 border-line-subtle text-sm">
-                  <td colSpan={6} className="pt-3 text-right text-ink-secondary">Netto</td>
+                  <td colSpan={9} className="pt-3 text-right text-ink-secondary">Netto</td>
                   <td className="pt-3 text-right tabular-nums">{totals.net.toFixed(2)}</td>
                   <td></td>
                 </tr>
                 <tr>
-                  <td colSpan={6} className="pt-1 text-right text-ink-secondary">MVA</td>
+                  <td colSpan={9} className="pt-1 text-right text-ink-secondary">MVA</td>
                   <td className="pt-1 text-right tabular-nums">{totals.vat.toFixed(2)}</td>
                   <td></td>
                 </tr>
                 <tr>
-                  <td colSpan={6} className="pt-1 text-right font-semibold">Totalt</td>
+                  <td colSpan={9} className="pt-1 text-right font-semibold">Totalt</td>
                   <td className="pt-1 text-right font-semibold tabular-nums">{totals.total.toFixed(2)}</td>
                   <td></td>
                 </tr>

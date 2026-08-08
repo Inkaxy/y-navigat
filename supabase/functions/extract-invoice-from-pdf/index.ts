@@ -20,7 +20,7 @@ Felter som skal hentes:
 - invoice_number (string): fakturanummer
 - invoice_date (string, ISO 8601 format YYYY-MM-DD)
 - due_date (string, ISO 8601 format) eller null
-- total_amount (number): totalbeløp inkl. MVA
+- total_amount (number): fakturaens totalbeløp INKLUSIVE MVA (beløp å betale)
 - total_vat (number): MVA-beløp eller null
 - currency (string): valuta-kode, default "NOK"
 - kid_number (string) eller null
@@ -30,8 +30,8 @@ Felter som skal hentes:
   - sku (string) eller null
   - quantity (number) eller null — antall enheter slik fakturaen viser dem (f.eks. 2 hvis "2 STK")
   - unit (string) eller null — NORMALISER til kanonisk form: "kg", "g", "l", "ml", "dl", "cl", "stk", "eske", "pakke", "sekk", "flaske", "rull", "spann", "boks", "brett". Aldri rå koder som "STK", "ESK", "POS", "FL", "KRT", "BX", "PK" — oversett dem.
-  - unit_price (number) eller null — pris per enhet (samme enhet som unit)
-  - total_amount (number) eller null
+  - unit_price (number) eller null — pris per enhet (samme enhet som unit), EKSKLUSIVE MVA
+  - total_amount (number) eller null — linjesum EKSKLUSIVE MVA (quantity x unit_price, etter rabatt)
   - vat_rate (number) eller null
   - package_size (number) eller null — pakke-størrelse hentet fra beskrivelsen (f.eks. 10 for "10l bib", 90 for "36X90G ALI", 0.5 for "500ml flaske"). Hvis "36X90G", sett package_size=90 og count_per_package=36.
   - package_unit (string) eller null — base-enhet for package_size ("g", "kg", "l", "ml", "dl", "cl", "stk")
@@ -43,6 +43,11 @@ Eksempler på linjer:
   "ALI ORIGINAL FINMALT 36X90G" qty=1 ESK -> unit="eske", package_size=90, package_unit="g", count_per_package=36
   "VANILJEKREM 2 KG" qty=96 KG       -> unit="kg", package_size=2, package_unit="kg"  (her er fakturaen tvetydig — sett field_confidence lavt)
   "EPLEJUICE 2L" qty=8 STK           -> unit="stk", package_size=2, package_unit="l"
+
+VIKTIG OM MVA: Beløp PÅ VARELINJER (unit_price og total_amount) skal alltid være EKSKLUSIVE mva.
+total_amount på fakturahodet skal derimot være INKLUSIVE mva. Summen av linjenes total_amount skal
+derfor tilsvare (fakturahodets total_amount − total_vat). Hvis fakturaen kun viser priser inkl. mva
+på linjene, regn dem om til eks. mva ved hjelp av linjens vat_rate.
 
 Hvis du er usikker på et felt, returner null. Aldri gjett.
 Returner alltid valid JSON, aldri prose.`;

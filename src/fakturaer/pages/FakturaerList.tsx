@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Search, Loader2, FileText, Plus, FileUp, Upload, AlertCircle } from "lucide-react";
+import { Search, Loader2, FileText, Plus, FileUp, Upload, AlertCircle, AlertTriangle } from "lucide-react";
 import { FakturaerHeaderBanner } from "@/fakturaer/components/FakturaerHeaderBanner";
 import { InvoiceStatusBadge } from "@/fakturaer/components/InvoiceStatusBadge";
 import { useInvoices } from "@/fakturaer/hooks/useInvoices";
@@ -178,7 +178,30 @@ export default function FakturaerListPage() {
                           )}
                         </div>
                       </td>
-                      <td className="px-4 py-3"><InvoiceStatusBadge status={r.status} /></td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <InvoiceStatusBadge status={r.status} />
+                          {r.extraction_confidence != null && Number(r.extraction_confidence) < 0.7 && (
+                            <Badge
+                              variant="outline"
+                              className="gap-1 border-warning/30 bg-warning/15 text-warning"
+                              title={`Lest med lav sikkerhet (${Math.round(Number(r.extraction_confidence) * 100)} %)`}
+                            >
+                              <AlertTriangle className="h-3 w-3" />
+                              {Math.round(Number(r.extraction_confidence) * 100)} %
+                            </Badge>
+                          )}
+                          {r.lines_sum_status === "mismatch" && (
+                            <Badge
+                              variant="outline"
+                              className="border-warning/30 bg-warning/15 text-warning"
+                              title="Varelinjene summerer seg ikke til fakturabeløpet"
+                            >
+                              Sum-avvik
+                            </Badge>
+                          )}
+                        </div>
+                      </td>
                     </tr>
                   );
                 })}
