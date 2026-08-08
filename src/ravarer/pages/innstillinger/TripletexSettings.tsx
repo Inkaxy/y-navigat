@@ -98,26 +98,9 @@ export default function TripletexSettings() {
       ) : entities.length === 0 ? (
         <Card><CardContent className="p-6 text-sm text-muted-foreground">Du har ikke admin-tilgang til noen selskaper.</CardContent></Card>
       ) : (
-        <>
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Selskap</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Select value={selectedEntity ?? undefined} onValueChange={setSelectedEntity}>
-                <SelectTrigger><SelectValue placeholder="Velg selskap" /></SelectTrigger>
-                <SelectContent>
-                  {entities.map((e) => (
-                    <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </CardContent>
-          </Card>
-
-          {selectedEntity && <EntityConfig legalEntityId={selectedEntity} />}
-        </>
+        selectedEntity && <EntityConfig legalEntityId={selectedEntity} />
       )}
+
     </div>
   );
 }
