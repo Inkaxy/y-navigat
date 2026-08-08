@@ -25,7 +25,7 @@ const FIELD_LABELS: Record<string, string> = {
 };
 
 export function DatasheetSection({ rawMaterialId }: Props) {
-  const { canWrite } = useRavarer();
+  const { canWrite, legalEntityId } = useRavarer();
   const qc = useQueryClient();
   const { data: datasheets = [] } = useDatasheets(rawMaterialId);
   const { data: changelog = [] } = useChangelog({ rawMaterialId });
@@ -40,9 +40,11 @@ export function DatasheetSection({ rawMaterialId }: Props) {
     if (!canWrite) return;
     setUploading(true);
     try {
-      const path = `${rawMaterialId}/${Date.now()}-${file.name}`;
+      if (!legalEntityId) throw new Error("Mangler valgt selskap (legal_entity_id)");
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+      const path = `${legalEntityId}/${rawMaterialId}/${Date.now()}-${safeName}`;
       const { error: upErr } = await supabase.storage.from("raw-material-datasheets").upload(path, file);
-      if (upErr) throw upErr;
+      if (upErr) throw new Error(`Opplasting feilet: ${upErr.message}`);
       setUploading(false);
       setExtracting(true);
       const { data, error } = await supabase.functions.invoke("extract-datasheet", {
