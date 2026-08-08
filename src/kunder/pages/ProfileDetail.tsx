@@ -51,7 +51,6 @@ import {
 } from "@/kunder/hooks/useCustomerProfiles";
 import { usePriceLists } from "@/kunder/hooks/useCustomers";
 import { usePickupLocations } from "@/kunder/hooks/usePickupLocations";
-import { PickupLocationSelect } from "@/kunder/components/customers/PickupLocationSelect";
 import { useUserAccess } from "@/kunder/hooks/useUserAccess";
 import { useAuth } from "@/hooks/useAuth";
 import { logAudit } from "@/kunder/lib/audit";
@@ -97,7 +96,6 @@ const schema = z.object({
 
   // Utkjøring
   default_pickup_location: z.string().max(100).optional().or(z.literal("")),
-  pickup_location_id: z.string().optional().or(z.literal("")),
   include_change_log_on_packing_slip: z.boolean(),
   price_on_packing_slip: z.boolean(),
   sum_on_packing_slip: z.boolean(),
@@ -172,7 +170,6 @@ export default function ProfileDetail() {
       return_price_reduction_percent: null as any,
       only_products_with_price_in_offer_group: false,
       default_pickup_location: "",
-      pickup_location_id: "",
       include_change_log_on_packing_slip: false,
       price_on_packing_slip: false,
       sum_on_packing_slip: false,
@@ -228,7 +225,6 @@ export default function ProfileDetail() {
       only_products_with_price_in_offer_group:
         !!profile.only_products_with_price_in_offer_group,
       default_pickup_location: profile.default_pickup_location ?? "",
-      pickup_location_id: (profile as any).pickup_location_id ?? "",
       include_change_log_on_packing_slip:
         !!profile.include_change_log_on_packing_slip,
       price_on_packing_slip: !!profile.price_on_packing_slip,
@@ -290,7 +286,6 @@ export default function ProfileDetail() {
         default_order_reference: values.default_order_reference?.trim() || null,
         mva_code: values.mva_code || null,
         default_pickup_location: values.default_pickup_location?.trim() || null,
-        pickup_location_id: values.pickup_location_id || null,
         order_confirmation_mode: values.order_confirmation_mode || null,
         order_confirmation_emails: values.order_confirmation_emails?.trim() || null,
         packing_slip_delivery_mode: values.packing_slip_delivery_mode || "none",
@@ -896,14 +891,6 @@ export default function ProfileDetail() {
                   <CardTitle>Følgeseddel og utskrifter</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <PickupLocationSelect
-                    legalEntityId={profile.legal_entity_id}
-                    value={form.watch("pickup_location_id") || ""}
-                    onChange={(v) =>
-                      form.setValue("pickup_location_id", v, { shouldDirty: true })
-                    }
-                    disabled={!canWrite}
-                  />
                   <div className="rounded-md border border-border bg-muted/30 p-3 space-y-3">
                     <Field label="Sending av følgeseddel/utskrifter">
                       <SelectField
