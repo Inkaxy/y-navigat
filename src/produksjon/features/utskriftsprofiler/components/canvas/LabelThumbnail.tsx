@@ -1,6 +1,8 @@
 import { useLayoutEffect, useRef, useState } from "react";
-import { FALLBACK_FIELD_LABELS, type ProfileField, type ProfileLine } from "../../types";
+import type { ProfileField, ProfileLine } from "../../types";
+import { useLabelFieldCatalog } from "../../hooks/useLabelFieldCatalog";
 import { fitFontSizePt } from "../../lib/fitText";
+
 
 interface Props {
   paperWidth: number;
@@ -37,6 +39,7 @@ export function LabelThumbnail({
   const paperW = landscape ? paperWidth : paperHeight;
   const paperH = landscape ? paperHeight : paperWidth;
 
+  const catalog = useLabelFieldCatalog();
   const wrapRef = useRef<HTMLDivElement>(null);
   const [pxPerMm, setPxPerMm] = useState(1);
 
@@ -95,10 +98,10 @@ export function LabelThumbnail({
                   />
                 );
               } else if (f.field_type === "firmanavn") {
-                measureString = companyName || FALLBACK_FIELD_LABELS.firmanavn;
+                measureString = companyName || catalog.label("firmanavn");
                 content = measureString;
               } else {
-                measureString = `[${FALLBACK_FIELD_LABELS[f.field_type]}]`;
+                measureString = `[${catalog.label(f.field_type)}]`;
                 content = measureString;
               }
               const effectivePt =

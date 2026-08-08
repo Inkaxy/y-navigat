@@ -113,15 +113,22 @@ export function UtskriftsprofilDialog({
       setCompanyNote(existing.company_note ?? "");
       setLogoUrl(existing.logo_url);
       setLogoHeight(existing.logo_height_mm ?? "");
-      // Merge: start from defaultFields() (full set incl. nye felt) og overlay lagrede.
+      // Merge: start fra katalogen (full set inkl. nye felt) og overlay lagrede.
       const existingMap = new Map(
         (existing.fields ?? []).map((f) => [f.field_type, f]),
       );
-      const baseFields = defaultFields(catalog.entries).map((d) => {
+      const catalogBase = defaultFields(catalog.entries).map((d) => {
         const saved = existingMap.get(d.field_type);
         if (!saved) return d;
         return { ...d, ...saved, show_label: saved.show_label ?? true };
       });
+      // Behold lagrede felter som ikke finnes i katalogen — ingen data skal gå tapt.
+      const covered = new Set(catalogBase.map((f) => f.field_type));
+      const orphans = (existing.fields ?? [])
+        .filter((f) => !covered.has(f.field_type))
+        .map((f) => ({ ...f, show_label: f.show_label ?? true }));
+      const baseFields = [...catalogBase, ...orphans];
+
       const inner = getInnerArea(
         Number(existing.paper_width_mm),
         Number(existing.paper_height_mm),
@@ -170,7 +177,7 @@ export function UtskriftsprofilDialog({
     setEditorMode("design");
     setZoom(4);
     zCounterRef.current = 100;
-  }, [open, mode, existing, legalEntity]);
+  }, [open, mode, existing, legalEntity, catalog]);
 
   const inner = useMemo(
     () =>
@@ -209,10 +216,34 @@ export function UtskriftsprofilDialog({
   const addFieldAt = (type: FieldType, x: number, y: number) => {
     zCounterRef.current += 1;
     const z = zCounterRef.current;
-    setFields((prev) =>
-      prev.map((f) => {
+    const sz = catalog.size(type);
+    setFields((prev) => {
+      const exists = prev.some((f) => f.field_type === type);
+      if (!exists) {
+        // Feltet finnes bare i katalogen — opprett det og legg det bakerst.
+        const [base] = defaultFields([
+          {
+            field_key: type,
+            default_width_mm: sz.w,
+            default_height_mm: sz.h,
+          },
+        ]);
+        return [
+          ...prev,
+          {
+            ...base,
+            row_number: prev.length + 1,
+            include: true,
+            x_mm: clamp(x, 0, Math.max(0, inner.w - sz.w)),
+            y_mm: clamp(y, 0, Math.max(0, inner.h - sz.h)),
+            width_mm: Math.min(sz.w, inner.w),
+            height_mm: Math.min(sz.h, inner.h),
+            z_index: z,
+          },
+        ];
+      }
+      return prev.map((f) => {
         if (f.field_type !== type) return f;
-        const sz = catalog.size(type);
         const w = f.width_mm > 0 ? f.width_mm : sz.w;
         const h = f.height_mm > 0 ? f.height_mm : sz.h;
         return {
@@ -224,10 +255,11 @@ export function UtskriftsprofilDialog({
           height_mm: Math.min(h, inner.h),
           z_index: z,
         };
-      }),
-    );
+      });
+    });
     setSelectedFieldType(type);
   };
+
 
   const handleAddByClick = (type: FieldType) => {
     const sz = catalog.size(type);
