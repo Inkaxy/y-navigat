@@ -47,7 +47,27 @@ export default function Recipes() {
     },
   });
 
+  /** Antall aktive delingslenker per oppskrift — viser hva som ligger ute. */
+  const shareCountsQuery = useQuery({
+    queryKey: ["recipe-share-counts", legalEntityId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("recipe_share_links")
+        .select("recipe_id, expires_at, revoked_at")
+        .is("revoked_at", null);
+      const counts: Record<string, number> = {};
+      const now = Date.now();
+      for (const r of (data ?? []) as any[]) {
+        if (r.expires_at && new Date(r.expires_at).getTime() < now) continue;
+        counts[r.recipe_id] = (counts[r.recipe_id] ?? 0) + 1;
+      }
+      return counts;
+    },
+  });
+
   const rmMap = rmQuery.data ?? {};
+  const shareCounts = shareCountsQuery.data ?? {};
+
 
   const rows = useMemo(() => {
     const q = search.trim().toLowerCase();
