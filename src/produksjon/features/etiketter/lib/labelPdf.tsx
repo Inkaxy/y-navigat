@@ -11,7 +11,7 @@ import type {
   ProfileField,
   FieldType,
 } from "@/produksjon/features/utskriftsprofiler/types";
-import { FIELD_LABELS } from "@/produksjon/features/utskriftsprofiler/types";
+import { FALLBACK_FIELD_LABELS } from "@/produksjon/features/utskriftsprofiler/types";
 import { fitFontSizePt } from "@/produksjon/features/utskriftsprofiler/lib/fitText";
 import type { LabelProductRow } from "../types";
 import type { LabelFields } from "../hooks/useLabelFields";
@@ -55,6 +55,33 @@ export interface LabelPdfData {
   deliveryNoteMessage?: string | null;
   /** Verdi som skal kodes i strekkoden. Default: etikettnummer, ellers varenr. */
   barcodeValue?: string | null;
+  /** Oppløste feltverdier fra RPC `resolve_label_data` — nøkkel = field_key. */
+  felter?: Record<string, unknown> | null;
+  /** Visningsnavn per feltnøkkel fra `label_field_catalog`. */
+  fieldLabels?: Record<string, string> | null;
+}
+
+/** Felter som styres av profil/system og ikke finnes i `resolve_label_data`. */
+const SYSTEM_FIELDS = new Set([
+  "logo",
+  "firmanavn",
+  "firmamerknad",
+  "etikett_nr",
+  "strekkode",
+  "utskriftstidspunkt",
+  "sist_endret",
+]);
+
+function fieldLabelFor(type: FieldType, data: LabelPdfData): string {
+  return data.fieldLabels?.[type] ?? FALLBACK_FIELD_LABELS[type] ?? type;
+}
+
+function formatValue(v: unknown): string {
+  if (v == null) return "";
+  if (typeof v === "boolean") return v ? "Ja" : "Nei";
+  if (Array.isArray(v)) return v.filter(Boolean).map(String).join(", ");
+  if (typeof v === "object") return "";
+  return String(v);
 }
 
 
@@ -62,12 +89,12 @@ function joinNonEmpty(parts: Array<string | undefined | null>, sep = " · "): st
   return parts.filter((s): s is string => !!s && s.trim().length > 0).join(sep);
 }
 
-/** Verdi for et felt basert på tilgjengelig data. */
+/** Verdi for et felt: system-/profilfelt her, alt annet fra `felter`. */
 function valueFor(
   type: FieldType,
   data: LabelPdfData,
 ): { text?: string; image?: string | null } {
-  const { profile, row, labelNumber, quantity, labelFields, tourLabel, pickupLabel, customerName, deliveryAddress, phone, deliveryDate, pickupTime, isPaid, distribution, routeLabel, deliveryNoteNumber, deliveryNoteMessage } = data;
+  const { profile, labelNumber } = data;
   switch (type) {
     case "logo":
       return { image: profile.logo_url };
@@ -75,59 +102,15 @@ function valueFor(
       return { text: profile.company_name || "" };
     case "firmamerknad":
       return { text: profile.company_note || "" };
-    case "varenavn":
-      return { text: row.display_name };
-    case "varenr":
-      return { text: String(row.display_number) };
-    case "antall":
-      return { text: String(quantity) };
     case "etikett_nr":
-      return { text: labelNumber || "—" };
-    case "tur":
-      return { text: tourLabel || "" };
-    case "hentested":
-      return { text: pickupLabel || "" };
-    case "kundenavn":
-      return { text: customerName || "" };
-    case "leveringsadresse":
-      return { text: deliveryAddress || "" };
-    case "telefon":
-      return { text: phone || "" };
-    case "leveringsdato":
-      return { text: deliveryDate || "" };
-    case "hentetidspunkt":
-      return { text: pickupTime || "" };
-    case "er_betalt":
-      return { text: isPaid ? "Ja" : "Nei" };
-    case "distribusjon":
-      return { text: distribution || "" };
-    case "kjorerute":
-      return { text: routeLabel || tourLabel || "" };
-    case "pakkseddelnr":
-      return { text: deliveryNoteNumber || "" };
-    case "melding_pakkseddel":
-      return { text: deliveryNoteMessage || "" };
+      return { text: labelNumber || "" };
     case "strekkode":
       return { text: barcodeText(data) };
-
+    case "utskriftstidspunkt":
     case "sist_endret":
       return { text: new Date().toLocaleString("nb-NO") };
-    case "bestilt_av":
-      return { text: labelFields?.bestilt_av || "" };
-    case "fyll":
-      return { text: labelFields?.fyll || "" };
-    case "tekst":
-      return { text: labelFields?.tekst || "" };
-    case "pynt":
-      return { text: labelFields?.pynt || "" };
-    case "sukkerbilde":
-      return {
-        text: labelFields?.sukkerbilde === true ? "+ BILDE" : "",
-      };
-    case "kommentar":
-      return { text: labelFields?.kommentar || "" };
     default:
-      return { text: `[${FIELD_LABELS[type]}]` };
+      return { text: formatValue(data.felter?.[type]) };
   }
 }
 
@@ -175,6 +158,10 @@ function BarcodeView({ value, heightMm }: { value: string; heightMm: number }) {
 
 function renderField(field: ProfileField, data: LabelPdfData, key: string) {
   const v = valueFor(field.field_type, data);
+  // Hopp over tomme felter med mindre profilen ber om å alltid tegne dem.
+  const isEmpty =
+    field.field_type === "logo" ? !v.image : !(v.text ?? "").trim();
+  if (isEmpty && !(field.always_show ?? false)) return null;
   const align: "left" | "center" | "right" =
     field.alignment === "center"
       ? "center"
@@ -193,7 +180,7 @@ function renderField(field: ProfileField, data: LabelPdfData, key: string) {
     data.profile.include_field_labels &&
     (field.show_label ?? true) &&
     field.field_type !== "logo";
-  const labelText = showLabel ? `${FIELD_LABELS[field.field_type]}: ` : "";
+  const labelText = showLabel ? `${fieldLabelFor(field.field_type, data)}: ` : "";
 
   const autoFit = field.auto_fit ?? false;
   const fullText = labelText + (v.text ?? "");
