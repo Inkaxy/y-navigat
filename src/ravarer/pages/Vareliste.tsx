@@ -173,7 +173,15 @@ export default function VarelistePage() {
                         ? <>{formatNumber(s.quantity_12m, 0)} <span className="text-xs text-ink-secondary">{r.base_unit}</span></>
                         : <span className="text-ink-secondary">—</span>}
                     </td>
+                    <td className="px-4 py-3 text-right tabular-nums">
+                      {r.stock_tracking
+                        ? <span className={r.current_stock < 0 ? "font-semibold text-destructive" : r.min_stock != null && r.current_stock <= r.min_stock ? "font-semibold text-warning" : ""}>
+                            {formatNumber(r.current_stock, 2)} <span className="text-xs font-normal text-ink-secondary">{r.base_unit}</span>
+                          </span>
+                        : <span className="text-ink-secondary">—</span>}
+                    </td>
                     <td className="px-4 py-3 text-ink-secondary">{formatDate(r.price_updated_at)}</td>
+
                     <td className="px-4 py-3">
                       {r.is_packaging && <Badge variant="outline" className="mr-1">Emballasje</Badge>}
                       {r.is_active ? (
