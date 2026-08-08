@@ -13,6 +13,8 @@ export interface InvoiceListRow {
   status: string;
   source: string | null;
   imported_at: string;
+  line_extraction_status: string | null;
+  line_extraction_error: string | null;
   supplier?: { name: string } | null;
   legal_entity?: { legal_name: string; short_code: string | null } | null;
   line_count: number;
