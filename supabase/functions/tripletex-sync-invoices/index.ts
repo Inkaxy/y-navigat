@@ -194,13 +194,15 @@ Deno.serve(async (req) => {
       "currency(code),voucher(id,number),supplier(id,name,organizationNumber,supplierNumber)";
 
     async function fetchPage(from: string, to: string, offset: number) {
-      const query = {
+      const query: Record<string, unknown> = {
         invoiceDateFrom: from,
         invoiceDateTo: to,
         from: offset,
         count: 1000,
         fields: FIELDS,
       };
+      // Ved etterhenting filtrerer vi på leverandør direkte i API-et.
+      if (ttSupplierFilterId) query.supplierId = ttSupplierFilterId;
       try {
         return await tripletexFetch("/v2/supplierInvoice", { sessionToken, query });
       } catch (e) {
@@ -217,6 +219,8 @@ Deno.serve(async (req) => {
     let skipped = 0;
     let updated = 0;
     let failed = 0;
+    // Fakturaer fra leverandører som ikke følges lagres ikke i det hele tatt.
+    let hoppetOverIkkeFulgt = 0;
     const touchedSupplierIds = new Set<string>();
     const nowIso = new Date().toISOString();
     let lastCompletedChunkTo: string | null = null;
