@@ -82,20 +82,19 @@ Deno.serve(async (req) => {
 
     try {
       const session = await createSessionForMode(mode, consumerToken, secretToken!);
-      const probeUrl =
-        (Deno.env.get("TRIPLETEX_BASE_URL") || "https://tripletex.no").replace(/\/+$/, "") +
-        "/v2/company/%3E";
-      const probe = await fetch(probeUrl, {
-        headers: {
-          Authorization: "Basic " + btoa(`0:${session.token}`),
-          Accept: "application/json",
-        },
-      });
-      const probeText = await probe.text();
-      if (!probe.ok) {
-        let msg = probeText.slice(0, 300);
+      const base = (Deno.env.get("TRIPLETEX_BASE_URL") || "https://tripletex.no").replace(/\/+$/, "");
+      const authHeaders = {
+        Authorization: "Basic " + btoa(`0:${session.token}`),
+        Accept: "application/json",
+      };
+
+      // 1) Hvem er vi innlogget som?
+      const whoRes = await fetch(`${base}/v2/token/session/%3EwhoAmI`, { headers: authHeaders });
+      const whoText = await whoRes.text();
+      if (!whoRes.ok) {
+        let msg = whoText.slice(0, 300);
         try {
-          const parsed = JSON.parse(probeText);
+          const parsed = JSON.parse(whoText);
           const parts: string[] = [];
           if (parsed?.message) parts.push(String(parsed.message));
           if (Array.isArray(parsed?.validationMessages)) {
@@ -109,14 +108,37 @@ Deno.serve(async (req) => {
         }
         return json({
           ok: false,
-          error: `Kontrollkallet mot Tripletex feilet (${probe.status}): ${msg}`,
-          detail: probeText.slice(0, 400),
+          error: `Kontrollkallet mot Tripletex feilet (${whoRes.status}): ${msg}`,
+          detail: whoText.slice(0, 400),
         });
       }
-      const probeJson = JSON.parse(probeText);
+      const whoJson = JSON.parse(whoText);
+      const companyId = whoJson?.value?.companyId ?? null;
+      const employeeId = whoJson?.value?.employeeId ?? null;
+
+      // 2) Hent selskapsdetaljer — feil her skal ikke velte testen.
+      let name: string | null = null;
+      let organizationNumber: string | null = null;
+      if (companyId != null) {
+        try {
+          const compRes = await fetch(
+            `${base}/v2/company/${companyId}?fields=id,name,organizationNumber`,
+            { headers: authHeaders },
+          );
+          if (compRes.ok) {
+            const compJson = await compRes.json();
+            name = compJson?.value?.name ?? null;
+            organizationNumber = compJson?.value?.organizationNumber ?? null;
+          }
+        } catch {
+          /* ignorer — tilkoblingen er allerede bevist */
+        }
+      }
+
       return json({
         ok: true,
-        company: { id: probeJson?.value?.id, name: probeJson?.value?.name },
+        company: { id: companyId, name, organization_number: organizationNumber },
+        employee_id: employeeId,
         session_expires: session.expirationDate,
         mode,
       });
