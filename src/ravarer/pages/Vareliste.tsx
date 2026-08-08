@@ -184,6 +184,8 @@ export default function VarelistePage() {
 
                     <td className="px-4 py-3">
                       {r.is_packaging && <Badge variant="outline" className="mr-1">Emballasje</Badge>}
+                      {r.is_resale_item && <Badge variant="outline" className="mr-1">Handelsvare</Badge>}
+
                       {r.is_active ? (
                         <Badge className="bg-success/15 text-success border-success/30">Aktiv</Badge>
                       ) : (
