@@ -1,56 +1,18 @@
 import { supabase } from "@/integrations/supabase/client";
 
-export type LinesSumStatus = "not_checked" | "ok" | "mismatch" | "no_lines" | "no_total";
+// Sumkontrollen bor i supabase/functions/_shared/lines-sum.ts slik at både den
+// manuelle PDF-importen og Tripletex-importen bruker nøyaktig samme regnestykke.
+export {
+  computeLinesSum,
+  needsReviewFromConfidence,
+  EXTRACTION_CONFIDENCE_THRESHOLD,
+  LINES_SUM_TOLERANCE_PCT,
+  LINES_SUM_TOLERANCE_PCT_NO_VAT,
+} from "../../../supabase/functions/_shared/lines-sum.ts";
+export type { LinesSumCheck, LinesSumStatus } from "../../../supabase/functions/_shared/lines-sum.ts";
 
-export interface LinesSumCheck {
-  lines_sum_excl_vat: number | null;
-  lines_sum_variance_pct: number | null;
-  lines_sum_status: LinesSumStatus;
-}
-
-/** Toleranse når vi kan sammenligne mot eks. mva (total_vat kjent). */
-export const LINES_SUM_TOLERANCE_PCT = 2;
-/** Slingringsmonn når total_vat mangler og vi må sammenligne mot inkl. mva. */
-export const LINES_SUM_TOLERANCE_PCT_NO_VAT = 20;
-
-/**
- * Sammenlign summen av varelinjene (eks. mva) mot fakturaens totalbeløp.
- * Fakturaens total_amount er inkl. mva, så vi trekker fra total_vat når den finnes.
- */
-export function computeLinesSum(input: {
-  lineTotals: Array<number | null | undefined>;
-  totalAmount: number | null | undefined;
-  totalVat: number | null | undefined;
-}): LinesSumCheck {
-  const { lineTotals, totalAmount, totalVat } = input;
-
-  if (!lineTotals || lineTotals.length === 0) {
-    return { lines_sum_excl_vat: null, lines_sum_variance_pct: null, lines_sum_status: "no_lines" };
-  }
-
-  const sum = lineTotals.reduce<number>((s, v) => s + (Number(v) || 0), 0);
-  const rounded = Number(sum.toFixed(2));
-
-  const total = totalAmount == null ? null : Number(totalAmount);
-  if (total == null || !Number.isFinite(total) || total === 0) {
-    return { lines_sum_excl_vat: rounded, lines_sum_variance_pct: null, lines_sum_status: "no_total" };
-  }
-
-  const vatKnown = totalVat != null && Number.isFinite(Number(totalVat));
-  const expected = vatKnown ? total - Number(totalVat) : total;
-  const tolerance = vatKnown ? LINES_SUM_TOLERANCE_PCT : LINES_SUM_TOLERANCE_PCT_NO_VAT;
-
-  if (expected === 0) {
-    return { lines_sum_excl_vat: rounded, lines_sum_variance_pct: null, lines_sum_status: "no_total" };
-  }
-
-  const variance = ((rounded - expected) / expected) * 100;
-  return {
-    lines_sum_excl_vat: rounded,
-    lines_sum_variance_pct: Number(variance.toFixed(3)),
-    lines_sum_status: Math.abs(variance) <= tolerance ? "ok" : "mismatch",
-  };
-}
+import { computeLinesSum } from "../../../supabase/functions/_shared/lines-sum.ts";
+import type { LinesSumCheck } from "../../../supabase/functions/_shared/lines-sum.ts";
 
 /** Regn ut og lagre kontrollen på fakturaen. Returnerer resultatet. */
 export async function saveLinesSumCheck(
