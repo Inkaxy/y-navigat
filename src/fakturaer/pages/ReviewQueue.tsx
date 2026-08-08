@@ -113,13 +113,52 @@ export default function FakturaerReviewQueuePage() {
               </SelectContent>
             </Select>
           )}
-          <Select value={supplierId} onValueChange={setSupplierId} disabled={legalEntityId === "all"}>
-            <SelectTrigger className="w-[220px]"><SelectValue placeholder="Leverandør" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Alle leverandører</SelectItem>
-              {suppliers.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
+          <Popover open={supplierOpen} onOpenChange={setSupplierOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                role="combobox"
+                disabled={legalEntityId === "all"}
+                className="w-[260px] justify-between font-normal"
+              >
+                <span className="truncate">
+                  {supplierId === "all"
+                    ? "Alle leverandører"
+                    : suppliers.find((s) => s.id === supplierId)?.name ?? "Leverandør"}
+                </span>
+                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[300px] p-0" align="start">
+              <Command>
+                <CommandInput placeholder="Søk leverandør…" />
+                <CommandList>
+                  <CommandEmpty>Ingen treff</CommandEmpty>
+                  <CommandGroup>
+                    <CommandItem
+                      value="Alle leverandører"
+                      onSelect={() => { setSupplierId("all"); setSupplierOpen(false); }}
+                    >
+                      <Check className={supplierId === "all" ? "mr-2 h-4 w-4 opacity-100" : "mr-2 h-4 w-4 opacity-0"} />
+                      Alle leverandører
+                    </CommandItem>
+                    {suppliers.map((s) => (
+                      <CommandItem
+                        key={s.id}
+                        value={`${s.name} ${s.org_number ?? ""}`}
+                        onSelect={() => { setSupplierId(s.id); setSupplierOpen(false); }}
+                      >
+                        <Check className={supplierId === s.id ? "mr-2 h-4 w-4 opacity-100" : "mr-2 h-4 w-4 opacity-0"} />
+                        <span className="truncate">{s.name}</span>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
+
           <span className="text-sm text-ink-secondary">Totalt {lines.length}{totalCount > lines.length ? ` av ${totalCount}` : ""} linjer til behandling</span>
         </div>
       </Card>
