@@ -3,6 +3,8 @@
 // Kjøres av cron (små porsjoner) eller manuelt per faktura fra fakturadetaljsiden.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { getSessionToken, baseUrl, authHeader } from "../_shared/tripletex.ts";
+import { parsePackageFromDescription } from "../_shared/units.ts";
+import { computeLinesSum, needsReviewFromConfidence } from "../_shared/lines-sum.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -94,7 +96,7 @@ Deno.serve(async (req) => {
 
     let q = admin
       .from("invoices")
-      .select("id, tripletex_supplier_invoice_id, invoice_number")
+      .select("id, tripletex_supplier_invoice_id, invoice_number, total_amount, total_vat, status")
       .eq("legal_entity_id", legalEntityId)
       .not("tripletex_supplier_invoice_id", "is", null)
       .order("invoice_date", { ascending: false })
@@ -166,22 +168,49 @@ Deno.serve(async (req) => {
             : [];
           const rows = rawLines
             .filter((l: any) => (l?.description ?? "") !== "" || num(l?.total_amount) !== null)
-            .map((l: any, i: number) => ({
-              invoice_id: inv.id,
-              line_number: i + 1,
-              supplier_sku: l?.sku ?? null,
-              description: l?.description ?? null,
-              quantity: num(l?.quantity),
-              unit: l?.unit ?? null,
-              unit_price: num(l?.unit_price),
-              total_amount: num(l?.total_amount),
-              vat_rate: num(l?.vat_rate),
-            }));
+            .map((l: any, i: number) => {
+              // Pakningsfeltene kommer fra uthentingen. Mangler de, tolker vi beskrivelsen
+              // («36X90G») slik at package_size × count_per_package = total pakningsstørrelse.
+              let packageSize = num(l?.package_size);
+              let packageUnit = (l?.package_unit ?? null) as string | null;
+              let countPerPackage = num(l?.count_per_package);
+              if (packageSize == null || !packageUnit) {
+                const parsed = parsePackageFromDescription(l?.description);
+                if (parsed) {
+                  packageSize = parsed.size;
+                  packageUnit = parsed.unit;
+                  countPerPackage = parsed.count ?? 1;
+                }
+              }
+              return {
+                invoice_id: inv.id,
+                line_number: i + 1,
+                supplier_sku: l?.sku ?? null,
+                description: l?.description ?? null,
+                quantity: num(l?.quantity),
+                unit: l?.unit ?? null,
+                unit_price: num(l?.unit_price),
+                total_amount: num(l?.total_amount),
+                vat_rate: num(l?.vat_rate),
+                package_size: packageSize,
+                package_unit: packageUnit,
+                count_per_package: countPerPackage,
+              };
+            });
+
+          const confidence = num(extractJsonBody?.extracted?.confidence);
+          const lowConfidence = needsReviewFromConfidence(confidence);
 
           if (rows.length === 0) {
             await admin
               .from("invoices")
               .update({
+                extraction_confidence: confidence,
+                ...computeLinesSum({
+                  lineTotals: [],
+                  totalAmount: inv.total_amount as number | null,
+                  totalVat: inv.total_vat as number | null,
+                }),
                 lines_source: null,
                 line_extraction_status: "done",
                 line_extraction_at: new Date().toISOString(),
@@ -195,6 +224,13 @@ Deno.serve(async (req) => {
           const { error: linesErr } = await admin.from("invoice_lines").insert(rows);
           if (linesErr) throw new Error(linesErr.message);
 
+          // Sumkontroll: linjene er eks. mva, fakturaens totalbeløp inkl. mva.
+          const sumCheck = computeLinesSum({
+            lineTotals: rows.map((r: any) => r.total_amount),
+            totalAmount: inv.total_amount as number | null,
+            totalVat: inv.total_vat as number | null,
+          });
+
           await admin
             .from("invoices")
             .update({
@@ -202,6 +238,10 @@ Deno.serve(async (req) => {
               line_extraction_status: "done",
               line_extraction_at: new Date().toISOString(),
               line_extraction_error: null,
+              extraction_confidence: confidence,
+              ...sumCheck,
+              // Usikker uthenting skal ikke gli gjennom som ferdig importert.
+              ...(lowConfidence && inv.status === "imported" ? { status: "needs_review" } : {}),
             })
             .eq("id", inv.id);
           vellykket++;
