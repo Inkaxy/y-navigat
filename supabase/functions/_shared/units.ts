@@ -75,7 +75,10 @@ export function toBaseFactor(
 }
 
 export interface PackageInfo {
-  /** Antall base-enhet per pakke (f.eks. 10 for "10l", 3240 for "36X90G"). */
+  /**
+   * Størrelse per sub-enhet i base-enhet (f.eks. 10 for "10l", 90 for "36X90G").
+   * Total pakningsstørrelse = size * count.
+   */
   size: number;
   /** Base-enhet pakken er uttrykt i (kg/g/l/ml/dl/cl/stk). */
   unit: CanonicalUnit;
@@ -87,15 +90,18 @@ export interface PackageInfo {
 
 /**
  * Trekk ut pakke-størrelse fra norsk fakturabeskrivelse.
+ * Definisjonen er identisk med AI-prompten: `size` er størrelsen PER sub-enhet,
+ * og `count` er antall sub-enheter. Total = size * count.
  * Eksempler:
  *   "10l"          -> { size: 10,    unit: "l",  count: 1 }
  *   "2 kg"         -> { size: 2,     unit: "kg", count: 1 }
  *   "500ml"        -> { size: 500,   unit: "ml", count: 1 }
  *   "1/4l"         -> { size: 0.25,  unit: "l",  count: 1 }
- *   "36X90G"       -> { size: 3240,  unit: "g",  count: 36 }
- *   "12 x 500 ML"  -> { size: 6000,  unit: "ml", count: 12 }
- *   "6X1L"         -> { size: 6,     unit: "l",  count: 6 }
+ *   "36X90G"       -> { size: 90,    unit: "g",  count: 36 }
+ *   "12 x 500 ML"  -> { size: 500,   unit: "ml", count: 12 }
+ *   "6X1L"         -> { size: 1,     unit: "l",  count: 6 }
  */
+
 export function parsePackageFromDescription(desc: string | null | undefined): PackageInfo | null {
   if (!desc) return null;
   const text = String(desc).replace(/\s+/g, " ").trim();
