@@ -213,6 +213,8 @@ function RavarerNav() {
 
   const items: NavItem[] = [
     { kind: "link", to: "/ravarer/vareliste", label: "Vareliste", icon: Boxes },
+    { kind: "link", to: "/ravarer/lager", label: "Lager", icon: Warehouse },
+
     { kind: "link", to: "/ravarer/leverandorer", label: "Leverandører", icon: Building2 },
     { kind: "link", to: "/ravarer/avtaler", label: "Avtaler", icon: FileText },
     { kind: "dropdown", label: "Datablad", icon: Database, basePath: "/ravarer/datablad", links: [
