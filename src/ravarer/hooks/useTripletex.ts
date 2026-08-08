@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 export interface TripletexCredentialRow {
   legal_entity_id: string;
-  mode: "standard" | "private";
+  mode: "jwt" | "standard" | "private";
   has_consumer_token: boolean;
   has_employee_token: boolean;
   sync_enabled: boolean;
