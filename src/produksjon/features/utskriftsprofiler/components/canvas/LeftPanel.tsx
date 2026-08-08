@@ -1,48 +1,11 @@
 import { useMemo, useState } from "react";
-import {
-  Search,
-  User,
-  Truck,
-  MapPin,
-  Route,
-  UserCircle,
-  Package,
-  Hash,
-  Tag,
-  Sparkles,
-  Type,
-  Flower2,
-  Cookie,
-  FileText,
-  MessageSquare,
-  StickyNote,
-  Building2,
-  Image as ImageIcon,
-  Info,
-  Barcode,
-  Clock,
-  ListOrdered,
-  Calendar,
-  CheckCircle2,
-
-  Eye,
-  EyeOff,
-  Trash2,
-  ChevronUp,
-  ChevronDown,
-} from "lucide-react";
+import { Search, Trash2, ChevronUp, ChevronDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import {
-  FIELD_GROUPS,
-  FIELD_LABELS,
-  FIELD_TYPES,
-  GROUP_LABELS,
-  type FieldType,
-  type FieldGroup,
-  type ProfileField,
-} from "../../types";
+import { useLabelFieldCatalog } from "../../hooks/useLabelFieldCatalog";
+import { fieldIcon } from "../../lib/fieldIcons";
+import { type FieldType, type ProfileField } from "../../types";
 
 interface Props {
   fields: ProfileField[];
@@ -53,40 +16,8 @@ interface Props {
   onUpdateField: (type: FieldType, patch: Partial<ProfileField>) => void;
 }
 
-const GROUP_ORDER: FieldGroup[] = ["bestilling", "vare", "system", "firma", "pakkseddel"];
-
-const FIELD_ICONS: Record<FieldType, React.ComponentType<{ className?: string }>> = {
-  etikett_nr: ListOrdered,
-  strekkode: Barcode,
-  sist_endret: Clock,
-  kundenavn: User,
-  bestilt_av: UserCircle,
-  distribusjon: Truck,
-  kjorerute: Route,
-  tur: Route,
-  leveringsadresse: MapPin,
-  varenr: Hash,
-  varenavn: Tag,
-  antall: Package,
-  fyll: Sparkles,
-  tekst: Type,
-  pynt: Flower2,
-  sukkerbilde: Cookie,
-  hentested: MapPin,
-  pakkseddelnr: FileText,
-  melding_pakkseddel: MessageSquare,
-  kommentar: StickyNote,
-  logo: ImageIcon,
-  firmanavn: Building2,
-  firmamerknad: Info,
-  telefon: User,
-  leveringsdato: Calendar,
-  hentetidspunkt: Clock,
-  er_betalt: CheckCircle2,
-
-};
-
 export function LeftPanel(props: Props) {
+  const catalog = useLabelFieldCatalog();
   const [tab, setTab] = useState<"felter" | "lag">("felter");
   const placedCount = props.activeFieldTypes.size;
 
@@ -96,7 +27,7 @@ export function LeftPanel(props: Props) {
       <div className="flex items-center gap-1 border-b border-border px-3 pt-3">
         <TabBtn active={tab === "felter"} onClick={() => setTab("felter")}>
           Felter
-          <Badge>{FIELD_TYPES.length}</Badge>
+          <Badge>{catalog.keys.length}</Badge>
         </TabBtn>
         <TabBtn active={tab === "lag"} onClick={() => setTab("lag")}>
           Lag
@@ -150,25 +81,22 @@ function FieldsTab({
   activeFieldTypes,
   onClickField,
 }: Props) {
+  const catalog = useLabelFieldCatalog();
   const [query, setQuery] = useState("");
 
-  const filtered = useMemo(() => {
+  const groups = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return FIELD_TYPES.slice();
-    return FIELD_TYPES.filter((t) => FIELD_LABELS[t].toLowerCase().includes(q));
-  }, [query]);
+    return catalog.groups
+      .map((g) => ({
+        ...g,
+        keys: q
+          ? g.keys.filter((k) => catalog.label(k).toLowerCase().includes(q))
+          : g.keys,
+      }))
+      .filter((g) => g.keys.length > 0);
+  }, [catalog, query]);
 
-  const grouped = useMemo(() => {
-    const groups: Record<FieldGroup, FieldType[]> = {
-      bestilling: [],
-      vare: [],
-      pakkseddel: [],
-      firma: [],
-      system: [],
-    };
-    for (const t of filtered) groups[FIELD_GROUPS[t]].push(t);
-    return groups;
-  }, [filtered]);
+  const hits = groups.reduce((acc, g) => acc + g.keys.length, 0);
 
   return (
     <>
@@ -188,18 +116,17 @@ function FieldsTab({
       </div>
 
       <div className="flex-1 overflow-y-auto px-3 py-3">
-        {GROUP_ORDER.map((g) => {
-          const items = grouped[g];
-          if (items.length === 0) return null;
+        {groups.map((g) => {
+          const items = g.keys;
           return (
-            <div key={g} className="mb-4">
+            <div key={g.group} className="mb-4">
               <h4 className="mb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                {GROUP_LABELS[g]}
+                {g.label}
               </h4>
               <div className="grid grid-cols-2 gap-1.5">
                 {items.map((type) => {
                   const active = activeFieldTypes.has(type);
-                  const Icon = FIELD_ICONS[type];
+                  const Icon = fieldIcon(type, catalog.group(type));
                   return (
                     <button
                       key={type}
@@ -217,7 +144,7 @@ function FieldsTab({
                         if (!active) onClickField(type);
                       }}
                       disabled={active}
-                      title={FIELD_LABELS[type]}
+                      title={catalog.sourceLabel(type)}
                       className={cn(
                         "group relative flex h-9 items-center gap-1.5 rounded-[10px] border px-2 text-left text-xs font-medium transition",
                         active
@@ -226,7 +153,7 @@ function FieldsTab({
                       )}
                     >
                       <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                      <span className="truncate">{FIELD_LABELS[type]}</span>
+                      <span className="truncate">{catalog.label(type)}</span>
                       {active && (
                         <span className="ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-brand-bronze" />
                       )}
@@ -237,7 +164,7 @@ function FieldsTab({
             </div>
           );
         })}
-        {filtered.length === 0 && (
+        {hits === 0 && (
           <p className="px-2 py-4 text-center text-xs text-muted-foreground">
             Ingen felt matcher «{query}».
           </p>
@@ -253,6 +180,7 @@ function LayersTab({
   onSelectField,
   onUpdateField,
 }: Props) {
+  const catalog = useLabelFieldCatalog();
   const placed = useMemo(
     () => fields.filter((f) => f.include).sort((a, b) => b.z_index - a.z_index),
     [fields],
@@ -288,7 +216,7 @@ function LayersTab({
     <div className="flex-1 overflow-y-auto p-2">
       <ul className="space-y-1">
         {placed.map((f) => {
-          const Icon = FIELD_ICONS[f.field_type];
+          const Icon = fieldIcon(f.field_type, catalog.group(f.field_type));
           const isSel = selectedFieldType === f.field_type;
           return (
             <li
@@ -307,7 +235,7 @@ function LayersTab({
               >
                 <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                 <span className="truncate font-medium">
-                  {FIELD_LABELS[f.field_type]}
+                  {catalog.label(f.field_type)}
                 </span>
               </button>
               <div className="flex items-center opacity-0 transition group-hover:opacity-100">
@@ -355,6 +283,3 @@ function LayersTab({
     </div>
   );
 }
-
-void Eye;
-void EyeOff;
