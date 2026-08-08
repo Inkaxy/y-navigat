@@ -157,9 +157,18 @@ export default function Recipes() {
                 {rows.map((r: any) => (
                   <tr key={r.id} onClick={() => navigate(`/varer/oppskrifter/${r.id}`)} className="cursor-pointer border-t border-border hover:bg-muted/30">
                     <td className="px-4 py-2.5">
-                      <div className="font-medium">{r.name || "Uten navn"}</div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{r.name || "Uten navn"}</span>
+                        {shareCounts[r.id] > 0 && (
+                          <Badge variant="outline" className="gap-1 px-1.5 py-0 text-[11px] font-normal">
+                            <Link2 className="h-3 w-3" />
+                            {shareCounts[r.id]}
+                          </Badge>
+                        )}
+                      </div>
                       <div className="text-xs text-muted-foreground">v{r.version}</div>
                     </td>
+
                     <td className="px-4 py-2.5">{r.category ?? "—"}</td>
                     <td className="px-4 py-2.5 text-right tabular-nums">{fmtPercent(r.totals.hydrationPct)}</td>
                     <td className="px-4 py-2.5 text-right tabular-nums">{fmtG(r.totals.totalDoughG)} g</td>
