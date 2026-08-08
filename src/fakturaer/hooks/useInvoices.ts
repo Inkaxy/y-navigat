@@ -58,6 +58,8 @@ export function useInvoices(filters: { legalEntityId?: string | null; status?: s
         status: r.status,
         source: r.source,
         imported_at: r.imported_at,
+        line_extraction_status: r.line_extraction_status ?? null,
+        line_extraction_error: r.line_extraction_error ?? null,
         supplier: r.suppliers ? { name: r.suppliers.name } : null,
         legal_entity: r.legal_entities ? { legal_name: r.legal_entities.legal_name, short_code: r.legal_entities.short_code } : null,
         line_count: (r.invoice_lines ?? []).length,
