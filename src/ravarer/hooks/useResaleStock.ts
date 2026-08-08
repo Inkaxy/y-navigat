@@ -153,7 +153,7 @@ export function useReorderSuggestions() {
           supplier_sku: link?.supplier_sku ?? null,
         };
         const key = link?.supplier?.id ?? "ukjent";
-        const group = groups.get(key) ?? {
+        const group: ReorderGroup = groups.get(key) ?? {
           supplier_id: link?.supplier?.id ?? null,
           supplier_name: link?.supplier?.name ?? "Uten leverandør",
           lines: [],
