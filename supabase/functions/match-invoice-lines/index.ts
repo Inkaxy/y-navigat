@@ -145,8 +145,9 @@ Deno.serve(async (req) => {
             baseUnit: rm.base_unit,
             rmsPackageSize: rmsRow?.package_size ?? null,
             rmsPackageUnit: rmsRow?.package_unit ?? null,
-            linePackageSize: (line as any).package_size ?? null,
-            linePackageUnit: (line as any).package_unit ?? null,
+            linePackageSize: line.package_size ?? null,
+            linePackageUnit: line.package_unit ?? null,
+            lineCountPerPackage: line.count_per_package ?? null,
           });
           if (conv && conv.factor !== 0) actual = Number(line.unit_price) / conv.factor;
         }
@@ -429,8 +430,9 @@ Deno.serve(async (req) => {
             baseUnit: rm.base_unit,
             rmsPackageSize: rmsRow?.package_size ?? null,
             rmsPackageUnit: rmsRow?.package_unit ?? null,
-            linePackageSize: (line as any).package_size ?? null,
-            linePackageUnit: (line as any).package_unit ?? null,
+            linePackageSize: line.package_size ?? null,
+            linePackageUnit: line.package_unit ?? null,
+            lineCountPerPackage: line.count_per_package ?? null,
           });
           if (conv && conv.factor !== 0) actual = Number(line.unit_price) / conv.factor;
         }
