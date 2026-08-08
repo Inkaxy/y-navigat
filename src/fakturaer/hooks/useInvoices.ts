@@ -15,6 +15,10 @@ export interface InvoiceListRow {
   imported_at: string;
   line_extraction_status: string | null;
   line_extraction_error: string | null;
+  /** AI-ens lesesikkerhet ved PDF-import (0–1). */
+  extraction_confidence: number | null;
+  lines_sum_status: string | null;
+
   supplier?: { name: string } | null;
   legal_entity?: { legal_name: string; short_code: string | null } | null;
   line_count: number;
