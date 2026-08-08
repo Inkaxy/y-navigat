@@ -10,6 +10,7 @@ import { categorizePriceSource } from "@/ordre/hooks/useNBProducts";
 import { useDeliveryTours, trimSec } from "@/ordre/hooks/useDeliveryTours";
 import { ChangeTourDialog } from "@/ordre/components/orders/ChangeTourDialog";
 import type { OrderDetail, OrderLineDetail } from "@/ordre/hooks/useOrderDetail";
+import { StockAvailabilityWarning } from "@/ordre/components/orders/StockAvailabilityWarning";
 
 const KUNDER_APP_BASE = "https://kunder.nbos.app"; // ekstern app — kommer som env-konfig senere
 

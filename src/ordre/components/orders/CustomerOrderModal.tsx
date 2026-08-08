@@ -71,6 +71,7 @@ import {
   findCakeLineForOrder,
 } from "@/ordre/lib/cakeImages";
 import { osloTodayISO } from "@/lib/osloDate";
+import { StockAvailabilityWarning } from "@/ordre/components/orders/StockAvailabilityWarning";
 
 
 export type FieldConfidenceHint =
