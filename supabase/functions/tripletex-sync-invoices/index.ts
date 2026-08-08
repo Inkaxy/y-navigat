@@ -21,6 +21,10 @@ interface Body {
   legal_entity_id?: string;
   from?: string;
   to?: string;
+  /** Etterhenting: hent kun denne leverandørens fakturaer. */
+  supplier_id?: string;
+  /** Antall måneder bakover ved etterhenting (standard 12). */
+  backfill_months?: number;
 }
 
 const DAY = 24 * 60 * 60 * 1000;
