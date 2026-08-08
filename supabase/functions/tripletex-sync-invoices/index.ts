@@ -269,6 +269,12 @@ Deno.serve(async (req) => {
             supplier = created;
             if (ttSupId) byTtId.set(ttSupId, supplier);
           }
+          // 1b) Følges leverandøren? Hvis ikke: hopp over fakturaen helt.
+          // Leverandøren er likevel opprettet, slik at den kan skrus på senere.
+          if (!supplier.track_invoice_lines) {
+            hoppetOverIkkeFulgt++;
+            continue;
+          }
           touchedSupplierIds.add(supplier.id);
 
           const ttInvoiceId = String(inv.id);
