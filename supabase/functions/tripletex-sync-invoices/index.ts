@@ -391,6 +391,8 @@ Deno.serve(async (req) => {
       antall_biter: chunks.length,
       har_mer: harMer,
       oppdatert: updated,
+      hoppet_over_ikke_fulgt: hoppetOverIkkeFulgt,
+      etterhenting: isBackfill ? body.supplier_id : null,
     };
 
     if (logId) {
