@@ -123,9 +123,9 @@ export function MatchDrawer({ open, onOpenChange, line }: Props) {
       baseUnit,
       rmsPackageSize: packageSize ? Number(packageSize.replace(",", ".")) : null,
       rmsPackageUnit: packageUnit || null,
-      linePackageSize: (line as any).package_size ?? null,
-      linePackageUnit: (line as any).package_unit ?? null,
-      lineCountPerPackage: (line as any).count_per_package ?? null,
+      linePackageSize: line.package_size,
+      linePackageUnit: line.package_unit,
+      lineCountPerPackage: line.count_per_package,
     });
     if (!conv?.factor || conv.factor <= 0) return null;
     const p = Number(line.unit_price) / conv.factor;
@@ -424,10 +424,10 @@ export function MatchDrawer({ open, onOpenChange, line }: Props) {
 /** Pakning fra linjens lagrede felter, ellers tolket fra beskrivelsen. */
 function derivePackage(line: ReviewLineRow | null): { size: number; unit: string } | null {
   if (!line) return null;
-  const ps = (line as any).package_size as number | null | undefined;
-  const pu = (line as any).package_unit as string | null | undefined;
+  const ps = line.package_size;
+  const pu = line.package_unit;
   if (ps && pu && isBaseUnit(normalizeUnit(pu))) {
-    const cnt = Number((line as any).count_per_package);
+    const cnt = Number(line.count_per_package);
     const mult = Number.isFinite(cnt) && cnt > 0 ? cnt : 1;
     return { size: Number(ps) * mult, unit: normalizeUnit(pu)! };
   }

@@ -1,7 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
-export type ReviewReason = "unmatched" | "low_confidence" | "price_variance" | "sku_collision";
+export type ReviewReason =
+  | "unmatched"
+  | "low_confidence"
+  | "price_variance"
+  | "sku_collision"
+  | "unknown_package_size"
+  | "price_increase"
+  | "no_baseline";
 
 export interface ReviewLineRow {
   id: string;
@@ -13,6 +20,9 @@ export interface ReviewLineRow {
   unit: string | null;
   unit_price: number | null;
   total_amount: number | null;
+  package_size: number | null;
+  package_unit: string | null;
+  count_per_package: number | null;
   match_confidence: string | null;
   raw_material_id: string | null;
   price_per_base_unit: number | null;
@@ -54,6 +64,7 @@ export function useReviewLines(filters: Filters) {
         .from("invoice_lines")
         .select(
           `id, invoice_id, line_number, supplier_sku, description, quantity, unit, unit_price, total_amount,
+           package_size, package_unit, count_per_package,
            match_confidence, raw_material_id, price_per_base_unit, expected_price_per_base_unit, price_variance_pct,
            variance_status, review_reason,
            invoice:invoices!inner(id, invoice_number, invoice_date, legal_entity_id, supplier_id, source, source_document_url,
