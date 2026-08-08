@@ -227,46 +227,67 @@ function EntityConfig({ legalEntityId }: { legalEntityId: string }) {
           </div>
           <CardDescription>
             {isConfigured
-              ? "Tokens er lagret kryptert. La feltene stå tomme for å beholde dem, eller skriv inn nye for å erstatte."
-              : "Lim inn API-tokens fra Tripletex."}
+              ? "Nøkler er lagret kryptert. La feltene stå tomme for å beholde dem, eller skriv inn nye for å erstatte."
+              : "Lim inn nøkkel fra Tripletex."}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
           <div className="space-y-2">
             <Label>Modus</Label>
-            <RadioGroup value={mode} onValueChange={(v) => setMode(v as "standard" | "private")}>
+            <RadioGroup value={mode} onValueChange={(v) => setMode(v as TripletexMode)}>
+              <div className="flex items-start gap-3">
+                <RadioGroupItem id="mode-jwt" value="jwt" />
+                <div>
+                  <Label htmlFor="mode-jwt" className="font-medium">API-nøkkel (anbefalt)</Label>
+                  <p className="text-xs text-muted-foreground">Én nøkkel per selskap. Lages i Tripletex under Selskap → API-tokens.</p>
+                </div>
+              </div>
               <div className="flex items-start gap-3">
                 <RadioGroupItem id="mode-std" value="standard" />
                 <div>
                   <Label htmlFor="mode-std" className="font-medium">Standard (consumer + employee token)</Label>
-                  <p className="text-xs text-muted-foreground">Brukes når NBhub er registrert som softwareleverandør.</p>
+                  <p className="text-xs text-muted-foreground">Eldre alternativ. Brukes når NBhub er registrert som softwareleverandør.</p>
                 </div>
               </div>
               <div className="flex items-start gap-3">
                 <RadioGroupItem id="mode-priv" value="private" />
                 <div>
                   <Label htmlFor="mode-priv" className="font-medium">Privat API-bruk (kun employee token)</Label>
-                  <p className="text-xs text-muted-foreground">Krever at Tripletex-kontoen har direkte API-tilgang.</p>
+                  <p className="text-xs text-muted-foreground">Eldre alternativ. Krever at Tripletex-kontoen har direkte API-tilgang.</p>
                 </div>
               </div>
             </RadioGroup>
           </div>
 
-          {mode === "standard" && (
+          {mode === "jwt" ? (
             <div className="space-y-2">
-              <Label htmlFor="consumer">Consumer token</Label>
-              <Input id="consumer" type="password" autoComplete="off"
-                placeholder={cred?.has_consumer_token ? "•••••••• (lagret – la stå for å beholde)" : "Lim inn consumer token"}
-                value={consumerToken} onChange={(e) => setConsumerToken(e.target.value)} />
+              <Label htmlFor="jwt">API-nøkkel</Label>
+              <Input id="jwt" type="password" autoComplete="off"
+                placeholder={hasStoredJwt ? "•••••••• (lagret – la stå for å beholde)" : "Lim inn API-nøkkel"}
+                value={jwtToken} onChange={(e) => setJwtToken(e.target.value)} />
+              <p className="text-xs text-muted-foreground">
+                Nøkkelen vises bare én gang i Tripletex — kopier den med en gang.
+              </p>
             </div>
-          )}
+          ) : (
+            <>
+              {mode === "standard" && (
+                <div className="space-y-2">
+                  <Label htmlFor="consumer">Consumer token</Label>
+                  <Input id="consumer" type="password" autoComplete="off"
+                    placeholder={cred?.has_consumer_token ? "•••••••• (lagret – la stå for å beholde)" : "Lim inn consumer token"}
+                    value={consumerToken} onChange={(e) => setConsumerToken(e.target.value)} />
+                </div>
+              )}
 
-          <div className="space-y-2">
-            <Label htmlFor="employee">Employee token</Label>
-            <Input id="employee" type="password" autoComplete="off"
-              placeholder={cred?.has_employee_token ? "•••••••• (lagret – la stå for å beholde)" : "Lim inn employee token"}
-              value={employeeToken} onChange={(e) => setEmployeeToken(e.target.value)} />
-          </div>
+              <div className="space-y-2">
+                <Label htmlFor="employee">Employee token</Label>
+                <Input id="employee" type="password" autoComplete="off"
+                  placeholder={cred?.has_employee_token ? "•••••••• (lagret – la stå for å beholde)" : "Lim inn employee token"}
+                  value={employeeToken} onChange={(e) => setEmployeeToken(e.target.value)} />
+              </div>
+            </>
+          )}
 
           <div className="flex items-center justify-between rounded-lg border p-3">
             <div>
