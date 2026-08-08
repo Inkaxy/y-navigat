@@ -35,7 +35,7 @@ export const FIELD_TYPES = [
  */
 export type FieldType = string;
 
-export const FIELD_LABELS: Record<FieldType, string> = {
+export const FALLBACK_FIELD_LABELS: Record<FieldType, string> = {
   logo: "Logo",
   hentested: "Hentested",
   kundenavn: "Kundenavn",
