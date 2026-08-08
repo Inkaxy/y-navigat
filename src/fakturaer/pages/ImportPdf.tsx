@@ -550,7 +550,9 @@ export default function ImportPdfPage({ embedded = false }: { embedded?: boolean
           <div>
             <h3 className="font-medium">Linjer ({lines.length})</h3>
             <p className="text-xs text-ink-secondary">
-              {lines.length === 0 ? "Ingen linjer ekstrahert — legg til manuelt eller lagre uten." : "Rediger ved behov."}
+              {lines.length === 0
+                ? "Ingen linjer ekstrahert — legg til manuelt eller lagre uten."
+                : "Rediger ved behov. Pk.str er størrelsen per sub-enhet (90 for «36X90G»), Ant./pk er antallet (36)."}
             </p>
           </div>
           <Button size="sm" variant="outline" onClick={addLine} className="gap-1">
@@ -569,6 +571,9 @@ export default function ImportPdfPage({ embedded = false }: { embedded?: boolean
                   <th className="p-2 w-24">Stk.pris</th>
                   <th className="p-2 w-24">Sum</th>
                   <th className="p-2 w-16">Mva%</th>
+                  <th className="p-2 w-20" title="Pakningsstørrelse per sub-enhet">Pk.str</th>
+                  <th className="p-2 w-16" title="Base-enhet for pakningsstørrelsen">Pk.enhet</th>
+                  <th className="p-2 w-16" title="Antall sub-enheter per pakke (36 for 36X90G)">Ant./pk</th>
                   <th className="p-2 w-8"></th>
                 </tr>
               </thead>
@@ -582,6 +587,9 @@ export default function ImportPdfPage({ embedded = false }: { embedded?: boolean
                     <td className="p-1"><Input type="number" step="0.01" value={l.unit_price ?? ""} onChange={(e) => updateLine(i, { unit_price: e.target.value ? Number(e.target.value) : null })} className="h-8" /></td>
                     <td className="p-1"><Input type="number" step="0.01" value={l.total_amount ?? ""} onChange={(e) => updateLine(i, { total_amount: e.target.value ? Number(e.target.value) : null })} className="h-8" /></td>
                     <td className="p-1"><Input type="number" step="0.1" value={l.vat_rate ?? ""} onChange={(e) => updateLine(i, { vat_rate: e.target.value ? Number(e.target.value) : null })} className="h-8" /></td>
+                    <td className="p-1"><Input type="number" step="0.001" value={l.package_size ?? ""} onChange={(e) => updateLine(i, { package_size: e.target.value ? Number(e.target.value) : null })} className="h-8" /></td>
+                    <td className="p-1"><Input value={l.package_unit ?? ""} onChange={(e) => updateLine(i, { package_unit: e.target.value || null })} className="h-8" /></td>
+                    <td className="p-1"><Input type="number" step="1" value={l.count_per_package ?? ""} onChange={(e) => updateLine(i, { count_per_package: e.target.value ? Number(e.target.value) : null })} className="h-8" /></td>
                     <td className="p-1 text-center">
                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeLine(i)}>
                         <Trash2 className="h-3 w-3 text-destructive" />
