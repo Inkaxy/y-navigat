@@ -93,3 +93,6 @@ verify_jwt = false
 verify_jwt = false
 
 
+
+[functions.tripletex-import-invoice-lines]
+verify_jwt = false
