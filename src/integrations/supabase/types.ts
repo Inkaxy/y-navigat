@@ -2979,6 +2979,39 @@ export type Database = {
         }
         Relationships: []
       }
+      label_marks: {
+        Row: {
+          id: string
+          image_url: string | null
+          legal_entity_id: string
+          licence_note: string | null
+          mark_key: string
+          updated_at: string
+          uploaded_by: string | null
+          valid_to: string | null
+        }
+        Insert: {
+          id?: string
+          image_url?: string | null
+          legal_entity_id: string
+          licence_note?: string | null
+          mark_key: string
+          updated_at?: string
+          uploaded_by?: string | null
+          valid_to?: string | null
+        }
+        Update: {
+          id?: string
+          image_url?: string | null
+          legal_entity_id?: string
+          licence_note?: string | null
+          mark_key?: string
+          updated_at?: string
+          uploaded_by?: string | null
+          valid_to?: string | null
+        }
+        Relationships: []
+      }
       label_number_sequences: {
         Row: {
           last_number: number
@@ -8361,6 +8394,7 @@ export type Database = {
           base_unit: string
           categories: string[]
           category: string | null
+          cereal_type: string | null
           components_reviewed_at: string | null
           created_at: string
           created_by: string | null
@@ -8390,6 +8424,7 @@ export type Database = {
           base_unit: string
           categories?: string[]
           category?: string | null
+          cereal_type?: string | null
           components_reviewed_at?: string | null
           created_at?: string
           created_by?: string | null
@@ -8419,6 +8454,7 @@ export type Database = {
           base_unit?: string
           categories?: string[]
           category?: string | null
+          cereal_type?: string | null
           components_reviewed_at?: string | null
           created_at?: string
           created_by?: string | null
@@ -8507,6 +8543,87 @@ export type Database = {
             columns: ["product_recipe_link_id"]
             isOneToOne: true
             referencedRelation: "product_recipe_links"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recipe_label_calculated: {
+        Row: {
+          allergens: Json | null
+          computed_at: string
+          coverage_by_weight_pct: number | null
+          dry_matter_grams: number | null
+          dry_matter_pct: number | null
+          final_weight_grams: number | null
+          flour_grams: number | null
+          grain_category: string | null
+          grain_score_pct: number | null
+          ingredient_declaration: string | null
+          keyhole: Json | null
+          missing_data: Json | null
+          nutrition_per_100g: Json | null
+          recipe_id: string
+          rye_share_of_grain_pct: number | null
+          total_input_grams: number | null
+          warnings: Json | null
+          whole_grain_grams: number | null
+          whole_grain_pct_of_dry: number | null
+        }
+        Insert: {
+          allergens?: Json | null
+          computed_at?: string
+          coverage_by_weight_pct?: number | null
+          dry_matter_grams?: number | null
+          dry_matter_pct?: number | null
+          final_weight_grams?: number | null
+          flour_grams?: number | null
+          grain_category?: string | null
+          grain_score_pct?: number | null
+          ingredient_declaration?: string | null
+          keyhole?: Json | null
+          missing_data?: Json | null
+          nutrition_per_100g?: Json | null
+          recipe_id: string
+          rye_share_of_grain_pct?: number | null
+          total_input_grams?: number | null
+          warnings?: Json | null
+          whole_grain_grams?: number | null
+          whole_grain_pct_of_dry?: number | null
+        }
+        Update: {
+          allergens?: Json | null
+          computed_at?: string
+          coverage_by_weight_pct?: number | null
+          dry_matter_grams?: number | null
+          dry_matter_pct?: number | null
+          final_weight_grams?: number | null
+          flour_grams?: number | null
+          grain_category?: string | null
+          grain_score_pct?: number | null
+          ingredient_declaration?: string | null
+          keyhole?: Json | null
+          missing_data?: Json | null
+          nutrition_per_100g?: Json | null
+          recipe_id?: string
+          rye_share_of_grain_pct?: number | null
+          total_input_grams?: number | null
+          warnings?: Json | null
+          whole_grain_grams?: number | null
+          whole_grain_pct_of_dry?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recipe_label_calculated_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: true
+            referencedRelation: "recipe_nutrition_calculated"
+            referencedColumns: ["recipe_id"]
+          },
+          {
+            foreignKeyName: "recipe_label_calculated_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: true
+            referencedRelation: "recipes"
             referencedColumns: ["id"]
           },
         ]
@@ -8903,6 +9020,7 @@ export type Database = {
           bulk_proof_minutes: number | null
           category: string | null
           cooling_minutes: number | null
+          country_of_origin: string | null
           created_at: string
           created_by: string | null
           declaration_mode: Database["public"]["Enums"]["declaration_mode"]
@@ -8913,6 +9031,10 @@ export type Database = {
           hourly_rate: number
           id: string
           image_url: string | null
+          label_claim_grain: boolean
+          label_claim_keyhole: boolean
+          label_claims_approved_at: string | null
+          label_claims_approved_by: string | null
           legal_entity_id: string | null
           manual_allergen_summary: Json | null
           manual_ingredient_declaration: string | null
@@ -8929,8 +9051,10 @@ export type Database = {
           production_notes: string | null
           requires_cleanup: boolean
           shape_proof_minutes: number | null
+          shelf_life_days: number | null
           status: string
           steam_seconds: number | null
+          storage_instructions: string | null
           target_db_pct: number
           target_dough_temp_celsius: number | null
           unit_weight_grams: number | null
@@ -8951,6 +9075,7 @@ export type Database = {
           bulk_proof_minutes?: number | null
           category?: string | null
           cooling_minutes?: number | null
+          country_of_origin?: string | null
           created_at?: string
           created_by?: string | null
           declaration_mode?: Database["public"]["Enums"]["declaration_mode"]
@@ -8961,6 +9086,10 @@ export type Database = {
           hourly_rate?: number
           id?: string
           image_url?: string | null
+          label_claim_grain?: boolean
+          label_claim_keyhole?: boolean
+          label_claims_approved_at?: string | null
+          label_claims_approved_by?: string | null
           legal_entity_id?: string | null
           manual_allergen_summary?: Json | null
           manual_ingredient_declaration?: string | null
@@ -8977,8 +9106,10 @@ export type Database = {
           production_notes?: string | null
           requires_cleanup?: boolean
           shape_proof_minutes?: number | null
+          shelf_life_days?: number | null
           status?: string
           steam_seconds?: number | null
+          storage_instructions?: string | null
           target_db_pct?: number
           target_dough_temp_celsius?: number | null
           unit_weight_grams?: number | null
@@ -8999,6 +9130,7 @@ export type Database = {
           bulk_proof_minutes?: number | null
           category?: string | null
           cooling_minutes?: number | null
+          country_of_origin?: string | null
           created_at?: string
           created_by?: string | null
           declaration_mode?: Database["public"]["Enums"]["declaration_mode"]
@@ -9009,6 +9141,10 @@ export type Database = {
           hourly_rate?: number
           id?: string
           image_url?: string | null
+          label_claim_grain?: boolean
+          label_claim_keyhole?: boolean
+          label_claims_approved_at?: string | null
+          label_claims_approved_by?: string | null
           legal_entity_id?: string | null
           manual_allergen_summary?: Json | null
           manual_ingredient_declaration?: string | null
@@ -9025,8 +9161,10 @@ export type Database = {
           production_notes?: string | null
           requires_cleanup?: boolean
           shape_proof_minutes?: number | null
+          shelf_life_days?: number | null
           status?: string
           steam_seconds?: number | null
+          storage_instructions?: string | null
           target_db_pct?: number
           target_dough_temp_celsius?: number | null
           unit_weight_grams?: number | null
@@ -11923,6 +12061,7 @@ export type Database = {
           base_unit: string
           categories: string[]
           category: string | null
+          cereal_type: string | null
           components_reviewed_at: string | null
           created_at: string
           created_by: string | null
