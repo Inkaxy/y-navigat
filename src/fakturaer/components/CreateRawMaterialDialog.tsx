@@ -11,7 +11,13 @@ import { Loader2 } from "lucide-react";
 import { formatNok } from "@/fakturaer/lib/constants";
 import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
 
-interface Props { open: boolean; onOpenChange: (v: boolean) => void; line: ReviewLineRow | null; }
+interface Props {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  line: ReviewLineRow | null;
+  /** Kalles når råvaren faktisk ble opprettet (ikke ved avbryt). */
+  onCreated?: (rawMaterialId: string) => void;
+}
 
 const UNIT_TO_BASE: Record<string, string> = { g: "kg", kg: "kg", ml: "l", l: "l", stk: "stk", pakke: "stk" };
 function toBaseFactor(from: string | null, to: string): number {
