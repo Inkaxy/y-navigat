@@ -6,6 +6,7 @@ export interface LegalEntityRow {
   id: string;
   name: string;
   short_code: string | null;
+  status: string | null;
 }
 
 /** Returnerer alle legal_entities brukeren har faktura-tilgang til (via posisjon eller eier-flagg). */
