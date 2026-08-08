@@ -8,11 +8,12 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, ExternalLink, Search } from "lucide-react";
+import { Loader2, ExternalLink, Search, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { formatNok, formatDate } from "@/fakturaer/lib/constants";
 import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
 import { isBaseUnit, normalizeUnit, parsePackageFromDescription, quantityToBase } from "@/fakturaer/lib/units";
+import { CreateRawMaterialDialog } from "@/fakturaer/components/CreateRawMaterialDialog";
 
 interface Props {
   open: boolean;
@@ -41,6 +42,7 @@ export function MatchDrawer({ open, onOpenChange, line }: Props) {
   const [agreedPrice, setAgreedPrice] = useState("");
   const [packageSize, setPackageSize] = useState("");
   const [packageUnit, setPackageUnit] = useState("");
+  const [createOpen, setCreateOpen] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -319,7 +321,12 @@ export function MatchDrawer({ open, onOpenChange, line }: Props) {
             )}
 
             <div>
-              <Label className="mb-1.5 block">Søk etter råvare</Label>
+              <div className="mb-1.5 flex items-center justify-between gap-2">
+                <Label>Søk etter råvare</Label>
+                <Button type="button" variant="outline" size="sm" onClick={() => setCreateOpen(true)}>
+                  <Plus className="h-3.5 w-3.5" /> Opprett ny råvare
+                </Button>
+              </div>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-secondary" />
                 <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Navn eller SKU…" className="pl-9" />
@@ -420,6 +427,17 @@ export function MatchDrawer({ open, onOpenChange, line }: Props) {
             </div>
           </div>
         </div>
+
+        <CreateRawMaterialDialog
+          open={createOpen}
+          onOpenChange={setCreateOpen}
+          line={line}
+          onCreated={() => {
+            qc.invalidateQueries({ queryKey: ["fakturaer-review-lines"] });
+            qc.invalidateQueries({ queryKey: ["fakturaer-review-count"] });
+            onOpenChange(false);
+          }}
+        />
       </SheetContent>
     </Sheet>
   );

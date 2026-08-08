@@ -11,7 +11,13 @@ import { Loader2 } from "lucide-react";
 import { formatNok } from "@/fakturaer/lib/constants";
 import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
 
-interface Props { open: boolean; onOpenChange: (v: boolean) => void; line: ReviewLineRow | null; }
+interface Props {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  line: ReviewLineRow | null;
+  /** Kalles når råvaren faktisk ble opprettet (ikke ved avbryt). */
+  onCreated?: (rawMaterialId: string) => void;
+}
 
 const UNIT_TO_BASE: Record<string, string> = { g: "kg", kg: "kg", ml: "l", l: "l", stk: "stk", pakke: "stk" };
 function toBaseFactor(from: string | null, to: string): number {
@@ -22,7 +28,7 @@ function toBaseFactor(from: string | null, to: string): number {
   return e && e[0] === to ? e[1] : 1;
 }
 
-export function CreateRawMaterialDialog({ open, onOpenChange, line }: Props) {
+export function CreateRawMaterialDialog({ open, onOpenChange, line, onCreated }: Props) {
   const qc = useQueryClient();
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
@@ -129,6 +135,7 @@ export function CreateRawMaterialDialog({ open, onOpenChange, line }: Props) {
       qc.invalidateQueries({ queryKey: ["rm-categories"] });
       qc.invalidateQueries({ queryKey: ["raw-material-categories"] });
       qc.invalidateQueries({ queryKey: ["raw-materials"] });
+      onCreated?.(rm.id);
       onOpenChange(false);
     } catch (e: any) {
       toast.error(e.message ?? "Kunne ikke opprette");
