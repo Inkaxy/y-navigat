@@ -2518,6 +2518,7 @@ export type Database = {
       }
       invoice_lines: {
         Row: {
+          count_per_package: number | null
           created_at: string | null
           description: string | null
           expected_price_per_base_unit: number | null
@@ -2525,6 +2526,8 @@ export type Database = {
           invoice_id: string
           line_number: number | null
           match_confidence: string | null
+          package_size: number | null
+          package_unit: string | null
           price_per_base_unit: number | null
           price_variance_pct: number | null
           quantity: number | null
@@ -2543,6 +2546,7 @@ export type Database = {
           vat_rate: number | null
         }
         Insert: {
+          count_per_package?: number | null
           created_at?: string | null
           description?: string | null
           expected_price_per_base_unit?: number | null
@@ -2550,6 +2554,8 @@ export type Database = {
           invoice_id: string
           line_number?: number | null
           match_confidence?: string | null
+          package_size?: number | null
+          package_unit?: string | null
           price_per_base_unit?: number | null
           price_variance_pct?: number | null
           quantity?: number | null
@@ -2568,6 +2574,7 @@ export type Database = {
           vat_rate?: number | null
         }
         Update: {
+          count_per_package?: number | null
           created_at?: string | null
           description?: string | null
           expected_price_per_base_unit?: number | null
@@ -2575,6 +2582,8 @@ export type Database = {
           invoice_id?: string
           line_number?: number | null
           match_confidence?: string | null
+          package_size?: number | null
+          package_unit?: string | null
           price_per_base_unit?: number | null
           price_variance_pct?: number | null
           quantity?: number | null
@@ -2781,6 +2790,7 @@ export type Database = {
           currency: string | null
           due_date: string | null
           ehf_payload: Json | null
+          extraction_confidence: number | null
           flag_action_type: string | null
           flag_reason: string | null
           flagged_at: string | null
@@ -2796,6 +2806,9 @@ export type Database = {
           line_extraction_error: string | null
           line_extraction_status: string
           lines_source: string | null
+          lines_sum_excl_vat: number | null
+          lines_sum_status: string
+          lines_sum_variance_pct: number | null
           notes: string | null
           pdf_status: string
           reconciled_at: string | null
@@ -2817,6 +2830,7 @@ export type Database = {
           currency?: string | null
           due_date?: string | null
           ehf_payload?: Json | null
+          extraction_confidence?: number | null
           flag_action_type?: string | null
           flag_reason?: string | null
           flagged_at?: string | null
@@ -2832,6 +2846,9 @@ export type Database = {
           line_extraction_error?: string | null
           line_extraction_status?: string
           lines_source?: string | null
+          lines_sum_excl_vat?: number | null
+          lines_sum_status?: string
+          lines_sum_variance_pct?: number | null
           notes?: string | null
           pdf_status?: string
           reconciled_at?: string | null
@@ -2853,6 +2870,7 @@ export type Database = {
           currency?: string | null
           due_date?: string | null
           ehf_payload?: Json | null
+          extraction_confidence?: number | null
           flag_action_type?: string | null
           flag_reason?: string | null
           flagged_at?: string | null
@@ -2868,6 +2886,9 @@ export type Database = {
           line_extraction_error?: string | null
           line_extraction_status?: string
           lines_source?: string | null
+          lines_sum_excl_vat?: number | null
+          lines_sum_status?: string
+          lines_sum_variance_pct?: number | null
           notes?: string | null
           pdf_status?: string
           reconciled_at?: string | null
@@ -8250,7 +8271,10 @@ export type Database = {
       raw_material_suppliers: {
         Row: {
           agreed_price: number | null
+          agreed_price_legacy: number | null
           agreed_price_per_base_unit: number | null
+          agreed_price_set_at: string | null
+          agreed_price_set_by: string | null
           agreement_document_url: string | null
           agreement_valid_from: string | null
           agreement_valid_to: string | null
@@ -8270,7 +8294,10 @@ export type Database = {
         }
         Insert: {
           agreed_price?: number | null
+          agreed_price_legacy?: number | null
           agreed_price_per_base_unit?: number | null
+          agreed_price_set_at?: string | null
+          agreed_price_set_by?: string | null
           agreement_document_url?: string | null
           agreement_valid_from?: string | null
           agreement_valid_to?: string | null
@@ -8290,7 +8317,10 @@ export type Database = {
         }
         Update: {
           agreed_price?: number | null
+          agreed_price_legacy?: number | null
           agreed_price_per_base_unit?: number | null
+          agreed_price_set_at?: string | null
+          agreed_price_set_by?: string | null
           agreement_document_url?: string | null
           agreement_valid_from?: string | null
           agreement_valid_to?: string | null
