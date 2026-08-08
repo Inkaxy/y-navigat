@@ -48,7 +48,7 @@ export function RecipeSummaryCard({ productId, productName, legalEntityId, canWr
     queryFn: async () => {
       const { data } = await supabase
         .from("raw_materials")
-        .select("id, name, category, grain_classification, water_content_pct")
+        .select("id, name, category, grain_classification, water_content_pct, current_cost_price")
         .limit(2000);
       const map: Record<string, BakersRawMaterial> = {};
       for (const r of (data ?? []) as any[]) map[r.id] = r;
