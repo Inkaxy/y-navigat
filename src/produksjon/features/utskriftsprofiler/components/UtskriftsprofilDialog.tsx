@@ -4,8 +4,8 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
+import { useLabelFieldCatalog } from "../hooks/useLabelFieldCatalog";
 import {
-  defaultFieldSize,
   defaultFields,
   type FieldType,
   type LabelPrintProfile,
@@ -74,6 +74,7 @@ export function UtskriftsprofilDialog({
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [logoHeight, setLogoHeight] = useState<number | "">(15);
   const [logoUploading, setLogoUploading] = useState(false);
+  const catalog = useLabelFieldCatalog();
   const [fields, setFields] = useState<ProfileField[]>(defaultFields());
   const [lines, setLines] = useState<ProfileLine[]>([]);
   const [selectedLineId, setSelectedLineId] = useState<string | null>(null);
@@ -116,7 +117,7 @@ export function UtskriftsprofilDialog({
       const existingMap = new Map(
         (existing.fields ?? []).map((f) => [f.field_type, f]),
       );
-      const baseFields = defaultFields().map((d) => {
+      const baseFields = defaultFields(catalog.entries).map((d) => {
         const saved = existingMap.get(d.field_type);
         if (!saved) return d;
         return { ...d, ...saved, show_label: saved.show_label ?? true };
@@ -153,7 +154,7 @@ export function UtskriftsprofilDialog({
       setCompanyNote("");
       setLogoUrl(null);
       setLogoHeight(15);
-      setFields(defaultFields());
+      setFields(defaultFields(catalog.entries));
       setLines([]);
       setCommentFt1(true);
       setCommentFt2(true);
@@ -211,7 +212,7 @@ export function UtskriftsprofilDialog({
     setFields((prev) =>
       prev.map((f) => {
         if (f.field_type !== type) return f;
-        const sz = defaultFieldSize(type);
+        const sz = catalog.size(type);
         const w = f.width_mm > 0 ? f.width_mm : sz.w;
         const h = f.height_mm > 0 ? f.height_mm : sz.h;
         return {
@@ -229,7 +230,7 @@ export function UtskriftsprofilDialog({
   };
 
   const handleAddByClick = (type: FieldType) => {
-    const sz = defaultFieldSize(type);
+    const sz = catalog.size(type);
     const placed = fields.filter((f) => f.include);
     const maxY = placed.reduce(
       (acc, f) => Math.max(acc, f.y_mm + f.height_mm),
