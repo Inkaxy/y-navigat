@@ -145,6 +145,31 @@ export function MatchDrawer({ open, onOpenChange, line }: Props) {
         });
       }
 
+      // 2b) Pensjonér motstridende alias hos samme leverandør som peker på ANDRE råvarer.
+      // Uten dette blir aliaset tvetydig (dubletter i råvareregisteret) og linjen havner
+      // rett tilbake i «til behandling» ved neste kjøring.
+      if (aliasInserts.length > 0 && supplierId) {
+        const { data: supplierRms } = await supabase
+          .from("raw_material_suppliers")
+          .select("id, raw_material_id")
+          .eq("supplier_id", supplierId);
+        const otherRmsIds = (supplierRms ?? [])
+          .filter((r: any) => r.raw_material_id !== selectedRmId)
+          .map((r: any) => r.id);
+        if (otherRmsIds.length > 0) {
+          for (const a of aliasInserts) {
+            await supabase
+              .from("raw_material_supplier_aliases")
+              .update({ status: "superseded" })
+              .in("raw_material_supplier_id", otherRmsIds)
+              .eq("alias_type", a.alias_type)
+              .eq("alias_value", a.alias_value)
+              .eq("status", "confirmed");
+          }
+        }
+      }
+
+
       // 3) Set match on this line (or all matching lines in invoice)
       const lineIds: string[] = [line.id];
       if (applyToAll) {

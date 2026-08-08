@@ -225,12 +225,40 @@ Deno.serve(async (req) => {
       // STEG 2 — confirmed alias match
       const skuN = norm(line.supplier_sku);
       const descN = norm(line.description);
-      const confirmedHits = aliases.filter((a) => a.status === "confirmed" && (
+      const confirmedHitsRaw = aliases.filter((a) => a.status === "confirmed" && (
         (a.alias_type === "supplier_sku" && skuN && a.alias_value_normalized === skuN) ||
         (a.alias_type === "product_name" && descN && a.alias_value_normalized === descN)
       ));
+      // Flere alias kan peke på SAMME råvare (f.eks. både SKU og produktnavn) — det er ikke tvetydig.
+      const confirmedRmIds = new Set(
+        confirmedHitsRaw
+          .map((a) => rmsById.get(a.raw_material_supplier_id)?.raw_material_id)
+          .filter(Boolean) as string[],
+      );
+      const confirmedHits = confirmedRmIds.size <= 1 ? confirmedHitsRaw.slice(0, 1) : [];
+
+      // Ekte tvetydighet: samme alias er bekreftet på flere ULIKE råvarer (dublett i råvareregisteret).
+      // Da foreslår vi alle kandidatene i stedet for å falle tilbake til fuzzy og ende opp umatchet.
+      if (confirmedRmIds.size > 1) {
+        let rank = 1;
+        for (const rmId of confirmedRmIds) {
+          suggestionsToInsert.push({
+            invoice_line_id: line.id, raw_material_id: rmId,
+            confidence: 0.9, match_reason: "Flere råvarer har samme bekreftede alias (mulig dublett)", rank: rank++,
+          });
+        }
+        update.match_confidence = "unmatched";
+        update.requires_review = true;
+        update.review_reason = "sku_collision";
+        update.raw_material_id = null;
+        await applyUpdate(svc, line.id, update);
+        await insertSuggestions(svc, suggestionsToInsert);
+        results.push({ id: line.id, status: "ambiguous_alias" });
+        continue;
+      }
 
       if (confirmedHits.length === 1) {
+
         const hit = confirmedHits[0];
         const rmsRow = rmsById.get(hit.raw_material_supplier_id);
         if (rmsRow) {
