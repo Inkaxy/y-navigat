@@ -76,7 +76,7 @@ export async function createSessionToken(
   expirationDate?: string,
 ): Promise<{ token: string; expirationDate: string }> {
   const exp = expirationDate ?? new Date(Date.now() + 23 * 60 * 60 * 1000).toISOString().slice(0, 10);
-  const r = await requestSession(consumerToken, employeeToken, exp);
+  const r = await requestSession({ consumerToken, employeeToken }, exp);
   if (!r.ok) throw new Error(`Tripletex auth failed (${r.status}): ${r.text}`);
   if (!r.token) throw new Error("Tripletex returned no session token");
   return { token: r.token, expirationDate: r.expirationDate! };
@@ -84,19 +84,25 @@ export async function createSessionToken(
 
 /**
  * JWT/API-nøkkel-modus: én nøkkel per selskap (Selskap → API-tokens).
- * Tripletex tar imot nøkkelen som employeeToken uten consumerToken;
- * enkelte kontoer krever samme nøkkel i begge felt, derfor fallback.
+ * Nyere Tripletex-nøkler veksles inn som `refreshToken`; eldre oppsett
+ * godtar samme nøkkel som `employeeToken` — derfor fallback-rekkefølge.
  */
 export async function createSessionTokenFromApiKey(
   apiKey: string,
   expirationDate?: string,
 ): Promise<{ token: string; expirationDate: string }> {
   const exp = expirationDate ?? new Date(Date.now() + 23 * 60 * 60 * 1000).toISOString().slice(0, 10);
-  let r = await requestSession(undefined, apiKey, exp);
-  if (!r.ok) r = await requestSession(apiKey, apiKey, exp);
-  if (!r.ok) throw new Error(`Tripletex auth failed (${r.status}): ${r.text}`);
-  if (!r.token) throw new Error("Tripletex returned no session token");
-  return { token: r.token, expirationDate: r.expirationDate! };
+  const attempts: Record<string, string>[] = [
+    { refreshToken: apiKey },
+    { employeeToken: apiKey },
+    { consumerToken: apiKey, employeeToken: apiKey },
+  ];
+  let last: Awaited<ReturnType<typeof requestSession>> | null = null;
+  for (const params of attempts) {
+    last = await requestSession(params, exp);
+    if (last.ok && last.token) return { token: last.token, expirationDate: last.expirationDate! };
+  }
+  throw new Error(`Tripletex auth failed (${last?.status}): ${last?.text}`);
 }
 
 /** Velger riktig innloggingsmåte ut fra lagret modus. */
