@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { FakturaerHeaderBanner } from "@/fakturaer/components/FakturaerHeaderBanner";
 import { useFakturaer } from "@/fakturaer/context/FakturaerContext";
+import { computeLinesSum } from "@/fakturaer/lib/linesSum";
 
 interface Line {
   id?: string;
@@ -20,6 +21,9 @@ interface Line {
   unit_price: number | null;
   total_amount: number | null;
   vat_rate: number | null;
+  package_size: number | null;
+  package_unit: string | null;
+  count_per_package: number | null;
 }
 
 export default function RegistrerLinjerPage() {
@@ -37,7 +41,7 @@ export default function RegistrerLinjerPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("invoices")
-        .select("id, invoice_number, source, lines_source, source_document_url, total_amount, supplier:suppliers(name), legal_entity:legal_entities(legal_name)")
+        .select("id, invoice_number, source, lines_source, source_document_url, total_amount, total_vat, supplier:suppliers(name), legal_entity:legal_entities(legal_name)")
         .eq("id", id!)
         .single();
       if (error) throw error;
@@ -51,7 +55,7 @@ export default function RegistrerLinjerPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("invoice_lines")
-        .select("id, description, supplier_sku, quantity, unit, unit_price, total_amount, vat_rate, line_number")
+        .select("id, description, supplier_sku, quantity, unit, unit_price, total_amount, vat_rate, package_size, package_unit, count_per_package, line_number")
         .eq("invoice_id", id!)
         .order("line_number");
       if (error) throw error;
@@ -65,6 +69,8 @@ export default function RegistrerLinjerPage() {
         id: l.id, description: l.description ?? "", supplier_sku: l.supplier_sku,
         quantity: l.quantity, unit: l.unit, unit_price: l.unit_price,
         total_amount: l.total_amount, vat_rate: l.vat_rate,
+        package_size: l.package_size, package_unit: l.package_unit,
+        count_per_package: l.count_per_package,
       })));
     }
   }, [linesQ.data]);
@@ -91,6 +97,7 @@ export default function RegistrerLinjerPage() {
   const add = () => setLines((prev) => [...prev, {
     description: "", supplier_sku: null, quantity: null, unit: null,
     unit_price: null, total_amount: null, vat_rate: null,
+    package_size: null, package_unit: null, count_per_package: null,
   }]);
   const remove = (i: number) => setLines((prev) => prev.filter((_, idx) => idx !== i));
 
@@ -105,6 +112,8 @@ export default function RegistrerLinjerPage() {
         invoice_id: id, line_number: idx + 1, description: l.description,
         supplier_sku: l.supplier_sku, quantity: l.quantity, unit: l.unit,
         unit_price: l.unit_price, total_amount: l.total_amount, vat_rate: l.vat_rate,
+        package_size: l.package_size, package_unit: l.package_unit,
+        count_per_package: l.count_per_package,
       }));
       const { error: replaceErr } = await (supabase as any).rpc("replace_child_rows", {
         p_table: "invoice_lines",
@@ -114,11 +123,25 @@ export default function RegistrerLinjerPage() {
       });
       if (replaceErr) throw replaceErr;
 
+      const sumCheck = computeLinesSum({
+        lineTotals: lines.map((l) => l.total_amount),
+        totalAmount: inv.total_amount,
+        totalVat: (inv as any).total_vat,
+      });
       const { error: invErr } = await supabase
         .from("invoices")
-        .update({ lines_source: "manual_entry", status: "imported" })
+        .update({
+          lines_source: "manual_entry",
+          status: "imported",
+          lines_sum_excl_vat: sumCheck.lines_sum_excl_vat,
+          lines_sum_variance_pct: sumCheck.lines_sum_variance_pct,
+          lines_sum_status: sumCheck.lines_sum_status,
+        })
         .eq("id", id);
       if (invErr) throw invErr;
+      if (sumCheck.lines_sum_status === "mismatch") {
+        toast.warning("Linjene summerer seg ikke til fakturabeløpet — sjekk om noen linjer mangler");
+      }
 
       // Try matching
       try { await supabase.functions.invoke("match-invoice-lines", { body: { invoice_id: id } }); } catch { /* ignore */ }
@@ -207,6 +230,9 @@ export default function RegistrerLinjerPage() {
                           <Compact label="Stk.pris"><Input type="number" step="0.01" value={l.unit_price ?? ""} onChange={(e) => update(i, { unit_price: e.target.value ? Number(e.target.value) : null })} /></Compact>
                           <Compact label="Sum"><Input type="number" step="0.01" value={l.total_amount ?? ""} onChange={(e) => update(i, { total_amount: e.target.value ? Number(e.target.value) : null })} /></Compact>
                           <Compact label="Mva%"><Input type="number" step="0.1" value={l.vat_rate ?? ""} onChange={(e) => update(i, { vat_rate: e.target.value ? Number(e.target.value) : null })} /></Compact>
+                          <Compact label="Pk.str"><Input type="number" step="0.001" value={l.package_size ?? ""} onChange={(e) => update(i, { package_size: e.target.value ? Number(e.target.value) : null })} /></Compact>
+                          <Compact label="Pk.enhet"><Input value={l.package_unit ?? ""} onChange={(e) => update(i, { package_unit: e.target.value || null })} /></Compact>
+                          <Compact label="Ant./pk"><Input type="number" step="1" value={l.count_per_package ?? ""} onChange={(e) => update(i, { count_per_package: e.target.value ? Number(e.target.value) : null })} /></Compact>
                         </div>
                       </div>
                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => remove(i)}>
