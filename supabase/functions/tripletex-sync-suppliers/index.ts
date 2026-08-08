@@ -147,7 +147,11 @@ Deno.serve(async (req) => {
         const { error: upErr } = await admin.from("suppliers").update(patch).eq("id", match.id);
         if (upErr) return json({ error: upErr.message }, 500);
 
-        // Unngå at samme rad matches på nytt av en annen Tripletex-leverandør.
+        // Unngå at samme rad matches på nytt av en annen Tripletex-leverandør:
+        // fjern den fra ALLE oppslagene, ikke bare tripletex-id-oppslaget.
+        for (const [k, v] of byTtId) if (v.id === match.id) byTtId.delete(k);
+        for (const [k, v] of byOrg) if (v.id === match.id) byOrg.delete(k);
+        for (const [k, v] of byName) if (v.id === match.id) byName.delete(k);
         byTtId.set(ttId, match);
         if (changed) oppdatert++;
         else uendret++;
