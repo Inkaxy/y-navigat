@@ -69,13 +69,22 @@ import { supabase } from "@/integrations/supabase/client";
 import { CakeFontPicker } from "@/ordre/components/cake-images/CakeFontPicker";
 import { loadCakeFont } from "@/ordre/lib/cakeFonts";
 
-const TEMPLATES = [
-  { id: "qland", label: '1/4 ark — landskap (10×7,5")', w: 1000, h: 750 },
-  { id: "qport", label: '1/4 ark — portrett (7,5×10")', w: 750, h: 1000 },
-  { id: "round8", label: '8" rund', w: 800, h: 800, circle: true },
-  { id: "card", label: "Visittkort (8,9×5,1 cm)", w: 890, h: 510 },
-] as const;
-type TemplateId = (typeof TEMPLATES)[number]["id"];
+import { useCakeFormats, defaultFormat } from "@/ordre/hooks/useCakeFormats";
+import {
+  computeEffectiveDpi,
+  formatDims,
+  formatSizeLabel,
+  qualityFlagFor,
+  qualityMessage,
+  sheetFit,
+  type CakeImageFormat,
+} from "@/ordre/lib/cakeFormats";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
+
+/** Nåværende versjon av editor_state-formatet vi skriver. */
+const EDITOR_STATE_VERSION = 2;
+
 
 const TEXT_PRESETS = [
   { id: "title", label: "Tittel (stor)", size: 72, weight: "bold" },
