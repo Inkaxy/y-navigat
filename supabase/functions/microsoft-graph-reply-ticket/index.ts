@@ -1,27 +1,21 @@
 // microsoft-graph-reply-ticket: sender et svar på et eksisterende ticket
-// (Microsoft Graph melding) via Lovable connector-gateway (Ordrekontoret-tilkobling).
+// (Microsoft Graph melding) via lagret M365 OAuth-token (microsoft_oauth_tokens).
 //
 // Body: { ticket_id: string, body_html: string, mark_resolved?: boolean }
 // Krever innlogget bruker.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { decryptToken, encryptToken, refreshAccessToken } from "../_shared/m365-crypto.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const GATEWAY_URL = "https://connector-gateway.lovable.dev/microsoft_outlook";
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   try {
     const authHeader = req.headers.get("Authorization") ?? "";
     if (!authHeader) return json({ error: "Unauthorized" }, 401);
-
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) return json({ error: "LOVABLE_API_KEY mangler" }, 500);
-    const MICROSOFT_OUTLOOK_API_KEY = Deno.env.get("MICROSOFT_OUTLOOK_API_KEY");
-    if (!MICROSOFT_OUTLOOK_API_KEY) return json({ error: "MICROSOFT_OUTLOOK_API_KEY mangler — koble til Ordrekontoret" }, 500);
 
     const userClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -63,13 +57,32 @@ Deno.serve(async (req) => {
     const signatureHtml = (sigRow?.value as { html?: string } | null)?.html ?? "";
     const finalHtml = body.body_html + (signatureHtml ? `<br/><br/>${signatureHtml}` : "");
 
-    const mailbox = ticket.source_mailbox || "ordre@nottero-bakeri.no";
-    const url = `${GATEWAY_URL}/users/${encodeURIComponent(mailbox)}/messages/${encodeURIComponent(ticket.microsoft_message_id)}/reply`;
+    // Access token fra lagret M365-tilkobling (samme kilde som webhook/vedlegg).
+    const tenantId = Deno.env.get("MICROSOFT_GRAPH_TENANT_ID")!;
+    const clientId = Deno.env.get("MICROSOFT_GRAPH_CLIENT_ID")!;
+    const clientSecret = Deno.env.get("MICROSOFT_GRAPH_CLIENT_SECRET")!;
+    const { data: tokenRow } = await admin.from("microsoft_oauth_tokens")
+      .select("id, access_token_encrypted, refresh_token_encrypted, expires_at")
+      .order("updated_at", { ascending: false }).limit(1).maybeSingle();
+    if (!tokenRow) return json({ error: "Ingen M365-token konfigurert — koble til Microsoft-kontoen" }, 500);
+    let accessToken = await decryptToken(tokenRow.access_token_encrypted);
+    if (new Date(tokenRow.expires_at).getTime() - Date.now() < 5 * 60 * 1000) {
+      const refresh = await decryptToken(tokenRow.refresh_token_encrypted);
+      const fresh = await refreshAccessToken({ tenantId, clientId, clientSecret, refreshToken: refresh });
+      accessToken = fresh.access_token;
+      await admin.from("microsoft_oauth_tokens").update({
+        access_token_encrypted: await encryptToken(fresh.access_token),
+        refresh_token_encrypted: await encryptToken(fresh.refresh_token ?? refresh),
+        expires_at: new Date(Date.now() + fresh.expires_in * 1000).toISOString(),
+        last_refresh_at: new Date().toISOString(),
+      }).eq("id", tokenRow.id);
+    }
+
+    const url = `https://graph.microsoft.com/v1.0/me/messages/${encodeURIComponent(ticket.microsoft_message_id)}/reply`;
     const graphRes = await fetch(url, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "X-Connection-Api-Key": MICROSOFT_OUTLOOK_API_KEY,
+        Authorization: `Bearer ${accessToken}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -80,6 +93,7 @@ Deno.serve(async (req) => {
       const errTxt = await graphRes.text();
       return json({ error: `Graph reply feilet (${graphRes.status}): ${errTxt}` }, 502);
     }
+
 
     const patch: Record<string, unknown> = {
       status: body.mark_resolved ? "resolved" : "in_progress",
