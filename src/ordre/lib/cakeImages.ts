@@ -23,6 +23,7 @@ export type CakeImage = {
   created_at: string;
   updated_at: string;
   ticket_id?: string | null;
+  ticket_attachment_id?: string | null;
   order_id?: string | null;
   order_line_id?: string | null;
   production_department_id?: string | null;
