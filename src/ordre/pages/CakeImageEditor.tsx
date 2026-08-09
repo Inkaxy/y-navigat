@@ -527,18 +527,40 @@ export default function CakeImageEditor() {
     });
   };
 
+  // Lerretet er allerede i 300 DPI — ingen ekstra multiplier, ellers blir
+  // filen dobbelt så stor uten å bli skarpere.
   const renderPng = async (): Promise<Blob> => {
     const c = fabRef.current!;
-    const dataUrl = c.toDataURL({ format: "png", multiplier: 2 });
+    const dataUrl = c.toDataURL({ format: "png", multiplier: 1 });
     const res = await fetch(dataUrl);
     return await res.blob();
   };
+
+  // Kvalitet regnes på nytt hver gang formatet endres — et bilde som holder
+  // til kvartark holder ikke til A4.
+  const effectiveDpi = computeEffectiveDpi(
+    image?.source_width_px ?? null,
+    image?.source_height_px ?? null,
+    format,
+  );
+  const qualityFlag = qualityFlagFor(effectiveDpi);
+  const needsQualityAck = qualityFlag === "lav" && !qualityAcked;
+  const rightsAnswered = rightsCleared || (rightsNote.trim().length > 0);
+  const canMarkFerdig = !needsQualityAck && rightsAnswered;
 
   const doSave = async (
     markFerdig = false,
     opts: { navigateBack?: boolean } = {},
   ): Promise<boolean> => {
     if (!image || !fabRef.current) return false;
+    if (markFerdig && !canMarkFerdig) {
+      toast.error(
+        needsQualityAck
+          ? "Bekreft at bildet skal trykkes selv om oppløsningen er lav"
+          : "Ta stilling til rettighetene før bildet markeres ferdig",
+      );
+      return false;
+    }
     setSaving(true);
     try {
       const blob = await renderPng();
@@ -551,11 +573,18 @@ export default function CakeImageEditor() {
         {
           edited_path: editedPath,
           editor_state: JSON.parse(canvasSnapshot(fabRef.current)) as never,
-          status: markFerdig
-            ? "ferdig_redigert"
-            : image.status === "skrevet_ut"
-              ? image.status
-              : "venter",
+          editor_state_version: EDITOR_STATE_VERSION,
+          // Et vanlig «Lagre» skal ALDRI nedgradere et ferdigmarkert bilde.
+          // Statusen endres bare når brukeren aktivt ber om det.
+          status: markFerdig ? "ferdig_redigert" : image.status,
+          format_id: format?.id ?? image.format_id ?? null,
+          shape: format?.shape ?? image.shape ?? null,
+          width_mm: format ? formatDims(format).widthMm : (image.width_mm ?? null),
+          height_mm: format ? formatDims(format).heightMm : (image.height_mm ?? null),
+          effective_dpi: effectiveDpi,
+          quality_flag: qualityFlag,
+          rights_cleared: rightsCleared,
+          rights_note: rightsNote.trim() || null,
         },
       );
       // Rydd forrige edited-fil basert på DB-verdien (ikke lokal state)
@@ -593,6 +622,21 @@ export default function CakeImageEditor() {
       setSaving(false);
     }
   };
+
+  /** Bekreft lav oppløsning — lagres på raden så noen har tatt stilling. */
+  const ackQuality = async () => {
+    if (!image) return;
+    const { data: u } = await supabase.auth.getUser();
+    await updateCakeImage(image.id, {
+      quality_ack_by: u.user?.id ?? null,
+      quality_ack_at: new Date().toISOString(),
+      effective_dpi: effectiveDpi,
+      quality_flag: qualityFlag,
+    });
+    setQualityAcked(true);
+    qc.invalidateQueries({ queryKey: ["cake-image", image.id] });
+  };
+
 
   const printNow = async () => {
     const c = fabRef.current!;
