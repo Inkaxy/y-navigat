@@ -95,20 +95,52 @@ export type ChangeField =
   | "delivery_time"
   | "customer_notes"
   | "internal_notes"
+  | "production_notes"
+  | "store_notes"
   | "delivery_address_line1"
   | "delivery_address_line2"
   | "delivery_postal_code"
-  | "delivery_city";
+  | "delivery_city"
+  | "distribution"
+  | "delivery_tour_id"
+  | "pickup_location_id"
+  | "final_customer_name"
+  | "final_customer_email"
+  | "final_customer_phone"
+  | "cake_text"
+  | "cake_flavor"
+  | "cake_filling"
+  | "cake_shape"
+  | "cake_size"
+  | "allergies"
+  | "portions"
+  | "decoration";
 
 export const CHANGE_FIELD_LABEL: Record<ChangeField, string> = {
   delivery_date: "Hentedato",
   delivery_time: "Hentetid",
   customer_notes: "Kundenotat",
   internal_notes: "Internt notat",
+  production_notes: "Produksjonsnotat",
+  store_notes: "Butikknotat",
   delivery_address_line1: "Adresse",
   delivery_address_line2: "Adresse 2",
   delivery_postal_code: "Postnr",
   delivery_city: "By",
+  distribution: "Levering/henting",
+  delivery_tour_id: "Kjørerute",
+  pickup_location_id: "Hentested",
+  final_customer_name: "Mottakernavn",
+  final_customer_email: "Mottaker e-post",
+  final_customer_phone: "Mottaker telefon",
+  cake_text: "Kaketekst",
+  cake_flavor: "Smak",
+  cake_filling: "Fyll",
+  cake_shape: "Fasong",
+  cake_size: "Størrelse",
+  allergies: "Allergier",
+  portions: "Antall porsjoner",
+  decoration: "Dekor",
 };
 
 export type ProposedChange = {
