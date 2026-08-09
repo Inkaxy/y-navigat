@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ShoppingCart, Loader2, Search } from "lucide-react";
+import { ShoppingCart, Loader2, Search, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,38 +14,43 @@ import {
   type CustomerOrderInitialValues,
   type TicketAttachmentForOrder,
 } from "@/ordre/components/orders/CustomerOrderModal";
+import QuickCreateCustomerDialog from "@/ordre/components/tickets/QuickCreateCustomerDialog";
 import type { AiSuggestion } from "@/ordre/lib/aiSuggestion";
 import type { Ticket, TicketAttachment } from "@/ordre/hooks/useTickets";
 
 interface Props {
   ticket: Ticket;
-  ai: AiSuggestion;
+  /** AI-forslaget er valgfritt — ordre skal alltid kunne opprettes. */
+  ai?: AiSuggestion | null;
   attachments?: TicketAttachment[];
   onCreated: () => void;
+  /** Full bredde i AI-panelet, kompakt i topplinjen. */
+  variant?: "panel" | "compact";
+  label?: string;
 }
 
-function edibleHint(a: TicketAttachment, ai: AiSuggestion): boolean {
+function edibleHint(a: TicketAttachment, ai: AiSuggestion | null): boolean {
   if (!(a.content_type ?? "").startsWith("image/")) return false;
   const summary = (a.ai_summary ?? "").toLowerCase();
   if (/print|spiselig|trykk|sukkerpapir|kake/.test(summary)) return true;
-  if ((ai.order_fields?.cake_text ?? "").trim().length > 0) return true;
+  if ((ai?.order_fields?.cake_text ?? "").trim().length > 0) return true;
   return false;
 }
 
 function buildInitialValues(
   ticket: Ticket,
-  ai: AiSuggestion,
+  ai: AiSuggestion | null,
   attachments: TicketAttachment[],
 ): CustomerOrderInitialValues {
-  const of = ai.order_fields ?? {};
+  const of = ai?.order_fields ?? {};
   const phone = of.contact_phone ?? null;
   const name =
-    ai.customer_match?.customer_name ??
+    ai?.customer_match?.customer_name ??
     ticket.sender_name ??
     ticket.sender_email ??
     "";
 
-  const lines = (ai.products ?? [])
+  const lines = (ai?.products ?? [])
     .filter((p) => p.product_id)
     .map((p) => ({
       product_id: p.product_id as string,
@@ -53,8 +58,8 @@ function buildInitialValues(
     }));
 
   const fieldConfidence: CustomerOrderInitialValues["fieldConfidence"] = {};
-  const fc = ai.field_confidence ?? {};
-  const nameConf = ai.customer_match?.match_confidence;
+  const fc = ai?.field_confidence ?? {};
+  const nameConf = ai?.customer_match?.match_confidence;
   if (typeof nameConf === "number") fieldConfidence.name = nameConf;
   fieldConfidence.email = { label: "fra avsender", tone: "green" };
   fieldConfidence.phone = phone
@@ -95,6 +100,7 @@ function buildInitialValues(
     lines,
     fieldConfidence,
     cakeText: of.cake_text ?? null,
+    customerNotes: (ticket.ai_summary ?? "").trim() || null,
     ticketAttachments,
   };
 }
@@ -104,17 +110,20 @@ export default function CreateOrderFromTicketButton({
   ai,
   attachments,
   onCreated,
+  variant = "panel",
+  label = "Opprett kundeordre fra e-posten",
 }: Props) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [chosenId, setChosenId] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [newCustomerOpen, setNewCustomerOpen] = useState(false);
 
   const { data: results, isLoading } = useNBCustomers(search);
   const { data: chosen, isLoading: loadingChosen } = useCustomerById(chosenId);
 
   const initialValues = useMemo(
-    () => buildInitialValues(ticket, ai, attachments ?? []),
+    () => buildInitialValues(ticket, ai ?? null, attachments ?? []),
     [ticket, ai, attachments],
   );
 
@@ -128,10 +137,17 @@ export default function CreateOrderFromTicketButton({
     <>
       <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
         <PopoverTrigger asChild>
-          <Button size="sm" className="mt-2 w-full gap-1.5">
-            <ShoppingCart className="h-3.5 w-3.5" />
-            Opprett kundeordre fra e-posten
-          </Button>
+          {variant === "compact" ? (
+            <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs">
+              <ShoppingCart className="h-3.5 w-3.5" />
+              {label}
+            </Button>
+          ) : (
+            <Button size="sm" className="mt-2 w-full gap-1.5">
+              <ShoppingCart className="h-3.5 w-3.5" />
+              {label}
+            </Button>
+          )}
         </PopoverTrigger>
         <PopoverContent align="end" className="w-80 p-2">
           <div className="mb-2 text-xs font-semibold text-muted-foreground">
@@ -177,8 +193,31 @@ export default function CreateOrderFromTicketButton({
               </button>
             ))}
           </div>
+          <div className="mt-2 border-t pt-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 w-full justify-start gap-1.5 text-xs"
+              onClick={() => {
+                setPickerOpen(false);
+                setNewCustomerOpen(true);
+              }}
+            >
+              <UserPlus className="h-3.5 w-3.5" />
+              Opprett ny kunde fra e-posten
+            </Button>
+          </div>
         </PopoverContent>
       </Popover>
+
+      <QuickCreateCustomerDialog
+        open={newCustomerOpen}
+        onOpenChange={setNewCustomerOpen}
+        defaultName={ticket.sender_name ?? ticket.sender_email ?? ""}
+        defaultEmail={ticket.sender_email ?? ""}
+        onCreated={(id) => pick(id)}
+      />
 
       {loadingChosen && modalOpen && (
         <div className="fixed inset-0 z-40 grid place-items-center bg-black/40">
