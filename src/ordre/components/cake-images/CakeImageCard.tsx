@@ -98,6 +98,27 @@ export function CakeImageCard({
           </Badge>
         </div>
 
+        {missingOrder && (
+          <div className="mt-1 space-y-1.5 rounded-md border border-amber-300 bg-amber-50 p-2">
+            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-amber-900">
+              <AlertTriangle className="h-3.5 w-3.5" />
+              Mangler ordrekobling
+            </div>
+            <p className="text-[11px] leading-snug text-amber-900/80">
+              Uten ordre får bildet ikke etikettnummer og kan ikke pares med kaken.
+            </p>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 w-full px-2 text-[11px]"
+              onClick={() => setLinkOpen(true)}
+            >
+              <LinkIcon className="mr-1 h-3.5 w-3.5" />
+              Koble til ordre
+            </Button>
+          </div>
+        )}
+
         <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground">
           <span>
             {image.print_count > 0 ? `Skrevet ut ${image.print_count}×` : "—"}
@@ -110,6 +131,15 @@ export function CakeImageCard({
           </Button>
         </div>
       </div>
+
+      {linkOpen && (
+        <LinkCakeImageOrderDialog
+          image={image}
+          open={linkOpen}
+          onOpenChange={setLinkOpen}
+        />
+      )}
     </div>
   );
 }
+
