@@ -21,6 +21,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -29,10 +30,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { useInsertLabelPrintJob } from "../hooks/useLabelPrintJobs";
 import {
-  useInsertLabelPrintJob,
-  useNextLabelNumber,
-} from "../hooks/useLabelPrintJobs";
+  formatNumberRanges,
+  markLabelUnitsPrinted,
+  type LabelUnit,
+} from "../hooks/useLabelUnits";
 import type { LabelProductRow } from "../types";
 import type { ProductionDepartment } from "@/produksjon/features/produksjonsavdelinger/types";
 
@@ -44,6 +47,8 @@ interface Props {
   departments: ProductionDepartment[];
   /** Profil bundet til varen (kan være null hvis ikke satt). Logges på label_print_jobs. */
   profileId?: string | null;
+  /** Etikett-enheter (numre) for varen på valgt dato. */
+  units?: LabelUnit[];
 }
 
 export function PrintLabelDialog({
@@ -53,6 +58,7 @@ export function PrintLabelDialog({
   legalEntityId,
   departments,
   profileId,
+  units = [],
 }: Props) {
   const eligibleDepts = departments.filter((d) =>
     row ? row.department_ids.includes(d.id) : false,
@@ -60,18 +66,31 @@ export function PrintLabelDialog({
 
   const [deptId, setDeptId] = useState<string>("");
   const [quantity, setQuantity] = useState<number>(1);
-  const [labelNumber, setLabelNumber] = useState<string | null>(null);
+  const [onlyUnprinted, setOnlyUnprinted] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   /** Sortering når `label_print_model === "orig_plus_copy"`:
    *  - "stack":      [A, B, C, A, B, C]   (alle originaler, så alle kopier)
    *  - "interleave": [A, A, B, B, C, C]   (orig + kopi annenhver) */
   const [copySortMode, setCopySortMode] = useState<"stack" | "interleave">("stack");
 
-  const nextNumber = useNextLabelNumber();
   const insertJob = useInsertLabelPrintJob();
   const { data: profiles } = useLabelPrintProfiles(legalEntityId || undefined);
   const profile = profiles?.find((p) => p.id === profileId) ?? null;
   const [downloading, setDownloading] = useState(false);
+  const [printing, setPrinting] = useState(false);
+
+  const activeUnits = useMemo(
+    () => units.filter((u) => u.status !== "cancelled"),
+    [units],
+  );
+  const unprintedUnits = useMemo(
+    () => activeUnits.filter((u) => u.status !== "printed"),
+    [activeUnits],
+  );
+  const selectedUnits = useMemo(
+    () => (onlyUnprinted ? unprintedUnits : activeUnits),
+    [onlyUnprinted, unprintedUnits, activeUnits],
+  );
 
   const orderLineIds = useMemo(() => row?.order_line_ids ?? [], [row]);
   const { data: labelDataMap } = useLabelData(orderLineIds);
@@ -81,55 +100,45 @@ export function PrintLabelDialog({
   );
   const { data: customerInfoMap } = useOrderLineCustomerInfo(orderLineIds);
 
-  /** Bygg en LabelPdfData per ordrelinje, padder/trimmer til ønsket `quantity`. */
-  function buildItems(overrideLabelNumber?: string | null): CombinedLabelItem[] {
+  /** Bygg etikettene som skal skrives ut — én per etikett-enhet (nummer). */
+  function buildItems(): CombinedLabelItem[] {
     if (!profile || !row) return [];
-    const activeLabelNumber = overrideLabelNumber ?? labelNumber;
-    const base = { profile, row, labelNumber: activeLabelNumber };
+    const base = { profile, row, fieldLabels };
     const isOrigPlusCopy = row.label_print_model === "orig_plus_copy";
 
     let base_items: LabelPdfData[];
-    if (orderLineIds.length === 0) {
-      base_items = [{
-        ...base, quantity, copies: quantity, felter: null, fieldLabels,
-        pickupLabel: null,
-      }];
-    } else {
-      const perLine: LabelPdfData[] = orderLineIds.map((id) => ({
+    if (selectedUnits.length > 0) {
+      base_items = selectedUnits.map((u) => ({
         ...base,
-        quantity,
+        labelNumber: String(u.number),
+        quantity: selectedUnits.length,
         copies: 1,
-        felter: labelDataMap?.[id]?.felter ?? null,
-        fieldLabels,
-        pickupLabel: customerInfoMap?.[id]?.pickupLabel ?? null,
+        felter: u.order_line_id ? (labelDataMap?.[u.order_line_id]?.felter ?? null) : null,
+        pickupLabel: u.order_line_id
+          ? (customerInfoMap?.[u.order_line_id]?.pickupLabel ?? null)
+          : null,
       }));
-      if (quantity <= perLine.length) {
-        base_items = perLine.slice(0, quantity);
-      } else {
-        const extras = quantity - perLine.length;
-        base_items = [
-          ...perLine,
-          {
-            ...base,
-            quantity,
-            copies: extras,
-            felter: perLine[0]?.felter ?? null,
-            fieldLabels,
-            pickupLabel: perLine[0]?.pickupLabel ?? null,
-          },
-        ];
-      }
+    } else {
+      // Ingen etikett-enheter (f.eks. varen mangler ordrelinjer) — fall tilbake
+      // til rent antall uten nummer.
+      base_items = [
+        {
+          ...base,
+          labelNumber: null,
+          quantity,
+          copies: quantity,
+          felter: null,
+          pickupLabel: null,
+        },
+      ];
     }
-
 
     if (!isOrigPlusCopy) return base_items;
 
-    // Dupliser hver etikett 1 gang ekstra (original + kopi).
+    // Orig og kopi deler nummer — samme etikett skrives to ganger.
     if (copySortMode === "interleave") {
-      // [A, A, B, B, ...] — bevarer `copies` (dobles per item)
       return base_items.map((it) => ({ ...it, copies: (it.copies ?? 1) * 2 }));
     }
-    // "stack" — [A, B, C, ---- KOPI ----, A, B, C]
     return [
       ...base_items,
       { separator: true as const, profile, text: "---- KOPI ----" },
@@ -137,10 +146,9 @@ export function PrintLabelDialog({
     ];
   }
 
-  async function generateBlob(overrideLabelNumber?: string | null): Promise<Blob> {
+  async function generateBlob(): Promise<Blob> {
     const { pdf } = await import("@react-pdf/renderer");
-    const items = buildItems(overrideLabelNumber);
-    return pdf(<CombinedLabelPdfDocument items={items} />).toBlob();
+    return pdf(<CombinedLabelPdfDocument items={buildItems()} />).toBlob();
   }
 
   const handleDownloadPdf = async () => {
@@ -153,7 +161,7 @@ export function PrintLabelDialog({
     try {
       const blob = await generateBlob();
       const url = URL.createObjectURL(blob);
-      const fileName = `etikett_${row.display_number}_${slugifyLabel(row.display_name)}${labelNumber ? `_${labelNumber}` : ""}.pdf`;
+      const fileName = `etikett_${row.display_number}_${slugifyLabel(row.display_name)}.pdf`;
       const a = document.createElement("a");
       a.href = url;
       a.download = fileName;
@@ -169,36 +177,31 @@ export function PrintLabelDialog({
       setDownloading(false);
     }
   };
+
   useEffect(() => {
     if (open && row) {
       setDeptId(eligibleDepts[0]?.id ?? "");
       setQuantity(row.total_labels || 1);
-      setLabelNumber(null);
+      setOnlyUnprinted(true);
       setErrorMessage(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, row?.product_id]);
 
-  /** Logger én print-jobb per ordrelinje (ikke bare den første) slik at
-   *  nummer-gjenbruk/logging dekker alle linjene bak etiketten. */
-  async function logJobs(
-    assignedNumber: string,
-    status: "printed" | "failed",
-  ) {
+  /** Logger én print-jobb per etikett-enhet, med enhetens nummer. */
+  async function logJobs(status: "printed" | "failed") {
     if (!row || !deptId) return;
-    const ids = orderLineIds.length > 0 ? orderLineIds : [null];
-    // Fordel antall: første linje får resten, øvrige 1 hver.
-    const extra = Math.max(ids.length - 1, 0);
-    const firstQty = Math.max(quantity - extra, 1);
-    for (let i = 0; i < ids.length; i++) {
+    if (selectedUnits.length === 0) return;
+    for (const u of selectedUnits) {
       await insertJob.mutateAsync({
-        label_number: assignedNumber,
+        label_number: String(u.number),
+        label_unit_id: u.id,
         product_id: row.product_id,
-        order_line_id: ids[i],
+        order_line_id: u.order_line_id,
         legal_entity_id: legalEntityId,
         production_department_id: deptId,
         profile_id: profileId ?? null,
-        quantity: i === 0 ? firstQty : 1,
+        quantity: 1,
         printer_name: null,
         status,
       });
@@ -208,26 +211,10 @@ export function PrintLabelDialog({
   const handlePrint = async () => {
     if (!row || !deptId) return;
     setErrorMessage(null);
-    let assignedNumber: string;
-    try {
-      assignedNumber = await nextNumber.mutateAsync({
-        deptId,
-        productId: row.product_id,
-        orderLineId: row.order_line_ids[0] ?? null,
-      });
-      setLabelNumber(assignedNumber);
-      toast.success(`Etikett ${assignedNumber} tildelt`);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "Kunne ikke tildele nummer";
-      setErrorMessage(msg);
-      toast.error(msg);
-      return;
-    }
-
-    // Generer selve etiketten (PDF) og åpne utskriftsdialogen før jobben logges.
+    setPrinting(true);
     try {
       if (!profile) throw new Error("Mangler etikett-profil for varen — sett profil først.");
-      const blob = await generateBlob(assignedNumber);
+      const blob = await generateBlob();
       const url = URL.createObjectURL(blob);
       const win = window.open(url, "_blank");
       if (win) {
@@ -237,7 +224,7 @@ export function PrintLabelDialog({
       } else {
         const a = document.createElement("a");
         a.href = url;
-        a.download = `etikett_${row.display_number}_${slugifyLabel(row.display_name)}_${assignedNumber}.pdf`;
+        a.download = `etikett_${row.display_number}_${slugifyLabel(row.display_name)}.pdf`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -245,33 +232,36 @@ export function PrintLabelDialog({
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Kunne ikke generere etikett-PDF";
-      setErrorMessage(`${msg} (nummer ${assignedNumber} er brent)`);
+      setErrorMessage(msg);
       toast.error(msg);
       try {
-        await logJobs(assignedNumber, "failed");
+        await logJobs("failed");
       } catch { /* ignorer dobbel-feil */ }
+      setPrinting(false);
       return;
     }
 
     try {
-      await logJobs(assignedNumber, "printed");
-      toast.success(`Etikett ${assignedNumber} skrevet ut`);
+      await logJobs("printed");
+      await markLabelUnitsPrinted(selectedUnits);
+      toast.success(
+        selectedUnits.length > 0
+          ? `Etikett ${formatNumberRanges(selectedUnits.map((u) => u.number))} skrevet ut`
+          : "Etikett skrevet ut",
+      );
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Kunne ikke logge print-jobb";
-      // Brent nummer — logg som failed (best effort)
-      try {
-        await logJobs(assignedNumber, "failed");
-      } catch {
-        // ignorer dobbel-feil
-      }
-      setErrorMessage(`${msg} (nummer ${assignedNumber} er brent)`);
+      setErrorMessage(msg);
       toast.error(msg);
+    } finally {
+      setPrinting(false);
     }
   };
 
   if (!row) return null;
 
-  const isWorking = nextNumber.isPending || insertJob.isPending;
+  const isWorking = printing || insertJob.isPending;
+  const nothingToPrint = activeUnits.length > 0 && selectedUnits.length === 0;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -283,13 +273,16 @@ export function PrintLabelDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {labelNumber && (
-          <div className="rounded-lg bg-muted p-6 text-center">
+        {activeUnits.length > 0 && (
+          <div className="rounded-lg bg-muted p-4 text-center">
             <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
-              Tildelt nummer
+              Etikett-nr
             </p>
             <p className="text-3xl font-mono font-bold tabular-nums">
-              {labelNumber}
+              {formatNumberRanges(selectedUnits.map((u) => u.number)) || "—"}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {unprintedUnits.length} av {activeUnits.length} ikke skrevet ut
             </p>
           </div>
         )}
@@ -324,16 +317,32 @@ export function PrintLabelDialog({
             )}
           </div>
 
-          <div className="space-y-1">
-            <Label htmlFor="qty">Antall</Label>
-            <Input
-              id="qty"
-              type="number"
-              min={1}
-              value={quantity}
-              onChange={(e) => setQuantity(Math.max(1, Number(e.target.value)))}
-            />
-          </div>
+          {activeUnits.length > 0 ? (
+            <div className="flex items-center justify-between rounded-md border border-border p-3">
+              <div>
+                <Label htmlFor="only-unprinted">Kun uutskrevne</Label>
+                <p className="text-xs text-muted-foreground">
+                  Hopp over numre som allerede er skrevet ut.
+                </p>
+              </div>
+              <Switch
+                id="only-unprinted"
+                checked={onlyUnprinted}
+                onCheckedChange={setOnlyUnprinted}
+              />
+            </div>
+          ) : (
+            <div className="space-y-1">
+              <Label htmlFor="qty">Antall</Label>
+              <Input
+                id="qty"
+                type="number"
+                min={1}
+                value={quantity}
+                onChange={(e) => setQuantity(Math.max(1, Number(e.target.value)))}
+              />
+            </div>
+          )}
 
           {row.label_print_model === "orig_plus_copy" && (
             <div className="space-y-1">
@@ -355,7 +364,7 @@ export function PrintLabelDialog({
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                Hver etikett skrives ut to ganger. Velg hvordan bunken sorteres.
+                Orig og kopi deler etikettnummer — samme etikett skrives to ganger.
               </p>
             </div>
           )}
@@ -364,9 +373,9 @@ export function PrintLabelDialog({
         <div className="flex items-start gap-2 rounded-md border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
           <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
           <span>
-            «Skriv ut» tildeler etikett-nummer og logger jobben i utskriftskøen
-            (ingen fysisk skriver er koblet til ennå). Bruk «Last ned PDF» for å
-            få etiketten som fil.
+            Etikettnummeret tildeles når bestillingen kommer inn og beholdes ved
+            ny utskrift. «Skriv ut» logger jobben i utskriftskøen (ingen fysisk
+            skriver er koblet til ennå).
           </span>
         </div>
 
@@ -377,7 +386,7 @@ export function PrintLabelDialog({
           <Button
             variant="outline"
             onClick={handleDownloadPdf}
-            disabled={downloading || !profile}
+            disabled={downloading || !profile || nothingToPrint}
             className="gap-2"
             title={!profile ? "Sett etikett-profil for varen først" : undefined}
           >
@@ -390,8 +399,9 @@ export function PrintLabelDialog({
           </Button>
           <Button
             onClick={handlePrint}
-            disabled={!deptId || isWorking}
+            disabled={!deptId || isWorking || nothingToPrint}
             className="gap-2"
+            title={nothingToPrint ? "Alle numre er allerede skrevet ut" : undefined}
           >
             {isWorking ? (
               <Loader2 className="h-4 w-4 animate-spin" />

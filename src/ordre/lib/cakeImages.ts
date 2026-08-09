@@ -27,6 +27,7 @@ export type CakeImage = {
   order_line_id?: string | null;
   production_department_id?: string | null;
   label_number?: string | null;
+  label_unit_id?: string | null;
 };
 
 export const CAKE_BUCKET = "cake-images";
@@ -71,6 +72,36 @@ export async function uploadEditedPng(
   return path;
 }
 
+/**
+ * Finn etikett-enheten (label_units) som bildet hører til. Velger laveste
+ * ledige nummer for ordrelinjen som ikke allerede er brukt av et annet bilde.
+ */
+export async function findLabelUnitForOrderLine(
+  orderLineId: string,
+  deliveryDate: string,
+): Promise<{ id: string; number: number } | null> {
+  const { data, error } = await supabase
+    .from("label_units")
+    .select("id, number")
+    .eq("order_line_id", orderLineId)
+    .eq("seq_date", deliveryDate)
+    .neq("status", "cancelled")
+    .order("number", { ascending: true });
+  if (error || !data || data.length === 0) return null;
+  const units = data as unknown as { id: string; number: number }[];
+
+  const { data: taken } = await supabase
+    .from("cake_images")
+    .select("label_unit_id")
+    .in("label_unit_id", units.map((u) => u.id));
+  const used = new Set(
+    ((taken ?? []) as { label_unit_id: string | null }[])
+      .map((r) => r.label_unit_id)
+      .filter(Boolean) as string[],
+  );
+  return units.find((u) => !used.has(u.id)) ?? units[0];
+}
+
 export async function createCakeImage(input: {
   delivery_date: string;
   title: string;
@@ -86,31 +117,22 @@ export async function createCakeImage(input: {
 }): Promise<CakeImage> {
   const { data: u } = await supabase.auth.getUser();
 
-  // Reserver etikett-nummer hvis vi har både ordrelinje og produksjonsavdeling.
-  // Modifisert assign_label_number gjenbruker nummeret når etiketten skrives ut senere.
+  // Etikettnummeret er allerede tildelt av `sync_label_numbers` når
+  // bestillingen kom inn. Koble bildet til etikett-enheten og gjenbruk nummeret.
   let labelNumber: string | null = null;
-  if (input.order_line_id && input.production_department_id) {
+  let labelUnitId: string | null = null;
+  if (input.order_line_id) {
     try {
-      const { data: line } = await supabase
-        .from("order_lines")
-        .select("product_id")
-        .eq("id", input.order_line_id)
-        .maybeSingle();
-      const productId = (line as { product_id?: string } | null)?.product_id;
-      if (productId) {
-        const { data: num, error: nErr } = await supabase.rpc(
-          "assign_label_number",
-          {
-            p_dept_id: input.production_department_id,
-            p_product_id: productId,
-            p_order_line_id: input.order_line_id,
-            p_seq_date: input.delivery_date,
-          } as never,
-        );
-        if (!nErr && num) labelNumber = String(num);
+      const unit = await findLabelUnitForOrderLine(
+        input.order_line_id,
+        input.delivery_date,
+      );
+      if (unit) {
+        labelUnitId = unit.id;
+        labelNumber = String(unit.number);
       }
     } catch (err) {
-      console.warn("[cake_images] Kunne ikke reservere label_number", err);
+      console.warn("[cake_images] Kunne ikke koble til etikett-enhet", err);
     }
   }
 
@@ -128,6 +150,7 @@ export async function createCakeImage(input: {
       order_line_id: input.order_line_id ?? null,
       production_department_id: input.production_department_id ?? null,
       label_number: labelNumber,
+      label_unit_id: labelUnitId,
       order_ref: input.order_ref ?? null,
       notes: input.notes ?? null,
       created_by: u.user?.id,

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
-import { Info, Printer, RotateCcw, Download } from "lucide-react";
+import { Info, Printer, RotateCcw, Download, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import {
   CombinedLabelPdfDocument,
@@ -55,10 +55,15 @@ import { useLabelChangeTracking } from "@/produksjon/features/etiketter/hooks/us
 import { useLabelRealtime } from "@/produksjon/features/etiketter/hooks/useLabelRealtime";
 import { usePrintedLabelCount } from "@/produksjon/features/etiketter/hooks/usePrintedLabelCount";
 import { useProductLabelProfiles } from "@/produksjon/features/etiketter/hooks/useProductLabelProfiles";
+import { useInsertLabelPrintJob } from "@/produksjon/features/etiketter/hooks/useLabelPrintJobs";
 import {
-  useInsertLabelPrintJob,
-  useNextLabelNumber,
-} from "@/produksjon/features/etiketter/hooks/useLabelPrintJobs";
+  cancelledGaps,
+  formatNumberRanges,
+  groupUnitsByProduct,
+  markLabelUnitsPrinted,
+  useLabelUnits,
+  useSyncLabelNumbers,
+} from "@/produksjon/features/etiketter/hooks/useLabelUnits";
 import { useLabelPrintProfiles } from "@/produksjon/features/utskriftsprofiler/hooks/useLabelPrintProfiles";
 import type { LabelProductRow, LabelScreenFilter } from "@/produksjon/features/etiketter/types";
 
@@ -109,6 +114,30 @@ export default function EtiketterPage() {
     useLabelChangeTracking(filter, rawRows);
 
   const { status: realtimeStatus, lastUpdateAt } = useLabelRealtime(filter);
+
+  // Etikettnumre: én serie per dag for hele selskapet. Synkroniser ved last
+  // og hver gang realtime melder om endringer i grunnlaget.
+  const syncNumbers = useSyncLabelNumbers();
+  const syncMutate = syncNumbers.mutate;
+  useEffect(() => {
+    if (!legalEntityId || !date) return;
+    syncMutate({ legalEntityId, date });
+  }, [legalEntityId, date, lastUpdateAt, syncMutate]);
+
+  const { data: labelUnits } = useLabelUnits(legalEntityId || undefined, date);
+  const unitsByProduct = useMemo(
+    () => groupUnitsByProduct(labelUnits),
+    [labelUnits],
+  );
+  const gaps = useMemo(() => cancelledGaps(labelUnits), [labelUnits]);
+  const activeUnitCount = useMemo(
+    () => (labelUnits ?? []).filter((u) => u.status !== "cancelled").length,
+    [labelUnits],
+  );
+  const highestNumber = useMemo(
+    () => (labelUnits ?? []).reduce((m, u) => Math.max(m, u.number), 0),
+    [labelUnits],
+  );
 
   const [, forceTick] = useState(0);
   useEffect(() => {
@@ -169,7 +198,6 @@ export default function EtiketterPage() {
 
 
   // Bulk-print
-  const nextNumber = useNextLabelNumber();
   const insertJob = useInsertLabelPrintJob();
   const [bulkRunning, setBulkRunning] = useState(false);
   const [missingProfileOpen, setMissingProfileOpen] = useState(false);
@@ -225,29 +253,28 @@ export default function EtiketterPage() {
           continue;
         }
         try {
-          const labelNumber = await nextNumber.mutateAsync({
-            deptId,
-            productId: r.product_id,
-            orderLineId: r.order_line_ids[0] ?? null,
-          });
-          // Logg én jobb per ordrelinje, ikke bare den første.
-          const lineIds: (string | null)[] =
-            r.order_line_ids.length > 0 ? r.order_line_ids : [null];
-          const totalQty = r.total_labels || 1;
-          const firstQty = Math.max(totalQty - Math.max(lineIds.length - 1, 0), 1);
-          for (let i = 0; i < lineIds.length; i++) {
+          // Etikettene har allerede fått nummer via `sync_label_numbers`.
+          const units = (unitsByProduct[r.product_id] ?? []).filter(
+            (u) => u.status === "reserved",
+          );
+          if (units.length === 0) {
+            continue;
+          }
+          for (const u of units) {
             await insertJob.mutateAsync({
-              label_number: labelNumber,
+              label_number: String(u.number),
+              label_unit_id: u.id,
               product_id: r.product_id,
-              order_line_id: lineIds[i],
+              order_line_id: u.order_line_id,
               legal_entity_id: legalEntityId,
               production_department_id: deptId,
               profile_id: profileId,
-              quantity: i === 0 ? firstQty : 1,
+              quantity: 1,
               printer_name: null,
               status: "printed",
             });
           }
+          await markLabelUnitsPrinted(units);
           ok++;
         } catch {
           failed++;
@@ -291,10 +318,30 @@ export default function EtiketterPage() {
         const profileId = productProfiles[r.product_id];
         const profile = profiles.find((p) => p.id === profileId);
         if (!profile) continue;
+        const units = (unitsByProduct[r.product_id] ?? []).filter(
+          (u) => u.status !== "cancelled",
+        );
         const totalCopies = r.total_labels || 1;
         const lineIds = r.order_line_ids ?? [];
         const rowItems: LabelPdfData[] = [];
-        if (lineIds.length === 0) {
+        if (units.length > 0) {
+          for (const u of units) {
+            rowItems.push({
+              profile,
+              row: r,
+              labelNumber: String(u.number),
+              quantity: units.length,
+              copies: 1,
+              felter: u.order_line_id
+                ? (labelDataMap[u.order_line_id]?.felter ?? null)
+                : null,
+              fieldLabels,
+              pickupLabel: u.order_line_id
+                ? (customerInfoMap[u.order_line_id]?.pickupLabel ?? null)
+                : null,
+            });
+          }
+        } else if (lineIds.length === 0) {
           rowItems.push({
             profile,
             row: r,
@@ -497,6 +544,31 @@ export default function EtiketterPage() {
         </Button>
       </div>
 
+      {(gaps.length > 0 || highestNumber > 1000) && (
+        <div className="space-y-2">
+          {gaps.length > 0 && (
+            <div className="flex items-start gap-2 rounded-md border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
+              <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+              <span>
+                Hull i serien (kansellerte etiketter):{" "}
+                <span className="font-mono">{formatNumberRanges(gaps)}</span>.
+                Numrene gjenbrukes ikke.
+              </span>
+            </div>
+          )}
+          {highestNumber > 1000 && (
+            <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-400">
+              <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+              <span>
+                Dagen har passert 1000 etiketter ({activeUnitCount} aktive, høyeste
+                nummer {highestNumber}). Numrene blir firesifrede — sjekk at
+                etikettmalen har plass til dem.
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+
       <LabelFlaggedProductsBar legalEntityId={legalEntityId || undefined} />
 
       <LabelProductsTable
@@ -505,6 +577,7 @@ export default function EtiketterPage() {
         departments={departments}
         productProfiles={productProfiles}
         profiles={profiles}
+        unitsByProduct={unitsByProduct}
         missingFieldsByProduct={missingFieldsByProduct}
         onPrint={(row) => {
           setPrintRow(row);
@@ -527,6 +600,7 @@ export default function EtiketterPage() {
         profileId={
           printRow ? (productProfiles?.[printRow.product_id] ?? null) : null
         }
+        units={printRow ? (unitsByProduct[printRow.product_id] ?? []) : []}
       />
 
       <VelgProfilForVareDialog

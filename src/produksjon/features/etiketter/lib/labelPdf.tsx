@@ -18,6 +18,8 @@ import { code128Modules } from "./code128";
 
 const MM_TO_PT = 2.83465;
 const mm = (v: number) => v * MM_TO_PT;
+/** Største fornuftige punktstørrelse som får plass i en boks på `h` mm. */
+const mmToPtCap = (h: number) => Math.max(6, mm(h) * 0.7);
 
 export interface LabelPdfData {
   profile: LabelPrintProfile;
@@ -144,6 +146,9 @@ function renderField(field: ProfileField, data: LabelPdfData, key: string) {
     field.field_type !== "logo";
   const labelText = showLabel ? `${fieldLabelFor(field.field_type, data)}: ` : "";
 
+  // Etikettnummeret er hovedidentifikatoren i produksjon — det skal alltid
+  // stå stort og fett, uansett hva profilen er satt opp med.
+  const isLabelNumber = field.field_type === "etikett_nr";
   const autoFit = field.auto_fit ?? false;
   const fullText = labelText + (v.text ?? "");
   const fontPt =
@@ -152,6 +157,9 @@ function renderField(field: ProfileField, data: LabelPdfData, key: string) {
           bold: field.bold,
         })
       : field.font_size;
+  const effectiveFontPt = isLabelNumber
+    ? Math.max(fontPt, Math.min(mmToPtCap(field.height_mm), 24))
+    : fontPt;
 
   return (
     <View
@@ -183,8 +191,8 @@ function renderField(field: ProfileField, data: LabelPdfData, key: string) {
       ) : (
         <Text
           style={{
-            fontSize: fontPt,
-            fontWeight: field.bold ? 700 : 400,
+            fontSize: effectiveFontPt,
+            fontWeight: isLabelNumber || field.bold ? 700 : 400,
             textAlign: align,
             lineHeight: 1.15,
           }}

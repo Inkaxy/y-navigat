@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 export interface LabelPrintJob {
   id: string;
   label_number: string;
+  label_unit_id?: string | null;
   product_id: string;
   order_line_id: string | null;
   legal_entity_id: string;
@@ -57,7 +58,7 @@ export function useRecentLabelJobs(
       const { data, error } = await supabase
         .from("label_print_jobs")
         .select(
-          "id, label_number, product_id, order_line_id, legal_entity_id, production_department_id, quantity, printer_name, printed_by, printed_at, status, product:products!label_print_jobs_product_id_fkey(display_name, display_number)",
+          "id, label_number, label_unit_id, product_id, order_line_id, legal_entity_id, production_department_id, quantity, printer_name, printed_by, printed_at, status, product:products!label_print_jobs_product_id_fkey(display_name, display_number)",
         )
         .eq("production_department_id", deptId!)
         .order("printed_at", { ascending: false })
@@ -68,37 +69,10 @@ export function useRecentLabelJobs(
   });
 }
 
-export interface AssignLabelNumberInput {
-  deptId: string;
-  productId: string;
-  orderLineId?: string | null;
-  /** ISO date (YYYY-MM-DD). Default = i dag (Europe/Oslo). */
-  seqDate?: string | null;
-}
-
-/**
- * Tildeler etikett-nummer. Hvis samme vare/ordrelinje allerede er printet
- * for samme produksjonsavdeling, gjenbrukes det eksisterende nummeret —
- * ellers tildeles neste ledige i sekvensen for `seqDate`.
- */
-export function useNextLabelNumber() {
-  return useMutation({
-    mutationFn: async (input: AssignLabelNumberInput): Promise<string> => {
-      const params: Record<string, unknown> = {
-        p_dept_id: input.deptId,
-        p_product_id: input.productId,
-        p_order_line_id: input.orderLineId ?? null,
-      };
-      if (input.seqDate) params.p_seq_date = input.seqDate;
-      const { data, error } = await supabase.rpc("assign_label_number", params as never);
-      if (error) throw error;
-      return data as string;
-    },
-  });
-}
-
 export interface InsertLabelJobInput {
   label_number: string;
+  /** Etikett-enheten som ble skrevet ut (label_units.id). */
+  label_unit_id?: string | null;
   product_id: string;
   order_line_id?: string | null;
   legal_entity_id: string;
@@ -121,6 +95,7 @@ export function useInsertLabelPrintJob() {
         .from("label_print_jobs")
         .insert({
           label_number: input.label_number,
+          label_unit_id: input.label_unit_id ?? null,
           product_id: input.product_id,
           order_line_id: input.order_line_id ?? null,
           legal_entity_id: input.legal_entity_id,
