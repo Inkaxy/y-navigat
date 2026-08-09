@@ -220,11 +220,12 @@ export function buildCakeSheet(
   doc: Document,
   item: CakePrintItem,
   scale = 1,
+  scaleY = scale,
 ): HTMLElement {
   const sheet = el(doc, "div", "cake-sheet");
 
   const wMm = applyScale(item.widthMm, scale);
-  const hMm = applyScale(item.heightMm, scale);
+  const hMm = applyScale(item.heightMm, scaleY);
   const known = !!wMm && !!hMm;
 
   const art = el(doc, "div", "cake-artwork");
@@ -292,7 +293,11 @@ export function buildCakeSheet(
     "div",
     undefined,
     known
-      ? `${Math.round(item.widthMm!)} × ${Math.round(item.heightMm!)} mm${scale !== 1 ? ` · korrigert ×${scale}` : ""}`
+      ? `${Math.round(item.widthMm!)} × ${Math.round(item.heightMm!)} mm${
+          scale !== 1 || scaleY !== 1
+            ? ` · korrigert ${Math.round(scale * 10000) / 100} % × ${Math.round(scaleY * 10000) / 100} %`
+            : ""
+        }`
       : "Ukjent størrelse",
   );
   foot.appendChild(left);
@@ -305,7 +310,7 @@ export function buildCakeSheet(
 /** Åpner et utskriftsvindu med arkene og kaller `onPrinted` etter faktisk utskrift. */
 export async function openCakePrintWindow(
   items: CakePrintItem[],
-  opts: { scale?: number; onPrinted?: () => void; title?: string } = {},
+  opts: { scale?: number; scaleY?: number; onPrinted?: () => void; title?: string } = {},
 ): Promise<void> {
   const w = window.open("", "_blank", "width=900,height=1100");
   if (!w) {
@@ -317,7 +322,9 @@ export async function openCakePrintWindow(
   style.textContent = CAKE_PRINT_CSS;
   doc.head.appendChild(style);
   for (const item of items) {
-    doc.body.appendChild(buildCakeSheet(doc, item, opts.scale ?? 1));
+    doc.body.appendChild(
+      buildCakeSheet(doc, item, opts.scale ?? 1, opts.scaleY ?? opts.scale ?? 1),
+    );
   }
 
   // Vent til alle bildene er lastet — ellers printes tomme sider.
@@ -354,15 +361,16 @@ async function urlToDataUrl(url: string): Promise<string> {
 /** Samme ark som på papir, men som PDF. Millimeter, ikke punkter. */
 export async function cakeSheetsToPdf(
   items: CakePrintItem[],
-  opts: { scale?: number; fileName?: string } = {},
+  opts: { scale?: number; scaleY?: number; fileName?: string } = {},
 ): Promise<void> {
   const scale = opts.scale ?? 1;
+  const scaleY = opts.scaleY ?? scale;
   const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   for (let i = 0; i < items.length; i++) {
     if (i > 0) pdf.addPage();
     const item = items[i];
     const wMm = applyScale(item.widthMm, scale) ?? 150;
-    const hMm = applyScale(item.heightMm, scale) ?? 150;
+    const hMm = applyScale(item.heightMm, scaleY) ?? 150;
     if (item.url) {
       const dataUrl = item.url.startsWith("data:")
         ? item.url

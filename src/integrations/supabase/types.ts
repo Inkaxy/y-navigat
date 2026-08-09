@@ -680,6 +680,8 @@ export type Database = {
           note: string | null
           printed_at: string
           printed_by: string | null
+          printer_label: string | null
+          scale_applied_pct: number | null
           sheet: string | null
         }
         Insert: {
@@ -689,6 +691,8 @@ export type Database = {
           note?: string | null
           printed_at?: string
           printed_by?: string | null
+          printer_label?: string | null
+          scale_applied_pct?: number | null
           sheet?: string | null
         }
         Update: {
@@ -698,6 +702,8 @@ export type Database = {
           note?: string | null
           printed_at?: string
           printed_by?: string | null
+          printer_label?: string | null
+          scale_applied_pct?: number | null
           sheet?: string | null
         }
         Relationships: [
@@ -882,6 +888,51 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      cake_print_calibration: {
+        Row: {
+          created_at: string
+          id: string
+          is_default: boolean
+          legal_entity_id: string
+          measured_mm: number | null
+          note: string | null
+          printer_label: string
+          scale_x_pct: number
+          scale_y_pct: number
+          target_mm: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_default?: boolean
+          legal_entity_id: string
+          measured_mm?: number | null
+          note?: string | null
+          printer_label: string
+          scale_x_pct?: number
+          scale_y_pct?: number
+          target_mm?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_default?: boolean
+          legal_entity_id?: string
+          measured_mm?: number | null
+          note?: string | null
+          printer_label?: string
+          scale_x_pct?: number
+          scale_y_pct?: number
+          target_mm?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
       }
       cake_printer_calibrations: {
         Row: {

@@ -505,13 +505,31 @@ export async function markPrinted(
   kind: "print" | "reprint" | "pdf" | "test" = "print",
   sheet: string | null = "A4",
   note?: string | null,
+  printer?: { printerLabel?: string | null; scaleAppliedPct?: number | null },
 ) {
   if (ids.length === 0) return [] as CakeImage[];
+  const startedAt = new Date(Date.now() - 60 * 1000).toISOString();
   const { data: rows, error } = await supabase.rpc(
     "register_cake_image_print",
     { p_ids: ids, p_kind: kind, p_sheet: sheet, p_note: note ?? null } as never,
   );
   if (error) throw error;
+
+  // Hvilken skriver og hvilken korreksjon som faktisk ble brukt — da kan et
+  // avvik i ettertid spores til utstyret og ikke bare til bildet.
+  if (printer?.printerLabel || printer?.scaleAppliedPct != null) {
+    const { error: upErr } = await supabase
+      .from("cake_image_prints")
+      .update({
+        printer_label: printer.printerLabel ?? null,
+        scale_applied_pct: printer.scaleAppliedPct ?? null,
+      } as never)
+      .in("cake_image_id", ids)
+      .eq("kind", kind)
+      .is("printer_label", null)
+      .gte("printed_at", startedAt);
+    if (upErr) console.error("[cakeImages] kunne ikke lagre skriverinfo", upErr);
+  }
 
   const updated = (rows ?? []) as CakeImage[];
   if (kind !== "print" && kind !== "reprint") return updated;
@@ -682,4 +700,30 @@ export async function linkCakeImageToOrder(
   if (error) throw error;
 
   return { delivery_date: order.delivery_date, label_number: labelNumber };
+}
+
+/**
+ * Testarket fra kalibreringen logges som en utskrift med kind 'test'.
+ * `cake_image_prints` krever et bilde, så testarket henges på det sist
+ * oppdaterte kakebildet — det flytter ingen status, men gir sporbarhet.
+ */
+export async function logCalibrationTestPrint(printerLabel: string) {
+  const { data } = await supabase
+    .from("cake_images")
+    .select("id")
+    .order("updated_at", { ascending: false })
+    .limit(1);
+  const anchorId = (data ?? [])[0]?.id as string | undefined;
+  if (!anchorId) return;
+  const { data: u } = await supabase.auth.getUser();
+  const { error } = await supabase.from("cake_image_prints").insert({
+    cake_image_id: anchorId,
+    kind: "test",
+    sheet: "A4",
+    note: `Kalibreringsark 100 × 100 mm — ${printerLabel}`,
+    printer_label: printerLabel,
+    scale_applied_pct: 100,
+    printed_by: u.user?.id ?? null,
+  } as never);
+  if (error) console.error("[cakeImages] kunne ikke logge kalibreringsark", error);
 }

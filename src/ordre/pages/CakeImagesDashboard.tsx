@@ -9,6 +9,7 @@ import {
   Clock,
   LinkIcon,
   AlertTriangle,
+  Ruler,
 } from "lucide-react";
 import { format as fmt } from "date-fns";
 import { nb } from "date-fns/locale";
@@ -20,6 +21,8 @@ import { todayISO, formatDate } from "@/ordre/lib/format";
 import { relativeDateLabel, shiftIsoDate } from "@/ordre/lib/relativeDate";
 import { useCakeImageCounts } from "@/ordre/hooks/useCakeImages";
 import { UploadButton } from "@/ordre/components/cake-images/UploadButton";
+import { CalibratePrinterDialog } from "@/ordre/components/cake-images/CalibratePrinterDialog";
+import { useCakePrinterSelection } from "@/ordre/hooks/useCakeCalibration";
 
 /**
  * Kakebilder — dashboard.
@@ -32,6 +35,8 @@ export default function CakeImagesDashboard() {
   const [searchParams, setSearchParams] = useSearchParams();
   const date = searchParams.get("date") || todayISO();
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [calibrateOpen, setCalibrateOpen] = useState(false);
+  const { printerLabel, scaleXPct, scaleYPct, isCalibrated } = useCakePrinterSelection();
 
   const setDate = useCallback(
     (next: string | ((prev: string) => string)) => {
@@ -121,6 +126,7 @@ export default function CakeImagesDashboard() {
 
   return (
     <div className="mx-auto w-full max-w-5xl px-4 py-8 space-y-8">
+      <CalibratePrinterDialog open={calibrateOpen} onOpenChange={setCalibrateOpen} />
       {/* Topp — tittel */}
       <div className="flex flex-col items-center gap-2 text-center">
         <div className="flex items-center gap-3">
@@ -131,6 +137,17 @@ export default function CakeImagesDashboard() {
           Bilder som skal printes ut til kakeproduksjon. Bildene kommer typisk
           fra ticket-systemet og e-post, og legges her klare for utskrift.
         </p>
+        <div className="mt-1 flex flex-col items-center gap-1">
+          <Button variant="outline" size="sm" onClick={() => setCalibrateOpen(true)}>
+            <Ruler className="mr-2 h-4 w-4" />
+            Kalibrer skriver
+          </Button>
+          <span className="text-xs text-muted-foreground">
+            {isCalibrated
+              ? `${printerLabel}: korreksjon ${scaleXPct} % × ${scaleYPct} %`
+              : "Skriveren er ikke kalibrert ennå — utskrifter går i 100 %."}
+          </span>
+        </div>
       </div>
 
       {/* Dato-velger — samme mønster som pakksedler */}

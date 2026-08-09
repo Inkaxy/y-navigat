@@ -85,7 +85,7 @@ import {
   openCakePrintWindow,
   type CakePrintItem,
 } from "@/ordre/lib/cakePrint";
-import { useCakePrintScale } from "@/ordre/hooks/useCakeCalibration";
+import { useCakePrinterSelection } from "@/ordre/hooks/useCakeCalibration";
 import { CakePrintHistory } from "@/ordre/components/cake-images/CakePrintHistory";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
@@ -196,7 +196,12 @@ export default function CakeImageEditor() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   /** Korreksjonsfaktor fra skriverkalibreringen. */
-  const printScale = useCakePrintScale();
+  const {
+    printerLabel,
+    scaleX: printScale,
+    scaleY: printScaleY,
+    scaleXPct: printScalePct,
+  } = useCakePrinterSelection();
   const { data: image, isLoading } = useCakeImage(id);
 
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -676,11 +681,15 @@ export default function CakeImageEditor() {
     try {
       await openCakePrintWindow([buildItem(dataUrl)], {
         scale: printScale,
+        scaleY: printScaleY,
         title: image?.title ?? "Kakebilde",
         onPrinted: () => {
           if (!imageId) return;
           // Status settes først NÅR utskriften faktisk er utført.
-          markPrinted([imageId], wasPrinted ? "reprint" : "print")
+          markPrinted([imageId], wasPrinted ? "reprint" : "print", "A4", null, {
+            printerLabel,
+            scaleAppliedPct: printScalePct,
+          })
             .then(() => {
               qc.invalidateQueries({ queryKey: ["cake-images"] });
               qc.invalidateQueries({ queryKey: ["cake-image-prints", imageId] });
@@ -701,12 +710,16 @@ export default function CakeImageEditor() {
       "kakebilde";
     await cakeSheetsToPdf([buildItem(dataUrl)], {
       scale: printScale,
+      scaleY: printScaleY,
       fileName: `${safeName}.pdf`,
     });
 
     if (image) {
       // PDF er ikke papir — loggføres, men flytter ikke status.
-      await markPrinted([image.id], "pdf");
+      await markPrinted([image.id], "pdf", "A4", null, {
+        printerLabel,
+        scaleAppliedPct: printScalePct,
+      });
       qc.invalidateQueries({ queryKey: ["cake-image-prints", image.id] });
     }
   };
