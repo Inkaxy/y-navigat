@@ -37,7 +37,35 @@ export interface Ticket {
   updated_at: string;
 }
 
-export type AttachmentKind = "inspiration" | "logo" | "document" | "other" | "unclassified";
+export type AttachmentKind =
+  | "inspiration"
+  | "logo"
+  | "document"
+  | "other"
+  | "cake_image"
+  | "unclassified";
+
+/** Ordrenummer for et sett ordre-id-er — brukes til å vise ordre i innboksene. */
+export function useOrderNumbersByIds(orderIds: (string | null | undefined)[]) {
+  const ids = Array.from(new Set(orderIds.filter(Boolean) as string[])).sort();
+  return useQuery({
+    enabled: ids.length > 0,
+    queryKey: ["ticket-order-numbers", ids.join(",")],
+    staleTime: 60_000,
+    queryFn: async (): Promise<Record<string, string>> => {
+      const { data, error } = await supabase
+        .from("orders")
+        .select("id, order_number")
+        .in("id", ids);
+      if (error) throw error;
+      const map: Record<string, string> = {};
+      for (const r of (data ?? []) as { id: string; order_number: string }[]) {
+        map[r.id] = r.order_number;
+      }
+      return map;
+    },
+  });
+}
 
 export interface TicketAttachment {
   id: string;
