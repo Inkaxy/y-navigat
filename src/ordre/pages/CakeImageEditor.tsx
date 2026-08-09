@@ -965,30 +965,79 @@ img { max-width:100%; max-height:100vh; }`;
           className="relative overflow-auto bg-[hsl(var(--muted))] p-6"
           style={{ backgroundImage: "linear-gradient(45deg,hsl(var(--muted)) 25%,transparent 25%),linear-gradient(-45deg,hsl(var(--muted)) 25%,transparent 25%),linear-gradient(45deg,transparent 75%,hsl(var(--muted)) 75%),linear-gradient(-45deg,transparent 75%,hsl(var(--muted)) 75%)", backgroundSize: "16px 16px", backgroundPosition: "0 0, 0 8px, 8px -8px, -8px 0" }}
         >
+          {stateLoadFailed && (
+            <div className="mx-auto mb-3 flex max-w-xl items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span className="flex-1">
+                Den lagrede redigeringen kunne ikke åpnes. Originalbildet vises i
+                stedet — ingenting er slettet. Lagrer du nå, erstattes den gamle
+                redigeringen.
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setStateLoadFailed(false)}
+              >
+                Begynn på nytt
+              </Button>
+            </div>
+          )}
+
+          {format && (
+            <div className="mx-auto mb-2 w-fit rounded-full border bg-background px-3 py-1 text-[11px] text-muted-foreground">
+              {formatSizeLabel(format)}
+            </div>
+          )}
+
           <div
             className={cn(
-              "mx-auto bg-white shadow-lg",
-              "circle" in tpl && tpl.circle ? "rounded-full" : "",
+              "relative mx-auto bg-white shadow-lg",
+              dims.isRound ? "rounded-full" : "",
             )}
             style={{
-              width: tpl.w * zoom,
-              height: tpl.h * zoom,
+              width: dims.widthPx * zoom,
+              height: dims.heightPx * zoom,
               transform: "translateZ(0)",
               overflow: "hidden",
             }}
           >
             <div
               style={{
-                width: tpl.w,
-                height: tpl.h,
+                width: dims.widthPx,
+                height: dims.heightPx,
                 transform: `scale(${zoom})`,
                 transformOrigin: "top left",
               }}
             >
               <canvas ref={canvasRef} />
             </div>
+
+            {/* Utfallende sone — det som klippes bort */}
+            {dims.bleedPx > 0 && (
+              <div
+                className={cn(
+                  "pointer-events-none absolute border border-dashed border-destructive/60",
+                  dims.isRound ? "rounded-full" : "",
+                )}
+                style={{ inset: dims.bleedPx * zoom }}
+                aria-hidden
+              >
+                <span className="absolute -top-4 left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] text-destructive/80">
+                  klippes bort
+                </span>
+              </div>
+            )}
+
+            {/* Hjelpelinje: her slutter kaken */}
+            {dims.isRound && (
+              <div
+                className="pointer-events-none absolute inset-0 rounded-full border border-primary/50"
+                aria-hidden
+              />
+            )}
           </div>
         </div>
+
 
         {/* Høyre panel */}
         <aside className="overflow-y-auto border-l bg-background p-3">
