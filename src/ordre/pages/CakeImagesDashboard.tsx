@@ -9,6 +9,7 @@ import {
   Clock,
   LinkIcon,
   AlertTriangle,
+  Ruler,
 } from "lucide-react";
 import { format as fmt } from "date-fns";
 import { nb } from "date-fns/locale";
@@ -34,6 +35,8 @@ export default function CakeImagesDashboard() {
   const [searchParams, setSearchParams] = useSearchParams();
   const date = searchParams.get("date") || todayISO();
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [calibrateOpen, setCalibrateOpen] = useState(false);
+  const { printerLabel, scaleXPct, scaleYPct, isCalibrated } = useCakePrinterSelection();
 
   const setDate = useCallback(
     (next: string | ((prev: string) => string)) => {
