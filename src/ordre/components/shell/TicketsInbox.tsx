@@ -70,6 +70,10 @@ export function TicketsInbox() {
     [tickets, showAll],
   );
 
+  const { data: orderNumbers } = useOrderNumbersByIds(
+    visible.map((t) => t.related_order_id),
+  );
+
   const togglePrio = (p: TicketPriority) =>
     setPriorities((prev) => (prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]));
 
