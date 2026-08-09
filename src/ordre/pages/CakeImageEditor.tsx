@@ -193,10 +193,29 @@ export default function CakeImageEditor() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fabRef = useRef<fabric.Canvas | null>(null);
 
-  const [template, setTemplate] = useState<TemplateId>("qland");
-  const tpl = useMemo(() => TEMPLATES.find((t) => t.id === template)!, [template]);
+  // Formatene kommer fra basen — lerretet settes opp fra fysisk størrelse.
+  const { data: formats = [] } = useCakeFormats();
+  const [formatId, setFormatId] = useState<string>("");
+  const format: CakeImageFormat | null =
+    formats.find((f) => f.id === formatId) ?? null;
+  const dims = useMemo(
+    () =>
+      format
+        ? formatDims(format)
+        : {
+            widthMm: 0,
+            heightMm: 0,
+            isRound: false,
+            bleedMm: 0,
+            widthPx: 1000,
+            heightPx: 750,
+            bleedPx: 0,
+          },
+    [format],
+  );
+  const fit = format ? sheetFit(format) : null;
 
-  const [zoom, setZoom] = useState(0.6);
+  const [zoom, setZoom] = useState(0.25);
   const [textInput, setTextInput] = useState("");
   const [textPreset, setTextPreset] = useState("title");
   const [fontFamily, setFontFamily] = useState<string>("Inter");
@@ -206,6 +225,11 @@ export default function CakeImageEditor() {
   const [selVersion, setSelVersion] = useState(0); // tvinger re-render av høyre-panel
   const [layers, setLayers] = useState<fabric.Object[]>([]);
   const [saving, setSaving] = useState(false);
+  const [stateLoadFailed, setStateLoadFailed] = useState(false);
+  const [rightsCleared, setRightsCleared] = useState(false);
+  const [rightsNote, setRightsNote] = useState("");
+  const [qualityAcked, setQualityAcked] = useState(false);
+
 
   // Undo/redo (enkel snapshot-stack av canvas.toJSON())
   const undoStack = useRef<string[]>([]);
