@@ -885,6 +885,16 @@ export default function TicketDetail() {
                 >
                   Åpne ordren →
                 </Button>
+                <EditLinkedOrderButton
+                  orderId={linked.order.id}
+                  customerId={
+                    (linked.order as unknown as { customer_id: string | null }).customer_id ?? null
+                  }
+                  onSaved={() => {
+                    qc.invalidateQueries({ queryKey: ["ticket-linked-order", linked.order!.id] });
+                    qc.invalidateQueries({ queryKey: ["ticket", id] });
+                  }}
+                />
                 <Button
                   size="sm"
                   className="mt-2 w-full gap-2 bg-emerald-600 text-white hover:bg-emerald-700"
@@ -909,14 +919,29 @@ export default function TicketDetail() {
             </SideCard>
           ) : (
             id && (
-              <SideCard label="Koble til ordre">
-                <LinkOrderSearch
-                  ticketId={id}
-                  onLinked={() => {
-                    qc.invalidateQueries({ queryKey: ["ticket", id] });
-                    qc.invalidateQueries({ queryKey: ["ticket-events", id] });
-                  }}
-                />
+              <SideCard label="Ordre">
+                <div className="space-y-3">
+                  <LinkOrderSearch
+                    ticketId={id}
+                    onLinked={() => {
+                      qc.invalidateQueries({ queryKey: ["ticket", id] });
+                      qc.invalidateQueries({ queryKey: ["ticket-events", id] });
+                      qc.invalidateQueries({ queryKey: ["cake-images-for", id] });
+                    }}
+                  />
+                  <div className="border-t pt-2">
+                    <CreateOrderFromTicketButton
+                      ticket={ticket}
+                      ai={ai ?? null}
+                      attachments={attachments}
+                      onCreated={() => {
+                        qc.invalidateQueries({ queryKey: ["ticket", id] });
+                        qc.invalidateQueries({ queryKey: ["ticket-events", id] });
+                        qc.invalidateQueries({ queryKey: ["cake-images-for", id] });
+                      }}
+                    />
+                  </div>
+                </div>
               </SideCard>
             )
           )}
