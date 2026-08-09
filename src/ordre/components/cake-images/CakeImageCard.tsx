@@ -1,16 +1,19 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
-import { CheckCircle2, ImageIcon, Pencil } from "lucide-react";
+import { CheckCircle2, ImageIcon, Pencil, Link as LinkIcon, AlertTriangle } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { type CakeImage, statusLabel } from "@/ordre/lib/cakeImages";
+import { LinkCakeImageOrderDialog } from "@/ordre/components/cake-images/LinkCakeImageOrderDialog";
 
 const STATUS_TONE: Record<CakeImage["status"], string> = {
   venter: "bg-amber-100 text-amber-900 border-amber-300",
   ferdig_redigert: "bg-emerald-100 text-emerald-900 border-emerald-300",
   skrevet_ut: "bg-muted text-muted-foreground border-border",
 };
+
 
 export function CakeImageCard({
   image,
