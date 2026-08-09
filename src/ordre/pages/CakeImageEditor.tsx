@@ -251,8 +251,8 @@ export default function CakeImageEditor() {
     const c = new fabric.Canvas(canvasRef.current, {
       backgroundColor: "",
       preserveObjectStacking: true,
-      width: tpl.w,
-      height: tpl.h,
+      width: dims.widthPx,
+      height: dims.heightPx,
     });
     fabRef.current = c;
 
@@ -288,25 +288,42 @@ export default function CakeImageEditor() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Sett mal-størrelse / rund-clip
+  // Velg format: bildets eget, ellers standardformatet (Rund 20 cm).
+  useEffect(() => {
+    if (formatId || formats.length === 0) return;
+    const own = image?.format_id
+      ? formats.find((f) => f.id === image.format_id)
+      : null;
+    setFormatId((own ?? defaultFormat(formats))?.id ?? "");
+  }, [formats, image?.format_id, formatId]);
+
+  // Rettigheter / kvalitetsbekreftelse fra raden
+  useEffect(() => {
+    if (!image) return;
+    setRightsCleared(!!image.rights_cleared);
+    setRightsNote(image.rights_note ?? "");
+    setQualityAcked(!!image.quality_ack_at);
+  }, [image?.id, image?.rights_cleared, image?.rights_note, image?.quality_ack_at]);
+
+  // Lerretet settes opp fra fysisk størrelse, ikke omvendt.
   useEffect(() => {
     const c = fabRef.current;
     if (!c) return;
-    c.setDimensions({ width: tpl.w, height: tpl.h });
-    if ("circle" in tpl && tpl.circle) {
+    c.setDimensions({ width: dims.widthPx, height: dims.heightPx });
+    if (dims.isRound) {
       c.clipPath = new fabric.Circle({
-        radius: Math.min(tpl.w, tpl.h) / 2,
+        radius: Math.min(dims.widthPx, dims.heightPx) / 2,
         originX: "center",
         originY: "center",
-        left: tpl.w / 2,
-        top: tpl.h / 2,
+        left: dims.widthPx / 2,
+        top: dims.heightPx / 2,
         absolutePositioned: true,
       });
     } else {
       c.clipPath = undefined;
     }
     c.renderAll();
-  }, [tpl]);
+  }, [dims]);
 
   // Last inn lagret state / original
   useEffect(() => {
@@ -314,32 +331,7 @@ export default function CakeImageEditor() {
     if (!c || !image) return;
     skipSnapshotRef.current = true;
 
-    const load = async () => {
-      if (image.editor_state) {
-        try {
-          await c.loadFromJSON((await prepareEditorStateForLoad(image.editor_state)) as never);
-          if (c.getObjects().length > 0) {
-            // Preload alle skrifttyper som brukes i lagret state, og re-render.
-            const families = new Set<string>();
-            c.getObjects().forEach((o) => {
-              const f = (o as fabric.IText).fontFamily;
-              if (typeof f === "string") families.add(f);
-            });
-            await Promise.all([...families].map((f) => loadCakeFont(f)));
-            c.renderAll();
-            setLayers([...c.getObjects()]);
-            undoStack.current = [canvasSnapshot(c)];
-            redoStack.current = [];
-            skipSnapshotRef.current = false;
-            return;
-          }
-        } catch (e) {
-          console.warn("editor_state load failed", e);
-        }
-        c.clear();
-        c.backgroundColor = "";
-      }
-      // Init med original-bilde sentrert
+    const loadOriginal = async () => {
       const url = await cakeObjectUrl(image.original_path);
       if (!url) {
         skipSnapshotRef.current = false;
@@ -359,8 +351,39 @@ export default function CakeImageEditor() {
       redoStack.current = [];
       skipSnapshotRef.current = false;
     };
+
+    const load = async () => {
+      if (image.editor_state) {
+        try {
+          await c.loadFromJSON((await prepareEditorStateForLoad(image.editor_state)) as never);
+          if (c.getObjects().length > 0) {
+            // Preload alle skrifttyper som brukes i lagret state, og re-render.
+            const families = new Set<string>();
+            c.getObjects().forEach((o) => {
+              const f = (o as fabric.IText).fontFamily;
+              if (typeof f === "string") families.add(f);
+            });
+            await Promise.all([...families].map((f) => loadCakeFont(f)));
+            c.renderAll();
+            setLayers([...c.getObjects()]);
+            undoStack.current = [canvasSnapshot(c)];
+            redoStack.current = [];
+            skipSnapshotRef.current = false;
+            setStateLoadFailed(false);
+            return;
+          }
+        } catch (e) {
+          console.error("[CakeImageEditor] editor_state kunne ikke åpnes", e);
+        }
+        // Redigeringen kunne ikke åpnes. Vi tømmer IKKE lerretet i stillhet —
+        // vi viser originalbildet og sier tydelig fra.
+        setStateLoadFailed(true);
+      }
+      await loadOriginal();
+    };
     load();
   }, [image]);
+
 
   // ---- helpers ----
   const active = fabRef.current?.getActiveObject() ?? null;
