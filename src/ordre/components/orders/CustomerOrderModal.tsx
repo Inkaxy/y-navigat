@@ -409,7 +409,7 @@ export function CustomerOrderModal({
       // Standardvalg for vedlegg fra e-posten
       const initialChoice: Record<string, "edible_print" | "reference_only"> = {};
       for (const a of iv?.ticketAttachments ?? []) {
-        initialChoice[a.id] = a.edible_suggested ? "edible_print" : "reference_only";
+        initialChoice[a.id] = a.edible_suggested === false ? "reference_only" : "edible_print";
       }
       setAttachmentChoice(initialChoice);
 
