@@ -6,6 +6,9 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  Clock,
+  LinkIcon,
+  AlertTriangle,
 } from "lucide-react";
 import { format as fmt } from "date-fns";
 import { nb } from "date-fns/locale";
@@ -49,28 +52,70 @@ export default function CakeImagesDashboard() {
 
   const rel = useMemo(() => relativeDateLabel(date), [date]);
 
-  const { data: counts = { forUtskrift: 0, skrevetUt: 0 } } = useCakeImageCounts(date);
+  const { data: counts } = useCakeImageCounts(date);
+  const c = counts ?? {
+    venter: 0,
+    ferdig: 0,
+    skrevetUt: 0,
+    manglerKobling: 0,
+    lavKvalitet: 0,
+    forUtskrift: 0,
+    total: 0,
+  };
 
+  const goList = (bucket: "for-utskrift" | "skrevet-ut", extra = "") =>
+    navigate(`/ordre/kakebilder/liste?date=${date}&status=${bucket}${extra}`);
+
+  // Dagsoversikt: de tre normale bøttene, pluss det som stopper produksjonen.
   const widgets = [
     {
-      key: "for-utskrift",
-      label: "FOR UTSKRIFT",
-      value: counts.forUtskrift,
-      icon: Printer,
+      key: "venter",
+      label: "VENTER",
+      value: c.venter,
+      icon: Clock,
+      classes:
+        "bg-background border border-border text-foreground hover:bg-muted",
+      onClick: () => goList("for-utskrift"),
+    },
+    {
+      key: "ferdig",
+      label: "FERDIG REDIGERT",
+      value: c.ferdig,
+      icon: CheckCircle2,
       classes:
         "bg-brand-ink text-brand-cream hover:bg-brand-ink-deep ring-1 ring-brand-ink/40",
-      onClick: () =>
-        navigate(`/ordre/kakebilder/liste?date=${date}&status=for-utskrift`),
+      onClick: () => goList("for-utskrift"),
     },
     {
       key: "skrevet-ut",
       label: "SKREVET UT",
-      value: counts.skrevetUt,
-      icon: CheckCircle2,
+      value: c.skrevetUt,
+      icon: Printer,
       classes:
         "bg-background border border-border text-foreground hover:bg-muted",
-      onClick: () =>
-        navigate(`/ordre/kakebilder/liste?date=${date}&status=skrevet-ut`),
+      onClick: () => goList("skrevet-ut"),
+    },
+    {
+      key: "mangler-kobling",
+      label: "MANGLER ORDRE",
+      value: c.manglerKobling,
+      icon: LinkIcon,
+      classes:
+        c.manglerKobling > 0
+          ? "bg-amber-100 border border-amber-300 text-amber-900 hover:bg-amber-200"
+          : "bg-background border border-border text-muted-foreground hover:bg-muted",
+      onClick: () => goList("for-utskrift", "&filter=mangler-kobling"),
+    },
+    {
+      key: "lav-kvalitet",
+      label: "LAV KVALITET",
+      value: c.lavKvalitet,
+      icon: AlertTriangle,
+      classes:
+        c.lavKvalitet > 0
+          ? "bg-rose-100 border border-rose-300 text-rose-900 hover:bg-rose-200"
+          : "bg-background border border-border text-muted-foreground hover:bg-muted",
+      onClick: () => goList("for-utskrift", "&filter=lav-kvalitet"),
     },
   ];
 
@@ -166,7 +211,7 @@ export default function CakeImagesDashboard() {
       </div>
 
       {/* Widget-grid */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
         {widgets.map((w) => {
           const Icon = w.icon;
           return (
@@ -175,7 +220,7 @@ export default function CakeImagesDashboard() {
               type="button"
               onClick={w.onClick}
               className={cn(
-                "group relative flex aspect-[5/4] flex-col items-center justify-center rounded-2xl p-6 text-center transition-colors",
+                "group relative flex aspect-square flex-col items-center justify-center rounded-2xl p-6 text-center transition-colors",
                 "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                 w.classes,
               )}
@@ -184,7 +229,7 @@ export default function CakeImagesDashboard() {
               <div className="text-xs font-semibold uppercase tracking-[0.18em] opacity-80">
                 {w.label}
               </div>
-              <div className="mt-2 text-7xl font-bold tabular-nums">
+              <div className="mt-2 text-5xl font-bold tabular-nums">
                 {w.value}
               </div>
             </button>
@@ -196,7 +241,7 @@ export default function CakeImagesDashboard() {
         <UploadButton date={date} />
       </div>
       <p className="text-center text-xs text-muted-foreground">
-        Kobling mot tickets, etikett og ordre kommer i neste fase.
+        Totalt {c.total} kakebilde(r) på denne dagen.
       </p>
     </div>
   );

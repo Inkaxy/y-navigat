@@ -1,16 +1,28 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Loader2, Printer, Download } from "lucide-react";
-import jsPDF from "jspdf";
+import { Loader2, Printer, Download, Ruler } from "lucide-react";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { CAKE_BUCKET, type CakeImage, markPrinted } from "@/ordre/lib/cakeImages";
+import {
+  buildCakeSheet,
+  cakeSheetsToPdf,
+  itemToPrint,
+  openCakePrintWindow,
+  CAKE_PRINT_CSS,
+  type CakePrintItem,
+} from "@/ordre/lib/cakePrint";
+import { useCakeFormats } from "@/ordre/hooks/useCakeFormats";
+import { useCakePrintScale } from "@/ordre/hooks/useCakeCalibration";
+import { CalibratePrinterDialog } from "@/ordre/components/cake-images/CalibratePrinterDialog";
 import { Button } from "@/components/ui/button";
 
 /**
- * Print-rute for valgte kakebilder.
+ * Utskriftsrute for kakebilder — én felles vei til papiret.
  * URL: /ordre/kakebilder/print?ids=a,b,c&auto=1
- * - auto=1 starter browser-print automatisk
- * - knapp for PDF-nedlasting
+ *
+ * Arket bygges av `cakePrint.ts`, i eksakte millimeter, med klippemerker,
+ * etikettnummer, ordredetaljer og en 50 mm kontrollskala.
  */
 export default function CakeImagesPrint() {
   const [params] = useSearchParams();
@@ -20,23 +32,25 @@ export default function CakeImagesPrint() {
     [params],
   );
   const auto = params.get("auto") === "1";
-  const [items, setItems] = useState<
-    { image: CakeImage; url: string }[] | null
-  >(null);
+  const { data: formats = [] } = useCakeFormats();
+  const scale = useCakePrintScale();
+  const [rows, setRows] = useState<{ image: CakeImage; url: string }[] | null>(
+    null,
+  );
+  const [calibrateOpen, setCalibrateOpen] = useState(false);
+  const previewRef = useRef<HTMLDivElement>(null);
+  const autoDone = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       if (ids.length === 0) {
-        setItems([]);
+        setRows([]);
         return;
       }
-      const { data } = await supabase
-        .from("cake_images")
-        .select("*")
-        .in("id", ids);
-      const rows = (data ?? []) as CakeImage[];
-      const paths = rows.map((r) => r.edited_path || r.original_path);
+      const { data } = await supabase.from("cake_images").select("*").in("id", ids);
+      const list = (data ?? []) as CakeImage[];
+      const paths = list.map((r) => r.edited_path || r.original_path);
       const { data: signed } = await supabase.storage
         .from(CAKE_BUCKET)
         .createSignedUrls(paths, 60 * 30);
@@ -44,8 +58,8 @@ export default function CakeImagesPrint() {
         (signed ?? []).map((s) => [s.path!, s.signedUrl!]),
       );
       if (cancelled) return;
-      setItems(
-        rows.map((r) => ({
+      setRows(
+        list.map((r) => ({
           image: r,
           url: urlMap[r.edited_path || r.original_path] ?? "",
         })),
@@ -56,80 +70,75 @@ export default function CakeImagesPrint() {
     };
   }, [ids]);
 
-  // Marker som skrevet ut FØRST etter at nettleseren faktisk har printet.
-  const runPrint = async () => {
-    if (!items || items.length === 0) return;
-    // Vent til alle bildene er lastet — ellers printes tomme sider.
-    await Promise.all(
-      items
-        .filter((i) => i.url)
-        .map(
-          (i) =>
-            new Promise<void>((resolve) => {
-              const img = new Image();
-              img.onload = () => resolve();
-              img.onerror = () => resolve();
-              img.src = i.url;
-            }),
-        ),
+  const items: CakePrintItem[] = useMemo(() => {
+    if (!rows) return [];
+    return rows.map((r) =>
+      itemToPrint(
+        r.image,
+        r.url,
+        formats.find((f) => f.id === r.image.format_id) ?? null,
+      ),
     );
-    const ids = items.map((i) => i.image.id);
-    const onAfterPrint = () => {
-      window.removeEventListener("afterprint", onAfterPrint);
-      markPrinted(ids).catch((e) =>
-        console.error("[CakeImagesPrint] markPrinted feilet", e),
-      );
-    };
-    window.addEventListener("afterprint", onAfterPrint);
-    window.print();
+  }, [rows, formats]);
+
+  // Forhåndsvisning bruker nøyaktig samme DOM som papiret.
+  useEffect(() => {
+    const host = previewRef.current;
+    if (!host) return;
+    host.replaceChildren();
+    for (const item of items) {
+      host.appendChild(buildCakeSheet(document, item, scale));
+    }
+  }, [items, scale]);
+
+  /** Bare ekte utskrift setter status — derfor onafterprint, ikke knappetrykket. */
+  const registerPrinted = async () => {
+    if (!rows) return;
+    const fresh = rows.filter((r) => r.image.status !== "skrevet_ut").map((r) => r.image.id);
+    const again = rows.filter((r) => r.image.status === "skrevet_ut").map((r) => r.image.id);
+    try {
+      if (fresh.length) await markPrinted(fresh, "print");
+      if (again.length) await markPrinted(again, "reprint");
+      toast.success(`${rows.length} kakebilde(r) registrert som skrevet ut`);
+    } catch (e) {
+      console.error("[CakeImagesPrint] kunne ikke registrere utskrift", e);
+      toast.error("Kunne ikke registrere utskriften");
+    }
+  };
+
+  const runPrint = async () => {
+    if (items.length === 0) return;
+    try {
+      await openCakePrintWindow(items, {
+        scale,
+        title: "Kakebilder",
+        onPrinted: () => void registerPrinted(),
+      });
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
   };
 
   useEffect(() => {
-    if (auto && items && items.length > 0) {
+    if (auto && items.length > 0 && !autoDone.current) {
+      autoDone.current = true;
       void runPrint();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auto, items]);
 
-
   const downloadPdf = async () => {
-    if (!items) return;
-    // Millimeter styrer utskriften: har bildet fysisk størrelse, plasseres det
-    // i eksakt den størrelsen på arket — aldri strukket til papirkanten.
-    const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-    const pageW = pdf.internal.pageSize.getWidth();
-    const pageH = pdf.internal.pageSize.getHeight();
-    for (let i = 0; i < items.length; i++) {
-      if (i > 0) pdf.addPage();
-      const url = items[i].url;
-      const img = items[i].image;
-      const dataUrl = await urlToDataUrl(url);
-      const dims = await imgDims(dataUrl);
-      let drawW: number;
-      let drawH: number;
-      if (img.width_mm && img.height_mm) {
-        drawW = Number(img.width_mm);
-        drawH = Number(img.height_mm);
-      } else {
-        const ratio = Math.min(pageW / dims.w, pageH / dims.h) * 0.92;
-        drawW = dims.w * ratio;
-        drawH = dims.h * ratio;
-      }
-      pdf.addImage(
-        dataUrl,
-        "PNG",
-        (pageW - drawW) / 2,
-        (pageH - drawH) / 2,
-        drawW,
-        drawH,
-      );
-    }
-    pdf.save(`kakebilder.pdf`);
-    markPrinted(items.map((i) => i.image.id));
+    if (items.length === 0) return;
+    await cakeSheetsToPdf(items, { scale, fileName: "kakebilder.pdf" });
+    // PDF er ikke papir: logges, men flytter ikke status.
+    await markPrinted(
+      items.map((i) => i.image!.id),
+      "pdf",
+    );
+    toast.success("PDF lastet ned (status er uendret)");
   };
 
-
-  if (!items) {
+  if (!rows) {
     return (
       <div className="flex h-[60vh] items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -138,83 +147,56 @@ export default function CakeImagesPrint() {
   }
 
   return (
-    <div className="cake-print-root">
+    <div>
       <style>{`
-        @media print {
-          @page { size: auto; margin: 8mm; }
-          .no-print { display: none !important; }
-          .cake-print-page { page-break-after: always; break-after: page; height: 100vh; }
-          body { background: white !important; }
+        ${CAKE_PRINT_CSS}
+        @media screen {
+          .cake-preview { background: hsl(var(--muted)); padding: 16px 0; }
+          .cake-preview .cake-sheet {
+            box-shadow: 0 2px 12px rgba(0,0,0,.15);
+            margin-bottom: 16px;
+            border: 1px solid rgba(0,0,0,.1);
+          }
         }
-        .cake-print-page { position:relative; display:flex; align-items:center; justify-content:center; padding:24px; }
-        .cake-print-page img { max-width:100%; max-height:90vh; object-fit:contain; }
+        @media print { .no-print { display: none !important; } .cake-preview { padding: 0; } }
       `}</style>
 
-      <div className="no-print flex items-center gap-2 border-b bg-card px-3 py-2">
+      <div className="no-print flex flex-wrap items-center gap-2 border-b bg-card px-3 py-2">
         <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
           Tilbake
         </Button>
         <div className="ml-2 text-sm font-semibold">
-          {items.length} kakebilde(r) — utskrift
+          {rows.length} kakebilde(r) — A4, faktisk størrelse
         </div>
+        {scale !== 1 && (
+          <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">
+            Kalibrert ×{scale}
+          </span>
+        )}
         <div className="ml-auto flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => setCalibrateOpen(true)}>
+            <Ruler className="mr-2 h-4 w-4" />
+            Kalibrer
+          </Button>
           <Button onClick={() => void runPrint()}>
             <Printer className="mr-2 h-4 w-4" />
             Skriv ut
           </Button>
-          <Button variant="outline" onClick={downloadPdf}>
+          <Button variant="outline" onClick={() => void downloadPdf()}>
             <Download className="mr-2 h-4 w-4" />
             Last ned PDF
           </Button>
         </div>
       </div>
 
-      {items.map((it) => (
-        <div key={it.image.id} className="cake-print-page">
-          {it.image.label_number && (
-            <div className="absolute left-6 top-6 rounded bg-black px-2 py-1 font-mono text-sm font-bold text-white no-print-hide">
-              #{it.image.label_number}
-            </div>
-          )}
-          {it.url ? (
-            <img
-              src={it.url}
-              alt={it.image.title}
-              style={
-                it.image.width_mm && it.image.height_mm
-                  ? {
-                      width: `${it.image.width_mm}mm`,
-                      height: `${it.image.height_mm}mm`,
-                      maxWidth: "none",
-                      maxHeight: "none",
-                    }
-                  : undefined
-              }
-            />
-          ) : (
-            <span className="text-muted-foreground">Mangler bilde</span>
-          )}
+      <p className="no-print px-3 py-2 text-xs text-muted-foreground">
+        Skriv ut uten «tilpass til side» / «scale to fit». Mål kontrollskalaen
+        nederst på arket: viser linjalen 50 mm, er størrelsen riktig.
+      </p>
 
-        </div>
-      ))}
+      <div ref={previewRef} className="cake-preview" />
+
+      <CalibratePrinterDialog open={calibrateOpen} onOpenChange={setCalibrateOpen} />
     </div>
   );
-}
-
-async function urlToDataUrl(url: string): Promise<string> {
-  const res = await fetch(url);
-  const blob = await res.blob();
-  return await new Promise<string>((resolve) => {
-    const r = new FileReader();
-    r.onload = () => resolve(r.result as string);
-    r.readAsDataURL(blob);
-  });
-}
-
-function imgDims(dataUrl: string): Promise<{ w: number; h: number }> {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
-    img.src = dataUrl;
-  });
 }

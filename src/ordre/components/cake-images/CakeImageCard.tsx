@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { type CakeImage, statusLabel } from "@/ordre/lib/cakeImages";
+import type { CakeOrderMeta } from "@/ordre/hooks/useCakeImages";
 import { LinkCakeImageOrderDialog } from "@/ordre/components/cake-images/LinkCakeImageOrderDialog";
 
 const STATUS_TONE: Record<CakeImage["status"], string> = {
@@ -20,11 +21,14 @@ export function CakeImageCard({
   thumbUrl,
   selected,
   onToggle,
+  order,
 }: {
   image: CakeImage;
   thumbUrl?: string;
   selected: boolean;
   onToggle: (id: string, on: boolean) => void;
+  /** Ordredetaljer vises direkte i køen — bakeren skal slippe å klikke seg inn. */
+  order?: CakeOrderMeta;
 }) {
   const [linkOpen, setLinkOpen] = useState(false);
   const missingOrder = !image.order_id;
@@ -97,6 +101,29 @@ export function CakeImageCard({
             {statusLabel(image.status)}
           </Badge>
         </div>
+
+        {!missingOrder && order && (
+          <div className="mt-1 rounded-md border border-border bg-muted/40 px-2 py-1 text-[11px] leading-snug">
+            <div className="font-semibold">
+              {order.order_number ? `Ordre ${order.order_number}` : "Ordre"}
+              {order.tour_name ? ` · ${order.tour_name}` : ""}
+            </div>
+            {(order.customer_name || order.delivery_time) && (
+              <div className="truncate text-muted-foreground">
+                {[order.customer_name, order.delivery_time?.slice(0, 5)]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </div>
+            )}
+          </div>
+        )}
+
+        {image.quality_flag === "lav" && !image.quality_ack_at && (
+          <div className="mt-1 flex items-center gap-1.5 rounded-md border border-rose-300 bg-rose-50 px-2 py-1 text-[11px] font-semibold text-rose-900">
+            <AlertTriangle className="h-3.5 w-3.5" />
+            Lav oppløsning — må bekreftes i editoren
+          </div>
+        )}
 
         {missingOrder && (
           <div className="mt-1 space-y-1.5 rounded-md border border-amber-300 bg-amber-50 p-2">

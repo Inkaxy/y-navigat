@@ -11,6 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { useCakeImagesByProduct } from "../hooks/useCakeImagesByProduct";
 
 export interface ColumnVisibility {
   mainGroup: boolean;
@@ -28,6 +29,8 @@ interface Props {
   showTraysWithPlus: boolean;
   loading: boolean;
   columns: ColumnVisibility;
+  /** Leveringsdato — brukes for å hente kakebilder til varelinjene. */
+  deliveryDate?: string;
 }
 
 function fmtNum(n: number | null | undefined, digits = 0): string {
@@ -36,7 +39,8 @@ function fmtNum(n: number | null | undefined, digits = 0): string {
   return n.toLocaleString("nb-NO", { maximumFractionDigits: digits });
 }
 
-export function ProductionPlanTable({ rows, showByMainGroup, showTraysWithPlus, loading, columns }: Props) {
+export function ProductionPlanTable({ rows, showByMainGroup, showTraysWithPlus, loading, columns, deliveryDate }: Props) {
+  const { data: cakeByProduct = {} } = useCakeImagesByProduct(deliveryDate);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const toggle = (k: string) =>
     setExpanded((prev) => {
@@ -186,7 +190,32 @@ export function ProductionPlanTable({ rows, showByMainGroup, showTraysWithPlus, 
                     {r.product_code ?? ""}
                   </span>
                 </TableCell>
-                <TableCell>{r.product_name}</TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-2">
+                    <span>{r.product_name}</span>
+                    {(cakeByProduct[r.product_id] ?? []).slice(0, 4).map((ci) => (
+                      <span
+                        key={ci.id}
+                        className="inline-flex items-center gap-1 rounded border border-border bg-muted/50 px-1 py-0.5"
+                        title={`Kakebilde${ci.label_number ? ` #${ci.label_number}` : ""}`}
+                      >
+                        {ci.url && (
+                          <img
+                            src={ci.url}
+                            alt={`Kakebilde ${ci.label_number ?? ""}`}
+                            className="h-7 w-9 rounded-sm object-contain"
+                            loading="lazy"
+                          />
+                        )}
+                        {ci.label_number && (
+                          <span className="font-mono text-[10px] font-semibold">
+                            #{ci.label_number}
+                          </span>
+                        )}
+                      </span>
+                    ))}
+                  </div>
+                </TableCell>
                 {columns.ordered && (
                   <TableCell className="text-right tabular-nums">{fmtNum(r.quantity_ordered)}</TableCell>
                 )}

@@ -8,6 +8,9 @@ export type PakkseddelPDFLine = {
   product_name: string;
   quantity: number;
   sales_unit: string;
+  /** Kakebildet som hører til linja — bakeren skal se bildet på pakkseddelen. */
+  cake_label_number?: string | null;
+  cake_thumb_url?: string | null;
 };
 
 export type PakkseddelPDFData = {
@@ -58,7 +61,7 @@ export function usePakkseddelPDF(id: string | undefined) {
         await Promise.all([
           supabase
             .from("delivery_note_lines")
-            .select("id, line_number, product_snapshot, quantity, sales_unit")
+            .select("id, line_number, product_snapshot, quantity, sales_unit, order_line_id")
             .eq("delivery_note_id", id)
             .order("line_number", { ascending: true }),
           supabase
@@ -82,6 +85,32 @@ export function usePakkseddelPDF(id: string | undefined) {
             .filter((n): n is string => !!n)
         )
       ).sort();
+
+      // Kakebilder for linjene — miniatyr + etikettnummer rett på pakkseddelen.
+      const orderLineIds = ((lines ?? []) as any[])
+        .map((l) => l.order_line_id)
+        .filter(Boolean) as string[];
+      const cakeByLine: Record<string, { label_number: string | null; url: string | null }> = {};
+      if (orderLineIds.length > 0) {
+        const { data: cakeRows } = await supabase
+          .from("cake_images")
+          .select("order_line_id, label_number, edited_path, original_path")
+          .in("order_line_id", orderLineIds);
+        const rows = (cakeRows ?? []) as any[];
+        const paths = rows.map((r) => r.edited_path || r.original_path).filter(Boolean);
+        const { data: signed } = paths.length
+          ? await supabase.storage.from("cake-images").createSignedUrls(paths, 60 * 30)
+          : { data: [] as any[] };
+        const urlMap = Object.fromEntries(
+          (signed ?? []).map((sg: any) => [sg.path, sg.signedUrl]),
+        );
+        for (const r of rows) {
+          cakeByLine[r.order_line_id as string] = {
+            label_number: r.label_number ?? null,
+            url: urlMap[r.edited_path || r.original_path] ?? null,
+          };
+        }
+      }
 
       const cs = ((note as any).customer_snapshot ?? {}) as Record<string, unknown>;
       const addr = ((note as any).delivery_address_snapshot ?? {}) as Record<string, unknown>;
@@ -131,6 +160,12 @@ export function usePakkseddelPDF(id: string | undefined) {
               (ps["display_name"] as string) ?? (ps["name"] as string) ?? "—",
             quantity: Number(l.quantity ?? 0),
             sales_unit: l.sales_unit ?? "",
+            cake_label_number: l.order_line_id
+              ? (cakeByLine[l.order_line_id]?.label_number ?? null)
+              : null,
+            cake_thumb_url: l.order_line_id
+              ? (cakeByLine[l.order_line_id]?.url ?? null)
+              : null,
           };
         }),
       };

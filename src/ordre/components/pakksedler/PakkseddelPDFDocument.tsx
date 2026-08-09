@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
+import { Document, Page, Text, View, StyleSheet, Image } from "@react-pdf/renderer";
 import type { PakkseddelPDFData } from "@/ordre/hooks/usePakkseddelPDF";
 
 // NOTE: Use neutral palette only — @react-pdf/renderer doesn't read CSS tokens.
@@ -188,11 +188,33 @@ export function PakkseddelPDFPage({ data }: Props) {
             <Text style={styles.colUnit}>Enhet</Text>
           </View>
           {data.lines.map((l) => (
-            <View key={l.id} style={styles.row} wrap={false}>
-              <Text style={styles.colNr}>{l.product_number}</Text>
-              <Text style={styles.colName}>{l.product_name}</Text>
-              <Text style={styles.colQty}>{l.quantity}</Text>
-              <Text style={styles.colUnit}>{l.sales_unit}</Text>
+            <View key={l.id} wrap={false}>
+              <View style={styles.row}>
+                <Text style={styles.colNr}>{l.product_number}</Text>
+                <Text style={styles.colName}>{l.product_name}</Text>
+                <Text style={styles.colQty}>{l.quantity}</Text>
+                <Text style={styles.colUnit}>{l.sales_unit}</Text>
+              </View>
+              {(l.cake_thumb_url || l.cake_label_number) && (
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    paddingLeft: 60,
+                    paddingBottom: 4,
+                  }}
+                >
+                  {l.cake_thumb_url ? (
+                    <Image
+                      src={l.cake_thumb_url}
+                      style={{ width: 48, height: 36, objectFit: "contain", marginRight: 6 }}
+                    />
+                  ) : null}
+                  <Text style={{ fontSize: 9, color: "#444" }}>
+                    Kakebilde{l.cake_label_number ? ` · etikett #${l.cake_label_number}` : ""}
+                  </Text>
+                </View>
+              )}
             </View>
           ))}
           {data.lines.length === 0 && (

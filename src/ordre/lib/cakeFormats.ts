@@ -137,3 +137,21 @@ export function qualityMessage(
       return `Dette bildet blir ${dpi} DPI på ${size} — det vil se synlig uskarpt ut. Be kunden om en større fil hvis mulig.`;
   }
 }
+
+/**
+ * Hvor mange ganger må lerretet forstørres ved eksport for å lande på minst
+ * 300 DPI? Lerretet kan være mindre enn den fysiske størrelsen tilsier (f.eks.
+ * hvis det er begrenset av nettleseren), og da må eksporten kompensere —
+ * ellers får trykkeriet et uskarpt bilde.
+ */
+export function exportMultiplier(
+  canvasWidthPx: number,
+  widthMm: number,
+  dpi = CAKE_DPI,
+): number {
+  if (!canvasWidthPx || !widthMm) return 1;
+  const needed = mmToPx(widthMm, dpi);
+  const m = needed / canvasWidthPx;
+  if (!Number.isFinite(m) || m <= 1) return 1;
+  return Math.min(8, Math.ceil(m * 100) / 100);
+}

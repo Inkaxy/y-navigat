@@ -6,7 +6,20 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { todayISO } from "@/ordre/lib/format";
-import { useCakeImageList, useSignedUrls } from "@/ordre/hooks/useCakeImages";
+import {
+  useCakeImageList,
+  useCakeOrderMeta,
+  useSignedUrls,
+} from "@/ordre/hooks/useCakeImages";
+import { useProductionDepartments } from "@/produksjon/features/produksjonsavdelinger/hooks/useProductionDepartments";
+import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { CakeImageCard } from "@/ordre/components/cake-images/CakeImageCard";
 import { UploadButton } from "@/ordre/components/cake-images/UploadButton";
 import { deleteCakeImage, markPrinted, updateCakeImage } from "@/ordre/lib/cakeImages";
@@ -25,7 +38,69 @@ export default function CakeImagesList() {
   const status = (searchParams.get("status") as Status) || "for-utskrift";
   const date = searchParams.get("date") || todayISO();
 
-  const { data: images = [], isLoading } = useCakeImageList(date, status);
+  const { data: allImages = [], isLoading } = useCakeImageList(date, status);
+  const focus = searchParams.get("filter") || "";
+  const tourFilter = searchParams.get("tour") || "";
+  const deptFilter = searchParams.get("dept") || "";
+
+  const { data: orderMeta = {} } = useCakeOrderMeta(
+    allImages.map((i) => i.order_id ?? null),
+  );
+  const { data: departments = [] } = useProductionDepartments(NB_LEGAL_ENTITY_ID, false);
+
+  const tours = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const img of allImages) {
+      const m = img.order_id ? orderMeta[img.order_id] : null;
+      if (m?.delivery_tour_id) {
+        map.set(m.delivery_tour_id, m.tour_name ?? "Tur");
+      }
+    }
+    return Array.from(map, ([id, name]) => ({ id, name }));
+  }, [allImages, orderMeta]);
+
+  /**
+   * Køen sorteres etter hva som haster: det som stopper produksjonen først.
+   * Lav kvalitet uten bekreftelse > mangler ordrekobling > uredigerte > ferdige.
+   */
+  const priority = (img: (typeof allImages)[number]) => {
+    if (img.quality_flag === "lav" && !img.quality_ack_at) return 0;
+    if (!img.order_id) return 1;
+    if (img.status === "venter") return 2;
+    return 3;
+  };
+
+  const images = useMemo(() => {
+    let list = allImages;
+    if (focus === "mangler-kobling") list = list.filter((i) => !i.order_id);
+    if (focus === "lav-kvalitet")
+      list = list.filter((i) => i.quality_flag === "lav" && !i.quality_ack_at);
+    if (tourFilter)
+      list = list.filter(
+        (i) =>
+          i.order_id && orderMeta[i.order_id]?.delivery_tour_id === tourFilter,
+      );
+    if (deptFilter)
+      list = list.filter((i) => i.production_department_id === deptFilter);
+    return [...list].sort((a, b) => {
+      const p = priority(a) - priority(b);
+      if (p !== 0) return p;
+      return (a.label_number ?? "").localeCompare(b.label_number ?? "");
+    });
+  }, [allImages, focus, tourFilter, deptFilter, orderMeta]);
+
+  const setParam = (key: string, value: string) => {
+    setSearchParams(
+      (prev) => {
+        const np = new URLSearchParams(prev);
+        if (value) np.set(key, value);
+        else np.delete(key);
+        return np;
+      },
+      { replace: true },
+    );
+  };
+
   const paths = useMemo(
     () => images.map((i) => i.edited_path || i.original_path),
     [images],
@@ -154,6 +229,43 @@ export default function CakeImagesList() {
 
 
 
+      <div className="flex flex-wrap items-center gap-2">
+        <Select value={tourFilter || "all"} onValueChange={(v) => setParam("tour", v === "all" ? "" : v)}>
+          <SelectTrigger className="h-9 w-[190px]">
+            <SelectValue placeholder="Alle turer" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Alle turer</SelectItem>
+            {tours.map((t) => (
+              <SelectItem key={t.id} value={t.id}>
+                {t.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={deptFilter || "all"} onValueChange={(v) => setParam("dept", v === "all" ? "" : v)}>
+          <SelectTrigger className="h-9 w-[190px]">
+            <SelectValue placeholder="Alle avdelinger" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Alle avdelinger</SelectItem>
+            {departments.map((d) => (
+              <SelectItem key={d.id} value={d.id}>
+                {d.display_name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {focus && (
+          <Button size="sm" variant="outline" onClick={() => setParam("filter", "")}>
+            Fjern filter: {focus === "lav-kvalitet" ? "lav kvalitet" : "mangler ordre"}
+          </Button>
+        )}
+        <span className="ml-auto text-sm text-muted-foreground">
+          {images.length} av {allImages.length} vises
+        </span>
+      </div>
+
       <div
         role="tablist"
         className="mx-auto flex w-fit items-center gap-1 rounded-lg border border-border bg-muted/40 p-1"
@@ -236,6 +348,7 @@ export default function CakeImagesList() {
               thumbUrl={urls[img.edited_path || img.original_path]}
               selected={selected.has(img.id)}
               onToggle={toggle}
+              order={img.order_id ? orderMeta[img.order_id] : undefined}
             />
           ))}
         </div>
