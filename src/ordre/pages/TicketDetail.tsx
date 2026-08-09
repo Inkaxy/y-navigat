@@ -330,9 +330,17 @@ function useLinkedOrder(orderId: string | null) {
 function AttachmentThumb({
   att,
   onOpen,
+  ticketId,
+  ticketSubject,
+  order,
+  customerName,
 }: {
   att: TicketAttachment;
   onOpen: (url: string, name: string) => void;
+  ticketId?: string;
+  ticketSubject?: string | null;
+  order?: { id: string; order_number: string; delivery_date: string | null } | null;
+  customerName?: string | null;
 }) {
   const [url, setUrl] = useState<string | null>(null);
   useEffect(() => {
@@ -362,36 +370,47 @@ function AttachmentThumb({
   };
 
   return (
-    <button
-      type="button"
-      onClick={handleClick}
-      className="group flex items-center gap-2 rounded-md border bg-background px-2 py-1.5 text-left text-xs hover:bg-muted"
-      title={isPdf ? "Åpne PDF i ny fane" : isImage ? "Åpne bilde" : "Åpne vedlegg"}
-    >
-      {isImage && url ? (
-        <img
-          src={url}
-          alt={att.file_name}
-          className="h-10 w-10 rounded object-cover"
-        />
-      ) : (
-        <div className={`flex h-10 w-10 items-center justify-center rounded ${isPdf ? "bg-red-100 text-red-700" : "bg-muted text-muted-foreground"}`}>
-          {isPdf ? (
-            <span className="text-[10px] font-bold">PDF</span>
-          ) : (
-            <Paperclip className="h-4 w-4" />
-          )}
-        </div>
-      )}
-      <div className="min-w-0">
-        <div className="truncate font-medium text-foreground">{att.file_name}</div>
-        {att.size_bytes && (
-          <div className="text-[10px] text-muted-foreground">
-            {(att.size_bytes / 1024).toFixed(0)} kB
+    <div className="flex flex-col gap-1.5 rounded-md border bg-background p-1.5">
+      <button
+        type="button"
+        onClick={handleClick}
+        className="group flex items-center gap-2 rounded px-0.5 py-0.5 text-left text-xs hover:bg-muted"
+        title={isPdf ? "Åpne PDF i ny fane" : isImage ? "Åpne bilde" : "Åpne vedlegg"}
+      >
+        {isImage && url ? (
+          <img
+            src={url}
+            alt={att.file_name}
+            className="h-10 w-10 rounded object-cover"
+          />
+        ) : (
+          <div className={`flex h-10 w-10 items-center justify-center rounded ${isPdf ? "bg-red-100 text-red-700" : "bg-muted text-muted-foreground"}`}>
+            {isPdf ? (
+              <span className="text-[10px] font-bold">PDF</span>
+            ) : (
+              <Paperclip className="h-4 w-4" />
+            )}
           </div>
         )}
-      </div>
-    </button>
+        <div className="min-w-0">
+          <div className="truncate font-medium text-foreground">{att.file_name}</div>
+          {att.size_bytes && (
+            <div className="text-[10px] text-muted-foreground">
+              {(att.size_bytes / 1024).toFixed(0)} kB
+            </div>
+          )}
+        </div>
+      </button>
+      {isImage && ticketId && (
+        <AttachmentCakePrintButton
+          att={att}
+          ticketId={ticketId}
+          ticketSubject={ticketSubject}
+          order={order}
+          customerName={customerName}
+        />
+      )}
+    </div>
   );
 }
 
