@@ -5,7 +5,7 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
-  useTickets, useTicketCounts, useUpdateTicket,
+  useTickets, useTicketCounts, useUpdateTicket, useOrderNumbersByIds,
   type TicketStatus, type TicketPriority, type Ticket,
 } from "@/ordre/hooks/useTickets";
 import { useAuth } from "@/hooks/useAuth";
@@ -68,6 +68,10 @@ export function TicketsInbox() {
   const visible = useMemo(
     () => (showAll ? tickets : tickets.slice(0, VISIBLE_LIMIT)),
     [tickets, showAll],
+  );
+
+  const { data: orderNumbers } = useOrderNumbersByIds(
+    visible.map((t) => t.related_order_id),
   );
 
   const togglePrio = (p: TicketPriority) =>
@@ -286,7 +290,13 @@ export function TicketsInbox() {
                           <span className="text-[10px] text-muted-foreground">Uten ansvarlig</span>
                         )}
                         {t.related_order_id && (
-                          <span className="text-[10px] text-primary">· koblet til ordre</span>
+                          <Link
+                            to={`/ordre/ordrer/${t.related_order_id}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-[10px] font-semibold text-primary hover:underline"
+                          >
+                            · Ordre #{orderNumbers?.[t.related_order_id] ?? "…"}
+                          </Link>
                         )}
                       </div>
                     </div>

@@ -646,6 +646,7 @@ export type Database = {
           production_department_id: string | null
           source: string
           status: string
+          ticket_attachment_id: string | null
           ticket_id: string | null
           title: string
           updated_at: string
@@ -671,6 +672,7 @@ export type Database = {
           production_department_id?: string | null
           source?: string
           status?: string
+          ticket_attachment_id?: string | null
           ticket_id?: string | null
           title?: string
           updated_at?: string
@@ -696,6 +698,7 @@ export type Database = {
           production_department_id?: string | null
           source?: string
           status?: string
+          ticket_attachment_id?: string | null
           ticket_id?: string | null
           title?: string
           updated_at?: string
@@ -727,6 +730,13 @@ export type Database = {
             columns: ["production_department_id"]
             isOneToOne: false
             referencedRelation: "production_departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cake_images_ticket_attachment_id_fkey"
+            columns: ["ticket_attachment_id"]
+            isOneToOne: false
+            referencedRelation: "ticket_attachments"
             referencedColumns: ["id"]
           },
           {
@@ -11865,6 +11875,7 @@ export type Database = {
           production_department_id: string | null
           source: string
           status: string
+          ticket_attachment_id: string | null
           ticket_id: string | null
           title: string
           updated_at: string

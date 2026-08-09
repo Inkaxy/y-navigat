@@ -17,16 +17,45 @@ function jsonErr(msg: string, status: number, extra: Record<string, unknown> = {
   });
 }
 
+/** Kolonner på `orders` som kan endres direkte fra ticket-flyten. */
 const ALLOWED_FIELDS = new Set([
   "delivery_date",
   "delivery_time",
   "customer_notes",
   "internal_notes",
+  "production_notes",
+  "store_notes",
   "delivery_address_line1",
   "delivery_address_line2",
   "delivery_postal_code",
   "delivery_city",
+  "distribution",
+  "delivery_tour_id",
+  "pickup_location_id",
+  "final_customer_name",
+  "final_customer_email",
+  "final_customer_phone",
 ]);
+
+/**
+ * Virtuelle felt som lagres inne i `orders.cake_payload` (jsonb).
+ * Nøkkel = feltnavn i AI-forslaget, verdi = nøkkel i cake_payload.
+ */
+const CAKE_PAYLOAD_FIELDS: Record<string, string> = {
+  cake_text: "cake_text",
+  cake_flavor: "flavor",
+  cake_filling: "filling",
+  cake_shape: "shape",
+  cake_size: "size",
+  allergies: "allergies",
+  portions: "portions",
+  decoration: "decoration",
+};
+
+/** Felt som må være uuid når de settes. */
+const UUID_FIELDS = new Set(["delivery_tour_id", "pickup_location_id"]);
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 
 const LineChangeSchema = z.object({
   order_line_id: z.string().uuid().optional(),
@@ -88,7 +117,7 @@ Deno.serve(async (req) => {
     if (!linked) return jsonErr("Ordren er ikke koblet til denne saken", 403);
 
     const { data: order } = await admin.from("orders")
-      .select("id,order_number,status,customer_id,delivery_date,delivery_time,customer_notes,internal_notes,delivery_address_line1,delivery_address_line2,delivery_postal_code,delivery_city,legal_entity_id")
+      .select("id,order_number,status,customer_id,delivery_date,delivery_time,distribution,delivery_tour_id,pickup_location_id,final_customer_name,final_customer_email,final_customer_phone,customer_notes,internal_notes,production_notes,store_notes,cake_payload,delivery_address_line1,delivery_address_line2,delivery_postal_code,delivery_city,legal_entity_id")
       .eq("id", order_id).maybeSingle();
     if (!order) return jsonErr("Ordre ikke funnet", 404);
 
@@ -132,14 +161,39 @@ Deno.serve(async (req) => {
     } else {
       // apply_changes
       const patch: Record<string, unknown> = {};
+      const cakePayload: Record<string, unknown> = {
+        ...((order as any).cake_payload ?? {}),
+      };
+      let cakeTouched = false;
+
       for (const c of changes) {
-        if (!ALLOWED_FIELDS.has(c.field)) continue;
-        before[c.field] = (order as any)[c.field] ?? null;
-        // Normaliser tomme strenger til null
         const v = c.new_value === "" ? null : c.new_value;
+
+        // Virtuelle kakefelt lagres i cake_payload
+        const cakeKey = CAKE_PAYLOAD_FIELDS[c.field];
+        if (cakeKey) {
+          before[c.field] = cakePayload[cakeKey] ?? null;
+          if (v === null) delete cakePayload[cakeKey];
+          else cakePayload[cakeKey] = c.field === "portions" ? Number(v) || v : v;
+          after[c.field] = v;
+          cakeTouched = true;
+          continue;
+        }
+
+        if (!ALLOWED_FIELDS.has(c.field)) continue;
+        if (UUID_FIELDS.has(c.field) && v !== null && !UUID_RE.test(v)) {
+          return jsonErr(`Ugyldig id for ${c.field}`, 400);
+        }
+        if (c.field === "distribution" && v !== null && !["delivery", "pickup"].includes(v)) {
+          return jsonErr("distribution må være 'delivery' eller 'pickup'", 400);
+        }
+        before[c.field] = (order as any)[c.field] ?? null;
         patch[c.field] = v;
         after[c.field] = v;
       }
+
+      if (cakeTouched) patch.cake_payload = cakePayload;
+
       if (Object.keys(patch).length > 0) {
         const { error: uErr } = await admin.from("orders").update(patch).eq("id", order_id);
         if (uErr) return jsonErr(`Kunne ikke oppdatere ordre: ${uErr.message}`, 500);

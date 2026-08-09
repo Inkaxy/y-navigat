@@ -46,6 +46,8 @@ import type { TicketAttachment } from "@/ordre/hooks/useTickets";
 import ChangeIntentCard from "@/ordre/components/tickets/ChangeIntentCard";
 import LinkOrderSearch from "@/ordre/components/tickets/LinkOrderSearch";
 import CreateOrderFromTicketButton from "@/ordre/components/tickets/CreateOrderFromTicketButton";
+import AttachmentCakePrintButton from "@/ordre/components/tickets/AttachmentCakePrintButton";
+import EditLinkedOrderButton from "@/ordre/components/tickets/EditLinkedOrderButton";
 import TicketComposerActions from "@/ordre/components/tickets/TicketComposerActions";
 import { CakeImageStatusCard } from "@/ordre/components/orders/CakeImageStatusCard";
 import { useInboundMessages, type InboundMessage } from "@/ordre/hooks/useInboundMessages";
@@ -309,7 +311,7 @@ function useLinkedOrder(orderId: string | null) {
       const { data, error } = await supabase
         .from("orders")
         .select(
-          "id, order_number, status, delivery_date, delivery_time, subtotal_excl_vat, total_incl_vat, legal_entity_id",
+          "id, order_number, status, delivery_date, delivery_time, customer_id, subtotal_excl_vat, total_incl_vat, legal_entity_id",
         )
         .eq("id", orderId!)
         .maybeSingle();
@@ -330,9 +332,17 @@ function useLinkedOrder(orderId: string | null) {
 function AttachmentThumb({
   att,
   onOpen,
+  ticketId,
+  ticketSubject,
+  order,
+  customerName,
 }: {
   att: TicketAttachment;
   onOpen: (url: string, name: string) => void;
+  ticketId?: string;
+  ticketSubject?: string | null;
+  order?: { id: string; order_number: string; delivery_date: string | null } | null;
+  customerName?: string | null;
 }) {
   const [url, setUrl] = useState<string | null>(null);
   useEffect(() => {
@@ -362,36 +372,47 @@ function AttachmentThumb({
   };
 
   return (
-    <button
-      type="button"
-      onClick={handleClick}
-      className="group flex items-center gap-2 rounded-md border bg-background px-2 py-1.5 text-left text-xs hover:bg-muted"
-      title={isPdf ? "Åpne PDF i ny fane" : isImage ? "Åpne bilde" : "Åpne vedlegg"}
-    >
-      {isImage && url ? (
-        <img
-          src={url}
-          alt={att.file_name}
-          className="h-10 w-10 rounded object-cover"
-        />
-      ) : (
-        <div className={`flex h-10 w-10 items-center justify-center rounded ${isPdf ? "bg-red-100 text-red-700" : "bg-muted text-muted-foreground"}`}>
-          {isPdf ? (
-            <span className="text-[10px] font-bold">PDF</span>
-          ) : (
-            <Paperclip className="h-4 w-4" />
-          )}
-        </div>
-      )}
-      <div className="min-w-0">
-        <div className="truncate font-medium text-foreground">{att.file_name}</div>
-        {att.size_bytes && (
-          <div className="text-[10px] text-muted-foreground">
-            {(att.size_bytes / 1024).toFixed(0)} kB
+    <div className="flex flex-col gap-1.5 rounded-md border bg-background p-1.5">
+      <button
+        type="button"
+        onClick={handleClick}
+        className="group flex items-center gap-2 rounded px-0.5 py-0.5 text-left text-xs hover:bg-muted"
+        title={isPdf ? "Åpne PDF i ny fane" : isImage ? "Åpne bilde" : "Åpne vedlegg"}
+      >
+        {isImage && url ? (
+          <img
+            src={url}
+            alt={att.file_name}
+            className="h-10 w-10 rounded object-cover"
+          />
+        ) : (
+          <div className={`flex h-10 w-10 items-center justify-center rounded ${isPdf ? "bg-red-100 text-red-700" : "bg-muted text-muted-foreground"}`}>
+            {isPdf ? (
+              <span className="text-[10px] font-bold">PDF</span>
+            ) : (
+              <Paperclip className="h-4 w-4" />
+            )}
           </div>
         )}
-      </div>
-    </button>
+        <div className="min-w-0">
+          <div className="truncate font-medium text-foreground">{att.file_name}</div>
+          {att.size_bytes && (
+            <div className="text-[10px] text-muted-foreground">
+              {(att.size_bytes / 1024).toFixed(0)} kB
+            </div>
+          )}
+        </div>
+      </button>
+      {isImage && ticketId && (
+        <AttachmentCakePrintButton
+          att={att}
+          ticketId={ticketId}
+          ticketSubject={ticketSubject}
+          order={order}
+          customerName={customerName}
+        />
+      )}
+    </div>
   );
 }
 
@@ -505,7 +526,14 @@ export default function TicketDetail() {
       items.push({
         kind: "email",
         at: ticket.received_at,
-        node: <IncomingEmail ticket={ticket} attachments={attachmentsByCreated} onOpen={setLightbox} />,
+        node: (
+          <IncomingEmail
+            ticket={ticket}
+            attachments={attachmentsByCreated}
+            onOpen={setLightbox}
+            order={linked?.order ?? null}
+          />
+        ),
       });
     }
     for (const r of replies) {
@@ -809,18 +837,7 @@ export default function TicketDetail() {
                     ))}
                   </div>
                 )}
-                {intent === "new_order" && !linked?.order && id && (
-                  <CreateOrderFromTicketButton
-                    ticket={ticket}
-                    ai={ai}
-                    attachments={attachments}
-                    onCreated={() => {
-                      qc.invalidateQueries({ queryKey: ["ticket", id] });
-                      qc.invalidateQueries({ queryKey: ["ticket-events", id] });
-                      qc.invalidateQueries({ queryKey: ["cake-images-for", id] });
-                    }}
-                  />
-                )}
+                {/* Opprett ordre ligger i «Ordre»-kortet under — alltid tilgjengelig */}
               </div>
             </SideCard>
           )}
@@ -857,6 +874,16 @@ export default function TicketDetail() {
                 >
                   Åpne ordren →
                 </Button>
+                <EditLinkedOrderButton
+                  orderId={linked.order.id}
+                  customerId={
+                    (linked.order as unknown as { customer_id: string | null }).customer_id ?? null
+                  }
+                  onSaved={() => {
+                    qc.invalidateQueries({ queryKey: ["ticket-linked-order", linked.order!.id] });
+                    qc.invalidateQueries({ queryKey: ["ticket", id] });
+                  }}
+                />
                 <Button
                   size="sm"
                   className="mt-2 w-full gap-2 bg-emerald-600 text-white hover:bg-emerald-700"
@@ -881,14 +908,29 @@ export default function TicketDetail() {
             </SideCard>
           ) : (
             id && (
-              <SideCard label="Koble til ordre">
-                <LinkOrderSearch
-                  ticketId={id}
-                  onLinked={() => {
-                    qc.invalidateQueries({ queryKey: ["ticket", id] });
-                    qc.invalidateQueries({ queryKey: ["ticket-events", id] });
-                  }}
-                />
+              <SideCard label="Ordre">
+                <div className="space-y-3">
+                  <LinkOrderSearch
+                    ticketId={id}
+                    onLinked={() => {
+                      qc.invalidateQueries({ queryKey: ["ticket", id] });
+                      qc.invalidateQueries({ queryKey: ["ticket-events", id] });
+                      qc.invalidateQueries({ queryKey: ["cake-images-for", id] });
+                    }}
+                  />
+                  <div className="border-t pt-2">
+                    <CreateOrderFromTicketButton
+                      ticket={ticket}
+                      ai={ai ?? null}
+                      attachments={attachments}
+                      onCreated={() => {
+                        qc.invalidateQueries({ queryKey: ["ticket", id] });
+                        qc.invalidateQueries({ queryKey: ["ticket-events", id] });
+                        qc.invalidateQueries({ queryKey: ["cake-images-for", id] });
+                      }}
+                    />
+                  </div>
+                </div>
               </SideCard>
             )
           )}
@@ -949,10 +991,12 @@ function IncomingEmail({
   ticket,
   attachments,
   onOpen,
+  order,
 }: {
   ticket: NonNullable<ReturnType<typeof useTicket>["data"]>["ticket"];
   attachments: TicketAttachment[];
   onOpen: (x: { url: string; name: string }) => void;
+  order?: { id: string; order_number: string; delivery_date: string | null } | null;
 }) {
   if (!ticket) return null;
   const html = ticket.body_html ? sanitize(ticket.body_html) : null;
@@ -989,6 +1033,10 @@ function IncomingEmail({
                 key={a.id}
                 att={a}
                 onOpen={(url, name) => onOpen({ url, name })}
+                ticketId={ticket.id}
+                ticketSubject={ticket.subject}
+                order={order}
+                customerName={ticket.sender_name ?? ticket.sender_email}
               />
             ))}
         </div>

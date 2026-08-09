@@ -473,7 +473,7 @@ export default function TicketsInbox() {
                 <div className="flex shrink-0 items-center gap-2">
                   {t.related_order_id && t.orders?.order_number ? (
                     <Link
-                      to={`/ordre/${t.related_order_id}`}
+                      to={`/ordre/ordrer/${t.related_order_id}`}
                       onClick={(e) => e.stopPropagation()}
                       className="inline-flex items-center gap-1 rounded-md border bg-background px-2 py-1 text-xs font-medium text-foreground hover:bg-muted"
                     >
