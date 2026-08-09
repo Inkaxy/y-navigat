@@ -179,6 +179,14 @@ export async function createCakeImage(input: {
       label_unit_id: labelUnitId,
       order_ref: input.order_ref ?? null,
       notes: input.notes ?? null,
+      format_id: input.format_id ?? null,
+      shape: input.shape ?? null,
+      width_mm: input.width_mm ?? null,
+      height_mm: input.height_mm ?? null,
+      source_width_px: input.source_width_px ?? null,
+      source_height_px: input.source_height_px ?? null,
+      effective_dpi: input.effective_dpi ?? null,
+      quality_flag: input.quality_flag ?? "ukjent",
       created_by: u.user?.id,
     } as never)
     .select("*")
