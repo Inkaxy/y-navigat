@@ -5,7 +5,7 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
-  useTickets, useTicketCounts, useUpdateTicket,
+  useTickets, useTicketCounts, useUpdateTicket, useOrderNumbersByIds,
   type TicketStatus, type TicketPriority, type Ticket,
 } from "@/ordre/hooks/useTickets";
 import { useAuth } from "@/hooks/useAuth";
