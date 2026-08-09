@@ -161,14 +161,39 @@ Deno.serve(async (req) => {
     } else {
       // apply_changes
       const patch: Record<string, unknown> = {};
+      const cakePayload: Record<string, unknown> = {
+        ...((order as any).cake_payload ?? {}),
+      };
+      let cakeTouched = false;
+
       for (const c of changes) {
-        if (!ALLOWED_FIELDS.has(c.field)) continue;
-        before[c.field] = (order as any)[c.field] ?? null;
-        // Normaliser tomme strenger til null
         const v = c.new_value === "" ? null : c.new_value;
+
+        // Virtuelle kakefelt lagres i cake_payload
+        const cakeKey = CAKE_PAYLOAD_FIELDS[c.field];
+        if (cakeKey) {
+          before[c.field] = cakePayload[cakeKey] ?? null;
+          if (v === null) delete cakePayload[cakeKey];
+          else cakePayload[cakeKey] = c.field === "portions" ? Number(v) || v : v;
+          after[c.field] = v;
+          cakeTouched = true;
+          continue;
+        }
+
+        if (!ALLOWED_FIELDS.has(c.field)) continue;
+        if (UUID_FIELDS.has(c.field) && v !== null && !UUID_RE.test(v)) {
+          return jsonErr(`Ugyldig id for ${c.field}`, 400);
+        }
+        if (c.field === "distribution" && v !== null && !["delivery", "pickup"].includes(v)) {
+          return jsonErr("distribution må være 'delivery' eller 'pickup'", 400);
+        }
+        before[c.field] = (order as any)[c.field] ?? null;
         patch[c.field] = v;
         after[c.field] = v;
       }
+
+      if (cakeTouched) patch.cake_payload = cakePayload;
+
       if (Object.keys(patch).length > 0) {
         const { error: uErr } = await admin.from("orders").update(patch).eq("id", order_id);
         if (uErr) return jsonErr(`Kunne ikke oppdatere ordre: ${uErr.message}`, 500);
