@@ -100,7 +100,6 @@ function buildInitialValues(
     lines,
     fieldConfidence,
     cakeText: of.cake_text ?? null,
-    customerNotes: (ticket.ai_summary ?? "").trim() || null,
     ticketAttachments,
   };
 }
