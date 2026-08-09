@@ -634,6 +634,7 @@ export type Database = {
           editor_state: Json | null
           id: string
           label_number: string | null
+          label_unit_id: string | null
           legal_entity_id: string
           notes: string | null
           order_id: string | null
@@ -658,6 +659,7 @@ export type Database = {
           editor_state?: Json | null
           id?: string
           label_number?: string | null
+          label_unit_id?: string | null
           legal_entity_id: string
           notes?: string | null
           order_id?: string | null
@@ -682,6 +684,7 @@ export type Database = {
           editor_state?: Json | null
           id?: string
           label_number?: string | null
+          label_unit_id?: string | null
           legal_entity_id?: string
           notes?: string | null
           order_id?: string | null
@@ -698,6 +701,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "cake_images_label_unit_id_fkey"
+            columns: ["label_unit_id"]
+            isOneToOne: false
+            referencedRelation: "label_units"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "cake_images_order_id_fkey"
             columns: ["order_id"]
@@ -2954,6 +2964,24 @@ export type Database = {
         }
         Relationships: []
       }
+      label_day_sequences: {
+        Row: {
+          last_number: number
+          legal_entity_id: string
+          seq_date: string
+        }
+        Insert: {
+          last_number?: number
+          legal_entity_id: string
+          seq_date: string
+        }
+        Update: {
+          last_number?: number
+          legal_entity_id?: string
+          seq_date?: string
+        }
+        Relationships: []
+      }
       label_field_catalog: {
         Row: {
           default_height_mm: number
@@ -3059,6 +3087,7 @@ export type Database = {
         Row: {
           id: string
           label_number: string
+          label_unit_id: string | null
           legal_entity_id: string
           order_line_id: string | null
           printed_at: string
@@ -3073,6 +3102,7 @@ export type Database = {
         Insert: {
           id?: string
           label_number: string
+          label_unit_id?: string | null
           legal_entity_id: string
           order_line_id?: string | null
           printed_at?: string
@@ -3087,6 +3117,7 @@ export type Database = {
         Update: {
           id?: string
           label_number?: string
+          label_unit_id?: string | null
           legal_entity_id?: string
           order_line_id?: string | null
           printed_at?: string
@@ -3099,6 +3130,13 @@ export type Database = {
           status?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "label_print_jobs_label_unit_id_fkey"
+            columns: ["label_unit_id"]
+            isOneToOne: false
+            referencedRelation: "label_units"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "label_print_jobs_legal_entity_id_fkey"
             columns: ["legal_entity_id"]
@@ -3230,6 +3268,63 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      label_units: {
+        Row: {
+          created_at: string
+          first_printed_at: string | null
+          id: string
+          label_mode: string
+          legal_entity_id: string
+          note_text: string | null
+          number: number
+          order_id: string | null
+          order_line_id: string | null
+          print_count: number
+          product_id: string | null
+          seq_date: string
+          status: string
+          unit_index: number | null
+          unit_key: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          first_printed_at?: string | null
+          id?: string
+          label_mode: string
+          legal_entity_id: string
+          note_text?: string | null
+          number: number
+          order_id?: string | null
+          order_line_id?: string | null
+          print_count?: number
+          product_id?: string | null
+          seq_date: string
+          status?: string
+          unit_index?: number | null
+          unit_key: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          first_printed_at?: string | null
+          id?: string
+          label_mode?: string
+          legal_entity_id?: string
+          note_text?: string | null
+          number?: number
+          order_id?: string | null
+          order_line_id?: string | null
+          print_count?: number
+          product_id?: string | null
+          seq_date?: string
+          status?: string
+          unit_index?: number | null
+          unit_key?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       legal_entities: {
         Row: {
@@ -11758,6 +11853,7 @@ export type Database = {
           editor_state: Json | null
           id: string
           label_number: string | null
+          label_unit_id: string | null
           legal_entity_id: string
           notes: string | null
           order_id: string | null
@@ -12428,6 +12524,14 @@ export type Database = {
       stock_from_delivery_note_lines: {
         Args: { p_note_id: string; p_remove: boolean }
         Returns: undefined
+      }
+      sync_label_numbers: {
+        Args: { p_date: string; p_legal_entity_id: string }
+        Returns: {
+          kansellert: number
+          tildelt: number
+          totalt: number
+        }[]
       }
       tripletex_token_status: {
         Args: { _legal_entity_id: string }
