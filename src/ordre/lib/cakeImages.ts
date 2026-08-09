@@ -29,6 +29,21 @@ export type CakeImage = {
   production_department_id?: string | null;
   label_number?: string | null;
   label_unit_id?: string | null;
+  // Fysisk størrelse og kvalitet
+  format_id?: string | null;
+  shape?: string | null;
+  width_mm?: number | null;
+  height_mm?: number | null;
+  source_width_px?: number | null;
+  source_height_px?: number | null;
+  effective_dpi?: number | null;
+  quality_flag?: "god" | "akseptabel" | "lav" | "ukjent" | null;
+  quality_ack_by?: string | null;
+  quality_ack_at?: string | null;
+  rights_cleared?: boolean | null;
+  rights_note?: string | null;
+  editor_state_version?: number | null;
+  last_printed_by?: string | null;
 };
 
 export const CAKE_BUCKET = "cake-images";
