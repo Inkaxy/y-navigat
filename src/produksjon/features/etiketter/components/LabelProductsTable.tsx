@@ -22,6 +22,7 @@ import type { LabelMode, LabelPrintModel, LabelProductRow } from "../types";
 import type { ProductionDepartment } from "@/produksjon/features/produksjonsavdelinger/types";
 import type { LabelPrintProfile } from "@/produksjon/features/utskriftsprofiler/types";
 import { useLabelFieldCatalog } from "@/produksjon/features/utskriftsprofiler/hooks/useLabelFieldCatalog";
+import { formatNumberRanges, type LabelUnit } from "../hooks/useLabelUnits";
 
 interface Props {
   rows: LabelProductRow[] | undefined;
@@ -33,6 +34,8 @@ interface Props {
   profiles?: LabelPrintProfile[];
   /** product_id -> liste med etikettfelter som mangler verdi. */
   missingFieldsByProduct?: Record<string, string[]>;
+  /** product_id -> etikett-enheter (numre) for valgt dato. */
+  unitsByProduct?: Record<string, LabelUnit[]>;
   onPrint?: (row: LabelProductRow) => void;
   onPickProfile?: (row: LabelProductRow) => void;
 }
@@ -112,6 +115,7 @@ export function LabelProductsTable({
   productProfiles,
   profiles,
   missingFieldsByProduct,
+  unitsByProduct,
   onPrint,
   onPickProfile,
 }: Props) {
@@ -149,6 +153,7 @@ export function LabelProductsTable({
           <TableRow>
             <TableHead className="w-16">Nr</TableHead>
             <TableHead>Navn</TableHead>
+            <TableHead>Etikett-nr</TableHead>
             <TableHead>Modus</TableHead>
             <TableHead>Print</TableHead>
             <TableHead>Profil</TableHead>
@@ -170,6 +175,9 @@ export function LabelProductsTable({
                   {row.display_name}
                   <MissingFieldsBadge fields={missingFieldsByProduct?.[row.product_id]} />
                 </span>
+              </TableCell>
+              <TableCell>
+                <LabelNumbersCell units={unitsByProduct?.[row.product_id]} />
               </TableCell>
               <TableCell>
                 <ModeBadge mode={row.label_mode} />
@@ -211,7 +219,7 @@ export function LabelProductsTable({
                 <NotesBadge notes={row.unique_notes ?? []} />
               </TableCell>
               <TableCell>
-                <span className="text-xs text-muted-foreground">Ikke skrevet</span>
+                <PrintStatusCell units={unitsByProduct?.[row.product_id]} />
               </TableCell>
               <TableCell>
                 <Button
@@ -230,6 +238,52 @@ export function LabelProductsTable({
         </TableBody>
       </Table>
     </Card>
+  );
+}
+
+function LabelNumbersCell({ units }: { units?: LabelUnit[] }) {
+  if (!units || units.length === 0)
+    return <span className="text-xs text-muted-foreground">—</span>;
+  const active = units.filter((u) => u.status !== "cancelled");
+  const cancelled = units.filter((u) => u.status === "cancelled");
+  return (
+    <div className="space-y-0.5">
+      <span className="font-mono font-semibold tabular-nums">
+        {formatNumberRanges(active.map((u) => u.number))}
+      </span>
+      {cancelled.length > 0 && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="block font-mono text-xs text-muted-foreground line-through">
+              {formatNumberRanges(cancelled.map((u) => u.number))}
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>
+            Kansellerte etiketter — numrene blir hull i serien
+          </TooltipContent>
+        </Tooltip>
+      )}
+    </div>
+  );
+}
+
+function PrintStatusCell({ units }: { units?: LabelUnit[] }) {
+  const active = (units ?? []).filter((u) => u.status !== "cancelled");
+  if (active.length === 0)
+    return <span className="text-xs text-muted-foreground">Ikke skrevet</span>;
+  const printed = active.filter((u) => u.status === "printed").length;
+  if (printed === 0)
+    return <span className="text-xs text-muted-foreground">Ikke skrevet</span>;
+  if (printed === active.length)
+    return (
+      <Badge variant="secondary" className="font-normal">
+        Skrevet ut
+      </Badge>
+    );
+  return (
+    <Badge variant="outline" className="font-normal">
+      {printed} av {active.length} skrevet ut
+    </Badge>
   );
 }
 
