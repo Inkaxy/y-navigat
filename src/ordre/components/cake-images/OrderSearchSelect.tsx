@@ -71,7 +71,7 @@ export function OrderSearchSelect({
             )
             .order("delivery_date", { ascending: false })
             .limit(8);
-          rows.push(...((((c.data ?? []) as never) as Row[]) ?? []));
+          rows.push(...(((c.data ?? []) as never) as Row[]));
         }
         const nameById = new Map(customers.map((c) => [c.id, c.display_name ?? ""]));
         const merged = new Map<string, OrderHit>();
