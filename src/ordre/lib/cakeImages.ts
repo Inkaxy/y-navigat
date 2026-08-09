@@ -109,6 +109,7 @@ export async function createCakeImage(input: {
   source?: CakeImageSource;
   customer_name?: string | null;
   ticket_id?: string | null;
+  ticket_attachment_id?: string | null;
   order_id?: string | null;
   order_line_id?: string | null;
   production_department_id?: string | null;
@@ -146,6 +147,7 @@ export async function createCakeImage(input: {
       source: input.source ?? "upload",
       customer_name: input.customer_name ?? null,
       ticket_id: input.ticket_id ?? null,
+      ticket_attachment_id: input.ticket_attachment_id ?? null,
       order_id: input.order_id ?? null,
       order_line_id: input.order_line_id ?? null,
       production_department_id: input.production_department_id ?? null,
@@ -164,13 +166,15 @@ export async function createCakeImage(input: {
 /**
  * Last ned ticket-vedlegg via signert URL, last opp i cake-images bucket
  * med samme sti-mønster som uploadOriginal, og opprett cake_images-rad
- * med source='ticket'. Brukes når en ordre opprettes fra en samtale.
+ * med source='ticket' og `ticket_attachment_id` satt (unik indeks hindrer
+ * duplikater). Ordre er valgfritt — vedlegget kan legges i kakeprint-køen
+ * før henvendelsen har fått en ordre.
  */
 export async function createCakeImageFromTicketAttachment(input: {
   attachment_id: string;
   file_name: string;
   ticket_id: string;
-  order_id: string;
+  order_id?: string | null;
   order_line_id?: string | null;
   production_department_id?: string | null;
   delivery_date: string;
@@ -179,6 +183,11 @@ export async function createCakeImageFromTicketAttachment(input: {
   order_ref?: string | null;
   notes?: string | null;
 }): Promise<CakeImage> {
+  // 0) Allerede i køen? Unik indeks i basen — men vis eksisterende rad i stedet
+  //    for å feile på duplikatnøkkel.
+  const existing = await findCakeImageByTicketAttachment(input.attachment_id);
+  if (existing) return existing;
+
   // 1) Hent signert URL fra edge-funksjonen
   const { data: signed, error: sErr } = await supabase.functions.invoke(
     "ticket-attachment-signed-url",
@@ -206,13 +215,100 @@ export async function createCakeImageFromTicketAttachment(input: {
     source: "ticket",
     customer_name: input.customer_name ?? null,
     ticket_id: input.ticket_id,
-    order_id: input.order_id,
+    ticket_attachment_id: input.attachment_id,
+    order_id: input.order_id ?? null,
     order_line_id: input.order_line_id ?? null,
     production_department_id: input.production_department_id ?? null,
     order_ref: input.order_ref ?? null,
     notes: input.notes ?? null,
   });
 }
+
+/** Kakebildet som allerede er laget fra et gitt ticket-vedlegg, hvis det finnes. */
+export async function findCakeImageByTicketAttachment(
+  attachmentId: string,
+): Promise<CakeImage | null> {
+  const { data, error } = await supabase
+    .from("cake_images")
+    .select("*")
+    .eq("ticket_attachment_id", attachmentId)
+    .maybeSingle();
+  if (error) return null;
+  return (data as CakeImage | null) ?? null;
+}
+
+/** Slår opp kakebilder for flere vedlegg samtidig (nøkkel = ticket_attachment_id). */
+export async function fetchCakeImagesForAttachments(
+  attachmentIds: string[],
+): Promise<Record<string, CakeImage>> {
+  if (attachmentIds.length === 0) return {};
+  const { data, error } = await supabase
+    .from("cake_images")
+    .select("*")
+    .in("ticket_attachment_id", attachmentIds);
+  if (error) return {};
+  const map: Record<string, CakeImage> = {};
+  for (const row of (data ?? []) as CakeImage[]) {
+    const key = (row as { ticket_attachment_id?: string | null }).ticket_attachment_id;
+    if (key) map[key] = row;
+  }
+  return map;
+}
+
+/**
+ * Når en henvendelse kobles til en ordre i etterkant: oppdater kakebilder
+ * som ble laget uten ordre med ordre, ordrenummer og leveringsdato — og
+ * etikett-enhet når kake-ordrelinjen er kjent.
+ */
+export async function attachTicketCakeImagesToOrder(input: {
+  ticket_id: string;
+  order_id: string;
+  order_number?: string | null;
+  delivery_date: string;
+}): Promise<number> {
+  const { data, error } = await supabase
+    .from("cake_images")
+    .select("id")
+    .eq("ticket_id", input.ticket_id)
+    .is("order_id", null);
+  if (error) return 0;
+  const rows = (data ?? []) as { id: string }[];
+  if (rows.length === 0) return 0;
+
+  const cakeLine = await findCakeLineForOrder(input.order_id).catch(() => null);
+  let labelUnitId: string | null = null;
+  let labelNumber: string | null = null;
+  if (cakeLine?.order_line_id) {
+    const unit = await findLabelUnitForOrderLine(
+      cakeLine.order_line_id,
+      input.delivery_date,
+    ).catch(() => null);
+    if (unit) {
+      labelUnitId = unit.id;
+      labelNumber = String(unit.number);
+    }
+  }
+
+  const { error: uErr } = await supabase
+    .from("cake_images")
+    .update({
+      order_id: input.order_id,
+      order_ref: input.order_number ?? null,
+      delivery_date: input.delivery_date,
+      order_line_id: cakeLine?.order_line_id ?? null,
+      production_department_id: cakeLine?.production_department_id ?? null,
+      label_unit_id: labelUnitId,
+      label_number: labelNumber,
+    } as never)
+    .in(
+      "id",
+      rows.map((r) => r.id),
+    );
+  if (uErr) return 0;
+  return rows.length;
+}
+
+
 
 /**
  * Finn første kake-ordrelinje for ordren og tilhørende produksjonsavdeling
