@@ -526,7 +526,14 @@ export default function TicketDetail() {
       items.push({
         kind: "email",
         at: ticket.received_at,
-        node: <IncomingEmail ticket={ticket} attachments={attachmentsByCreated} onOpen={setLightbox} />,
+        node: (
+          <IncomingEmail
+            ticket={ticket}
+            attachments={attachmentsByCreated}
+            onOpen={setLightbox}
+            order={linked?.order ?? null}
+          />
+        ),
       });
     }
     for (const r of replies) {
