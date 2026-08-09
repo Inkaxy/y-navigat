@@ -140,6 +140,19 @@ export default function CakeImagesList() {
         </div>
       )}
 
+      {missingOrderCount > 0 && (
+        <div className="flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>
+            <strong>{missingOrderCount}</strong> bilde(r) mangler ordrekobling og
+            har derfor ikke etikettnummer. Bruk «Koble til ordre» på kortet for å
+            koble dem — ellers kan de ikke pares med kaken i produksjonen.
+          </span>
+        </div>
+      )}
+
+
+
 
       <div
         role="tablist"
