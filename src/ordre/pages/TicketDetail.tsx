@@ -837,7 +837,7 @@ export default function TicketDetail() {
                     ))}
                   </div>
                 )}
-                {intent === "new_order" && !linked?.order && id && (
+                {!linked?.order && id && (
                   <CreateOrderFromTicketButton
                     ticket={ticket}
                     ai={ai}
