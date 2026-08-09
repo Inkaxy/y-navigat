@@ -13,7 +13,7 @@ import {
   type CakePrintItem,
 } from "@/ordre/lib/cakePrint";
 import { useCakeFormats } from "@/ordre/hooks/useCakeFormats";
-import { useCakePrintScale } from "@/ordre/hooks/useCakeCalibration";
+import { useCakePrinterSelection } from "@/ordre/hooks/useCakeCalibration";
 import { CalibratePrinterDialog } from "@/ordre/components/cake-images/CalibratePrinterDialog";
 import { Button } from "@/components/ui/button";
 
@@ -33,7 +33,17 @@ export default function CakeImagesPrint() {
   );
   const auto = params.get("auto") === "1";
   const { data: formats = [] } = useCakeFormats();
-  const scale = useCakePrintScale();
+  const {
+    calibrations,
+    printerLabel,
+    selectPrinter,
+    scaleX,
+    scaleY,
+    scaleXPct,
+    scaleYPct,
+    isCalibrated,
+  } = useCakePrinterSelection();
+  const scale = scaleX;
   const [rows, setRows] = useState<{ image: CakeImage; url: string }[] | null>(
     null,
   );
@@ -87,9 +97,9 @@ export default function CakeImagesPrint() {
     if (!host) return;
     host.replaceChildren();
     for (const item of items) {
-      host.appendChild(buildCakeSheet(document, item, scale));
+      host.appendChild(buildCakeSheet(document, item, scale, scaleY));
     }
-  }, [items, scale]);
+  }, [items, scale, scaleY]);
 
   /** Bare ekte utskrift setter status — derfor onafterprint, ikke knappetrykket. */
   const registerPrinted = async () => {
@@ -97,8 +107,9 @@ export default function CakeImagesPrint() {
     const fresh = rows.filter((r) => r.image.status !== "skrevet_ut").map((r) => r.image.id);
     const again = rows.filter((r) => r.image.status === "skrevet_ut").map((r) => r.image.id);
     try {
-      if (fresh.length) await markPrinted(fresh, "print");
-      if (again.length) await markPrinted(again, "reprint");
+      const printerMeta = { printerLabel, scaleAppliedPct: scaleXPct };
+      if (fresh.length) await markPrinted(fresh, "print", "A4", null, printerMeta);
+      if (again.length) await markPrinted(again, "reprint", "A4", null, printerMeta);
       toast.success(`${rows.length} kakebilde(r) registrert som skrevet ut`);
     } catch (e) {
       console.error("[CakeImagesPrint] kunne ikke registrere utskrift", e);
@@ -111,6 +122,7 @@ export default function CakeImagesPrint() {
     try {
       await openCakePrintWindow(items, {
         scale,
+        scaleY,
         title: "Kakebilder",
         onPrinted: () => void registerPrinted(),
       });
@@ -129,11 +141,14 @@ export default function CakeImagesPrint() {
 
   const downloadPdf = async () => {
     if (items.length === 0) return;
-    await cakeSheetsToPdf(items, { scale, fileName: "kakebilder.pdf" });
+    await cakeSheetsToPdf(items, { scale, scaleY, fileName: "kakebilder.pdf" });
     // PDF er ikke papir: logges, men flytter ikke status.
     await markPrinted(
       items.map((i) => i.image!.id),
       "pdf",
+      "A4",
+      null,
+      { printerLabel, scaleAppliedPct: scaleXPct },
     );
     toast.success("PDF lastet ned (status er uendret)");
   };
@@ -168,11 +183,28 @@ export default function CakeImagesPrint() {
         <div className="ml-2 text-sm font-semibold">
           {rows.length} kakebilde(r) — A4, faktisk størrelse
         </div>
-        {scale !== 1 && (
-          <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">
-            Kalibrert ×{scale}
-          </span>
-        )}
+        <select
+          className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+          value={printerLabel ?? ""}
+          onChange={(e) => selectPrinter(e.target.value || null)}
+          aria-label="Skriver"
+        >
+          <option value="">Velg skriver…</option>
+          {calibrations.map((c) => (
+            <option key={c.id} value={c.printer_label}>
+              {c.printer_label}
+              {c.is_default ? " (standard)" : ""}
+            </option>
+          ))}
+          {printerLabel && !calibrations.some((c) => c.printer_label === printerLabel) && (
+            <option value={printerLabel}>{printerLabel}</option>
+          )}
+        </select>
+        <span className="text-xs text-muted-foreground">
+          {isCalibrated
+            ? `Korreksjon ${scaleXPct} % × ${scaleYPct} %`
+            : "Skriveren er ikke kalibrert ennå — skriver ut i 100 %."}
+        </span>
         <div className="ml-auto flex gap-2">
           <Button variant="outline" size="sm" onClick={() => setCalibrateOpen(true)}>
             <Ruler className="mr-2 h-4 w-4" />
