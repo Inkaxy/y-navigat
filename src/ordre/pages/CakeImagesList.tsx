@@ -71,6 +71,12 @@ export default function CakeImagesList() {
     [images],
   );
 
+  const missingOrderCount = useMemo(
+    () => images.filter((i) => !i.order_id).length,
+    [images],
+  );
+
+
   const printAllReady = () => {
     if (readyIds.length === 0) return;
     window.open(
