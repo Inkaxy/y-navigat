@@ -16,7 +16,6 @@ import {
 import { toast } from "sonner";
 import {
   useInsertLabelPrintJob,
-  useNextLabelNumber,
   useRecentLabelJobs,
   type LabelPrintJob,
 } from "../hooks/useLabelPrintJobs";
@@ -39,18 +38,14 @@ const STATUS_META: Record<
 
 export function RecentLabelJobs({ deptId, department, legalEntityId }: Props) {
   const { data, isLoading } = useRecentLabelJobs(deptId, legalEntityId);
-  const nextNumber = useNextLabelNumber();
   const insertJob = useInsertLabelPrintJob();
 
   const handleReprint = async (job: LabelPrintJob) => {
     try {
-      const newNumber = await nextNumber.mutateAsync({
-        deptId: job.production_department_id,
-        productId: job.product_id,
-        orderLineId: job.order_line_id,
-      });
+      // Reprint beholder etikettens nummer — det tildeles ikke på nytt.
       await insertJob.mutateAsync({
-        label_number: newNumber,
+        label_number: job.label_number,
+        label_unit_id: job.label_unit_id ?? null,
         product_id: job.product_id,
         order_line_id: job.order_line_id,
         legal_entity_id: job.legal_entity_id,
@@ -59,7 +54,7 @@ export function RecentLabelJobs({ deptId, department, legalEntityId }: Props) {
         printer_name: job.printer_name,
         status: "reprinted",
       });
-      toast.success(`Reprint ${newNumber} ferdig`);
+      toast.success(`Reprint ${job.label_number} ferdig`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Reprint feilet";
       toast.error(msg);
@@ -144,7 +139,7 @@ export function RecentLabelJobs({ deptId, department, legalEntityId }: Props) {
                     variant="ghost"
                     className="gap-1 text-xs"
                     onClick={() => handleReprint(job)}
-                    disabled={nextNumber.isPending || insertJob.isPending}
+                    disabled={insertJob.isPending}
                   >
                     <RotateCw className="h-3 w-3" />
                     Reprint

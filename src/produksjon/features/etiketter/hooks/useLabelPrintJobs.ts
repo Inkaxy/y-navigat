@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 export interface LabelPrintJob {
   id: string;
   label_number: string;
+  label_unit_id?: string | null;
   product_id: string;
   order_line_id: string | null;
   legal_entity_id: string;
@@ -57,7 +58,7 @@ export function useRecentLabelJobs(
       const { data, error } = await supabase
         .from("label_print_jobs")
         .select(
-          "id, label_number, product_id, order_line_id, legal_entity_id, production_department_id, quantity, printer_name, printed_by, printed_at, status, product:products!label_print_jobs_product_id_fkey(display_name, display_number)",
+          "id, label_number, label_unit_id, product_id, order_line_id, legal_entity_id, production_department_id, quantity, printer_name, printed_by, printed_at, status, product:products!label_print_jobs_product_id_fkey(display_name, display_number)",
         )
         .eq("production_department_id", deptId!)
         .order("printed_at", { ascending: false })
