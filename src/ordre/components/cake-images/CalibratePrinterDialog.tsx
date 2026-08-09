@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Ruler } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -12,20 +12,26 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import {
   CALIBRATION_MM,
   CAKE_PRINT_CSS,
   calibrationSheetHtml,
 } from "@/ordre/lib/cakePrint";
 import {
+  correctionPct,
+  correctionSentence,
   useCakeCalibrations,
+  useCakePrinterSelection,
   useSaveCakeCalibration,
 } from "@/ordre/hooks/useCakeCalibration";
+import { logCalibrationTestPrint } from "@/ordre/lib/cakeImages";
 
 /**
- * Kalibrering per skriver. Vi skriver ut et kvadrat på 100 mm, brukeren måler
- * det med linjal, og korreksjonsfaktoren lagres slik at 200 mm faktisk blir
- * 200 mm på sukkerpapiret.
+ * Kalibrering per skriver. Vi skriver ut et kvadrat på 100 × 100 mm, brukeren
+ * måler det med linjal i begge retninger, og korreksjonen
+ * `target_mm / measured_mm × 100` lagres i prosent.
  */
 export function CalibratePrinterDialog({
   open,
@@ -35,11 +41,32 @@ export function CalibratePrinterDialog({
   onOpenChange: (v: boolean) => void;
 }) {
   const { data: calibrations = [] } = useCakeCalibrations();
+  const { printerLabel, selectPrinter } = useCakePrinterSelection();
   const save = useSaveCakeCalibration();
-  const [printer, setPrinter] = useState("Standardskriver");
-  const [measured, setMeasured] = useState("");
+  const [printer, setPrinter] = useState("");
+  const [measuredX, setMeasuredX] = useState("");
+  const [measuredY, setMeasuredY] = useState("");
+  const [isDefault, setIsDefault] = useState(false);
+  const [note, setNote] = useState("");
 
-  const printTestSheet = () => {
+  useEffect(() => {
+    if (open) setPrinter(printerLabel ?? "");
+  }, [open, printerLabel]);
+
+  const parse = (v: string) => Number(v.replace(",", "."));
+  const mx = parse(measuredX);
+  const my = parse(measuredY);
+
+  const preview = useMemo(() => {
+    const rows: Array<{ label: string; pct: number }> = [];
+    if (Number.isFinite(mx) && mx > 0)
+      rows.push({ label: "Bredde", pct: correctionPct(CALIBRATION_MM, mx) });
+    if (Number.isFinite(my) && my > 0)
+      rows.push({ label: "Høyde", pct: correctionPct(CALIBRATION_MM, my) });
+    return rows;
+  }, [mx, my]);
+
+  const printTestSheet = async () => {
     const w = window.open("", "_blank", "width=900,height=1100");
     if (!w) {
       toast.error("Nettleseren blokkerte utskriftsvinduet");
@@ -49,26 +76,41 @@ export function CalibratePrinterDialog({
     style.textContent = CAKE_PRINT_CSS;
     w.document.head.appendChild(style);
     w.document.body.appendChild(calibrationSheetHtml(w.document));
+    w.onafterprint = () => {
+      void logCalibrationTestPrint(printer.trim() || printerLabel || "Ukjent skriver");
+    };
     w.focus();
     w.print();
   };
 
   const onSave = async () => {
-    const m = Number(measured.replace(",", "."));
-    if (!printer.trim() || !Number.isFinite(m) || m <= 0) {
-      toast.error("Fyll inn skrivernavn og målt lengde");
+    if (!printer.trim()) {
+      toast.error("Gi skriveren et navn");
       return;
     }
-    if (Math.abs(m - CALIBRATION_MM) / CALIBRATION_MM > 0.15) {
+    if (!Number.isFinite(mx) || mx <= 0 || !Number.isFinite(my) || my <= 0) {
+      toast.error("Fyll inn hva du målte i begge retninger");
+      return;
+    }
+    if (
+      Math.abs(mx - CALIBRATION_MM) / CALIBRATION_MM > 0.15 ||
+      Math.abs(my - CALIBRATION_MM) / CALIBRATION_MM > 0.15
+    ) {
       toast.error("Målet avviker mer enn 15 % — kontroller at du målte kvadratet");
       return;
     }
-    const factor = await save.mutateAsync({
-      printer_name: printer.trim(),
-      expected_mm: CALIBRATION_MM,
-      measured_mm: m,
+    const res = await save.mutateAsync({
+      printer_label: printer.trim(),
+      target_mm: CALIBRATION_MM,
+      measured_x_mm: mx,
+      measured_y_mm: my,
+      is_default: isDefault,
+      note: note.trim() || null,
     });
-    toast.success(`Korreksjonsfaktor lagret: ×${Math.round(factor * 10000) / 10000}`);
+    selectPrinter(printer.trim());
+    toast.success(
+      `Kalibrering lagret: ${res.scale_x_pct} % × ${res.scale_y_pct} %`,
+    );
     onOpenChange(false);
   };
 
@@ -87,9 +129,6 @@ export function CalibratePrinterDialog({
         </DialogHeader>
 
         <div className="space-y-3">
-          <Button variant="outline" className="w-full" onClick={printTestSheet}>
-            Skriv ut testark ({CALIBRATION_MM} × {CALIBRATION_MM} mm)
-          </Button>
           <div className="space-y-1.5">
             <Label htmlFor="cal-printer">Skriver</Label>
             <Input
@@ -99,14 +138,74 @@ export function CalibratePrinterDialog({
               placeholder="F.eks. Epson konditori"
             />
           </div>
+
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={() => void printTestSheet()}
+          >
+            Skriv ut testark ({CALIBRATION_MM} × {CALIBRATION_MM} mm + 50 mm skala)
+          </Button>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="cal-x">Målt bredde (mm)</Label>
+              <Input
+                id="cal-x"
+                inputMode="decimal"
+                value={measuredX}
+                onChange={(e) => setMeasuredX(e.target.value)}
+                placeholder={String(CALIBRATION_MM)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="cal-y">Målt høyde (mm)</Label>
+              <Input
+                id="cal-y"
+                inputMode="decimal"
+                value={measuredY}
+                onChange={(e) => setMeasuredY(e.target.value)}
+                placeholder={String(CALIBRATION_MM)}
+              />
+            </div>
+          </div>
+
+          {preview.length > 0 && (
+            <div className="rounded-lg border bg-muted/40 p-3 text-sm">
+              {preview.map((r) => (
+                <div key={r.label} className="flex items-baseline justify-between">
+                  <span className="text-muted-foreground">{r.label}</span>
+                  <span className="font-semibold tabular-nums">
+                    {r.pct.toLocaleString("nb-NO", { maximumFractionDigits: 2 })} %
+                  </span>
+                </div>
+              ))}
+              <p className="mt-2 text-xs text-muted-foreground">
+                {correctionSentence(preview[0].pct)}
+              </p>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between rounded-lg border p-3">
+            <div>
+              <Label htmlFor="cal-default" className="text-sm">
+                Standardskriver
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Velges automatisk på nye maskiner.
+              </p>
+            </div>
+            <Switch id="cal-default" checked={isDefault} onCheckedChange={setIsDefault} />
+          </div>
+
           <div className="space-y-1.5">
-            <Label htmlFor="cal-measured">Målt lengde (mm)</Label>
-            <Input
-              id="cal-measured"
-              inputMode="decimal"
-              value={measured}
-              onChange={(e) => setMeasured(e.target.value)}
-              placeholder={String(CALIBRATION_MM)}
+            <Label htmlFor="cal-note">Merknad</Label>
+            <Textarea
+              id="cal-note"
+              rows={2}
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="F.eks. hvilket papir og hvilken driverinnstilling som ble brukt"
             />
           </div>
 
@@ -116,8 +215,8 @@ export function CalibratePrinterDialog({
               <ul className="space-y-0.5 text-muted-foreground">
                 {calibrations.map((c) => (
                   <li key={c.id}>
-                    {c.printer_name}: målt {c.measured_mm} mm → ×{c.scale_factor}
-                    {c.is_active ? " (aktiv)" : ""}
+                    {c.printer_label}: {c.scale_x_pct} % × {c.scale_y_pct} %
+                    {c.is_default ? " (standard)" : ""}
                   </li>
                 ))}
               </ul>
