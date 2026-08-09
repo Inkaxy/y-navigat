@@ -555,3 +555,56 @@ export function statusLabel(s: CakeImageStatus) {
       return "Skrevet ut";
   }
 }
+
+/**
+ * Koble et enkelt kakebilde til en ordre i ettertid: setter ordre, ordrenummer,
+ * leveringsdato fra ordren og etikett-enhet/-nummer når kake-ordrelinjen finnes.
+ */
+export async function linkCakeImageToOrder(
+  imageId: string,
+  orderId: string,
+): Promise<{ delivery_date: string | null; label_number: string | null }> {
+  const { data: ord, error: ordErr } = await supabase
+    .from("orders")
+    .select("id, order_number, delivery_date")
+    .eq("id", orderId)
+    .maybeSingle();
+  if (ordErr) throw ordErr;
+  const order = ord as {
+    order_number: string;
+    delivery_date: string | null;
+  } | null;
+  if (!order) throw new Error("Fant ikke ordren");
+
+  const cakeLine = await findCakeLineForOrder(orderId).catch(() => null);
+  let labelUnitId: string | null = null;
+  let labelNumber: string | null = null;
+  if (cakeLine?.order_line_id && order.delivery_date) {
+    const unit = await findLabelUnitForOrderLine(
+      cakeLine.order_line_id,
+      order.delivery_date,
+    ).catch(() => null);
+    if (unit) {
+      labelUnitId = unit.id;
+      labelNumber = String(unit.number);
+    }
+  }
+
+  const patch: Record<string, unknown> = {
+    order_id: orderId,
+    order_ref: order.order_number,
+    order_line_id: cakeLine?.order_line_id ?? null,
+    production_department_id: cakeLine?.production_department_id ?? null,
+    label_unit_id: labelUnitId,
+    label_number: labelNumber,
+  };
+  if (order.delivery_date) patch.delivery_date = order.delivery_date;
+
+  const { error } = await supabase
+    .from("cake_images")
+    .update(patch as never)
+    .eq("id", imageId);
+  if (error) throw error;
+
+  return { delivery_date: order.delivery_date, label_number: labelNumber };
+}

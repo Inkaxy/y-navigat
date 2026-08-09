@@ -1,16 +1,19 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
-import { CheckCircle2, ImageIcon, Pencil } from "lucide-react";
+import { CheckCircle2, ImageIcon, Pencil, Link as LinkIcon, AlertTriangle } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { type CakeImage, statusLabel } from "@/ordre/lib/cakeImages";
+import { LinkCakeImageOrderDialog } from "@/ordre/components/cake-images/LinkCakeImageOrderDialog";
 
 const STATUS_TONE: Record<CakeImage["status"], string> = {
   venter: "bg-amber-100 text-amber-900 border-amber-300",
   ferdig_redigert: "bg-emerald-100 text-emerald-900 border-emerald-300",
   skrevet_ut: "bg-muted text-muted-foreground border-border",
 };
+
 
 export function CakeImageCard({
   image,
@@ -23,7 +26,10 @@ export function CakeImageCard({
   selected: boolean;
   onToggle: (id: string, on: boolean) => void;
 }) {
+  const [linkOpen, setLinkOpen] = useState(false);
+  const missingOrder = !image.order_id;
   return (
+
     <div
       className={cn(
         "group relative flex flex-col overflow-hidden rounded-xl border bg-card shadow-sm transition",
@@ -92,6 +98,27 @@ export function CakeImageCard({
           </Badge>
         </div>
 
+        {missingOrder && (
+          <div className="mt-1 space-y-1.5 rounded-md border border-amber-300 bg-amber-50 p-2">
+            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-amber-900">
+              <AlertTriangle className="h-3.5 w-3.5" />
+              Mangler ordrekobling
+            </div>
+            <p className="text-[11px] leading-snug text-amber-900/80">
+              Uten ordre får bildet ikke etikettnummer og kan ikke pares med kaken.
+            </p>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 w-full px-2 text-[11px]"
+              onClick={() => setLinkOpen(true)}
+            >
+              <LinkIcon className="mr-1 h-3.5 w-3.5" />
+              Koble til ordre
+            </Button>
+          </div>
+        )}
+
         <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground">
           <span>
             {image.print_count > 0 ? `Skrevet ut ${image.print_count}×` : "—"}
@@ -104,6 +131,15 @@ export function CakeImageCard({
           </Button>
         </div>
       </div>
+
+      {linkOpen && (
+        <LinkCakeImageOrderDialog
+          image={image}
+          open={linkOpen}
+          onOpenChange={setLinkOpen}
+        />
+      )}
     </div>
   );
 }
+
