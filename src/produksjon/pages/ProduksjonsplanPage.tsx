@@ -452,6 +452,7 @@ export default function ProduksjonsplanPage() {
                 showTraysWithPlus={prefs.showTraysWithPlus}
                 loading={plan.isLoading}
                 columns={cols}
+                deliveryDate={dateISO}
               />
               {counts && (
                 <p className="text-xs text-muted-foreground mt-2">
@@ -495,6 +496,7 @@ export default function ProduksjonsplanPage() {
                       showTraysWithPlus={prefs.showTraysWithPlus}
                       loading={false}
                       columns={cols}
+                      deliveryDate={dateISO}
                     />
                   )}
                   {counts && (
