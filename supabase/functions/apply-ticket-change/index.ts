@@ -117,7 +117,7 @@ Deno.serve(async (req) => {
     if (!linked) return jsonErr("Ordren er ikke koblet til denne saken", 403);
 
     const { data: order } = await admin.from("orders")
-      .select("id,order_number,status,customer_id,delivery_date,delivery_time,customer_notes,internal_notes,delivery_address_line1,delivery_address_line2,delivery_postal_code,delivery_city,legal_entity_id")
+      .select("id,order_number,status,customer_id,delivery_date,delivery_time,distribution,delivery_tour_id,pickup_location_id,final_customer_name,final_customer_email,final_customer_phone,customer_notes,internal_notes,production_notes,store_notes,cake_payload,delivery_address_line1,delivery_address_line2,delivery_postal_code,delivery_city,legal_entity_id")
       .eq("id", order_id).maybeSingle();
     if (!order) return jsonErr("Ordre ikke funnet", 404);
 
