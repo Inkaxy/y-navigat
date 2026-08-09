@@ -46,6 +46,8 @@ import type { TicketAttachment } from "@/ordre/hooks/useTickets";
 import ChangeIntentCard from "@/ordre/components/tickets/ChangeIntentCard";
 import LinkOrderSearch from "@/ordre/components/tickets/LinkOrderSearch";
 import CreateOrderFromTicketButton from "@/ordre/components/tickets/CreateOrderFromTicketButton";
+import AttachmentCakePrintButton from "@/ordre/components/tickets/AttachmentCakePrintButton";
+import EditLinkedOrderButton from "@/ordre/components/tickets/EditLinkedOrderButton";
 import TicketComposerActions from "@/ordre/components/tickets/TicketComposerActions";
 import { CakeImageStatusCard } from "@/ordre/components/orders/CakeImageStatusCard";
 import { useInboundMessages, type InboundMessage } from "@/ordre/hooks/useInboundMessages";
