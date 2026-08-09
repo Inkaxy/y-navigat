@@ -837,18 +837,7 @@ export default function TicketDetail() {
                     ))}
                   </div>
                 )}
-                {!linked?.order && id && (
-                  <CreateOrderFromTicketButton
-                    ticket={ticket}
-                    ai={ai}
-                    attachments={attachments}
-                    onCreated={() => {
-                      qc.invalidateQueries({ queryKey: ["ticket", id] });
-                      qc.invalidateQueries({ queryKey: ["ticket-events", id] });
-                      qc.invalidateQueries({ queryKey: ["cake-images-for", id] });
-                    }}
-                  />
-                )}
+                {/* Opprett ordre ligger i «Ordre»-kortet under — alltid tilgjengelig */}
               </div>
             </SideCard>
           )}
