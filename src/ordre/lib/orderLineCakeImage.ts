@@ -1,5 +1,10 @@
 import { supabase } from "@/integrations/supabase/client";
-import { CAKE_BUCKET, uploadOriginal, type CakeImage } from "./cakeImages";
+import {
+  CAKE_BUCKET,
+  findLabelUnitForOrderLine,
+  uploadOriginal,
+  type CakeImage,
+} from "./cakeImages";
 
 /** Nøkkel i `merknad` der stien til et opplastet, ennå ikke koblet, kakebilde lagres. */
 export const PENDING_CAKE_IMAGE_KEY = "pending_cake_image_path";
@@ -27,7 +32,28 @@ export async function attachCakeImageToOrderLine(
     ...(notes ? { p_notes: notes } : {}),
   });
   if (error) throw error;
-  return data as string;
+  const imageId = data as string;
+
+  // Koble bildet til etikett-enheten slik at det deler nummer med etiketten.
+  try {
+    const row = await fetchCakeImageForLine(orderLineId);
+    if (row && !row.label_unit_id) {
+      const unit = await findLabelUnitForOrderLine(orderLineId, row.delivery_date);
+      if (unit) {
+        await supabase
+          .from("cake_images")
+          .update({
+            label_unit_id: unit.id,
+            label_number: String(unit.number),
+          } as never)
+          .eq("id", row.id);
+      }
+    }
+  } catch (err) {
+    console.warn("[cake_images] Kunne ikke koble bilde til etikett-enhet", err);
+  }
+
+  return imageId;
 }
 
 export async function fetchCakeImageForLine(
