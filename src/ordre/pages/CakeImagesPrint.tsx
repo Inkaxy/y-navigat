@@ -177,10 +177,24 @@ export default function CakeImagesPrint() {
             </div>
           )}
           {it.url ? (
-            <img src={it.url} alt={it.image.title} />
+            <img
+              src={it.url}
+              alt={it.image.title}
+              style={
+                it.image.width_mm && it.image.height_mm
+                  ? {
+                      width: `${it.image.width_mm}mm`,
+                      height: `${it.image.height_mm}mm`,
+                      maxWidth: "none",
+                      maxHeight: "none",
+                    }
+                  : undefined
+              }
+            />
           ) : (
             <span className="text-muted-foreground">Mangler bilde</span>
           )}
+
         </div>
       ))}
     </div>
