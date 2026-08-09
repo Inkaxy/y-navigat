@@ -26,7 +26,10 @@ export function CakeImageCard({
   selected: boolean;
   onToggle: (id: string, on: boolean) => void;
 }) {
+  const [linkOpen, setLinkOpen] = useState(false);
+  const missingOrder = !image.order_id;
   return (
+
     <div
       className={cn(
         "group relative flex flex-col overflow-hidden rounded-xl border bg-card shadow-sm transition",
