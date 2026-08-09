@@ -977,10 +977,12 @@ function IncomingEmail({
   ticket,
   attachments,
   onOpen,
+  order,
 }: {
   ticket: NonNullable<ReturnType<typeof useTicket>["data"]>["ticket"];
   attachments: TicketAttachment[];
   onOpen: (x: { url: string; name: string }) => void;
+  order?: { id: string; order_number: string; delivery_date: string | null } | null;
 }) {
   if (!ticket) return null;
   const html = ticket.body_html ? sanitize(ticket.body_html) : null;
@@ -1017,6 +1019,10 @@ function IncomingEmail({
                 key={a.id}
                 att={a}
                 onOpen={(url, name) => onOpen({ url, name })}
+                ticketId={ticket.id}
+                ticketSubject={ticket.subject}
+                order={order}
+                customerName={ticket.sender_name ?? ticket.sender_email}
               />
             ))}
         </div>
