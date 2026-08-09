@@ -759,35 +759,125 @@ img { max-width:100%; max-height:100vh; }`;
         <aside className="overflow-y-auto border-r bg-background p-3">
           <Accordion type="multiple" defaultValue={["mal", "bilde", "tekst"]}>
             <AccordionItem value="mal">
-              <AccordionTrigger className="text-sm">Maler</AccordionTrigger>
+              <AccordionTrigger className="text-sm">
+                Format og størrelse
+              </AccordionTrigger>
               <AccordionContent>
                 <div className="grid grid-cols-2 gap-2">
-                  {TEMPLATES.map((t) => (
-                    <button
-                      key={t.id}
-                      onClick={() => setTemplate(t.id)}
-                      className={cn(
-                        "rounded-md border p-2 text-left text-xs hover:bg-accent",
-                        template === t.id && "border-primary ring-1 ring-primary",
-                      )}
-                    >
-                      <div
+                  {formats.map((f) => {
+                    const d = formatDims(f);
+                    return (
+                      <button
+                        key={f.id}
+                        onClick={() => setFormatId(f.id)}
                         className={cn(
-                          "mx-auto mb-1 border bg-muted",
-                          "circle" in t && t.circle ? "rounded-full" : "rounded-sm",
+                          "rounded-md border p-2 text-left text-xs hover:bg-accent",
+                          formatId === f.id && "border-primary ring-1 ring-primary",
                         )}
-                        style={{
-                          width: 60,
-                          height: (60 * t.h) / t.w,
-                          maxHeight: 60,
-                        }}
-                      />
-                      <div className="truncate">{t.label}</div>
-                    </button>
-                  ))}
+                      >
+                        <div
+                          className={cn(
+                            "mx-auto mb-1 border bg-muted",
+                            d.isRound ? "rounded-full" : "rounded-sm",
+                          )}
+                          style={{
+                            width: 60,
+                            height: (60 * d.heightMm) / (d.widthMm || 1),
+                            maxHeight: 60,
+                          }}
+                        />
+                        <div className="truncate font-medium">{f.name}</div>
+                        <div className="truncate text-[11px] text-muted-foreground">
+                          {d.isRound
+                            ? `Ø ${d.widthMm} mm`
+                            : `${d.widthMm} × ${d.heightMm} mm`}
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
+
+                {format && (
+                  <div className="mt-3 flex items-start gap-2 rounded-md border bg-muted/40 p-2 text-xs">
+                    <Ruler className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    <span>{formatSizeLabel(format)}</span>
+                  </div>
+                )}
+
+                {fit && !fit.fits && (
+                  <div className="mt-2 flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
+                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    <span>{fit.message}</span>
+                  </div>
+                )}
+
+                {dims.bleedMm > 0 && (
+                  <p className="mt-2 text-[11px] text-muted-foreground">
+                    {dims.bleedMm} mm utfallende sone rundt kanten klippes bort —
+                    la bildet gå helt ut, ellers blir det hvit rand.
+                  </p>
+                )}
               </AccordionContent>
             </AccordionItem>
+
+            <AccordionItem value="kvalitet">
+              <AccordionTrigger className="text-sm">
+                Kvalitet og rettigheter
+              </AccordionTrigger>
+              <AccordionContent className="space-y-3">
+                <div
+                  className={cn(
+                    "rounded-md border p-2 text-xs",
+                    qualityFlag === "lav"
+                      ? "border-destructive/40 bg-destructive/10 text-destructive"
+                      : qualityFlag === "akseptabel"
+                        ? "border-amber-300 bg-amber-50 text-amber-900"
+                        : "bg-muted/40",
+                  )}
+                >
+                  {qualityMessage(effectiveDpi, format)}
+                </div>
+
+                {qualityFlag === "lav" && (
+                  <label className="flex items-start gap-2 text-xs">
+                    <Checkbox
+                      checked={qualityAcked}
+                      onCheckedChange={(v) => {
+                        if (v) void ackQuality();
+                        else setQualityAcked(false);
+                      }}
+                    />
+                    <span>
+                      Jeg har sett oppløsningen og vil trykke bildet likevel.
+                    </span>
+                  </label>
+                )}
+
+                <Separator />
+
+                <label className="flex items-start gap-2 text-xs">
+                  <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  <Checkbox
+                    checked={rightsCleared}
+                    onCheckedChange={(v) => setRightsCleared(!!v)}
+                  />
+                  <span>Rettigheter avklart</span>
+                </label>
+                <Textarea
+                  value={rightsNote}
+                  onChange={(e) => setRightsNote(e.target.value)}
+                  rows={2}
+                  placeholder="Notat om rettigheter (hvem har godkjent, kilde …)"
+                  className="text-xs"
+                />
+                {!rightsAnswered && (
+                  <p className="text-[11px] text-muted-foreground">
+                    Ta stilling til rettighetene før bildet markeres ferdig.
+                  </p>
+                )}
+              </AccordionContent>
+            </AccordionItem>
+
 
             <AccordionItem value="bilde">
               <AccordionTrigger className="text-sm">Bilder</AccordionTrigger>
