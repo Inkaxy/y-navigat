@@ -29,12 +29,9 @@ interface Props {
   label?: string;
 }
 
-function edibleHint(a: TicketAttachment, ai: AiSuggestion | null): boolean {
-  if (!(a.content_type ?? "").startsWith("image/")) return false;
-  const summary = (a.ai_summary ?? "").toLowerCase();
-  if (/print|spiselig|trykk|sukkerpapir|kake/.test(summary)) return true;
-  if ((ai?.order_fields?.cake_text ?? "").trim().length > 0) return true;
-  return false;
+// Standard: bildevedlegg foreslås som spiselig print. Andre filtyper er kun referanse.
+function edibleHint(a: TicketAttachment, _ai: AiSuggestion | null): boolean {
+  return (a.content_type ?? "").startsWith("image/");
 }
 
 function buildInitialValues(
