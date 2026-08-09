@@ -675,14 +675,15 @@ img { max-width:100%; max-height:100vh; }`;
 
   const downloadPdf = async () => {
     const c = fabRef.current!;
-    const dataUrl = c.toDataURL({ format: "png", multiplier: 2 });
-    const orientation = tpl.w >= tpl.h ? "landscape" : "portrait";
-    const pdf = new jsPDF({ orientation, unit: "pt", format: "a4" });
+    const dataUrl = c.toDataURL({ format: "png", multiplier: 1 });
+    // Millimeter styrer alt: bildet plasseres i eksakt fysisk størrelse på A4.
+    const orientation = dims.widthMm >= dims.heightMm ? "landscape" : "portrait";
+    const pdf = new jsPDF({ orientation, unit: "mm", format: "a4" });
     const pageW = pdf.internal.pageSize.getWidth();
     const pageH = pdf.internal.pageSize.getHeight();
-    const ratio = Math.min(pageW / tpl.w, pageH / tpl.h) * 0.92;
-    const drawW = tpl.w * ratio;
-    const drawH = tpl.h * ratio;
+    const drawW = dims.widthMm;
+    const drawH = dims.heightMm;
+
     pdf.addImage(dataUrl, "PNG", (pageW - drawW) / 2, (pageH - drawH) / 2, drawW, drawH);
     const safeName = (image?.title ?? "kakebilde").replace(/[^\p{L}\p{N} _-]/gu, "_").slice(0, 80) || "kakebilde";
     pdf.save(`${safeName}.pdf`);
