@@ -18,6 +18,7 @@ const KIND_LABEL: Record<AttachmentKind, string> = {
   inspiration: "Inspirasjon",
   logo: "Logo",
   document: "Dokument",
+  cake_image: "Kakeprint",
   other: "Annet",
 };
 
@@ -26,6 +27,7 @@ const KIND_BADGE: Record<AttachmentKind, string> = {
   inspiration: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
   logo: "bg-sky-500/15 text-sky-700 dark:text-sky-300",
   document: "bg-slate-500/15 text-foreground",
+  cake_image: "bg-pink-500/15 text-pink-700 dark:text-pink-300",
   other: "bg-muted text-foreground",
 };
 
