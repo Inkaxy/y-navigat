@@ -624,6 +624,92 @@ export type Database = {
           },
         ]
       }
+      cake_image_formats: {
+        Row: {
+          bleed_mm: number
+          created_at: string
+          diameter_mm: number | null
+          height_mm: number | null
+          id: string
+          is_active: boolean
+          is_default: boolean
+          legal_entity_id: string
+          name: string
+          shape: string
+          sheet: string
+          sort_order: number
+          width_mm: number | null
+        }
+        Insert: {
+          bleed_mm?: number
+          created_at?: string
+          diameter_mm?: number | null
+          height_mm?: number | null
+          id?: string
+          is_active?: boolean
+          is_default?: boolean
+          legal_entity_id: string
+          name: string
+          shape?: string
+          sheet?: string
+          sort_order?: number
+          width_mm?: number | null
+        }
+        Update: {
+          bleed_mm?: number
+          created_at?: string
+          diameter_mm?: number | null
+          height_mm?: number | null
+          id?: string
+          is_active?: boolean
+          is_default?: boolean
+          legal_entity_id?: string
+          name?: string
+          shape?: string
+          sheet?: string
+          sort_order?: number
+          width_mm?: number | null
+        }
+        Relationships: []
+      }
+      cake_image_prints: {
+        Row: {
+          cake_image_id: string
+          id: string
+          kind: string
+          note: string | null
+          printed_at: string
+          printed_by: string | null
+          sheet: string | null
+        }
+        Insert: {
+          cake_image_id: string
+          id?: string
+          kind?: string
+          note?: string | null
+          printed_at?: string
+          printed_by?: string | null
+          sheet?: string | null
+        }
+        Update: {
+          cake_image_id?: string
+          id?: string
+          kind?: string
+          note?: string | null
+          printed_at?: string
+          printed_by?: string | null
+          sheet?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cake_image_prints_cake_image_id_fkey"
+            columns: ["cake_image_id"]
+            isOneToOne: false
+            referencedRelation: "cake_images"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cake_images: {
         Row: {
           created_at: string
@@ -632,9 +718,14 @@ export type Database = {
           delivery_date: string
           edited_path: string | null
           editor_state: Json | null
+          editor_state_version: number
+          effective_dpi: number | null
+          format_id: string | null
+          height_mm: number | null
           id: string
           label_number: string | null
           label_unit_id: string | null
+          last_printed_by: string | null
           legal_entity_id: string
           notes: string | null
           order_id: string | null
@@ -644,12 +735,21 @@ export type Database = {
           print_count: number
           printed_at: string | null
           production_department_id: string | null
+          quality_ack_at: string | null
+          quality_ack_by: string | null
+          quality_flag: string | null
+          rights_cleared: boolean | null
+          rights_note: string | null
+          shape: string | null
           source: string
+          source_height_px: number | null
+          source_width_px: number | null
           status: string
           ticket_attachment_id: string | null
           ticket_id: string | null
           title: string
           updated_at: string
+          width_mm: number | null
         }
         Insert: {
           created_at?: string
@@ -658,9 +758,14 @@ export type Database = {
           delivery_date?: string
           edited_path?: string | null
           editor_state?: Json | null
+          editor_state_version?: number
+          effective_dpi?: number | null
+          format_id?: string | null
+          height_mm?: number | null
           id?: string
           label_number?: string | null
           label_unit_id?: string | null
+          last_printed_by?: string | null
           legal_entity_id: string
           notes?: string | null
           order_id?: string | null
@@ -670,12 +775,21 @@ export type Database = {
           print_count?: number
           printed_at?: string | null
           production_department_id?: string | null
+          quality_ack_at?: string | null
+          quality_ack_by?: string | null
+          quality_flag?: string | null
+          rights_cleared?: boolean | null
+          rights_note?: string | null
+          shape?: string | null
           source?: string
+          source_height_px?: number | null
+          source_width_px?: number | null
           status?: string
           ticket_attachment_id?: string | null
           ticket_id?: string | null
           title?: string
           updated_at?: string
+          width_mm?: number | null
         }
         Update: {
           created_at?: string
@@ -684,9 +798,14 @@ export type Database = {
           delivery_date?: string
           edited_path?: string | null
           editor_state?: Json | null
+          editor_state_version?: number
+          effective_dpi?: number | null
+          format_id?: string | null
+          height_mm?: number | null
           id?: string
           label_number?: string | null
           label_unit_id?: string | null
+          last_printed_by?: string | null
           legal_entity_id?: string
           notes?: string | null
           order_id?: string | null
@@ -696,14 +815,30 @@ export type Database = {
           print_count?: number
           printed_at?: string | null
           production_department_id?: string | null
+          quality_ack_at?: string | null
+          quality_ack_by?: string | null
+          quality_flag?: string | null
+          rights_cleared?: boolean | null
+          rights_note?: string | null
+          shape?: string | null
           source?: string
+          source_height_px?: number | null
+          source_width_px?: number | null
           status?: string
           ticket_attachment_id?: string | null
           ticket_id?: string | null
           title?: string
           updated_at?: string
+          width_mm?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "cake_images_format_id_fkey"
+            columns: ["format_id"]
+            isOneToOne: false
+            referencedRelation: "cake_image_formats"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "cake_images_label_unit_id_fkey"
             columns: ["label_unit_id"]
@@ -11861,9 +11996,14 @@ export type Database = {
           delivery_date: string
           edited_path: string | null
           editor_state: Json | null
+          editor_state_version: number
+          effective_dpi: number | null
+          format_id: string | null
+          height_mm: number | null
           id: string
           label_number: string | null
           label_unit_id: string | null
+          last_printed_by: string | null
           legal_entity_id: string
           notes: string | null
           order_id: string | null
@@ -11873,12 +12013,21 @@ export type Database = {
           print_count: number
           printed_at: string | null
           production_department_id: string | null
+          quality_ack_at: string | null
+          quality_ack_by: string | null
+          quality_flag: string | null
+          rights_cleared: boolean | null
+          rights_note: string | null
+          shape: string | null
           source: string
+          source_height_px: number | null
+          source_width_px: number | null
           status: string
           ticket_attachment_id: string | null
           ticket_id: string | null
           title: string
           updated_at: string
+          width_mm: number | null
         }[]
         SetofOptions: {
           from: "*"

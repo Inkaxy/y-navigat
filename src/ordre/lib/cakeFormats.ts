@@ -1,0 +1,139 @@
+/**
+ * Fysisk størrelse styrer alt i kakebilder. Lerretet regnes ut fra millimeter
+ * ved 300 DPI — aldri omvendt. En kake på 20 cm skal bli 20 cm på sukkerpapiret.
+ */
+
+export const CAKE_DPI = 300;
+
+/** Ark vi trykker på. Ett bilde per ark. */
+export const SHEETS: Record<string, { widthMm: number; heightMm: number }> = {
+  A4: { widthMm: 210, heightMm: 297 },
+};
+
+export type CakeImageFormat = {
+  id: string;
+  legal_entity_id: string;
+  name: string;
+  shape: "rect" | "round";
+  width_mm: number | null;
+  height_mm: number | null;
+  diameter_mm: number | null;
+  bleed_mm: number;
+  sheet: string;
+  is_default: boolean;
+  is_active: boolean;
+  sort_order: number;
+};
+
+export function mmToPx(mm: number, dpi = CAKE_DPI) {
+  return Math.round((mm / 25.4) * dpi);
+}
+
+export function pxToMm(px: number, dpi = CAKE_DPI) {
+  return (px / dpi) * 25.4;
+}
+
+export type FormatDims = {
+  widthMm: number;
+  heightMm: number;
+  isRound: boolean;
+  bleedMm: number;
+  widthPx: number;
+  heightPx: number;
+  bleedPx: number;
+};
+
+export function formatDims(f: CakeImageFormat): FormatDims {
+  const isRound = f.shape === "round";
+  const widthMm = isRound ? (f.diameter_mm ?? 0) : (f.width_mm ?? 0);
+  const heightMm = isRound ? (f.diameter_mm ?? 0) : (f.height_mm ?? 0);
+  const bleedMm = f.bleed_mm ?? 0;
+  return {
+    widthMm,
+    heightMm,
+    isRound,
+    bleedMm,
+    widthPx: mmToPx(widthMm),
+    heightPx: mmToPx(heightMm),
+    bleedPx: mmToPx(bleedMm),
+  };
+}
+
+/** «Rund 20 cm · 200 mm · 2362 × 2362 px» */
+export function formatSizeLabel(f: CakeImageFormat) {
+  const d = formatDims(f);
+  const mm = d.isRound
+    ? `${Math.round(d.widthMm)} mm`
+    : `${Math.round(d.widthMm)} × ${Math.round(d.heightMm)} mm`;
+  return `${f.name} · ${mm} · ${d.widthPx} × ${d.heightPx} px`;
+}
+
+/**
+ * Passer formatet på arket? A4 er 210 mm bredt, så et rundt format over
+ * 20 cm får ikke plass — da skal vi si fra, ikke skalere ned i stillhet.
+ */
+export function sheetFit(f: CakeImageFormat): {
+  fits: boolean;
+  sheet: { widthMm: number; heightMm: number } | null;
+  message: string | null;
+} {
+  const sheet = SHEETS[f.sheet] ?? null;
+  if (!sheet) return { fits: true, sheet: null, message: null };
+  const d = formatDims(f);
+  const total = { w: d.widthMm + 2 * d.bleedMm, h: d.heightMm + 2 * d.bleedMm };
+  const fits =
+    (total.w <= sheet.widthMm && total.h <= sheet.heightMm) ||
+    (total.h <= sheet.widthMm && total.w <= sheet.heightMm);
+  return {
+    fits,
+    sheet,
+    message: fits
+      ? null
+      : `${f.name} (${Math.round(total.w)} × ${Math.round(total.h)} mm med utfall) er større enn ${f.sheet} (${sheet.widthMm} × ${sheet.heightMm} mm). Bildet kan ikke trykkes i riktig størrelse på dette arket.`,
+  };
+}
+
+export type QualityFlag = "god" | "akseptabel" | "lav" | "ukjent";
+
+/**
+ * effective_dpi = source_px / (mm / 25.4), målt på korteste kant mot
+ * tilsvarende fysiske mål.
+ */
+export function computeEffectiveDpi(
+  sourceWidthPx: number | null | undefined,
+  sourceHeightPx: number | null | undefined,
+  f: CakeImageFormat | null | undefined,
+): number | null {
+  if (!f || !sourceWidthPx || !sourceHeightPx) return null;
+  const d = formatDims(f);
+  if (!d.widthMm || !d.heightMm) return null;
+  const dpiW = sourceWidthPx / (d.widthMm / 25.4);
+  const dpiH = sourceHeightPx / (d.heightMm / 25.4);
+  return Math.round(Math.min(dpiW, dpiH));
+}
+
+export function qualityFlagFor(dpi: number | null | undefined): QualityFlag {
+  if (dpi == null || !Number.isFinite(dpi)) return "ukjent";
+  if (dpi >= 300) return "god";
+  if (dpi >= 150) return "akseptabel";
+  return "lav";
+}
+
+/** Rolig setning, ikke en teknisk verdi. */
+export function qualityMessage(
+  dpi: number | null | undefined,
+  f: CakeImageFormat | null | undefined,
+): string {
+  if (dpi == null || !f) return "Oppløsningen er ikke målt for dette bildet ennå.";
+  const size = formatDims(f).isRound
+    ? `${Math.round(formatDims(f).widthMm / 10)} cm`
+    : f.name.toLowerCase();
+  switch (qualityFlagFor(dpi)) {
+    case "god":
+      return `Dette bildet blir ${dpi} DPI på ${size} — skarpt nok for spiselig print.`;
+    case "akseptabel":
+      return `Dette bildet blir ${dpi} DPI på ${size} — det går, men det blir litt mykt i kantene. En større fil ville gitt et bedre resultat.`;
+    default:
+      return `Dette bildet blir ${dpi} DPI på ${size} — det vil se synlig uskarpt ut. Be kunden om en større fil hvis mulig.`;
+  }
+}

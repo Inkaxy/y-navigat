@@ -26,6 +26,9 @@ import {
   Cake,
   Heart,
   ShoppingBag,
+  AlertTriangle,
+  Ruler,
+  ShieldCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
@@ -66,13 +69,22 @@ import { supabase } from "@/integrations/supabase/client";
 import { CakeFontPicker } from "@/ordre/components/cake-images/CakeFontPicker";
 import { loadCakeFont } from "@/ordre/lib/cakeFonts";
 
-const TEMPLATES = [
-  { id: "qland", label: '1/4 ark — landskap (10×7,5")', w: 1000, h: 750 },
-  { id: "qport", label: '1/4 ark — portrett (7,5×10")', w: 750, h: 1000 },
-  { id: "round8", label: '8" rund', w: 800, h: 800, circle: true },
-  { id: "card", label: "Visittkort (8,9×5,1 cm)", w: 890, h: 510 },
-] as const;
-type TemplateId = (typeof TEMPLATES)[number]["id"];
+import { useCakeFormats, defaultFormat } from "@/ordre/hooks/useCakeFormats";
+import {
+  computeEffectiveDpi,
+  formatDims,
+  formatSizeLabel,
+  qualityFlagFor,
+  qualityMessage,
+  sheetFit,
+  type CakeImageFormat,
+} from "@/ordre/lib/cakeFormats";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
+
+/** Nåværende versjon av editor_state-formatet vi skriver. */
+const EDITOR_STATE_VERSION = 2;
+
 
 const TEXT_PRESETS = [
   { id: "title", label: "Tittel (stor)", size: 72, weight: "bold" },
@@ -181,10 +193,29 @@ export default function CakeImageEditor() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fabRef = useRef<fabric.Canvas | null>(null);
 
-  const [template, setTemplate] = useState<TemplateId>("qland");
-  const tpl = useMemo(() => TEMPLATES.find((t) => t.id === template)!, [template]);
+  // Formatene kommer fra basen — lerretet settes opp fra fysisk størrelse.
+  const { data: formats = [] } = useCakeFormats();
+  const [formatId, setFormatId] = useState<string>("");
+  const format: CakeImageFormat | null =
+    formats.find((f) => f.id === formatId) ?? null;
+  const dims = useMemo(
+    () =>
+      format
+        ? formatDims(format)
+        : {
+            widthMm: 0,
+            heightMm: 0,
+            isRound: false,
+            bleedMm: 0,
+            widthPx: 1000,
+            heightPx: 750,
+            bleedPx: 0,
+          },
+    [format],
+  );
+  const fit = format ? sheetFit(format) : null;
 
-  const [zoom, setZoom] = useState(0.6);
+  const [zoom, setZoom] = useState(0.25);
   const [textInput, setTextInput] = useState("");
   const [textPreset, setTextPreset] = useState("title");
   const [fontFamily, setFontFamily] = useState<string>("Inter");
@@ -194,6 +225,11 @@ export default function CakeImageEditor() {
   const [selVersion, setSelVersion] = useState(0); // tvinger re-render av høyre-panel
   const [layers, setLayers] = useState<fabric.Object[]>([]);
   const [saving, setSaving] = useState(false);
+  const [stateLoadFailed, setStateLoadFailed] = useState(false);
+  const [rightsCleared, setRightsCleared] = useState(false);
+  const [rightsNote, setRightsNote] = useState("");
+  const [qualityAcked, setQualityAcked] = useState(false);
+
 
   // Undo/redo (enkel snapshot-stack av canvas.toJSON())
   const undoStack = useRef<string[]>([]);
@@ -215,8 +251,8 @@ export default function CakeImageEditor() {
     const c = new fabric.Canvas(canvasRef.current, {
       backgroundColor: "",
       preserveObjectStacking: true,
-      width: tpl.w,
-      height: tpl.h,
+      width: dims.widthPx,
+      height: dims.heightPx,
     });
     fabRef.current = c;
 
@@ -252,25 +288,42 @@ export default function CakeImageEditor() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Sett mal-størrelse / rund-clip
+  // Velg format: bildets eget, ellers standardformatet (Rund 20 cm).
+  useEffect(() => {
+    if (formatId || formats.length === 0) return;
+    const own = image?.format_id
+      ? formats.find((f) => f.id === image.format_id)
+      : null;
+    setFormatId((own ?? defaultFormat(formats))?.id ?? "");
+  }, [formats, image?.format_id, formatId]);
+
+  // Rettigheter / kvalitetsbekreftelse fra raden
+  useEffect(() => {
+    if (!image) return;
+    setRightsCleared(!!image.rights_cleared);
+    setRightsNote(image.rights_note ?? "");
+    setQualityAcked(!!image.quality_ack_at);
+  }, [image?.id, image?.rights_cleared, image?.rights_note, image?.quality_ack_at]);
+
+  // Lerretet settes opp fra fysisk størrelse, ikke omvendt.
   useEffect(() => {
     const c = fabRef.current;
     if (!c) return;
-    c.setDimensions({ width: tpl.w, height: tpl.h });
-    if ("circle" in tpl && tpl.circle) {
+    c.setDimensions({ width: dims.widthPx, height: dims.heightPx });
+    if (dims.isRound) {
       c.clipPath = new fabric.Circle({
-        radius: Math.min(tpl.w, tpl.h) / 2,
+        radius: Math.min(dims.widthPx, dims.heightPx) / 2,
         originX: "center",
         originY: "center",
-        left: tpl.w / 2,
-        top: tpl.h / 2,
+        left: dims.widthPx / 2,
+        top: dims.heightPx / 2,
         absolutePositioned: true,
       });
     } else {
       c.clipPath = undefined;
     }
     c.renderAll();
-  }, [tpl]);
+  }, [dims]);
 
   // Last inn lagret state / original
   useEffect(() => {
@@ -278,32 +331,7 @@ export default function CakeImageEditor() {
     if (!c || !image) return;
     skipSnapshotRef.current = true;
 
-    const load = async () => {
-      if (image.editor_state) {
-        try {
-          await c.loadFromJSON((await prepareEditorStateForLoad(image.editor_state)) as never);
-          if (c.getObjects().length > 0) {
-            // Preload alle skrifttyper som brukes i lagret state, og re-render.
-            const families = new Set<string>();
-            c.getObjects().forEach((o) => {
-              const f = (o as fabric.IText).fontFamily;
-              if (typeof f === "string") families.add(f);
-            });
-            await Promise.all([...families].map((f) => loadCakeFont(f)));
-            c.renderAll();
-            setLayers([...c.getObjects()]);
-            undoStack.current = [canvasSnapshot(c)];
-            redoStack.current = [];
-            skipSnapshotRef.current = false;
-            return;
-          }
-        } catch (e) {
-          console.warn("editor_state load failed", e);
-        }
-        c.clear();
-        c.backgroundColor = "";
-      }
-      // Init med original-bilde sentrert
+    const loadOriginal = async () => {
       const url = await cakeObjectUrl(image.original_path);
       if (!url) {
         skipSnapshotRef.current = false;
@@ -323,8 +351,39 @@ export default function CakeImageEditor() {
       redoStack.current = [];
       skipSnapshotRef.current = false;
     };
+
+    const load = async () => {
+      if (image.editor_state) {
+        try {
+          await c.loadFromJSON((await prepareEditorStateForLoad(image.editor_state)) as never);
+          if (c.getObjects().length > 0) {
+            // Preload alle skrifttyper som brukes i lagret state, og re-render.
+            const families = new Set<string>();
+            c.getObjects().forEach((o) => {
+              const f = (o as fabric.IText).fontFamily;
+              if (typeof f === "string") families.add(f);
+            });
+            await Promise.all([...families].map((f) => loadCakeFont(f)));
+            c.renderAll();
+            setLayers([...c.getObjects()]);
+            undoStack.current = [canvasSnapshot(c)];
+            redoStack.current = [];
+            skipSnapshotRef.current = false;
+            setStateLoadFailed(false);
+            return;
+          }
+        } catch (e) {
+          console.error("[CakeImageEditor] editor_state kunne ikke åpnes", e);
+        }
+        // Redigeringen kunne ikke åpnes. Vi tømmer IKKE lerretet i stillhet —
+        // vi viser originalbildet og sier tydelig fra.
+        setStateLoadFailed(true);
+      }
+      await loadOriginal();
+    };
     load();
   }, [image]);
+
 
   // ---- helpers ----
   const active = fabRef.current?.getActiveObject() ?? null;
@@ -468,18 +527,40 @@ export default function CakeImageEditor() {
     });
   };
 
+  // Lerretet er allerede i 300 DPI — ingen ekstra multiplier, ellers blir
+  // filen dobbelt så stor uten å bli skarpere.
   const renderPng = async (): Promise<Blob> => {
     const c = fabRef.current!;
-    const dataUrl = c.toDataURL({ format: "png", multiplier: 2 });
+    const dataUrl = c.toDataURL({ format: "png", multiplier: 1 });
     const res = await fetch(dataUrl);
     return await res.blob();
   };
+
+  // Kvalitet regnes på nytt hver gang formatet endres — et bilde som holder
+  // til kvartark holder ikke til A4.
+  const effectiveDpi = computeEffectiveDpi(
+    image?.source_width_px ?? null,
+    image?.source_height_px ?? null,
+    format,
+  );
+  const qualityFlag = qualityFlagFor(effectiveDpi);
+  const needsQualityAck = qualityFlag === "lav" && !qualityAcked;
+  const rightsAnswered = rightsCleared || (rightsNote.trim().length > 0);
+  const canMarkFerdig = !needsQualityAck && rightsAnswered;
 
   const doSave = async (
     markFerdig = false,
     opts: { navigateBack?: boolean } = {},
   ): Promise<boolean> => {
     if (!image || !fabRef.current) return false;
+    if (markFerdig && !canMarkFerdig) {
+      toast.error(
+        needsQualityAck
+          ? "Bekreft at bildet skal trykkes selv om oppløsningen er lav"
+          : "Ta stilling til rettighetene før bildet markeres ferdig",
+      );
+      return false;
+    }
     setSaving(true);
     try {
       const blob = await renderPng();
@@ -492,11 +573,18 @@ export default function CakeImageEditor() {
         {
           edited_path: editedPath,
           editor_state: JSON.parse(canvasSnapshot(fabRef.current)) as never,
-          status: markFerdig
-            ? "ferdig_redigert"
-            : image.status === "skrevet_ut"
-              ? image.status
-              : "venter",
+          editor_state_version: EDITOR_STATE_VERSION,
+          // Et vanlig «Lagre» skal ALDRI nedgradere et ferdigmarkert bilde.
+          // Statusen endres bare når brukeren aktivt ber om det.
+          status: markFerdig ? "ferdig_redigert" : image.status,
+          format_id: format?.id ?? image.format_id ?? null,
+          shape: format?.shape ?? image.shape ?? null,
+          width_mm: format ? formatDims(format).widthMm : (image.width_mm ?? null),
+          height_mm: format ? formatDims(format).heightMm : (image.height_mm ?? null),
+          effective_dpi: effectiveDpi,
+          quality_flag: qualityFlag,
+          rights_cleared: rightsCleared,
+          rights_note: rightsNote.trim() || null,
         },
       );
       // Rydd forrige edited-fil basert på DB-verdien (ikke lokal state)
@@ -535,6 +623,21 @@ export default function CakeImageEditor() {
     }
   };
 
+  /** Bekreft lav oppløsning — lagres på raden så noen har tatt stilling. */
+  const ackQuality = async () => {
+    if (!image) return;
+    const { data: u } = await supabase.auth.getUser();
+    await updateCakeImage(image.id, {
+      quality_ack_by: u.user?.id ?? null,
+      quality_ack_at: new Date().toISOString(),
+      effective_dpi: effectiveDpi,
+      quality_flag: qualityFlag,
+    });
+    setQualityAcked(true);
+    qc.invalidateQueries({ queryKey: ["cake-image", image.id] });
+  };
+
+
   const printNow = async () => {
     const c = fabRef.current!;
     const dataUrl = c.toDataURL({ format: "png", multiplier: 2 });
@@ -572,14 +675,15 @@ img { max-width:100%; max-height:100vh; }`;
 
   const downloadPdf = async () => {
     const c = fabRef.current!;
-    const dataUrl = c.toDataURL({ format: "png", multiplier: 2 });
-    const orientation = tpl.w >= tpl.h ? "landscape" : "portrait";
-    const pdf = new jsPDF({ orientation, unit: "pt", format: "a4" });
+    const dataUrl = c.toDataURL({ format: "png", multiplier: 1 });
+    // Millimeter styrer alt: bildet plasseres i eksakt fysisk størrelse på A4.
+    const orientation = dims.widthMm >= dims.heightMm ? "landscape" : "portrait";
+    const pdf = new jsPDF({ orientation, unit: "mm", format: "a4" });
     const pageW = pdf.internal.pageSize.getWidth();
     const pageH = pdf.internal.pageSize.getHeight();
-    const ratio = Math.min(pageW / tpl.w, pageH / tpl.h) * 0.92;
-    const drawW = tpl.w * ratio;
-    const drawH = tpl.h * ratio;
+    const drawW = dims.widthMm;
+    const drawH = dims.heightMm;
+
     pdf.addImage(dataUrl, "PNG", (pageW - drawW) / 2, (pageH - drawH) / 2, drawW, drawH);
     const safeName = (image?.title ?? "kakebilde").replace(/[^\p{L}\p{N} _-]/gu, "_").slice(0, 80) || "kakebilde";
     pdf.save(`${safeName}.pdf`);
@@ -655,35 +759,125 @@ img { max-width:100%; max-height:100vh; }`;
         <aside className="overflow-y-auto border-r bg-background p-3">
           <Accordion type="multiple" defaultValue={["mal", "bilde", "tekst"]}>
             <AccordionItem value="mal">
-              <AccordionTrigger className="text-sm">Maler</AccordionTrigger>
+              <AccordionTrigger className="text-sm">
+                Format og størrelse
+              </AccordionTrigger>
               <AccordionContent>
                 <div className="grid grid-cols-2 gap-2">
-                  {TEMPLATES.map((t) => (
-                    <button
-                      key={t.id}
-                      onClick={() => setTemplate(t.id)}
-                      className={cn(
-                        "rounded-md border p-2 text-left text-xs hover:bg-accent",
-                        template === t.id && "border-primary ring-1 ring-primary",
-                      )}
-                    >
-                      <div
+                  {formats.map((f) => {
+                    const d = formatDims(f);
+                    return (
+                      <button
+                        key={f.id}
+                        onClick={() => setFormatId(f.id)}
                         className={cn(
-                          "mx-auto mb-1 border bg-muted",
-                          "circle" in t && t.circle ? "rounded-full" : "rounded-sm",
+                          "rounded-md border p-2 text-left text-xs hover:bg-accent",
+                          formatId === f.id && "border-primary ring-1 ring-primary",
                         )}
-                        style={{
-                          width: 60,
-                          height: (60 * t.h) / t.w,
-                          maxHeight: 60,
-                        }}
-                      />
-                      <div className="truncate">{t.label}</div>
-                    </button>
-                  ))}
+                      >
+                        <div
+                          className={cn(
+                            "mx-auto mb-1 border bg-muted",
+                            d.isRound ? "rounded-full" : "rounded-sm",
+                          )}
+                          style={{
+                            width: 60,
+                            height: (60 * d.heightMm) / (d.widthMm || 1),
+                            maxHeight: 60,
+                          }}
+                        />
+                        <div className="truncate font-medium">{f.name}</div>
+                        <div className="truncate text-[11px] text-muted-foreground">
+                          {d.isRound
+                            ? `Ø ${d.widthMm} mm`
+                            : `${d.widthMm} × ${d.heightMm} mm`}
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
+
+                {format && (
+                  <div className="mt-3 flex items-start gap-2 rounded-md border bg-muted/40 p-2 text-xs">
+                    <Ruler className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    <span>{formatSizeLabel(format)}</span>
+                  </div>
+                )}
+
+                {fit && !fit.fits && (
+                  <div className="mt-2 flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
+                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    <span>{fit.message}</span>
+                  </div>
+                )}
+
+                {dims.bleedMm > 0 && (
+                  <p className="mt-2 text-[11px] text-muted-foreground">
+                    {dims.bleedMm} mm utfallende sone rundt kanten klippes bort —
+                    la bildet gå helt ut, ellers blir det hvit rand.
+                  </p>
+                )}
               </AccordionContent>
             </AccordionItem>
+
+            <AccordionItem value="kvalitet">
+              <AccordionTrigger className="text-sm">
+                Kvalitet og rettigheter
+              </AccordionTrigger>
+              <AccordionContent className="space-y-3">
+                <div
+                  className={cn(
+                    "rounded-md border p-2 text-xs",
+                    qualityFlag === "lav"
+                      ? "border-destructive/40 bg-destructive/10 text-destructive"
+                      : qualityFlag === "akseptabel"
+                        ? "border-amber-300 bg-amber-50 text-amber-900"
+                        : "bg-muted/40",
+                  )}
+                >
+                  {qualityMessage(effectiveDpi, format)}
+                </div>
+
+                {qualityFlag === "lav" && (
+                  <label className="flex items-start gap-2 text-xs">
+                    <Checkbox
+                      checked={qualityAcked}
+                      onCheckedChange={(v) => {
+                        if (v) void ackQuality();
+                        else setQualityAcked(false);
+                      }}
+                    />
+                    <span>
+                      Jeg har sett oppløsningen og vil trykke bildet likevel.
+                    </span>
+                  </label>
+                )}
+
+                <Separator />
+
+                <label className="flex items-start gap-2 text-xs">
+                  <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  <Checkbox
+                    checked={rightsCleared}
+                    onCheckedChange={(v) => setRightsCleared(!!v)}
+                  />
+                  <span>Rettigheter avklart</span>
+                </label>
+                <Textarea
+                  value={rightsNote}
+                  onChange={(e) => setRightsNote(e.target.value)}
+                  rows={2}
+                  placeholder="Notat om rettigheter (hvem har godkjent, kilde …)"
+                  className="text-xs"
+                />
+                {!rightsAnswered && (
+                  <p className="text-[11px] text-muted-foreground">
+                    Ta stilling til rettighetene før bildet markeres ferdig.
+                  </p>
+                )}
+              </AccordionContent>
+            </AccordionItem>
+
 
             <AccordionItem value="bilde">
               <AccordionTrigger className="text-sm">Bilder</AccordionTrigger>
@@ -771,30 +965,79 @@ img { max-width:100%; max-height:100vh; }`;
           className="relative overflow-auto bg-[hsl(var(--muted))] p-6"
           style={{ backgroundImage: "linear-gradient(45deg,hsl(var(--muted)) 25%,transparent 25%),linear-gradient(-45deg,hsl(var(--muted)) 25%,transparent 25%),linear-gradient(45deg,transparent 75%,hsl(var(--muted)) 75%),linear-gradient(-45deg,transparent 75%,hsl(var(--muted)) 75%)", backgroundSize: "16px 16px", backgroundPosition: "0 0, 0 8px, 8px -8px, -8px 0" }}
         >
+          {stateLoadFailed && (
+            <div className="mx-auto mb-3 flex max-w-xl items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span className="flex-1">
+                Den lagrede redigeringen kunne ikke åpnes. Originalbildet vises i
+                stedet — ingenting er slettet. Lagrer du nå, erstattes den gamle
+                redigeringen.
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setStateLoadFailed(false)}
+              >
+                Begynn på nytt
+              </Button>
+            </div>
+          )}
+
+          {format && (
+            <div className="mx-auto mb-2 w-fit rounded-full border bg-background px-3 py-1 text-[11px] text-muted-foreground">
+              {formatSizeLabel(format)}
+            </div>
+          )}
+
           <div
             className={cn(
-              "mx-auto bg-white shadow-lg",
-              "circle" in tpl && tpl.circle ? "rounded-full" : "",
+              "relative mx-auto bg-white shadow-lg",
+              dims.isRound ? "rounded-full" : "",
             )}
             style={{
-              width: tpl.w * zoom,
-              height: tpl.h * zoom,
+              width: dims.widthPx * zoom,
+              height: dims.heightPx * zoom,
               transform: "translateZ(0)",
               overflow: "hidden",
             }}
           >
             <div
               style={{
-                width: tpl.w,
-                height: tpl.h,
+                width: dims.widthPx,
+                height: dims.heightPx,
                 transform: `scale(${zoom})`,
                 transformOrigin: "top left",
               }}
             >
               <canvas ref={canvasRef} />
             </div>
+
+            {/* Utfallende sone — det som klippes bort */}
+            {dims.bleedPx > 0 && (
+              <div
+                className={cn(
+                  "pointer-events-none absolute border border-dashed border-destructive/60",
+                  dims.isRound ? "rounded-full" : "",
+                )}
+                style={{ inset: dims.bleedPx * zoom }}
+                aria-hidden
+              >
+                <span className="absolute -top-4 left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] text-destructive/80">
+                  klippes bort
+                </span>
+              </div>
+            )}
+
+            {/* Hjelpelinje: her slutter kaken */}
+            {dims.isRound && (
+              <div
+                className="pointer-events-none absolute inset-0 rounded-full border border-primary/50"
+                aria-hidden
+              />
+            )}
           </div>
         </div>
+
 
         {/* Høyre panel */}
         <aside className="overflow-y-auto border-l bg-background p-3">

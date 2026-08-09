@@ -94,27 +94,40 @@ export default function CakeImagesPrint() {
 
   const downloadPdf = async () => {
     if (!items) return;
-    const pdf = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+    // Millimeter styrer utskriften: har bildet fysisk størrelse, plasseres det
+    // i eksakt den størrelsen på arket — aldri strukket til papirkanten.
+    const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
     const pageW = pdf.internal.pageSize.getWidth();
     const pageH = pdf.internal.pageSize.getHeight();
     for (let i = 0; i < items.length; i++) {
       if (i > 0) pdf.addPage();
       const url = items[i].url;
+      const img = items[i].image;
       const dataUrl = await urlToDataUrl(url);
       const dims = await imgDims(dataUrl);
-      const ratio = Math.min(pageW / dims.w, pageH / dims.h) * 0.92;
+      let drawW: number;
+      let drawH: number;
+      if (img.width_mm && img.height_mm) {
+        drawW = Number(img.width_mm);
+        drawH = Number(img.height_mm);
+      } else {
+        const ratio = Math.min(pageW / dims.w, pageH / dims.h) * 0.92;
+        drawW = dims.w * ratio;
+        drawH = dims.h * ratio;
+      }
       pdf.addImage(
         dataUrl,
         "PNG",
-        (pageW - dims.w * ratio) / 2,
-        (pageH - dims.h * ratio) / 2,
-        dims.w * ratio,
-        dims.h * ratio,
+        (pageW - drawW) / 2,
+        (pageH - drawH) / 2,
+        drawW,
+        drawH,
       );
     }
     pdf.save(`kakebilder.pdf`);
     markPrinted(items.map((i) => i.image.id));
   };
+
 
   if (!items) {
     return (
@@ -164,10 +177,24 @@ export default function CakeImagesPrint() {
             </div>
           )}
           {it.url ? (
-            <img src={it.url} alt={it.image.title} />
+            <img
+              src={it.url}
+              alt={it.image.title}
+              style={
+                it.image.width_mm && it.image.height_mm
+                  ? {
+                      width: `${it.image.width_mm}mm`,
+                      height: `${it.image.height_mm}mm`,
+                      maxWidth: "none",
+                      maxHeight: "none",
+                    }
+                  : undefined
+              }
+            />
           ) : (
             <span className="text-muted-foreground">Mangler bilde</span>
           )}
+
         </div>
       ))}
     </div>

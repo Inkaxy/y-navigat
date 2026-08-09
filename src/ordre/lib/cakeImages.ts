@@ -29,6 +29,21 @@ export type CakeImage = {
   production_department_id?: string | null;
   label_number?: string | null;
   label_unit_id?: string | null;
+  // Fysisk størrelse og kvalitet
+  format_id?: string | null;
+  shape?: string | null;
+  width_mm?: number | null;
+  height_mm?: number | null;
+  source_width_px?: number | null;
+  source_height_px?: number | null;
+  effective_dpi?: number | null;
+  quality_flag?: "god" | "akseptabel" | "lav" | "ukjent" | null;
+  quality_ack_by?: string | null;
+  quality_ack_at?: string | null;
+  rights_cleared?: boolean | null;
+  rights_note?: string | null;
+  editor_state_version?: number | null;
+  last_printed_by?: string | null;
 };
 
 export const CAKE_BUCKET = "cake-images";
@@ -116,6 +131,14 @@ export async function createCakeImage(input: {
   production_department_id?: string | null;
   order_ref?: string | null;
   notes?: string | null;
+  format_id?: string | null;
+  shape?: string | null;
+  width_mm?: number | null;
+  height_mm?: number | null;
+  source_width_px?: number | null;
+  source_height_px?: number | null;
+  effective_dpi?: number | null;
+  quality_flag?: "god" | "akseptabel" | "lav" | "ukjent" | null;
 }): Promise<CakeImage> {
   const { data: u } = await supabase.auth.getUser();
 
@@ -156,6 +179,14 @@ export async function createCakeImage(input: {
       label_unit_id: labelUnitId,
       order_ref: input.order_ref ?? null,
       notes: input.notes ?? null,
+      format_id: input.format_id ?? null,
+      shape: input.shape ?? null,
+      width_mm: input.width_mm ?? null,
+      height_mm: input.height_mm ?? null,
+      source_width_px: input.source_width_px ?? null,
+      source_height_px: input.source_height_px ?? null,
+      effective_dpi: input.effective_dpi ?? null,
+      quality_flag: input.quality_flag ?? "ukjent",
       created_by: u.user?.id,
     } as never)
     .select("*")
@@ -348,22 +379,35 @@ export async function findCakeLineForOrder(orderId: string): Promise<{
   };
 }
 
-export async function updateCakeImage(
-  id: string,
-  patch: Partial<
-    Pick<
-      CakeImage,
-      | "title"
-      | "customer_name"
-      | "order_ref"
-      | "notes"
-      | "edited_path"
-      | "editor_state"
-      | "status"
-      | "delivery_date"
-    >
-  >,
-) {
+/** Felt grensesnittet har lov til å endre på et kakebilde. */
+export type CakeImagePatch = Partial<
+  Pick<
+    CakeImage,
+    | "title"
+    | "customer_name"
+    | "order_ref"
+    | "notes"
+    | "edited_path"
+    | "editor_state"
+    | "status"
+    | "delivery_date"
+    | "format_id"
+    | "shape"
+    | "width_mm"
+    | "height_mm"
+    | "source_width_px"
+    | "source_height_px"
+    | "effective_dpi"
+    | "quality_flag"
+    | "quality_ack_by"
+    | "quality_ack_at"
+    | "rights_cleared"
+    | "rights_note"
+    | "editor_state_version"
+  >
+>;
+
+export async function updateCakeImage(id: string, patch: CakeImagePatch) {
   const { error } = await supabase
     .from("cake_images")
     .update(patch as never)
@@ -386,12 +430,8 @@ export class CakeImageConflictError extends Error {
 export async function updateCakeImageGuarded(
   id: string,
   expectedUpdatedAt: string,
-  patch: Partial<
-    Pick<
-      CakeImage,
-      "title" | "customer_name" | "order_ref" | "notes" | "edited_path" | "editor_state" | "status" | "delivery_date"
-    >
-  >,
+  patch: CakeImagePatch,
+
 ): Promise<{ updated: CakeImage; previousEditedPath: string | null }> {
   // Les DB-verdien først, slik at opprydding av gammel fil bruker sannheten i DB.
   const { data: current, error: readErr } = await supabase
@@ -432,7 +472,11 @@ export async function deleteCakeImage(image: CakeImage) {
   if (error) throw error;
 }
 
-export async function markPrinted(ids: string[]) {
+export async function markPrinted(
+  ids: string[],
+  kind: "print" | "reprint" | "pdf" | "test" = "print",
+  sheet: string | null = "A4",
+) {
   if (ids.length === 0) return;
   // Tellingen skjer i SQL (print_count = print_count + 1) for å unngå at to
   // samtidige utskrifter overskriver hverandres teller.
@@ -445,9 +489,30 @@ export async function markPrinted(ids: string[]) {
   const userId = u.user?.id ?? null;
   const userLabel = u.user?.email ?? null;
 
+  // Utskriftshistorikk — hver utskrift er en egen rad.
+  try {
+    await supabase.from("cake_image_prints").insert(
+      ids.map((cake_image_id) => ({
+        cake_image_id,
+        printed_by: userId,
+        kind,
+        sheet,
+      })) as never,
+    );
+    if (userId) {
+      await supabase
+        .from("cake_images")
+        .update({ last_printed_by: userId } as never)
+        .in("id", ids);
+    }
+  } catch (err) {
+    console.warn("[cake_images] kunne ikke logge utskrift", err);
+  }
+
   await Promise.all(
     ((rows ?? []) as CakeImage[]).map(async (row) => {
       const nextCount = row.print_count ?? 1;
+
 
 
       // Skriv ticket-hendelse + systeminnslag i tråden hvis raden er koblet til en ticket
