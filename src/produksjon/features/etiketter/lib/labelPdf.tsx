@@ -18,6 +18,8 @@ import { code128Modules } from "./code128";
 
 const MM_TO_PT = 2.83465;
 const mm = (v: number) => v * MM_TO_PT;
+/** Største fornuftige punktstørrelse som får plass i en boks på `h` mm. */
+const mmToPtCap = (h: number) => Math.max(6, mm(h) * 0.7);
 
 export interface LabelPdfData {
   profile: LabelPrintProfile;
