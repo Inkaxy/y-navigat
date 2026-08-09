@@ -472,49 +472,57 @@ export async function deleteCakeImage(image: CakeImage) {
   if (error) throw error;
 }
 
+export type CakeImagePrint = {
+  id: string;
+  cake_image_id: string;
+  printed_by: string | null;
+  printed_at: string;
+  kind: "print" | "reprint" | "pdf" | "test";
+  sheet: string | null;
+  note: string | null;
+};
+
+/** Utskriftshistorikken for ett bilde — hvem, når og hva slags utskrift. */
+export async function fetchPrintHistory(cakeImageId: string) {
+  const { data, error } = await supabase
+    .from("cake_image_prints")
+    .select("*")
+    .eq("cake_image_id", cakeImageId)
+    .order("printed_at", { ascending: false })
+    .limit(25);
+  if (error) throw error;
+  return (data ?? []) as unknown as CakeImagePrint[];
+}
+
+/**
+ * Registrerer en utskrift. «Skrevet ut» skal bety skrevet ut: bare 'print' og
+ * 'reprint' flytter status og teller — PDF-nedlasting og testark logges bare.
+ * Alt skjer i én RPC, slik at to samtidige utskrifter ikke overskriver
+ * hverandres teller.
+ */
 export async function markPrinted(
   ids: string[],
   kind: "print" | "reprint" | "pdf" | "test" = "print",
   sheet: string | null = "A4",
+  note?: string | null,
 ) {
-  if (ids.length === 0) return;
-  // Tellingen skjer i SQL (print_count = print_count + 1) for å unngå at to
-  // samtidige utskrifter overskriver hverandres teller.
+  if (ids.length === 0) return [] as CakeImage[];
   const { data: rows, error } = await supabase.rpc(
-    "increment_cake_image_print",
-    { p_ids: ids } as never,
+    "register_cake_image_print",
+    { p_ids: ids, p_kind: kind, p_sheet: sheet, p_note: note ?? null } as never,
   );
   if (error) throw error;
+
+  const updated = (rows ?? []) as CakeImage[];
+  if (kind !== "print" && kind !== "reprint") return updated;
+
   const { data: u } = await supabase.auth.getUser();
   const userId = u.user?.id ?? null;
   const userLabel = u.user?.email ?? null;
 
-  // Utskriftshistorikk — hver utskrift er en egen rad.
-  try {
-    await supabase.from("cake_image_prints").insert(
-      ids.map((cake_image_id) => ({
-        cake_image_id,
-        printed_by: userId,
-        kind,
-        sheet,
-      })) as never,
-    );
-    if (userId) {
-      await supabase
-        .from("cake_images")
-        .update({ last_printed_by: userId } as never)
-        .in("id", ids);
-    }
-  } catch (err) {
-    console.warn("[cake_images] kunne ikke logge utskrift", err);
-  }
-
   await Promise.all(
-    ((rows ?? []) as CakeImage[]).map(async (row) => {
+    updated.map(async (row) => {
       const nextCount = row.print_count ?? 1;
-
-
-
       // Skriv ticket-hendelse + systeminnslag i tråden hvis raden er koblet til en ticket
       if (row.ticket_id) {
         const summary = `Kakebildet er skrevet ut (${nextCount}×) — klart for produksjon`;
@@ -546,7 +554,9 @@ export async function markPrinted(
       }
     }),
   );
+  return updated;
 }
+
 
 const DEMO_SOURCES = [
   {

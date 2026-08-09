@@ -883,6 +883,48 @@ export type Database = {
           },
         ]
       }
+      cake_printer_calibrations: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          expected_mm: number
+          id: string
+          is_active: boolean
+          legal_entity_id: string
+          measured_mm: number
+          note: string | null
+          printer_name: string
+          scale_factor: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          expected_mm?: number
+          id?: string
+          is_active?: boolean
+          legal_entity_id: string
+          measured_mm: number
+          note?: string | null
+          printer_name: string
+          scale_factor?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          expected_mm?: number
+          id?: string
+          is_active?: boolean
+          legal_entity_id?: string
+          measured_mm?: number
+          note?: string | null
+          printer_name?: string
+          scale_factor?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       cake_step_products: {
         Row: {
           cake_step_id: string
@@ -12582,6 +12624,60 @@ export type Database = {
       }
       push_products_to_nettside: { Args: never; Returns: Json }
       refresh_purchase_stats: { Args: never; Returns: undefined }
+      register_cake_image_print: {
+        Args: {
+          p_ids: string[]
+          p_kind?: string
+          p_note?: string
+          p_sheet?: string
+        }
+        Returns: {
+          created_at: string
+          created_by: string | null
+          customer_name: string | null
+          delivery_date: string
+          edited_path: string | null
+          editor_state: Json | null
+          editor_state_version: number
+          effective_dpi: number | null
+          format_id: string | null
+          height_mm: number | null
+          id: string
+          label_number: string | null
+          label_unit_id: string | null
+          last_printed_by: string | null
+          legal_entity_id: string
+          notes: string | null
+          order_id: string | null
+          order_line_id: string | null
+          order_ref: string | null
+          original_path: string
+          print_count: number
+          printed_at: string | null
+          production_department_id: string | null
+          quality_ack_at: string | null
+          quality_ack_by: string | null
+          quality_flag: string | null
+          rights_cleared: boolean | null
+          rights_note: string | null
+          shape: string | null
+          source: string
+          source_height_px: number | null
+          source_width_px: number | null
+          status: string
+          ticket_attachment_id: string | null
+          ticket_id: string | null
+          title: string
+          updated_at: string
+          width_mm: number | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "cake_images"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       rename_raw_material: {
         Args: { p_id: string; p_name: string }
         Returns: {

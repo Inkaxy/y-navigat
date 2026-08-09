@@ -72,6 +72,7 @@ import { loadCakeFont } from "@/ordre/lib/cakeFonts";
 import { useCakeFormats, defaultFormat } from "@/ordre/hooks/useCakeFormats";
 import {
   computeEffectiveDpi,
+  exportMultiplier,
   formatDims,
   formatSizeLabel,
   qualityFlagFor,
@@ -79,6 +80,13 @@ import {
   sheetFit,
   type CakeImageFormat,
 } from "@/ordre/lib/cakeFormats";
+import {
+  cakeSheetsToPdf,
+  openCakePrintWindow,
+  type CakePrintItem,
+} from "@/ordre/lib/cakePrint";
+import { useCakePrintScale } from "@/ordre/hooks/useCakeCalibration";
+import { CakePrintHistory } from "@/ordre/components/cake-images/CakePrintHistory";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -187,6 +195,8 @@ export default function CakeImageEditor() {
   const { id } = useParams();
   const navigate = useNavigate();
   const qc = useQueryClient();
+  /** Korreksjonsfaktor fra skriverkalibreringen. */
+  const printScale = useCakePrintScale();
   const { data: image, isLoading } = useCakeImage(id);
 
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -527,11 +537,17 @@ export default function CakeImageEditor() {
     });
   };
 
-  // Lerretet er allerede i 300 DPI — ingen ekstra multiplier, ellers blir
-  // filen dobbelt så stor uten å bli skarpere.
+  /**
+   * Eksporten skal alltid ha nok piksler: multiplikatoren regnes ut fra fysisk
+   * størrelse slik at resultatet lander på minst 300 DPI, uansett hvor stort
+   * lerretet tilfeldigvis er.
+   */
+  const exportScale = () =>
+    exportMultiplier(fabRef.current?.getWidth() ?? 0, dims.widthMm);
+
   const renderPng = async (): Promise<Blob> => {
     const c = fabRef.current!;
-    const dataUrl = c.toDataURL({ format: "png", multiplier: 1 });
+    const dataUrl = c.toDataURL({ format: "png", multiplier: exportScale() });
     const res = await fetch(dataUrl);
     return await res.blob();
   };
@@ -638,59 +654,60 @@ export default function CakeImageEditor() {
   };
 
 
+  /** Bygger arket via den felles utskriftsveien — samme papir som fra køen. */
+  const buildItem = (dataUrl: string): CakePrintItem => ({
+    image: image ?? null,
+    url: dataUrl,
+    widthMm: dims.widthMm,
+    heightMm: dims.heightMm,
+    isRound: dims.isRound,
+    labelNumber: image?.label_number ?? null,
+    orderRef: image?.order_ref ?? null,
+    customerName: image?.customer_name ?? null,
+    deliveryDate: image?.delivery_date ?? null,
+    title: image?.title ?? null,
+  });
+
   const printNow = async () => {
     const c = fabRef.current!;
-    const dataUrl = c.toDataURL({ format: "png", multiplier: 2 });
-    const w = window.open("", "_blank", "width=900,height=700");
-    if (!w) return;
-
-    // Bygg dokumentet med DOM-API — aldri string-interpolering av brukerdata
-    // (en tittel som «</title><script>…» ville ellers kjørt kode i vår origin).
-    const doc = w.document;
-    doc.title = image?.title ?? "Kakebilde";
-    const style = doc.createElement("style");
-    style.textContent = `
-@page { size: auto; margin: 10mm; }
-body { margin:0; display:flex; align-items:center; justify-content:center; min-height:100vh; }
-img { max-width:100%; max-height:100vh; }`;
-    doc.head.appendChild(style);
-    const img = doc.createElement("img");
-    img.src = dataUrl;
-    img.alt = image?.title ?? "Kakebilde";
+    const dataUrl = c.toDataURL({ format: "png", multiplier: exportScale() });
     const imageId = image?.id ?? null;
-    w.addEventListener("afterprint", () => {
-      if (!imageId) return;
-      // Marker først NÅR utskriften faktisk er utført
-      markPrinted([imageId])
-        .then(() => qc.invalidateQueries({ queryKey: ["cake-images"] }))
-        .catch((e) => console.error("[CakeImageEditor] markPrinted feilet", e));
-    });
-    img.onload = () => {
-      w.focus();
-      w.print();
-    };
-    doc.body.appendChild(img);
+    const wasPrinted = image?.status === "skrevet_ut";
+    try {
+      await openCakePrintWindow([buildItem(dataUrl)], {
+        scale: printScale,
+        title: image?.title ?? "Kakebilde",
+        onPrinted: () => {
+          if (!imageId) return;
+          // Status settes først NÅR utskriften faktisk er utført.
+          markPrinted([imageId], wasPrinted ? "reprint" : "print")
+            .then(() => {
+              qc.invalidateQueries({ queryKey: ["cake-images"] });
+              qc.invalidateQueries({ queryKey: ["cake-image-prints", imageId] });
+            })
+            .catch((e) => console.error("[CakeImageEditor] markPrinted feilet", e));
+        },
+      });
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
   };
-
 
   const downloadPdf = async () => {
     const c = fabRef.current!;
-    const dataUrl = c.toDataURL({ format: "png", multiplier: 1 });
-    // Millimeter styrer alt: bildet plasseres i eksakt fysisk størrelse på A4.
-    const orientation = dims.widthMm >= dims.heightMm ? "landscape" : "portrait";
-    const pdf = new jsPDF({ orientation, unit: "mm", format: "a4" });
-    const pageW = pdf.internal.pageSize.getWidth();
-    const pageH = pdf.internal.pageSize.getHeight();
-    const drawW = dims.widthMm;
-    const drawH = dims.heightMm;
-
-    pdf.addImage(dataUrl, "PNG", (pageW - drawW) / 2, (pageH - drawH) / 2, drawW, drawH);
-    const safeName = (image?.title ?? "kakebilde").replace(/[^\p{L}\p{N} _-]/gu, "_").slice(0, 80) || "kakebilde";
-    pdf.save(`${safeName}.pdf`);
+    const dataUrl = c.toDataURL({ format: "png", multiplier: exportScale() });
+    const safeName =
+      (image?.title ?? "kakebilde").replace(/[^\p{L}\p{N} _-]/gu, "_").slice(0, 80) ||
+      "kakebilde";
+    await cakeSheetsToPdf([buildItem(dataUrl)], {
+      scale: printScale,
+      fileName: `${safeName}.pdf`,
+    });
 
     if (image) {
-      await markPrinted([image.id]);
-      qc.invalidateQueries({ queryKey: ["cake-images"] });
+      // PDF er ikke papir — loggføres, men flytter ikke status.
+      await markPrinted([image.id], "pdf");
+      qc.invalidateQueries({ queryKey: ["cake-image-prints", image.id] });
     }
   };
 
@@ -1217,6 +1234,7 @@ img { max-width:100%; max-height:100vh; }`;
             <div className="space-y-1 text-xs text-muted-foreground">
               <div>Status: {image.status}</div>
               <div>Skrevet ut: {image.print_count}×</div>
+              <CakePrintHistory cakeImageId={image.id} />
             </div>
           </div>
         </aside>
