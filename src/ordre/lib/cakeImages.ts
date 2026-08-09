@@ -131,6 +131,14 @@ export async function createCakeImage(input: {
   production_department_id?: string | null;
   order_ref?: string | null;
   notes?: string | null;
+  format_id?: string | null;
+  shape?: string | null;
+  width_mm?: number | null;
+  height_mm?: number | null;
+  source_width_px?: number | null;
+  source_height_px?: number | null;
+  effective_dpi?: number | null;
+  quality_flag?: "god" | "akseptabel" | "lav" | "ukjent" | null;
 }): Promise<CakeImage> {
   const { data: u } = await supabase.auth.getUser();
 
