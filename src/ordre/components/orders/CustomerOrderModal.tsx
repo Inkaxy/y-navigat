@@ -725,11 +725,8 @@ export function CustomerOrderModal({
               .from("tickets")
               .update({ related_order_id: row.id } as never)
               .eq("id", sourceTicketId);
-            await supabase.from("ticket_order_links").insert({
-              ticket_id: sourceTicketId,
-              order_id: row.id,
-              created_by: userId,
-            } as never);
+            // ticket_order_links vedlikeholdes av trigger på tickets.related_order_id
+
             await supabase.from("ticket_events").insert({
               ticket_id: sourceTicketId,
               order_id: row.id,
