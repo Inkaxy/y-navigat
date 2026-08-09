@@ -290,7 +290,13 @@ export function TicketsInbox() {
                           <span className="text-[10px] text-muted-foreground">Uten ansvarlig</span>
                         )}
                         {t.related_order_id && (
-                          <span className="text-[10px] text-primary">· koblet til ordre</span>
+                          <Link
+                            to={`/ordre/ordrer/${t.related_order_id}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-[10px] font-semibold text-primary hover:underline"
+                          >
+                            · Ordre #{orderNumbers?.[t.related_order_id] ?? "…"}
+                          </Link>
                         )}
                       </div>
                     </div>
