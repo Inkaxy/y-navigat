@@ -102,11 +102,28 @@ export default function LinkOrderSearch({ ticketId, onLinked }: Props) {
         .eq("id", ticketId);
       if (upd.error) throw upd.error;
 
-      await supabase.from("ticket_order_links").insert({
-        ticket_id: ticketId,
-        order_id: o.id,
-        created_by: userId,
-      } as never);
+      // ticket_order_links vedlikeholdes av trigger på tickets.related_order_id
+
+      // Kakebilder som ble lagt i køen før ordren fantes kobles til ordren nå.
+      try {
+        const { data: ord } = await supabase
+          .from("orders")
+          .select("delivery_date")
+          .eq("id", o.id)
+          .maybeSingle();
+        const deliveryDate = (ord as { delivery_date: string | null } | null)?.delivery_date;
+        if (deliveryDate) {
+          await attachTicketCakeImagesToOrder({
+            ticket_id: ticketId,
+            order_id: o.id,
+            order_number: o.order_number,
+            delivery_date: deliveryDate,
+          });
+        }
+      } catch (cakeErr) {
+        console.warn("[cake_images] Kunne ikke koble kakebilder til ordren", cakeErr);
+      }
+
 
       await supabase.from("ticket_events").insert({
         ticket_id: ticketId,
