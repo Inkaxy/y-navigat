@@ -17,16 +17,45 @@ function jsonErr(msg: string, status: number, extra: Record<string, unknown> = {
   });
 }
 
+/** Kolonner på `orders` som kan endres direkte fra ticket-flyten. */
 const ALLOWED_FIELDS = new Set([
   "delivery_date",
   "delivery_time",
   "customer_notes",
   "internal_notes",
+  "production_notes",
+  "store_notes",
   "delivery_address_line1",
   "delivery_address_line2",
   "delivery_postal_code",
   "delivery_city",
+  "distribution",
+  "delivery_tour_id",
+  "pickup_location_id",
+  "final_customer_name",
+  "final_customer_email",
+  "final_customer_phone",
 ]);
+
+/**
+ * Virtuelle felt som lagres inne i `orders.cake_payload` (jsonb).
+ * Nøkkel = feltnavn i AI-forslaget, verdi = nøkkel i cake_payload.
+ */
+const CAKE_PAYLOAD_FIELDS: Record<string, string> = {
+  cake_text: "cake_text",
+  cake_flavor: "flavor",
+  cake_filling: "filling",
+  cake_shape: "shape",
+  cake_size: "size",
+  allergies: "allergies",
+  portions: "portions",
+  decoration: "decoration",
+};
+
+/** Felt som må være uuid når de settes. */
+const UUID_FIELDS = new Set(["delivery_tour_id", "pickup_location_id"]);
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 
 const LineChangeSchema = z.object({
   order_line_id: z.string().uuid().optional(),
