@@ -472,7 +472,11 @@ export async function deleteCakeImage(image: CakeImage) {
   if (error) throw error;
 }
 
-export async function markPrinted(ids: string[]) {
+export async function markPrinted(
+  ids: string[],
+  kind: "print" | "reprint" | "pdf" | "test" = "print",
+  sheet: string | null = "A4",
+) {
   if (ids.length === 0) return;
   // Tellingen skjer i SQL (print_count = print_count + 1) for å unngå at to
   // samtidige utskrifter overskriver hverandres teller.
@@ -485,9 +489,30 @@ export async function markPrinted(ids: string[]) {
   const userId = u.user?.id ?? null;
   const userLabel = u.user?.email ?? null;
 
+  // Utskriftshistorikk — hver utskrift er en egen rad.
+  try {
+    await supabase.from("cake_image_prints").insert(
+      ids.map((cake_image_id) => ({
+        cake_image_id,
+        printed_by: userId,
+        kind,
+        sheet,
+      })) as never,
+    );
+    if (userId) {
+      await supabase
+        .from("cake_images")
+        .update({ last_printed_by: userId } as never)
+        .in("id", ids);
+    }
+  } catch (err) {
+    console.warn("[cake_images] kunne ikke logge utskrift", err);
+  }
+
   await Promise.all(
     ((rows ?? []) as CakeImage[]).map(async (row) => {
       const nextCount = row.print_count ?? 1;
+
 
 
       // Skriv ticket-hendelse + systeminnslag i tråden hvis raden er koblet til en ticket
