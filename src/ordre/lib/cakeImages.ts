@@ -379,22 +379,35 @@ export async function findCakeLineForOrder(orderId: string): Promise<{
   };
 }
 
-export async function updateCakeImage(
-  id: string,
-  patch: Partial<
-    Pick<
-      CakeImage,
-      | "title"
-      | "customer_name"
-      | "order_ref"
-      | "notes"
-      | "edited_path"
-      | "editor_state"
-      | "status"
-      | "delivery_date"
-    >
-  >,
-) {
+/** Felt grensesnittet har lov til å endre på et kakebilde. */
+export type CakeImagePatch = Partial<
+  Pick<
+    CakeImage,
+    | "title"
+    | "customer_name"
+    | "order_ref"
+    | "notes"
+    | "edited_path"
+    | "editor_state"
+    | "status"
+    | "delivery_date"
+    | "format_id"
+    | "shape"
+    | "width_mm"
+    | "height_mm"
+    | "source_width_px"
+    | "source_height_px"
+    | "effective_dpi"
+    | "quality_flag"
+    | "quality_ack_by"
+    | "quality_ack_at"
+    | "rights_cleared"
+    | "rights_note"
+    | "editor_state_version"
+  >
+>;
+
+export async function updateCakeImage(id: string, patch: CakeImagePatch) {
   const { error } = await supabase
     .from("cake_images")
     .update(patch as never)
@@ -417,12 +430,8 @@ export class CakeImageConflictError extends Error {
 export async function updateCakeImageGuarded(
   id: string,
   expectedUpdatedAt: string,
-  patch: Partial<
-    Pick<
-      CakeImage,
-      "title" | "customer_name" | "order_ref" | "notes" | "edited_path" | "editor_state" | "status" | "delivery_date"
-    >
-  >,
+  patch: CakeImagePatch,
+
 ): Promise<{ updated: CakeImage; previousEditedPath: string | null }> {
   // Les DB-verdien først, slik at opprydding av gammel fil bruker sannheten i DB.
   const { data: current, error: readErr } = await supabase
