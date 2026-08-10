@@ -567,7 +567,7 @@ export default function CakeImageEditor() {
   const qualityFlag = qualityFlagFor(effectiveDpi);
   const needsQualityAck = qualityFlag === "lav" && !qualityAcked;
   const rightsAnswered = rightsCleared || (rightsNote.trim().length > 0);
-  const canMarkFerdig = !needsQualityAck && rightsAnswered;
+  const canMarkFerdig = !needsQualityAck && rightsAnswered && !!format;
 
   const doSave = async (
     markFerdig = false,
@@ -576,9 +576,11 @@ export default function CakeImageEditor() {
     if (!image || !fabRef.current) return false;
     if (markFerdig && !canMarkFerdig) {
       toast.error(
-        needsQualityAck
-          ? "Bekreft at bildet skal trykkes selv om oppløsningen er lav"
-          : "Ta stilling til rettighetene før bildet markeres ferdig",
+        !format
+          ? "Velg format før bildet markeres ferdig — uten format kan det ikke skrives ut i riktig størrelse"
+          : needsQualityAck
+            ? "Bekreft at bildet skal trykkes selv om oppløsningen er lav"
+            : "Ta stilling til rettighetene før bildet markeres ferdig",
       );
       return false;
     }

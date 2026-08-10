@@ -48,6 +48,7 @@ export default function CakeImagesPrint() {
     null,
   );
   const [calibrateOpen, setCalibrateOpen] = useState(false);
+  const [preparing, setPreparing] = useState(false);
   const previewRef = useRef<HTMLDivElement>(null);
   const autoDone = useRef(false);
 
@@ -118,7 +119,8 @@ export default function CakeImagesPrint() {
   };
 
   const runPrint = async () => {
-    if (items.length === 0) return;
+    if (items.length === 0 || preparing) return;
+    setPreparing(true);
     try {
       await openCakePrintWindow(items, {
         scale,
@@ -128,8 +130,11 @@ export default function CakeImagesPrint() {
       });
     } catch (e) {
       toast.error((e as Error).message);
+    } finally {
+      setPreparing(false);
     }
   };
+
 
   useEffect(() => {
     if (auto && items.length > 0 && !autoDone.current) {
@@ -210,9 +215,13 @@ export default function CakeImagesPrint() {
             <Ruler className="mr-2 h-4 w-4" />
             Kalibrer
           </Button>
-          <Button onClick={() => void runPrint()}>
-            <Printer className="mr-2 h-4 w-4" />
-            Skriv ut
+          <Button onClick={() => void runPrint()} disabled={preparing}>
+            {preparing ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Printer className="mr-2 h-4 w-4" />
+            )}
+            {preparing ? "Klargjør bildene…" : "Skriv ut"}
           </Button>
           <Button variant="outline" onClick={() => void downloadPdf()}>
             <Download className="mr-2 h-4 w-4" />
