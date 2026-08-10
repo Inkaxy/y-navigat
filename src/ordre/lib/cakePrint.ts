@@ -103,7 +103,21 @@ export const CAKE_PRINT_CSS = `
     transform: translate(-50%, -50%);
     display: block;
   }
+  .cake-artwork { overflow: hidden; }
   .cake-artwork img { display: block; width: 100%; height: 100%; }
+  .cake-missing {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 8mm;
+    font-weight: 800;
+    color: #000;
+    text-align: center;
+    border: 1mm solid #000;
+    padding: 6mm 8mm;
+    max-width: 170mm;
+  }
   .cake-round-guide {
     position: absolute;
     left: 50%;
