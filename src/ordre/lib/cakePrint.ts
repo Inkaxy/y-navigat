@@ -328,11 +328,85 @@ export function buildCakeSheet(
   return sheet;
 }
 
+async function urlToDataUrl(url: string): Promise<string> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const blob = await res.blob();
+  if (blob.size === 0) throw new Error("Tom fil");
+  return await new Promise<string>((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result as string);
+    r.onerror = () => reject(new Error("Kunne ikke lese bildet"));
+    r.readAsDataURL(blob);
+  });
+}
+
+/**
+ * Baker bildene inn som data-URL-er FØR utskriftsvinduet åpnes. Da finnes det
+ * ingen nettverkskall igjen i utskriftsvinduet — hverken utløpt signert URL
+ * eller kappløp mot `print()` kan gi tomme ark.
+ */
+export async function embedCakeImages(
+  items: CakePrintItem[],
+): Promise<{ items: CakePrintItem[]; failed: CakePrintItem[] }> {
+  const failed: CakePrintItem[] = [];
+  const out = await Promise.all(
+    items.map(async (item) => {
+      if (!item.url) {
+        failed.push(item);
+        return { ...item, url: "" };
+      }
+      if (item.url.startsWith("data:")) return item;
+      try {
+        return { ...item, url: await urlToDataUrl(item.url) };
+      } catch (e) {
+        console.error("[cakePrint] kunne ikke hente bildet", item.url, e);
+        failed.push(item);
+        return { ...item, url: "" };
+      }
+    }),
+  );
+  return { items: out, failed };
+}
+
+/** Navn på et ark, til feilmeldinger. */
+export function cakeItemLabel(item: CakePrintItem): string {
+  return (
+    item.labelNumber ??
+    item.title ??
+    item.orderRef ??
+    item.customerName ??
+    item.image?.id ??
+    "ukjent bilde"
+  );
+}
+
 /** Åpner et utskriftsvindu med arkene og kaller `onPrinted` etter faktisk utskrift. */
 export async function openCakePrintWindow(
   items: CakePrintItem[],
-  opts: { scale?: number; scaleY?: number; onPrinted?: () => void; title?: string } = {},
+  opts: {
+    scale?: number;
+    scaleY?: number;
+    onPrinted?: () => void;
+    title?: string;
+    /** Sett false hvis kildene allerede er data-URL-er. */
+    embed?: boolean;
+  } = {},
 ): Promise<void> {
+  let sheets = items;
+  if (opts.embed !== false) {
+    const res = await embedCakeImages(items);
+    if (res.failed.length > 0) {
+      // Heller stoppe enn å skrive ut noen ark og la brukeren tro alt gikk bra.
+      throw new Error(
+        `Kunne ikke hente ${res.failed.length} bilde(r): ${res.failed
+          .map(cakeItemLabel)
+          .join(", ")}. Utskriften ble ikke startet.`,
+      );
+    }
+    sheets = res.items;
+  }
+
   const w = window.open("", "_blank", "width=900,height=1100");
   if (!w) {
     throw new Error("Nettleseren blokkerte utskriftsvinduet");
@@ -342,24 +416,47 @@ export async function openCakePrintWindow(
   const style = doc.createElement("style");
   style.textContent = CAKE_PRINT_CSS;
   doc.head.appendChild(style);
-  for (const item of items) {
+  for (const item of sheets) {
     doc.body.appendChild(
       buildCakeSheet(doc, item, opts.scale ?? 1, opts.scaleY ?? opts.scale ?? 1),
     );
   }
 
-  // Vent til alle bildene er lastet — ellers printes tomme sider.
+  // Vent til bildene faktisk er dekodet — `complete` er upålitelig i et
+  // nyåpnet about:blank-vindu.
   const imgs = Array.from(doc.images);
+  const broken: HTMLImageElement[] = [];
   await Promise.all(
-    imgs.map(
-      (img) =>
-        new Promise<void>((resolve) => {
-          if (img.complete) return resolve();
-          img.onload = () => resolve();
-          img.onerror = () => resolve();
-        }),
-    ),
+    imgs.map(async (img) => {
+      try {
+        if (typeof img.decode === "function") {
+          await img.decode();
+        } else {
+          await new Promise<void>((resolve) => {
+            img.onload = () => resolve();
+            img.onerror = () => resolve();
+          });
+        }
+      } catch {
+        /* håndteres av naturalWidth-sjekken under */
+      }
+      if (!img.naturalWidth) broken.push(img);
+    }),
   );
+
+  if (broken.length > 0) {
+    for (const img of broken) {
+      const art = img.parentElement;
+      img.remove();
+      const holder = art?.parentElement ?? doc.body;
+      const warn = el(doc, "div", "cake-missing", "BILDE MANGLER — ikke bruk dette arket");
+      holder.appendChild(warn);
+    }
+    w.close();
+    throw new Error(
+      `${broken.length} bilde(r) kunne ikke vises. Utskriften ble ikke startet.`,
+    );
+  }
 
   // Avbrutt dialog skal ikke registreres — derfor onafterprint, ikke et løfte.
   if (opts.onPrinted) {
@@ -369,15 +466,6 @@ export async function openCakePrintWindow(
   w.print();
 }
 
-async function urlToDataUrl(url: string): Promise<string> {
-  const res = await fetch(url);
-  const blob = await res.blob();
-  return await new Promise<string>((resolve) => {
-    const r = new FileReader();
-    r.onload = () => resolve(r.result as string);
-    r.readAsDataURL(blob);
-  });
-}
 
 /** Samme ark som på papir, men som PDF. Millimeter, ikke punkter. */
 export async function cakeSheetsToPdf(
