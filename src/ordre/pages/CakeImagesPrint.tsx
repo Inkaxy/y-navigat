@@ -118,7 +118,8 @@ export default function CakeImagesPrint() {
   };
 
   const runPrint = async () => {
-    if (items.length === 0) return;
+    if (items.length === 0 || preparing) return;
+    setPreparing(true);
     try {
       await openCakePrintWindow(items, {
         scale,
@@ -128,8 +129,11 @@ export default function CakeImagesPrint() {
       });
     } catch (e) {
       toast.error((e as Error).message);
+    } finally {
+      setPreparing(false);
     }
   };
+
 
   useEffect(() => {
     if (auto && items.length > 0 && !autoDone.current) {
