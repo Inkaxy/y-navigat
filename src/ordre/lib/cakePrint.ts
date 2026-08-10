@@ -260,6 +260,13 @@ export function buildCakeSheet(
   }
   sheet.appendChild(art);
 
+  if (!item.url) {
+    // Et blankt ark som ser normalt ut er verre enn en synlig feil.
+    sheet.appendChild(
+      el(doc, "div", "cake-missing", "BILDE MANGLER — ikke bruk dette arket"),
+    );
+  }
+
   if (known) {
     addCropMarks(doc, sheet, wMm!, hMm!);
     if (item.isRound) {
