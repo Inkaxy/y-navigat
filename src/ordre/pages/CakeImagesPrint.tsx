@@ -215,9 +215,13 @@ export default function CakeImagesPrint() {
             <Ruler className="mr-2 h-4 w-4" />
             Kalibrer
           </Button>
-          <Button onClick={() => void runPrint()}>
-            <Printer className="mr-2 h-4 w-4" />
-            Skriv ut
+          <Button onClick={() => void runPrint()} disabled={preparing}>
+            {preparing ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Printer className="mr-2 h-4 w-4" />
+            )}
+            {preparing ? "Klargjør bildene…" : "Skriv ut"}
           </Button>
           <Button variant="outline" onClick={() => void downloadPdf()}>
             <Download className="mr-2 h-4 w-4" />
