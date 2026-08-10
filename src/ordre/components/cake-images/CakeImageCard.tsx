@@ -118,12 +118,25 @@ export function CakeImageCard({
           </div>
         )}
 
+        {image.width_mm && image.height_mm ? (
+          <div className="mt-1 text-[11px] text-muted-foreground">
+            {Math.round(Number(image.width_mm))} × {Math.round(Number(image.height_mm))} mm
+            {image.shape === "round" ? " · rund" : ""}
+          </div>
+        ) : (
+          <div className="mt-1 flex items-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-900">
+            <AlertTriangle className="h-3.5 w-3.5" />
+            Mangler format — kan ikke skrives ut i riktig størrelse
+          </div>
+        )}
+
         {image.quality_flag === "lav" && !image.quality_ack_at && (
           <div className="mt-1 flex items-center gap-1.5 rounded-md border border-rose-300 bg-rose-50 px-2 py-1 text-[11px] font-semibold text-rose-900">
             <AlertTriangle className="h-3.5 w-3.5" />
             Lav oppløsning — må bekreftes i editoren
           </div>
         )}
+
 
         {missingOrder && (
           <div className="mt-1 space-y-1.5 rounded-md border border-amber-300 bg-amber-50 p-2">
