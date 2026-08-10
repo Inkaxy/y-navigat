@@ -48,6 +48,7 @@ export default function CakeImagesPrint() {
     null,
   );
   const [calibrateOpen, setCalibrateOpen] = useState(false);
+  const [preparing, setPreparing] = useState(false);
   const previewRef = useRef<HTMLDivElement>(null);
   const autoDone = useRef(false);
 
