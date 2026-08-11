@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
@@ -39,6 +40,7 @@ import { cn } from "@/lib/utils";
 import { osloTodayISO } from "@/lib/osloDate";
 import { nKr, nNum, nPct, parseNum } from "@/varer/lib/calcFormat";
 import { downloadCsv } from "@/varer/lib/pricing";
+import { AddToPriceRoundDialog } from "@/varer/components/prices/AddToPriceRoundDialog";
 
 /* ---------------------------------------------------------------- typer */
 
@@ -141,7 +143,7 @@ type SortKey =
 
 export default function Profitability() {
   const navigate = useNavigate();
-  const { legalEntityId } = useAppContext();
+  const { legalEntityId, user } = useAppContext();
 
   const [priceListId, setPriceListId] = useState<string>("");
   const [date, setDate] = useState<string>(osloTodayISO());
