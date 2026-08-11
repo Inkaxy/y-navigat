@@ -236,6 +236,7 @@ function RmSupplierDialog({ open, onOpenChange, rawMaterialId, existing }: any) 
   const [sku, setSku] = useState(existing?.supplier_sku ?? "");
   const [productName, setProductName] = useState(existing?.supplier_product_name ?? "");
   const [packageSize, setPackageSize] = useState(existing?.package_size?.toString() ?? "");
+  const [baseUnitsPerPackage, setBaseUnitsPerPackage] = useState(existing?.base_units_per_package?.toString() ?? "");
   const [packageUnit, setPackageUnit] = useState(existing?.package_unit ?? "");
   const [agreedPrice, setAgreedPrice] = useState(existing?.agreed_price?.toString() ?? "");
   const [validTo, setValidTo] = useState(existing?.agreement_valid_to ?? "");
