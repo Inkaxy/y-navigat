@@ -633,27 +633,47 @@ export default function RecipeDetail() {
                   <Label className="text-xs">Deigemnevekt (g)</Label>
                   <Input type="number" value={header.dough_piece_grams ?? ""} disabled={!editable}
                     onChange={(e) => patchHeader({ dough_piece_grams: e.target.value })} />
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Vekten på deigemnet før steking. Denne styrer kalkylen.
+                  </p>
                 </div>
                 <div>
                   <Label className="text-xs">Deigsvinn (%)</Label>
                   <Input type="number" value={header.dough_waste_pct ?? ""} disabled={!editable}
                     onChange={(e) => patchHeader({ dough_waste_pct: e.target.value })} />
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Rester, avskjær, feilvekt og vraket bakst.
+                  </p>
                 </div>
                 <div>
                   <Label className="text-xs">Ferdigvekt (g)</Label>
                   <Input type="number" value={header.finished_weight_grams ?? ""} disabled={!editable}
                     onChange={(e) => patchHeader({ finished_weight_grams: e.target.value })} />
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Vekten etter steking. Brukes til deklarasjon og grovhet, ikke til kostprisen.
+                  </p>
                 </div>
               </div>
-              <label className="mt-3 flex items-center gap-2 text-sm">
+              <YieldPreview
+                doughGrams={doughGramsTotal}
+                doughPieceGrams={Number(header.dough_piece_grams) || null}
+                doughWastePct={Number(header.dough_waste_pct) || 0}
+                finishedWeightGrams={Number(header.finished_weight_grams) || null}
+              />
+              <label className="mt-3 flex items-start gap-2 text-sm">
                 <input
                   type="checkbox"
-                  className="h-4 w-4 rounded border-input"
+                  className="mt-0.5 h-4 w-4 rounded border-input"
                   checked={!!header.measured_per_kg}
                   disabled={!editable}
                   onChange={(e) => patchHeader({ measured_per_kg: e.target.checked })}
                 />
-                Oppskriften er målt per kg
+                <span>
+                  Oppskriften er målt per kg
+                  <span className="block text-xs font-normal text-muted-foreground">
+                    For halvfabrikat som deig, krem og fyll. Sett deigemnevekt til 1000 g.
+                  </span>
+                </span>
               </label>
             </div>
             <div>
