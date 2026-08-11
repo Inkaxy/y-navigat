@@ -1827,6 +1827,7 @@ export type Database = {
           product_id: string
           product_snapshot: Json
           quantity: number
+          received_quantity: number | null
           sales_unit: string
           unit_price: number
           vat_rate: number
@@ -1847,6 +1848,7 @@ export type Database = {
           product_id: string
           product_snapshot?: Json
           quantity: number
+          received_quantity?: number | null
           sales_unit: string
           unit_price?: number
           vat_rate?: number
@@ -1867,6 +1869,7 @@ export type Database = {
           product_id?: string
           product_snapshot?: Json
           quantity?: number
+          received_quantity?: number | null
           sales_unit?: string
           unit_price?: number
           vat_rate?: number
@@ -1957,6 +1960,8 @@ export type Database = {
       }
       delivery_notes: {
         Row: {
+          approved_at: string | null
+          approved_by: string | null
           cancelled_at: string | null
           cancelled_by: string | null
           cancelled_reason: string | null
@@ -1972,8 +1977,13 @@ export type Database = {
           finalized_by: string | null
           generated_by_run_id: string | null
           id: string
+          is_return: boolean
           legal_entity_id: string
           notes: string | null
+          rejected_at: string | null
+          rejected_by: string | null
+          rejected_reason: string | null
+          return_order_id: string | null
           route_label: string | null
           status: string
           subtotal_excl_vat: number
@@ -1982,6 +1992,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
           cancelled_at?: string | null
           cancelled_by?: string | null
           cancelled_reason?: string | null
@@ -1997,8 +2009,13 @@ export type Database = {
           finalized_by?: string | null
           generated_by_run_id?: string | null
           id?: string
+          is_return?: boolean
           legal_entity_id: string
           notes?: string | null
+          rejected_at?: string | null
+          rejected_by?: string | null
+          rejected_reason?: string | null
+          return_order_id?: string | null
           route_label?: string | null
           status?: string
           subtotal_excl_vat?: number
@@ -2007,6 +2024,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          approved_at?: string | null
+          approved_by?: string | null
           cancelled_at?: string | null
           cancelled_by?: string | null
           cancelled_reason?: string | null
@@ -2022,8 +2041,13 @@ export type Database = {
           finalized_by?: string | null
           generated_by_run_id?: string | null
           id?: string
+          is_return?: boolean
           legal_entity_id?: string
           notes?: string | null
+          rejected_at?: string | null
+          rejected_by?: string | null
+          rejected_reason?: string | null
+          return_order_id?: string | null
           route_label?: string | null
           status?: string
           subtotal_excl_vat?: number
@@ -2044,6 +2068,13 @@ export type Database = {
             columns: ["generated_by_run_id"]
             isOneToOne: false
             referencedRelation: "delivery_note_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_notes_return_order_id_fkey"
+            columns: ["return_order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
             referencedColumns: ["id"]
           },
         ]
@@ -12415,6 +12446,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      approve_return_delivery_note: {
+        Args: { p_lines?: Json; p_note?: string; p_note_id: string }
+        Returns: Json
+      }
       assign_label_number: {
         Args: {
           p_dept_id: string
@@ -13200,6 +13235,7 @@ export type Database = {
           original_unit_price: number
           product_id: string
           return_price_type: string
+          return_rule_source: string
           return_unit_price: number
           return_value: number
           sales_unit: string
@@ -13673,6 +13709,10 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      reject_return_delivery_note: {
+        Args: { p_note_id: string; p_reason: string }
+        Returns: Json
+      }
       rename_raw_material: {
         Args: { p_id: string; p_name: string }
         Returns: {
@@ -13759,6 +13799,20 @@ export type Database = {
           target_brutto_pct: number
           target_dg2_pct: number
           warn_below_pp: number
+        }[]
+      }
+      return_is_approved: { Args: { p_order_id: string }; Returns: boolean }
+      return_unit_price: {
+        Args: {
+          p_delivered_unit_price: number
+          p_price_list_id: string
+          p_product_id: string
+        }
+        Returns: {
+          return_unit_price: number
+          rule_source: string
+          rule_type: string
+          rule_value: number
         }[]
       }
       rm_can_read: { Args: { _rm_id: string }; Returns: boolean }
