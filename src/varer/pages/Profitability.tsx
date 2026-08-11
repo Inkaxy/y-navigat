@@ -670,6 +670,7 @@ function Row({
   onSim: (v: string) => void;
   onOpen: () => void;
 }) {
+  const simulerbar = kanSimuleres(row);
   const sim = simulate(row, parseNum(simValue));
   const calc = CALC_MAP[row.calc_type ?? ""];
   const status = sim ? STATUS_MAP[sim.status] : STATUS_MAP[row.status ?? ""];
