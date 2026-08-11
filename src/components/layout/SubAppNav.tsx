@@ -317,6 +317,7 @@ function VarerNav() {
     { kind: "link", to: "/varer/vareliste", label: "Vareliste", icon: Cookie },
     { kind: "link", to: "/varer/priser", label: "Priser", icon: Tags },
     { kind: "link", to: "/varer/spesialpriser", label: "Spesialpriser", icon: HandCoins },
+    { kind: "link", to: "/varer/lonnsomhet", label: "Lønnsomhet", icon: TrendingUp },
     { kind: "link", to: "/varer/kakebygger", label: "Kakebygger", icon: CakeSlice },
     {
       kind: "dropdown",
