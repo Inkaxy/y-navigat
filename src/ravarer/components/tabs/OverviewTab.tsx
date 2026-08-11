@@ -213,6 +213,13 @@ export function OverviewTab({ rm }: Props) {
         </div>
       </Card>
 
+      <Card className="p-5 space-y-3">
+        <h3 className="text-base font-semibold">Omregninger av kostpris</h3>
+        <RecalcHistory rawMaterialId={rm.id} baseUnit={rm.base_unit} />
+      </Card>
+
+
+
       {canWrite && (
         <div className="sticky bottom-4 flex justify-end gap-2">
           <Button variant="outline" disabled={!dirty} onClick={() => setDraft(rm)}>Forkast</Button>
