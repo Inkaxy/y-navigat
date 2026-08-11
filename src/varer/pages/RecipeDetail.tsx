@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Calculator, FileText, Loader2, Lock, Plus, Printer, Save, Share2 } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Calculator, FileText, Loader2, Lock, Plus, Printer, Save, Share2 } from "lucide-react";
 import { logAudit } from "@/varer/lib/audit";
 import { RecipeProductLinks } from "@/varer/components/products/RecipeProductLinks";
 import { RecipeStatsBar } from "@/varer/components/recipes/RecipeStatsBar";
@@ -157,6 +157,19 @@ export default function RecipeDetail() {
   const totals = useMemo(
     () => computeTotals(hydratedLines, Number(header.dough_piece_grams) || null),
     [hydratedLines, header.dough_piece_grams],
+  );
+
+  /** Sum deigvekt i gram — kun forhåndsvisning i nettleseren. */
+  const doughGramsTotal = useMemo(
+    () =>
+      hydratedLines.reduce((sum, l: any) => {
+        const q = Number(l.quantity) || 0;
+        const u = String(l.unit ?? "g");
+        if (u === "kg" || u === "liter") return sum + q * 1000;
+        if (u === "g" || u === "ml") return sum + q;
+        return sum;
+      }, 0),
+    [hydratedLines],
   );
 
   // ===== Skalering (kun visning — basen røres ikke) =====
@@ -633,27 +646,47 @@ export default function RecipeDetail() {
                   <Label className="text-xs">Deigemnevekt (g)</Label>
                   <Input type="number" value={header.dough_piece_grams ?? ""} disabled={!editable}
                     onChange={(e) => patchHeader({ dough_piece_grams: e.target.value })} />
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Vekten på deigemnet før steking. Denne styrer kalkylen.
+                  </p>
                 </div>
                 <div>
                   <Label className="text-xs">Deigsvinn (%)</Label>
                   <Input type="number" value={header.dough_waste_pct ?? ""} disabled={!editable}
                     onChange={(e) => patchHeader({ dough_waste_pct: e.target.value })} />
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Rester, avskjær, feilvekt og vraket bakst.
+                  </p>
                 </div>
                 <div>
                   <Label className="text-xs">Ferdigvekt (g)</Label>
                   <Input type="number" value={header.finished_weight_grams ?? ""} disabled={!editable}
                     onChange={(e) => patchHeader({ finished_weight_grams: e.target.value })} />
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Vekten etter steking. Brukes til deklarasjon og grovhet, ikke til kostprisen.
+                  </p>
                 </div>
               </div>
-              <label className="mt-3 flex items-center gap-2 text-sm">
+              <YieldPreview
+                doughGrams={doughGramsTotal}
+                doughPieceGrams={Number(header.dough_piece_grams) || null}
+                doughWastePct={Number(header.dough_waste_pct) || 0}
+                finishedWeightGrams={Number(header.finished_weight_grams) || null}
+              />
+              <label className="mt-3 flex items-start gap-2 text-sm">
                 <input
                   type="checkbox"
-                  className="h-4 w-4 rounded border-input"
+                  className="mt-0.5 h-4 w-4 rounded border-input"
                   checked={!!header.measured_per_kg}
                   disabled={!editable}
                   onChange={(e) => patchHeader({ measured_per_kg: e.target.checked })}
                 />
-                Oppskriften er målt per kg
+                <span>
+                  Oppskriften er målt per kg
+                  <span className="block text-xs font-normal text-muted-foreground">
+                    For halvfabrikat som deig, krem og fyll. Sett deigemnevekt til 1000 g.
+                  </span>
+                </span>
               </label>
             </div>
             <div>
@@ -768,5 +801,66 @@ export default function RecipeDetail() {
     </>
 
 
+  );
+}
+
+/** Forhåndsvisning av utbytte og steketap. Kun visning — kalkylen kommer fra product_cost. */
+function YieldPreview({
+  doughGrams,
+  doughPieceGrams,
+  doughWastePct,
+  finishedWeightGrams,
+}: {
+  doughGrams: number;
+  doughPieceGrams: number | null;
+  doughWastePct: number;
+  finishedWeightGrams: number | null;
+}) {
+  const nb = (n: number, d = 1) =>
+    n.toLocaleString("nb-NO", { minimumFractionDigits: d, maximumFractionDigits: d });
+
+  if (!doughPieceGrams || doughPieceGrams <= 0) {
+    return (
+      <p className="mt-3 text-sm text-muted-foreground">
+        Sett deigemnevekt for å beregne antall enheter
+      </p>
+    );
+  }
+
+  const units = (doughGrams * (1 - (doughWastePct || 0) / 100)) / doughPieceGrams;
+
+  let bake: { pct: number; tone: "grey" | "warn" | "bad" } | null = null;
+  if (finishedWeightGrams && finishedWeightGrams > 0) {
+    const pct = (1 - finishedWeightGrams / doughPieceGrams) * 100;
+    bake = {
+      pct,
+      tone: finishedWeightGrams > doughPieceGrams ? "bad" : pct < 3 || pct > 25 ? "warn" : "grey",
+    };
+  }
+
+  return (
+    <div className="mt-3 space-y-1">
+      <p className="text-sm text-muted-foreground">
+        {nb(doughGrams, 0)} g deig · {nb(doughWastePct || 0, 0)} % svinn · {nb(doughPieceGrams, 0)} g per emne →{" "}
+        <span className="font-semibold text-foreground">{nb(units, 1)} enheter</span>
+      </p>
+      {bake && bake.tone === "grey" && (
+        <p className="text-sm text-muted-foreground">
+          Steketap <span className="font-semibold text-foreground">{nb(bake.pct, 1)} %</span>
+        </p>
+      )}
+      {bake && bake.tone === "warn" && (
+        <p className="flex items-center gap-1.5 text-sm text-warning">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          Steketap <span className="font-semibold">{nb(bake.pct, 1)} %</span> — Sjekk vektene, dette ser ikke ut som et vanlig steketap
+        </p>
+      )}
+      {bake && bake.tone === "bad" && (
+        <p className="flex items-center gap-1.5 text-sm text-destructive">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          Ferdigvekt kan ikke være høyere enn deigemnevekt
+        </p>
+      )}
+    </div>
   );
 }
