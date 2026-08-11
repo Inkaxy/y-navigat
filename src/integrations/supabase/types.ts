@@ -7198,6 +7198,276 @@ export type Database = {
           },
         ]
       }
+      price_round_letters: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          body: string
+          created_at: string
+          customer_id: string
+          customer_name: string
+          id: string
+          round_id: string
+          sent_at: string | null
+          sent_note: string | null
+          status: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          body: string
+          created_at?: string
+          customer_id: string
+          customer_name: string
+          id?: string
+          round_id: string
+          sent_at?: string | null
+          sent_note?: string | null
+          status?: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          body?: string
+          created_at?: string
+          customer_id?: string
+          customer_name?: string
+          id?: string
+          round_id?: string
+          sent_at?: string | null
+          sent_note?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "price_round_letters_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "price_round_letters_round_id_fkey"
+            columns: ["round_id"]
+            isOneToOne: false
+            referencedRelation: "price_round_letter_basis"
+            referencedColumns: ["round_id"]
+          },
+          {
+            foreignKeyName: "price_round_letters_round_id_fkey"
+            columns: ["round_id"]
+            isOneToOne: false
+            referencedRelation: "price_rounds"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      price_round_lines: {
+        Row: {
+          added_at: string
+          added_by: string | null
+          arbeidskost: number | null
+          brutto_etter: number | null
+          brutto_for: number | null
+          cost_snapshot: Json | null
+          dg2_etter: number | null
+          dg2_for: number | null
+          id: string
+          ingredient_snapshot: Json | null
+          kostpris: number | null
+          kvalitet: string | null
+          maal_brutto_pct: number | null
+          maal_dg2_pct: number | null
+          new_price: number
+          nodvendig_pris: number | null
+          old_price: number | null
+          price_list_id: string
+          product_id: string
+          raavarekost: number | null
+          reason: string | null
+          round_id: string
+        }
+        Insert: {
+          added_at?: string
+          added_by?: string | null
+          arbeidskost?: number | null
+          brutto_etter?: number | null
+          brutto_for?: number | null
+          cost_snapshot?: Json | null
+          dg2_etter?: number | null
+          dg2_for?: number | null
+          id?: string
+          ingredient_snapshot?: Json | null
+          kostpris?: number | null
+          kvalitet?: string | null
+          maal_brutto_pct?: number | null
+          maal_dg2_pct?: number | null
+          new_price: number
+          nodvendig_pris?: number | null
+          old_price?: number | null
+          price_list_id: string
+          product_id: string
+          raavarekost?: number | null
+          reason?: string | null
+          round_id: string
+        }
+        Update: {
+          added_at?: string
+          added_by?: string | null
+          arbeidskost?: number | null
+          brutto_etter?: number | null
+          brutto_for?: number | null
+          cost_snapshot?: Json | null
+          dg2_etter?: number | null
+          dg2_for?: number | null
+          id?: string
+          ingredient_snapshot?: Json | null
+          kostpris?: number | null
+          kvalitet?: string | null
+          maal_brutto_pct?: number | null
+          maal_dg2_pct?: number | null
+          new_price?: number
+          nodvendig_pris?: number | null
+          old_price?: number | null
+          price_list_id?: string
+          product_id?: string
+          raavarekost?: number | null
+          reason?: string | null
+          round_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "price_round_lines_price_list_id_fkey"
+            columns: ["price_list_id"]
+            isOneToOne: false
+            referencedRelation: "price_lists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "price_round_lines_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "price_round_lines_round_id_fkey"
+            columns: ["round_id"]
+            isOneToOne: false
+            referencedRelation: "price_round_letter_basis"
+            referencedColumns: ["round_id"]
+          },
+          {
+            foreignKeyName: "price_round_lines_round_id_fkey"
+            columns: ["round_id"]
+            isOneToOne: false
+            referencedRelation: "price_rounds"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      price_round_price_lists: {
+        Row: {
+          price_list_id: string
+          round_id: string
+        }
+        Insert: {
+          price_list_id: string
+          round_id: string
+        }
+        Update: {
+          price_list_id?: string
+          round_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "price_round_price_lists_price_list_id_fkey"
+            columns: ["price_list_id"]
+            isOneToOne: false
+            referencedRelation: "price_lists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "price_round_price_lists_round_id_fkey"
+            columns: ["round_id"]
+            isOneToOne: false
+            referencedRelation: "price_round_letter_basis"
+            referencedColumns: ["round_id"]
+          },
+          {
+            foreignKeyName: "price_round_price_lists_round_id_fkey"
+            columns: ["round_id"]
+            isOneToOne: false
+            referencedRelation: "price_rounds"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      price_rounds: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          created_by: string | null
+          discarded_at: string | null
+          discarded_by: string | null
+          effective_date: string
+          id: string
+          legal_entity_id: string
+          letter_template: string | null
+          letters_generated_at: string | null
+          name: string
+          note: string | null
+          published_at: string | null
+          published_by: string | null
+          status: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          discarded_at?: string | null
+          discarded_by?: string | null
+          effective_date: string
+          id?: string
+          legal_entity_id: string
+          letter_template?: string | null
+          letters_generated_at?: string | null
+          name: string
+          note?: string | null
+          published_at?: string | null
+          published_by?: string | null
+          status?: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          discarded_at?: string | null
+          discarded_by?: string | null
+          effective_date?: string
+          id?: string
+          legal_entity_id?: string
+          letter_template?: string | null
+          letters_generated_at?: string | null
+          name?: string
+          note?: string | null
+          published_at?: string | null
+          published_by?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "price_rounds_legal_entity_id_fkey"
+            columns: ["legal_entity_id"]
+            isOneToOne: false
+            referencedRelation: "legal_entities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_cost_additions: {
         Row: {
           created_at: string
@@ -11763,6 +12033,27 @@ export type Database = {
       }
     }
     Views: {
+      price_round_letter_basis: {
+        Row: {
+          antall_varer: number | null
+          endring_max_pct: number | null
+          endring_min_pct: number | null
+          ikrafttredelsesdato: string | null
+          legal_entity_id: string | null
+          round_id: string | null
+          runde_navn: string | null
+          selskap: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "price_rounds_legal_entity_id_fkey"
+            columns: ["legal_entity_id"]
+            isOneToOne: false
+            referencedRelation: "legal_entities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_nutrition_calculated: {
         Row: {
           carbs_g_per_100g: number | null
@@ -13251,6 +13542,19 @@ export type Database = {
           total_events: number
         }[]
       }
+      price_round_add_lines: {
+        Args: { p_items: Json; p_round_id: string }
+        Returns: Json
+      }
+      price_round_generate_letters: {
+        Args: { p_round_id: string; p_template?: string }
+        Returns: Json
+      }
+      price_round_publish: { Args: { p_round_id: string }; Returns: Json }
+      price_round_set_status: {
+        Args: { p_action: string; p_round_id: string }
+        Returns: Json
+      }
       product_cost: {
         Args: { p_depth?: number; p_product_id: string }
         Returns: Json
@@ -13524,6 +13828,7 @@ export type Database = {
       set_rfq_password: { Args: { p_recipient_id: string }; Returns: string }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
+      snapshot_recipe_prices: { Args: { p_product_id: string }; Returns: Json }
       stock_from_delivery_note_lines: {
         Args: { p_note_id: string; p_remove: boolean }
         Returns: undefined

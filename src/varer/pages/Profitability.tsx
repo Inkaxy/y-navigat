@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
@@ -39,6 +40,7 @@ import { cn } from "@/lib/utils";
 import { osloTodayISO } from "@/lib/osloDate";
 import { nKr, nNum, nPct, parseNum } from "@/varer/lib/calcFormat";
 import { downloadCsv } from "@/varer/lib/pricing";
+import { AddToPriceRoundDialog } from "@/varer/components/prices/AddToPriceRoundDialog";
 
 /* ---------------------------------------------------------------- typer */
 
@@ -141,7 +143,7 @@ type SortKey =
 
 export default function Profitability() {
   const navigate = useNavigate();
-  const { legalEntityId } = useAppContext();
+  const { legalEntityId, user } = useAppContext();
 
   const [priceListId, setPriceListId] = useState<string>("");
   const [date, setDate] = useState<string>(osloTodayISO());
@@ -155,6 +157,8 @@ export default function Profitability() {
   const [page, setPage] = useState(0);
   const [simulated, setSimulated] = useState<Record<string, string>>({});
   const [detail, setDetail] = useState<SheetRow | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   /* --- prislister --- */
   const listsQuery = useQuery({
@@ -262,7 +266,44 @@ export default function Profitability() {
   const safePage = Math.min(page, pageCount - 1);
   const visible = filtered.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
 
+  /* --- utvalg for prisrunde --- */
+  const alleValgt = visible.length > 0 && visible.every((r) => selected.has(r.product_id));
+
+  const toggleSelect = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const toggleAllVisible = () =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (alleValgt) visible.forEach((r) => next.delete(r.product_id));
+      else visible.forEach((r) => next.add(r.product_id));
+      return next;
+    });
+
+  /** Ny pris = simulert verdi hvis satt, ellers nødvendig pris. */
+  const valgteLinjer = useMemo(() => {
+    const items: { product_id: string; price_list_id: string; new_price: number }[] = [];
+    let skipped = 0;
+    for (const r of rows) {
+      if (!selected.has(r.product_id)) continue;
+      const sim = parseNum(simulated[r.product_id] ?? "");
+      const pris = sim != null && sim > 0 ? sim : r.nodvendig_pris;
+      if (pris == null || pris <= 0) {
+        skipped++;
+        continue;
+      }
+      items.push({ product_id: r.product_id, price_list_id: activeListId, new_price: pris });
+    }
+    return { items, skipped };
+  }, [rows, selected, simulated, activeListId]);
+
   /* --- handlinger --- */
+
   const toggleStatus = (key: string) => {
     setPage(0);
     setStatusFilter((prev) => {
@@ -512,6 +553,13 @@ export default function Profitability() {
               <table className="w-full min-w-[1450px] text-sm">
                 <thead className="bg-muted/50 text-xs">
                   <tr className="border-b">
+                    <th className="w-8 px-2 py-2">
+                      <Checkbox
+                        checked={alleValgt}
+                        onCheckedChange={toggleAllVisible}
+                        aria-label="Velg alle på siden"
+                      />
+                    </th>
                     <Th label="Varenr" k="display_number" {...{ sortKey, sortAsc, toggleSort }} />
                     <Th label="Navn" k="navn" {...{ sortKey, sortAsc, toggleSort }} />
                     <Th label="Kategori" k="kategori" {...{ sortKey, sortAsc, toggleSort }} />
@@ -560,11 +608,13 @@ export default function Profitability() {
                         })
                       }
                       onOpen={() => setDetail(r)}
+                      selected={selected.has(r.product_id)}
+                      onToggleSelect={() => toggleSelect(r.product_id)}
                     />
                   ))}
                   {!visible.length && (
                     <tr>
-                      <td colSpan={18} className="px-3 py-10 text-center text-muted-foreground">
+                      <td colSpan={19} className="px-3 py-10 text-center text-muted-foreground">
                         Ingen varer matcher filtrene.
                       </td>
                     </tr>
@@ -572,6 +622,32 @@ export default function Profitability() {
                 </tbody>
               </table>
             </div>
+
+            {selected.size > 0 && (
+              <div className="sticky bottom-4 z-20 flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card/95 px-4 py-3 shadow-lg backdrop-blur">
+                <span className="text-sm">
+                  <strong>{nNum(selected.size, 0)}</strong> varer valgt
+                  {valgteLinjer.skipped > 0 && (
+                    <span className="ml-2 text-muted-foreground">
+                      ({nNum(valgteLinjer.skipped, 0)} mangler ny pris og hoppes over)
+                    </span>
+                  )}
+                </span>
+                <div className="flex items-center gap-2">
+                  <Button variant="ghost" size="sm" onClick={() => setSelected(new Set())}>
+                    Nullstill valg
+                  </Button>
+                  <Button
+                    size="sm"
+                    disabled={!valgteLinjer.items.length}
+                    onClick={() => setDialogOpen(true)}
+                  >
+                    Legg i prisrunde ({nNum(valgteLinjer.items.length, 0)})
+                  </Button>
+                </div>
+              </div>
+            )}
+
 
             {pageCount > 1 && (
               <div className="flex items-center justify-center gap-3 text-sm">
@@ -595,6 +671,16 @@ export default function Profitability() {
         )}
 
         <DetailPanel row={detail} onClose={() => setDetail(null)} onOpenProduct={(id) => navigate(`/varer/vareliste/${id}?tab=kalkyle`)} />
+
+        <AddToPriceRoundDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          legalEntityId={legalEntityId}
+          userId={user?.id ?? null}
+          items={valgteLinjer.items}
+          skipped={valgteLinjer.skipped}
+        />
+
       </div>
     </TooltipProvider>
   );
@@ -664,11 +750,15 @@ function Row({
   simValue,
   onSim,
   onOpen,
+  selected,
+  onToggleSelect,
 }: {
   row: SheetRow;
   simValue: string;
   onSim: (v: string) => void;
   onOpen: () => void;
+  selected: boolean;
+  onToggleSelect: () => void;
 }) {
   const simulerbar = kanSimuleres(row);
   const sim = simulate(row, parseNum(simValue));
@@ -683,7 +773,15 @@ function Row({
       className="cursor-pointer border-b transition-colors last:border-0 hover:bg-muted/40"
       style={{ contentVisibility: "auto", containIntrinsicSize: "40px" }}
     >
+      <td className="px-2 py-1.5" onClick={(e) => e.stopPropagation()}>
+        <Checkbox
+          checked={selected}
+          onCheckedChange={onToggleSelect}
+          aria-label={`Velg ${row.navn ?? "vare"}`}
+        />
+      </td>
       <td className="px-2 py-1.5 tabular-nums text-muted-foreground">{row.display_number ?? "—"}</td>
+
       <td className="max-w-[260px] truncate px-2 py-1.5 font-medium">{row.navn ?? "—"}</td>
       <td className="max-w-[160px] truncate px-2 py-1.5 text-muted-foreground">{row.kategori ?? "—"}</td>
       <td className="px-2 py-1.5">
