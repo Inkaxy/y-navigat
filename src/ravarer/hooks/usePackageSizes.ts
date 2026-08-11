@@ -35,6 +35,8 @@ export interface PackageWorklistRow {
   referansekilde: string | null;
   referansedato: string | null;
   referanse_faktor: number | null;
+  foreslatt_fra_navn: number | null;
+  foreslatt_fra_referanse: number | null;
   status: PackageStatus | string | null;
 }
 

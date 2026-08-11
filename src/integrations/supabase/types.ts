@@ -11581,6 +11581,8 @@ export type Database = {
           current_cost_price: number | null
           enheter_i_bruk: string | null
           faktor_kilde: string | null
+          foreslatt_fra_navn: number | null
+          foreslatt_fra_referanse: number | null
           id: string | null
           implisert_mengde: number | null
           kjopt_kr_totalt: number | null
@@ -12991,6 +12993,9 @@ export type Database = {
       recalc_raw_material_cost: {
         Args: {
           p_dry_run?: boolean
+          p_override_material_factor?: number
+          p_override_supplier_factor?: number
+          p_override_supplier_id?: string
           p_raw_material_id: string
           p_reason?: string
         }
@@ -13149,6 +13154,10 @@ export type Database = {
           factor: number
           source: string
         }[]
+      }
+      rm_suggest_package_from_name: {
+        Args: { p_base_unit: string; p_name: string }
+        Returns: number
       }
       rm_unit_factor: {
         Args: { p_base_unit: string; p_unit: string }

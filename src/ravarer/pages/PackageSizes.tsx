@@ -53,7 +53,7 @@ function statusBadge(status: string | null) {
 }
 
 type SortKey =
-  | "name" | "base_unit" | "current_cost_price" | "referansepris" | "pakningsfaktor"
+  | "name" | "base_unit" | "current_cost_price" | "referansepris" | "foreslatt_fra_navn" | "pakningsfaktor"
   | "enheter_i_bruk" | "antall_fakturalinjer" | "kjopt_kr_totalt" | "pris_spredning" | "status";
 
 const kr0 = (n: number | null) =>
@@ -72,6 +72,34 @@ function ReferenceFactorBadge({ f }: { f: number | null }) {
     </Badge>
   );
 }
+
+function SuggestionCell({ navn, ref: refVal }: { navn: number | null; ref: number | null }) {
+  if (navn == null && refVal == null) return <span className="text-ink-secondary">—</span>;
+  let badge: { text: string; cls: string } | null = null;
+  if (navn != null && refVal != null && navn > 0) {
+    const dev = Math.abs(refVal - navn) / navn;
+    badge =
+      dev < 0.15
+        ? { text: "bekreftet av referanse", cls: "border-success/40 bg-success/10 text-success" }
+        : dev <= 0.4
+        ? { text: "sjekk", cls: "border-warning/40 bg-warning/10 text-warning" }
+        : { text: "spriker", cls: "border-destructive/40 bg-destructive/10 text-destructive" };
+  }
+  return (
+    <div>
+      <div className="flex items-center gap-2">
+        <span className="font-medium tabular-nums">
+          {navn != null ? formatNumber(navn, 3) : formatNumber(refVal, 1)}
+        </span>
+        {badge && <Badge variant="outline" className={badge.cls}>{badge.text}</Badge>}
+      </div>
+      {navn != null && refVal != null && (
+        <div className="text-xs text-ink-secondary">≈ {formatNumber(refVal, 1)} fra referanse</div>
+      )}
+    </div>
+  );
+}
+
 
 export default function PackageSizesPage() {
   const { data: rows = [], isLoading } = usePackageWorklist();
@@ -169,6 +197,7 @@ export default function PackageSizesPage() {
                   <Th k="base_unit">Baseenhet</Th>
                   <Th k="current_cost_price" right>Kostpris nå</Th>
                   <Th k="referansepris" right>Referanse</Th>
+                  <Th k="foreslatt_fra_navn">Forslag</Th>
                   <Th k="pakningsfaktor">Pakning</Th>
                   <Th k="enheter_i_bruk">Enheter på faktura</Th>
                   <Th k="antall_fakturalinjer" right>Linjer</Th>
@@ -198,6 +227,9 @@ export default function PackageSizesPage() {
                       </div>
                       <div className="text-xs text-ink-secondary">Kalkyleark 2021</div>
                       <div className="mt-1"><ReferenceFactorBadge f={r.referanse_faktor} /></div>
+                    </td>
+                    <td className="px-3 py-2">
+                      <SuggestionCell navn={r.foreslatt_fra_navn} ref={r.foreslatt_fra_referanse} />
                     </td>
                     <td className="px-3 py-2">
                       {r.pakningsfaktor == null ? (
