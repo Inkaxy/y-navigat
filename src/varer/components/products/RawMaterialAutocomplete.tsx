@@ -62,6 +62,8 @@ export function RawMaterialAutocomplete({
   disabled,
   placeholder = "Velg råvare…",
   allowClear = true,
+  subValue = null,
+  onSelectSubProduct,
 }: Props) {
   const { legalEntityId } = useAppContext();
   const [open, setOpen] = useState(false);
@@ -83,8 +85,28 @@ export function RawMaterialAutocomplete({
     },
   });
 
+  const subQuery = useQuery({
+    queryKey: ["halvfabrikat_autocomplete", legalEntityId],
+    enabled: !!onSelectSubProduct && !!legalEntityId,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("products")
+        .select("id, display_name")
+        .eq("legal_entity_id", legalEntityId!)
+        .eq("calc_type", "halvfabrikat")
+        .order("display_name");
+      if (error) throw error;
+      return (data ?? []) as { id: string; display_name: string }[];
+    },
+  });
+
   const options = query.data ?? [];
+  const subOptions = subQuery.data ?? [];
   const selected = useMemo(() => options.find((o) => o.id === value) ?? null, [options, value]);
+  const selectedSub = useMemo(
+    () => subOptions.find((o) => o.id === subValue) ?? null,
+    [subOptions, subValue],
+  );
 
   return (
     <>
@@ -96,12 +118,18 @@ export function RawMaterialAutocomplete({
               variant="outline"
               role="combobox"
               disabled={disabled}
-              className={cn("w-full justify-between font-normal", !selected && "text-muted-foreground")}
+              className={cn(
+                "w-full justify-between font-normal",
+                !selected && !selectedSub && "text-muted-foreground",
+              )}
             >
               <span className="truncate">
-                {selected ? `${selected.name}` : placeholder}
+                {selected ? `${selected.name}` : selectedSub ? selectedSub.display_name : placeholder}
                 {selected?.sku && (
                   <span className="ml-1 text-xs text-muted-foreground font-mono">({selected.sku})</span>
+                )}
+                {selectedSub && (
+                  <span className="ml-1 text-xs text-purple-600">halvfabrikat</span>
                 )}
               </span>
               <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
