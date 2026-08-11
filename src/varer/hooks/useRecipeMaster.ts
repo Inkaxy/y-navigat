@@ -49,7 +49,7 @@ export function useProductRecipeLink(productId: string | undefined) {
     queryFn: async () => {
       const { data } = await supabase
         .from("product_recipe_links")
-        .select("*, recipes(id, name, version, units_per_batch, hourly_rate, target_db_pct, price_netto, price_engros, price_engros_with_packaging, price_egne_utsalg)")
+        .select("*, recipes(id, name, version, units_per_batch, hourly_rate, target_db_pct)")
         .eq("product_id", productId!)
         .order("is_primary", { ascending: false })
         .limit(1)
