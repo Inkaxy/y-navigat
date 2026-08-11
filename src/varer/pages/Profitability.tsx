@@ -194,9 +194,9 @@ export default function Profitability() {
     },
   });
 
-  if (sheetQuery.error) {
-    toast.error("Kunne ikke hente lønnsomhetsdata");
-  }
+  useEffect(() => {
+    if (sheetQuery.error) toast.error("Kunne ikke hente lønnsomhetsdata");
+  }, [sheetQuery.error]);
 
   const rows = useMemo(() => sheetQuery.data ?? [], [sheetQuery.data]);
 
