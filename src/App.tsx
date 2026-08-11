@@ -418,6 +418,7 @@ const App = () => (
               <Route path="/ordre/ticket" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreTicketsList /></AppAccessGuard></Shell>} />
               <Route path="/ordre/ticket/:id" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreTicketDetail /></AppAccessGuard></Shell>} />
               <Route path="/ordre/nettbutikk" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreWebsiteOrders /></AppAccessGuard></Shell>} />
+              <Route path="/ordre/returer" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreReturns /></AppAccessGuard></Shell>} />
               <Route path="/ordre/tilbakebetalinger" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreRefundsQueue /></AppAccessGuard></Shell>} />
               <Route path="/ordre/ai-forslag" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreAiForslag /></AppAccessGuard></Shell>} />
               <Route path="/ordre/ticket-rapporter" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreTicketReports /></AppAccessGuard></Shell>} />
