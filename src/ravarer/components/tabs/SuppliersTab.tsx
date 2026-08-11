@@ -80,6 +80,8 @@ export function SuppliersTab({ rm }: Props) {
                   <th className="pb-2">Leverandør-SKU</th>
                   <th className="pb-2">Pakning</th>
                   <th className="pb-2 text-right">Avtalt pris</th>
+                  <th className="pb-2 text-right">Avtalt pris/baseenhet</th>
+                  <th className="pb-2 text-right">Siste fakturapris</th>
                   <th className="pb-2">Avtale gyldig til</th>
                   <th className="pb-2"></th>
                 </tr>
