@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { ChevronDown, ChevronRight, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -118,9 +118,8 @@ export function LagerBalanceTable({
           </TableHeader>
           <TableBody>
             {items.map((item) => (
-              <>
+              <Fragment key={item.id}>
                 <TableRow
-                  key={item.id}
                   className={item.batch_tracking ? "cursor-pointer" : undefined}
                   onClick={() => item.batch_tracking && setExpanded(expanded === item.id ? null : item.id)}
                 >
@@ -160,10 +159,8 @@ export function LagerBalanceTable({
                     </Button>
                   </TableCell>
                 </TableRow>
-                {expanded === item.id && (
-                  <BatchRows key={`${item.id}-batches`} item={item} onWaste={(i, b) => onWaste(i, b)} />
-                )}
-              </>
+                {expanded === item.id && <BatchRows item={item} onWaste={(i, b) => onWaste(i, b)} />}
+              </Fragment>
             ))}
           </TableBody>
         </Table>
