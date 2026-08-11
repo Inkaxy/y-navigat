@@ -265,17 +265,31 @@ function SortableLine({
         </button>
       ) : <div className="col-span-1" />}
 
-      <div className="col-span-3">
+      <div className={cn("col-span-3", (line as any).sub_product_id && "rounded-md ring-1 ring-purple-300")}>
         <RawMaterialAutocomplete
           value={line.raw_material_id}
+          subValue={(line as any).sub_product_id ?? null}
           disabled={!canWrite}
           onChange={(id, opt) => {
             onChange({
               raw_material_id: id,
+              ...(id ? { sub_product_id: null } : {}),
               ingredient_name: opt?.name ?? line.ingredient_name,
               unit: opt?.base_unit === "kg" || opt?.base_unit === "liter" ? line.unit : (opt?.base_unit ?? line.unit),
               _rm: id ? (rmMap[id] ?? { id, name: opt?.name ?? "" }) : null,
-            });
+            } as never);
+          }}
+          onSelectSubProduct={(id, name) => {
+            if (!id) {
+              onChange({ sub_product_id: null } as never);
+              return;
+            }
+            onChange({
+              sub_product_id: id,
+              raw_material_id: null,
+              ingredient_name: name ?? line.ingredient_name,
+              _rm: null,
+            } as never);
           }}
           placeholder={line.ingredient_name ? `(ukoblet) ${line.ingredient_name}` : "Velg råvare…"}
         />
