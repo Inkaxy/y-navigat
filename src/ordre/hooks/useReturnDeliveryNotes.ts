@@ -165,7 +165,7 @@ export function useApproveReturn() {
       const { data, error } = await supabase.rpc("approve_return_delivery_note", {
         p_note_id: args.noteId,
         p_lines: args.lines,
-        p_note: args.note?.trim() ? args.note.trim() : null,
+        p_note: args.note?.trim() ? args.note.trim() : undefined,
       });
       if (error) throw error;
       return (data ?? {}) as ApproveReturnResult;
