@@ -16,6 +16,7 @@ const STATUS_CARDS: { key: string; label: string; tone: Tone }[] = [
   { key: "avviker_fra_referanse", label: "Avviker fra referanse", tone: "red" },
   { key: "ustabil_pris", label: "Ustabil pris", tone: "yellow" },
   { key: "linjer_uten_pris", label: "Linjer uten pris", tone: "yellow" },
+  { key: "mangler_kostpris", label: "Mangler kostpris", tone: "grey" },
   { key: "ikke_bekreftet", label: "Ikke bekreftet", tone: "grey" },
   { key: "ok", label: "OK", tone: "green" },
   { key: "ingen_fakturaer", label: "Ingen fakturaer", tone: "grey" },
@@ -73,7 +74,16 @@ function ReferenceFactorBadge({ f }: { f: number | null }) {
   );
 }
 
-function SuggestionCell({ navn, ref: refVal }: { navn: number | null; ref: number | null }) {
+function formatReferenceSource(kilde: string | null, dato: string | null) {
+  if (!kilde) return null;
+  const pretty = kilde.replace(/_/g, " ").replace(/^./, c => c.toUpperCase());
+  const year = dato ? new Date(dato).getFullYear() : null;
+  if (year && !Number.isNaN(year) && !pretty.includes(String(year))) return `${pretty} ${year}`;
+  return pretty;
+}
+
+function SuggestionCell({ navn, referanse }: { navn: number | null; referanse: number | null }) {
+  const refVal = referanse;
   if (navn == null && refVal == null) return <span className="text-ink-secondary">—</span>;
   let badge: { text: string; cls: string } | null = null;
   if (navn != null && refVal != null && navn > 0) {
