@@ -235,11 +235,15 @@ export default function PackageSizesPage() {
                       <div className="tabular-nums whitespace-nowrap">
                         {r.referansepris == null ? "—" : `${formatNumber(r.referansepris, 3)} kr/${r.base_unit ?? ""}`}
                       </div>
-                      <div className="text-xs text-ink-secondary">Kalkyleark 2021</div>
+                      {r.referansepris != null && formatReferenceSource(r.referansekilde, r.referansedato) && (
+                        <div className="text-xs text-ink-secondary">
+                          {formatReferenceSource(r.referansekilde, r.referansedato)}
+                        </div>
+                      )}
                       <div className="mt-1"><ReferenceFactorBadge f={r.referanse_faktor} /></div>
                     </td>
                     <td className="px-3 py-2">
-                      <SuggestionCell navn={r.foreslatt_fra_navn} ref={r.foreslatt_fra_referanse} />
+                      <SuggestionCell navn={r.foreslatt_fra_navn} referanse={r.foreslatt_fra_referanse} />
                     </td>
                     <td className="px-3 py-2">
                       {r.pakningsfaktor == null ? (
