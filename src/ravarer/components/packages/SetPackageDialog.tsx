@@ -22,7 +22,7 @@ import {
   type PackageRpcResult,
 } from "@/ravarer/hooks/usePackageSizes";
 
-const PACKAGE_UNIT_OPTIONS = ["sekk", "kartong", "pall", "palleboks", "konteiner", "spann", "pakke", "flaske", "boks", "eske", "stk"];
+const PACKAGE_UNIT_OPTIONS = ["sekk", "kartong", "pall", "palleboks", "konteiner", "spann", "pakke", "flaske", "boks", "eske", "stk", "bulk"];
 
 const METHOD_LABEL: Record<string, string> = {
   ukjent_enhet: "Ukjent enhet",
