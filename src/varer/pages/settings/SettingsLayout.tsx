@@ -8,6 +8,7 @@ import {
   Factory,
   Sparkles,
   Stamp,
+  Calculator,
 } from "lucide-react";
 import { AppHeaderBanner } from "@/varer/components/layout/AppHeaderBanner";
 import { cn } from "@/lib/utils";
@@ -20,6 +21,7 @@ const tabs = [
   { to: "/varer/innstillinger/salgsgrupper", label: "Salgsgrupper", icon: Tag },
   { to: "/varer/innstillinger/produksjonsgrupper", label: "Produksjonsgrupper", icon: Factory },
   { to: "/varer/innstillinger/merking", label: "Merking", icon: Stamp },
+  { to: "/varer/innstillinger/kalkyle", label: "Kalkyle", icon: Calculator },
   { to: "/varer/innstillinger/ai", label: "AI", icon: Sparkles },
 ];
 
