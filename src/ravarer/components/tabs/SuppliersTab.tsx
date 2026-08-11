@@ -80,6 +80,8 @@ export function SuppliersTab({ rm }: Props) {
                   <th className="pb-2">Leverandør-SKU</th>
                   <th className="pb-2">Pakning</th>
                   <th className="pb-2 text-right">Avtalt pris</th>
+                  <th className="pb-2 text-right">Avtalt pris/baseenhet</th>
+                  <th className="pb-2 text-right">Siste fakturapris</th>
                   <th className="pb-2">Avtale gyldig til</th>
                   <th className="pb-2"></th>
                 </tr>
@@ -98,8 +100,15 @@ export function SuppliersTab({ rm }: Props) {
                         {l.is_primary && <Badge className="ml-2" variant="outline"><Star className="mr-1 h-3 w-3" />Primær</Badge>}
                       </td>
                       <td className="py-3 font-mono text-xs">{l.supplier_sku ?? "—"}</td>
-                      <td className="py-3 text-ink-secondary">{l.package_size ? `${l.package_size} ${l.package_unit ?? ""}` : "—"}</td>
+                      <td className="py-3 text-ink-secondary">
+                        {l.package_size ? `${l.package_size} ${l.package_unit ?? ""}` : "—"}
+                        {l.base_units_per_package != null && (
+                          <span className="ml-1 text-xs">({l.base_units_per_package} pr. pakning)</span>
+                        )}
+                      </td>
                       <td className="py-3 text-right tabular-nums">{formatNok(l.agreed_price)}</td>
+                      <td className="py-3 text-right tabular-nums text-ink-secondary">{formatNok(l.agreed_price_per_base_unit)}</td>
+                      <td className="py-3 text-right tabular-nums text-ink-secondary">{formatNok(l.last_invoice_price)}</td>
                       <td className={`py-3 ${expiryClass}`}>{formatDate(l.agreement_valid_to)}</td>
                       <td className="py-3 text-right">
                         {canWrite && (
@@ -236,6 +245,7 @@ function RmSupplierDialog({ open, onOpenChange, rawMaterialId, existing }: any) 
   const [sku, setSku] = useState(existing?.supplier_sku ?? "");
   const [productName, setProductName] = useState(existing?.supplier_product_name ?? "");
   const [packageSize, setPackageSize] = useState(existing?.package_size?.toString() ?? "");
+  const [baseUnitsPerPackage, setBaseUnitsPerPackage] = useState(existing?.base_units_per_package?.toString() ?? "");
   const [packageUnit, setPackageUnit] = useState(existing?.package_unit ?? "");
   const [agreedPrice, setAgreedPrice] = useState(existing?.agreed_price?.toString() ?? "");
   const [validTo, setValidTo] = useState(existing?.agreement_valid_to ?? "");
@@ -250,6 +260,7 @@ function RmSupplierDialog({ open, onOpenChange, rawMaterialId, existing }: any) 
       supplier_sku: sku || null,
       supplier_product_name: productName || null,
       package_size: packageSize ? Number(packageSize) : null,
+      base_units_per_package: baseUnitsPerPackage ? Number(baseUnitsPerPackage) : null,
       package_unit: packageUnit || null,
       agreed_price: agreedPrice ? Number(agreedPrice) : null,
       agreement_valid_to: validTo || null,
@@ -283,6 +294,11 @@ function RmSupplierDialog({ open, onOpenChange, rawMaterialId, existing }: any) 
                 <SelectContent>{PACKAGE_UNITS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}</SelectContent>
               </Select>
             </div>
+          </div>
+          <div>
+            <Label>Antall baseenheter per pakning</Label>
+            <Input type="number" step="0.001" value={baseUnitsPerPackage} onChange={e => setBaseUnitsPerPackage(e.target.value)} />
+            <p className="mt-1 text-xs text-ink-secondary">Brukes til å regne om fakturapriser til pris per baseenhet for denne leverandøren.</p>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div><Label>Avtalt pris</Label><Input type="number" step="0.01" value={agreedPrice} onChange={e => setAgreedPrice(e.target.value)} /></div>

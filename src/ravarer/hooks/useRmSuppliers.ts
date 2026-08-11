@@ -10,6 +10,9 @@ export interface RmSupplierRow {
   supplier_product_name: string | null;
   package_size: number | null;
   package_unit: string | null;
+  base_units_per_package: number | null;
+  package_confirmed_at: string | null;
+  package_confirmed_by: string | null;
   agreed_price: number | null;
   agreed_price_per_base_unit: number | null;
   agreement_valid_from: string | null;

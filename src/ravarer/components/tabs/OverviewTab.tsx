@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useUpdateRawMaterial, type RawMaterialRow } from "@/ravarer/hooks/useRawMaterials";
 import { useSuppliers } from "@/ravarer/hooks/useSuppliers";
 import { Card } from "@/components/ui/card";
@@ -10,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BASE_UNITS, PACKAGE_UNITS, DEFAULT_CATEGORIES, formatNok, formatDate } from "@/ravarer/lib/constants";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
+import { RecalcHistory } from "@/ravarer/components/packages/RecalcHistory";
 
 interface Props {
   rm: RawMaterialRow;
@@ -33,6 +35,7 @@ export function OverviewTab({ rm }: Props) {
       base_unit: draft.base_unit,
       package_size: draft.package_size,
       package_unit: draft.package_unit,
+      base_units_per_package: draft.base_units_per_package,
       current_cost_price: draft.current_cost_price,
       agreed_price: draft.agreed_price,
       current_stock: draft.current_stock,
@@ -134,6 +137,28 @@ export function OverviewTab({ rm }: Props) {
             </Select>
           </div>
         </div>
+        <div>
+          <Label>Antall {draft.base_unit} per pakning</Label>
+          <Input
+            type="number"
+            step="0.001"
+            value={draft.base_units_per_package ?? ""}
+            onChange={e => setDraft(d => ({ ...d, base_units_per_package: e.target.value === "" ? null : Number(e.target.value) }))}
+            disabled={!canWrite}
+          />
+          <p className="mt-1 text-xs text-ink-secondary">
+            Brukes til å regne om fakturapriser til pris per {draft.base_unit}.
+          </p>
+          {draft.base_units_per_package !== rm.base_units_per_package && (
+            <div className="mt-2 rounded-lg border border-warning/50 bg-warning/10 p-3 text-xs">
+              Endring her oppdaterer ikke prisene.{" "}
+              <Link to="/ravarer/pakninger" className="underline">
+                Bruk Pakningsstørrelser-siden
+              </Link>{" "}
+              for å regne om.
+            </div>
+          )}
+        </div>
         <div className="flex items-center justify-between rounded-lg border p-3">
           <div>
             <Label className="text-sm">Aktiv</Label>
@@ -188,6 +213,13 @@ export function OverviewTab({ rm }: Props) {
           </div>
         </div>
       </Card>
+
+      <Card className="p-5 space-y-3">
+        <h3 className="text-base font-semibold">Omregninger av kostpris</h3>
+        <RecalcHistory rawMaterialId={rm.id} baseUnit={rm.base_unit} />
+      </Card>
+
+
 
       {canWrite && (
         <div className="sticky bottom-4 flex justify-end gap-2">
