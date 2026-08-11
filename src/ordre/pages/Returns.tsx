@@ -60,7 +60,7 @@ export default function Returns() {
     <div className="space-y-5 p-6">
       <PageHeader
         title="Returer"
-        description="Godkjenn returpakksedler fra kundeportalen"
+        subtitle="Godkjenn returpakksedler fra kundeportalen"
         icon={Undo2}
       />
 
