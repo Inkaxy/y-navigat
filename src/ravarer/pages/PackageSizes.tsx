@@ -197,6 +197,7 @@ export default function PackageSizesPage() {
                   <Th k="base_unit">Baseenhet</Th>
                   <Th k="current_cost_price" right>Kostpris nå</Th>
                   <Th k="referansepris" right>Referanse</Th>
+                  <Th k="foreslatt_fra_navn">Forslag</Th>
                   <Th k="pakningsfaktor">Pakning</Th>
                   <Th k="enheter_i_bruk">Enheter på faktura</Th>
                   <Th k="antall_fakturalinjer" right>Linjer</Th>
