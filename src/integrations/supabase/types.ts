@@ -14223,6 +14223,18 @@ export type Database = {
         }
         Returns: Json
       }
+      stock_consume_delivery_note: {
+        Args: { p_note_id: string; p_remove: boolean }
+        Returns: undefined
+      }
+      stock_consume_dn_line: {
+        Args: { p_line_id: string; p_remove: boolean }
+        Returns: undefined
+      }
+      stock_count_apply: {
+        Args: { p_lines: Json; p_note?: string }
+        Returns: Json
+      }
       stock_from_delivery_note_lines: {
         Args: { p_note_id: string; p_remove: boolean }
         Returns: undefined

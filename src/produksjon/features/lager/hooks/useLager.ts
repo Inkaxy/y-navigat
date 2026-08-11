@@ -170,3 +170,39 @@ export function useStockRealtime() {
     };
   }, [qc]);
 }
+
+export interface StockCountLine {
+  stock_item_id: string;
+  batch_id?: string;
+  counted: number;
+}
+
+export interface StockCountResult {
+  ok?: boolean;
+  adjusted?: number;
+  unchanged?: number;
+  rows?: {
+    stock_item_id: string;
+    name: string;
+    batch_id: string | null;
+    before: number;
+    counted: number;
+    diff: number;
+  }[];
+}
+
+/** Bokfører en varetelling — differansen mot beholdning føres som count_adjust. */
+export function useStockCountApply() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (args: { lines: StockCountLine[]; note?: string }): Promise<StockCountResult> => {
+      const { data, error } = await supabase.rpc("stock_count_apply", {
+        p_lines: args.lines as unknown as never,
+        p_note: args.note,
+      });
+      if (error) throw error;
+      return (data ?? {}) as StockCountResult;
+    },
+    onSuccess: () => invalidateStock(qc),
+  });
+}
