@@ -533,18 +533,6 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
         });
       }
 
-      // Beregn produksjon, plater, liter
-      for (const row of agg.values()) {
-        row.quantity_to_produce = Math.max(0, row.quantity_ordered - row.quantity_from_stock);
-        if (row.pieces_per_tray && row.pieces_per_tray > 0) {
-          row.trays_full = Math.floor(row.quantity_to_produce / row.pieces_per_tray);
-          row.trays_partial = row.quantity_to_produce - row.trays_full * row.pieces_per_tray;
-        }
-        if (row.pieces_per_liter && row.pieces_per_liter > 0) {
-          row.liters = row.quantity_to_produce / row.pieces_per_liter;
-        }
-      }
-
       // Sortering
       const rows = Array.from(agg.values());
       rows.sort((a, b) => {
@@ -570,7 +558,52 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
         return 0;
       });
 
+      // === Fra lager ==========================================================
+      // Fordeler tilgjengelig beholdning per lagervare grådig i planens rekkefølge.
+      {
+        const [linkRes, balRes] = await Promise.all([
+          supabase.from("product_stock_links").select("product_id, stock_item_id, units_per_sold_unit"),
+          supabase.from("stock_item_balance").select("id, on_hand").eq("legal_entity_id", legalEntityId),
+        ]);
+        const linkByProduct = new Map<string, { stock_item_id: string; units_per_sold_unit: number }>(
+          ((linkRes.data ?? []) as Record<string, any>[]).map((l) => [
+            l.product_id as string,
+            {
+              stock_item_id: l.stock_item_id as string,
+              units_per_sold_unit: Math.max(1, Number(l.units_per_sold_unit ?? 1)),
+            },
+          ]),
+        );
+        const avail = new Map<string, number>(
+          ((balRes.data ?? []) as Record<string, any>[]).map((b) => [b.id as string, Number(b.on_hand ?? 0)]),
+        );
+        for (const row of rows) {
+          const link = linkByProduct.get(row.product_id);
+          if (!link) continue;
+          const a = avail.get(link.stock_item_id) ?? 0;
+          if (a <= 0) continue;
+          const canCover = Math.floor(a / link.units_per_sold_unit);
+          const fromStock = Math.min(row.quantity_ordered, canCover);
+          if (fromStock <= 0) continue;
+          row.quantity_from_stock = fromStock;
+          avail.set(link.stock_item_id, a - fromStock * link.units_per_sold_unit);
+        }
+      }
+
+      // Beregn produksjon, plater, liter
+      for (const row of rows) {
+        row.quantity_to_produce = Math.max(0, row.quantity_ordered - row.quantity_from_stock);
+        if (row.pieces_per_tray && row.pieces_per_tray > 0) {
+          row.trays_full = Math.floor(row.quantity_to_produce / row.pieces_per_tray);
+          row.trays_partial = row.quantity_to_produce - row.trays_full * row.pieces_per_tray;
+        }
+        if (row.pieces_per_liter && row.pieces_per_liter > 0) {
+          row.liters = row.quantity_to_produce / row.pieces_per_liter;
+        }
+      }
+
       return { rows, orderCounts };
+
     },
   });
 }
