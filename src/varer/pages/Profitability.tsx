@@ -262,7 +262,44 @@ export default function Profitability() {
   const safePage = Math.min(page, pageCount - 1);
   const visible = filtered.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
 
+  /* --- utvalg for prisrunde --- */
+  const alleValgt = visible.length > 0 && visible.every((r) => selected.has(r.product_id));
+
+  const toggleSelect = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const toggleAllVisible = () =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (alleValgt) visible.forEach((r) => next.delete(r.product_id));
+      else visible.forEach((r) => next.add(r.product_id));
+      return next;
+    });
+
+  /** Ny pris = simulert verdi hvis satt, ellers nødvendig pris. */
+  const valgteLinjer = useMemo(() => {
+    const items: { product_id: string; price_list_id: string; new_price: number }[] = [];
+    let skipped = 0;
+    for (const r of rows) {
+      if (!selected.has(r.product_id)) continue;
+      const sim = parseNum(simulated[r.product_id] ?? "");
+      const pris = sim != null && sim > 0 ? sim : r.nodvendig_pris;
+      if (pris == null || pris <= 0) {
+        skipped++;
+        continue;
+      }
+      items.push({ product_id: r.product_id, price_list_id: activeListId, new_price: pris });
+    }
+    return { items, skipped };
+  }, [rows, selected, simulated, activeListId]);
+
   /* --- handlinger --- */
+
   const toggleStatus = (key: string) => {
     setPage(0);
     setStatusFilter((prev) => {
