@@ -83,6 +83,7 @@ const VarerProductDetail = lazy(() => import("@/varer/pages/ProductDetail"));
 const VarerPriceLists = lazy(() => import("@/varer/pages/PriceLists"));
 const VarerPriceListDetail = lazy(() => import("@/varer/pages/PriceListDetail"));
 const VarerSpecialPrices = lazy(() => import("@/varer/pages/SpecialPrices"));
+const VarerProfitability = lazy(() => import("@/varer/pages/Profitability"));
 const VarerRecipes = lazy(() => import("@/varer/pages/Recipes"));
 const VarerRecipesCleanup = lazy(() => import("@/varer/pages/RecipesCleanup"));
 const VarerRecipeDetail = lazy(() => import("@/varer/pages/RecipeDetail"));
