@@ -20,6 +20,7 @@ import {
   Loader2,
   RotateCcw,
   ScrollText,
+  Boxes,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -47,6 +48,7 @@ import { RecipeSummaryCard } from "@/varer/components/products/RecipeSummaryCard
 import { SelvStekingCard } from "@/varer/components/products/detail/SelvStekingCard";
 import { DeclarationTab } from "@/varer/components/products/DeclarationTab";
 import { CalculationTab } from "@/varer/components/products/CalculationTab";
+import { StockTab } from "@/varer/components/products/StockTab";
 import { useNavigate as useNav } from "react-router-dom";
 
 const TABS: TabConfig[] = [
@@ -57,6 +59,7 @@ const TABS: TabConfig[] = [
   { type: "tab", id: "leveranse", label: "Leveranse", icon: Truck },
   { type: "tab", id: "pakke", label: "Pakke", icon: Package },
   { type: "tab", id: "retur", label: "Retur", icon: RotateCcw },
+  { type: "tab", id: "lager", label: "Lager", icon: Boxes },
   { type: "separator", id: "sep1" },
   { type: "tab", id: "varianter", label: "Varianter", icon: GitBranch },
   { type: "tab", id: "oppskrift", label: "Oppskrift", icon: ChefHat },
@@ -491,6 +494,15 @@ export default function ProductDetail() {
           />
         )}
         {tab === "retur" && <ReturTab productId={product.id} canWrite={canWrite} />}
+        {tab === "lager" && (
+          <StockTab
+            productId={product.id}
+            productName={product.display_name}
+            canWrite={canWrite}
+            legalEntityId={legalEntityId ?? undefined}
+            productionDepartments={lookups?.productionDepartments ?? []}
+          />
+        )}
         {tab === "varianter" && <VariantsTab product={product} variants={variantsQuery.data ?? []} />}
         {tab === "oppskrift" && !product.variant_of_product_id && (
           <RecipeSummaryCard
