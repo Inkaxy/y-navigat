@@ -11,6 +11,7 @@ import { ProductionRegisterCard } from "@/produksjon/features/lager/components/P
 import { LagerBalanceTable } from "@/produksjon/features/lager/components/LagerBalanceTable";
 import { WasteDialog } from "@/produksjon/features/lager/components/WasteDialog";
 import { QuickCorrectionDialog } from "@/produksjon/features/lager/components/QuickCorrectionDialog";
+import { StockCountMode } from "@/produksjon/features/lager/components/StockCountMode";
 
 const STORAGE_KEY = "produksjon.lager.dept";
 const ALL = "all";
@@ -27,6 +28,7 @@ export default function LagerPage() {
   const [wasteItem, setWasteItem] = useState<string | null>(null);
   const [wasteBatch, setWasteBatch] = useState<string | null>(null);
   const [corrOpen, setCorrOpen] = useState(false);
+  const [countMode, setCountMode] = useState(false);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, deptId);
