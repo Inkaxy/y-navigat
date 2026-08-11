@@ -35,6 +35,10 @@ interface Props {
   disabled?: boolean;
   placeholder?: string;
   allowClear?: boolean;
+  /** Valgt halvfabrikat (products.calc_type = 'halvfabrikat'). */
+  subValue?: string | null;
+  /** Når denne er satt vises gruppen «Halvfabrikat» i nedtrekket. */
+  onSelectSubProduct?: (id: string | null, name?: string) => void;
 }
 
 const BASE_UNITS = ["kg", "g", "liter", "ml", "stk"];
