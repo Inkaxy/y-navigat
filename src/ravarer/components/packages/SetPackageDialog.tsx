@@ -141,6 +141,43 @@ export function SetPackageDialog({ row, open, onOpenChange }: Props) {
                   onChange={e => setUnits(e.target.value)}
                   autoFocus
                 />
+                {(row.foreslatt_fra_navn != null || row.foreslatt_fra_referanse != null) && (
+                  <>
+                    <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-ink-secondary">
+                      <span>Forslag:</span>
+                      {row.foreslatt_fra_navn != null && (
+                        <>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setUnits(String(row.foreslatt_fra_navn))}
+                          >
+                            {formatNumber(row.foreslatt_fra_navn, 3)}
+                          </Button>
+                          <span>fra navnet</span>
+                        </>
+                      )}
+                      {row.foreslatt_fra_navn != null && row.foreslatt_fra_referanse != null && <span>·</span>}
+                      {row.foreslatt_fra_referanse != null && (
+                        <>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setUnits(String(row.foreslatt_fra_referanse))}
+                          >
+                            {formatNumber(row.foreslatt_fra_referanse, 1)}
+                          </Button>
+                          <span>fra referanseprisen</span>
+                        </>
+                      )}
+                    </div>
+                    <p className="mt-1 text-xs text-ink-secondary">
+                      Forslagene er utledet automatisk og må bekreftes.
+                    </p>
+                  </>
+                )}
               </div>
               <div>
                 <Label>Pakningsenhet</Label>
