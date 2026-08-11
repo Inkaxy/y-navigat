@@ -284,6 +284,11 @@ function RmSupplierDialog({ open, onOpenChange, rawMaterialId, existing }: any) 
               </Select>
             </div>
           </div>
+          <div>
+            <Label>Antall baseenheter per pakning</Label>
+            <Input type="number" step="0.001" value={baseUnitsPerPackage} onChange={e => setBaseUnitsPerPackage(e.target.value)} />
+            <p className="mt-1 text-xs text-ink-secondary">Brukes til å regne om fakturapriser til pris per baseenhet for denne leverandøren.</p>
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <div><Label>Avtalt pris</Label><Input type="number" step="0.01" value={agreedPrice} onChange={e => setAgreedPrice(e.target.value)} /></div>
             <div><Label>Avtale gyldig til</Label><Input type="date" value={validTo} onChange={e => setValidTo(e.target.value)} /></div>
