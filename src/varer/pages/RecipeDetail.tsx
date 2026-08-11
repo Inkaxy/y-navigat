@@ -622,10 +622,37 @@ export default function RecipeDetail() {
                 {RECIPE_STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             </div>
-            <div>
-              <Label className="text-xs">Vekt per enhet (g)</Label>
-              <Input type="number" value={header.dough_piece_grams ?? ""} disabled={!editable}
-                onChange={(e) => patchHeader({ unit_weight_grams: e.target.value })} />
+            <div className="col-span-full mt-1 border-t pt-3">
+              <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Vekt og utbytte
+              </div>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div>
+                  <Label className="text-xs">Deigemnevekt (g)</Label>
+                  <Input type="number" value={header.dough_piece_grams ?? ""} disabled={!editable}
+                    onChange={(e) => patchHeader({ dough_piece_grams: e.target.value })} />
+                </div>
+                <div>
+                  <Label className="text-xs">Deigsvinn (%)</Label>
+                  <Input type="number" value={header.dough_waste_pct ?? ""} disabled={!editable}
+                    onChange={(e) => patchHeader({ dough_waste_pct: e.target.value })} />
+                </div>
+                <div>
+                  <Label className="text-xs">Ferdigvekt (g)</Label>
+                  <Input type="number" value={header.finished_weight_grams ?? ""} disabled={!editable}
+                    onChange={(e) => patchHeader({ finished_weight_grams: e.target.value })} />
+                </div>
+              </div>
+              <label className="mt-3 flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-input"
+                  checked={!!header.measured_per_kg}
+                  disabled={!editable}
+                  onChange={(e) => patchHeader({ measured_per_kg: e.target.checked })}
+                />
+                Oppskriften er målt per kg
+              </label>
             </div>
             <div>
               <Label className="text-xs">Antall per batch</Label>
