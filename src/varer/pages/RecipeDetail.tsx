@@ -152,8 +152,8 @@ export default function RecipeDetail() {
   );
 
   const totals = useMemo(
-    () => computeTotals(hydratedLines, Number(header.unit_weight_grams) || null),
-    [hydratedLines, header.unit_weight_grams],
+    () => computeTotals(hydratedLines, Number(header.dough_piece_grams) || null),
+    [hydratedLines, header.dough_piece_grams],
   );
 
   // ===== Skalering (kun visning — basen røres ikke) =====
@@ -179,11 +179,11 @@ export default function RecipeDetail() {
       scaledSummary(
         hydratedLines,
         factor,
-        Number(header.unit_weight_grams) || null,
+        Number(header.dough_piece_grams) || null,
         desiredUnits || baseUnits,
         Number(mixerCapacity) || null,
       ),
-    [hydratedLines, factor, header.unit_weight_grams, desiredUnits, baseUnits, mixerCapacity],
+    [hydratedLines, factor, header.dough_piece_grams, desiredUnits, baseUnits, mixerCapacity],
   );
 
   /**
@@ -222,7 +222,7 @@ export default function RecipeDetail() {
       version: recipe?.version ?? null,
       description: header.description || null,
       imageUrl: recipe?.image_url ?? null,
-      unitWeightGrams: Number(header.unit_weight_grams) || null,
+      unitWeightGrams: Number(header.dough_piece_grams) || null,
       targetDoughTemp: header.target_dough_temp_celsius ?? null,
       frictionFactor: header.friction_factor_celsius ?? null,
       scaledUnits: scaleSummary.unitCount ?? desiredUnits ?? baseUnits,
@@ -367,7 +367,7 @@ export default function RecipeDetail() {
           status: header.status,
           description: header.description || null,
           notes: header.notes || null,
-          unit_weight_grams: header.unit_weight_grams === "" ? null : Number(header.unit_weight_grams),
+          unit_weight_grams: header.dough_piece_grams === "" ? null : Number(header.dough_piece_grams),
           units_per_batch: header.units_per_batch === "" ? null : Number(header.units_per_batch),
           target_dough_temp_celsius: header.target_dough_temp_celsius,
           friction_factor_celsius: header.friction_factor_celsius,
@@ -618,7 +618,7 @@ export default function RecipeDetail() {
             </div>
             <div>
               <Label className="text-xs">Vekt per enhet (g)</Label>
-              <Input type="number" value={header.unit_weight_grams ?? ""} disabled={!editable}
+              <Input type="number" value={header.dough_piece_grams ?? ""} disabled={!editable}
                 onChange={(e) => patchHeader({ unit_weight_grams: e.target.value })} />
             </div>
             <div>
