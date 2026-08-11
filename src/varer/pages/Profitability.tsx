@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -194,9 +194,9 @@ export default function Profitability() {
     },
   });
 
-  if (sheetQuery.error) {
-    toast.error("Kunne ikke hente lønnsomhetsdata");
-  }
+  useEffect(() => {
+    if (sheetQuery.error) toast.error("Kunne ikke hente lønnsomhetsdata");
+  }, [sheetQuery.error]);
 
   const rows = useMemo(() => sheetQuery.data ?? [], [sheetQuery.data]);
 
@@ -635,15 +635,27 @@ function Th({
   );
 }
 
+const IKKE_SIMULERBARE_STATUSER = new Set(["mangler_kalkyle", "ikke_vurdert", "halvfabrikat"]);
+
+function kanSimuleres(row: SheetRow) {
+  if (row.raavarekost == null) return false;
+  return !IKKE_SIMULERBARE_STATUSER.has(row.status ?? "");
+}
+
+const WARN_BELOW_PP = 3;
+
 function simulate(row: SheetRow, price: number | null) {
   if (price == null || price <= 0) return null;
+  if (!kanSimuleres(row)) return null;
   const raa = row.raavarekost ?? 0;
   const arb = row.arbeidskost ?? 0;
   const brutto = ((price - raa) / price) * 100;
   const db2 = price - raa - arb;
   const dg2 = (db2 / price) * 100;
   const maal = row.maal_dg2_pct;
-  const status = maal == null ? "uten_maal" : dg2 >= maal ? "gronn" : dg2 >= maal - 5 ? "gul" : "rod";
+  const avvik = maal == null ? null : dg2 - maal;
+  const status =
+    avvik == null ? "uten_maal" : avvik >= 0 ? "gronn" : avvik >= -WARN_BELOW_PP ? "gul" : "rod";
   return { brutto, db2, dg2, status };
 }
 
@@ -658,6 +670,7 @@ function Row({
   onSim: (v: string) => void;
   onOpen: () => void;
 }) {
+  const simulerbar = kanSimuleres(row);
   const sim = simulate(row, parseNum(simValue));
   const calc = CALC_MAP[row.calc_type ?? ""];
   const status = sim ? STATUS_MAP[sim.status] : STATUS_MAP[row.status ?? ""];
@@ -735,13 +748,29 @@ function Row({
         {row.nodvendig_pris == null ? "—" : nNum(row.nodvendig_pris)}
       </td>
       <td className="px-2 py-1.5 text-right" onClick={(e) => e.stopPropagation()}>
-        <Input
-          value={simValue}
-          onChange={(e) => onSim(e.target.value)}
-          placeholder="—"
-          inputMode="decimal"
-          className="h-7 w-[86px] text-right text-xs"
-        />
+        {simulerbar ? (
+          <Input
+            value={simValue}
+            onChange={(e) => onSim(e.target.value)}
+            placeholder="—"
+            inputMode="decimal"
+            className="h-7 w-[86px] text-right text-xs"
+          />
+        ) : (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="inline-block cursor-not-allowed">
+                <Input
+                  value=""
+                  disabled
+                  placeholder="—"
+                  className="pointer-events-none h-7 w-[86px] text-right text-xs"
+                />
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>Kan ikke simuleres uten kalkyle</TooltipContent>
+          </Tooltip>
+        )}
       </td>
       <td className="px-2 py-1.5">
         {status ? (
