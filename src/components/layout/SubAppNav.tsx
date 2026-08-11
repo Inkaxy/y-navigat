@@ -49,6 +49,7 @@ import {
   Printer,
   Globe,
   Warehouse,
+  TrendingUp,
   type LucideIcon,
 
 } from "lucide-react";
