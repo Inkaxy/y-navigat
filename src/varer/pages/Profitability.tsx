@@ -155,6 +155,8 @@ export default function Profitability() {
   const [page, setPage] = useState(0);
   const [simulated, setSimulated] = useState<Record<string, string>>({});
   const [detail, setDetail] = useState<SheetRow | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   /* --- prislister --- */
   const listsQuery = useQuery({
