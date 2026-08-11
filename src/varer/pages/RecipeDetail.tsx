@@ -803,3 +803,64 @@ export default function RecipeDetail() {
 
   );
 }
+
+/** Forhåndsvisning av utbytte og steketap. Kun visning — kalkylen kommer fra product_cost. */
+function YieldPreview({
+  doughGrams,
+  doughPieceGrams,
+  doughWastePct,
+  finishedWeightGrams,
+}: {
+  doughGrams: number;
+  doughPieceGrams: number | null;
+  doughWastePct: number;
+  finishedWeightGrams: number | null;
+}) {
+  const nb = (n: number, d = 1) =>
+    n.toLocaleString("nb-NO", { minimumFractionDigits: d, maximumFractionDigits: d });
+
+  if (!doughPieceGrams || doughPieceGrams <= 0) {
+    return (
+      <p className="mt-3 text-sm text-muted-foreground">
+        Sett deigemnevekt for å beregne antall enheter
+      </p>
+    );
+  }
+
+  const units = (doughGrams * (1 - (doughWastePct || 0) / 100)) / doughPieceGrams;
+
+  let bake: { pct: number; tone: "grey" | "warn" | "bad" } | null = null;
+  if (finishedWeightGrams && finishedWeightGrams > 0) {
+    const pct = (1 - finishedWeightGrams / doughPieceGrams) * 100;
+    bake = {
+      pct,
+      tone: finishedWeightGrams > doughPieceGrams ? "bad" : pct < 3 || pct > 25 ? "warn" : "grey",
+    };
+  }
+
+  return (
+    <div className="mt-3 space-y-1">
+      <p className="text-sm text-muted-foreground">
+        {nb(doughGrams, 0)} g deig · {nb(doughWastePct || 0, 0)} % svinn · {nb(doughPieceGrams, 0)} g per emne →{" "}
+        <span className="font-semibold text-foreground">{nb(units, 1)} enheter</span>
+      </p>
+      {bake && bake.tone === "grey" && (
+        <p className="text-sm text-muted-foreground">
+          Steketap <span className="font-semibold text-foreground">{nb(bake.pct, 1)} %</span>
+        </p>
+      )}
+      {bake && bake.tone === "warn" && (
+        <p className="flex items-center gap-1.5 text-sm text-warning">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          Steketap <span className="font-semibold">{nb(bake.pct, 1)} %</span> — Sjekk vektene, dette ser ikke ut som et vanlig steketap
+        </p>
+      )}
+      {bake && bake.tone === "bad" && (
+        <p className="flex items-center gap-1.5 text-sm text-destructive">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          Ferdigvekt kan ikke være høyere enn deigemnevekt
+        </p>
+      )}
+    </div>
+  );
+}
