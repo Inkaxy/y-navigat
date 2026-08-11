@@ -13259,6 +13259,36 @@ export type Database = {
         Args: { p_date?: string; p_product_id: string }
         Returns: Json
       }
+      profitability_sheet: {
+        Args: { p_date?: string; p_price_list_id: string }
+        Returns: {
+          antall_per_bakst: number
+          arbeidskost: number
+          avvik_pp: number
+          brutto_pct: number
+          calc_type: string
+          code: string
+          db2: number
+          dg2_pct: number
+          display_number: number
+          emballasjekost: number
+          kategori: string
+          kostpris: number
+          kvalitet: string
+          maal_brutto_pct: number
+          maal_dg2_pct: number
+          maal_kilde: string
+          merknader: string[]
+          navn: string
+          nodvendig_endring_pct: number
+          nodvendig_pris: number
+          pris: number
+          pris_med_emballasje: number
+          product_id: string
+          raavarekost: number
+          status: string
+        }[]
+      }
       push_products_to_nettside: { Args: never; Returns: Json }
       recalc_raw_material_cost: {
         Args: {
@@ -13270,6 +13300,19 @@ export type Database = {
           p_reason?: string
         }
         Returns: Json
+      }
+      recipe_line_base_qty: {
+        Args: {
+          p_base_unit: string
+          p_quantity: number
+          p_quantity_grams: number
+          p_unit: string
+        }
+        Returns: number
+      }
+      recipe_line_grams: {
+        Args: { p_quantity: number; p_quantity_grams: number; p_unit: string }
+        Returns: number
       }
       refresh_purchase_stats: { Args: never; Returns: undefined }
       register_cake_image_print: {
