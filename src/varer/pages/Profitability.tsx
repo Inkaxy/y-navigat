@@ -560,11 +560,13 @@ export default function Profitability() {
                         })
                       }
                       onOpen={() => setDetail(r)}
+                      selected={selected.has(r.product_id)}
+                      onToggleSelect={() => toggleSelect(r.product_id)}
                     />
                   ))}
                   {!visible.length && (
                     <tr>
-                      <td colSpan={18} className="px-3 py-10 text-center text-muted-foreground">
+                      <td colSpan={19} className="px-3 py-10 text-center text-muted-foreground">
                         Ingen varer matcher filtrene.
                       </td>
                     </tr>
@@ -572,6 +574,32 @@ export default function Profitability() {
                 </tbody>
               </table>
             </div>
+
+            {selected.size > 0 && (
+              <div className="sticky bottom-4 z-20 flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card/95 px-4 py-3 shadow-lg backdrop-blur">
+                <span className="text-sm">
+                  <strong>{nNum(selected.size, 0)}</strong> varer valgt
+                  {valgteLinjer.skipped > 0 && (
+                    <span className="ml-2 text-muted-foreground">
+                      ({nNum(valgteLinjer.skipped, 0)} mangler ny pris og hoppes over)
+                    </span>
+                  )}
+                </span>
+                <div className="flex items-center gap-2">
+                  <Button variant="ghost" size="sm" onClick={() => setSelected(new Set())}>
+                    Nullstill valg
+                  </Button>
+                  <Button
+                    size="sm"
+                    disabled={!valgteLinjer.items.length}
+                    onClick={() => setDialogOpen(true)}
+                  >
+                    Legg i prisrunde ({nNum(valgteLinjer.items.length, 0)})
+                  </Button>
+                </div>
+              </div>
+            )}
+
 
             {pageCount > 1 && (
               <div className="flex items-center justify-center gap-3 text-sm">
@@ -595,6 +623,16 @@ export default function Profitability() {
         )}
 
         <DetailPanel row={detail} onClose={() => setDetail(null)} onOpenProduct={(id) => navigate(`/varer/vareliste/${id}?tab=kalkyle`)} />
+
+        <AddToPriceRoundDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          legalEntityId={legalEntityId}
+          userId={user?.id ?? null}
+          items={valgteLinjer.items}
+          skipped={valgteLinjer.skipped}
+        />
+
       </div>
     </TooltipProvider>
   );
@@ -664,11 +702,15 @@ function Row({
   simValue,
   onSim,
   onOpen,
+  selected,
+  onToggleSelect,
 }: {
   row: SheetRow;
   simValue: string;
   onSim: (v: string) => void;
   onOpen: () => void;
+  selected: boolean;
+  onToggleSelect: () => void;
 }) {
   const simulerbar = kanSimuleres(row);
   const sim = simulate(row, parseNum(simValue));
@@ -683,7 +725,15 @@ function Row({
       className="cursor-pointer border-b transition-colors last:border-0 hover:bg-muted/40"
       style={{ contentVisibility: "auto", containIntrinsicSize: "40px" }}
     >
+      <td className="px-2 py-1.5" onClick={(e) => e.stopPropagation()}>
+        <Checkbox
+          checked={selected}
+          onCheckedChange={onToggleSelect}
+          aria-label={`Velg ${row.navn ?? "vare"}`}
+        />
+      </td>
       <td className="px-2 py-1.5 tabular-nums text-muted-foreground">{row.display_number ?? "—"}</td>
+
       <td className="max-w-[260px] truncate px-2 py-1.5 font-medium">{row.navn ?? "—"}</td>
       <td className="max-w-[160px] truncate px-2 py-1.5 text-muted-foreground">{row.kategori ?? "—"}</td>
       <td className="px-2 py-1.5">

@@ -84,6 +84,9 @@ const VarerPriceLists = lazy(() => import("@/varer/pages/PriceLists"));
 const VarerPriceListDetail = lazy(() => import("@/varer/pages/PriceListDetail"));
 const VarerSpecialPrices = lazy(() => import("@/varer/pages/SpecialPrices"));
 const VarerProfitability = lazy(() => import("@/varer/pages/Profitability"));
+const VarerProfitabilityDashboard = lazy(() => import("@/varer/pages/ProfitabilityDashboard"));
+const VarerPriceRounds = lazy(() => import("@/varer/pages/PriceRounds"));
+const VarerPriceRoundDetail = lazy(() => import("@/varer/pages/PriceRoundDetail"));
 const VarerRecipes = lazy(() => import("@/varer/pages/Recipes"));
 const VarerRecipesCleanup = lazy(() => import("@/varer/pages/RecipesCleanup"));
 const VarerRecipeDetail = lazy(() => import("@/varer/pages/RecipeDetail"));
@@ -313,6 +316,10 @@ const App = () => (
               <Route path="/varer/priser/:id" element={<Shell><AppAccessGuard appCode="varer" appName="Varer"><VarerAppProvider><VarerPriceListDetail /></VarerAppProvider></AppAccessGuard></Shell>} />
               <Route path="/varer/spesialpriser" element={<Shell><AppAccessGuard appCode="varer" appName="Varer"><VarerAppProvider><VarerSpecialPrices /></VarerAppProvider></AppAccessGuard></Shell>} />
               <Route path="/varer/lonnsomhet" element={<Shell><AppAccessGuard appCode="varer" appName="Varer"><VarerAppProvider><VarerProfitability /></VarerAppProvider></AppAccessGuard></Shell>} />
+              <Route path="/varer/dashbord" element={<Shell><AppAccessGuard appCode="varer" appName="Varer"><VarerAppProvider><VarerProfitabilityDashboard /></VarerAppProvider></AppAccessGuard></Shell>} />
+              <Route path="/varer/prisrunder" element={<Shell><AppAccessGuard appCode="varer" appName="Varer"><VarerAppProvider><VarerPriceRounds /></VarerAppProvider></AppAccessGuard></Shell>} />
+              <Route path="/varer/prisrunder/:id" element={<Shell><AppAccessGuard appCode="varer" appName="Varer"><VarerAppProvider><VarerPriceRoundDetail /></VarerAppProvider></AppAccessGuard></Shell>} />
+
 
               <Route path="/varer/oppskrifter" element={<Shell><AppAccessGuard appCode="varer" appName="Varer"><VarerAppProvider><VarerRecipes /></VarerAppProvider></AppAccessGuard></Shell>} />
               <Route path="/varer/oppskrifter/krever-opprydding" element={<Shell><AppAccessGuard appCode="varer" appName="Varer"><VarerAppProvider><VarerRecipesCleanup /></VarerAppProvider></AppAccessGuard></Shell>} />
