@@ -159,6 +159,19 @@ export default function RecipeDetail() {
     [hydratedLines, header.dough_piece_grams],
   );
 
+  /** Sum deigvekt i gram — kun forhåndsvisning i nettleseren. */
+  const doughGramsTotal = useMemo(
+    () =>
+      hydratedLines.reduce((sum, l: any) => {
+        const q = Number(l.quantity) || 0;
+        const u = String(l.unit ?? "g");
+        if (u === "kg" || u === "liter") return sum + q * 1000;
+        if (u === "g" || u === "ml") return sum + q;
+        return sum;
+      }, 0),
+    [hydratedLines],
+  );
+
   // ===== Skalering (kun visning — basen røres ikke) =====
   const baseUnits = useMemo(() => {
     const u = Number(header.units_per_batch) || 0;
