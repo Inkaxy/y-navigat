@@ -18,6 +18,9 @@ export interface RawMaterialRow {
 
   package_size: number | null;
   package_unit: string | null;
+  base_units_per_package: number | null;
+  package_confirmed_at: string | null;
+  package_confirmed_by: string | null;
   current_cost_price: number | null;
   agreed_price: number | null;
   price_updated_at: string | null;
