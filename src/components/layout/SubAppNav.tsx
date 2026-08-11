@@ -117,6 +117,7 @@ const STATIC_SUBMENUS: Record<string, { prefix: string; appSlug: string; items: 
       { kind: "link", to: "/produksjon/oversikt", label: "Oversikt", icon: LayoutDashboard },
       { kind: "link", to: "/produksjon/produksjonsplan", label: "Produksjonsplan", icon: ClipboardList },
       { kind: "link", to: "/produksjon/pakkesystem", label: "Pakkesystem", icon: Plug },
+      { kind: "link", to: "/produksjon/lager", label: "Lager", icon: Boxes },
       { kind: "link", to: "/produksjon/etiketter", label: "Etiketter", icon: Tags },
       { kind: "dropdown", label: "Innstillinger", icon: Settings, basePath: "/produksjon/innstillinger", links: [
         { to: "/produksjon/innstillinger/produksjonsavdelinger", label: "Produksjonsavdelinger" },

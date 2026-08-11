@@ -7999,6 +7999,55 @@ export type Database = {
           },
         ]
       }
+      product_stock_links: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          product_id: string
+          stock_item_id: string
+          units_per_sold_unit: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          product_id: string
+          stock_item_id: string
+          units_per_sold_unit?: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          product_id?: string
+          stock_item_id?: string
+          units_per_sold_unit?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_stock_links_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: true
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_stock_links_stock_item_id_fkey"
+            columns: ["stock_item_id"]
+            isOneToOne: false
+            referencedRelation: "stock_item_balance"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_stock_links_stock_item_id_fkey"
+            columns: ["stock_item_id"]
+            isOneToOne: false
+            referencedRelation: "stock_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_sub_categories: {
         Row: {
           code: string
@@ -10842,8 +10891,149 @@ export type Database = {
           },
         ]
       }
+      stock_batches: {
+        Row: {
+          batch_number: string
+          created_at: string
+          created_by: string | null
+          department_id: string | null
+          expires_on: string | null
+          id: string
+          initial_quantity: number
+          note: string | null
+          produced_on: string
+          stock_item_id: string
+        }
+        Insert: {
+          batch_number: string
+          created_at?: string
+          created_by?: string | null
+          department_id?: string | null
+          expires_on?: string | null
+          id?: string
+          initial_quantity: number
+          note?: string | null
+          produced_on?: string
+          stock_item_id: string
+        }
+        Update: {
+          batch_number?: string
+          created_at?: string
+          created_by?: string | null
+          department_id?: string | null
+          expires_on?: string | null
+          id?: string
+          initial_quantity?: number
+          note?: string | null
+          produced_on?: string
+          stock_item_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_batches_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "production_departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_batches_stock_item_id_fkey"
+            columns: ["stock_item_id"]
+            isOneToOne: false
+            referencedRelation: "stock_item_balance"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_batches_stock_item_id_fkey"
+            columns: ["stock_item_id"]
+            isOneToOne: false
+            referencedRelation: "stock_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stock_items: {
+        Row: {
+          base_unit: string
+          batch_tracking: boolean
+          created_at: string
+          created_by: string | null
+          defined_by_product_id: string | null
+          department_id: string | null
+          id: string
+          legal_entity_id: string
+          max_level: number | null
+          min_level: number | null
+          name: string
+          notes: string | null
+          pieces_per_tray: number | null
+          shelf_life_days: number | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          base_unit?: string
+          batch_tracking?: boolean
+          created_at?: string
+          created_by?: string | null
+          defined_by_product_id?: string | null
+          department_id?: string | null
+          id?: string
+          legal_entity_id: string
+          max_level?: number | null
+          min_level?: number | null
+          name: string
+          notes?: string | null
+          pieces_per_tray?: number | null
+          shelf_life_days?: number | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          base_unit?: string
+          batch_tracking?: boolean
+          created_at?: string
+          created_by?: string | null
+          defined_by_product_id?: string | null
+          department_id?: string | null
+          id?: string
+          legal_entity_id?: string
+          max_level?: number | null
+          min_level?: number | null
+          name?: string
+          notes?: string | null
+          pieces_per_tray?: number | null
+          shelf_life_days?: number | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_items_defined_by_product_id_fkey"
+            columns: ["defined_by_product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_items_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "production_departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_items_legal_entity_id_fkey"
+            columns: ["legal_entity_id"]
+            isOneToOne: false
+            referencedRelation: "legal_entities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stock_movements: {
         Row: {
+          batch_id: string | null
           created_at: string
           created_by: string | null
           id: string
@@ -10853,11 +11043,14 @@ export type Database = {
           occurred_at: string
           product_id: string | null
           quantity_base: number
-          raw_material_id: string
+          raw_material_id: string | null
+          reason: string | null
           source_id: string | null
           source_table: string | null
+          stock_item_id: string | null
         }
         Insert: {
+          batch_id?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
@@ -10867,11 +11060,14 @@ export type Database = {
           occurred_at?: string
           product_id?: string | null
           quantity_base: number
-          raw_material_id: string
+          raw_material_id?: string | null
+          reason?: string | null
           source_id?: string | null
           source_table?: string | null
+          stock_item_id?: string | null
         }
         Update: {
+          batch_id?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
@@ -10881,11 +11077,27 @@ export type Database = {
           occurred_at?: string
           product_id?: string | null
           quantity_base?: number
-          raw_material_id?: string
+          raw_material_id?: string | null
+          reason?: string | null
           source_id?: string | null
           source_table?: string | null
+          stock_item_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "stock_movements_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "stock_batch_balance"
+            referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "stock_movements_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "stock_batches"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "stock_movements_raw_material_id_fkey"
             columns: ["raw_material_id"]
@@ -10906,6 +11118,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "resale_stock_status"
             referencedColumns: ["raw_material_id"]
+          },
+          {
+            foreignKeyName: "stock_movements_stock_item_id_fkey"
+            columns: ["stock_item_id"]
+            isOneToOne: false
+            referencedRelation: "stock_item_balance"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_movements_stock_item_id_fkey"
+            columns: ["stock_item_id"]
+            isOneToOne: false
+            referencedRelation: "stock_items"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -12335,6 +12561,109 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "raw_materials_legal_entity_id_fkey"
+            columns: ["legal_entity_id"]
+            isOneToOne: false
+            referencedRelation: "legal_entities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stock_batch_balance: {
+        Row: {
+          batch_id: string | null
+          batch_number: string | null
+          department_id: string | null
+          expires_on: string | null
+          expiry_status: string | null
+          initial_quantity: number | null
+          produced_on: string | null
+          remaining: number | null
+          stock_item_id: string | null
+        }
+        Insert: {
+          batch_id?: string | null
+          batch_number?: string | null
+          department_id?: string | null
+          expires_on?: string | null
+          expiry_status?: never
+          initial_quantity?: number | null
+          produced_on?: string | null
+          remaining?: never
+          stock_item_id?: string | null
+        }
+        Update: {
+          batch_id?: string | null
+          batch_number?: string | null
+          department_id?: string | null
+          expires_on?: string | null
+          expiry_status?: never
+          initial_quantity?: number | null
+          produced_on?: string | null
+          remaining?: never
+          stock_item_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_batches_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "production_departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_batches_stock_item_id_fkey"
+            columns: ["stock_item_id"]
+            isOneToOne: false
+            referencedRelation: "stock_item_balance"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_batches_stock_item_id_fkey"
+            columns: ["stock_item_id"]
+            isOneToOne: false
+            referencedRelation: "stock_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stock_item_balance: {
+        Row: {
+          base_unit: string | null
+          batch_tracking: boolean | null
+          defined_by_product_id: string | null
+          department_id: string | null
+          department_name: string | null
+          id: string | null
+          legal_entity_id: string | null
+          level_status: string | null
+          linked_products: number | null
+          max_level: number | null
+          min_level: number | null
+          name: string | null
+          on_hand: number | null
+          out_today: number | null
+          pieces_per_tray: number | null
+          produced_today: number | null
+          shelf_life_days: number | null
+          status: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_items_defined_by_product_id_fkey"
+            columns: ["defined_by_product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_items_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "production_departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_items_legal_entity_id_fkey"
             columns: ["legal_entity_id"]
             isOneToOne: false
             referencedRelation: "legal_entities"
@@ -13883,9 +14212,32 @@ export type Database = {
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
       snapshot_recipe_prices: { Args: { p_product_id: string }; Returns: Json }
+      stock_adjust: {
+        Args: {
+          p_batch_id?: string
+          p_delta: number
+          p_kind: string
+          p_note?: string
+          p_reason?: string
+          p_stock_item_id: string
+        }
+        Returns: Json
+      }
       stock_from_delivery_note_lines: {
         Args: { p_note_id: string; p_remove: boolean }
         Returns: undefined
+      }
+      stock_register_production: {
+        Args: {
+          p_batch_number?: string
+          p_department_id?: string
+          p_expires_on?: string
+          p_note?: string
+          p_pieces?: number
+          p_stock_item_id: string
+          p_trays?: number
+        }
+        Returns: Json
       }
       sync_label_numbers: {
         Args: { p_date: string; p_legal_entity_id: string }
