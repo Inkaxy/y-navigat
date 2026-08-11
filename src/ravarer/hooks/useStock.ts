@@ -7,7 +7,7 @@ import type { MovementType } from "@/ravarer/lib/stock";
 
 export interface StockMovementRow {
   id: string;
-  raw_material_id: string;
+  raw_material_id: string | null;
   movement_type: string;
   quantity_base: number;
   occurred_at: string;
