@@ -747,13 +747,29 @@ function Row({
         {row.nodvendig_pris == null ? "—" : nNum(row.nodvendig_pris)}
       </td>
       <td className="px-2 py-1.5 text-right" onClick={(e) => e.stopPropagation()}>
-        <Input
-          value={simValue}
-          onChange={(e) => onSim(e.target.value)}
-          placeholder="—"
-          inputMode="decimal"
-          className="h-7 w-[86px] text-right text-xs"
-        />
+        {simulerbar ? (
+          <Input
+            value={simValue}
+            onChange={(e) => onSim(e.target.value)}
+            placeholder="—"
+            inputMode="decimal"
+            className="h-7 w-[86px] text-right text-xs"
+          />
+        ) : (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="inline-block cursor-not-allowed">
+                <Input
+                  value=""
+                  disabled
+                  placeholder="—"
+                  className="pointer-events-none h-7 w-[86px] text-right text-xs"
+                />
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>Kan ikke simuleres uten kalkyle</TooltipContent>
+          </Tooltip>
+        )}
       </td>
       <td className="px-2 py-1.5">
         {status ? (
