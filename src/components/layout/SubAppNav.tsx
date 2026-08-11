@@ -2,6 +2,7 @@ import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAccessibleApps } from "@/hooks/useAccessibleApps";
 import { useReviewCount } from "@/fakturaer/hooks/useReviewCount";
 import { useInvoiceAccess } from "@/ravarer/hooks/useInvoiceAccess";
+import { usePendingReturnsCount } from "@/ordre/hooks/useReturnDeliveryNotes";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -290,12 +291,15 @@ function OrdreNav() {
     refetchInterval: 60_000,
   });
 
+  const { data: pendingReturns = 0 } = usePendingReturnsCount();
+
   const base = STATIC_SUBMENUS.ordre.items;
-  const items: NavItem[] = base.map((item) =>
-    item.kind === "link" && item.to === "/ordre/nettbutikk"
-      ? { ...item, badge: pendingWebOrders }
-      : item,
-  );
+  const items: NavItem[] = base.map((item) => {
+    if (item.kind !== "link") return item;
+    if (item.to === "/ordre/nettbutikk") return { ...item, badge: pendingWebOrders };
+    if (item.to === "/ordre/returer") return { ...item, badge: pendingReturns };
+    return item;
+  });
 
   return <NavBar appSlug="ordre" items={items} />;
 }
