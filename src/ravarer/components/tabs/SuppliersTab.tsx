@@ -251,6 +251,7 @@ function RmSupplierDialog({ open, onOpenChange, rawMaterialId, existing }: any) 
       supplier_sku: sku || null,
       supplier_product_name: productName || null,
       package_size: packageSize ? Number(packageSize) : null,
+      base_units_per_package: baseUnitsPerPackage ? Number(baseUnitsPerPackage) : null,
       package_unit: packageUnit || null,
       agreed_price: agreedPrice ? Number(agreedPrice) : null,
       agreement_valid_to: validTo || null,
