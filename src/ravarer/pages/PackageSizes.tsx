@@ -229,6 +229,9 @@ export default function PackageSizesPage() {
                       <div className="mt-1"><ReferenceFactorBadge f={r.referanse_faktor} /></div>
                     </td>
                     <td className="px-3 py-2">
+                      <SuggestionCell navn={r.foreslatt_fra_navn} ref={r.foreslatt_fra_referanse} />
+                    </td>
+                    <td className="px-3 py-2">
                       {r.pakningsfaktor == null ? (
                         <span className="font-medium text-destructive">mangler</span>
                       ) : (
