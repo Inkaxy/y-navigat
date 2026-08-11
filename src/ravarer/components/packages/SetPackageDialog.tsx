@@ -73,8 +73,9 @@ export function SetPackageDialog({ row, open, onOpenChange }: Props) {
     onOpenChange(v);
   };
 
-  const unitsNum = Number(units.replace(",", "."));
-  const validUnits = units !== "" && !Number.isNaN(unitsNum) && unitsNum > 0;
+  const isBulk = packageUnit === "bulk";
+  const unitsNum = isBulk ? 1 : Number(units.replace(",", "."));
+  const validUnits = isBulk || (units !== "" && !Number.isNaN(unitsNum) && unitsNum > 0);
 
   const baseArgs = () => ({
     p_raw_material_id: row!.id,
