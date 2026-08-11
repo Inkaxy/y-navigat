@@ -195,7 +195,13 @@ export function ProductionPlanTable({ rows, showByMainGroup, showTraysWithPlus, 
                 <TableCell>
                   <div className="flex items-center gap-2">
                     <span>{r.product_name}</span>
+                    {r.quantity_from_stock > 0 && r.quantity_to_produce === 0 && (
+                      <span className="rounded bg-success/15 px-1.5 py-0.5 text-[10px] font-semibold text-success">
+                        Dekket av lager
+                      </span>
+                    )}
                     {(cakeByProduct[r.product_id] ?? []).slice(0, 4).map((ci) => (
+
                       <span
                         key={ci.id}
                         className="inline-flex items-center gap-1 rounded border border-border bg-muted/50 px-1 py-0.5"
