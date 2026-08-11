@@ -134,6 +134,28 @@ export function OverviewTab({ rm }: Props) {
             </Select>
           </div>
         </div>
+        <div>
+          <Label>Antall {draft.base_unit} per pakning</Label>
+          <Input
+            type="number"
+            step="0.001"
+            value={draft.base_units_per_package ?? ""}
+            onChange={e => setDraft(d => ({ ...d, base_units_per_package: e.target.value === "" ? null : Number(e.target.value) }))}
+            disabled={!canWrite}
+          />
+          <p className="mt-1 text-xs text-ink-secondary">
+            Brukes til å regne om fakturapriser til pris per {draft.base_unit}.
+          </p>
+          {draft.base_units_per_package !== rm.base_units_per_package && (
+            <div className="mt-2 rounded-lg border border-warning/50 bg-warning/10 p-3 text-xs">
+              Endring her oppdaterer ikke prisene.{" "}
+              <Link to="/ravarer/pakninger" className="underline">
+                Bruk Pakningsstørrelser-siden
+              </Link>{" "}
+              for å regne om.
+            </div>
+          )}
+        </div>
         <div className="flex items-center justify-between rounded-lg border p-3">
           <div>
             <Label className="text-sm">Aktiv</Label>
