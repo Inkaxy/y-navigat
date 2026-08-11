@@ -34,6 +34,7 @@ export function OverviewTab({ rm }: Props) {
       base_unit: draft.base_unit,
       package_size: draft.package_size,
       package_unit: draft.package_unit,
+      base_units_per_package: draft.base_units_per_package,
       current_cost_price: draft.current_cost_price,
       agreed_price: draft.agreed_price,
       current_stock: draft.current_stock,
