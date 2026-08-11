@@ -325,6 +325,7 @@ export default function RecipeDetail() {
         _new: true,
         recipe_part_id: partId,
         raw_material_id: null,
+        sub_product_id: null,
         ingredient_name: null,
         quantity: "",
         unit: "g",
@@ -421,11 +422,12 @@ export default function RecipeDetail() {
         .map((l) => {
           const partId = partIdMap[l.recipe_part_id] ?? l.recipe_part_id;
           const qty = Number(l.quantity) || 0;
-          if (qty <= 0 && !l.raw_material_id && !l.ingredient_name) return null;
+          if (qty <= 0 && !l.raw_material_id && !(l as any).sub_product_id && !l.ingredient_name) return null;
           return {
             recipe_id: recipe.id,
             recipe_part_id: partId,
             raw_material_id: l.raw_material_id,
+            sub_product_id: (l as any).sub_product_id ?? null,
             ingredient_name: l.raw_material_id ? null : (l.ingredient_name || null),
             quantity: qty,
             unit: l.unit,

@@ -127,6 +127,7 @@ export interface BakersLine {
   id: string;
   recipe_part_id: string;
   raw_material_id: string | null;
+  sub_product_id?: string | null;
   ingredient_name?: string | null;
   quantity: number | string;
   unit: string;
