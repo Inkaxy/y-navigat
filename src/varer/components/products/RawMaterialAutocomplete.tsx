@@ -35,6 +35,10 @@ interface Props {
   disabled?: boolean;
   placeholder?: string;
   allowClear?: boolean;
+  /** Valgt halvfabrikat (products.calc_type = 'halvfabrikat'). */
+  subValue?: string | null;
+  /** Når denne er satt vises gruppen «Halvfabrikat» i nedtrekket. */
+  onSelectSubProduct?: (id: string | null, name?: string) => void;
 }
 
 const BASE_UNITS = ["kg", "g", "liter", "ml", "stk"];
@@ -58,6 +62,8 @@ export function RawMaterialAutocomplete({
   disabled,
   placeholder = "Velg råvare…",
   allowClear = true,
+  subValue = null,
+  onSelectSubProduct,
 }: Props) {
   const { legalEntityId } = useAppContext();
   const [open, setOpen] = useState(false);
@@ -79,8 +85,28 @@ export function RawMaterialAutocomplete({
     },
   });
 
+  const subQuery = useQuery({
+    queryKey: ["halvfabrikat_autocomplete", legalEntityId],
+    enabled: !!onSelectSubProduct && !!legalEntityId,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("products")
+        .select("id, display_name")
+        .eq("legal_entity_id", legalEntityId!)
+        .eq("calc_type", "halvfabrikat")
+        .order("display_name");
+      if (error) throw error;
+      return (data ?? []) as { id: string; display_name: string }[];
+    },
+  });
+
   const options = query.data ?? [];
+  const subOptions = subQuery.data ?? [];
   const selected = useMemo(() => options.find((o) => o.id === value) ?? null, [options, value]);
+  const selectedSub = useMemo(
+    () => subOptions.find((o) => o.id === subValue) ?? null,
+    [subOptions, subValue],
+  );
 
   return (
     <>
@@ -92,12 +118,18 @@ export function RawMaterialAutocomplete({
               variant="outline"
               role="combobox"
               disabled={disabled}
-              className={cn("w-full justify-between font-normal", !selected && "text-muted-foreground")}
+              className={cn(
+                "w-full justify-between font-normal",
+                !selected && !selectedSub && "text-muted-foreground",
+              )}
             >
               <span className="truncate">
-                {selected ? `${selected.name}` : placeholder}
+                {selected ? `${selected.name}` : selectedSub ? selectedSub.display_name : placeholder}
                 {selected?.sku && (
                   <span className="ml-1 text-xs text-muted-foreground font-mono">({selected.sku})</span>
+                )}
+                {selectedSub && (
+                  <span className="ml-1 text-xs text-purple-600">halvfabrikat</span>
                 )}
               </span>
               <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -122,12 +154,13 @@ export function RawMaterialAutocomplete({
                     <CommandEmpty>
                       <div className="py-3 text-center text-sm text-muted-foreground">Ingen treff</div>
                     </CommandEmpty>
-                    <CommandGroup>
+                    <CommandGroup heading={onSelectSubProduct ? "Råvarer" : undefined}>
                       {options.map((o) => (
                         <CommandItem
                           key={o.id}
                           value={`${o.name} ${o.sku} ${o.category ?? ""}`}
                           onSelect={() => {
+                            onSelectSubProduct?.(null);
                             onChange(o.id, o);
                             setOpen(false);
                           }}
@@ -148,6 +181,27 @@ export function RawMaterialAutocomplete({
                         </CommandItem>
                       ))}
                     </CommandGroup>
+                    {onSelectSubProduct && subOptions.length > 0 && (
+                      <CommandGroup heading="Halvfabrikat">
+                        {subOptions.map((s) => (
+                          <CommandItem
+                            key={s.id}
+                            value={`${s.display_name} halvfabrikat`}
+                            onSelect={() => {
+                              onChange(null);
+                              onSelectSubProduct(s.id, s.display_name);
+                              setOpen(false);
+                            }}
+                          >
+                            <Check className={cn("mr-2 h-4 w-4", subValue === s.id ? "opacity-100" : "opacity-0")} />
+                            <span className="truncate text-sm">{s.display_name}</span>
+                            <span className="ml-auto rounded bg-purple-100 px-1.5 py-0.5 text-[10px] font-medium text-purple-700">
+                              Halvfabrikat
+                            </span>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    )}
                     <div className="border-t p-1">
                       <Button
                         type="button"
@@ -170,8 +224,18 @@ export function RawMaterialAutocomplete({
             </Command>
           </PopoverContent>
         </Popover>
-        {allowClear && selected && !disabled && (
-          <Button type="button" variant="ghost" size="icon" onClick={() => onChange(null)} className="h-9 w-9 shrink-0" title="Fjern">
+        {allowClear && (selected || selectedSub) && !disabled && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={() => {
+              onChange(null);
+              onSelectSubProduct?.(null);
+            }}
+            className="h-9 w-9 shrink-0"
+            title="Fjern"
+          >
             <X className="h-4 w-4" />
           </Button>
         )}

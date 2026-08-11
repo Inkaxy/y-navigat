@@ -2369,6 +2369,53 @@ export type Database = {
         }
         Relationships: []
       }
+      entity_calc_settings: {
+        Row: {
+          default_dough_waste_pct: number
+          default_vat_rate: number
+          hourly_rate: number
+          legal_entity_id: string
+          markup_engros_pct: number
+          markup_internpris_pct: number
+          markup_utsalg_pct: number
+          packaging_mode: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          default_dough_waste_pct?: number
+          default_vat_rate?: number
+          hourly_rate?: number
+          legal_entity_id: string
+          markup_engros_pct?: number
+          markup_internpris_pct?: number
+          markup_utsalg_pct?: number
+          packaging_mode?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          default_dough_waste_pct?: number
+          default_vat_rate?: number
+          hourly_rate?: number
+          legal_entity_id?: string
+          markup_engros_pct?: number
+          markup_internpris_pct?: number
+          markup_utsalg_pct?: number
+          packaging_mode?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "entity_calc_settings_legal_entity_id_fkey"
+            columns: ["legal_entity_id"]
+            isOneToOne: true
+            referencedRelation: "legal_entities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       integration_events: {
         Row: {
           audit_log_id: string | null
@@ -3759,6 +3806,60 @@ export type Database = {
             columns: ["legal_entity_id"]
             isOneToOne: true
             referencedRelation: "legal_entities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      margin_targets: {
+        Row: {
+          calc_type: Database["public"]["Enums"]["calc_type"] | null
+          id: string
+          legal_entity_id: string
+          main_category_id: string | null
+          price_level: Database["public"]["Enums"]["price_level"]
+          target_brutto_pct: number | null
+          target_dg2_pct: number | null
+          updated_at: string
+          updated_by: string | null
+          warn_below_pp: number
+        }
+        Insert: {
+          calc_type?: Database["public"]["Enums"]["calc_type"] | null
+          id?: string
+          legal_entity_id: string
+          main_category_id?: string | null
+          price_level: Database["public"]["Enums"]["price_level"]
+          target_brutto_pct?: number | null
+          target_dg2_pct?: number | null
+          updated_at?: string
+          updated_by?: string | null
+          warn_below_pp?: number
+        }
+        Update: {
+          calc_type?: Database["public"]["Enums"]["calc_type"] | null
+          id?: string
+          legal_entity_id?: string
+          main_category_id?: string | null
+          price_level?: Database["public"]["Enums"]["price_level"]
+          target_brutto_pct?: number | null
+          target_dg2_pct?: number | null
+          updated_at?: string
+          updated_by?: string | null
+          warn_below_pp?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "margin_targets_legal_entity_id_fkey"
+            columns: ["legal_entity_id"]
+            isOneToOne: false
+            referencedRelation: "legal_entities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "margin_targets_main_category_id_fkey"
+            columns: ["main_category_id"]
+            isOneToOne: false
+            referencedRelation: "product_main_categories"
             referencedColumns: ["id"]
           },
         ]
@@ -7043,10 +7144,13 @@ export type Database = {
           display_name: string
           id: string
           is_default: boolean
+          is_provisional: boolean
           legal_entity_id: string
           list_number: number | null
+          price_level: Database["public"]["Enums"]["price_level"] | null
           price_list_type: string
           prices_include_mva: boolean
+          provisional_note: string | null
           status: string
           updated_at: string
         }
@@ -7057,10 +7161,13 @@ export type Database = {
           display_name: string
           id?: string
           is_default?: boolean
+          is_provisional?: boolean
           legal_entity_id: string
           list_number?: number | null
+          price_level?: Database["public"]["Enums"]["price_level"] | null
           price_list_type?: string
           prices_include_mva?: boolean
+          provisional_note?: string | null
           status?: string
           updated_at?: string
         }
@@ -7071,10 +7178,13 @@ export type Database = {
           display_name?: string
           id?: string
           is_default?: boolean
+          is_provisional?: boolean
           legal_entity_id?: string
           list_number?: number | null
+          price_level?: Database["public"]["Enums"]["price_level"] | null
           price_list_type?: string
           prices_include_mva?: boolean
+          provisional_note?: string | null
           status?: string
           updated_at?: string
         }
@@ -7084,6 +7194,81 @@ export type Database = {
             columns: ["legal_entity_id"]
             isOneToOne: false
             referencedRelation: "legal_entities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_cost_additions: {
+        Row: {
+          created_at: string
+          description: string | null
+          fixed_cost: number | null
+          id: string
+          product_id: string
+          quantity_grams: number | null
+          raw_material_id: string | null
+          sort_order: number
+          sub_product_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          fixed_cost?: number | null
+          id?: string
+          product_id: string
+          quantity_grams?: number | null
+          raw_material_id?: string | null
+          sort_order?: number
+          sub_product_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          fixed_cost?: number | null
+          id?: string
+          product_id?: string
+          quantity_grams?: number | null
+          raw_material_id?: string | null
+          sort_order?: number
+          sub_product_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_cost_additions_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_cost_additions_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "raw_material_package_worklist"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_cost_additions_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "raw_materials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_cost_additions_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "resale_stock_status"
+            referencedColumns: ["raw_material_id"]
+          },
+          {
+            foreignKeyName: "product_cost_additions_sub_product_id_fkey"
+            columns: ["sub_product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
             referencedColumns: ["id"]
           },
         ]
@@ -7855,6 +8040,9 @@ export type Database = {
           baked_product_id: string | null
           breadscale_value: number | null
           cake_role: string | null
+          calc_factor: number | null
+          calc_source_product_id: string | null
+          calc_type: Database["public"]["Enums"]["calc_type"] | null
           cert_nokkelhull: boolean
           cert_norsk_100: boolean
           code: string
@@ -7872,7 +8060,11 @@ export type Database = {
           eatin_mva_rate: number | null
           energy_cost_per_unit: number
           epd_number: string | null
+          freight_mode: Database["public"]["Enums"]["markup_mode"] | null
+          freight_value: number | null
           gtin: string | null
+          handling_mode: Database["public"]["Enums"]["markup_mode"] | null
+          handling_value: number | null
           id: string
           image_url: string | null
           in_pos: boolean
@@ -7896,6 +8088,10 @@ export type Database = {
           main_category_id: string | null
           manual_allergens_contains: string[]
           manual_allergens_may_contain: string[]
+          manual_cost_note: string | null
+          manual_cost_price: number | null
+          manual_cost_set_at: string | null
+          manual_cost_set_by: string | null
           manual_declaration_updated_at: string | null
           manual_declaration_updated_by: string | null
           manual_ingredient_declaration: string | null
@@ -7923,9 +8119,14 @@ export type Database = {
           shelf_life_chilled_days: number | null
           shelf_life_frozen_days: number | null
           show_breadscale: boolean | null
+          shrinkage_pct: number | null
           statistics_group: string | null
           status: string
+          storage_mode: Database["public"]["Enums"]["markup_mode"] | null
+          storage_value: number | null
           sub_category_id: string | null
+          target_brutto_pct: number | null
+          target_dg2_pct: number | null
           unit_of_sale: string
           updated_at: string
           variant_label: string | null
@@ -7938,6 +8139,9 @@ export type Database = {
           baked_product_id?: string | null
           breadscale_value?: number | null
           cake_role?: string | null
+          calc_factor?: number | null
+          calc_source_product_id?: string | null
+          calc_type?: Database["public"]["Enums"]["calc_type"] | null
           cert_nokkelhull?: boolean
           cert_norsk_100?: boolean
           code: string
@@ -7955,7 +8159,11 @@ export type Database = {
           eatin_mva_rate?: number | null
           energy_cost_per_unit?: number
           epd_number?: string | null
+          freight_mode?: Database["public"]["Enums"]["markup_mode"] | null
+          freight_value?: number | null
           gtin?: string | null
+          handling_mode?: Database["public"]["Enums"]["markup_mode"] | null
+          handling_value?: number | null
           id?: string
           image_url?: string | null
           in_pos?: boolean
@@ -7979,6 +8187,10 @@ export type Database = {
           main_category_id?: string | null
           manual_allergens_contains?: string[]
           manual_allergens_may_contain?: string[]
+          manual_cost_note?: string | null
+          manual_cost_price?: number | null
+          manual_cost_set_at?: string | null
+          manual_cost_set_by?: string | null
           manual_declaration_updated_at?: string | null
           manual_declaration_updated_by?: string | null
           manual_ingredient_declaration?: string | null
@@ -8006,9 +8218,14 @@ export type Database = {
           shelf_life_chilled_days?: number | null
           shelf_life_frozen_days?: number | null
           show_breadscale?: boolean | null
+          shrinkage_pct?: number | null
           statistics_group?: string | null
           status?: string
+          storage_mode?: Database["public"]["Enums"]["markup_mode"] | null
+          storage_value?: number | null
           sub_category_id?: string | null
+          target_brutto_pct?: number | null
+          target_dg2_pct?: number | null
           unit_of_sale?: string
           updated_at?: string
           variant_label?: string | null
@@ -8021,6 +8238,9 @@ export type Database = {
           baked_product_id?: string | null
           breadscale_value?: number | null
           cake_role?: string | null
+          calc_factor?: number | null
+          calc_source_product_id?: string | null
+          calc_type?: Database["public"]["Enums"]["calc_type"] | null
           cert_nokkelhull?: boolean
           cert_norsk_100?: boolean
           code?: string
@@ -8038,7 +8258,11 @@ export type Database = {
           eatin_mva_rate?: number | null
           energy_cost_per_unit?: number
           epd_number?: string | null
+          freight_mode?: Database["public"]["Enums"]["markup_mode"] | null
+          freight_value?: number | null
           gtin?: string | null
+          handling_mode?: Database["public"]["Enums"]["markup_mode"] | null
+          handling_value?: number | null
           id?: string
           image_url?: string | null
           in_pos?: boolean
@@ -8062,6 +8286,10 @@ export type Database = {
           main_category_id?: string | null
           manual_allergens_contains?: string[]
           manual_allergens_may_contain?: string[]
+          manual_cost_note?: string | null
+          manual_cost_price?: number | null
+          manual_cost_set_at?: string | null
+          manual_cost_set_by?: string | null
           manual_declaration_updated_at?: string | null
           manual_declaration_updated_by?: string | null
           manual_ingredient_declaration?: string | null
@@ -8089,9 +8317,14 @@ export type Database = {
           shelf_life_chilled_days?: number | null
           shelf_life_frozen_days?: number | null
           show_breadscale?: boolean | null
+          shrinkage_pct?: number | null
           statistics_group?: string | null
           status?: string
+          storage_mode?: Database["public"]["Enums"]["markup_mode"] | null
+          storage_value?: number | null
           sub_category_id?: string | null
+          target_brutto_pct?: number | null
+          target_dg2_pct?: number | null
           unit_of_sale?: string
           updated_at?: string
           variant_label?: string | null
@@ -8102,6 +8335,13 @@ export type Database = {
           {
             foreignKeyName: "products_baked_product_id_fkey"
             columns: ["baked_product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "products_calc_source_product_id_fkey"
+            columns: ["calc_source_product_id"]
             isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
@@ -9413,6 +9653,7 @@ export type Database = {
           recipe_id: string
           recipe_part_id: string
           sort_order: number
+          sub_product_id: string | null
           unit: string
           updated_at: string
           waste_percent: number | null
@@ -9436,6 +9677,7 @@ export type Database = {
           recipe_id: string
           recipe_part_id: string
           sort_order?: number
+          sub_product_id?: string | null
           unit: string
           updated_at?: string
           waste_percent?: number | null
@@ -9459,6 +9701,7 @@ export type Database = {
           recipe_id?: string
           recipe_part_id?: string
           sort_order?: number
+          sub_product_id?: string | null
           unit?: string
           updated_at?: string
           waste_percent?: number | null
@@ -9505,6 +9748,13 @@ export type Database = {
             columns: ["recipe_part_id"]
             isOneToOne: false
             referencedRelation: "recipe_parts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipe_lines_sub_product_id_fkey"
+            columns: ["sub_product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
             referencedColumns: ["id"]
           },
         ]
@@ -9773,6 +10023,9 @@ export type Database = {
           declaration_updated_at: string | null
           declaration_updated_by: string | null
           description: string | null
+          dough_piece_grams: number | null
+          dough_waste_pct: number
+          finished_weight_grams: number | null
           friction_factor_celsius: number | null
           hourly_rate: number
           id: string
@@ -9785,6 +10038,7 @@ export type Database = {
           manual_allergen_summary: Json | null
           manual_ingredient_declaration: string | null
           manual_nutrition: Json | null
+          measured_per_kg: boolean
           mixing_speed1_minutes: number | null
           mixing_speed2_minutes: number | null
           name: string | null
@@ -9828,6 +10082,9 @@ export type Database = {
           declaration_updated_at?: string | null
           declaration_updated_by?: string | null
           description?: string | null
+          dough_piece_grams?: number | null
+          dough_waste_pct?: number
+          finished_weight_grams?: number | null
           friction_factor_celsius?: number | null
           hourly_rate?: number
           id?: string
@@ -9840,6 +10097,7 @@ export type Database = {
           manual_allergen_summary?: Json | null
           manual_ingredient_declaration?: string | null
           manual_nutrition?: Json | null
+          measured_per_kg?: boolean
           mixing_speed1_minutes?: number | null
           mixing_speed2_minutes?: number | null
           name?: string | null
@@ -9883,6 +10141,9 @@ export type Database = {
           declaration_updated_at?: string | null
           declaration_updated_by?: string | null
           description?: string | null
+          dough_piece_grams?: number | null
+          dough_waste_pct?: number
+          finished_weight_grams?: number | null
           friction_factor_celsius?: number | null
           hourly_rate?: number
           id?: string
@@ -9895,6 +10156,7 @@ export type Database = {
           manual_allergen_summary?: Json | null
           manual_ingredient_declaration?: string | null
           manual_nutrition?: Json | null
+          measured_per_kg?: boolean
           mixing_speed1_minutes?: number | null
           mixing_speed2_minutes?: number | null
           name?: string | null
@@ -12989,6 +13251,14 @@ export type Database = {
           total_events: number
         }[]
       }
+      product_cost: {
+        Args: { p_depth?: number; p_product_id: string }
+        Returns: Json
+      }
+      product_margins: {
+        Args: { p_date?: string; p_product_id: string }
+        Returns: Json
+      }
       push_products_to_nettside: { Args: never; Returns: Json }
       recalc_raw_material_cost: {
         Args: {
@@ -13130,6 +13400,18 @@ export type Database = {
           sukkerbilde: boolean
           tekst: string
           ukjente_nokler: string[]
+        }[]
+      }
+      resolve_margin_target: {
+        Args: {
+          p_price_level: Database["public"]["Enums"]["price_level"]
+          p_product_id: string
+        }
+        Returns: {
+          source: string
+          target_brutto_pct: number
+          target_dg2_pct: number
+          warn_below_pp: number
         }[]
       }
       rm_can_read: { Args: { _rm_id: string }; Returns: boolean }
@@ -13298,7 +13580,16 @@ export type Database = {
         | "sulphites"
         | "lupin"
         | "molluscs"
+      calc_type:
+        | "oppskrift"
+        | "arvet"
+        | "handelsvare"
+        | "bakeoff"
+        | "halvfabrikat"
+        | "sammensatt"
+        | "manuell"
       declaration_mode: "auto" | "manual" | "auto_with_overrides"
+      markup_mode: "prosent" | "kroner"
       negotiation_recipient_status:
         | "invited"
         | "viewed"
@@ -13314,6 +13605,7 @@ export type Database = {
         | "concluded"
         | "cancelled"
         | "awaiting_confirmation"
+      price_level: "internpris" | "engros" | "utsalg"
       ticket_team:
         | "kundeservice"
         | "produksjon"
@@ -13478,7 +13770,17 @@ export const Constants = {
         "lupin",
         "molluscs",
       ],
+      calc_type: [
+        "oppskrift",
+        "arvet",
+        "handelsvare",
+        "bakeoff",
+        "halvfabrikat",
+        "sammensatt",
+        "manuell",
+      ],
       declaration_mode: ["auto", "manual", "auto_with_overrides"],
+      markup_mode: ["prosent", "kroner"],
       negotiation_recipient_status: [
         "invited",
         "viewed",
@@ -13496,6 +13798,7 @@ export const Constants = {
         "cancelled",
         "awaiting_confirmation",
       ],
+      price_level: ["internpris", "engros", "utsalg"],
       ticket_team: [
         "kundeservice",
         "produksjon",

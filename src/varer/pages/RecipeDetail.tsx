@@ -88,7 +88,10 @@ export default function RecipeDetail() {
       category: recipe.category ?? "",
       status: recipe.status ?? "draft",
       description: recipe.description ?? "",
-      unit_weight_grams: recipe.unit_weight_grams ?? "",
+      dough_piece_grams: (recipe as any).dough_piece_grams ?? "",
+      dough_waste_pct: (recipe as any).dough_waste_pct ?? "",
+      finished_weight_grams: (recipe as any).finished_weight_grams ?? "",
+      measured_per_kg: (recipe as any).measured_per_kg ?? false,
       units_per_batch: recipe.units_per_batch ?? "",
       target_dough_temp_celsius: recipe.target_dough_temp_celsius,
       friction_factor_celsius: recipe.friction_factor_celsius,
@@ -152,8 +155,8 @@ export default function RecipeDetail() {
   );
 
   const totals = useMemo(
-    () => computeTotals(hydratedLines, Number(header.unit_weight_grams) || null),
-    [hydratedLines, header.unit_weight_grams],
+    () => computeTotals(hydratedLines, Number(header.dough_piece_grams) || null),
+    [hydratedLines, header.dough_piece_grams],
   );
 
   // ===== Skalering (kun visning — basen røres ikke) =====
@@ -179,11 +182,11 @@ export default function RecipeDetail() {
       scaledSummary(
         hydratedLines,
         factor,
-        Number(header.unit_weight_grams) || null,
+        Number(header.dough_piece_grams) || null,
         desiredUnits || baseUnits,
         Number(mixerCapacity) || null,
       ),
-    [hydratedLines, factor, header.unit_weight_grams, desiredUnits, baseUnits, mixerCapacity],
+    [hydratedLines, factor, header.dough_piece_grams, desiredUnits, baseUnits, mixerCapacity],
   );
 
   /**
@@ -222,7 +225,7 @@ export default function RecipeDetail() {
       version: recipe?.version ?? null,
       description: header.description || null,
       imageUrl: recipe?.image_url ?? null,
-      unitWeightGrams: Number(header.unit_weight_grams) || null,
+      unitWeightGrams: Number(header.dough_piece_grams) || null,
       targetDoughTemp: header.target_dough_temp_celsius ?? null,
       frictionFactor: header.friction_factor_celsius ?? null,
       scaledUnits: scaleSummary.unitCount ?? desiredUnits ?? baseUnits,
@@ -322,6 +325,7 @@ export default function RecipeDetail() {
         _new: true,
         recipe_part_id: partId,
         raw_material_id: null,
+        sub_product_id: null,
         ingredient_name: null,
         quantity: "",
         unit: "g",
@@ -367,7 +371,10 @@ export default function RecipeDetail() {
           status: header.status,
           description: header.description || null,
           notes: header.notes || null,
-          unit_weight_grams: header.unit_weight_grams === "" ? null : Number(header.unit_weight_grams),
+          dough_piece_grams: header.dough_piece_grams === "" ? null : Number(header.dough_piece_grams),
+          dough_waste_pct: header.dough_waste_pct === "" ? null : Number(header.dough_waste_pct),
+          finished_weight_grams: header.finished_weight_grams === "" ? null : Number(header.finished_weight_grams),
+          measured_per_kg: !!header.measured_per_kg,
           units_per_batch: header.units_per_batch === "" ? null : Number(header.units_per_batch),
           target_dough_temp_celsius: header.target_dough_temp_celsius,
           friction_factor_celsius: header.friction_factor_celsius,
@@ -415,11 +422,12 @@ export default function RecipeDetail() {
         .map((l) => {
           const partId = partIdMap[l.recipe_part_id] ?? l.recipe_part_id;
           const qty = Number(l.quantity) || 0;
-          if (qty <= 0 && !l.raw_material_id && !l.ingredient_name) return null;
+          if (qty <= 0 && !l.raw_material_id && !(l as any).sub_product_id && !l.ingredient_name) return null;
           return {
             recipe_id: recipe.id,
             recipe_part_id: partId,
             raw_material_id: l.raw_material_id,
+            sub_product_id: (l as any).sub_product_id ?? null,
             ingredient_name: l.raw_material_id ? null : (l.ingredient_name || null),
             quantity: qty,
             unit: l.unit,
@@ -616,10 +624,37 @@ export default function RecipeDetail() {
                 {RECIPE_STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             </div>
-            <div>
-              <Label className="text-xs">Vekt per enhet (g)</Label>
-              <Input type="number" value={header.unit_weight_grams ?? ""} disabled={!editable}
-                onChange={(e) => patchHeader({ unit_weight_grams: e.target.value })} />
+            <div className="col-span-full mt-1 border-t pt-3">
+              <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Vekt og utbytte
+              </div>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div>
+                  <Label className="text-xs">Deigemnevekt (g)</Label>
+                  <Input type="number" value={header.dough_piece_grams ?? ""} disabled={!editable}
+                    onChange={(e) => patchHeader({ dough_piece_grams: e.target.value })} />
+                </div>
+                <div>
+                  <Label className="text-xs">Deigsvinn (%)</Label>
+                  <Input type="number" value={header.dough_waste_pct ?? ""} disabled={!editable}
+                    onChange={(e) => patchHeader({ dough_waste_pct: e.target.value })} />
+                </div>
+                <div>
+                  <Label className="text-xs">Ferdigvekt (g)</Label>
+                  <Input type="number" value={header.finished_weight_grams ?? ""} disabled={!editable}
+                    onChange={(e) => patchHeader({ finished_weight_grams: e.target.value })} />
+                </div>
+              </div>
+              <label className="mt-3 flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-input"
+                  checked={!!header.measured_per_kg}
+                  disabled={!editable}
+                  onChange={(e) => patchHeader({ measured_per_kg: e.target.checked })}
+                />
+                Oppskriften er målt per kg
+              </label>
             </div>
             <div>
               <Label className="text-xs">Antall per batch</Label>
