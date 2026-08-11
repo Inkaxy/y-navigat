@@ -7,7 +7,7 @@ export const NB_LEGAL_ENTITY_ID = "751709bc-04b3-4449-867d-b97faa9ab373" as cons
 export const BASE_UNITS = ["kg", "g", "l", "ml", "stk"] as const;
 export type BaseUnit = (typeof BASE_UNITS)[number];
 
-export const PACKAGE_UNITS = ["sekk", "kartong", "pall", "spann", "pakke", "flaske", "boks", "stk"] as const;
+export const PACKAGE_UNITS = ["sekk", "kartong", "pall", "konteiner", "spann", "pakke", "flaske", "boks", "stk"] as const;
 
 export const DEFAULT_CATEGORIES = [
   "Mel",
