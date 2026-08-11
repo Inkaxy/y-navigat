@@ -28,6 +28,7 @@ import { PreviewDrawer } from "@/fakturering/components/PreviewDrawer";
 import { EntityPickerBanner } from "@/fakturering/components/EntityPickerBanner";
 import { cn } from "@/lib/utils";
 import { readEdgeError } from "@/fakturering/lib/edgeError";
+import { usePendingReturnsCount } from "@/ordre/hooks/useReturnDeliveryNotes";
 
 function toISO(d: Date) { return format(d, "yyyy-MM-dd"); }
 
@@ -45,6 +46,7 @@ export default function Fakturakjoring() {
 
   const runDateISO = toISO(runDate);
   const preview = useInvoiceRunPreview(activeEntityId, runDateISO);
+  const { data: pendingReturns = 0 } = usePendingReturnsCount(activeEntityId ?? undefined);
   const settings = useInvoiceSettings(activeEntityId);
   const tripletex = useTripletexTokenStatus(activeEntityId);
   const writeAccess = useHasFakturaWriteAccess();
