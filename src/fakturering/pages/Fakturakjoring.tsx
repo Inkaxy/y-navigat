@@ -175,6 +175,21 @@ export default function Fakturakjoring() {
 
       <EntityPickerBanner />
 
+      {pendingReturns > 0 && (
+        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-900 dark:text-amber-100">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>
+            <strong>{pendingReturns} returer venter på godkjenning.</strong> De kommer ikke med i
+            denne kjøringen før de er godkjent.
+          </span>
+          <Button asChild size="sm" variant="outline" className="ml-auto">
+            <Link to="/ordre/returer">Gå til returer</Link>
+          </Button>
+        </div>
+      )}
+
+
+
 
 
       {/* Datovelger */}
