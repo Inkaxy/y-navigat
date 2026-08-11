@@ -161,9 +161,11 @@ export function ProductionPlanTable({ rows, showByMainGroup, showTraysWithPlus, 
                 className={cn(
                   hasDetails && "cursor-pointer print:cursor-auto hover:bg-muted/60",
                   isExpanded && "bg-accent/30",
+                  r.quantity_from_stock > 0 && r.quantity_to_produce === 0 && "bg-success/10",
                 )}
                 onClick={() => hasDetails && toggle(rowKey)}
               >
+
                 {showByMainGroup && columns.mainGroup && span > 0 && (
                   <TableCell
                     rowSpan={span}
