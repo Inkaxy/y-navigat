@@ -512,6 +512,13 @@ export default function Profitability() {
               <table className="w-full min-w-[1450px] text-sm">
                 <thead className="bg-muted/50 text-xs">
                   <tr className="border-b">
+                    <th className="w-8 px-2 py-2">
+                      <Checkbox
+                        checked={alleValgt}
+                        onCheckedChange={toggleAllVisible}
+                        aria-label="Velg alle på siden"
+                      />
+                    </th>
                     <Th label="Varenr" k="display_number" {...{ sortKey, sortAsc, toggleSort }} />
                     <Th label="Navn" k="navn" {...{ sortKey, sortAsc, toggleSort }} />
                     <Th label="Kategori" k="kategori" {...{ sortKey, sortAsc, toggleSort }} />
