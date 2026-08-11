@@ -133,16 +133,23 @@ export function SetPackageDialog({ row, open, onOpenChange }: Props) {
           <div className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <Label>Antall {baseUnit} per pakning *</Label>
+                <Label>Antall {baseUnit} per pakning {isBulk ? "" : "*"}</Label>
                 <Input
                   type="number"
                   step="0.001"
                   min="0"
-                  value={units}
+                  value={isBulk ? "" : units}
                   onChange={e => setUnits(e.target.value)}
+                  disabled={isBulk}
+                  placeholder={isBulk ? `Bulk — faktureres per ${baseUnit}` : undefined}
                   autoFocus
                 />
-                {(row.foreslatt_fra_navn != null || row.foreslatt_fra_referanse != null) && (
+                {isBulk && (
+                  <p className="mt-1 text-xs text-ink-secondary">
+                    Bulk har ingen fast mengde per levering. Prisen regnes direkte per {baseUnit} fra fakturaen.
+                  </p>
+                )}
+                {!isBulk && (row.foreslatt_fra_navn != null || row.foreslatt_fra_referanse != null) && (
                   <>
                     <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-ink-secondary">
                       <span>Forslag:</span>
