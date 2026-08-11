@@ -167,6 +167,7 @@ const OrdreWebsiteOrders = lazy(() => import("@/ordre/pages/WebsiteOrders"));
 const RavarerVareliste = lazy(() => import("@/ravarer/pages/Vareliste"));
 const RavarerDetail = lazy(() => import("@/ravarer/pages/RawMaterialDetail"));
 const RavarerLager = lazy(() => import("@/ravarer/pages/Lager"));
+const RavarerPakninger = lazy(() => import("@/ravarer/pages/PackageSizes"));
 
 const FakturaerList = lazy(() => import("@/fakturaer/pages/FakturaerList"));
 const FakturaerNew = lazy(() => import("@/fakturaer/pages/NewInvoice"));
