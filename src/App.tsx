@@ -115,6 +115,7 @@ const KunderCustomerHistory = lazy(() => import("@/kunder/pages/CustomerHistory"
 const KunderPlaceholder = lazy(() => import("@/kunder/pages/Placeholder"));
 const KunderPortalUsers = lazy(() => import("@/kunder/pages/PortalUsers"));
 const ProduksjonOversikt = lazy(() => import("@/produksjon/pages/OversiktPage"));
+const ProduksjonLager = lazy(() => import("@/produksjon/pages/LagerPage"));
 const ProduksjonEtiketter = lazy(() => import("@/produksjon/pages/EtiketterPage"));
 const ProduksjonsplanPage = lazy(() => import("@/produksjon/pages/ProduksjonsplanPage"));
 const ProduksjonsavdelingerPage = lazy(() => import("@/produksjon/pages/innstillinger/ProduksjonsavdelingerPage"));
@@ -431,6 +432,7 @@ const App = () => (
               <Route path="/produksjon/oversikt" element={<Shell><AppAccessGuard appCode="produksjon" appName="Produksjon"><ProduksjonOversikt /></AppAccessGuard></Shell>} />
               <Route path="/produksjon/produksjonsplan" element={<Shell><AppAccessGuard appCode="produksjon" appName="Produksjon"><ProduksjonsplanPage /></AppAccessGuard></Shell>} />
               <Route path="/produksjon/pakkesystem" element={<Shell><AppAccessGuard appCode="produksjon" appName="Produksjon"><OrdrePakkesystem /></AppAccessGuard></Shell>} />
+              <Route path="/produksjon/lager" element={<Shell><AppAccessGuard appCode="produksjon" appName="Produksjon"><ProduksjonLager /></AppAccessGuard></Shell>} />
               <Route path="/produksjon/etiketter" element={<Shell><AppAccessGuard appCode="produksjon" appName="Produksjon"><ProduksjonEtiketter /></AppAccessGuard></Shell>} />
               <Route path="/produksjon/innstillinger/produksjonsavdelinger" element={<Shell><AppAccessGuard appCode="produksjon" appName="Produksjon"><ProduksjonsavdelingerPage /></AppAccessGuard></Shell>} />
               <Route path="/produksjon/innstillinger/pakkeomrader" element={<Shell><AppAccessGuard appCode="produksjon" appName="Produksjon"><PakkeomraderPage /></AppAccessGuard></Shell>} />
