@@ -83,6 +83,7 @@ const VarerProductDetail = lazy(() => import("@/varer/pages/ProductDetail"));
 const VarerPriceLists = lazy(() => import("@/varer/pages/PriceLists"));
 const VarerPriceListDetail = lazy(() => import("@/varer/pages/PriceListDetail"));
 const VarerSpecialPrices = lazy(() => import("@/varer/pages/SpecialPrices"));
+const VarerProfitability = lazy(() => import("@/varer/pages/Profitability"));
 const VarerRecipes = lazy(() => import("@/varer/pages/Recipes"));
 const VarerRecipesCleanup = lazy(() => import("@/varer/pages/RecipesCleanup"));
 const VarerRecipeDetail = lazy(() => import("@/varer/pages/RecipeDetail"));
@@ -311,6 +312,8 @@ const App = () => (
               <Route path="/varer/priser" element={<Shell><AppAccessGuard appCode="varer" appName="Varer"><VarerAppProvider><VarerPriceLists /></VarerAppProvider></AppAccessGuard></Shell>} />
               <Route path="/varer/priser/:id" element={<Shell><AppAccessGuard appCode="varer" appName="Varer"><VarerAppProvider><VarerPriceListDetail /></VarerAppProvider></AppAccessGuard></Shell>} />
               <Route path="/varer/spesialpriser" element={<Shell><AppAccessGuard appCode="varer" appName="Varer"><VarerAppProvider><VarerSpecialPrices /></VarerAppProvider></AppAccessGuard></Shell>} />
+              <Route path="/varer/lonnsomhet" element={<Shell><AppAccessGuard appCode="varer" appName="Varer"><VarerAppProvider><VarerProfitability /></VarerAppProvider></AppAccessGuard></Shell>} />
+
               <Route path="/varer/oppskrifter" element={<Shell><AppAccessGuard appCode="varer" appName="Varer"><VarerAppProvider><VarerRecipes /></VarerAppProvider></AppAccessGuard></Shell>} />
               <Route path="/varer/oppskrifter/krever-opprydding" element={<Shell><AppAccessGuard appCode="varer" appName="Varer"><VarerAppProvider><VarerRecipesCleanup /></VarerAppProvider></AppAccessGuard></Shell>} />
               <Route path="/varer/oppskrifter/:id" element={<Shell><AppAccessGuard appCode="varer" appName="Varer"><VarerAppProvider><VarerRecipeDetail /></VarerAppProvider></AppAccessGuard></Shell>} />
