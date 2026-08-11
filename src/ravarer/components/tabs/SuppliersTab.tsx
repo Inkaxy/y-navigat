@@ -100,8 +100,15 @@ export function SuppliersTab({ rm }: Props) {
                         {l.is_primary && <Badge className="ml-2" variant="outline"><Star className="mr-1 h-3 w-3" />Primær</Badge>}
                       </td>
                       <td className="py-3 font-mono text-xs">{l.supplier_sku ?? "—"}</td>
-                      <td className="py-3 text-ink-secondary">{l.package_size ? `${l.package_size} ${l.package_unit ?? ""}` : "—"}</td>
+                      <td className="py-3 text-ink-secondary">
+                        {l.package_size ? `${l.package_size} ${l.package_unit ?? ""}` : "—"}
+                        {l.base_units_per_package != null && (
+                          <span className="ml-1 text-xs">({l.base_units_per_package} pr. pakning)</span>
+                        )}
+                      </td>
                       <td className="py-3 text-right tabular-nums">{formatNok(l.agreed_price)}</td>
+                      <td className="py-3 text-right tabular-nums text-ink-secondary">{formatNok(l.agreed_price_per_base_unit)}</td>
+                      <td className="py-3 text-right tabular-nums text-ink-secondary">{formatNok(l.last_invoice_price)}</td>
                       <td className={`py-3 ${expiryClass}`}>{formatDate(l.agreement_valid_to)}</td>
                       <td className="py-3 text-right">
                         {canWrite && (
