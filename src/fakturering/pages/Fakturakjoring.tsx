@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { addDays, format, isToday } from "date-fns";
 import { nb } from "date-fns/locale";
@@ -41,10 +41,19 @@ export default function Fakturakjoring() {
   const navigate = useNavigate();
   const qc = useQueryClient();
 
-  const [runDate, setRunDate] = useState<Date>(new Date());
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const datoParam = searchParams.get("dato");
+  const [runDate, setRunDate] = useState<Date>(() => {
+    if (datoParam && /^\d{4}-\d{2}-\d{2}$/.test(datoParam)) {
+      const d = new Date(`${datoParam}T00:00:00`);
+      if (!Number.isNaN(d.getTime())) return d;
+    }
+    return new Date();
+  });
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [previewGroup, setPreviewGroup] = useState<string | null>(null);
+  const [previewGroup, setPreviewGroup] = useState<string | null>(() => searchParams.get("preview"));
   const [isRunning, setIsRunning] = useState(false);
 
   const runDateISO = toISO(runDate);
@@ -54,6 +63,28 @@ export default function Fakturakjoring() {
   const tripletex = useTripletexTokenStatus(activeEntityId);
   const writeAccess = useHasFakturaWriteAccess();
   const recentRuns = useRecentInvoiceRuns(activeEntityId, 5);
+
+  // Hold dialog-tilstand i URL-en slik at man kan komme tilbake hit fra ordren.
+  useEffect(() => {
+    const next = new URLSearchParams(searchParams);
+    if (previewGroup) {
+      next.set("preview", previewGroup);
+      next.set("dato", runDateISO);
+    } else {
+      next.delete("preview");
+      next.delete("dato");
+    }
+    if (next.toString() !== searchParams.toString()) {
+      setSearchParams(next, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [previewGroup, runDateISO]);
+
+  // Frisk data ved mount (f.eks. når man kommer tilbake fra en ordre).
+  useEffect(() => {
+    void qc.invalidateQueries({ queryKey: ["fakturering", "preview-lines"] });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const lines = useMemo(() => preview.data ?? [], [preview.data]);
   const rowByKey = useMemo(() => aggregatePreviewLines(lines), [lines]);
@@ -435,6 +466,10 @@ export default function Fakturakjoring() {
         error={preview.error}
         onRetry={() => preview.refetch()}
         isFetching={preview.isFetching}
+        onOpenOrder={(orderId) => {
+          const backUrl = `${window.location.pathname}?preview=${encodeURIComponent(previewGroup ?? "")}&dato=${runDateISO}`;
+          navigate(`/ordre/ordrer/${orderId}?tilbake=${encodeURIComponent(backUrl)}`);
+        }}
       />
 
     </div>

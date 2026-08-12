@@ -19,7 +19,9 @@ interface Props {
   error?: unknown;
   onRetry: () => void;
   isFetching: boolean;
+  onOpenOrder?: (orderId: string) => void;
 }
+
 
 function fmtDate(v: string) {
   try {
@@ -30,7 +32,7 @@ function fmtDate(v: string) {
 }
 
 export function GroupPreviewDialog({
-  open, onOpenChange, groupKey, runDate, lines, isLoading, isError, error, onRetry, isFetching,
+  open, onOpenChange, groupKey, runDate, lines, isLoading, isError, error, onRetry, isFetching, onOpenOrder,
 }: Props) {
   const [q, setQ] = useState("");
 
@@ -127,7 +129,19 @@ export function GroupPreviewDialog({
                   <tbody className="divide-y divide-line-subtle">
                     {filtered.map((r, idx) => (
                       <tr key={r.order_id} className={idx % 2 === 0 ? "bg-transparent" : "bg-surface-sunken/40"}>
-                        <td className="px-4 py-2.5 tabular-nums text-text-primary">{r.order_number}</td>
+                        <td className="px-4 py-2.5 tabular-nums text-text-primary">
+                          {onOpenOrder ? (
+                            <button
+                              type="button"
+                              onClick={() => onOpenOrder(r.order_id)}
+                              className="font-semibold text-[hsl(var(--app-primary))] underline underline-offset-2 hover:opacity-80"
+                            >
+                              {r.order_number}
+                            </button>
+                          ) : (
+                            r.order_number
+                          )}
+                        </td>
                         <td className="px-4 py-2.5 font-semibold tabular-nums">{r.customer_number ?? "—"}</td>
                         <td className="px-4 py-2.5 text-text-primary">
                           {r.customer_name}
