@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -13,7 +13,6 @@ import { WasteDialog } from "@/produksjon/features/lager/components/WasteDialog"
 import { QuickCorrectionDialog } from "@/produksjon/features/lager/components/QuickCorrectionDialog";
 import { StockCountMode } from "@/produksjon/features/lager/components/StockCountMode";
 
-const STORAGE_KEY = "produksjon.lager.dept";
 const ALL = "all";
 
 export default function LagerPage() {
@@ -23,7 +22,14 @@ export default function LagerPage() {
   const { data: items = [], isLoading } = useLagerItems(entityId);
   useStockRealtime();
 
-  const [deptId, setDeptId] = useState<string>(() => localStorage.getItem(STORAGE_KEY) ?? ALL);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const deptId = searchParams.get("avdeling") ?? ALL;
+  const setDeptId = (next: string) => {
+    const params = new URLSearchParams(searchParams);
+    if (next === ALL) params.delete("avdeling");
+    else params.set("avdeling", next);
+    setSearchParams(params, { replace: true });
+  };
   const [wasteOpen, setWasteOpen] = useState(false);
   const [wasteItem, setWasteItem] = useState<string | null>(null);
   const [wasteBatch, setWasteBatch] = useState<string | null>(null);
@@ -31,13 +37,10 @@ export default function LagerPage() {
   const [countMode, setCountMode] = useState(false);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, deptId);
-  }, [deptId]);
-
-  useEffect(() => {
     if (deptId !== ALL && departments.length > 0 && !departments.some((d) => d.id === deptId)) {
       setDeptId(ALL);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [departments, deptId]);
 
   const visibleItems = useMemo(

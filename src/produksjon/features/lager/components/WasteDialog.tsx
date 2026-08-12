@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { BigStepper } from "./BigStepper";
 import { useLagerBatches, useStockAdjust, type LagerItem } from "../hooks/useLager";
 import { cn } from "@/lib/utils";
+import { showError } from "@/lib/userError";
 
 const REASONS = ["Utgått på dato", "Brekkasje", "Feilproduksjon", "Annet"] as const;
 
@@ -57,6 +58,15 @@ export function WasteDialog({ open, onOpenChange, items, initialItemId, initialB
   const selected = items.find((i) => i.id === itemId) ?? null;
   const { data: batches = [] } = useLagerBatches(selected?.batch_tracking ? itemId : undefined);
 
+  // FIFO: forvelg eldste batch med rest.
+  useEffect(() => {
+    if (!open || batchId) return;
+    const oldest = [...batches]
+      .filter((b) => b.remaining > 0)
+      .sort((a, b) => (a.produced_on < b.produced_on ? -1 : 1))[0];
+    if (oldest) setBatchId(oldest.batch_id);
+  }, [open, batches, batchId]);
+
   const submit = async () => {
     if (!selected) {
       setErrMsg("Velg lagervare");
@@ -82,7 +92,7 @@ export function WasteDialog({ open, onOpenChange, items, initialItemId, initialB
       setOkMsg(`−${count} ${selected.name} svinnført`);
       onOpenChange(false);
     } catch (e) {
-      setErrMsg((e as Error).message);
+      showError("WasteDialog", e, (e as Error).message || "Kunne ikke registrere svinn.");
     }
   };
 
@@ -118,7 +128,7 @@ export function WasteDialog({ open, onOpenChange, items, initialItemId, initialB
 
           {selected?.batch_tracking && batches.length > 0 && (
             <div className="space-y-1.5">
-              <Label>Batch (valgfritt)</Label>
+              <Label>Batch (eldste med rest er forvalgt)</Label>
               <Select value={batchId} onValueChange={setBatchId}>
                 <SelectTrigger className="h-12">
                   <SelectValue placeholder="Uten batch" />

@@ -73,6 +73,7 @@ const RULES: PageRule[] = [
   // Produksjon
   { test: (p) => p === "/produksjon" || p.startsWith("/produksjon/oversikt"), label: "Oversikt" },
   { test: (p) => p.startsWith("/produksjon/etiketter"), label: "Etiketter" },
+  { test: (p) => p.startsWith("/produksjon/lager"), label: "Lager" },
   { test: (p) => p.startsWith("/produksjon/innstillinger/pakkeomrader"), label: "Pakkeområder" },
   { test: (p) => p.startsWith("/produksjon/innstillinger/produksjonsavdelinger"), label: "Produksjonsavdelinger" },
   { test: (p) => p.startsWith("/produksjon/innstillinger/utskriftsprofiler"), label: "Utskriftsprofiler" },
