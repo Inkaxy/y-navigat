@@ -201,7 +201,7 @@ export function ProductionPlanTable({ rows, showByMainGroup, showTraysWithPlus, 
                           "rounded px-1.5 py-0.5 text-[10px] font-semibold",
                           r.quantity_to_produce === 0
                             ? "bg-success/15 text-success"
-                            : "bg-warning/15 text-warning-foreground",
+                            : "bg-warning/15 text-warning",
                         )}
                         title={`Dekkes av lager: ${fmtNum(r.quantity_from_stock)} av ${fmtNum(r.quantity_ordered)}`}
                       >
