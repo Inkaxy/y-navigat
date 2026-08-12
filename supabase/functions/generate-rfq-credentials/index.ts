@@ -60,7 +60,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { data: recipients, error: recErr } = await supabase
+    // Caller authorization has passed (auth.getUser + RLS-scoped negotiation lookup).
+    // All remaining DB work runs with service role because credential columns
+    // (access_token / password_hash) are revoked from authenticated/anon.
+    const { data: recipients, error: recErr } = await supabaseAdmin
       .from("negotiation_recipients")
       .select("id, supplier_id, contact_email, suppliers!inner(name)")
       .eq("negotiation_id", negotiationId);
@@ -77,7 +80,7 @@ Deno.serve(async (req) => {
 
     for (const r of recipients as any[]) {
       // Generate password via SECURITY DEFINER RPC
-      const { data: pw, error: pwErr } = await supabase.rpc("set_rfq_password", {
+      const { data: pw, error: pwErr } = await supabaseAdmin.rpc("set_rfq_password", {
         p_recipient_id: r.id,
       });
       if (pwErr) throw pwErr;
@@ -102,14 +105,14 @@ Deno.serve(async (req) => {
 
     // Move negotiation to invited if currently draft
     if (neg.status === "draft") {
-      await supabase
+      await supabaseAdmin
         .from("negotiations")
         .update({ status: "invited" })
         .eq("id", negotiationId);
     }
 
     // Audit log
-    await supabase.from("negotiation_messages").insert(
+    await supabaseAdmin.from("negotiation_messages").insert(
       recipients.map((r: any) => ({
         negotiation_id: negotiationId,
         recipient_id: r.id,
@@ -117,6 +120,7 @@ Deno.serve(async (req) => {
         actor: "nbhub",
       })) as any,
     );
+
 
     return new Response(JSON.stringify({ success: true, credentials }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
