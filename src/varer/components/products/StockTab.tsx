@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { Boxes, Check, ChevronsUpDown, Loader2 } from "lucide-react";
@@ -18,7 +18,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
+import { showError } from "@/lib/userError";
 import {
   useProductStock,
   useRemoveStockLink,
@@ -70,11 +81,16 @@ export function StockTab({ productId, productName, canWrite, legalEntityId, prod
 
   // Skjema for «tapper lagervare»
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState(false);
   const [targetItemId, setTargetItemId] = useState("");
   const [targetUnits, setTargetUnits] = useState("1");
 
+  const seededFor = useRef<string | null>(null);
+
   useEffect(() => {
     if (!state) return;
+    if (seededFor.current === productId) return;
+    seededFor.current = productId;
     setMode(initialMode);
     const item = state.stockItem;
     setName(item && state.ownStockItemId ? item.name : `${productName}-emne`);
@@ -89,7 +105,7 @@ export function StockTab({ productId, productName, canWrite, legalEntityId, prod
       setTargetUnits(String(state.link.units_per_sold_unit));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state?.link?.id, state?.ownStockItemId, state?.stockItem?.id]);
+  }, [productId, state?.link?.id, state?.ownStockItemId, state?.stockItem?.id]);
 
   useEffect(() => {
     if (errorText) {
@@ -126,7 +142,9 @@ export function StockTab({ productId, productName, canWrite, legalEntityId, prod
       await removeLink.mutateAsync();
       setSuccessText("Varen holdes ikke lenger på lager");
     } catch (e) {
-      setErrorText((e as Error).message);
+      showError("StockTab.removeLink", e, "Kunne ikke fjerne koblingen. Prøv igjen.");
+    } finally {
+      setConfirmRemove(false);
     }
   };
 
@@ -140,20 +158,35 @@ export function StockTab({ productId, productName, canWrite, legalEntityId, prod
       setErrorText("Enheter per solgt enhet må være større enn 0");
       return;
     }
+    const tray = num(piecesPerTray);
+    const min = num(minLevel);
+    const shelf = num(shelfLife);
+    if (tray != null && tray < 0) {
+      setErrorText("Emner per plate kan ikke være negativt");
+      return;
+    }
+    if (min != null && min < 0) {
+      setErrorText("Min-nivå kan ikke være negativt");
+      return;
+    }
+    if (shelf != null && shelf < 0) {
+      setErrorText("Holdbarhet kan ikke være negativ");
+      return;
+    }
     try {
       await saveOwn.mutateAsync({
         name,
         department_id: deptId || null,
-        pieces_per_tray: num(piecesPerTray),
-        min_level: num(minLevel),
-        shelf_life_days: num(shelfLife),
+        pieces_per_tray: tray,
+        min_level: min,
+        shelf_life_days: shelf,
         batch_tracking: batchTracking,
         units_per_sold_unit: units,
         stockItemId: state?.ownStockItemId ?? null,
       });
       setSuccessText("Lagervare lagret");
     } catch (e) {
-      setErrorText((e as Error).message);
+      showError("StockTab.saveOwn", e, "Kunne ikke lagre lagervaren. Prøv igjen.");
     }
   };
 
@@ -171,7 +204,7 @@ export function StockTab({ productId, productName, canWrite, legalEntityId, prod
       await saveLink.mutateAsync({ stock_item_id: targetItemId, units_per_sold_unit: units });
       setSuccessText("Kobling lagret");
     } catch (e) {
-      setErrorText((e as Error).message);
+      showError("StockTab.saveLink", e, "Kunne ikke lagre koblingen. Prøv igjen.");
     }
   };
 
@@ -246,19 +279,46 @@ export function StockTab({ productId, productName, canWrite, legalEntityId, prod
         </CardContent>
       </Card>
 
-      {mode === "none" && (state?.link || state?.ownStockItemId) && (
+      {mode === "none" && state?.link && (
         <Card>
           <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-6">
             <p className="text-sm text-muted-foreground">
               Fjerner koblingen mellom varen og lagervaren. Selve lagervaren og historikken beholdes.
             </p>
-            <Button variant="destructive" disabled={!canWrite || busy || !state?.link} onClick={handleRemove}>
+            <Button variant="destructive" disabled={!canWrite || busy} onClick={() => setConfirmRemove(true)}>
               {removeLink.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Fjern kobling
             </Button>
           </CardContent>
         </Card>
       )}
+
+      {mode === "none" && !state?.link && state?.ownStockItemId && (
+        <Card>
+          <CardContent className="pt-6 text-sm text-muted-foreground">
+            Denne varen definerer selve lagervaren «{current?.name}». Beholdning og historikk styres fra{" "}
+            <Link to="/produksjon/lager" className="underline">
+              lagersiden i produksjon
+            </Link>
+            .
+          </CardContent>
+        </Card>
+      )}
+
+      <AlertDialog open={confirmRemove} onOpenChange={setConfirmRemove}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Fjerne koblingen?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Salg av «{productName}» vil ikke lenger trekke fra lagervaren. Lagervaren og historikken beholdes.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Avbryt</AlertDialogCancel>
+            <AlertDialogAction onClick={handleRemove}>Fjern kobling</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {mode === "is_item" && (
         <Card>
@@ -375,12 +435,19 @@ export function StockTab({ productId, productName, canWrite, legalEntityId, prod
                     <Command>
                       <CommandInput placeholder="Søk …" />
                       <CommandList>
-                        <CommandEmpty>Ingen lagervarer funnet.</CommandEmpty>
+                        <CommandEmpty className="px-4 py-6 text-center text-sm text-muted-foreground">
+                          Ingen lagervarer funnet. Lagervarer opprettes ved å velge «Denne varen ER en lagervare» på
+                          hovedvarens varekort.{" "}
+                          <Link to="/varer/varer" className="underline">
+                            Gå til varelisten
+                          </Link>
+                          .
+                        </CommandEmpty>
                         <CommandGroup>
                           {selectableItems.map((i) => (
                             <CommandItem
                               key={i.id}
-                              value={i.name}
+                              value={`${i.name} ${i.department_name ?? ""}`}
                               onSelect={() => {
                                 setTargetItemId(i.id);
                                 setPickerOpen(false);
