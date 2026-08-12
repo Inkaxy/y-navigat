@@ -156,11 +156,8 @@ export default function Fakturakjoring() {
       setConfirmOpen(false);
       navigate(`/fakturering/kjoringer/${runId}`);
     } catch (e: any) {
-      toast({
-        title: "Kunne ikke kjøre fakturering",
-        description: await readEdgeError(e),
-        variant: "destructive",
-      });
+      showError("fakturakjoring/run", e, await readEdgeError(e));
+
     } finally {
       setIsRunning(false);
     }
