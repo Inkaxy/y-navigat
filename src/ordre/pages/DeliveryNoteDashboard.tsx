@@ -319,6 +319,9 @@ export default function DeliveryNoteDashboard() {
   }, [tourId, tourStatus]);
   const modeSuffix = mode === "correction" ? "&mode=correction" : "";
   const { data: pendingReturns = 0 } = usePendingReturnsCount();
+  const [showReturns, setShowReturns] = useState(false);
+  const returnsRef = useRef<HTMLDivElement | null>(null);
+
   const allWidgets = [
     {
       key: "fast",
@@ -351,10 +354,25 @@ export default function DeliveryNoteDashboard() {
     },
   ];
 
+  const returnWidget = {
+    key: "retur",
+    label: "RETURORDRE",
+    value: pendingReturns,
+    classes: "bg-purple-200 text-purple-950 hover:bg-purple-300",
+    span: 1,
+    onClick: () => {
+      setShowReturns(true);
+      requestAnimationFrame(() =>
+        returnsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
+      );
+    },
+  };
+
   const widgets =
     mode === "correction"
-      ? allWidgets.filter((w) => w.key === "datert")
+      ? [...allWidgets.filter((w) => w.key === "datert"), returnWidget]
       : allWidgets;
+
 
 
   return (
