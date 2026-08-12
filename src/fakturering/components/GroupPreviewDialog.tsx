@@ -19,7 +19,9 @@ interface Props {
   error?: unknown;
   onRetry: () => void;
   isFetching: boolean;
+  onOpenOrder?: (orderId: string) => void;
 }
+
 
 function fmtDate(v: string) {
   try {
