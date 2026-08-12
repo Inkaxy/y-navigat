@@ -185,7 +185,7 @@ export default function Fakturakjoring() {
             denne kjøringen før de er godkjent.
           </span>
           <Button asChild size="sm" variant="outline" className="ml-auto">
-            <Link to="/ordre/returer">Gå til returer</Link>
+            <Link to="/ordre/pakksedler?mode=correction">Gå til returer</Link>
           </Button>
         </div>
       )}

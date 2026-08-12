@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { showError } from "@/lib/userError";
 import { Loader2 } from "lucide-react";
 import {
   Dialog,
@@ -129,7 +130,7 @@ export function ApproveReturnDialog({
       );
       onOpenChange(false);
     } catch (e) {
-      setErrorText(e instanceof Error ? e.message : "Kunne ikke godkjenne returen");
+      showError("approve-return", e, "Kunne ikke godkjenne returen. Prøv igjen.");
     }
   };
 
@@ -144,7 +145,7 @@ export function ApproveReturnDialog({
       setSuccessText("Retur avvist");
       onOpenChange(false);
     } catch (e) {
-      setErrorText(e instanceof Error ? e.message : "Kunne ikke avvise returen");
+      showError("reject-return", e, "Kunne ikke avvise returen. Prøv igjen.");
     }
   };
 
