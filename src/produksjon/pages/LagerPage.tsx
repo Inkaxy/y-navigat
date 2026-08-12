@@ -91,7 +91,7 @@ export default function LagerPage() {
               Ingen lagervarer i denne avdelingen ennå. Lagervarer opprettes fra varekortet under Varer → Lager.
             </p>
             <Button asChild variant="outline" className="h-12">
-              <Link to="/varer/varer">Gå til varer</Link>
+              <Link to="/varer/vareliste">Gå til varer</Link>
             </Button>
           </CardContent>
         </Card>
