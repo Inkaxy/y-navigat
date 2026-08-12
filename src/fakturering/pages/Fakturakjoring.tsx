@@ -14,7 +14,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useFaktureringEntity } from "@/fakturering/context/FaktureringContext";
 import {
-  useInvoiceRunPreview,
+  useInvoiceRunPreviewLines,
+  aggregatePreviewLines,
   useInvoiceSettings,
   useTripletexTokenStatus,
   useHasFakturaWriteAccess,
@@ -24,11 +25,13 @@ import {
 import { KNOWN_GROUPS, isKnownGroup, groupDefFor, formatKr } from "@/fakturering/lib/groups";
 import { GroupCard } from "@/fakturering/components/GroupCard";
 import { ConfirmRunDialog } from "@/fakturering/components/ConfirmRunDialog";
-import { PreviewDrawer } from "@/fakturering/components/PreviewDrawer";
+import { GroupPreviewDialog } from "@/fakturering/components/GroupPreviewDialog";
 import { EntityPickerBanner } from "@/fakturering/components/EntityPickerBanner";
 import { cn } from "@/lib/utils";
 import { readEdgeError } from "@/fakturering/lib/edgeError";
+import { showError } from "@/lib/userError";
 import { usePendingReturnsCount } from "@/ordre/hooks/useReturnDeliveryNotes";
+
 
 function toISO(d: Date) { return format(d, "yyyy-MM-dd"); }
 
