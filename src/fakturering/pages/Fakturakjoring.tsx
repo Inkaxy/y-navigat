@@ -427,14 +427,19 @@ export default function Fakturakjoring() {
         onConfirm={handleRun}
         isRunning={isRunning}
       />
-      <PreviewDrawer
-        open={previewOpen}
-        onOpenChange={setPreviewOpen}
-        entityId={activeEntityId}
+      <GroupPreviewDialog
+        open={previewGroup !== null}
+        onOpenChange={(o) => !o && setPreviewGroup(null)}
+        groupKey={previewGroup}
         runDate={runDateISO}
-        selectedGroups={Array.from(selected)}
-        previewRows={previewRows}
+        lines={lines}
+        isLoading={preview.isLoading}
+        isError={preview.isError}
+        error={preview.error}
+        onRetry={() => preview.refetch()}
+        isFetching={preview.isFetching}
       />
+
     </div>
   );
 }
