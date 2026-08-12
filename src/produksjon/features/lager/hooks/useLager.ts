@@ -89,6 +89,7 @@ function invalidateStock(qc: ReturnType<typeof useQueryClient>) {
   qc.invalidateQueries({ queryKey: ["stock_item_balance"] });
   qc.invalidateQueries({ queryKey: ["stock_batch_balance"] });
   qc.invalidateQueries({ queryKey: ["product-stock"] });
+  qc.invalidateQueries({ queryKey: ["stock_movements"] });
 }
 
 export interface RegisterProductionResult {
@@ -204,5 +205,54 @@ export function useStockCountApply() {
       return (data ?? {}) as StockCountResult;
     },
     onSuccess: () => invalidateStock(qc),
+  });
+}
+
+export interface StockMovementRow {
+  id: string;
+  stock_item_id: string;
+  batch_id: string | null;
+  movement_type: string;
+  quantity_base: number;
+  occurred_at: string;
+  reason: string | null;
+  note: string | null;
+}
+
+export const MOVEMENT_LABELS: Record<string, string> = {
+  production_in: "Produksjon",
+  waste: "Svinn",
+  correction: "Korrigering",
+  count_adjust: "Telling",
+};
+
+/** Dagens bevegelser på lagervarer (nyeste først). */
+export function useTodayStockMovements(legalEntityId: string | undefined) {
+  return useQuery({
+    queryKey: ["stock_movements", "today", legalEntityId],
+    enabled: !!legalEntityId,
+    queryFn: async (): Promise<StockMovementRow[]> => {
+      const start = new Date();
+      start.setHours(0, 0, 0, 0);
+      const { data, error } = await supabase
+        .from("stock_movements")
+        .select("id, stock_item_id, batch_id, movement_type, quantity_base, occurred_at, reason, note")
+        .eq("legal_entity_id", legalEntityId!)
+        .not("stock_item_id", "is", null)
+        .gte("occurred_at", start.toISOString())
+        .order("occurred_at", { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      return ((data ?? []) as Record<string, any>[]).map((r) => ({
+        id: r.id,
+        stock_item_id: r.stock_item_id,
+        batch_id: r.batch_id ?? null,
+        movement_type: r.movement_type ?? "",
+        quantity_base: Number(r.quantity_base ?? 0),
+        occurred_at: r.occurred_at,
+        reason: r.reason ?? null,
+        note: r.note ?? null,
+      }));
+    },
   });
 }
