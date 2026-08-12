@@ -289,28 +289,36 @@ export default function Fakturakjoring() {
 
       {/* Gruppekort */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {preview.isLoading &&
+          KNOWN_GROUPS.map((def) => (
+            <div
+              key={`sk-${def.key}`}
+              className="h-[168px] animate-pulse rounded-2xl border border-line-subtle bg-surface-sunken"
+            />
+          ))}
 
-        {KNOWN_GROUPS.map((def) => {
+        {!preview.isLoading && KNOWN_GROUPS.map((def) => {
           const row = rowByKey.get(def.key);
           const cc = row?.customer_count ?? 0;
           const oc = row?.order_count ?? 0;
-          const sum = row?.sum_incl_vat ?? 0;
+          const sum = row?.sum_excl_vat ?? 0;
           return (
             <GroupCard
               key={def.key}
               def={def}
               customerCount={cc}
               orderCount={oc}
-              sumInclVat={sum}
+              sumExclVat={sum}
               isEmpty={cc === 0}
               isInternal={internalGroups.includes(def.key)}
               isNonTransfer={nonTransferGroups.includes(def.key)}
               selected={selected.has(def.key)}
               onToggle={() => toggleGroup(def.key)}
+              onPreview={() => setPreviewGroup(def.key)}
             />
           );
         })}
-        {unknownGroupKeys.map((key) => {
+        {!preview.isLoading && unknownGroupKeys.map((key) => {
           const row = rowByKey.get(key)!;
           const def = groupDefFor(key);
           return (
@@ -319,18 +327,17 @@ export default function Fakturakjoring() {
               def={def}
               customerCount={row.customer_count}
               orderCount={row.order_count}
-              sumInclVat={row.sum_incl_vat}
+              sumExclVat={row.sum_excl_vat}
               isEmpty={row.customer_count === 0}
               isInternal={false}
               isNonTransfer={false}
               selected={selected.has(key)}
               onToggle={() => toggleGroup(key)}
+              onPreview={() => setPreviewGroup(key)}
             />
           );
         })}
       </div>
-
-
 
       {/* Handlingslinje */}
       <div className="flex flex-col gap-4 rounded-2xl border border-line-subtle bg-surface-raised p-5 lg:flex-row lg:items-center">
@@ -344,15 +351,8 @@ export default function Fakturakjoring() {
             <Receipt className="mr-2 h-4 w-4" />
             Kjør fakturering — {selectedRows.length} {selectedRows.length === 1 ? "gruppe" : "grupper"} · {totalBasis} grunnlag · {formatKr(totalSum)}
           </Button>
-          <Button
-            variant="outline"
-            size="lg"
-            disabled={selectedRows.length === 0}
-            onClick={() => setPreviewOpen(true)}
-          >
-            Forhåndsvis grunnlag
-          </Button>
         </div>
+
         <p className="max-w-md text-xs text-muted-foreground">
           {runDisabledReason ? (
             <span className="text-[hsl(var(--brand-bronze))]">{runDisabledReason}. </span>
