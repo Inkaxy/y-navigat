@@ -12700,6 +12700,14 @@ export type Database = {
       }
     }
     Functions: {
+      _audit_jsonb_diff: {
+        Args: { p_exclude: string[]; p_new: Json; p_old: Json }
+        Returns: Json
+      }
+      _calc_access_guard: {
+        Args: { p_legal_entity_id: string }
+        Returns: undefined
+      }
       _enforce_order_delivery_rules: {
         Args: { p_order_id: string }
         Returns: undefined
