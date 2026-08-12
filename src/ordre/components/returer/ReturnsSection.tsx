@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Info, Undo2 } from "lucide-react";
-import { PageHeader } from "@/components/layout/PageHeader";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -31,18 +30,26 @@ function StatusBadge({ row }: { row: ReturnNoteRow }) {
     );
   if (row.approved_at)
     return (
-      <Badge variant="outline" className="border-emerald-500/40 bg-emerald-500/10 text-emerald-800 dark:text-emerald-200">
+      <Badge
+        variant="outline"
+        className="border-emerald-500/40 bg-emerald-500/10 text-emerald-800 dark:text-emerald-200"
+      >
         Godkjent
       </Badge>
     );
   return (
-    <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-200">
+    <Badge
+      variant="outline"
+      className="border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-200"
+    >
       Venter
     </Badge>
   );
 }
 
-export default function Returns() {
+/** Returgodkjenning — vises i pakkseddel-korreksjonsvisningen.
+ *  Ventende returer listes uansett leveringsdato. */
+export function ReturnsSection({ className }: { className?: string }) {
   const [tab, setTab] = useState<ReturnTab>("pending");
   const [selected, setSelected] = useState<ReturnNoteRow | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -57,18 +64,26 @@ export default function Returns() {
   };
 
   return (
-    <div className="space-y-5 p-6">
-      <PageHeader
-        title="Returer"
-        subtitle="Godkjenn returpakksedler fra kundeportalen"
-        icon={Undo2}
-      />
+    <section className={cn("space-y-4", className)}>
+      <div className="flex items-center gap-2">
+        <Undo2 className="h-5 w-5 text-muted-foreground" />
+        <h2 className="text-lg font-semibold tracking-tight">Returer</h2>
+        {pendingCount > 0 && (
+          <Badge
+            variant="outline"
+            className="border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-200"
+          >
+            {pendingCount} venter
+          </Badge>
+        )}
+      </div>
 
       <div className="flex items-start gap-3 rounded-xl border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
         <Info className="mt-0.5 h-4 w-4 shrink-0" />
         <p>
           Returer trekkes først fra ved fakturering når returpakkseddelen er godkjent. Godkjenner
           du med lavere antall enn kunden meldte, er det antallet du godkjenner som krediteres.
+          Ventende returer vises uansett leveringsdato.
         </p>
       </div>
 
@@ -143,6 +158,6 @@ export default function Returns() {
       </div>
 
       <ApproveReturnDialog note={selected} open={dialogOpen} onOpenChange={setDialogOpen} />
-    </div>
+    </section>
   );
 }

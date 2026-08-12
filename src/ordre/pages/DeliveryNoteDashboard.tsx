@@ -40,6 +40,8 @@ import { DateContextChips } from "@/ordre/components/shell/DateContextChips";
 import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
 import { useUndoDeliveryRuns } from "@/ordre/hooks/useUndoDeliveryRuns";
 import { supabase } from "@/integrations/supabase/client";
+import { ReturnsSection } from "@/ordre/components/returer/ReturnsSection";
+import { usePendingReturnsCount } from "@/ordre/hooks/useReturnDeliveryNotes";
 
 // HANDLING_ITEMS bygges nå dynamisk inni komponenten — for å støtte tilstand-aware
 // handlinger (Tilleggkjøring/Korreksjonskjøring krever at hovedkjøring er kjørt).
@@ -316,6 +318,7 @@ export default function DeliveryNoteDashboard() {
     return row?.status === "completed";
   }, [tourId, tourStatus]);
   const modeSuffix = mode === "correction" ? "&mode=correction" : "";
+  const { data: pendingReturns = 0 } = usePendingReturnsCount();
   const allWidgets = [
     {
       key: "fast",
@@ -337,15 +340,6 @@ export default function DeliveryNoteDashboard() {
         navigate(`/ordre/pakksedler/liste?date=${date}&tour=${tourId}&type=datert${modeSuffix}`),
     },
     {
-      key: "retur",
-      label: "RETURORDRE",
-      value: counts?.retur ?? 0,
-      classes: "bg-purple-200 text-purple-950 hover:bg-purple-300",
-      span: 1,
-      onClick: () =>
-        navigate(`/ordre/pakksedler/liste?date=${date}&tour=${tourId}&type=retur${modeSuffix}`),
-    },
-    {
       key: "pakk",
       label: "PAKKSEDLER",
       value: counts?.pakksedler ?? 0,
@@ -359,7 +353,7 @@ export default function DeliveryNoteDashboard() {
 
   const widgets =
     mode === "correction"
-      ? allWidgets.filter((w) => w.key === "datert" || w.key === "retur")
+      ? allWidgets.filter((w) => w.key === "datert")
       : allWidgets;
 
 
@@ -377,7 +371,7 @@ export default function DeliveryNoteDashboard() {
         <div className="relative flex items-start justify-between gap-6">
           {/* Venstre: modus-toggle */}
           <div className="flex-shrink-0">
-            <ModeToggle mode={mode} onChange={setMode} />
+            <ModeToggle mode={mode} onChange={setMode} pendingReturns={pendingReturns} />
           </div>
 
           {/* Senter: dato + turer */}
@@ -679,6 +673,8 @@ export default function DeliveryNoteDashboard() {
         <div className="mx-auto w-full max-w-4xl space-y-3">
           <TourRunStatus date={date} />
         </div>
+
+        {mode === "correction" && <ReturnsSection className="mx-auto w-full max-w-5xl" />}
       </div>
 
 
@@ -812,9 +808,11 @@ function TourChip({ active, label, onClick }: { active: boolean; label: string; 
 function ModeToggle({
   mode,
   onChange,
+  pendingReturns = 0,
 }: {
   mode: "date" | "correction";
   onChange: (next: "date" | "correction") => void;
+  pendingReturns?: number;
 }) {
   const items: {
     key: "date" | "correction";
@@ -843,16 +841,25 @@ function ModeToggle({
                   aria-label={it.label}
                   onClick={() => onChange(it.key)}
                   className={cn(
-                    "group flex h-16 w-16 items-center justify-center rounded-[12px] border-2 transition",
+                    "group relative flex h-16 w-16 items-center justify-center rounded-[12px] border-2 transition",
                     active
                       ? "border-emerald-600 bg-emerald-50 text-emerald-700 shadow-sm dark:bg-emerald-950/40"
                       : "border-border bg-background text-muted-foreground hover:border-emerald-600/60 hover:text-emerald-700",
                   )}
                 >
                   <Icon className="h-8 w-8" />
+                  {it.key === "correction" && pendingReturns > 0 && (
+                    <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 px-1 text-[11px] font-semibold text-amber-950">
+                      {pendingReturns}
+                    </span>
+                  )}
                 </button>
               </TooltipTrigger>
-              <TooltipContent side="bottom">{it.label}</TooltipContent>
+              <TooltipContent side="bottom">
+                {it.key === "correction" && pendingReturns > 0
+                  ? `${it.label} · ${pendingReturns} retur${pendingReturns === 1 ? "" : "er"} venter godkjenning`
+                  : it.label}
+              </TooltipContent>
             </Tooltip>
           );
         })}

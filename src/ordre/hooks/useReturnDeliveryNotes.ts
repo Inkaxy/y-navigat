@@ -32,14 +32,17 @@ export type ReturnNoteLine = {
   vat_rate: number;
 };
 
+// MERK: delivery_notes har ingen FK til customers, så customer-navnet kan ikke
+// embeddes via PostgREST (det ga en 400 og en tom liste). Vi henter navnene i
+// et separat oppslag og faller tilbake til customer_snapshot.
 const SELECT =
   "id, display_number, status, delivery_date, created_at, notes, total_incl_vat, " +
-  "approved_at, rejected_at, rejected_reason, return_order_id, customer_snapshot, " +
-  "customers(name), orders:return_order_id(order_number), delivery_note_lines(id)";
+  "approved_at, rejected_at, rejected_reason, return_order_id, customer_id, customer_snapshot, " +
+  "orders:return_order_id(order_number), delivery_note_lines(id)";
 
-function customerNameOf(row: Record<string, unknown>): string {
-  const joined = (row.customers as { name?: string } | null)?.name;
-  if (joined) return joined;
+function customerNameOf(row: Record<string, unknown>, names: Map<string, string>): string {
+  const byId = row.customer_id ? names.get(row.customer_id as string) : undefined;
+  if (byId) return byId;
   const snap = (row.customer_snapshot ?? {}) as Record<string, unknown>;
   return (snap.name as string) ?? "Ukjent kunde";
 }
@@ -54,8 +57,14 @@ export function useReturnDeliveryNotes(tab: ReturnTab) {
         .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
         .eq("is_return", true);
 
+      // Ventende returer vises uansett leveringsdato — en retur venter til
+      // noen tar stilling til den.
       if (tab === "pending") {
-        q = q.eq("status", "draft").order("created_at", { ascending: true });
+        q = q
+          .eq("status", "draft")
+          .is("approved_at", null)
+          .is("rejected_at", null)
+          .order("created_at", { ascending: true });
       } else if (tab === "approved") {
         q = q.not("approved_at", "is", null).order("approved_at", { ascending: false });
       } else {
@@ -65,7 +74,22 @@ export function useReturnDeliveryNotes(tab: ReturnTab) {
       const { data, error } = await q.limit(500);
       if (error) throw error;
 
-      return ((data ?? []) as unknown as Record<string, any>[]).map((row) => ({
+      const rows = (data ?? []) as unknown as Record<string, any>[];
+      const customerIds = Array.from(
+        new Set(rows.map((r) => r.customer_id).filter(Boolean) as string[]),
+      );
+      const names = new Map<string, string>();
+      if (customerIds.length > 0) {
+        const { data: cust } = await supabase
+          .from("customers")
+          .select("id, display_name")
+          .in("id", customerIds);
+        for (const c of (cust ?? []) as Array<{ id: string; display_name: string }>) {
+          names.set(c.id, c.display_name);
+        }
+      }
+
+      return rows.map((row) => ({
         id: row.id,
         display_number: row.display_number,
         status: row.status,
@@ -77,7 +101,7 @@ export function useReturnDeliveryNotes(tab: ReturnTab) {
         rejected_at: row.rejected_at ?? null,
         rejected_reason: row.rejected_reason ?? null,
         return_order_id: row.return_order_id ?? null,
-        customer_name: customerNameOf(row),
+        customer_name: customerNameOf(row, names),
         order_number: row.orders?.order_number ?? null,
         line_count: Array.isArray(row.delivery_note_lines) ? row.delivery_note_lines.length : 0,
       }));
@@ -85,6 +109,7 @@ export function useReturnDeliveryNotes(tab: ReturnTab) {
     staleTime: 15_000,
   });
 }
+
 
 /** Antall returpakksedler som venter på godkjenning. */
 export function usePendingReturnsCount(legalEntityId: string = NB_LEGAL_ENTITY_ID) {
@@ -96,7 +121,9 @@ export function usePendingReturnsCount(legalEntityId: string = NB_LEGAL_ENTITY_I
         .select("id", { count: "exact", head: true })
         .eq("legal_entity_id", legalEntityId)
         .eq("is_return", true)
-        .eq("status", "draft");
+        .eq("status", "draft")
+        .is("approved_at", null)
+        .is("rejected_at", null);
       if (error) return 0;
       return count ?? 0;
     },

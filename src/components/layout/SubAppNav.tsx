@@ -51,7 +51,6 @@ import {
   Globe,
   Warehouse,
   TrendingUp,
-  Undo2,
   type LucideIcon,
 
 } from "lucide-react";
@@ -99,7 +98,6 @@ const STATIC_SUBMENUS: Record<string, { prefix: string; appSlug: string; items: 
       { kind: "link", to: "/ordre/pakksedler", label: "Pakksedler", icon: Package },
       { kind: "link", to: "/ordre/kakebilder", label: "Kakebilder", icon: CakeSlice },
       { kind: "link", to: "/ordre/nettbutikk", label: "Nettbutikk-ordre", icon: Globe },
-      { kind: "link", to: "/ordre/returer", label: "Returer", icon: Undo2 },
       { kind: "link", to: "/ordre/turer", label: "Turer", icon: Truck },
       { kind: "link", to: "/ordre/leveringsregler", label: "Leveringsregler", icon: Route },
       { kind: "link", to: "/ordre/leveranseplan", label: "Leveranseplan", icon: CalendarCheck },
@@ -298,7 +296,7 @@ function OrdreNav() {
   const items: NavItem[] = base.map((item) => {
     if (item.kind !== "link") return item;
     if (item.to === "/ordre/nettbutikk") return { ...item, badge: pendingWebOrders };
-    if (item.to === "/ordre/returer") return { ...item, badge: pendingReturns };
+    if (item.to === "/ordre/pakksedler") return { ...item, badge: pendingReturns };
     return item;
   });
 
