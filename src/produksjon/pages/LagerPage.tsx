@@ -12,6 +12,7 @@ import { LagerBalanceTable } from "@/produksjon/features/lager/components/LagerB
 import { WasteDialog } from "@/produksjon/features/lager/components/WasteDialog";
 import { QuickCorrectionDialog } from "@/produksjon/features/lager/components/QuickCorrectionDialog";
 import { StockCountMode } from "@/produksjon/features/lager/components/StockCountMode";
+import { RecentMovementsCard } from "@/produksjon/features/lager/components/RecentMovementsCard";
 
 const ALL = "all";
 
@@ -100,6 +101,7 @@ export default function LagerPage() {
         <>
           <ProductionRegisterCard items={visibleItems} departmentId={deptId === ALL ? null : deptId} />
           <LagerBalanceTable items={visibleItems} onWaste={openWaste} />
+          <RecentMovementsCard legalEntityId={entityId} items={visibleItems} />
           <div className="flex flex-wrap gap-3">
             <Button
               className="h-16 flex-1 text-lg"
