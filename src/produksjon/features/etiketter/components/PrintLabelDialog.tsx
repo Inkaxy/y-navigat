@@ -100,6 +100,57 @@ export function PrintLabelDialog({
   );
   const { data: customerInfoMap } = useOrderLineCustomerInfo(orderLineIds);
 
+  /** Felter profilen faktisk skriver ut. */
+  const printedFields = useMemo(
+    () =>
+      new Set(
+        (profile?.fields ?? [])
+          .filter((f) => f.include)
+          .map((f) => String(f.field_type)),
+      ),
+    [profile],
+  );
+
+  /**
+   * Manglende data fra `resolve_label_data`, delt i kritiske (matsikkerhet) og
+   * øvrige. Kritiske mangler blokkerer utskrift — det finnes ingen «skriv ut
+   * likevel».
+   */
+  const missingReport = useMemo(() => {
+    const critical = new Map<string, Set<string>>();
+    const other = new Map<string, Set<string>>();
+    const rowsToCheck =
+      selectedUnits.length > 0
+        ? selectedUnits.map((u) => ({
+            id: u.order_line_id,
+            label: `etikett ${u.number}`,
+          }))
+        : orderLineIds.map((id) => ({ id, label: row?.display_name ?? "varen" }));
+
+    for (const r of rowsToCheck) {
+      if (!r.id) continue;
+      const mangler = labelDataMap?.[r.id]?.mangler ?? [];
+      for (const key of mangler) {
+        if (!printedFields.has(key)) continue;
+        const bucket = CRITICAL_LABEL_FIELDS.has(key) ? critical : other;
+        const set = bucket.get(key) ?? new Set<string>();
+        set.add(r.label);
+        bucket.set(key, set);
+      }
+    }
+    return { critical, other };
+  }, [labelDataMap, selectedUnits, orderLineIds, printedFields, row?.display_name]);
+
+  const blockedByMissing = missingReport.critical.size > 0;
+
+  const describeMissing = (m: Map<string, Set<string>>) =>
+    [...m.entries()].map(([key, who]) => ({
+      key,
+      label: (fieldLabels[key] ?? key).toLowerCase(),
+      who: [...who].join(", "),
+    }));
+
+
   /** Bygg etikettene som skal skrives ut — én per etikett-enhet (nummer). */
   function buildItems(): CombinedLabelItem[] {
     if (!profile || !row) return [];
