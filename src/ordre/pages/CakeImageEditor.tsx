@@ -89,6 +89,7 @@ import { useCakePrinterSelection } from "@/ordre/hooks/useCakeCalibration";
 import { CakePrintHistory } from "@/ordre/components/cake-images/CakePrintHistory";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
+import { showError } from "@/lib/userError";
 
 /** Nåværende versjon av editor_state-formatet vi skriver. */
 const EDITOR_STATE_VERSION = 2;
@@ -700,7 +701,7 @@ export default function CakeImageEditor() {
         },
       });
     } catch (e) {
-      toast.error((e as Error).message);
+      showError("CakeImageEditor.print", e, "Kunne ikke skrive ut. Prøv igjen — kontakt support hvis det gjentar seg.");
     }
   };
 
