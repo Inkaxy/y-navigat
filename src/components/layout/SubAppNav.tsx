@@ -51,7 +51,6 @@ import {
   Globe,
   Warehouse,
   TrendingUp,
-  Undo2,
   type LucideIcon,
 
 } from "lucide-react";
