@@ -5,6 +5,7 @@ export interface ProductionDepartment {
   display_name: string;
   sort_order: number;
   status: "active" | "inactive";
+  low_stock_alert_email: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -15,6 +16,7 @@ export interface ProductionDepartmentInput {
   display_name: string;
   sort_order: number;
   status: "active" | "inactive";
+  low_stock_alert_email: string | null;
 }
 
 export interface ProductionDepartmentUpdate {
@@ -22,4 +24,5 @@ export interface ProductionDepartmentUpdate {
   display_name: string;
   sort_order: number;
   status: "active" | "inactive";
+  low_stock_alert_email: string | null;
 }

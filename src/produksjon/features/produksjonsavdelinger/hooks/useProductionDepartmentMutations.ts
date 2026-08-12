@@ -27,6 +27,7 @@ export function useCreateProductionDepartment() {
           display_name: input.display_name,
           sort_order: input.sort_order,
           status: input.status,
+          low_stock_alert_email: input.low_stock_alert_email,
         })
         .select("*")
         .single();
@@ -55,6 +56,7 @@ export function useUpdateProductionDepartment() {
           display_name: input.display_name,
           sort_order: input.sort_order,
           status: input.status,
+          low_stock_alert_email: input.low_stock_alert_email,
         })
         .eq("id", input.id)
         .select("*")
