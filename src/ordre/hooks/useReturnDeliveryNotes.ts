@@ -82,10 +82,10 @@ export function useReturnDeliveryNotes(tab: ReturnTab) {
       if (customerIds.length > 0) {
         const { data: cust } = await supabase
           .from("customers")
-          .select("id, name")
+          .select("id, display_name")
           .in("id", customerIds);
-        for (const c of (cust ?? []) as Array<{ id: string; name: string }>) {
-          names.set(c.id, c.name);
+        for (const c of (cust ?? []) as Array<{ id: string; display_name: string }>) {
+          names.set(c.id, c.display_name);
         }
       }
 
