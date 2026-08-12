@@ -318,6 +318,7 @@ export default function DeliveryNoteDashboard() {
     return row?.status === "completed";
   }, [tourId, tourStatus]);
   const modeSuffix = mode === "correction" ? "&mode=correction" : "";
+  const { data: pendingReturns = 0 } = usePendingReturnsCount();
   const allWidgets = [
     {
       key: "fast",
@@ -840,16 +841,25 @@ function ModeToggle({
                   aria-label={it.label}
                   onClick={() => onChange(it.key)}
                   className={cn(
-                    "group flex h-16 w-16 items-center justify-center rounded-[12px] border-2 transition",
+                    "group relative flex h-16 w-16 items-center justify-center rounded-[12px] border-2 transition",
                     active
                       ? "border-emerald-600 bg-emerald-50 text-emerald-700 shadow-sm dark:bg-emerald-950/40"
                       : "border-border bg-background text-muted-foreground hover:border-emerald-600/60 hover:text-emerald-700",
                   )}
                 >
                   <Icon className="h-8 w-8" />
+                  {it.key === "correction" && pendingReturns > 0 && (
+                    <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 px-1 text-[11px] font-semibold text-amber-950">
+                      {pendingReturns}
+                    </span>
+                  )}
                 </button>
               </TooltipTrigger>
-              <TooltipContent side="bottom">{it.label}</TooltipContent>
+              <TooltipContent side="bottom">
+                {it.key === "correction" && pendingReturns > 0
+                  ? `${it.label} · ${pendingReturns} retur${pendingReturns === 1 ? "" : "er"} venter godkjenning`
+                  : it.label}
+              </TooltipContent>
             </Tooltip>
           );
         })}
