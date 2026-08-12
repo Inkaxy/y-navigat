@@ -62,7 +62,7 @@ export function RecentMovementsCard({ legalEntityId, items }: Props) {
     } catch (e) {
       const msg = e instanceof Error ? e.message : "";
       if (msg) toast.error(msg);
-      else showError(e, "Kunne ikke angre bevegelsen");
+      else showError("lager/angre-bevegelse", e, "Kunne ikke angre bevegelsen.");
     }
   };
 
