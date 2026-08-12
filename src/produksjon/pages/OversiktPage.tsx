@@ -6,6 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useLegalEntities } from "@/produksjon/features/produksjonsavdelinger/hooks/useLegalEntities";
 import { useProductionDepartments } from "@/produksjon/features/produksjonsavdelinger/hooks/useProductionDepartments";
 import { DepartmentCard } from "@/produksjon/features/oversikt/components/DepartmentCard";
+import { StockStatusCard } from "@/produksjon/features/oversikt/components/StockStatusCard";
 import { useOversiktRealtime } from "@/produksjon/features/oversikt/hooks/useDepartmentLabelStats";
 import { useSelection } from "@/providers/SelectionProvider";
 
@@ -72,6 +73,7 @@ export default function OversiktPage() {
           {departments.map((dept) => (
             <DepartmentCard key={dept.id} department={dept} />
           ))}
+          <StockStatusCard legalEntityId={legalEntityId || undefined} />
         </div>
       )}
     </div>
