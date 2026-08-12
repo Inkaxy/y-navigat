@@ -195,9 +195,19 @@ export function ProductionPlanTable({ rows, showByMainGroup, showTraysWithPlus, 
                 <TableCell>
                   <div className="flex items-center gap-2">
                     <span>{r.product_name}</span>
-                    {r.quantity_from_stock > 0 && r.quantity_to_produce === 0 && (
-                      <span className="rounded bg-success/15 px-1.5 py-0.5 text-[10px] font-semibold text-success">
-                        Dekket av lager
+                    {r.quantity_from_stock > 0 && (
+                      <span
+                        className={cn(
+                          "rounded px-1.5 py-0.5 text-[10px] font-semibold",
+                          r.quantity_to_produce === 0
+                            ? "bg-success/15 text-success"
+                            : "bg-warning/15 text-warning-foreground",
+                        )}
+                        title={`Dekkes av lager: ${fmtNum(r.quantity_from_stock)} av ${fmtNum(r.quantity_ordered)}`}
+                      >
+                        {r.quantity_to_produce === 0
+                          ? "Dekket av lager"
+                          : `Fra lager ${fmtNum(r.quantity_from_stock)}/${fmtNum(r.quantity_ordered)}`}
                       </span>
                     )}
                     {(cakeByProduct[r.product_id] ?? []).slice(0, 4).map((ci) => (
