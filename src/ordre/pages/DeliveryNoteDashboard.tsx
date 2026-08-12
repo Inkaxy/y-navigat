@@ -660,7 +660,11 @@ export default function DeliveryNoteDashboard() {
                   </button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  {clickable ? "Åpne pakkseddel-liste" : "Drill-down kommer i senere fase"}
+                  {w.key === "retur"
+                    ? "Vis returer som venter på godkjenning"
+                    : clickable
+                      ? "Åpne pakkseddel-liste"
+                      : "Drill-down kommer i senere fase"}
                 </TooltipContent>
               </Tooltip>
             );
