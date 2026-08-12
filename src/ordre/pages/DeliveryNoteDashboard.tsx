@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useRef } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ChevronLeft, ChevronRight, CalendarIcon, ChevronDown, Play, Loader2, CalendarCheck2, CalendarClock } from "lucide-react";
 import { toast } from "sonner";
@@ -319,6 +319,9 @@ export default function DeliveryNoteDashboard() {
   }, [tourId, tourStatus]);
   const modeSuffix = mode === "correction" ? "&mode=correction" : "";
   const { data: pendingReturns = 0 } = usePendingReturnsCount();
+  const [showReturns, setShowReturns] = useState(false);
+  const returnsRef = useRef<HTMLDivElement | null>(null);
+
   const allWidgets = [
     {
       key: "fast",
@@ -351,10 +354,25 @@ export default function DeliveryNoteDashboard() {
     },
   ];
 
+  const returnWidget = {
+    key: "retur",
+    label: "RETURORDRE",
+    value: pendingReturns,
+    classes: "bg-purple-200 text-purple-950 hover:bg-purple-300",
+    span: 1,
+    onClick: () => {
+      setShowReturns(true);
+      requestAnimationFrame(() =>
+        returnsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
+      );
+    },
+  };
+
   const widgets =
     mode === "correction"
-      ? allWidgets.filter((w) => w.key === "datert")
+      ? [...allWidgets.filter((w) => w.key === "datert"), returnWidget]
       : allWidgets;
+
 
 
   return (
@@ -642,7 +660,11 @@ export default function DeliveryNoteDashboard() {
                   </button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  {clickable ? "Åpne pakkseddel-liste" : "Drill-down kommer i senere fase"}
+                  {w.key === "retur"
+                    ? "Vis returer som venter på godkjenning"
+                    : clickable
+                      ? "Åpne pakkseddel-liste"
+                      : "Drill-down kommer i senere fase"}
                 </TooltipContent>
               </Tooltip>
             );
@@ -674,7 +696,12 @@ export default function DeliveryNoteDashboard() {
           <TourRunStatus date={date} />
         </div>
 
-        {mode === "correction" && <ReturnsSection className="mx-auto w-full max-w-5xl" />}
+        {mode === "correction" && showReturns && (
+          <div ref={returnsRef}>
+            <ReturnsSection className="mx-auto w-full max-w-5xl" />
+          </div>
+        )}
+
       </div>
 
 
