@@ -164,6 +164,7 @@ export function useStockRealtime() {
       .on("postgres_changes", { event: "*", schema: "public", table: "stock_movements" }, () => {
         qc.invalidateQueries({ queryKey: ["stock_item_balance"] });
         qc.invalidateQueries({ queryKey: ["stock_batch_balance"] });
+        qc.invalidateQueries({ queryKey: ["stock_movements"] });
       })
       .subscribe();
     return () => {
