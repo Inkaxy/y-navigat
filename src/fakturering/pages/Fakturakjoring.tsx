@@ -82,7 +82,7 @@ export default function Fakturakjoring() {
 
   // Frisk data ved mount (f.eks. når man kommer tilbake fra en ordre).
   useEffect(() => {
-    void qc.invalidateQueries({ queryKey: ["invoice-run-preview-lines"] });
+    void qc.invalidateQueries({ queryKey: ["fakturering", "preview-lines"] });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
