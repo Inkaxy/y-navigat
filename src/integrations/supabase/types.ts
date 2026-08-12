@@ -14,24 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      _pos_smoke_debug: {
-        Row: {
-          id: number
-          note: string | null
-          ts: string | null
-        }
-        Insert: {
-          id?: number
-          note?: string | null
-          ts?: string | null
-        }
-        Update: {
-          id?: number
-          note?: string | null
-          ts?: string | null
-        }
-        Relationships: []
-      }
       _pos_smoke_results: {
         Row: {
           msg: string | null
@@ -8157,6 +8139,7 @@ export type Database = {
           display_name: string
           id: string
           legal_entity_id: string
+          low_stock_alert_email: string | null
           sort_order: number
           status: string
           updated_at: string
@@ -8167,6 +8150,7 @@ export type Database = {
           display_name: string
           id?: string
           legal_entity_id: string
+          low_stock_alert_email?: string | null
           sort_order?: number
           status?: string
           updated_at?: string
@@ -8177,6 +8161,7 @@ export type Database = {
           display_name?: string
           id?: string
           legal_entity_id?: string
+          low_stock_alert_email?: string | null
           sort_order?: number
           status?: string
           updated_at?: string
@@ -12936,6 +12921,7 @@ export type Database = {
           order_deleted: boolean
         }[]
       }
+      enqueue_low_stock_alerts: { Args: never; Returns: Json }
       evaluate_delivery_rules: {
         Args: {
           p_customer_group_ids: string[]
