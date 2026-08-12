@@ -44,23 +44,19 @@ export default function Fakturakjoring() {
   const [runDate, setRunDate] = useState<Date>(new Date());
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewGroup, setPreviewGroup] = useState<string | null>(null);
   const [isRunning, setIsRunning] = useState(false);
 
   const runDateISO = toISO(runDate);
-  const preview = useInvoiceRunPreview(activeEntityId, runDateISO);
+  const preview = useInvoiceRunPreviewLines(activeEntityId, runDateISO);
   const { data: pendingReturns = 0 } = usePendingReturnsCount(activeEntityId ?? undefined);
   const settings = useInvoiceSettings(activeEntityId);
   const tripletex = useTripletexTokenStatus(activeEntityId);
   const writeAccess = useHasFakturaWriteAccess();
   const recentRuns = useRecentInvoiceRuns(activeEntityId, 5);
 
-  const previewRows = preview.data ?? [];
-  const rowByKey = useMemo(() => {
-    const m = new Map<string, PreviewRow>();
-    for (const r of previewRows) m.set(r.invoicing_group ?? "__none", r);
-    return m;
-  }, [previewRows]);
+  const lines = useMemo(() => preview.data ?? [], [preview.data]);
+  const rowByKey = useMemo(() => aggregatePreviewLines(lines), [lines]);
 
   const orphanRow = rowByKey.get("__none");
 
@@ -75,14 +71,16 @@ export default function Fakturakjoring() {
     });
   };
 
-  // Kjente + ukjente grupper (ukjente kommer fra preview-radene og skal
-  // fortsatt kunne fakturers — de ble tidligere skjult stille).
-  const unknownGroupKeys = useMemo(
-    () => previewRows
-      .map((r) => r.invoicing_group)
-      .filter((g): g is string => !!g && !isKnownGroup(g)),
-    [previewRows],
-  );
+  // Kjente + ukjente grupper (ukjente kommer fra grunnlagslinjene og skal
+  // fortsatt kunne faktureres — de ble tidligere skjult stille).
+  const unknownGroupKeys = useMemo(() => {
+    const keys: string[] = [];
+    for (const key of rowByKey.keys()) {
+      if (key === "__none" || isKnownGroup(key)) continue;
+      keys.push(key);
+    }
+    return keys;
+  }, [rowByKey]);
 
   const selectedRows: PreviewRow[] = useMemo(() => {
     const rows: PreviewRow[] = [];
@@ -100,7 +98,8 @@ export default function Fakturakjoring() {
   }, [selected, rowByKey, unknownGroupKeys]);
 
   const totalBasis = selectedRows.reduce((s, r) => s + r.customer_count, 0);
-  const totalSum = selectedRows.reduce((s, r) => s + r.sum_incl_vat, 0);
+  const totalSum = selectedRows.reduce((s, r) => s + r.sum_excl_vat, 0);
+
 
   const canRun =
     writeAccess.data === true &&
