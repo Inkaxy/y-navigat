@@ -29,7 +29,6 @@ import { GroupPreviewDialog } from "@/fakturering/components/GroupPreviewDialog"
 import { EntityPickerBanner } from "@/fakturering/components/EntityPickerBanner";
 import { cn } from "@/lib/utils";
 import { readEdgeError } from "@/fakturering/lib/edgeError";
-import { showError } from "@/lib/userError";
 import { usePendingReturnsCount } from "@/ordre/hooks/useReturnDeliveryNotes";
 
 
@@ -259,7 +258,7 @@ export default function Fakturakjoring() {
           <AlertTriangle className="mt-0.5 h-4 w-4 text-[hsl(var(--brand-bronze))]" />
           <div className="flex-1">
             <div className="font-medium text-text-primary">
-              {orphanRow.customer_count} kunder mangler faktureringsgruppe ({orphanRow.order_count} ordrer, {formatKr(orphanRow.sum_incl_vat)})
+              {orphanRow.customer_count} kunder mangler faktureringsgruppe ({orphanRow.order_count} ordrer, {formatKr(orphanRow.sum_excl_vat)})
             </div>
             <div className="text-muted-foreground">
               Disse blir ikke fakturert. <Link to="/kunder" className="underline underline-offset-2">Åpne kundelisten →</Link>
