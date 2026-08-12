@@ -213,6 +213,7 @@ export interface StockMovementRow {
   id: string;
   stock_item_id: string;
   batch_id: string | null;
+  batch_number: string | null;
   movement_type: string;
   quantity_base: number;
   occurred_at: string;
@@ -237,7 +238,9 @@ export function useTodayStockMovements(legalEntityId: string | undefined) {
       start.setHours(0, 0, 0, 0);
       const { data, error } = await supabase
         .from("stock_movements")
-        .select("id, stock_item_id, batch_id, movement_type, quantity_base, occurred_at, reason, note")
+        .select(
+          "id, stock_item_id, batch_id, movement_type, quantity_base, occurred_at, reason, note, stock_batches(batch_number)",
+        )
         .eq("legal_entity_id", legalEntityId!)
         .not("stock_item_id", "is", null)
         .gte("occurred_at", start.toISOString())
@@ -248,6 +251,7 @@ export function useTodayStockMovements(legalEntityId: string | undefined) {
         id: r.id,
         stock_item_id: r.stock_item_id,
         batch_id: r.batch_id ?? null,
+        batch_number: r.stock_batches?.batch_number ?? null,
         movement_type: r.movement_type ?? "",
         quantity_base: Number(r.quantity_base ?? 0),
         occurred_at: r.occurred_at,
