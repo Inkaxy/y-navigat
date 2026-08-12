@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useRef } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ChevronLeft, ChevronRight, CalendarIcon, ChevronDown, Play, Loader2, CalendarCheck2, CalendarClock } from "lucide-react";
 import { toast } from "sonner";
@@ -692,7 +692,12 @@ export default function DeliveryNoteDashboard() {
           <TourRunStatus date={date} />
         </div>
 
-        {mode === "correction" && <ReturnsSection className="mx-auto w-full max-w-5xl" />}
+        {mode === "correction" && showReturns && (
+          <div ref={returnsRef}>
+            <ReturnsSection className="mx-auto w-full max-w-5xl" />
+          </div>
+        )}
+
       </div>
 
 
