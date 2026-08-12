@@ -47,9 +47,9 @@ function customerNameOf(row: Record<string, unknown>, names: Map<string, string>
   return (snap.name as string) ?? "Ukjent kunde";
 }
 
-export function useReturnDeliveryNotes(tab: ReturnTab) {
+export function useReturnDeliveryNotes(tab: ReturnTab, maxDate?: string) {
   return useQuery({
-    queryKey: ["return-delivery-notes", tab],
+    queryKey: ["return-delivery-notes", tab, maxDate ?? null],
     queryFn: async (): Promise<ReturnNoteRow[]> => {
       let q = supabase
         .from("delivery_notes")
@@ -57,9 +57,10 @@ export function useReturnDeliveryNotes(tab: ReturnTab) {
         .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
         .eq("is_return", true);
 
-      // Ventende returer vises uansett leveringsdato — en retur venter til
-      // noen tar stilling til den.
+      // Ventende returer følger «til dato»-logikken i korreksjonsvisningen:
+      // alt som skal faktureres til og med valgt dato.
       if (tab === "pending") {
+        if (maxDate) q = q.lte("delivery_date", maxDate);
         q = q
           .eq("status", "draft")
           .is("approved_at", null)
@@ -112,11 +113,14 @@ export function useReturnDeliveryNotes(tab: ReturnTab) {
 
 
 /** Antall returpakksedler som venter på godkjenning. */
-export function usePendingReturnsCount(legalEntityId: string = NB_LEGAL_ENTITY_ID) {
+export function usePendingReturnsCount(
+  legalEntityId: string = NB_LEGAL_ENTITY_ID,
+  maxDate?: string,
+) {
   return useQuery({
-    queryKey: ["return-delivery-notes", "pending-count", legalEntityId],
+    queryKey: ["return-delivery-notes", "pending-count", legalEntityId, maxDate ?? null],
     queryFn: async (): Promise<number> => {
-      const { count, error } = await supabase
+      let q = supabase
         .from("delivery_notes")
         .select("id", { count: "exact", head: true })
         .eq("legal_entity_id", legalEntityId)
@@ -124,6 +128,8 @@ export function usePendingReturnsCount(legalEntityId: string = NB_LEGAL_ENTITY_I
         .eq("status", "draft")
         .is("approved_at", null)
         .is("rejected_at", null);
+      if (maxDate) q = q.lte("delivery_date", maxDate);
+      const { count, error } = await q;
       if (error) return 0;
       return count ?? 0;
     },

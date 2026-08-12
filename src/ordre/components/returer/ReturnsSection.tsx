@@ -48,14 +48,14 @@ function StatusBadge({ row }: { row: ReturnNoteRow }) {
 }
 
 /** Returgodkjenning — vises i pakkseddel-korreksjonsvisningen.
- *  Ventende returer listes uansett leveringsdato. */
-export function ReturnsSection({ className }: { className?: string }) {
+ *  Ventende returer filtreres på valgt «til dato». */
+export function ReturnsSection({ className, maxDate }: { className?: string; maxDate?: string }) {
   const [tab, setTab] = useState<ReturnTab>("pending");
   const [selected, setSelected] = useState<ReturnNoteRow | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  const { data: rows, isLoading } = useReturnDeliveryNotes(tab);
-  const { data: pendingCount = 0 } = usePendingReturnsCount();
+  const { data: rows, isLoading } = useReturnDeliveryNotes(tab, maxDate);
+  const { data: pendingCount = 0 } = usePendingReturnsCount(undefined, maxDate);
 
   const openRow = (row: ReturnNoteRow) => {
     if (tab !== "pending") return;
@@ -83,7 +83,6 @@ export function ReturnsSection({ className }: { className?: string }) {
         <p>
           Returer trekkes først fra ved fakturering når returpakkseddelen er godkjent. Godkjenner
           du med lavere antall enn kunden meldte, er det antallet du godkjenner som krediteres.
-          Ventende returer vises uansett leveringsdato.
         </p>
       </div>
 
