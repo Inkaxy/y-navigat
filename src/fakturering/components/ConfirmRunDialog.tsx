@@ -13,7 +13,7 @@ interface Props {
 
 export function ConfirmRunDialog({ open, onOpenChange, selected, onConfirm, isRunning }: Props) {
   const totalBasis = selected.reduce((s, r) => s + r.customer_count, 0);
-  const totalSum = selected.reduce((s, r) => s + r.sum_incl_vat, 0);
+  const totalSum = selected.reduce((s, r) => s + r.sum_excl_vat, 0);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -38,14 +38,14 @@ export function ConfirmRunDialog({ open, onOpenChange, selected, onConfirm, isRu
                   </div>
                   <div className="text-right text-xs text-muted-foreground">
                     <div>{row.customer_count} kunder · {row.order_count} ordrer</div>
-                    <div className="font-semibold text-text-primary">{formatKr(row.sum_incl_vat)}</div>
+                    <div className="font-semibold text-text-primary">{formatKr(row.sum_excl_vat)}</div>
                   </div>
                 </div>
               );
             })}
           </div>
           <div className="flex items-center justify-between border-t border-line-subtle bg-surface-raised px-4 py-2.5">
-            <span className="text-sm font-semibold">Sum</span>
+            <span className="text-sm font-semibold">Sum (u/mva)</span>
             <span className="font-display text-lg font-semibold tabular-nums">{formatKr(totalSum)}</span>
           </div>
         </div>

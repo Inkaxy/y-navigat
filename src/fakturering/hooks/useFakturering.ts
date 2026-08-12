@@ -495,3 +495,79 @@ export async function clearTripletexMetaCache(entityId: string) {
   });
   if (error) throw error;
 }
+
+// ---------------------------------------------------------------------------
+// Grunnlagslinjer (én spørring for hele siden — kortene aggregeres klientside)
+// ---------------------------------------------------------------------------
+
+export interface PreviewLineRow {
+  order_id: string;
+  order_number: string;
+  customer_number: string | null;
+  customer_name: string;
+  delivery_date: string;
+  tour_number: number | null;
+  invoicing_group: string | null;
+  sum_excl_vat: number;
+  sum_incl_vat: number;
+  is_return: boolean;
+}
+
+export function useInvoiceRunPreviewLines(entityId: string | null, runDate: string) {
+  return useQuery({
+    queryKey: ["fakturering", "preview-lines", entityId, runDate],
+    enabled: !!entityId && !!runDate,
+    queryFn: async (): Promise<PreviewLineRow[]> => {
+      const { data, error } = await (supabase.rpc as any)("get_invoice_run_preview_lines", {
+        p_legal_entity_id: entityId,
+        p_run_date: runDate,
+        p_groups: null,
+      });
+      if (error) throw error;
+      return ((data ?? []) as any[]).map((r) => ({
+        order_id: String(r.order_id),
+        order_number: String(r.order_number ?? ""),
+        customer_number: r.customer_number ?? null,
+        customer_name: r.customer_name ?? "—",
+        delivery_date: r.delivery_date,
+        tour_number: r.tour_number == null ? null : Number(r.tour_number),
+        invoicing_group: r.invoicing_group ?? null,
+        sum_excl_vat: Number(r.sum_excl_vat ?? 0),
+        sum_incl_vat: Number(r.sum_incl_vat ?? 0),
+        is_return: !!r.is_return,
+      }));
+    },
+  });
+}
+
+/** Aggregerer grunnlagslinjer per faktureringsgruppe. */
+export function aggregatePreviewLines(lines: PreviewLineRow[]): Map<string, PreviewRow & { line_count: number }> {
+  const acc = new Map<string, PreviewRow & { line_count: number; _customers: Set<string> }>();
+  for (const l of lines) {
+    const key = l.invoicing_group ?? "__none";
+    let e = acc.get(key);
+    if (!e) {
+      e = {
+        invoicing_group: l.invoicing_group ?? null,
+        customer_count: 0,
+        order_count: 0,
+        sum_excl_vat: 0,
+        sum_incl_vat: 0,
+        line_count: 0,
+        _customers: new Set<string>(),
+      };
+      acc.set(key, e);
+    }
+    e._customers.add(l.customer_number ?? l.customer_name);
+    e.order_count += 1;
+    e.line_count += 1;
+    e.sum_excl_vat += l.sum_excl_vat;
+    e.sum_incl_vat += l.sum_incl_vat;
+  }
+  const out = new Map<string, PreviewRow & { line_count: number }>();
+  for (const [k, v] of acc) {
+    const { _customers, ...rest } = v;
+    out.set(k, { ...rest, customer_count: _customers.size });
+  }
+  return out;
+}

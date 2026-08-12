@@ -14,7 +14,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useFaktureringEntity } from "@/fakturering/context/FaktureringContext";
 import {
-  useInvoiceRunPreview,
+  useInvoiceRunPreviewLines,
+  aggregatePreviewLines,
   useInvoiceSettings,
   useTripletexTokenStatus,
   useHasFakturaWriteAccess,
@@ -24,11 +25,13 @@ import {
 import { KNOWN_GROUPS, isKnownGroup, groupDefFor, formatKr } from "@/fakturering/lib/groups";
 import { GroupCard } from "@/fakturering/components/GroupCard";
 import { ConfirmRunDialog } from "@/fakturering/components/ConfirmRunDialog";
-import { PreviewDrawer } from "@/fakturering/components/PreviewDrawer";
+import { GroupPreviewDialog } from "@/fakturering/components/GroupPreviewDialog";
 import { EntityPickerBanner } from "@/fakturering/components/EntityPickerBanner";
 import { cn } from "@/lib/utils";
 import { readEdgeError } from "@/fakturering/lib/edgeError";
+import { showError } from "@/lib/userError";
 import { usePendingReturnsCount } from "@/ordre/hooks/useReturnDeliveryNotes";
+
 
 function toISO(d: Date) { return format(d, "yyyy-MM-dd"); }
 
@@ -41,23 +44,19 @@ export default function Fakturakjoring() {
   const [runDate, setRunDate] = useState<Date>(new Date());
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewGroup, setPreviewGroup] = useState<string | null>(null);
   const [isRunning, setIsRunning] = useState(false);
 
   const runDateISO = toISO(runDate);
-  const preview = useInvoiceRunPreview(activeEntityId, runDateISO);
+  const preview = useInvoiceRunPreviewLines(activeEntityId, runDateISO);
   const { data: pendingReturns = 0 } = usePendingReturnsCount(activeEntityId ?? undefined);
   const settings = useInvoiceSettings(activeEntityId);
   const tripletex = useTripletexTokenStatus(activeEntityId);
   const writeAccess = useHasFakturaWriteAccess();
   const recentRuns = useRecentInvoiceRuns(activeEntityId, 5);
 
-  const previewRows = preview.data ?? [];
-  const rowByKey = useMemo(() => {
-    const m = new Map<string, PreviewRow>();
-    for (const r of previewRows) m.set(r.invoicing_group ?? "__none", r);
-    return m;
-  }, [previewRows]);
+  const lines = useMemo(() => preview.data ?? [], [preview.data]);
+  const rowByKey = useMemo(() => aggregatePreviewLines(lines), [lines]);
 
   const orphanRow = rowByKey.get("__none");
 
@@ -72,14 +71,16 @@ export default function Fakturakjoring() {
     });
   };
 
-  // Kjente + ukjente grupper (ukjente kommer fra preview-radene og skal
-  // fortsatt kunne fakturers — de ble tidligere skjult stille).
-  const unknownGroupKeys = useMemo(
-    () => previewRows
-      .map((r) => r.invoicing_group)
-      .filter((g): g is string => !!g && !isKnownGroup(g)),
-    [previewRows],
-  );
+  // Kjente + ukjente grupper (ukjente kommer fra grunnlagslinjene og skal
+  // fortsatt kunne faktureres — de ble tidligere skjult stille).
+  const unknownGroupKeys = useMemo(() => {
+    const keys: string[] = [];
+    for (const key of rowByKey.keys()) {
+      if (key === "__none" || isKnownGroup(key)) continue;
+      keys.push(key);
+    }
+    return keys;
+  }, [rowByKey]);
 
   const selectedRows: PreviewRow[] = useMemo(() => {
     const rows: PreviewRow[] = [];
@@ -97,7 +98,8 @@ export default function Fakturakjoring() {
   }, [selected, rowByKey, unknownGroupKeys]);
 
   const totalBasis = selectedRows.reduce((s, r) => s + r.customer_count, 0);
-  const totalSum = selectedRows.reduce((s, r) => s + r.sum_incl_vat, 0);
+  const totalSum = selectedRows.reduce((s, r) => s + r.sum_excl_vat, 0);
+
 
   const canRun =
     writeAccess.data === true &&
@@ -155,11 +157,8 @@ export default function Fakturakjoring() {
       setConfirmOpen(false);
       navigate(`/fakturering/kjoringer/${runId}`);
     } catch (e: any) {
-      toast({
-        title: "Kunne ikke kjøre fakturering",
-        description: await readEdgeError(e),
-        variant: "destructive",
-      });
+      showError("fakturakjoring/run", e, await readEdgeError(e));
+
     } finally {
       setIsRunning(false);
     }
@@ -257,7 +256,7 @@ export default function Fakturakjoring() {
           <AlertTriangle className="mt-0.5 h-4 w-4 text-[hsl(var(--brand-bronze))]" />
           <div className="flex-1">
             <div className="font-medium text-text-primary">
-              {orphanRow.customer_count} kunder mangler faktureringsgruppe ({orphanRow.order_count} ordrer, {formatKr(orphanRow.sum_incl_vat)})
+              {orphanRow.customer_count} kunder mangler faktureringsgruppe ({orphanRow.order_count} ordrer, {formatKr(orphanRow.sum_excl_vat)})
             </div>
             <div className="text-muted-foreground">
               Disse blir ikke fakturert. <Link to="/kunder" className="underline underline-offset-2">Åpne kundelisten →</Link>
@@ -287,28 +286,36 @@ export default function Fakturakjoring() {
 
       {/* Gruppekort */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {preview.isLoading &&
+          KNOWN_GROUPS.map((def) => (
+            <div
+              key={`sk-${def.key}`}
+              className="h-[168px] animate-pulse rounded-2xl border border-line-subtle bg-surface-sunken"
+            />
+          ))}
 
-        {KNOWN_GROUPS.map((def) => {
+        {!preview.isLoading && KNOWN_GROUPS.map((def) => {
           const row = rowByKey.get(def.key);
           const cc = row?.customer_count ?? 0;
           const oc = row?.order_count ?? 0;
-          const sum = row?.sum_incl_vat ?? 0;
+          const sum = row?.sum_excl_vat ?? 0;
           return (
             <GroupCard
               key={def.key}
               def={def}
               customerCount={cc}
               orderCount={oc}
-              sumInclVat={sum}
+              sumExclVat={sum}
               isEmpty={cc === 0}
               isInternal={internalGroups.includes(def.key)}
               isNonTransfer={nonTransferGroups.includes(def.key)}
               selected={selected.has(def.key)}
               onToggle={() => toggleGroup(def.key)}
+              onPreview={() => setPreviewGroup(def.key)}
             />
           );
         })}
-        {unknownGroupKeys.map((key) => {
+        {!preview.isLoading && unknownGroupKeys.map((key) => {
           const row = rowByKey.get(key)!;
           const def = groupDefFor(key);
           return (
@@ -317,18 +324,17 @@ export default function Fakturakjoring() {
               def={def}
               customerCount={row.customer_count}
               orderCount={row.order_count}
-              sumInclVat={row.sum_incl_vat}
+              sumExclVat={row.sum_excl_vat}
               isEmpty={row.customer_count === 0}
               isInternal={false}
               isNonTransfer={false}
               selected={selected.has(key)}
               onToggle={() => toggleGroup(key)}
+              onPreview={() => setPreviewGroup(key)}
             />
           );
         })}
       </div>
-
-
 
       {/* Handlingslinje */}
       <div className="flex flex-col gap-4 rounded-2xl border border-line-subtle bg-surface-raised p-5 lg:flex-row lg:items-center">
@@ -342,15 +348,8 @@ export default function Fakturakjoring() {
             <Receipt className="mr-2 h-4 w-4" />
             Kjør fakturering — {selectedRows.length} {selectedRows.length === 1 ? "gruppe" : "grupper"} · {totalBasis} grunnlag · {formatKr(totalSum)}
           </Button>
-          <Button
-            variant="outline"
-            size="lg"
-            disabled={selectedRows.length === 0}
-            onClick={() => setPreviewOpen(true)}
-          >
-            Forhåndsvis grunnlag
-          </Button>
         </div>
+
         <p className="max-w-md text-xs text-muted-foreground">
           {runDisabledReason ? (
             <span className="text-[hsl(var(--brand-bronze))]">{runDisabledReason}. </span>
@@ -425,14 +424,19 @@ export default function Fakturakjoring() {
         onConfirm={handleRun}
         isRunning={isRunning}
       />
-      <PreviewDrawer
-        open={previewOpen}
-        onOpenChange={setPreviewOpen}
-        entityId={activeEntityId}
+      <GroupPreviewDialog
+        open={previewGroup !== null}
+        onOpenChange={(o) => !o && setPreviewGroup(null)}
+        groupKey={previewGroup}
         runDate={runDateISO}
-        selectedGroups={Array.from(selected)}
-        previewRows={previewRows}
+        lines={lines}
+        isLoading={preview.isLoading}
+        isError={preview.isError}
+        error={preview.error}
+        onRetry={() => preview.refetch()}
+        isFetching={preview.isFetching}
       />
+
     </div>
   );
 }
