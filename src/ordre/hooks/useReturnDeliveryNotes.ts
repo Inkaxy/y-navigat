@@ -121,7 +121,9 @@ export function usePendingReturnsCount(legalEntityId: string = NB_LEGAL_ENTITY_I
         .select("id", { count: "exact", head: true })
         .eq("legal_entity_id", legalEntityId)
         .eq("is_return", true)
-        .eq("status", "draft");
+        .eq("status", "draft")
+        .is("approved_at", null)
+        .is("rejected_at", null);
       if (error) return 0;
       return count ?? 0;
     },
