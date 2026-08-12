@@ -228,7 +228,17 @@ export function ProductionPlanTable({ rows, showByMainGroup, showTraysWithPlus, 
                   <TableCell className="text-right tabular-nums">{fmtNum(r.quantity_ordered)}</TableCell>
                 )}
                 {columns.fromStock && (
-                  <TableCell className="text-right tabular-nums text-muted-foreground">
+                  <TableCell
+                    className={cn(
+                      "text-right tabular-nums",
+                      r.quantity_from_stock > 0 ? "font-medium text-success" : "text-muted-foreground",
+                    )}
+                    title={
+                      r.quantity_from_stock > 0
+                        ? `Dekkes av lager: ${fmtNum(r.quantity_from_stock)} av ${fmtNum(r.quantity_ordered)}`
+                        : undefined
+                    }
+                  >
                     {r.quantity_from_stock > 0 ? fmtNum(r.quantity_from_stock) : ""}
                   </TableCell>
                 )}
