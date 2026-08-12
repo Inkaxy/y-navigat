@@ -55,6 +55,129 @@ function nb(n: number, decimals = 1): string {
   return Number(n).toFixed(decimals).replace(".", ",");
 }
 
+
+/** Maks nivåer halvfabrikat-i-halvfabrikat som følges. Beskytter mot sykluser. */
+const MAX_SUB_DEPTH = 4;
+
+const LINE_SELECT =
+  "id, raw_material_id, sub_product_id, ingredient_name, quantity, unit, waste_percent, include_in_declaration, is_quid_relevant, custom_declaration_text, water_content_pct_override, sort_order, raw_materials(id, name, unit_weight_grams, is_composite, grain_classification, cereal_type, water_content_pct, components_reviewed_at)";
+
+/** Ferdigvekt for en oppskrift: yield_grams, ellers innveid minus stektap. */
+function finalWeightOf(recipe: any, inputGrams: number): number {
+  const y = recipe?.yield_grams != null ? Number(recipe.yield_grams) : null;
+  const loss = Number(recipe?.yield_loss_pct) || 0;
+  return (y ?? inputGrams * (1 - loss / 100)) || 0;
+}
+
+/**
+ * Leser oppskriftslinjer og erstatter halvfabrikat-linjer (`sub_product_id`)
+ * med halvfabrikatets egne ingredienser, skalert etter hvor mange gram av
+ * halvfabrikatet som inngår. Slik forplanter allergener og ingredienser seg
+ * oppover i stedet for å forsvinne.
+ */
+async function expandRecipeLines(
+  service: any,
+  recipeId: string,
+  depth: number,
+  seen: Set<string>,
+  warnings: string[],
+): Promise<TopLine[]> {
+  const { data: lines } = await service
+    .from("recipe_lines")
+    .select(LINE_SELECT)
+    .eq("recipe_id", recipeId)
+    .order("sort_order");
+
+  const out: TopLine[] = [];
+  for (const l of (lines ?? []) as any[]) {
+    const rm = l.raw_materials;
+    const base: TopLine = {
+      source: "master",
+      raw_material: rm ?? null,
+      raw_material_id: l.raw_material_id ?? null,
+      name: rm?.name ?? l.ingredient_name ?? "(ukjent)",
+      quantity: Number(l.quantity) || 0,
+      unit: l.unit ?? "g",
+      waste_percent: Number(l.waste_percent) || 0,
+      include: l.include_in_declaration !== false,
+      is_quid: !!l.is_quid_relevant,
+      custom_text: l.custom_declaration_text || null,
+      unit_weight_grams: rm?.unit_weight_grams ?? null,
+      water_content_pct_override: l.water_content_pct_override ?? null,
+    };
+
+    if (!l.sub_product_id) {
+      out.push(base);
+      continue;
+    }
+
+    const neededGrams = toGrams(base.quantity, base.unit, base.unit_weight_grams);
+    if (neededGrams <= 0) {
+      out.push(base);
+      continue;
+    }
+
+    if (depth >= MAX_SUB_DEPTH) {
+      warnings.push(`Halvfabrikat «${base.name}» går dypere enn ${MAX_SUB_DEPTH} nivåer — ingrediensene er ikke regnet med`);
+      out.push(base);
+      continue;
+    }
+
+    const { data: link } = await service
+      .from("product_recipe_links")
+      .select("recipe_id, is_primary")
+      .eq("product_id", l.sub_product_id)
+      .order("is_primary", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const subRecipeId: string | null = link?.recipe_id ?? null;
+
+    if (!subRecipeId || seen.has(subRecipeId)) {
+      if (subRecipeId) warnings.push(`Halvfabrikat «${base.name}» peker i ring — hoppet over`);
+      else warnings.push(`Halvfabrikat «${base.name}» mangler oppskrift — ingrediensene er ikke regnet med`);
+      out.push(base);
+      continue;
+    }
+
+    const { data: subRecipe } = await service
+      .from("recipes")
+      .select("id, name, yield_grams, yield_loss_pct")
+      .eq("id", subRecipeId)
+      .maybeSingle();
+
+    const subLines = await expandRecipeLines(
+      service,
+      subRecipeId,
+      depth + 1,
+      new Set([...seen, subRecipeId]),
+      warnings,
+    );
+    const subInput = subLines.reduce(
+      (sum, sl) => sum + toGrams(sl.quantity, sl.unit, sl.unit_weight_grams) * (1 + sl.waste_percent / 100),
+      0,
+    );
+    const subFinal = finalWeightOf(subRecipe, subInput);
+    if (subFinal <= 0 || subInput <= 0) {
+      warnings.push(`Halvfabrikat «${base.name}» mangler vekt — ingrediensene er ikke regnet med`);
+      out.push(base);
+      continue;
+    }
+
+    // Skaler halvfabrikatets innveide gram til andelen som faktisk brukes her.
+    const factor = (neededGrams / subFinal) * (1 + base.waste_percent / 100);
+    for (const sl of subLines) {
+      out.push({
+        ...sl,
+        quantity: toGrams(sl.quantity, sl.unit, sl.unit_weight_grams) * (1 + sl.waste_percent / 100) * factor,
+        unit: "g",
+        waste_percent: 0,
+        include: base.include && sl.include,
+      });
+    }
+  }
+  return out;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -89,33 +212,18 @@ Deno.serve(async (req) => {
       .maybeSingle();
     if (!recipe) return json({ error: "Recipe not found" }, 404);
 
-    const { data: lines } = await service
-      .from("recipe_lines")
-      .select("id, raw_material_id, ingredient_name, quantity, unit, waste_percent, include_in_declaration, is_quid_relevant, custom_declaration_text, water_content_pct_override, sort_order, raw_materials(id, name, unit_weight_grams, is_composite, grain_classification, cereal_type, water_content_pct, components_reviewed_at)")
-      .eq("recipe_id", recipeId)
-      .order("sort_order");
-
-    // 1) Topplinjer (alle deler, inkl. fordeiger — recipe_lines dekker alle recipe_parts)
-    const topLines: TopLine[] = (lines ?? []).map((l: any) => {
-      const rm = l.raw_materials;
-      return {
-        source: "master" as const,
-        raw_material: rm ?? null,
-        raw_material_id: l.raw_material_id ?? null,
-        name: rm?.name ?? l.ingredient_name ?? "(ukjent)",
-        quantity: Number(l.quantity) || 0,
-        unit: l.unit ?? "g",
-        waste_percent: Number(l.waste_percent) || 0,
-        include: l.include_in_declaration !== false,
-        is_quid: !!l.is_quid_relevant,
-        custom_text: l.custom_declaration_text || null,
-        unit_weight_grams: rm?.unit_weight_grams ?? null,
-        water_content_pct_override: l.water_content_pct_override ?? null,
-      };
-    });
+    // 1) Topplinjer (alle deler, inkl. fordeiger) — halvfabrikater brettes ut rekursivt
+    const expandWarnings: string[] = [];
+    const topLines: TopLine[] = await expandRecipeLines(
+      service,
+      recipeId,
+      0,
+      new Set([recipeId]),
+      expandWarnings,
+    );
 
     const core = await computeDeclarationCore(service, topLines);
-    const warnings: string[] = [];
+    const warnings: string[] = [...expandWarnings];
 
     // 2) Vekter — ferdigvekt fra yield_grams, ellers innveid minus stektap
     const totalInputGrams = core.totalInputGrams;
