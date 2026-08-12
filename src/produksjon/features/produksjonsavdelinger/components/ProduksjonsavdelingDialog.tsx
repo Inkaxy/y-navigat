@@ -43,6 +43,8 @@ export function ProduksjonsavdelingDialog({
   const [displayName, setDisplayName] = useState("");
   const [sortOrder, setSortOrder] = useState(100);
   const [active, setActive] = useState(true);
+  const [alertEmail, setAlertEmail] = useState("");
+  const [emailError, setEmailError] = useState<string | null>(null);
   const [codeError, setCodeError] = useState<string | null>(null);
   const [nameError, setNameError] = useState<string | null>(null);
 
@@ -56,12 +58,15 @@ export function ProduksjonsavdelingDialog({
       setDisplayName(existing.display_name);
       setSortOrder(existing.sort_order);
       setActive(existing.status === "active");
+      setAlertEmail(existing.low_stock_alert_email ?? "");
     } else {
       setCode("");
       setDisplayName("");
       setSortOrder(suggestedSortOrder);
       setActive(true);
+      setAlertEmail("");
     }
+    setEmailError(null);
     setCodeError(null);
     setNameError(null);
   }, [open, mode, existing, suggestedSortOrder]);
@@ -72,6 +77,13 @@ export function ProduksjonsavdelingDialog({
     e.preventDefault();
     setCodeError(null);
     setNameError(null);
+    setEmailError(null);
+
+    const trimmedEmail = alertEmail.trim();
+    if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      setEmailError("Skriv en gyldig e-postadresse.");
+      return;
+    }
 
     const trimmedName = displayName.trim();
     if (!trimmedName) {
@@ -101,6 +113,7 @@ export function ProduksjonsavdelingDialog({
           display_name: trimmedName,
           sort_order: sortOrder,
           status: active ? "active" : "inactive",
+          low_stock_alert_email: trimmedEmail || null,
         });
         toast.success("Avdelingen er opprettet.");
         onOpenChange(false);
@@ -123,6 +136,7 @@ export function ProduksjonsavdelingDialog({
           display_name: trimmedName,
           sort_order: sortOrder,
           status: active ? "active" : "inactive",
+          low_stock_alert_email: trimmedEmail || null,
         });
         toast.success("Endringene er lagret.");
         onOpenChange(false);
@@ -202,6 +216,25 @@ export function ProduksjonsavdelingDialog({
               <p className="text-xs text-muted-foreground">
                 Lavere tall vises først.
               </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="low_stock_alert_email">Varsel-e-post ved lavt lager</Label>
+              <Input
+                id="low_stock_alert_email"
+                type="email"
+                value={alertEmail}
+                onChange={(e) => setAlertEmail(e.target.value)}
+                placeholder="produksjon@bakeri.no"
+                aria-invalid={!!emailError}
+              />
+              {emailError ? (
+                <p className="text-xs text-destructive">{emailError}</p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Daglig sammendrag kl. 05:30 med lagervarer under min-nivå. La stå tomt for ingen varsling.
+                </p>
+              )}
             </div>
 
             <div className="flex items-center justify-between rounded-md border border-border p-3">

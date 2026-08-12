@@ -10,6 +10,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BigStepper } from "./BigStepper";
 import { useRegisterProduction, type LagerItem } from "../hooks/useLager";
+import { showError } from "@/lib/userError";
 
 const nf = new Intl.NumberFormat("nb-NO");
 
@@ -89,7 +90,7 @@ export function ProductionRegisterCard({
       setExpiresOn("");
       setNote("");
     } catch (e) {
-      setErrMsg((e as Error).message);
+      showError("ProductionRegisterCard", e, (e as Error).message || "Kunne ikke registrere produksjon.");
     }
   };
 
