@@ -34,6 +34,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useTourOrder,
+  claimOrderRevision,
+  OrderConflictError,
   useUpdateOrderLine,
   useDeleteOrderLine,
   type TourOrderLine,
@@ -192,18 +194,22 @@ export function TourOrderDialog({
       toast.error(`Kan ikke lagre — bryter leveringsregel: ${rulesPreview.blocks[0].message}`);
       return;
     }
-    if (overrideReason) {
-      const { error: ovErr } = await supabase
-        .from("orders")
-        .update({ rule_override_reason: overrideReason } as never)
-        .eq("id", order.id);
-      if (ovErr) {
-        toast.error("Kunne ikke lagre overstyring", { description: ovErr.message });
-        return;
-      }
-    }
     setSavingAll(true);
     try {
+      // Optimistisk lås: sikrer at ingen andre har endret ordren siden den ble lastet.
+      const claimedAt = await claimOrderRevision(order.id, order.updated_at);
+
+      if (overrideReason) {
+        const { data: ovRows, error: ovErr } = await supabase
+          .from("orders")
+          .update({ rule_override_reason: overrideReason } as never)
+          .eq("id", order.id)
+          .eq("updated_at", claimedAt)
+          .select("id");
+        if (ovErr) throw ovErr;
+        if ((ovRows ?? []).length === 0) throw new OrderConflictError();
+      }
+
       const ops: PromiseLike<unknown>[] = [];
       for (const [lineId, e] of Object.entries(edits)) {
         const patch: Record<string, unknown> = {};
@@ -233,8 +239,16 @@ export function TourOrderDialog({
       setEdits({});
       qc.invalidateQueries({ queryKey: ["tour-order"] });
       qc.invalidateQueries({ queryKey: ["matrix"] });
-    } catch (e: any) {
-      toast.error("Kunne ikke lagre", { description: e?.message });
+    } catch (e: unknown) {
+      if (e instanceof OrderConflictError) {
+        toast.error("Ordren er endret av noen andre — laster på nytt");
+        setEdits({});
+        qc.invalidateQueries({ queryKey: ["tour-order"] });
+        qc.invalidateQueries({ queryKey: ["matrix"] });
+      } else {
+        console.error("[TourOrderDialog] saveAll", e);
+        toast.error("Kunne ikke lagre. Prøv igjen — kontakt support hvis det gjentar seg.");
+      }
     } finally {
       setSavingAll(false);
     }

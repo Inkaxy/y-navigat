@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { showError } from "@/lib/userError";
 
 /**
  * Henter master-oppskrift med linjer, arbeidskost, emballasje og koblede produkter.
@@ -71,7 +72,7 @@ export function useUnlinkProductFromRecipe() {
       qc.invalidateQueries({ queryKey: ["product-recipe-link"] });
       toast.success("Produkt frakoblet");
     },
-    onError: (e: any) => toast.error(e.message),
+    onError: (e: unknown) => showError("useRecipeMaster", e),
   });
 }
 
@@ -89,6 +90,6 @@ export function useLinkProductToRecipe() {
       qc.invalidateQueries({ queryKey: ["product-recipe-link"] });
       toast.success("Produkt koblet til oppskrift");
     },
-    onError: (e: any) => toast.error(e.message),
+    onError: (e: unknown) => showError("useRecipeMaster", e),
   });
 }

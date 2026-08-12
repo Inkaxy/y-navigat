@@ -19,6 +19,7 @@ import { logAudit } from "@/varer/lib/audit";
 import { PdfDeclarationImportDialog } from "@/varer/components/products/PdfDeclarationImportDialog";
 import { ManualDeclarationEditor } from "@/varer/components/products/ManualDeclarationEditor";
 import { CertificationsEditor } from "@/varer/components/products/CertificationsEditor";
+import { showError } from "@/lib/userError";
 
 type Mode = "auto" | "manual" | "auto_with_overrides";
 
@@ -160,7 +161,7 @@ function DeclarationView({ link, productName, canWrite, qc }: { link: any; produ
     }
     const { error } = await supabase.from("product_recipe_links").update(update).eq("id", link.id);
     setSavingMode(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { showError("DeclarationTab", error); return; }
     if (newMode !== "inherit") setMode(newMode);
     await logAudit({ action: "update", entity_type: "product_recipe_link", entity_id: link.id, entity_display_reference: productName, changes: { declaration_mode: newMode } });
     qc.invalidateQueries({ queryKey: ["product-recipe-link-decl", link.id] });
@@ -183,7 +184,7 @@ function DeclarationView({ link, productName, canWrite, qc }: { link: any; produ
       },
       declaration_updated_at: new Date().toISOString(),
     }).eq("id", link.id);
-    if (error) { toast.error(error.message); return; }
+    if (error) { showError("DeclarationTab", error); return; }
     toast.success("Manuell deklarasjon lagret");
     qc.invalidateQueries({ queryKey: ["product-recipe-link-decl", link.id] });
     qc.invalidateQueries({ queryKey: ["compute-product-declaration", link.id] });

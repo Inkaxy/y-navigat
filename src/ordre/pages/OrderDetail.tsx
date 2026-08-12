@@ -198,14 +198,28 @@ export default function OrderDetail() {
       updates.confirmed_by = userId;
     }
 
-    const { error: updErr } = await supabase
+    // Optimistisk lås — treffer 0 rader hvis noen andre har endret ordren.
+    const { data: updRows, error: updErr } = await supabase
       .from("orders")
       .update(updates as never)
-      .eq("id", order.id);
+      .eq("id", order.id)
+      .eq("updated_at", order.updated_at)
+      .select("id");
     if (updErr) {
-      toast.error(updErr.message);
+      console.error("[OrderDetail] performStatusChange", updErr);
+      toast.error("Kunne ikke lagre. Prøv igjen — kontakt support hvis det gjentar seg.");
       throw updErr;
     }
+    if ((updRows ?? []).length === 0) {
+      toast.error("Ordren er endret av noen andre — laster på nytt");
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["order", order.id] }),
+        qc.invalidateQueries({ queryKey: ["order-lines", order.id] }),
+        qc.invalidateQueries({ queryKey: ["order-events", order.id] }),
+      ]);
+      throw new Error("order_conflict");
+    }
+
 
     if (comment) {
       const { data: latest } = await supabase

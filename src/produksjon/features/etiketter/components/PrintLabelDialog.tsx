@@ -39,6 +39,16 @@ import {
 import type { LabelProductRow } from "../types";
 import type { ProductionDepartment } from "@/produksjon/features/produksjonsavdelinger/types";
 
+/**
+ * Felter der manglende data er et matsikkerhetsproblem. Mangler noen av disse
+ * på en etikett som skal bære deklarasjon, blokkeres utskriften.
+ */
+const CRITICAL_LABEL_FIELDS = new Set([
+  "allergener",
+  "kan_inneholde",
+  "ingredienser",
+]);
+
 interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -100,6 +110,57 @@ export function PrintLabelDialog({
   );
   const { data: customerInfoMap } = useOrderLineCustomerInfo(orderLineIds);
 
+  /** Felter profilen faktisk skriver ut. */
+  const printedFields = useMemo(
+    () =>
+      new Set(
+        (profile?.fields ?? [])
+          .filter((f) => f.include)
+          .map((f) => String(f.field_type)),
+      ),
+    [profile],
+  );
+
+  /**
+   * Manglende data fra `resolve_label_data`, delt i kritiske (matsikkerhet) og
+   * øvrige. Kritiske mangler blokkerer utskrift — det finnes ingen «skriv ut
+   * likevel».
+   */
+  const missingReport = useMemo(() => {
+    const critical = new Map<string, Set<string>>();
+    const other = new Map<string, Set<string>>();
+    const rowsToCheck =
+      selectedUnits.length > 0
+        ? selectedUnits.map((u) => ({
+            id: u.order_line_id,
+            label: `etikett ${u.number}`,
+          }))
+        : orderLineIds.map((id) => ({ id, label: row?.display_name ?? "varen" }));
+
+    for (const r of rowsToCheck) {
+      if (!r.id) continue;
+      const mangler = labelDataMap?.[r.id]?.mangler ?? [];
+      for (const key of mangler) {
+        if (!printedFields.has(key)) continue;
+        const bucket = CRITICAL_LABEL_FIELDS.has(key) ? critical : other;
+        const set = bucket.get(key) ?? new Set<string>();
+        set.add(r.label);
+        bucket.set(key, set);
+      }
+    }
+    return { critical, other };
+  }, [labelDataMap, selectedUnits, orderLineIds, printedFields, row?.display_name]);
+
+  const blockedByMissing = missingReport.critical.size > 0;
+
+  const describeMissing = (m: Map<string, Set<string>>) =>
+    [...m.entries()].map(([key, who]) => ({
+      key,
+      label: (fieldLabels[key] ?? key).toLowerCase(),
+      who: [...who].join(", "),
+    }));
+
+
   /** Bygg etikettene som skal skrives ut — én per etikett-enhet (nummer). */
   function buildItems(): CombinedLabelItem[] {
     if (!profile || !row) return [];
@@ -153,6 +214,10 @@ export function PrintLabelDialog({
 
   const handleDownloadPdf = async () => {
     if (!row) return;
+    if (blockedByMissing) {
+      toast.error("Kan ikke skrives ut — kritiske deklarasjonsdata mangler.");
+      return;
+    }
     if (!profile) {
       toast.error("Mangler etikett-profil for varen — sett profil først.");
       return;
@@ -210,6 +275,10 @@ export function PrintLabelDialog({
 
   const handlePrint = async () => {
     if (!row || !deptId) return;
+    if (blockedByMissing) {
+      toast.error("Kan ikke skrives ut — kritiske deklarasjonsdata mangler.");
+      return;
+    }
     setErrorMessage(null);
     setPrinting(true);
     try {
@@ -291,6 +360,45 @@ export function PrintLabelDialog({
           <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
             <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
             <span>{errorMessage}</span>
+          </div>
+        )}
+
+        {blockedByMissing && (
+          <div className="space-y-1 rounded-md border border-destructive bg-destructive/10 p-3 text-sm text-destructive">
+            <div className="flex items-center gap-2 font-semibold">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              Kan ikke skrives ut — kritiske data mangler
+            </div>
+            <ul className="ml-6 list-disc space-y-0.5">
+              {describeMissing(missingReport.critical).map((m) => (
+                <li key={m.key}>
+                  {m.label} mangler for {m.who}
+                </li>
+              ))}
+            </ul>
+            <p className="ml-6 text-xs">
+              Etiketten kan ikke skrives ut før dataene er på plass. Fyll ut
+              deklarasjonen på varen og prøv igjen.
+            </p>
+          </div>
+        )}
+
+        {missingReport.other.size > 0 && (
+          <div className="space-y-1 rounded-md border border-amber-500/50 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-400">
+            <div className="flex items-center gap-2 font-semibold">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              Noen felter mangler data
+            </div>
+            <ul className="ml-6 list-disc space-y-0.5">
+              {describeMissing(missingReport.other).map((m) => (
+                <li key={m.key}>
+                  {m.label} mangler for {m.who}
+                </li>
+              ))}
+            </ul>
+            <p className="ml-6 text-xs">
+              Etiketten kan skrives ut, men feltene står tomme.
+            </p>
           </div>
         )}
 
@@ -386,7 +494,7 @@ export function PrintLabelDialog({
           <Button
             variant="outline"
             onClick={handleDownloadPdf}
-            disabled={downloading || !profile || nothingToPrint}
+            disabled={downloading || !profile || nothingToPrint || blockedByMissing}
             className="gap-2"
             title={!profile ? "Sett etikett-profil for varen først" : undefined}
           >
@@ -399,9 +507,15 @@ export function PrintLabelDialog({
           </Button>
           <Button
             onClick={handlePrint}
-            disabled={!deptId || isWorking || nothingToPrint}
+            disabled={!deptId || isWorking || nothingToPrint || blockedByMissing}
             className="gap-2"
-            title={nothingToPrint ? "Alle numre er allerede skrevet ut" : undefined}
+            title={
+              blockedByMissing
+                ? "Utskrift er sperret — kritiske deklarasjonsdata mangler"
+                : nothingToPrint
+                  ? "Alle numre er allerede skrevet ut"
+                  : undefined
+            }
           >
             {isWorking ? (
               <Loader2 className="h-4 w-4 animate-spin" />
