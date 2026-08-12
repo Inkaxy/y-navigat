@@ -77,6 +77,8 @@ export default function OrderDetail() {
 
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get("tab") === "samtaler" ? "samtaler" : "detaljer";
+  const backParam = searchParams.get("tilbake");
+  const backUrl = backParam && backParam.startsWith("/") ? backParam : null;
 
   const { data: order, isLoading, error } = useOrderDetail(id);
   const { data: lines = [] } = useOrderLines(id);
@@ -289,11 +291,18 @@ export default function OrderDetail() {
         title={order.order_number}
         subtitle={`${customerName} · Levering ${formatDateLong(order.delivery_date)}`}
         actions={
-          <Button asChild variant="outline" size="sm" className="gap-2">
-            <Link to="/ordre/ordrer">
-              <ArrowLeft className="h-4 w-4" /> Bestillinger
-            </Link>
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            {backUrl && (
+              <Button size="sm" className="gap-2" onClick={() => navigate(backUrl)}>
+                <ArrowLeft className="h-4 w-4" /> Ferdig — tilbake til fakturering
+              </Button>
+            )}
+            <Button asChild variant="outline" size="sm" className="gap-2">
+              <Link to="/ordre/ordrer">
+                <ArrowLeft className="h-4 w-4" /> Bestillinger
+              </Link>
+            </Button>
+          </div>
         }
       />
 
