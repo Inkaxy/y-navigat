@@ -31,8 +31,40 @@ export type TourOrder = {
   subtotal_excl_vat: number | null;
   total_incl_vat: number | null;
   total_vat: number | null;
+  /** Versjonsstempel brukt til optimistisk lås ved lagring. */
+  updated_at: string;
   lines: TourOrderLine[];
 };
+
+/** Kastes når ordren er endret av noen andre siden den ble lastet. */
+export class OrderConflictError extends Error {
+  constructor() {
+    super("Ordren er endret av noen andre — laster på nytt");
+    this.name = "OrderConflictError";
+  }
+}
+
+/**
+ * Optimistisk lås: bumper ordrens `updated_at` kun hvis raden fremdeles står
+ * på versjonen som ble lastet inn. Treffer 0 rader ved konflikt.
+ */
+export async function claimOrderRevision(
+  orderId: string,
+  expectedUpdatedAt: string | null | undefined,
+): Promise<string> {
+  if (!expectedUpdatedAt) throw new OrderConflictError();
+  const next = new Date().toISOString();
+  const { data, error } = await supabase
+    .from("orders")
+    .update({ updated_at: next } as never)
+    .eq("id", orderId)
+    .eq("updated_at", expectedUpdatedAt)
+    .select("id, updated_at");
+  if (error) throw error;
+  const rows = (data ?? []) as Array<{ updated_at: string }>;
+  if (rows.length === 0) throw new OrderConflictError();
+  return rows[0].updated_at;
+}
 
 type Args = { customerId: string | null; date: string | null; tourId: string | null };
 
@@ -48,7 +80,7 @@ export function useTourOrder({ customerId, date, tourId }: Args) {
       const { data: orders, error } = await supabase
         .from("orders")
         .select(
-          "id, order_number, status, is_paid, delivery_date, delivery_tour_id, customer_id, subtotal_excl_vat, total_incl_vat, total_vat",
+          "id, order_number, status, is_paid, delivery_date, delivery_tour_id, customer_id, subtotal_excl_vat, total_incl_vat, total_vat, updated_at",
         )
         .eq("customer_id", customerId!)
         .eq("delivery_date", date!)
