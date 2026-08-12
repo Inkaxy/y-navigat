@@ -72,7 +72,7 @@ export interface NegotiationRecipientRow {
   supplier_id: string;
   contact_email: string | null;
   contact_name: string | null;
-  access_token?: string;
+  
   password_set_at: string | null;
   password_expires_at: string | null;
   failed_attempts: number;
