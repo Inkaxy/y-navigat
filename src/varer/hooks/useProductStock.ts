@@ -87,6 +87,7 @@ export function useProductStock(productId: string | undefined) {
           .maybeSingle(),
       ]);
       if (linkRes.error) throw linkRes.error;
+      if (ownRes.error) throw ownRes.error;
 
       const link = linkRes.data
         ? {
@@ -162,6 +163,7 @@ export function useSaveOwnStockItem(productId: string, legalEntityId: string | u
         name: input.name.trim(),
         department_id: input.department_id,
         defined_by_product_id: productId,
+        base_unit: "stk",
         pieces_per_tray: input.pieces_per_tray,
         min_level: input.min_level,
         shelf_life_days: input.shelf_life_days,
@@ -170,12 +172,12 @@ export function useSaveOwnStockItem(productId: string, legalEntityId: string | u
 
       let stockItemId = input.stockItemId ?? null;
       if (stockItemId) {
-        const { error } = await supabase.from("stock_items").update(payload as never).eq("id", stockItemId);
+        const { error } = await supabase.from("stock_items").update(payload).eq("id", stockItemId);
         if (error) throw error;
       } else {
         const { data, error } = await supabase
           .from("stock_items")
-          .insert(payload as never)
+          .insert(payload)
           .select("id")
           .single();
         if (error) throw error;
@@ -189,7 +191,7 @@ export function useSaveOwnStockItem(productId: string, legalEntityId: string | u
             product_id: productId,
             stock_item_id: stockItemId!,
             units_per_sold_unit: input.units_per_sold_unit,
-          } as never,
+          },
           { onConflict: "product_id" },
         );
       if (linkErr) throw linkErr;
@@ -211,7 +213,7 @@ export function useSaveStockLink(productId: string) {
             product_id: productId,
             stock_item_id: input.stock_item_id,
             units_per_sold_unit: input.units_per_sold_unit,
-          } as never,
+          },
           { onConflict: "product_id" },
         );
       if (error) throw error;
