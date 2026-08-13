@@ -18,6 +18,10 @@ import {
   type PeriodPreset,
 } from "@/rapporter/lib/periods";
 import { downloadCsv, nok, pct, pctChange, toCsv } from "@/rapporter/lib/reportFormat";
+import { downloadXlsx, FMT_NOK, FMT_PCT } from "@/rapporter/lib/xlsxExport";
+import { cleanConfig, readCompare, readPeriod, readUuid } from "@/rapporter/lib/reportConfig";
+import { SaveReportDialog } from "@/rapporter/components/SaveReportDialog";
+import { ExportMenu } from "@/rapporter/components/ExportMenu";
 
 type TrendRow = {
   id: string;
