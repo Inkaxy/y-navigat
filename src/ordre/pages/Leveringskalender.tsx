@@ -2091,7 +2091,7 @@ function MatrixGrid({
 
 
 
-                {columns.map((c) => {
+                {columns.map((c, ci) => {
                   const key = ckey(c.date, c.tour.id, p.id);
                   const value = getValue(key);
                   const dirty = isDirty(key);
@@ -2105,9 +2105,13 @@ function MatrixGrid({
                   return (
                     <td
                       key={key}
+                      onMouseEnter={() => setHoverCol(ci)}
                       className={cn(
-                        "group relative w-[72px] border-b border-r border-border p-0",
-                        dirty && "bg-warning/30",
+                        "group relative w-[72px] border-b border-border p-0 group-hover/row:bg-muted/40",
+                        dayEndIdx.has(ci) ? "border-r-2 border-r-border" : "border-r border-r-border/40",
+                        hoverCol === ci && "bg-muted/40",
+                        c.date === todayIso && "bg-warning/[0.06]",
+                        dirty && "bg-warning/30 group-hover/row:bg-warning/30",
                         pause && "bg-sky-50 dark:bg-sky-950/30",
                         fb && "outline outline-2 -outline-offset-2 outline-destructive/70",
                       )}
@@ -2128,11 +2132,17 @@ function MatrixGrid({
                         inputMode="decimal"
                         value={value}
                         readOnly={!!pause}
+                        data-cell={`${ri}-${ci}`}
+                        onKeyDown={(e) => onCellKeyDown(e, ri, ci)}
                         onChange={(e) => {
                           if (pause) return;
                           onChange(key, e.target.value);
                         }}
-                        onFocus={(e) => e.currentTarget.select()}
+                        onFocus={(e) => {
+                          setHoverCol(ci);
+                          e.currentTarget.select();
+                        }}
+
                         onMouseDown={(e) => {
                           if (pause) {
                             e.preventDefault();
