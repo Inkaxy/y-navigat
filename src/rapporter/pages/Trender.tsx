@@ -49,11 +49,33 @@ function buildTrend(nowRows: SalesRow[] | undefined, prevRows: SalesRow[] | unde
 }
 
 export default function Trender() {
-  const [preset, setPreset] = useState<PeriodPreset>("ytd");
-  const [range, setRange] = useState<DateRange>(() => rangeForPreset("ytd"));
-  const [compare, setCompare] = useState<ComparePreset>("same_period_last_year");
-  const [profileId, setProfileId] = useState<string | null>(null);
-  const [groupId, setGroupId] = useState<string | null>(null);
+  const [params] = useSearchParams();
+  const initial = useMemo(() => {
+    const period = readPeriod(params, "ytd");
+    return {
+      ...period,
+      compare: readCompare(params),
+      profileId: readUuid(params, "profil"),
+      groupId: readUuid(params, "gruppe"),
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const [preset, setPreset] = useState<PeriodPreset>(initial.preset);
+  const [range, setRange] = useState<DateRange>(initial.range);
+  const [compare, setCompare] = useState<ComparePreset>(initial.compare);
+  const [profileId, setProfileId] = useState<string | null>(initial.profileId);
+  const [groupId, setGroupId] = useState<string | null>(initial.groupId);
+
+  const reportConfig = () =>
+    cleanConfig({
+      preset,
+      start: range.start,
+      end: range.end,
+      compare,
+      profil: profileId,
+      gruppe: groupId,
+    });
 
   const filters = { customerProfileId: profileId, statisticGroupId: groupId };
   const cmpRange = useMemo(() => comparisonRange(range, compare), [range, compare]);
