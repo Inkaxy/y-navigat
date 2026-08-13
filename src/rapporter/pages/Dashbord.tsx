@@ -215,7 +215,7 @@ export default function Dashbord() {
       const lyKey = `${y - 1}-${pad(m)}`;
       out.push({
         key,
-        label: monthLabel(`${key}-01`).replace(/ \d{4}$/, (s) => ` ${s.trim().slice(2)}`),
+        label: `${MONTH_ABBR[m - 1]} ${String(y).slice(2)}`,
         now: now.get(key) ?? 0,
         prev: ly.get(lyKey) ?? 0,
       });
