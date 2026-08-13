@@ -1599,6 +1599,7 @@ export type Database = {
           is_private_person: boolean
           legal_entity_id: string
           mobile_phone: string | null
+          ng_reportable: boolean
           notes: string | null
           organization_number: string | null
           primary_contact_email: string | null
@@ -1650,6 +1651,7 @@ export type Database = {
           is_private_person?: boolean
           legal_entity_id: string
           mobile_phone?: string | null
+          ng_reportable?: boolean
           notes?: string | null
           organization_number?: string | null
           primary_contact_email?: string | null
@@ -1701,6 +1703,7 @@ export type Database = {
           is_private_person?: boolean
           legal_entity_id?: string
           mobile_phone?: string | null
+          ng_reportable?: boolean
           notes?: string | null
           organization_number?: string | null
           primary_contact_email?: string | null
@@ -3661,6 +3664,7 @@ export type Database = {
           legal_name: string
           logo_url: string | null
           mva_registered: boolean
+          ng_supplier_name: string | null
           notes: string | null
           org_number: string
           settings: Json
@@ -3695,6 +3699,7 @@ export type Database = {
           legal_name: string
           logo_url?: string | null
           mva_registered?: boolean
+          ng_supplier_name?: string | null
           notes?: string | null
           org_number: string
           settings?: Json
@@ -3729,6 +3734,7 @@ export type Database = {
           legal_name?: string
           logo_url?: string | null
           mva_registered?: boolean
+          ng_supplier_name?: string | null
           notes?: string | null
           org_number?: string
           settings?: Json
@@ -10735,6 +10741,65 @@ export type Database = {
           },
         ]
       }
+      report_runs: {
+        Row: {
+          created_at: string
+          customer_count: number
+          details: Json
+          file_name: string
+          file_path: string | null
+          generated_by: string | null
+          id: string
+          legal_entity_id: string
+          period_end: string
+          period_start: string
+          product_count: number
+          report_type: string
+          row_count: number
+          total_amount: number
+        }
+        Insert: {
+          created_at?: string
+          customer_count: number
+          details?: Json
+          file_name: string
+          file_path?: string | null
+          generated_by?: string | null
+          id?: string
+          legal_entity_id: string
+          period_end: string
+          period_start: string
+          product_count: number
+          report_type: string
+          row_count: number
+          total_amount: number
+        }
+        Update: {
+          created_at?: string
+          customer_count?: number
+          details?: Json
+          file_name?: string
+          file_path?: string | null
+          generated_by?: string | null
+          id?: string
+          legal_entity_id?: string
+          period_end?: string
+          period_start?: string
+          product_count?: number
+          report_type?: string
+          row_count?: number
+          total_amount?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "report_runs_legal_entity_id_fkey"
+            columns: ["legal_entity_id"]
+            isOneToOne: false
+            referencedRelation: "legal_entities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sales_groups: {
         Row: {
           code: string
@@ -13046,6 +13111,33 @@ export type Database = {
       generate_next_gtin: {
         Args: { p_legal_entity_id: string }
         Returns: string
+      }
+      generate_ng_report: {
+        Args: {
+          p_legal_entity_id: string
+          p_period_end: string
+          p_period_start: string
+        }
+        Returns: {
+          kjop_antall: number
+          kjop_belop: number
+          kunde_gln: string
+          kunde_navn: string
+          vare_gtin: string
+          vare_navn: string
+        }[]
+      }
+      generate_ng_report_outside: {
+        Args: {
+          p_legal_entity_id: string
+          p_period_end: string
+          p_period_start: string
+        }
+        Returns: {
+          belop: number
+          product_id: string
+          vare_navn: string
+        }[]
       }
       get_addable_products: {
         Args: { p_customer_id: string }
