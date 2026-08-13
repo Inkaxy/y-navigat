@@ -120,6 +120,22 @@ export default function Trender() {
     downloadCsv(`oppfolgingsliste_${range.start}_${range.end}.csv`, csv);
   };
 
+  const exportFollowUpXlsx = () => {
+    downloadXlsx(
+      `oppfolgingsliste_${range.start}_${range.end}.xlsx`,
+      "Oppfølging",
+      [
+        { header: "Kundenr", width: 10 },
+        { header: "Kunde", width: 34 },
+        { header: "Omsetning nå", width: 15, format: FMT_NOK },
+        { header: "Omsetning før", width: 15, format: FMT_NOK },
+        { header: "Endring", width: 14, format: FMT_NOK },
+        { header: "Endring %", width: 12, format: FMT_PCT },
+      ],
+      followUp.map((c) => [c.code ?? "", c.label, c.now, c.prev, c.delta, c.pct == null ? null : c.pct * 100]),
+    );
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
