@@ -57,6 +57,8 @@ export default function Historikk() {
         icon={History}
       />
 
+      <PowerBiExtractCard />
+
       <Card>
         <CardContent className="p-0">
           {isLoading ? (
