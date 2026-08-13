@@ -91,7 +91,19 @@ export function ProductInfoDialog({ productId, productName, displayNumber, sales
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle className="font-display text-xl">{productName}</DialogTitle>
+          {(displayNumber != null || salesUnit || unitPrice != null) && (
+            <p className="text-sm text-muted-foreground">
+              {[
+                displayNumber != null ? `Varenr. ${displayNumber}` : null,
+                salesUnit || null,
+                unitPrice != null ? formatNOK(unitPrice) : null,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
+          )}
         </DialogHeader>
+
 
         <div className="space-y-4">
           <div className="flex justify-center">
