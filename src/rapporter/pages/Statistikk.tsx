@@ -177,10 +177,10 @@ export default function Statistikk() {
         groupId={groupId}
         onGroupChange={setGroupId}
         actions={
-          <Button variant="outline" onClick={exportCsv} disabled={sorted.length === 0}>
-            <Download className="mr-2 h-4 w-4" />
-            Eksporter CSV
-          </Button>
+          <div className="flex items-center gap-2">
+            <SaveReportDialog kind="statistikk" config={reportConfig} />
+            <ExportMenu onXlsx={exportXlsx} onCsv={exportCsv} disabled={sorted.length === 0} />
+          </div>
         }
       />
 
