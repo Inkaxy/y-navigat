@@ -153,8 +153,8 @@ export function RecipeProductLinks({ recipeId, currentProductId, canWrite }: Pro
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-80 p-0" align="end">
-              <Command>
-                <CommandInput placeholder="Søk produkt…" />
+              <Command shouldFilter={false}>
+                <CommandInput placeholder="Søk produkt…" value={search} onValueChange={setSearch} />
                 <CommandList>
                   {productsQuery.isLoading ? (
                     <div className="flex justify-center py-6"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>
@@ -162,7 +162,7 @@ export function RecipeProductLinks({ recipeId, currentProductId, canWrite }: Pro
                     <>
                       <CommandEmpty>Ingen treff</CommandEmpty>
                       <CommandGroup>
-                        {candidates.slice(0, 50).map((p) => (
+                        {candidates.map((p) => (
                           <CommandItem key={p.id} value={`${p.display_name} ${p.display_number}`} onSelect={() => addLink(p.id)}>
                             <span className="font-mono text-xs text-muted-foreground mr-2">#{p.display_number}</span>
                             {p.display_name}
