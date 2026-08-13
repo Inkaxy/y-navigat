@@ -27,6 +27,8 @@ export interface RawMaterialOption {
   category: string | null;
   base_unit: string;
   current_cost_price: number | null;
+  is_composite?: boolean | null;
+  produced_by_recipe_id?: string | null;
 }
 
 interface Props {
@@ -39,7 +41,10 @@ interface Props {
   subValue?: string | null;
   /** Når denne er satt vises gruppen «Halvfabrikat» i nedtrekket. */
   onSelectSubProduct?: (id: string | null, name?: string) => void;
+  /** Oppskriften som redigeres — brukes til sirkelvern på halvfabrikat-råvarer. */
+  currentRecipeId?: string | null;
 }
+
 
 const BASE_UNITS = ["kg", "g", "liter", "ml", "stk"];
 const DEFAULT_CATEGORIES = [
