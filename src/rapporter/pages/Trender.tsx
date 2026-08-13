@@ -162,6 +162,7 @@ export default function Trender() {
         onProfileChange={setProfileId}
         groupId={groupId}
         onGroupChange={setGroupId}
+        actions={<SaveReportDialog kind="trender" config={reportConfig} />}
       />
 
       <KpiRow
