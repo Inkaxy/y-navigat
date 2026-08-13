@@ -1923,12 +1923,12 @@ function MatrixGrid({
 
 
   return (
-    <div className="w-full">
+    <div className="w-full" ref={gridRef} onMouseLeave={() => setHoverCol(null)}>
       <table className="w-full border-separate border-spacing-0 text-[13px]">
         <thead className="sticky top-0 z-20 bg-card">
           <tr>
             <th
-              className="sticky left-0 z-30 w-[220px] min-w-[220px] border-b border-r border-border bg-card px-2 py-1 text-left text-xs font-semibold"
+              className="sticky left-0 z-30 w-[220px] min-w-[220px] border-b border-r-2 border-border px-2 py-1 text-left text-xs font-semibold bg-card"
               rowSpan={2}
             >
               Produkt
@@ -1937,13 +1937,18 @@ function MatrixGrid({
               const d = new Date(g.date + "T12:00:00");
               const dow = (d.getDay() === 0 ? 7 : d.getDay()) - 1;
               const isWeekend = dow >= 5;
+              const isToday = g.date === todayIso;
               return (
                 <th
                   key={g.date}
                   colSpan={g.count}
                   className={cn(
-                    "border-b border-r border-border px-1 py-0.5 text-center text-[11px] font-semibold",
-                    isWeekend ? "bg-muted/60" : "bg-card",
+                    "border-b border-r-2 border-border px-1 py-0.5 text-center text-[11px] font-semibold",
+                    isToday
+                      ? "bg-warning/25"
+                      : isWeekend
+                        ? "bg-muted/60"
+                        : "bg-card",
                   )}
                 >
                   <div className="flex items-center justify-center gap-1 leading-tight">
@@ -1956,6 +1961,7 @@ function MatrixGrid({
                 </th>
               );
             })}
+
             <th
               rowSpan={2}
               className="border-b border-r border-border bg-card px-2 py-1 text-right text-[11px] font-semibold"
