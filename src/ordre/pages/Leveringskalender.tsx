@@ -2011,17 +2011,21 @@ function MatrixGrid({
                     <td
                       key={key}
                       className={cn(
-                        "group relative border-b border-r border-border p-0",
-                        dirty && "bg-warning/10",
+                        "group relative w-[72px] border-b border-r border-border p-0",
+                        dirty && "bg-warning/30",
                         pause && "bg-sky-50 dark:bg-sky-950/30",
                         fb && "outline outline-2 -outline-offset-2 outline-destructive/70",
                       )}
                       title={
                         fb
                           ? "Pris ikke funnet — mangler prisliste-rad eller spesialpris"
-                          : pause
-                            ? pause.reason ? `Leveransepause: ${pause.reason}` : "Leveransepause"
-                            : undefined
+                          : ghost
+                            ? ghostOverridden
+                              ? `Fastordre: ${ghost} stk — overstyrt til ${effectiveQty}`
+                              : `Fastordre: ${ghost} stk`
+                            : pause
+                              ? pause.reason ? `Leveransepause: ${pause.reason}` : "Leveransepause"
+                              : undefined
                       }
                     >
                       <Input
@@ -2033,6 +2037,7 @@ function MatrixGrid({
                           if (pause) return;
                           onChange(key, e.target.value);
                         }}
+                        onFocus={(e) => e.currentTarget.select()}
                         onMouseDown={(e) => {
                           if (pause) {
                             e.preventDefault();
@@ -2043,31 +2048,14 @@ function MatrixGrid({
                         }}
                         placeholder={ghost ? String(ghost) : ""}
                         className={cn(
-                          "h-9 w-16 rounded-none border-0 bg-transparent px-1 text-center tabular-nums shadow-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-0",
-                          value && "text-base font-semibold text-foreground",
-                          dirty && "font-bold text-warning",
+                          "h-7 w-full rounded-none border-0 bg-transparent px-1 text-right text-[13px] tabular-nums shadow-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-0",
+                          value && "font-medium text-foreground",
+                          dirty && "font-semibold",
                           pause && "cursor-not-allowed",
-                          ghost && "placeholder:italic placeholder:text-muted-foreground/60",
+                          ghost && !value && "placeholder:text-muted-foreground/60",
                         )}
                       />
-                      {ghost && (
-                        <span
-                          className={cn(
-                            "pointer-events-none absolute left-0.5 top-0.5 rounded px-1.5 py-0.5 text-sm font-extrabold leading-none tabular-nums shadow-md ring-1",
-                            ghostOverridden
-                              ? "bg-warning text-warning-foreground ring-warning/70 line-through decoration-warning-foreground/80"
-                              : "bg-primary text-primary-foreground ring-primary/70",
-                          )}
-                          title={
-                            ghostOverridden
-                              ? `Fastordre: ${ghost} stk — overstyrt til ${effectiveQty}`
-                              : `Fastordre: ${ghost} stk`
-                          }
-                          aria-hidden
-                        >
-                          {ghost}
-                        </span>
-                      )}
+
                       {hasM && (
                         <span
                           className="pointer-events-none absolute right-0.5 top-0.5 text-primary"
