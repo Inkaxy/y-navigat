@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, ArrowLeft, Calculator, FileText, Loader2, Lock, Plus, Printer, Save, Share2 } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Calculator, FileText, Loader2, Lock, Package, Plus, Printer, RefreshCw, Save, Share2 } from "lucide-react";
 import { logAudit } from "@/varer/lib/audit";
 import { RecipeProductLinks } from "@/varer/components/products/RecipeProductLinks";
 import { RecipeStatsBar } from "@/varer/components/recipes/RecipeStatsBar";
@@ -34,6 +34,9 @@ import { useComputeRecipeLabel } from "@/varer/hooks/useRecipeLabel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LabelTab } from "@/varer/components/recipes/label/LabelTab";
 import { COARSE_CLASSIFICATIONS, SIFTED_CLASSIFICATIONS, type FlourLine } from "@/varer/lib/breadscale";
+import { SaveAsRawMaterialDialog, type CompositeRawMaterial } from "@/varer/components/recipes/SaveAsRawMaterialDialog";
+import { RecipeImageUpload } from "@/varer/components/recipes/RecipeImageUpload";
+import { costPerKg } from "@/varer/lib/halvfabrikat";
 
 export default function RecipeDetail() {
   const { id } = useParams<{ id: string }>();
@@ -72,6 +75,21 @@ export default function RecipeDetail() {
   });
   const rmMap = rmQuery.data ?? {};
 
+  /** Råvaren denne oppskriften eventuelt allerede er lagret som. */
+  const compositeQuery = useQuery({
+    queryKey: ["recipe-composite", id],
+    enabled: !!id,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("raw_materials")
+        .select("id, name, sku, category, base_unit, current_cost_price")
+        .eq("produced_by_recipe_id", id!)
+        .maybeSingle();
+      return (data ?? null) as CompositeRawMaterial | null;
+    },
+  });
+  const composite = compositeQuery.data ?? null;
+
   const recipe = recipeQuery.data;
 
   const [header, setHeader] = useState<any>({});
@@ -80,6 +98,9 @@ export default function RecipeDetail() {
   const [steps, setSteps] = useState<EditorStep[]>([]);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [rawMatOpen, setRawMatOpen] = useState(false);
+  const [repricing, setRepricing] = useState(false);
 
   useEffect(() => {
     if (!recipe) return;
@@ -99,7 +120,9 @@ export default function RecipeDetail() {
       mixing_speed2_minutes: recipe.mixing_speed2_minutes ?? "",
       autolyse_minutes: recipe.autolyse_minutes ?? "",
       notes: recipe.notes ?? "",
+      decor_notes: (recipe as any).decor_notes ?? "",
     });
+    setImageUrl(recipe.image_url ?? null);
     setParts(
       [...(recipe.recipe_parts ?? [])]
         .sort((a: any, b: any) => a.sort_order - b.sort_order)
@@ -384,6 +407,7 @@ export default function RecipeDetail() {
           status: header.status,
           description: header.description || null,
           notes: header.notes || null,
+          decor_notes: header.decor_notes || null,
           dough_piece_grams: header.dough_piece_grams === "" ? null : Number(header.dough_piece_grams),
           dough_waste_pct: header.dough_waste_pct === "" ? null : Number(header.dough_waste_pct),
           finished_weight_grams: header.finished_weight_grams === "" ? null : Number(header.finished_weight_grams),
@@ -509,6 +533,32 @@ export default function RecipeDetail() {
     }
   }
 
+  async function updateCompositePrice() {
+    if (!composite) return;
+    const price = costPerKg(hydratedLines);
+    if (price == null) {
+      toast.error("Fant ingen kostpriser å beregne fra");
+      return;
+    }
+    setRepricing(true);
+    const { error } = await supabase
+      .from("raw_materials")
+      .update({
+        current_cost_price: price,
+        price_source: "recipe",
+        price_updated_at: new Date().toISOString(),
+      } as never)
+      .eq("id", composite.id);
+    setRepricing(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    qc.invalidateQueries({ queryKey: ["recipe-composite", recipe?.id] });
+    qc.invalidateQueries({ queryKey: ["raw_materials_autocomplete"] });
+    toast.success(`Pris oppdatert: ${price.toFixed(2).replace(".", ",")} kr/kg`);
+  }
+
   if (recipeQuery.isLoading) {
     return <div className="flex h-64 items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>;
   }
@@ -565,6 +615,11 @@ export default function RecipeDetail() {
 
 
           {canWrite && (
+            <Button variant="outline" onClick={() => setRawMatOpen(true)}>
+              <Package className="mr-2 h-4 w-4" /> Lagre som råvare
+            </Button>
+          )}
+          {canWrite && (
             <Button onClick={save} disabled={saving || !dirty || isScaled}>
               {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
               Lagre
@@ -618,6 +673,37 @@ export default function RecipeDetail() {
         <Card>
           <CardHeader className="pb-3"><CardTitle className="text-base">Oppskriftsinfo</CardTitle></CardHeader>
           <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="col-span-full flex flex-wrap items-start gap-4">
+              <RecipeImageUpload
+                recipeId={recipe.id}
+                legalEntityId={legalEntityId ?? null}
+                imageUrl={imageUrl}
+                canWrite={canWrite}
+                onChange={(url) => {
+                  setImageUrl(url);
+                  qc.invalidateQueries({ queryKey: ["recipes-list"] });
+                }}
+              />
+              {composite && (
+                <div className="flex items-center gap-2 rounded-md border border-app/40 bg-app/[0.06] px-3 py-2">
+                  <Badge variant="outline" className="border-app/50 text-app">Halvfabrikat</Badge>
+                  <span className="text-sm">
+                    {composite.name}
+                    <span className="ml-1 text-xs text-muted-foreground tabular-nums">
+                      {composite.current_cost_price != null
+                        ? `${Number(composite.current_cost_price).toFixed(2).replace(".", ",")} kr/kg`
+                        : "ingen pris"}
+                    </span>
+                  </span>
+                  {canWrite && (
+                    <Button size="sm" variant="ghost" disabled={repricing} onClick={updateCompositePrice}>
+                      {repricing ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-1.5 h-3.5 w-3.5" />}
+                      Oppdater pris
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
             <div className="sm:col-span-2">
               <Label className="text-xs">Navn</Label>
               <Input value={header.name ?? ""} disabled={!editable} onChange={(e) => patchHeader({ name: e.target.value })} />
@@ -736,6 +822,7 @@ export default function RecipeDetail() {
               canWrite={editable}
               totalFlourG={isScaled ? displayTotals.totalFlourG : totals.totalFlourG}
               rmMap={rmMap}
+              currentRecipeId={recipe.id}
               isFirst={i === 0}
               isLast={i === parts.length - 1}
               onUpdate={(patch) => updatePart(p.id, patch)}
@@ -770,6 +857,19 @@ export default function RecipeDetail() {
         <RecipeProductLinks recipeId={recipe.id} currentProductId={recipe.product_id ?? undefined} canWrite={canWrite} />
 
         <Card>
+          <CardHeader className="pb-3"><CardTitle className="text-base">Dekor / ferdiggjøring</CardTitle></CardHeader>
+          <CardContent>
+            <Textarea
+              rows={3}
+              value={header.decor_notes ?? ""}
+              disabled={!editable}
+              placeholder="Pynt, glasur, strø, ferdiggjøring…"
+              onChange={(e) => patchHeader({ decor_notes: e.target.value })}
+            />
+          </CardContent>
+        </Card>
+
+        <Card>
           <CardHeader className="pb-3"><CardTitle className="text-base">Notater</CardTitle></CardHeader>
           <CardContent>
             <Textarea rows={3} value={header.notes ?? ""} disabled={!editable}
@@ -789,6 +889,16 @@ export default function RecipeDetail() {
           printRecipeCard(buildRecipePDFData(buildPdfInput(opts.includeCosts)), opts);
           setCardDialogOpen(false);
         }}
+      />
+
+      <SaveAsRawMaterialDialog
+        open={rawMatOpen}
+        onOpenChange={setRawMatOpen}
+        recipeId={recipe.id}
+        recipeName={header.name || recipe.name || "Halvfabrikat"}
+        legalEntityId={legalEntityId ?? null}
+        lines={hydratedLines}
+        existing={composite}
       />
 
       <ShareRecipeDialog

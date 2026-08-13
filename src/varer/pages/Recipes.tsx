@@ -40,7 +40,7 @@ export default function Recipes() {
     queryFn: async () => {
       const { data } = await supabase
         .from("recipes")
-        .select("id, name, category, status, version, unit_weight_grams, units_per_batch, product_id, recipe_lines(id, quantity, unit, raw_material_id, is_flour_override, water_content_pct_override, ingredient_name), product_recipe_links(product_id, products(display_name))")
+        .select("id, name, image_url, category, status, version, unit_weight_grams, units_per_batch, product_id, recipe_lines(id, quantity, unit, raw_material_id, is_flour_override, water_content_pct_override, ingredient_name), product_recipe_links(product_id, products(display_name))")
         .is("valid_to", null)
         .order("created_at", { ascending: false });
       return (data ?? []) as any[];
@@ -158,6 +158,14 @@ export default function Recipes() {
                   <tr key={r.id} onClick={() => navigate(`/varer/oppskrifter/${r.id}`)} className="cursor-pointer border-t border-border hover:bg-muted/30">
                     <td className="px-4 py-2.5">
                       <div className="flex items-center gap-2">
+                        {r.image_url && (
+                          <img
+                            src={r.image_url}
+                            alt={r.name || "Oppskrift"}
+                            className="h-8 w-8 shrink-0 rounded object-cover"
+                            loading="lazy"
+                          />
+                        )}
                         <span className="font-medium">{r.name || "Uten navn"}</span>
                         {shareCounts[r.id] > 0 && (
                           <Badge variant="outline" className="gap-1 px-1.5 py-0 text-[11px] font-normal">

@@ -9702,6 +9702,7 @@ export type Database = {
           price_source: string | null
           price_updated_at: string | null
           primary_supplier_id: string | null
+          produced_by_recipe_id: string | null
           sku: string
           stock_tracking: boolean
           unit_weight_grams: number | null
@@ -9737,6 +9738,7 @@ export type Database = {
           price_source?: string | null
           price_updated_at?: string | null
           primary_supplier_id?: string | null
+          produced_by_recipe_id?: string | null
           sku: string
           stock_tracking?: boolean
           unit_weight_grams?: number | null
@@ -9772,6 +9774,7 @@ export type Database = {
           price_source?: string | null
           price_updated_at?: string | null
           primary_supplier_id?: string | null
+          produced_by_recipe_id?: string | null
           sku?: string
           stock_tracking?: boolean
           unit_weight_grams?: number | null
@@ -9791,6 +9794,20 @@ export type Database = {
             columns: ["primary_supplier_id"]
             isOneToOne: false
             referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "raw_materials_produced_by_recipe_id_fkey"
+            columns: ["produced_by_recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipe_nutrition_calculated"
+            referencedColumns: ["recipe_id"]
+          },
+          {
+            foreignKeyName: "raw_materials_produced_by_recipe_id_fkey"
+            columns: ["produced_by_recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
             referencedColumns: ["id"]
           },
         ]
@@ -10363,6 +10380,7 @@ export type Database = {
           declaration_mode: Database["public"]["Enums"]["declaration_mode"]
           declaration_updated_at: string | null
           declaration_updated_by: string | null
+          decor_notes: string | null
           description: string | null
           dough_piece_grams: number | null
           dough_waste_pct: number
@@ -10422,6 +10440,7 @@ export type Database = {
           declaration_mode?: Database["public"]["Enums"]["declaration_mode"]
           declaration_updated_at?: string | null
           declaration_updated_by?: string | null
+          decor_notes?: string | null
           description?: string | null
           dough_piece_grams?: number | null
           dough_waste_pct?: number
@@ -10481,6 +10500,7 @@ export type Database = {
           declaration_mode?: Database["public"]["Enums"]["declaration_mode"]
           declaration_updated_at?: string | null
           declaration_updated_by?: string | null
+          decor_notes?: string | null
           description?: string | null
           dough_piece_grams?: number | null
           dough_waste_pct?: number
@@ -14309,6 +14329,7 @@ export type Database = {
           price_source: string | null
           price_updated_at: string | null
           primary_supplier_id: string | null
+          produced_by_recipe_id: string | null
           sku: string
           stock_tracking: boolean
           unit_weight_grams: number | null
