@@ -196,10 +196,11 @@ export default function Trender() {
               <h2 className="text-sm font-semibold">Oppfølgingsliste</h2>
               <Badge variant="secondary">{followUp.length}</Badge>
             </div>
-            <Button variant="outline" size="sm" onClick={exportFollowUp} disabled={followUp.length === 0}>
-              <Download className="mr-2 h-4 w-4" />
-              Eksporter CSV
-            </Button>
+            <ExportMenu
+              onXlsx={exportFollowUpXlsx}
+              onCsv={exportFollowUp}
+              disabled={followUp.length === 0}
+            />
           </div>
           <p className="text-xs text-muted-foreground">
             Kunder med minst 20 % nedgang, eller som har sluttet å kjøpe helt.
