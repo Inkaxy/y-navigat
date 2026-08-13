@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
-import { GitCompareArrows, Download } from "lucide-react";
+import { GitCompareArrows } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
