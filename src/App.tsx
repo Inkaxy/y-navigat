@@ -205,6 +205,16 @@ const Kjoringer = lazy(() => import("@/fakturering/pages/Kjoringer"));
 const KjoringDetalj = lazy(() => import("@/fakturering/pages/KjoringDetalj"));
 const FakturaInnstillinger = lazy(() => import("@/fakturering/pages/FakturaInnstillinger"));
 
+// Rapporter (fase R.0: skall + 8 undersider)
+const RapporterDashbord = lazy(() => import("@/rapporter/pages/Dashbord"));
+const RapporterStatistikk = lazy(() => import("@/rapporter/pages/Statistikk"));
+const RapporterTrender = lazy(() => import("@/rapporter/pages/Trender"));
+const RapporterKunder = lazy(() => import("@/rapporter/pages/Kunder"));
+const RapporterSammenligning = lazy(() => import("@/rapporter/pages/Sammenligning"));
+const RapporterNgEksport = lazy(() => import("@/rapporter/pages/NgEksport"));
+const RapporterStatistikkgrupper = lazy(() => import("@/rapporter/pages/Statistikkgrupper"));
+const RapporterHistorikk = lazy(() => import("@/rapporter/pages/Historikk"));
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -242,6 +252,14 @@ const FaktureringShell = ({ children }: { children: React.ReactNode }) => (
       <AppColorProvider appCode="faktura">
         <FaktureringProvider>{children}</FaktureringProvider>
       </AppColorProvider>
+    </AppAccessGuard>
+  </Shell>
+);
+
+const RapporterShell = ({ children }: { children: React.ReactNode }) => (
+  <Shell>
+    <AppAccessGuard appCode="rapporter" appName="Rapporter">
+      <AppColorProvider appCode="rapporter">{children}</AppColorProvider>
     </AppAccessGuard>
   </Shell>
 );
@@ -465,6 +483,17 @@ const App = () => (
               <Route path="/fakturering/kjoringer" element={<FaktureringShell><Kjoringer /></FaktureringShell>} />
               <Route path="/fakturering/kjoringer/:id" element={<FaktureringShell><KjoringDetalj /></FaktureringShell>} />
               <Route path="/fakturering/innstillinger" element={<FaktureringShell><FakturaInnstillinger /></FaktureringShell>} />
+
+              {/* Rapporter (fase R.0: skall) */}
+              <Route path="/rapporter" element={<Navigate to="/rapporter/dashbord" replace />} />
+              <Route path="/rapporter/dashbord" element={<RapporterShell><RapporterDashbord /></RapporterShell>} />
+              <Route path="/rapporter/statistikk" element={<RapporterShell><RapporterStatistikk /></RapporterShell>} />
+              <Route path="/rapporter/trender" element={<RapporterShell><RapporterTrender /></RapporterShell>} />
+              <Route path="/rapporter/kunder" element={<RapporterShell><RapporterKunder /></RapporterShell>} />
+              <Route path="/rapporter/sammenligning" element={<RapporterShell><RapporterSammenligning /></RapporterShell>} />
+              <Route path="/rapporter/ng-eksport" element={<RapporterShell><RapporterNgEksport /></RapporterShell>} />
+              <Route path="/rapporter/statistikkgrupper" element={<RapporterShell><RapporterStatistikkgrupper /></RapporterShell>} />
+              <Route path="/rapporter/historikk" element={<RapporterShell><RapporterHistorikk /></RapporterShell>} />
 
 
 
