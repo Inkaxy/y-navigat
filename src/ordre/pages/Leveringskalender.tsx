@@ -1970,18 +1970,28 @@ function MatrixGrid({
             </th>
           </tr>
           <tr>
-            {columns.map((c) => {
+            {columns.map((c, ci) => {
               const pause = isPaused(pauseMap, c.date, c.tour.id);
               const hasComment = columnComments?.has(`${c.date}|${c.tour.id}`);
               const colHas = colHasData(c.date, c.tour.id);
               const nLines = lineCounts.get(`${c.date}|${c.tour.id}`) ?? 0;
+              const isToday = c.date === todayIso;
               return (
                 <th
                   key={`${c.date}-${c.tour.id}`}
+                  onMouseEnter={() => setHoverCol(ci)}
                   className={cn(
-                    "w-[72px] min-w-[64px] border-b border-r border-border px-0.5 py-0.5 text-center text-[11px] font-medium text-muted-foreground",
-                    pause ? "bg-sky-100 dark:bg-sky-950/40" : "bg-card/80",
+                    "w-[72px] min-w-[64px] border-b px-0.5 py-0.5 text-center text-[11px] font-medium text-muted-foreground",
+                    dayEndIdx.has(ci) ? "border-r-2 border-border" : "border-r border-border/50",
+                    pause
+                      ? "bg-sky-100 dark:bg-sky-950/40"
+                      : isToday
+                        ? "bg-warning/20"
+                        : hoverCol === ci
+                          ? "bg-muted/70"
+                          : "bg-card/80",
                   )}
+
                   title={`${c.tour.display_name} (${c.tour.time_from.slice(0, 5)}–${c.tour.time_to.slice(0, 5)})${pause?.reason ? ` · Pause: ${pause.reason}` : pause ? " · Pause" : ""}${hasComment ? `\nKommentar: ${columnComments?.get(`${c.date}|${c.tour.id}`)}` : ""}`}
                 >
                   <div className="flex items-center justify-center gap-0.5 leading-none">
