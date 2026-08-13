@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { TrendingUp, TrendingDown, Download } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,10 @@ import {
   type PeriodPreset,
 } from "@/rapporter/lib/periods";
 import { downloadCsv, nok, pct, pctChange, toCsv } from "@/rapporter/lib/reportFormat";
+import { downloadXlsx, FMT_NOK, FMT_PCT } from "@/rapporter/lib/xlsxExport";
+import { cleanConfig, readCompare, readPeriod, readUuid } from "@/rapporter/lib/reportConfig";
+import { SaveReportDialog } from "@/rapporter/components/SaveReportDialog";
+import { ExportMenu } from "@/rapporter/components/ExportMenu";
 
 type TrendRow = {
   id: string;
@@ -49,11 +54,33 @@ function buildTrend(nowRows: SalesRow[] | undefined, prevRows: SalesRow[] | unde
 }
 
 export default function Trender() {
-  const [preset, setPreset] = useState<PeriodPreset>("ytd");
-  const [range, setRange] = useState<DateRange>(() => rangeForPreset("ytd"));
-  const [compare, setCompare] = useState<ComparePreset>("same_period_last_year");
-  const [profileId, setProfileId] = useState<string | null>(null);
-  const [groupId, setGroupId] = useState<string | null>(null);
+  const [params] = useSearchParams();
+  const initial = useMemo(() => {
+    const period = readPeriod(params, "ytd");
+    return {
+      ...period,
+      compare: readCompare(params),
+      profileId: readUuid(params, "profil"),
+      groupId: readUuid(params, "gruppe"),
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const [preset, setPreset] = useState<PeriodPreset>(initial.preset);
+  const [range, setRange] = useState<DateRange>(initial.range);
+  const [compare, setCompare] = useState<ComparePreset>(initial.compare);
+  const [profileId, setProfileId] = useState<string | null>(initial.profileId);
+  const [groupId, setGroupId] = useState<string | null>(initial.groupId);
+
+  const reportConfig = () =>
+    cleanConfig({
+      preset,
+      start: range.start,
+      end: range.end,
+      compare,
+      profil: profileId,
+      gruppe: groupId,
+    });
 
   const filters = { customerProfileId: profileId, statisticGroupId: groupId };
   const cmpRange = useMemo(() => comparisonRange(range, compare), [range, compare]);
@@ -93,6 +120,22 @@ export default function Trender() {
     downloadCsv(`oppfolgingsliste_${range.start}_${range.end}.csv`, csv);
   };
 
+  const exportFollowUpXlsx = () => {
+    downloadXlsx(
+      `oppfolgingsliste_${range.start}_${range.end}.xlsx`,
+      "Oppfølging",
+      [
+        { header: "Kundenr", width: 10 },
+        { header: "Kunde", width: 34 },
+        { header: "Omsetning nå", width: 15, format: FMT_NOK },
+        { header: "Omsetning før", width: 15, format: FMT_NOK },
+        { header: "Endring", width: 14, format: FMT_NOK },
+        { header: "Endring %", width: 12, format: FMT_PCT },
+      ],
+      followUp.map((c) => [c.code ?? "", c.label, c.now, c.prev, c.delta, c.pct == null ? null : c.pct * 100]),
+    );
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -119,6 +162,7 @@ export default function Trender() {
         onProfileChange={setProfileId}
         groupId={groupId}
         onGroupChange={setGroupId}
+        actions={<SaveReportDialog kind="trender" config={reportConfig} />}
       />
 
       <KpiRow
@@ -152,10 +196,11 @@ export default function Trender() {
               <h2 className="text-sm font-semibold">Oppfølgingsliste</h2>
               <Badge variant="secondary">{followUp.length}</Badge>
             </div>
-            <Button variant="outline" size="sm" onClick={exportFollowUp} disabled={followUp.length === 0}>
-              <Download className="mr-2 h-4 w-4" />
-              Eksporter CSV
-            </Button>
+            <ExportMenu
+              onXlsx={exportFollowUpXlsx}
+              onCsv={exportFollowUp}
+              disabled={followUp.length === 0}
+            />
           </div>
           <p className="text-xs text-muted-foreground">
             Kunder med minst 20 % nedgang, eller som har sluttet å kjøpe helt.

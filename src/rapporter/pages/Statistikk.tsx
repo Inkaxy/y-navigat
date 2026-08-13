@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
-import { BarChart3, Download } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
+import { BarChart3 } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -14,6 +14,8 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ReportFilterBar } from "@/rapporter/components/ReportFilterBar";
 import { KpiRow } from "@/rapporter/components/KpiRow";
+import { ExportMenu } from "@/rapporter/components/ExportMenu";
+import { SaveReportDialog } from "@/rapporter/components/SaveReportDialog";
 import {
   useSalesAggregate,
   totals,
@@ -23,22 +25,58 @@ import {
 import {
   comparisonRange,
   monthLabel,
-  rangeForPreset,
   shortDate,
   type ComparePreset,
   type DateRange,
   type PeriodPreset,
 } from "@/rapporter/lib/periods";
 import { downloadCsv, int, nok, pct, pctChange, qty, share, toCsv } from "@/rapporter/lib/reportFormat";
+import { downloadXlsx, FMT_NOK, FMT_PCT, FMT_QTY } from "@/rapporter/lib/xlsxExport";
+import { cleanConfig, readCompare, readPeriod, readUuid } from "@/rapporter/lib/reportConfig";
+
+const DIMENSIONS: SalesDimension[] = [
+  "product",
+  "customer",
+  "main_category",
+  "sub_category",
+  "statistic_group",
+  "customer_profile",
+];
 
 export default function Statistikk() {
-  const [preset, setPreset] = useState<PeriodPreset>("ytd");
-  const [range, setRange] = useState<DateRange>(() => rangeForPreset("ytd"));
-  const [compare, setCompare] = useState<ComparePreset>("same_period_last_year");
-  const [dimension, setDimension] = useState<SalesDimension>("product");
-  const [profileId, setProfileId] = useState<string | null>(null);
-  const [groupId, setGroupId] = useState<string | null>(null);
+  const [params] = useSearchParams();
+  const initial = useMemo(() => {
+    const period = readPeriod(params, "ytd");
+    const dim = params.get("dim");
+    return {
+      ...period,
+      compare: readCompare(params),
+      dimension: (dim && DIMENSIONS.includes(dim as SalesDimension) ? dim : "product") as SalesDimension,
+      profileId: readUuid(params, "profil"),
+      groupId: readUuid(params, "gruppe"),
+    };
+    // Leses kun ved mount — lagrede rapporter åpnes som ny navigasjon.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const [preset, setPreset] = useState<PeriodPreset>(initial.preset);
+  const [range, setRange] = useState<DateRange>(initial.range);
+  const [compare, setCompare] = useState<ComparePreset>(initial.compare);
+  const [dimension, setDimension] = useState<SalesDimension>(initial.dimension);
+  const [profileId, setProfileId] = useState<string | null>(initial.profileId);
+  const [groupId, setGroupId] = useState<string | null>(initial.groupId);
   const [drill, setDrill] = useState<SalesRow | null>(null);
+
+  const reportConfig = () =>
+    cleanConfig({
+      preset,
+      start: range.start,
+      end: range.end,
+      compare,
+      dim: dimension,
+      profil: profileId,
+      gruppe: groupId,
+    });
 
   const filters = { customerProfileId: profileId, statisticGroupId: groupId };
   const cmpRange = useMemo(() => comparisonRange(range, compare), [range, compare]);
@@ -78,6 +116,38 @@ export default function Statistikk() {
     downloadCsv(`statistikk_${range.start}_${range.end}.csv`, csv);
   };
 
+  const exportXlsx = () => {
+    downloadXlsx(
+      `statistikk_${range.start}_${range.end}.xlsx`,
+      "Statistikk",
+      [
+        { header: "Nr", width: 10 },
+        { header: "Navn", width: 38 },
+        { header: "Omsetning", width: 14, format: FMT_NOK },
+        { header: "Antall", width: 12, format: FMT_QTY },
+        { header: "Linjer", width: 10 },
+        { header: "Ordrer", width: 10 },
+        { header: "Andel %", width: 10, format: FMT_PCT },
+        { header: "Omsetning forrige", width: 18, format: FMT_NOK },
+        { header: "Endring", width: 14, format: FMT_NOK },
+      ],
+      sorted.map((r) => {
+        const prev = cmpById.get(r.dim_id ?? r.dim_label);
+        return [
+          r.dim_code ?? "",
+          r.dim_label,
+          r.amount,
+          r.quantity,
+          r.line_count,
+          r.order_count,
+          (share(r.amount, sum.amount) ?? 0) * 100,
+          prev ? prev.amount : null,
+          prev ? r.amount - prev.amount : null,
+        ];
+      }),
+    );
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -107,10 +177,10 @@ export default function Statistikk() {
         groupId={groupId}
         onGroupChange={setGroupId}
         actions={
-          <Button variant="outline" onClick={exportCsv} disabled={sorted.length === 0}>
-            <Download className="mr-2 h-4 w-4" />
-            Eksporter CSV
-          </Button>
+          <div className="flex items-center gap-2">
+            <SaveReportDialog kind="statistikk" config={reportConfig} />
+            <ExportMenu onXlsx={exportXlsx} onCsv={exportCsv} disabled={sorted.length === 0} />
+          </div>
         }
       />
 

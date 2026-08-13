@@ -20,6 +20,7 @@ import { NBE_LEGAL_ENTITY_ID } from "@/rapporter/lib/constants";
 import { useSalesAggregate, totals } from "@/rapporter/hooks/useSalesAggregate";
 import { monthLabel, shortDate, type DateRange } from "@/rapporter/lib/periods";
 import { nok, pct, pctChange, qty, share } from "@/rapporter/lib/reportFormat";
+import { MyReportsCard } from "@/rapporter/components/MyReportsCard";
 import { osloTodayISO } from "@/lib/osloDate";
 import { cn } from "@/lib/utils";
 
@@ -476,14 +477,7 @@ export default function Dashbord() {
       </div>
 
       {/* Mine rapporter */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Mine rapporter</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">Lagrede rapporter kommer i fase R.5.</p>
-        </CardContent>
-      </Card>
+      <MyReportsCard />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Users, Download, ChevronRight } from "lucide-react";
+import { Users, ChevronRight } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,14 +9,23 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ReportFilterBar } from "@/rapporter/components/ReportFilterBar";
 import { KpiRow } from "@/rapporter/components/KpiRow";
+import { ExportMenu } from "@/rapporter/components/ExportMenu";
+import { SaveReportDialog } from "@/rapporter/components/SaveReportDialog";
 import { useSalesAggregate, totals, type SalesRow } from "@/rapporter/hooks/useSalesAggregate";
-import { rangeForPreset, shortDate, type DateRange, type PeriodPreset } from "@/rapporter/lib/periods";
+import { shortDate, type DateRange, type PeriodPreset } from "@/rapporter/lib/periods";
 import { downloadCsv, int, nok, pct, qty, share, toCsv } from "@/rapporter/lib/reportFormat";
+import { downloadXlsx, FMT_NOK, FMT_PCT, FMT_QTY } from "@/rapporter/lib/xlsxExport";
+import { cleanConfig, readPeriod, readUuid } from "@/rapporter/lib/reportConfig";
 
 export default function Kunder() {
-  const [preset, setPreset] = useState<PeriodPreset>("ytd");
-  const [range, setRange] = useState<DateRange>(() => rangeForPreset("ytd"));
-  const [profileId, setProfileId] = useState<string | null>(null);
+  const initialParams = new URLSearchParams(window.location.search);
+  const [initial] = useState(() => ({
+    ...readPeriod(initialParams, "ytd"),
+    profileId: readUuid(initialParams, "profil"),
+  }));
+  const [preset, setPreset] = useState<PeriodPreset>(initial.preset);
+  const [range, setRange] = useState<DateRange>(initial.range);
+  const [profileId, setProfileId] = useState<string | null>(initial.profileId);
   const [search, setSearch] = useState("");
 
   // Valgt kunde ligger i URL-en slik at valget overlever remount/refetch og kan deles.
@@ -75,6 +84,40 @@ export default function Kunder() {
     downloadCsv(`kunder_${range.start}_${range.end}.csv`, csv);
   };
 
+  const exportXlsx = () => {
+    downloadXlsx(
+      `kunder_${range.start}_${range.end}.xlsx`,
+      "Kunder",
+      [
+        { header: "Kundenr", width: 10 },
+        { header: "Kunde", width: 34 },
+        { header: "Omsetning", width: 14, format: FMT_NOK },
+        { header: "Antall", width: 12, format: FMT_QTY },
+        { header: "Ordrer", width: 10 },
+        { header: "Linjer", width: 10 },
+        { header: "Andel %", width: 10, format: FMT_PCT },
+      ],
+      rows.map((r) => [
+        r.dim_code ?? "",
+        r.dim_label,
+        r.amount,
+        r.quantity,
+        r.order_count,
+        r.line_count,
+        (share(r.amount, sum.amount) ?? 0) * 100,
+      ]),
+    );
+  };
+
+  const reportConfig = () =>
+    cleanConfig({
+      preset,
+      start: range.start,
+      end: range.end,
+      profil: profileId,
+      kunde: selectedId,
+    });
+
   return (
     <div className="space-y-6">
       <PageHeader eyebrow="Rapporter" title="Kunder" subtitle="Kundeanalyse med drilldown" icon={Users} />
@@ -93,10 +136,10 @@ export default function Kunder() {
         profileId={profileId}
         onProfileChange={setProfileId}
         actions={
-          <Button variant="outline" onClick={exportCsv} disabled={rows.length === 0}>
-            <Download className="mr-2 h-4 w-4" />
-            Eksporter CSV
-          </Button>
+          <div className="flex items-center gap-2">
+            <SaveReportDialog kind="kunder" config={reportConfig} />
+            <ExportMenu onXlsx={exportXlsx} onCsv={exportCsv} disabled={rows.length === 0} />
+          </div>
         }
       />
 

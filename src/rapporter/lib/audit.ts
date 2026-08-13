@@ -10,7 +10,11 @@ export type RapporterAuditAction =
   | "member_added"
   | "member_removed";
 
-export type RapporterAuditEntityType = "statistic_group" | "statistic_group_member";
+export type RapporterAuditEntityType =
+  | "statistic_group"
+  | "statistic_group_member"
+  | "report_definition"
+  | "report_run";
 
 interface LogAuditInput {
   action: RapporterAuditAction;

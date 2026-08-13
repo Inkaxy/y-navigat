@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
-import { GitCompareArrows, Download } from "lucide-react";
+import { GitCompareArrows } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -11,6 +10,10 @@ import { KpiRow } from "@/rapporter/components/KpiRow";
 import { useSalesAggregate, totals } from "@/rapporter/hooks/useSalesAggregate";
 import { monthKeys, monthLabel, rangeForPreset, shortDate, type DateRange } from "@/rapporter/lib/periods";
 import { downloadCsv, nok, pct, pctChange, toCsv } from "@/rapporter/lib/reportFormat";
+import { downloadXlsx, FMT_NOK, FMT_PCT } from "@/rapporter/lib/xlsxExport";
+import { cleanConfig, readDate } from "@/rapporter/lib/reportConfig";
+import { ExportMenu } from "@/rapporter/components/ExportMenu";
+import { SaveReportDialog } from "@/rapporter/components/SaveReportDialog";
 
 /** Summerer omsetning per månedsnøkkel (yyyy-mm-01). */
 function byMonth(rows: { bucket: string | null; amount: number }[] | undefined) {
@@ -25,8 +28,24 @@ function byMonth(rows: { bucket: string | null; amount: number }[] | undefined) 
 export default function Sammenligning() {
   const thisYear = rangeForPreset("ytd");
   const lastYear = rangeForPreset("ytd_last_year");
-  const [a, setA] = useState<DateRange>(thisYear);
-  const [b, setB] = useState<DateRange>(lastYear);
+  const [initial] = useState(() => {
+    const p = new URLSearchParams(window.location.search);
+    return {
+      a: {
+        start: readDate(p, "a_start", thisYear.start),
+        end: readDate(p, "a_end", thisYear.end),
+      },
+      b: {
+        start: readDate(p, "b_start", lastYear.start),
+        end: readDate(p, "b_end", lastYear.end),
+      },
+    };
+  });
+  const [a, setA] = useState<DateRange>(initial.a);
+  const [b, setB] = useState<DateRange>(initial.b);
+
+  const reportConfig = () =>
+    cleanConfig({ a_start: a.start, a_end: a.end, b_start: b.start, b_end: b.end });
 
   const qa = useSalesAggregate(a, "product", "month", {});
   const qb = useSalesAggregate(b, "product", "month", {});
@@ -85,6 +104,35 @@ export default function Sammenligning() {
     downloadCsv(`sammenligning_${a.start}_${b.start}.csv`, csv);
   };
 
+  const exportXlsx = () => {
+    downloadXlsx(
+      `sammenligning_${a.start}_${b.start}.xlsx`,
+      "Sammenligning",
+      [
+        { header: "Måned A", width: 14 },
+        { header: "Beløp A", width: 14, format: FMT_NOK },
+        { header: "Måned B", width: 14 },
+        { header: "Beløp B", width: 14, format: FMT_NOK },
+        { header: "Δ", width: 14, format: FMT_NOK },
+        { header: "Endring %", width: 12, format: FMT_PCT },
+        { header: "YTD A", width: 14, format: FMT_NOK },
+        { header: "YTD B", width: 14, format: FMT_NOK },
+        { header: "YTD Δ", width: 14, format: FMT_NOK },
+      ],
+      rows.map((r) => [
+        r.labelA,
+        r.a,
+        r.labelB,
+        r.b,
+        r.delta,
+        r.pct == null ? null : r.pct * 100,
+        r.ytdA,
+        r.ytdB,
+        r.ytdDelta,
+      ]),
+    );
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -109,10 +157,10 @@ export default function Sammenligning() {
             <DateField value={b.end} onChange={(d) => setB({ ...b, end: d })} label="Til" />
           </div>
         </div>
-        <Button variant="outline" className="ml-auto" onClick={exportCsv} disabled={rows.length === 0}>
-          <Download className="mr-2 h-4 w-4" />
-          Eksporter CSV
-        </Button>
+        <div className="ml-auto flex items-center gap-2">
+          <SaveReportDialog kind="sammenligning" config={reportConfig} />
+          <ExportMenu onXlsx={exportXlsx} onCsv={exportCsv} disabled={rows.length === 0} />
+        </div>
       </div>
 
       <KpiRow

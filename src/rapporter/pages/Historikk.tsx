@@ -7,9 +7,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { showError } from "@/lib/userError";
 import { useReportRuns, type ReportRun } from "@/rapporter/hooks/useNgExport";
+import { PowerBiExtractCard } from "@/rapporter/components/PowerBiExtractCard";
 
 const REPORT_LABELS: Record<string, string> = {
   ng_direktelevert: "NG DirekteLevert",
+  powerbi_salg: "Salgs data for Power BI",
 };
 
 const nok = (v: number) =>
@@ -55,6 +57,8 @@ export default function Historikk() {
         subtitle="Arkiv over genererte rapporter"
         icon={History}
       />
+
+      <PowerBiExtractCard />
 
       <Card>
         <CardContent className="p-0">
