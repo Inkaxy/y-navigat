@@ -9685,6 +9685,7 @@ export type Database = {
           created_by: string | null
           current_cost_price: number | null
           current_stock: number
+          declaration_name: string | null
           description: string | null
           grain_classification: string | null
           id: string
@@ -9721,6 +9722,7 @@ export type Database = {
           created_by?: string | null
           current_cost_price?: number | null
           current_stock?: number
+          declaration_name?: string | null
           description?: string | null
           grain_classification?: string | null
           id?: string
@@ -9757,6 +9759,7 @@ export type Database = {
           created_by?: string | null
           current_cost_price?: number | null
           current_stock?: number
+          declaration_name?: string | null
           description?: string | null
           grain_classification?: string | null
           id?: string
@@ -14312,6 +14315,7 @@ export type Database = {
           created_by: string | null
           current_cost_price: number | null
           current_stock: number
+          declaration_name: string | null
           description: string | null
           grain_classification: string | null
           id: string

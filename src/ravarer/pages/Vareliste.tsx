@@ -157,7 +157,12 @@ export default function VarelistePage() {
                     className="cursor-pointer border-t border-line-subtle transition-colors hover:bg-muted/40"
                   >
                     <td className="px-4 py-3 font-mono text-xs">{r.sku}</td>
-                    <td className="px-4 py-3 font-medium">{r.name}</td>
+                    <td className="px-4 py-3 font-medium">
+                      {r.name}
+                      {r.declaration_name?.trim() && (
+                        <div className="text-xs font-normal text-ink-secondary">{r.declaration_name}</div>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-ink-secondary">
                       {(() => {
                         const cs = allCatsOf(r);

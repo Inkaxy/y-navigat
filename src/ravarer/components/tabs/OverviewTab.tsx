@@ -29,6 +29,7 @@ export function OverviewTab({ rm }: Props) {
       id: rm.id,
       sku: draft.sku,
       name: draft.name,
+      declaration_name: draft.declaration_name?.trim() ? draft.declaration_name.trim() : null,
       description: draft.description,
       category: draft.category,
       categories: draft.categories ?? [],
@@ -112,6 +113,18 @@ export function OverviewTab({ rm }: Props) {
         <div>
           <Label>Navn *</Label>
           <Input value={draft.name} onChange={e => setDraft(d => ({ ...d, name: e.target.value }))} disabled={!canWrite} />
+        </div>
+        <div>
+          <Label>Deklarasjonsnavn</Label>
+          <Input
+            value={draft.declaration_name ?? ""}
+            onChange={e => setDraft(d => ({ ...d, declaration_name: e.target.value === "" ? null : e.target.value }))}
+            disabled={!canWrite}
+            placeholder="f.eks. hvetemel"
+          />
+          <p className="mt-1 text-xs text-ink-secondary">
+            Navnet slik det skal stå i ingrediensdeklarasjonen, med små bokstaver (f.eks. hvetemel). Tomt = bruk råvarenavnet.
+          </p>
         </div>
         <div>
           <Label>Beskrivelse</Label>
