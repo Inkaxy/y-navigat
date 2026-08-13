@@ -10876,6 +10876,89 @@ export type Database = {
           },
         ]
       }
+      statistic_group_members: {
+        Row: {
+          added_at: string
+          added_by: string | null
+          group_id: string
+          product_id: string
+        }
+        Insert: {
+          added_at?: string
+          added_by?: string | null
+          group_id: string
+          product_id: string
+        }
+        Update: {
+          added_at?: string
+          added_by?: string | null
+          group_id?: string
+          product_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "statistic_group_members_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "statistic_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "statistic_group_members_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      statistic_groups: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          display_name: string
+          id: string
+          is_report_bound: boolean
+          legal_entity_id: string
+          sort_order: number
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          display_name: string
+          id?: string
+          is_report_bound?: boolean
+          legal_entity_id: string
+          sort_order?: number
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          display_name?: string
+          id?: string
+          is_report_bound?: boolean
+          legal_entity_id?: string
+          sort_order?: number
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "statistic_groups_legal_entity_id_fkey"
+            columns: ["legal_entity_id"]
+            isOneToOne: false
+            referencedRelation: "legal_entities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stock_batches: {
         Row: {
           batch_number: string
