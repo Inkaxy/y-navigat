@@ -337,7 +337,7 @@ export default function Dashbord() {
             <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600" />
             <span className="flex-1">
               NG-rapport for {monthLabel(ngPeriod.start)} generert {shortDate(ngQ.data.created_at.slice(0, 10))}
-              {ngQ.data.generated_by ? "" : ""}
+              {ngQ.data.byName ? ` av ${ngQ.data.byName}` : ""}
             </span>
             <Link to="/rapporter/historikk" className="text-sm font-medium text-primary hover:underline">
               Se historikk →
