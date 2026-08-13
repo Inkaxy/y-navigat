@@ -116,6 +116,38 @@ export default function Statistikk() {
     downloadCsv(`statistikk_${range.start}_${range.end}.csv`, csv);
   };
 
+  const exportXlsx = () => {
+    downloadXlsx(
+      `statistikk_${range.start}_${range.end}.xlsx`,
+      "Statistikk",
+      [
+        { header: "Nr", width: 10 },
+        { header: "Navn", width: 38 },
+        { header: "Omsetning", width: 14, format: FMT_NOK },
+        { header: "Antall", width: 12, format: FMT_QTY },
+        { header: "Linjer", width: 10 },
+        { header: "Ordrer", width: 10 },
+        { header: "Andel %", width: 10, format: FMT_PCT },
+        { header: "Omsetning forrige", width: 18, format: FMT_NOK },
+        { header: "Endring", width: 14, format: FMT_NOK },
+      ],
+      sorted.map((r) => {
+        const prev = cmpById.get(r.dim_id ?? r.dim_label);
+        return [
+          r.dim_code ?? "",
+          r.dim_label,
+          r.amount,
+          r.quantity,
+          r.line_count,
+          r.order_count,
+          (share(r.amount, sum.amount) ?? 0) * 100,
+          prev ? prev.amount : null,
+          prev ? r.amount - prev.amount : null,
+        ];
+      }),
+    );
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
