@@ -28,8 +28,24 @@ function byMonth(rows: { bucket: string | null; amount: number }[] | undefined) 
 export default function Sammenligning() {
   const thisYear = rangeForPreset("ytd");
   const lastYear = rangeForPreset("ytd_last_year");
-  const [a, setA] = useState<DateRange>(thisYear);
-  const [b, setB] = useState<DateRange>(lastYear);
+  const [initial] = useState(() => {
+    const p = new URLSearchParams(window.location.search);
+    return {
+      a: {
+        start: readDate(p, "a_start", thisYear.start),
+        end: readDate(p, "a_end", thisYear.end),
+      },
+      b: {
+        start: readDate(p, "b_start", lastYear.start),
+        end: readDate(p, "b_end", lastYear.end),
+      },
+    };
+  });
+  const [a, setA] = useState<DateRange>(initial.a);
+  const [b, setB] = useState<DateRange>(initial.b);
+
+  const reportConfig = () =>
+    cleanConfig({ a_start: a.start, a_end: a.end, b_start: b.start, b_end: b.end });
 
   const qa = useSalesAggregate(a, "product", "month", {});
   const qb = useSalesAggregate(b, "product", "month", {});
