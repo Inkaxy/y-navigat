@@ -69,6 +69,7 @@ export function RawMaterialAutocomplete({
   allowClear = true,
   subValue = null,
   onSelectSubProduct,
+  currentRecipeId = null,
 }: Props) {
   const { legalEntityId } = useAppContext();
   const [open, setOpen] = useState(false);
@@ -81,7 +82,7 @@ export function RawMaterialAutocomplete({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("raw_materials")
-        .select("id, sku, name, category, base_unit, current_cost_price")
+        .select("id, sku, name, category, base_unit, current_cost_price, is_composite, produced_by_recipe_id")
         .eq("legal_entity_id", legalEntityId!)
         .eq("is_active", true)
         .order("name", { ascending: true });
@@ -89,6 +90,23 @@ export function RawMaterialAutocomplete({
       return (data ?? []) as RawMaterialOption[];
     },
   });
+
+  /** Sirkelvern: blokker halvfabrikat som (rekursivt) bruker denne oppskriften. */
+  async function selectRawMaterial(o: RawMaterialOption) {
+    if (currentRecipeId && o.is_composite && o.produced_by_recipe_id) {
+      const circular = await hasCircularReference(o.produced_by_recipe_id, currentRecipeId);
+      if (circular) {
+        toast.error(
+          "Sirkulær referanse: denne råvaren er laget av en oppskrift som bruker denne oppskriften",
+        );
+        return;
+      }
+    }
+    onSelectSubProduct?.(null);
+    onChange(o.id, o);
+    setOpen(false);
+  }
+
 
   const subQuery = useQuery({
     queryKey: ["halvfabrikat_autocomplete", legalEntityId],
