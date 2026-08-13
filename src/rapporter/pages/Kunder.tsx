@@ -146,8 +146,9 @@ export default function Kunder() {
                   {rows.map((r) => (
                     <TableRow
                       key={r.dim_id ?? r.dim_label}
-                      className={`cursor-pointer ${selected?.dim_id === r.dim_id ? "bg-accent/40" : ""}`}
-                      onClick={() => setSelected(r)}
+                      interactive
+                      className={selectedId && selectedId === r.dim_id ? "bg-accent/40" : ""}
+                      onClick={() => selectCustomer(r.dim_id)}
                     >
                       <TableCell className="tabular-nums text-muted-foreground">{r.dim_code ?? "–"}</TableCell>
                       <TableCell className="font-medium">{r.dim_label}</TableCell>
@@ -155,10 +156,20 @@ export default function Kunder() {
                       <TableCell className="text-right tabular-nums">{int(r.order_count)}</TableCell>
                       <TableCell className="text-right tabular-nums">{pct(share(r.amount, sum.amount))}</TableCell>
                       <TableCell>
-                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        <button
+                          type="button"
+                          aria-label={`Vis handlekurv for ${r.dim_label}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            selectCustomer(r.dim_id);
+                          }}
+                        >
+                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        </button>
                       </TableCell>
                     </TableRow>
                   ))}
+
                 </TableBody>
               </Table>
             )}
