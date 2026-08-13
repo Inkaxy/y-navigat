@@ -10741,6 +10741,53 @@ export type Database = {
           },
         ]
       }
+      report_definitions: {
+        Row: {
+          config: Json
+          created_at: string
+          created_by: string | null
+          display_name: string
+          id: string
+          is_favorite: boolean
+          legal_entity_id: string
+          report_kind: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          config?: Json
+          created_at?: string
+          created_by?: string | null
+          display_name: string
+          id?: string
+          is_favorite?: boolean
+          legal_entity_id: string
+          report_kind: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          created_by?: string | null
+          display_name?: string
+          id?: string
+          is_favorite?: boolean
+          legal_entity_id?: string
+          report_kind?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "report_definitions_legal_entity_id_fkey"
+            columns: ["legal_entity_id"]
+            isOneToOne: false
+            referencedRelation: "legal_entities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       report_runs: {
         Row: {
           created_at: string
@@ -14074,6 +14121,26 @@ export type Database = {
           broken_at_id: number
           is_valid: boolean
           total_events: number
+        }[]
+      }
+      powerbi_sales_extract: {
+        Args: {
+          p_legal_entity_id: string
+          p_period_end: string
+          p_period_start: string
+        }
+        Returns: {
+          antall: number
+          belop: number
+          gtin: string
+          kundenavn: string
+          kundenr: string
+          kundeprofil: string
+          maned: string
+          ordrer: number
+          statistikkgrupper: string
+          varenavn: string
+          varenr: string
         }[]
       }
       price_round_add_lines: {
