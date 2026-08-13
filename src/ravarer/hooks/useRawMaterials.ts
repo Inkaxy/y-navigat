@@ -8,6 +8,7 @@ export interface RawMaterialRow {
   legal_entity_id: string;
   sku: string;
   name: string;
+  declaration_name: string | null;
   description: string | null;
   category: string | null;
   categories: string[];
