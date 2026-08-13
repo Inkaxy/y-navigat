@@ -30,11 +30,15 @@ type ComputedDeclaration = {
 interface Props {
   productId: string | null;
   productName: string;
+  displayNumber?: number | string | null;
+  salesUnit?: string | null;
+  unitPrice?: number | null;
   open: boolean;
   onClose: () => void;
 }
 
-export function ProductInfoDialog({ productId, productName, open, onClose }: Props) {
+export function ProductInfoDialog({ productId, productName, displayNumber, salesUnit, unitPrice, open, onClose }: Props) {
+
   const productQuery = useQuery({
     queryKey: ["product-info", productId],
     enabled: !!productId && open,
