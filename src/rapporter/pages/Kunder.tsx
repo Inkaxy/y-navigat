@@ -181,14 +181,19 @@ export default function Kunder() {
             <h2 className="text-sm font-semibold">
               {selected ? `Handlekurv — ${selected.dim_label}` : "Handlekurv"}
             </h2>
-            {!selected ? (
+            {!selectedId ? (
               <p className="py-10 text-center text-sm text-muted-foreground">
                 Velg en kunde for å se hele handlekurven.
               </p>
             ) : basket.isLoading ? (
               <Skeleton className="h-40 w-full" />
+            ) : basket.error ? (
+              <p className="py-10 text-center text-sm text-destructive">
+                Kunne ikke hente handlekurven: {(basket.error as Error).message}
+              </p>
             ) : basketRows.length === 0 ? (
               <p className="py-10 text-center text-sm text-muted-foreground">Ingen varelinjer i perioden.</p>
+
             ) : (
               <div className="max-h-[520px] overflow-auto">
                 <Table>
