@@ -114,6 +114,18 @@ export function OverviewTab({ rm }: Props) {
           <Input value={draft.name} onChange={e => setDraft(d => ({ ...d, name: e.target.value }))} disabled={!canWrite} />
         </div>
         <div>
+          <Label>Deklarasjonsnavn</Label>
+          <Input
+            value={draft.declaration_name ?? ""}
+            onChange={e => setDraft(d => ({ ...d, declaration_name: e.target.value === "" ? null : e.target.value }))}
+            disabled={!canWrite}
+            placeholder="f.eks. hvetemel"
+          />
+          <p className="mt-1 text-xs text-ink-secondary">
+            Navnet slik det skal stå i ingrediensdeklarasjonen, med små bokstaver (f.eks. hvetemel). Tomt = bruk råvarenavnet.
+          </p>
+        </div>
+        <div>
           <Label>Beskrivelse</Label>
           <Textarea value={draft.description ?? ""} onChange={e => setDraft(d => ({ ...d, description: e.target.value }))} disabled={!canWrite} rows={2} />
         </div>
