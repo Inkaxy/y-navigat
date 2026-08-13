@@ -112,10 +112,10 @@ export default function Sammenligning() {
             <DateField value={b.end} onChange={(d) => setB({ ...b, end: d })} label="Til" />
           </div>
         </div>
-        <Button variant="outline" className="ml-auto" onClick={exportCsv} disabled={rows.length === 0}>
-          <Download className="mr-2 h-4 w-4" />
-          Eksporter CSV
-        </Button>
+        <div className="ml-auto flex items-center gap-2">
+          <SaveReportDialog kind="sammenligning" config={reportConfig} />
+          <ExportMenu onXlsx={exportXlsx} onCsv={exportCsv} disabled={rows.length === 0} />
+        </div>
       </div>
 
       <KpiRow
