@@ -184,21 +184,25 @@ export function RawMaterialAutocomplete({
                         <CommandItem
                           key={o.id}
                           value={`${o.name} ${o.sku} ${o.category ?? ""}`}
-                          onSelect={() => {
-                            onSelectSubProduct?.(null);
-                            onChange(o.id, o);
-                            setOpen(false);
-                          }}
+                          onSelect={() => void selectRawMaterial(o)}
                         >
                           <Check className={cn("mr-2 h-4 w-4", value === o.id ? "opacity-100" : "opacity-0")} />
                           <div className="flex flex-1 items-center justify-between gap-2">
                             <div className="min-w-0">
-                              <div className="truncate text-sm">{o.name}</div>
+                              <div className="flex items-center gap-1.5">
+                                <span className="truncate text-sm">{o.name}</span>
+                                {o.is_composite && o.produced_by_recipe_id && (
+                                  <span className="shrink-0 rounded bg-app/15 px-1.5 py-0.5 text-[10px] font-medium text-app">
+                                    Halvfabrikat
+                                  </span>
+                                )}
+                              </div>
                               <div className="text-xs text-muted-foreground font-mono">
                                 {o.sku}
                                 {o.category ? ` · ${o.category}` : ""}
                               </div>
                             </div>
+
                             <div className="shrink-0 text-right text-xs text-muted-foreground tabular-nums">
                               {o.current_cost_price != null ? `${o.current_cost_price.toFixed(2)} kr/${o.base_unit}` : "—"}
                             </div>
