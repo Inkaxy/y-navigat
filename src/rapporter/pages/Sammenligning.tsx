@@ -104,6 +104,35 @@ export default function Sammenligning() {
     downloadCsv(`sammenligning_${a.start}_${b.start}.csv`, csv);
   };
 
+  const exportXlsx = () => {
+    downloadXlsx(
+      `sammenligning_${a.start}_${b.start}.xlsx`,
+      "Sammenligning",
+      [
+        { header: "Måned A", width: 14 },
+        { header: "Beløp A", width: 14, format: FMT_NOK },
+        { header: "Måned B", width: 14 },
+        { header: "Beløp B", width: 14, format: FMT_NOK },
+        { header: "Δ", width: 14, format: FMT_NOK },
+        { header: "Endring %", width: 12, format: FMT_PCT },
+        { header: "YTD A", width: 14, format: FMT_NOK },
+        { header: "YTD B", width: 14, format: FMT_NOK },
+        { header: "YTD Δ", width: 14, format: FMT_NOK },
+      ],
+      rows.map((r) => [
+        r.labelA,
+        r.a,
+        r.labelB,
+        r.b,
+        r.delta,
+        r.pct == null ? null : r.pct * 100,
+        r.ytdA,
+        r.ytdB,
+        r.ytdDelta,
+      ]),
+    );
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
