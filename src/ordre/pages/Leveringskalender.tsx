@@ -2231,9 +2231,13 @@ function MatrixGrid({
       <ProductInfoDialog
         productId={infoProduct?.id ?? null}
         productName={infoProduct?.name ?? ""}
+        displayNumber={infoProduct?.number ?? null}
+        salesUnit={infoProduct?.unit ?? null}
+        unitPrice={infoProduct?.price ?? null}
         open={!!infoProduct}
         onClose={() => setInfoProduct(null)}
       />
+
     </div>
   );
 }
