@@ -165,7 +165,7 @@ export function useAddToSortiment() {
       toast.success(`${vars.length} vare(r) lagt i NG-sortiment`);
       qc.invalidateQueries({ queryKey: ["rapporter"] });
     },
-    onError: (e) => showError(e, "Kunne ikke legge varen i NG-sortiment"),
+    onError: (e) => showError("ng-sortiment-add", e, "Kunne ikke legge varen i NG-sortiment"),
   });
 }
 
@@ -221,7 +221,7 @@ export function useArchiveNgRun() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["rapporter", "report-runs"] });
     },
-    onError: (e) => showError(e, "Kunne ikke arkivere rapporten"),
+    onError: (e) => showError("ng-archive", e, "Kunne ikke arkivere rapporten"),
   });
 }
 
