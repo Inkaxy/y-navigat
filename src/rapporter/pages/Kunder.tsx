@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Users, Download, ChevronRight } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -17,7 +18,16 @@ export default function Kunder() {
   const [range, setRange] = useState<DateRange>(() => rangeForPreset("ytd"));
   const [profileId, setProfileId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [selected, setSelected] = useState<SalesRow | null>(null);
+
+  // Valgt kunde ligger i URL-en slik at valget overlever remount/refetch og kan deles.
+  const [params, setParams] = useSearchParams();
+  const selectedId = params.get("kunde");
+  const selectCustomer = (id: string | null) => {
+    const next = new URLSearchParams(params);
+    if (id) next.set("kunde", id);
+    else next.delete("kunde");
+    setParams(next, { replace: true });
+  };
 
   const filters = { customerProfileId: profileId };
   const main = useSalesAggregate(range, "customer", "total", filters);
@@ -30,18 +40,24 @@ export default function Kunder() {
       .sort((a, b) => b.amount - a.amount);
   }, [main.data, search]);
 
+  const selected: SalesRow | null = useMemo(
+    () => (main.data ?? []).find((r) => r.dim_id === selectedId) ?? null,
+    [main.data, selectedId],
+  );
+
   const basket = useSalesAggregate(
     range,
     "product",
     "total",
-    { ...filters, customerId: selected?.dim_id ?? null },
-    !!selected?.dim_id,
+    { ...filters, customerId: selectedId },
+    !!selectedId,
   );
   const basketRows = useMemo(
     () => [...(basket.data ?? [])].sort((a, b) => b.amount - a.amount),
     [basket.data],
   );
   const basketSum = totals(basket.data);
+
 
   const exportCsv = () => {
     const csv = toCsv(
