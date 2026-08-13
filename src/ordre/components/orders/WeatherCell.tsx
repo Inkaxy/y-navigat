@@ -54,33 +54,14 @@ function labelFor(symbolCode: string): string {
 
 type Props = {
   forecast: DayForecast | undefined;
-  /** Vis "—" + tooltip når kunden mangler koordinater. */
+  /** Beholdt for bakoverkompatibilitet — ingen plassholder vises uansett. */
   emptyReason?: string;
 };
 
-export function WeatherCell({ forecast, emptyReason }: Props) {
-  if (!forecast) {
-    const isExpectedEmpty = !!emptyReason;
-    const glyph = isExpectedEmpty ? "—" : "?";
-    const tooltip = isExpectedEmpty
-      ? emptyReason!
-      : "Værvarsel ikke lastet — sjekk kunde-koordinater";
-    return (
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <div
-            className={
-              "flex items-center justify-center text-[11px] font-medium " +
-              (isExpectedEmpty ? "text-muted-foreground/60" : "text-amber-600 dark:text-amber-400")
-            }
-          >
-            <span aria-hidden>{glyph}</span>
-          </div>
-        </TooltipTrigger>
-        <TooltipContent side="top">{tooltip}</TooltipContent>
-      </Tooltip>
-    );
-  }
+export function WeatherCell({ forecast }: Props) {
+  // Ingen varsel (fortid eller utenfor varselhorisont) → ingen plassholder.
+  if (!forecast) return null;
+
   const Icon = iconFor(forecast.symbolCode);
   const label = labelFor(forecast.symbolCode);
   return (
