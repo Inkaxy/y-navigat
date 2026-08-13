@@ -132,7 +132,14 @@ export type CoreResult = {
   nutritionByRm: Map<string, any>;
 };
 
-const RM_SELECT = "id, name, is_composite, grain_classification, cereal_type, water_content_pct, components_reviewed_at, unit_weight_grams";
+const RM_SELECT = "id, name, declaration_name, is_composite, grain_classification, cereal_type, water_content_pct, components_reviewed_at, unit_weight_grams";
+
+/** Navnet som skal stå i deklarasjonen for en råvare: declaration_name > name > fallback. */
+export function declarationNameFor(rm: any, fallbackName: string): string {
+  const dn = typeof rm?.declaration_name === "string" ? rm.declaration_name.trim() : "";
+  if (dn) return dn;
+  return rm?.name ?? fallbackName;
+}
 
 /**
  * Regner ut aggregert deklarasjonsgrunnlag fra topplinjer.
