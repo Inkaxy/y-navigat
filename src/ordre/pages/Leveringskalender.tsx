@@ -1842,7 +1842,21 @@ function MatrixGrid({
   canEdit: boolean;
   onOpenTourOrder: (date: string, tour: MatrixTour) => void;
 }) {
-  const [infoProduct, setInfoProduct] = useState<{ id: string; name: string } | null>(null);
+  const [infoProduct, setInfoProduct] = useState<{
+    id: string;
+    name: string;
+    number: number | string | null;
+    unit: string | null;
+    price: number | null;
+  } | null>(null);
+  const [hoverCol, setHoverCol] = useState<number | null>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
+
+  const todayIso = useMemo(
+    () => new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Oslo" }).format(new Date()),
+    [],
+  );
+
   const dateGroups = useMemo(() => {
     const groups: { date: string; count: number }[] = [];
     for (const c of columns) {
@@ -1852,6 +1866,47 @@ function MatrixGrid({
     }
     return groups;
   }, [columns]);
+
+  /** Siste kolonne i hver dag-gruppe → tydeligere vertikal delelinje. */
+  const dayEndIdx = useMemo(() => {
+    const s = new Set<number>();
+    columns.forEach((c, i) => {
+      if (i === columns.length - 1 || columns[i + 1].date !== c.date) s.add(i);
+    });
+    return s;
+  }, [columns]);
+
+  const focusCell = (r: number, c: number) => {
+    const el = gridRef.current?.querySelector<HTMLInputElement>(`[data-cell="${r}-${c}"]`);
+    if (el) {
+      el.focus();
+      el.select();
+    }
+  };
+
+  const onCellKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, r: number, c: number) => {
+    switch (e.key) {
+      case "ArrowDown":
+      case "Enter":
+        e.preventDefault();
+        focusCell(r + 1, c);
+        break;
+      case "ArrowUp":
+        e.preventDefault();
+        focusCell(r - 1, c);
+        break;
+      case "ArrowRight":
+        e.preventDefault();
+        focusCell(r, c + 1);
+        break;
+      case "ArrowLeft":
+        e.preventDefault();
+        focusCell(r, c - 1);
+        break;
+      default:
+        break;
+    }
+  };
 
   const lineCounts = useMemo(() => {
     const m = new Map<string, number>();
@@ -1865,6 +1920,7 @@ function MatrixGrid({
     }
     return m;
   }, [columns, products, getValue]);
+
 
   return (
     <div className="w-full">
