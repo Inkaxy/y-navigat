@@ -244,7 +244,21 @@ export default function Dashbord() {
         .order("created_at", { ascending: false })
         .limit(1);
       if (error) throw error;
-      return data?.[0] ?? null;
+      const run = data?.[0];
+      if (!run) return null;
+      let byName: string | null = null;
+      if (run.generated_by) {
+        const { data: u } = await supabase
+          .from("users")
+          .select("display_name, first_name, last_name")
+          .eq("id", run.generated_by)
+          .maybeSingle();
+        byName =
+          u?.display_name ||
+          [u?.first_name, u?.last_name].filter(Boolean).join(" ") ||
+          null;
+      }
+      return { ...run, byName };
     },
   });
 
