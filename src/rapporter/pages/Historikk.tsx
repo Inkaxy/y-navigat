@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { showError } from "@/lib/userError";
 import { useReportRuns, type ReportRun } from "@/rapporter/hooks/useNgExport";
+import { PowerBiExtractCard } from "@/rapporter/components/PowerBiExtractCard";
 
 const REPORT_LABELS: Record<string, string> = {
   ng_direktelevert: "NG DirekteLevert",
