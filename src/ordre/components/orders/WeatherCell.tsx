@@ -1,13 +1,3 @@
-import {
-  Sun,
-  Cloud,
-  CloudSun,
-  CloudRain,
-  CloudSnow,
-  CloudFog,
-  CloudLightning,
-  CloudDrizzle,
-} from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { DayForecast } from "@/ordre/hooks/useCustomerWeather";
 
@@ -33,23 +23,14 @@ const SYMBOL_LABEL_NB: Record<string, string> = {
   rainandthunder: "Regn og torden",
 };
 
-function iconFor(symbolCode: string) {
-  const base = symbolCode.replace(/_(day|night|polartwilight)$/, "");
-  if (base.startsWith("clearsky") || base.startsWith("fair")) return Sun;
-  if (base.startsWith("partlycloudy")) return CloudSun;
-  if (base.startsWith("cloudy")) return Cloud;
-  if (base.includes("thunder")) return CloudLightning;
-  if (base.startsWith("snow") || base.startsWith("lightsnow") || base.startsWith("heavysnow") || base.includes("sleet"))
-    return CloudSnow;
-  if (base.startsWith("drizzle") || base.startsWith("lightrainshowers")) return CloudDrizzle;
-  if (base.startsWith("rain") || base.startsWith("lightrain") || base.startsWith("heavyrain")) return CloudRain;
-  if (base.startsWith("fog")) return CloudFog;
-  return Cloud;
-}
-
 function labelFor(symbolCode: string): string {
   const base = symbolCode.replace(/_(day|night|polartwilight)$/, "");
   return SYMBOL_LABEL_NB[base] ?? "Ukjent vær";
+}
+
+/** Offisielle Yr/MET-værsymboler. */
+function iconUrl(symbolCode: string): string {
+  return `https://api.met.no/images/weathericons/svg/${symbolCode}.svg`;
 }
 
 type Props = {
@@ -62,20 +43,25 @@ export function WeatherCell({ forecast }: Props) {
   // Ingen varsel (fortid eller utenfor varselhorisont) → ingen plassholder.
   if (!forecast) return null;
 
-  const Icon = iconFor(forecast.symbolCode);
   const label = labelFor(forecast.symbolCode);
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <div className="flex items-center justify-center gap-1 text-[11px] font-medium text-muted-foreground">
-          <Icon className="h-4 w-4" aria-hidden />
-          <span className="tabular-nums">{forecast.tempMax}°</span>
+        <div className="flex items-center gap-0.5 text-[11px] font-medium text-muted-foreground">
+          <img
+            src={iconUrl(forecast.symbolCode)}
+            alt={label}
+            width={22}
+            height={22}
+            loading="lazy"
+            className="h-[22px] w-[22px] shrink-0"
+          />
+          <span className="tabular-nums text-foreground">{forecast.tempMax}°</span>
         </div>
       </TooltipTrigger>
       <TooltipContent side="top">
-        Min {forecast.tempMin}° / Maks {forecast.tempMax}° · {label}
+        Min {forecast.tempMin}° / Maks {forecast.tempMax}° · {label} (Yr / MET Norway)
       </TooltipContent>
     </Tooltip>
   );
 }
-
