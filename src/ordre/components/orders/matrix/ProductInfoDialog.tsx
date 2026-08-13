@@ -7,6 +7,8 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
+import { formatNOK } from "@/ordre/lib/format";
+
 
 const NUTRITION_FIELDS: { key: string; label: string }[] = [
   { key: "energy_kj", label: "Energi (kJ)" },
