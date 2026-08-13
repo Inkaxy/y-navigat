@@ -251,7 +251,7 @@ export async function computeDeclarationCore(service: any, topLines: TopLine[]):
         source,
         key,
         raw_material_id: rmId,
-        name: rm?.name ?? fallbackName,
+        name: declarationNameFor(rm, fallbackName),
         grams,
         effective_grams,
         is_quid: isQuid,
