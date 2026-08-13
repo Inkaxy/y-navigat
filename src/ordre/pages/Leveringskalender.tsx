@@ -2091,7 +2091,7 @@ function MatrixGrid({
                     </td>
                   );
                 })}
-                <td className="border-b border-r border-border bg-card px-3 py-1.5 text-right font-bold tabular-nums">
+                <td className="border-b border-r border-border bg-card px-2 py-0 text-right text-[12px] font-semibold tabular-nums">
                   {formatKrNetto(rowTotals[p.id] ?? 0)}
                 </td>
               </tr>
