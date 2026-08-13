@@ -136,10 +136,10 @@ export default function Kunder() {
         profileId={profileId}
         onProfileChange={setProfileId}
         actions={
-          <Button variant="outline" onClick={exportCsv} disabled={rows.length === 0}>
-            <Download className="mr-2 h-4 w-4" />
-            Eksporter CSV
-          </Button>
+          <div className="flex items-center gap-2">
+            <SaveReportDialog kind="kunder" config={reportConfig} />
+            <ExportMenu onXlsx={exportXlsx} onCsv={exportCsv} disabled={rows.length === 0} />
+          </div>
         }
       />
 
