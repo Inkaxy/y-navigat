@@ -29,6 +29,7 @@ export function OverviewTab({ rm }: Props) {
       id: rm.id,
       sku: draft.sku,
       name: draft.name,
+      declaration_name: draft.declaration_name?.trim() ? draft.declaration_name.trim() : null,
       description: draft.description,
       category: draft.category,
       categories: draft.categories ?? [],
