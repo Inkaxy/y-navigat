@@ -96,8 +96,7 @@ import { useDebouncedValue } from "@/ordre/hooks/useDebouncedValue";
 import { useProductsByIds } from "@/ordre/hooks/useProductsByIds";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserAccess } from "@/ordre/hooks/useUserAccess";
-import { useWeatherForecast, type WeatherMap } from "@/ordre/hooks/useWeatherForecast";
-import { useAutoGeocodeCustomer } from "@/ordre/hooks/useGeocodeCustomer";
+import { useCustomerWeather, type WeatherMap } from "@/ordre/hooks/useCustomerWeather";
 import { WeatherCell } from "@/ordre/components/orders/WeatherCell";
 import { useRecurringGhost, type RecurringGhostMap } from "@/ordre/hooks/useRecurringGhost";
 import { useRecurringSchedules, type RecurringScheduleWithCustomer } from "@/ordre/hooks/useRecurringOrders";
@@ -196,10 +195,7 @@ export default function MatrixPage() {
   const deleteMatrixColumn = useDeleteMatrixColumn();
   const generateNotes = useGenerateDeliveryNotes();
   const navigate = useNavigate();
-  const customerLat = selectedCustomer?.geocode_latitude ?? null;
-  const customerLon = selectedCustomer?.geocode_longitude ?? null;
-  useAutoGeocodeCustomer(selectedCustomer ?? null);
-  const { data: weatherMap } = useWeatherForecast(customerLat, customerLon);
+  const { data: weatherMap } = useCustomerWeather(customerId, dateFrom, dateTo);
   const { data: ghostMap } = useRecurringGhost(customerId, dateFrom, dateTo);
   const { data: pauseMap } = useDeliveryPausesForCustomer(customerId, dateFrom, dateTo);
   const { data: columnComments } = useColumnComments(customerId, dateFrom, dateTo);
@@ -999,7 +995,6 @@ export default function MatrixPage() {
 
   const hasAddable = (addableProducts?.length ?? 0) > 0;
   const isEmptyMatrix = !!matrix && allProducts.length === 0;
-  const hasCustomerCoords = customerLat != null && customerLon != null;
 
   return (
     <div className="-mt-8 -mb-12 flex h-full flex-col bg-background">
@@ -1428,7 +1423,7 @@ export default function MatrixPage() {
         </div>
       </div>
 
-      <div className="mx-auto w-full max-w-[1400px] flex-1 overflow-auto px-6">
+      <div className="w-full flex-1 overflow-auto px-4">
         {!customerId ? (
           <div className="grid h-full place-items-center p-10 text-center text-muted-foreground">
             <div className="max-w-2xl">
@@ -1527,7 +1522,6 @@ export default function MatrixPage() {
               colTotals={totals.colTotals}
               grandTotal={totals.grand}
               weatherMap={weatherMap}
-              hasCustomerCoords={hasCustomerCoords}
               ghostMap={ghostMap}
               pauseMap={pauseMap}
               columnComments={columnComments}
@@ -1812,7 +1806,6 @@ function MatrixGrid({
   colTotals,
   grandTotal,
   weatherMap,
-  hasCustomerCoords,
   ghostMap,
   pauseMap,
   columnComments,
@@ -1839,7 +1832,6 @@ function MatrixGrid({
   colTotals: Record<string, number>;
   grandTotal: number;
   weatherMap: WeatherMap | undefined;
-  hasCustomerCoords: boolean;
   ghostMap: RecurringGhostMap | undefined;
   pauseMap: PauseMap | undefined;
   columnComments: Map<string, string> | undefined;
@@ -1886,10 +1878,7 @@ function MatrixGrid({
                     isWeekend ? "bg-muted/60" : "bg-card",
                   )}
                 >
-                  <WeatherCell
-                    forecast={weatherMap?.get(g.date)}
-                    emptyReason={!hasCustomerCoords ? "Kundens adresse mangler koordinater" : undefined}
-                  />
+                  <WeatherCell forecast={weatherMap?.get(g.date)} />
                   <div className="text-muted-foreground">{DAY_LABELS[dow]}</div>
                   <div className="tabular-nums">
                     {new Intl.DateTimeFormat("nb-NO", { day: "2-digit", month: "2-digit" }).format(d)}
