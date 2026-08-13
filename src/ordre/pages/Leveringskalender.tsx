@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useCallback } from "react";
+import { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import {
@@ -10,6 +10,8 @@ import {
   RotateCcw,
   Plus,
   StickyNote,
+  Info,
+
   ArrowRight,
   MoreHorizontal,
   Copy,
@@ -1842,7 +1844,21 @@ function MatrixGrid({
   canEdit: boolean;
   onOpenTourOrder: (date: string, tour: MatrixTour) => void;
 }) {
-  const [infoProduct, setInfoProduct] = useState<{ id: string; name: string } | null>(null);
+  const [infoProduct, setInfoProduct] = useState<{
+    id: string;
+    name: string;
+    number: number | string | null;
+    unit: string | null;
+    price: number | null;
+  } | null>(null);
+  const [hoverCol, setHoverCol] = useState<number | null>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
+
+  const todayIso = useMemo(
+    () => new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Oslo" }).format(new Date()),
+    [],
+  );
+
   const dateGroups = useMemo(() => {
     const groups: { date: string; count: number }[] = [];
     for (const c of columns) {
@@ -1852,6 +1868,47 @@ function MatrixGrid({
     }
     return groups;
   }, [columns]);
+
+  /** Siste kolonne i hver dag-gruppe → tydeligere vertikal delelinje. */
+  const dayEndIdx = useMemo(() => {
+    const s = new Set<number>();
+    columns.forEach((c, i) => {
+      if (i === columns.length - 1 || columns[i + 1].date !== c.date) s.add(i);
+    });
+    return s;
+  }, [columns]);
+
+  const focusCell = (r: number, c: number) => {
+    const el = gridRef.current?.querySelector<HTMLInputElement>(`[data-cell="${r}-${c}"]`);
+    if (el) {
+      el.focus();
+      el.select();
+    }
+  };
+
+  const onCellKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, r: number, c: number) => {
+    switch (e.key) {
+      case "ArrowDown":
+      case "Enter":
+        e.preventDefault();
+        focusCell(r + 1, c);
+        break;
+      case "ArrowUp":
+        e.preventDefault();
+        focusCell(r - 1, c);
+        break;
+      case "ArrowRight":
+        e.preventDefault();
+        focusCell(r, c + 1);
+        break;
+      case "ArrowLeft":
+        e.preventDefault();
+        focusCell(r, c - 1);
+        break;
+      default:
+        break;
+    }
+  };
 
   const lineCounts = useMemo(() => {
     const m = new Map<string, number>();
@@ -1866,13 +1923,14 @@ function MatrixGrid({
     return m;
   }, [columns, products, getValue]);
 
+
   return (
-    <div className="w-full">
+    <div className="w-full" ref={gridRef} onMouseLeave={() => setHoverCol(null)}>
       <table className="w-full border-separate border-spacing-0 text-[13px]">
         <thead className="sticky top-0 z-20 bg-card">
           <tr>
             <th
-              className="sticky left-0 z-30 w-[220px] min-w-[220px] border-b border-r border-border bg-card px-2 py-1 text-left text-xs font-semibold"
+              className="sticky left-0 z-30 w-[220px] min-w-[220px] border-b border-r-2 border-border px-2 py-1 text-left text-xs font-semibold bg-card"
               rowSpan={2}
             >
               Produkt
@@ -1881,13 +1939,18 @@ function MatrixGrid({
               const d = new Date(g.date + "T12:00:00");
               const dow = (d.getDay() === 0 ? 7 : d.getDay()) - 1;
               const isWeekend = dow >= 5;
+              const isToday = g.date === todayIso;
               return (
                 <th
                   key={g.date}
                   colSpan={g.count}
                   className={cn(
-                    "border-b border-r border-border px-1 py-0.5 text-center text-[11px] font-semibold",
-                    isWeekend ? "bg-muted/60" : "bg-card",
+                    "border-b border-r-2 border-border px-1 py-0.5 text-center text-[11px] font-semibold",
+                    isToday
+                      ? "bg-warning/25"
+                      : isWeekend
+                        ? "bg-muted/60"
+                        : "bg-card",
                   )}
                 >
                   <div className="flex items-center justify-center gap-1 leading-tight">
@@ -1900,6 +1963,7 @@ function MatrixGrid({
                 </th>
               );
             })}
+
             <th
               rowSpan={2}
               className="border-b border-r border-border bg-card px-2 py-1 text-right text-[11px] font-semibold"
@@ -1908,18 +1972,28 @@ function MatrixGrid({
             </th>
           </tr>
           <tr>
-            {columns.map((c) => {
+            {columns.map((c, ci) => {
               const pause = isPaused(pauseMap, c.date, c.tour.id);
               const hasComment = columnComments?.has(`${c.date}|${c.tour.id}`);
               const colHas = colHasData(c.date, c.tour.id);
               const nLines = lineCounts.get(`${c.date}|${c.tour.id}`) ?? 0;
+              const isToday = c.date === todayIso;
               return (
                 <th
                   key={`${c.date}-${c.tour.id}`}
+                  onMouseEnter={() => setHoverCol(ci)}
                   className={cn(
-                    "w-[72px] min-w-[64px] border-b border-r border-border px-0.5 py-0.5 text-center text-[11px] font-medium text-muted-foreground",
-                    pause ? "bg-sky-100 dark:bg-sky-950/40" : "bg-card/80",
+                    "w-[72px] min-w-[64px] border-b px-0.5 py-0.5 text-center text-[11px] font-medium text-muted-foreground",
+                    dayEndIdx.has(ci) ? "border-r-2 border-border" : "border-r border-border/50",
+                    pause
+                      ? "bg-sky-100 dark:bg-sky-950/40"
+                      : isToday
+                        ? "bg-warning/20"
+                        : hoverCol === ci
+                          ? "bg-muted/70"
+                          : "bg-card/80",
                   )}
+
                   title={`${c.tour.display_name} (${c.tour.time_from.slice(0, 5)}–${c.tour.time_to.slice(0, 5)})${pause?.reason ? ` · Pause: ${pause.reason}` : pause ? " · Pause" : ""}${hasComment ? `\nKommentar: ${columnComments?.get(`${c.date}|${c.tour.id}`)}` : ""}`}
                 >
                   <div className="flex items-center justify-center gap-0.5 leading-none">
@@ -1957,45 +2031,67 @@ function MatrixGrid({
           </tr>
         </thead>
         <tbody>
-          {products.map((p) => {
+          {products.map((p, ri) => {
             const isAdded = addedIds.has(p.id);
+            const openInfo = () =>
+              setInfoProduct({
+                id: p.id,
+                name: p.display_name,
+                number: p.display_number ?? null,
+                unit: p.sales_unit ?? null,
+                price: p.unit_price ?? null,
+              });
+            const zebra = ri % 2 === 1;
             return (
-              <tr key={p.id} className="h-7 hover:bg-muted/30">
+              <tr key={p.id} className={cn("group/row h-7", zebra && "bg-muted/25")}>
                 <th
                   scope="row"
                   className={cn(
-                    "sticky left-0 z-10 w-[220px] min-w-[220px] border-b border-r border-border px-2 py-0 text-left font-normal",
-                    isAdded ? "bg-accent/30" : "bg-card",
+                    "sticky left-0 z-10 w-[220px] min-w-[220px] border-b border-r-2 border-border px-1 py-0 text-left font-normal group-hover/row:bg-muted/60",
+                    isAdded ? "bg-accent/30" : zebra ? "bg-muted/25" : "bg-card",
                   )}
                 >
-                  <TooltipProvider delayDuration={200}>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button
-                          type="button"
-                          onClick={() => setInfoProduct({ id: p.id, name: p.display_name })}
-                          className="flex w-full items-center gap-1.5 truncate text-left leading-tight hover:text-primary"
-                        >
-                          <span className="w-8 shrink-0 text-right font-mono text-[11px] text-muted-foreground tabular-nums">
-                            {p.display_number}
-                          </span>
-                          <span className="truncate">{p.display_name}</span>
-                          {isAdded && (
-                            <Badge variant="outline" className="ml-1 px-1 py-0 text-[9px]">Ny</Badge>
-                          )}
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent side="right" className="max-w-xs text-xs">
-                        {p.sales_unit} ·{" "}
-                        {p.unit_price == null
-                          ? "Ingen pris for denne kunden på valgt dato — settes i Varer-appen."
-                          : formatNOK(p.unit_price)}
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
+                  <div className="flex w-full items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={openInfo}
+                      aria-label={`Produkthåndbok for ${p.display_name}`}
+                      title="Produkthåndbok"
+                      className="shrink-0 rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-primary"
+                    >
+                      <Info className="h-3.5 w-3.5" />
+                    </button>
+                    <TooltipProvider delayDuration={200}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            onClick={openInfo}
+                            className="flex min-w-0 flex-1 items-center gap-1.5 truncate text-left leading-tight hover:text-primary"
+                          >
+                            <span className="w-8 shrink-0 text-right font-mono text-[11px] text-muted-foreground tabular-nums">
+                              {p.display_number}
+                            </span>
+                            <span className="truncate">{p.display_name}</span>
+                            {isAdded && (
+                              <Badge variant="outline" className="ml-1 px-1 py-0 text-[9px]">Ny</Badge>
+                            )}
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="right" className="max-w-xs text-xs">
+                          {p.sales_unit} ·{" "}
+                          {p.unit_price == null
+                            ? "Ingen pris for denne kunden på valgt dato — settes i Varer-appen."
+                            : formatNOK(p.unit_price)}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
                 </th>
 
-                {columns.map((c) => {
+
+
+                {columns.map((c, ci) => {
                   const key = ckey(c.date, c.tour.id, p.id);
                   const value = getValue(key);
                   const dirty = isDirty(key);
@@ -2009,9 +2105,13 @@ function MatrixGrid({
                   return (
                     <td
                       key={key}
+                      onMouseEnter={() => setHoverCol(ci)}
                       className={cn(
-                        "group relative w-[72px] border-b border-r border-border p-0",
-                        dirty && "bg-warning/30",
+                        "group relative w-[72px] border-b border-border p-0 group-hover/row:bg-muted/40",
+                        dayEndIdx.has(ci) ? "border-r-2 border-r-border" : "border-r border-r-border/40",
+                        hoverCol === ci && "bg-muted/40",
+                        c.date === todayIso && "bg-warning/[0.06]",
+                        dirty && "bg-warning/30 group-hover/row:bg-warning/30",
                         pause && "bg-sky-50 dark:bg-sky-950/30",
                         fb && "outline outline-2 -outline-offset-2 outline-destructive/70",
                       )}
@@ -2032,11 +2132,17 @@ function MatrixGrid({
                         inputMode="decimal"
                         value={value}
                         readOnly={!!pause}
+                        data-cell={`${ri}-${ci}`}
+                        onKeyDown={(e) => onCellKeyDown(e, ri, ci)}
                         onChange={(e) => {
                           if (pause) return;
                           onChange(key, e.target.value);
                         }}
-                        onFocus={(e) => e.currentTarget.select()}
+                        onFocus={(e) => {
+                          setHoverCol(ci);
+                          e.currentTarget.select();
+                        }}
+
                         onMouseDown={(e) => {
                           if (pause) {
                             e.preventDefault();
@@ -2125,9 +2231,13 @@ function MatrixGrid({
       <ProductInfoDialog
         productId={infoProduct?.id ?? null}
         productName={infoProduct?.name ?? ""}
+        displayNumber={infoProduct?.number ?? null}
+        salesUnit={infoProduct?.unit ?? null}
+        unitPrice={infoProduct?.price ?? null}
         open={!!infoProduct}
         onClose={() => setInfoProduct(null)}
       />
+
     </div>
   );
 }

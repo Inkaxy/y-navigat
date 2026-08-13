@@ -7,6 +7,8 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
+import { formatNOK } from "@/ordre/lib/format";
+
 
 const NUTRITION_FIELDS: { key: string; label: string }[] = [
   { key: "energy_kj", label: "Energi (kJ)" },
@@ -30,11 +32,15 @@ type ComputedDeclaration = {
 interface Props {
   productId: string | null;
   productName: string;
+  displayNumber?: number | string | null;
+  salesUnit?: string | null;
+  unitPrice?: number | null;
   open: boolean;
   onClose: () => void;
 }
 
-export function ProductInfoDialog({ productId, productName, open, onClose }: Props) {
+export function ProductInfoDialog({ productId, productName, displayNumber, salesUnit, unitPrice, open, onClose }: Props) {
+
   const productQuery = useQuery({
     queryKey: ["product-info", productId],
     enabled: !!productId && open,
@@ -87,7 +93,19 @@ export function ProductInfoDialog({ productId, productName, open, onClose }: Pro
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle className="font-display text-xl">{productName}</DialogTitle>
+          {(displayNumber != null || salesUnit || unitPrice != null) && (
+            <p className="text-sm text-muted-foreground">
+              {[
+                displayNumber != null ? `Varenr. ${displayNumber}` : null,
+                salesUnit || null,
+                unitPrice != null ? formatNOK(unitPrice) : null,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
+          )}
         </DialogHeader>
+
 
         <div className="space-y-4">
           <div className="flex justify-center">
