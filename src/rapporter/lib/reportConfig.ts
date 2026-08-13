@@ -86,12 +86,7 @@ export function readDate(params: URLSearchParams, key: string, fallback: string)
 }
 
 /** Fjerner tomme verdier fra et config-objekt. */
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export function readUuid(params: URLSearchParams, key: string): string | null {
-  const v = params.get(key);
-  return v && UUID.test(v) ? v : null;
-}
 
 export function cleanConfig(config: Record<string, string | null | undefined>): ReportConfig {
   const out: ReportConfig = {};
