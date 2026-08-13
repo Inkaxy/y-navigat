@@ -67,7 +67,10 @@ function isAppActive(app: AccessibleApp, pathname: string): boolean {
   const route = INTERNAL_ROUTES[app.slug];
   if (app.slug === "nbhub") return pathname === "/" || pathname === "/hjem";
   if (!route) return false;
-  return pathname === route || pathname.startsWith(route + "/");
+  // Match på app-prefiks (første segment), ikke eksakt landingsrute,
+  // slik at undersider som /rapporter/ng-eksport også treffer.
+  const base = "/" + route.split("/").filter(Boolean)[0];
+  return pathname === base || pathname.startsWith(base + "/");
 }
 
 function isNew(app: AccessibleApp): boolean {
