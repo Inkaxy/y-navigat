@@ -76,7 +76,7 @@ export function buildNgFile(rows: NgReportRow[], meta: NgFileMeta): string {
 }
 
 function ymd(date: string): string {
-  return date.replaceAll("-", "");
+  return date.replace(/-/g, "");
 }
 
 export function ngFileName(periodStart: string, periodEnd: string): string {
