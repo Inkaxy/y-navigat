@@ -50,6 +50,10 @@ import {
   Globe,
   Warehouse,
   TrendingUp,
+  GitCompareArrows,
+  FileDown,
+  Layers,
+  History,
   type LucideIcon,
 
 } from "lucide-react";
@@ -151,6 +155,20 @@ const STATIC_SUBMENUS: Record<string, { prefix: string; appSlug: string; items: 
       { kind: "link", to: "/fakturering/sok", label: "Fakturasøk", icon: FileText },
       { kind: "link", to: "/fakturering/kjoringer", label: "Kjøringer", icon: ClipboardList },
       { kind: "link", to: "/fakturering/innstillinger", label: "Innstillinger", icon: Settings },
+    ],
+  },
+  rapporter: {
+    prefix: "/rapporter",
+    appSlug: "rapporter",
+    items: [
+      { kind: "link", to: "/rapporter/dashbord", label: "Dashbord", icon: LayoutDashboard },
+      { kind: "link", to: "/rapporter/statistikk", label: "Statistikk", icon: BarChart3 },
+      { kind: "link", to: "/rapporter/trender", label: "Trender", icon: TrendingUp },
+      { kind: "link", to: "/rapporter/kunder", label: "Kunder", icon: Users },
+      { kind: "link", to: "/rapporter/sammenligning", label: "Sammenligning", icon: GitCompareArrows },
+      { kind: "link", to: "/rapporter/ng-eksport", label: "NG-eksport", icon: FileDown },
+      { kind: "link", to: "/rapporter/statistikkgrupper", label: "Statistikkgrupper", icon: Layers },
+      { kind: "link", to: "/rapporter/historikk", label: "Historikk", icon: History },
     ],
   },
   admin: {
