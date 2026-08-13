@@ -28,11 +28,6 @@ function labelFor(symbolCode: string): string {
   return SYMBOL_LABEL_NB[base] ?? "Ukjent vær";
 }
 
-/** Offisielle Yr/MET-værsymboler. */
-function iconUrl(symbolCode: string): string {
-  return `https://api.met.no/images/weathericons/svg/${symbolCode}.svg`;
-}
-
 type Props = {
   forecast: DayForecast | undefined;
   /** Beholdt for bakoverkompatibilitet — ingen plassholder vises uansett. */
@@ -44,18 +39,22 @@ export function WeatherCell({ forecast }: Props) {
   if (!forecast) return null;
 
   const label = labelFor(forecast.symbolCode);
+  const icon = weatherIconUrl(forecast.symbolCode);
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <div className="flex items-center gap-0.5 text-[11px] font-medium text-muted-foreground">
-          <img
-            src={iconUrl(forecast.symbolCode)}
-            alt={label}
-            width={22}
-            height={22}
-            loading="lazy"
-            className="h-[22px] w-[22px] shrink-0"
-          />
+          {icon && (
+            <img
+              src={icon}
+              alt={label}
+              width={22}
+              height={22}
+              loading="lazy"
+              className="h-[22px] w-[22px] shrink-0"
+            />
+          )}
+
           <span className="tabular-nums text-foreground">{forecast.tempMax}°</span>
         </div>
       </TooltipTrigger>
