@@ -14344,6 +14344,29 @@ export type Database = {
         Args: { p_base_unit: string; p_unit: string }
         Returns: number
       }
+      sales_aggregate: {
+        Args: {
+          p_customer_id?: string
+          p_customer_profile_id?: string
+          p_dimension?: string
+          p_granularity?: string
+          p_legal_entity_id: string
+          p_period_end: string
+          p_period_start: string
+          p_product_id?: string
+          p_statistic_group_id?: string
+        }
+        Returns: {
+          amount: number
+          bucket: string
+          dim_code: string
+          dim_id: string
+          dim_label: string
+          line_count: number
+          order_count: number
+          quantity: number
+        }[]
+      }
       save_matrix_changes: {
         Args: { p_changes: Json; p_customer_id: string }
         Returns: {
