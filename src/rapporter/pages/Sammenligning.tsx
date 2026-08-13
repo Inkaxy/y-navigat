@@ -10,6 +10,10 @@ import { KpiRow } from "@/rapporter/components/KpiRow";
 import { useSalesAggregate, totals } from "@/rapporter/hooks/useSalesAggregate";
 import { monthKeys, monthLabel, rangeForPreset, shortDate, type DateRange } from "@/rapporter/lib/periods";
 import { downloadCsv, nok, pct, pctChange, toCsv } from "@/rapporter/lib/reportFormat";
+import { downloadXlsx, FMT_NOK, FMT_PCT } from "@/rapporter/lib/xlsxExport";
+import { cleanConfig, readDate } from "@/rapporter/lib/reportConfig";
+import { ExportMenu } from "@/rapporter/components/ExportMenu";
+import { SaveReportDialog } from "@/rapporter/components/SaveReportDialog";
 
 /** Summerer omsetning per månedsnøkkel (yyyy-mm-01). */
 function byMonth(rows: { bucket: string | null; amount: number }[] | undefined) {
