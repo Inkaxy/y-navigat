@@ -476,14 +476,7 @@ export default function Dashbord() {
       </div>
 
       {/* Mine rapporter */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Mine rapporter</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">Lagrede rapporter kommer i fase R.5.</p>
-        </CardContent>
-      </Card>
+      <MyReportsCard />
     </div>
   );
 }
