@@ -9,7 +9,7 @@ import {
   CloudDrizzle,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import type { DayForecast } from "@/ordre/hooks/useWeatherForecast";
+import type { DayForecast } from "@/ordre/hooks/useCustomerWeather";
 
 const SYMBOL_LABEL_NB: Record<string, string> = {
   clearsky: "Klart",
