@@ -10,6 +10,7 @@ import { useReportRuns, type ReportRun } from "@/rapporter/hooks/useNgExport";
 
 const REPORT_LABELS: Record<string, string> = {
   ng_direktelevert: "NG DirekteLevert",
+  powerbi_salg: "Salgs data for Power BI",
 };
 
 const nok = (v: number) =>
