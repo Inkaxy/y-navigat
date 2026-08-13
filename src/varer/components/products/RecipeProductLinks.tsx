@@ -37,6 +37,7 @@ export function RecipeProductLinks({ recipeId, currentProductId, canWrite }: Pro
   const { legalEntityId } = useAppContext();
   const navigate = useNavigate();
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [search, setSearch] = useState("");
 
   const linksQuery = useQuery({
     queryKey: ["recipe-links", recipeId],
@@ -64,7 +65,17 @@ export function RecipeProductLinks({ recipeId, currentProductId, canWrite }: Pro
 
   const links = linksQuery.data ?? [];
   const linkedIds = new Set(links.map((l) => l.product_id));
-  const candidates = (productsQuery.data ?? []).filter((p) => !linkedIds.has(p.id));
+  const allCandidates = (productsQuery.data ?? []).filter((p) => !linkedIds.has(p.id));
+  const term = search.trim().toLocaleLowerCase("nb-NO");
+  const candidates = (
+    term
+      ? allCandidates.filter((p) =>
+          `${p.display_name ?? ""} ${p.display_number ?? ""}`
+            .toLocaleLowerCase("nb-NO")
+            .includes(term),
+        )
+      : allCandidates
+  ).slice(0, term ? 100 : 50);
 
   async function addLink(productId: string) {
     const { error } = await supabase
