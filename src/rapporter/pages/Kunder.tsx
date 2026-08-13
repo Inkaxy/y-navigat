@@ -84,6 +84,40 @@ export default function Kunder() {
     downloadCsv(`kunder_${range.start}_${range.end}.csv`, csv);
   };
 
+  const exportXlsx = () => {
+    downloadXlsx(
+      `kunder_${range.start}_${range.end}.xlsx`,
+      "Kunder",
+      [
+        { header: "Kundenr", width: 10 },
+        { header: "Kunde", width: 34 },
+        { header: "Omsetning", width: 14, format: FMT_NOK },
+        { header: "Antall", width: 12, format: FMT_QTY },
+        { header: "Ordrer", width: 10 },
+        { header: "Linjer", width: 10 },
+        { header: "Andel %", width: 10, format: FMT_PCT },
+      ],
+      rows.map((r) => [
+        r.dim_code ?? "",
+        r.dim_label,
+        r.amount,
+        r.quantity,
+        r.order_count,
+        r.line_count,
+        (share(r.amount, sum.amount) ?? 0) * 100,
+      ]),
+    );
+  };
+
+  const reportConfig = () =>
+    cleanConfig({
+      preset,
+      start: range.start,
+      end: range.end,
+      profil: profileId,
+      kunde: selectedId,
+    });
+
   return (
     <div className="space-y-6">
       <PageHeader eyebrow="Rapporter" title="Kunder" subtitle="Kundeanalyse med drilldown" icon={Users} />
