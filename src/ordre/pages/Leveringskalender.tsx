@@ -2029,43 +2029,65 @@ function MatrixGrid({
           </tr>
         </thead>
         <tbody>
-          {products.map((p) => {
+          {products.map((p, ri) => {
             const isAdded = addedIds.has(p.id);
+            const openInfo = () =>
+              setInfoProduct({
+                id: p.id,
+                name: p.display_name,
+                number: p.display_number ?? null,
+                unit: p.sales_unit ?? null,
+                price: p.unit_price ?? null,
+              });
+            const zebra = ri % 2 === 1;
             return (
-              <tr key={p.id} className="h-7 hover:bg-muted/30">
+              <tr key={p.id} className={cn("group/row h-7", zebra && "bg-muted/25")}>
                 <th
                   scope="row"
                   className={cn(
-                    "sticky left-0 z-10 w-[220px] min-w-[220px] border-b border-r border-border px-2 py-0 text-left font-normal",
-                    isAdded ? "bg-accent/30" : "bg-card",
+                    "sticky left-0 z-10 w-[220px] min-w-[220px] border-b border-r-2 border-border px-1 py-0 text-left font-normal group-hover/row:bg-muted/60",
+                    isAdded ? "bg-accent/30" : zebra ? "bg-muted/25" : "bg-card",
                   )}
                 >
-                  <TooltipProvider delayDuration={200}>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button
-                          type="button"
-                          onClick={() => setInfoProduct({ id: p.id, name: p.display_name })}
-                          className="flex w-full items-center gap-1.5 truncate text-left leading-tight hover:text-primary"
-                        >
-                          <span className="w-8 shrink-0 text-right font-mono text-[11px] text-muted-foreground tabular-nums">
-                            {p.display_number}
-                          </span>
-                          <span className="truncate">{p.display_name}</span>
-                          {isAdded && (
-                            <Badge variant="outline" className="ml-1 px-1 py-0 text-[9px]">Ny</Badge>
-                          )}
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent side="right" className="max-w-xs text-xs">
-                        {p.sales_unit} ·{" "}
-                        {p.unit_price == null
-                          ? "Ingen pris for denne kunden på valgt dato — settes i Varer-appen."
-                          : formatNOK(p.unit_price)}
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
+                  <div className="flex w-full items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={openInfo}
+                      aria-label={`Produkthåndbok for ${p.display_name}`}
+                      title="Produkthåndbok"
+                      className="shrink-0 rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-primary"
+                    >
+                      <Info className="h-3.5 w-3.5" />
+                    </button>
+                    <TooltipProvider delayDuration={200}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            onClick={openInfo}
+                            className="flex min-w-0 flex-1 items-center gap-1.5 truncate text-left leading-tight hover:text-primary"
+                          >
+                            <span className="w-8 shrink-0 text-right font-mono text-[11px] text-muted-foreground tabular-nums">
+                              {p.display_number}
+                            </span>
+                            <span className="truncate">{p.display_name}</span>
+                            {isAdded && (
+                              <Badge variant="outline" className="ml-1 px-1 py-0 text-[9px]">Ny</Badge>
+                            )}
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="right" className="max-w-xs text-xs">
+                          {p.sales_unit} ·{" "}
+                          {p.unit_price == null
+                            ? "Ingen pris for denne kunden på valgt dato — settes i Varer-appen."
+                            : formatNOK(p.unit_price)}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
                 </th>
+
+
 
                 {columns.map((c) => {
                   const key = ckey(c.date, c.tour.id, p.id);
