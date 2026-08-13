@@ -48,7 +48,7 @@ verify_jwt = true
 [functions.redeem-invitation]
 verify_jwt = false
 
-[functions.met-forecast]
+[functions.get-customer-weather]
 verify_jwt = false
 
 [functions.geocode-customer]

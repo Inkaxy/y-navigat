@@ -12310,6 +12310,33 @@ export type Database = {
         }
         Relationships: []
       }
+      weather_cache: {
+        Row: {
+          expires_at: string
+          fetched_at: string
+          forecast: Json
+          id: string
+          lat: number
+          lon: number
+        }
+        Insert: {
+          expires_at: string
+          fetched_at?: string
+          forecast: Json
+          id?: string
+          lat: number
+          lon: number
+        }
+        Update: {
+          expires_at?: string
+          fetched_at?: string
+          forecast?: Json
+          id?: string
+          lat?: number
+          lon?: number
+        }
+        Relationships: []
+      }
       website_order_rejects: {
         Row: {
           code: string

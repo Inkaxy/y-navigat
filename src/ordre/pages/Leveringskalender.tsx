@@ -19,7 +19,6 @@ import {
   ChevronDown,
   Repeat,
   Eye,
-  BookOpen,
   CalendarIcon,
   ShoppingCart,
 } from "lucide-react";
@@ -96,8 +95,7 @@ import { useDebouncedValue } from "@/ordre/hooks/useDebouncedValue";
 import { useProductsByIds } from "@/ordre/hooks/useProductsByIds";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserAccess } from "@/ordre/hooks/useUserAccess";
-import { useWeatherForecast, type WeatherMap } from "@/ordre/hooks/useWeatherForecast";
-import { useAutoGeocodeCustomer } from "@/ordre/hooks/useGeocodeCustomer";
+import { useCustomerWeather, type WeatherMap } from "@/ordre/hooks/useCustomerWeather";
 import { WeatherCell } from "@/ordre/components/orders/WeatherCell";
 import { useRecurringGhost, type RecurringGhostMap } from "@/ordre/hooks/useRecurringGhost";
 import { useRecurringSchedules, type RecurringScheduleWithCustomer } from "@/ordre/hooks/useRecurringOrders";
@@ -196,10 +194,7 @@ export default function MatrixPage() {
   const deleteMatrixColumn = useDeleteMatrixColumn();
   const generateNotes = useGenerateDeliveryNotes();
   const navigate = useNavigate();
-  const customerLat = selectedCustomer?.geocode_latitude ?? null;
-  const customerLon = selectedCustomer?.geocode_longitude ?? null;
-  useAutoGeocodeCustomer(selectedCustomer ?? null);
-  const { data: weatherMap } = useWeatherForecast(customerLat, customerLon);
+  const { data: weatherMap } = useCustomerWeather(customerId, dateFrom, dateTo);
   const { data: ghostMap } = useRecurringGhost(customerId, dateFrom, dateTo);
   const { data: pauseMap } = useDeliveryPausesForCustomer(customerId, dateFrom, dateTo);
   const { data: columnComments } = useColumnComments(customerId, dateFrom, dateTo);
@@ -999,7 +994,6 @@ export default function MatrixPage() {
 
   const hasAddable = (addableProducts?.length ?? 0) > 0;
   const isEmptyMatrix = !!matrix && allProducts.length === 0;
-  const hasCustomerCoords = customerLat != null && customerLon != null;
 
   return (
     <div className="-mt-8 -mb-12 flex h-full flex-col bg-background">
@@ -1428,7 +1422,7 @@ export default function MatrixPage() {
         </div>
       </div>
 
-      <div className="mx-auto w-full max-w-[1400px] flex-1 overflow-auto px-6">
+      <div className="w-full flex-1 overflow-auto px-4">
         {!customerId ? (
           <div className="grid h-full place-items-center p-10 text-center text-muted-foreground">
             <div className="max-w-2xl">
@@ -1527,7 +1521,6 @@ export default function MatrixPage() {
               colTotals={totals.colTotals}
               grandTotal={totals.grand}
               weatherMap={weatherMap}
-              hasCustomerCoords={hasCustomerCoords}
               ghostMap={ghostMap}
               pauseMap={pauseMap}
               columnComments={columnComments}
@@ -1812,7 +1805,6 @@ function MatrixGrid({
   colTotals,
   grandTotal,
   weatherMap,
-  hasCustomerCoords,
   ghostMap,
   pauseMap,
   columnComments,
@@ -1839,7 +1831,6 @@ function MatrixGrid({
   colTotals: Record<string, number>;
   grandTotal: number;
   weatherMap: WeatherMap | undefined;
-  hasCustomerCoords: boolean;
   ghostMap: RecurringGhostMap | undefined;
   pauseMap: PauseMap | undefined;
   columnComments: Map<string, string> | undefined;
@@ -1862,13 +1853,26 @@ function MatrixGrid({
     return groups;
   }, [columns]);
 
+  const lineCounts = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const c of columns) {
+      let n = 0;
+      for (const p of products) {
+        const v = getValue(ckey(c.date, c.tour.id, p.id));
+        if (v && Number(v.replace(",", ".")) > 0) n++;
+      }
+      m.set(`${c.date}|${c.tour.id}`, n);
+    }
+    return m;
+  }, [columns, products, getValue]);
+
   return (
-    <div className="min-w-max">
-      <table className="border-separate border-spacing-0 text-sm">
+    <div className="w-full">
+      <table className="w-full border-separate border-spacing-0 text-[13px]">
         <thead className="sticky top-0 z-20 bg-card">
           <tr>
             <th
-              className="sticky left-0 z-30 w-[320px] min-w-[320px] border-b border-r border-border bg-card px-3 py-2 text-left"
+              className="sticky left-0 z-30 w-[220px] min-w-[220px] border-b border-r border-border bg-card px-2 py-1 text-left text-xs font-semibold"
               rowSpan={2}
             >
               Produkt
@@ -1882,24 +1886,23 @@ function MatrixGrid({
                   key={g.date}
                   colSpan={g.count}
                   className={cn(
-                    "border-b border-r border-border px-2 py-1 text-center text-xs font-semibold",
+                    "border-b border-r border-border px-1 py-0.5 text-center text-[11px] font-semibold",
                     isWeekend ? "bg-muted/60" : "bg-card",
                   )}
                 >
-                  <WeatherCell
-                    forecast={weatherMap?.get(g.date)}
-                    emptyReason={!hasCustomerCoords ? "Kundens adresse mangler koordinater" : undefined}
-                  />
-                  <div className="text-muted-foreground">{DAY_LABELS[dow]}</div>
-                  <div className="tabular-nums">
-                    {new Intl.DateTimeFormat("nb-NO", { day: "2-digit", month: "2-digit" }).format(d)}
+                  <div className="flex items-center justify-center gap-1 leading-tight">
+                    <WeatherCell forecast={weatherMap?.get(g.date)} />
+                    <span className="text-muted-foreground">{DAY_LABELS[dow]}</span>
+                    <span className="tabular-nums">
+                      {new Intl.DateTimeFormat("nb-NO", { day: "2-digit", month: "2-digit" }).format(d)}
+                    </span>
                   </div>
                 </th>
               );
             })}
             <th
               rowSpan={2}
-              className="border-b border-r border-border bg-card px-3 py-2 text-right text-xs font-semibold"
+              className="border-b border-r border-border bg-card px-2 py-1 text-right text-[11px] font-semibold"
             >
               Sum kr
             </th>
@@ -1909,44 +1912,45 @@ function MatrixGrid({
               const pause = isPaused(pauseMap, c.date, c.tour.id);
               const hasComment = columnComments?.has(`${c.date}|${c.tour.id}`);
               const colHas = colHasData(c.date, c.tour.id);
-              const d = new Date(c.date + "T00:00:00");
-              const dow = (d.getDay() + 6) % 7;
-              const dayLabel = DAY_LABELS[dow];
+              const nLines = lineCounts.get(`${c.date}|${c.tour.id}`) ?? 0;
               return (
                 <th
                   key={`${c.date}-${c.tour.id}`}
                   className={cn(
-                    "border-b border-r border-border px-1 py-1 text-center text-[11px] font-medium text-muted-foreground",
+                    "w-[72px] min-w-[64px] border-b border-r border-border px-0.5 py-0.5 text-center text-[11px] font-medium text-muted-foreground",
                     pause ? "bg-sky-100 dark:bg-sky-950/40" : "bg-card/80",
                   )}
                   title={`${c.tour.display_name} (${c.tour.time_from.slice(0, 5)}–${c.tour.time_to.slice(0, 5)})${pause?.reason ? ` · Pause: ${pause.reason}` : pause ? " · Pause" : ""}${hasComment ? `\nKommentar: ${columnComments?.get(`${c.date}|${c.tour.id}`)}` : ""}`}
                 >
-                  <button
-                    type="button"
-                    disabled={!colHas}
-                    onClick={() => onOpenTourOrder(c.date, c.tour)}
-                    className="mx-auto block rounded px-1.5 py-0.5 text-[12px] font-semibold text-foreground hover:bg-primary/10 hover:text-primary disabled:cursor-default disabled:opacity-60 disabled:hover:bg-transparent disabled:hover:text-foreground"
-                    title={colHas ? "Åpne ordre for denne turen" : "Ingen ordre på denne turen"}
-                  >
-                    {dayLabel} ({c.tour.tour_number})
-                    {hasComment && <span className="ml-1 text-primary">•</span>}
-                  </button>
+                  <div className="flex items-center justify-center gap-0.5 leading-none">
+                    <button
+                      type="button"
+                      disabled={!colHas}
+                      onClick={() => onOpenTourOrder(c.date, c.tour)}
+                      className="rounded px-0.5 py-0.5 text-[11px] font-semibold text-foreground hover:bg-primary/10 hover:text-primary disabled:cursor-default disabled:opacity-60 disabled:hover:bg-transparent disabled:hover:text-foreground"
+                      title={colHas ? "Åpne ordre for denne turen" : "Ingen ordre på denne turen"}
+                    >
+                      T{c.tour.tour_number}
+                      {nLines > 0 && (
+                        <span className="ml-0.5 font-normal text-muted-foreground tabular-nums">({nLines})</span>
+                      )}
+                      {hasComment && <span className="ml-0.5 text-primary">•</span>}
+                    </button>
+                    <button type="button" disabled={!canEdit || !colHas} onClick={() => onColCopy(c.date, c.tour)} className="rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-30" title="Kopier kolonne">
+                      <Copy className="h-3 w-3" />
+                    </button>
+                    <button type="button" disabled={!canEdit || !colHas} onClick={() => onColDelete(c.date, c.tour)} className="rounded p-0.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-30" title="Slett kolonne">
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                    <button type="button" disabled={!colHas} onClick={() => onColPackingNote(c.date, c.tour)} className="rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-30" title="Lag pakkseddel">
+                      <PackageCheck className="h-3 w-3" />
+                    </button>
+                  </div>
                   {pause && (
                     <div className="mt-0.5 inline-block rounded-sm bg-sky-200/80 px-1 text-[9px] font-semibold uppercase tracking-wide text-sky-900 dark:bg-sky-800/60 dark:text-sky-100">
                       Pause
                     </div>
                   )}
-                  <div className="mt-1 flex items-center justify-center gap-1.5">
-                    <button type="button" disabled={!canEdit || !colHas} onClick={() => onColCopy(c.date, c.tour)} className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-30" title="Kopier kolonne">
-                      <Copy className="h-4 w-4" />
-                    </button>
-                    <button type="button" disabled={!canEdit || !colHas} onClick={() => onColDelete(c.date, c.tour)} className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-30" title="Slett kolonne">
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                    <button type="button" disabled={!colHas} onClick={() => onColPackingNote(c.date, c.tour)} className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-30" title="Lag pakkseddel">
-                      <PackageCheck className="h-4 w-4" />
-                    </button>
-                  </div>
                 </th>
               );
             })}
@@ -1956,52 +1960,41 @@ function MatrixGrid({
           {products.map((p) => {
             const isAdded = addedIds.has(p.id);
             return (
-              <tr key={p.id} className="hover:bg-muted/30">
+              <tr key={p.id} className="h-7 hover:bg-muted/30">
                 <th
                   scope="row"
                   className={cn(
-                    "sticky left-0 z-10 w-[320px] min-w-[320px] border-b border-r border-border px-3 py-1.5 text-left font-normal",
+                    "sticky left-0 z-10 w-[220px] min-w-[220px] border-b border-r border-border px-2 py-0 text-left font-normal",
                     isAdded ? "bg-accent/30" : "bg-card",
                   )}
                 >
-                  <div className="flex items-stretch gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setInfoProduct({ id: p.id, name: p.display_name })}
-                      className="inline-flex w-9 shrink-0 items-center justify-center self-stretch rounded-md border border-brand-bronze/40 bg-brand-bronze/10 text-brand-bronze shadow-sm transition-colors hover:border-brand-bronze hover:bg-brand-bronze hover:text-brand-ink"
-                      title="Vis produktinfo"
-                      aria-label="Vis produktinfo"
-                    >
-                      <BookOpen className="h-5 w-5" strokeWidth={2.25} />
-                    </button>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5 truncate font-medium">
-                        <span className="text-muted-foreground tabular-nums">{p.display_number}</span>
-                        <span className="truncate">{p.display_name}</span>
-                        {isAdded && (
-                          <Badge variant="outline" className="ml-1 text-[10px]">Ny</Badge>
-                        )}
-                      </div>
-                      <div className="text-[11px] text-muted-foreground">
+                  <TooltipProvider delayDuration={200}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          onClick={() => setInfoProduct({ id: p.id, name: p.display_name })}
+                          className="flex w-full items-center gap-1.5 truncate text-left leading-tight hover:text-primary"
+                        >
+                          <span className="w-8 shrink-0 text-right font-mono text-[11px] text-muted-foreground tabular-nums">
+                            {p.display_number}
+                          </span>
+                          <span className="truncate">{p.display_name}</span>
+                          {isAdded && (
+                            <Badge variant="outline" className="ml-1 px-1 py-0 text-[9px]">Ny</Badge>
+                          )}
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="right" className="max-w-xs text-xs">
                         {p.sales_unit} ·{" "}
-                        {p.unit_price == null ? (
-                          <TooltipProvider delayDuration={150}>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span className="cursor-help text-muted-foreground/70">—</span>
-                              </TooltipTrigger>
-                              <TooltipContent side="right" className="max-w-xs text-xs">
-                                Ingen pris for denne kunden på valgt dato. Pris må settes i Varer-appen før ordren kan lagres.
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        ) : (
-                          formatNOK(p.unit_price)
-                        )}
-                      </div>
-                    </div>
-                  </div>
+                        {p.unit_price == null
+                          ? "Ingen pris for denne kunden på valgt dato — settes i Varer-appen."
+                          : formatNOK(p.unit_price)}
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </th>
+
                 {columns.map((c) => {
                   const key = ckey(c.date, c.tour.id, p.id);
                   const value = getValue(key);
@@ -2017,17 +2010,21 @@ function MatrixGrid({
                     <td
                       key={key}
                       className={cn(
-                        "group relative border-b border-r border-border p-0",
-                        dirty && "bg-warning/10",
+                        "group relative w-[72px] border-b border-r border-border p-0",
+                        dirty && "bg-warning/30",
                         pause && "bg-sky-50 dark:bg-sky-950/30",
                         fb && "outline outline-2 -outline-offset-2 outline-destructive/70",
                       )}
                       title={
                         fb
                           ? "Pris ikke funnet — mangler prisliste-rad eller spesialpris"
-                          : pause
-                            ? pause.reason ? `Leveransepause: ${pause.reason}` : "Leveransepause"
-                            : undefined
+                          : ghost
+                            ? ghostOverridden
+                              ? `Fastordre: ${ghost} stk — overstyrt til ${effectiveQty}`
+                              : `Fastordre: ${ghost} stk`
+                            : pause
+                              ? pause.reason ? `Leveransepause: ${pause.reason}` : "Leveransepause"
+                              : undefined
                       }
                     >
                       <Input
@@ -2039,6 +2036,7 @@ function MatrixGrid({
                           if (pause) return;
                           onChange(key, e.target.value);
                         }}
+                        onFocus={(e) => e.currentTarget.select()}
                         onMouseDown={(e) => {
                           if (pause) {
                             e.preventDefault();
@@ -2049,31 +2047,14 @@ function MatrixGrid({
                         }}
                         placeholder={ghost ? String(ghost) : ""}
                         className={cn(
-                          "h-9 w-16 rounded-none border-0 bg-transparent px-1 text-center tabular-nums shadow-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-0",
-                          value && "text-base font-semibold text-foreground",
-                          dirty && "font-bold text-warning",
+                          "h-7 w-full rounded-none border-0 bg-transparent px-1 text-right text-[13px] tabular-nums shadow-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-0",
+                          value && "font-medium text-foreground",
+                          dirty && "font-semibold",
                           pause && "cursor-not-allowed",
-                          ghost && "placeholder:italic placeholder:text-muted-foreground/60",
+                          ghost && !value && "placeholder:text-muted-foreground/60",
                         )}
                       />
-                      {ghost && (
-                        <span
-                          className={cn(
-                            "pointer-events-none absolute left-0.5 top-0.5 rounded px-1.5 py-0.5 text-sm font-extrabold leading-none tabular-nums shadow-md ring-1",
-                            ghostOverridden
-                              ? "bg-warning text-warning-foreground ring-warning/70 line-through decoration-warning-foreground/80"
-                              : "bg-primary text-primary-foreground ring-primary/70",
-                          )}
-                          title={
-                            ghostOverridden
-                              ? `Fastordre: ${ghost} stk — overstyrt til ${effectiveQty}`
-                              : `Fastordre: ${ghost} stk`
-                          }
-                          aria-hidden
-                        >
-                          {ghost}
-                        </span>
-                      )}
+
                       {hasM && (
                         <span
                           className="pointer-events-none absolute right-0.5 top-0.5 text-primary"
@@ -2109,7 +2090,7 @@ function MatrixGrid({
                     </td>
                   );
                 })}
-                <td className="border-b border-r border-border bg-card px-3 py-1.5 text-right font-bold tabular-nums">
+                <td className="border-b border-r border-border bg-card px-2 py-0 text-right text-[12px] font-semibold tabular-nums">
                   {formatKrNetto(rowTotals[p.id] ?? 0)}
                 </td>
               </tr>
