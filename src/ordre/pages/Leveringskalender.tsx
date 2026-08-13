@@ -19,7 +19,6 @@ import {
   ChevronDown,
   Repeat,
   Eye,
-  BookOpen,
   CalendarIcon,
   ShoppingCart,
 } from "lucide-react";
