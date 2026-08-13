@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Users, Download, ChevronRight } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -17,7 +18,16 @@ export default function Kunder() {
   const [range, setRange] = useState<DateRange>(() => rangeForPreset("ytd"));
   const [profileId, setProfileId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [selected, setSelected] = useState<SalesRow | null>(null);
+
+  // Valgt kunde ligger i URL-en slik at valget overlever remount/refetch og kan deles.
+  const [params, setParams] = useSearchParams();
+  const selectedId = params.get("kunde");
+  const selectCustomer = (id: string | null) => {
+    const next = new URLSearchParams(params);
+    if (id) next.set("kunde", id);
+    else next.delete("kunde");
+    setParams(next, { replace: true });
+  };
 
   const filters = { customerProfileId: profileId };
   const main = useSalesAggregate(range, "customer", "total", filters);
@@ -30,18 +40,24 @@ export default function Kunder() {
       .sort((a, b) => b.amount - a.amount);
   }, [main.data, search]);
 
+  const selected: SalesRow | null = useMemo(
+    () => (main.data ?? []).find((r) => r.dim_id === selectedId) ?? null,
+    [main.data, selectedId],
+  );
+
   const basket = useSalesAggregate(
     range,
     "product",
     "total",
-    { ...filters, customerId: selected?.dim_id ?? null },
-    !!selected?.dim_id,
+    { ...filters, customerId: selectedId },
+    !!selectedId,
   );
   const basketRows = useMemo(
     () => [...(basket.data ?? [])].sort((a, b) => b.amount - a.amount),
     [basket.data],
   );
   const basketSum = totals(basket.data);
+
 
   const exportCsv = () => {
     const csv = toCsv(
@@ -130,8 +146,9 @@ export default function Kunder() {
                   {rows.map((r) => (
                     <TableRow
                       key={r.dim_id ?? r.dim_label}
-                      className={`cursor-pointer ${selected?.dim_id === r.dim_id ? "bg-accent/40" : ""}`}
-                      onClick={() => setSelected(r)}
+                      interactive
+                      className={selectedId && selectedId === r.dim_id ? "bg-accent/40" : ""}
+                      onClick={() => selectCustomer(r.dim_id)}
                     >
                       <TableCell className="tabular-nums text-muted-foreground">{r.dim_code ?? "–"}</TableCell>
                       <TableCell className="font-medium">{r.dim_label}</TableCell>
@@ -139,10 +156,20 @@ export default function Kunder() {
                       <TableCell className="text-right tabular-nums">{int(r.order_count)}</TableCell>
                       <TableCell className="text-right tabular-nums">{pct(share(r.amount, sum.amount))}</TableCell>
                       <TableCell>
-                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        <button
+                          type="button"
+                          aria-label={`Vis handlekurv for ${r.dim_label}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            selectCustomer(r.dim_id);
+                          }}
+                        >
+                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        </button>
                       </TableCell>
                     </TableRow>
                   ))}
+
                 </TableBody>
               </Table>
             )}
@@ -154,14 +181,19 @@ export default function Kunder() {
             <h2 className="text-sm font-semibold">
               {selected ? `Handlekurv — ${selected.dim_label}` : "Handlekurv"}
             </h2>
-            {!selected ? (
+            {!selectedId ? (
               <p className="py-10 text-center text-sm text-muted-foreground">
                 Velg en kunde for å se hele handlekurven.
               </p>
             ) : basket.isLoading ? (
               <Skeleton className="h-40 w-full" />
+            ) : basket.error ? (
+              <p className="py-10 text-center text-sm text-destructive">
+                Kunne ikke hente handlekurven: {(basket.error as Error).message}
+              </p>
             ) : basketRows.length === 0 ? (
               <p className="py-10 text-center text-sm text-muted-foreground">Ingen varelinjer i perioden.</p>
+
             ) : (
               <div className="max-h-[520px] overflow-auto">
                 <Table>
