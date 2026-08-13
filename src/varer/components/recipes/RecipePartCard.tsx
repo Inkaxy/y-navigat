@@ -61,11 +61,14 @@ interface Props {
   onUpdateLine: (id: string, patch: Partial<EditorLine>) => void;
   onRemoveLine: (id: string) => void;
   onReorderLines: (partId: string, activeId: string, overId: string) => void;
+  /** Oppskriften som redigeres — brukes til sirkelvern i ingrediensvelgeren. */
+  currentRecipeId?: string | null;
 }
 
 export function RecipePartCard({
   part, lines, canWrite, totalFlourG, rmMap, isFirst, isLast,
   onUpdate, onRemove, onDuplicate, onMove, onAddLine, onUpdateLine, onRemoveLine, onReorderLines,
+  currentRecipeId = null,
 }: Props) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
   const isPreferment = part.part_type === "preferment";
@@ -176,6 +179,7 @@ export function RecipePartCard({
                   canWrite={canWrite}
                   totalFlourG={totalFlourG}
                   rmMap={rmMap}
+                  currentRecipeId={currentRecipeId}
                   onChange={(patch) => onUpdateLine(l.id, patch)}
                   onRemove={() => onRemoveLine(l.id)}
                 />
@@ -211,12 +215,13 @@ export function RecipePartCard({
 }
 
 function SortableLine({
-  line, canWrite, totalFlourG, rmMap, onChange, onRemove,
+  line, canWrite, totalFlourG, rmMap, currentRecipeId, onChange, onRemove,
 }: {
   line: EditorLine;
   canWrite: boolean;
   totalFlourG: number;
   rmMap: Record<string, BakersRawMaterial>;
+  currentRecipeId?: string | null;
   onChange: (p: Partial<EditorLine>) => void;
   onRemove: () => void;
 }) {
@@ -268,6 +273,7 @@ function SortableLine({
       <div className={cn("col-span-3", (line as any).sub_product_id && "rounded-md ring-1 ring-purple-300")}>
         <RawMaterialAutocomplete
           value={line.raw_material_id}
+          currentRecipeId={currentRecipeId}
           subValue={(line as any).sub_product_id ?? null}
           disabled={!canWrite}
           onChange={(id, opt) => {
