@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Users, Download, ChevronRight } from "lucide-react";
+import { Users, ChevronRight } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,14 +9,23 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ReportFilterBar } from "@/rapporter/components/ReportFilterBar";
 import { KpiRow } from "@/rapporter/components/KpiRow";
+import { ExportMenu } from "@/rapporter/components/ExportMenu";
+import { SaveReportDialog } from "@/rapporter/components/SaveReportDialog";
 import { useSalesAggregate, totals, type SalesRow } from "@/rapporter/hooks/useSalesAggregate";
-import { rangeForPreset, shortDate, type DateRange, type PeriodPreset } from "@/rapporter/lib/periods";
+import { shortDate, type DateRange, type PeriodPreset } from "@/rapporter/lib/periods";
 import { downloadCsv, int, nok, pct, qty, share, toCsv } from "@/rapporter/lib/reportFormat";
+import { downloadXlsx, FMT_NOK, FMT_PCT, FMT_QTY } from "@/rapporter/lib/xlsxExport";
+import { cleanConfig, readPeriod, readUuid } from "@/rapporter/lib/reportConfig";
 
 export default function Kunder() {
-  const [preset, setPreset] = useState<PeriodPreset>("ytd");
-  const [range, setRange] = useState<DateRange>(() => rangeForPreset("ytd"));
-  const [profileId, setProfileId] = useState<string | null>(null);
+  const initialParams = new URLSearchParams(window.location.search);
+  const [initial] = useState(() => ({
+    ...readPeriod(initialParams, "ytd"),
+    profileId: readUuid(initialParams, "profil"),
+  }));
+  const [preset, setPreset] = useState<PeriodPreset>(initial.preset);
+  const [range, setRange] = useState<DateRange>(initial.range);
+  const [profileId, setProfileId] = useState<string | null>(initial.profileId);
   const [search, setSearch] = useState("");
 
   // Valgt kunde ligger i URL-en slik at valget overlever remount/refetch og kan deles.
