@@ -25,6 +25,8 @@ import { cn } from "@/lib/utils";
 
 /* ---------------- Datohjelpere (rene strengoperasjoner, Oslo-dato) ---------------- */
 
+const MONTH_ABBR = ["jan", "feb", "mar", "apr", "mai", "jun", "jul", "aug", "sep", "okt", "nov", "des"];
+
 const pad = (n: number) => String(n).padStart(2, "0");
 const iso = (y: number, m: number, d: number) => `${y}-${pad(m)}-${pad(d)}`;
 const daysInMonth = (y: number, m: number) => new Date(Date.UTC(y, m, 0)).getUTCDate();
