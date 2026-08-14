@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useCallback, useRef } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import {
@@ -10,8 +10,6 @@ import {
   RotateCcw,
   Plus,
   StickyNote,
-  Info,
-
   ArrowRight,
   MoreHorizontal,
   Copy,
@@ -21,6 +19,7 @@ import {
   ChevronDown,
   Repeat,
   Eye,
+  BookOpen,
   CalendarIcon,
   ShoppingCart,
 } from "lucide-react";
@@ -72,6 +71,7 @@ import {
 import { CorrectionsDialog } from "@/ordre/components/orders/matrix/CorrectionsDialog";
 import { FlatLinesView } from "@/ordre/components/orders/matrix/FlatLinesView";
 import { ProductInfoDialog } from "@/ordre/components/orders/matrix/ProductInfoDialog";
+import { ProductWeekEditor } from "@/ordre/components/orders/matrix/ProductWeekEditor";
 import { TourOrderDialog } from "@/ordre/components/orders/matrix/TourOrderDialog";
 import {
   useColumnComments,
@@ -102,7 +102,6 @@ import { WeatherCell } from "@/ordre/components/orders/WeatherCell";
 import { useRecurringGhost, type RecurringGhostMap } from "@/ordre/hooks/useRecurringGhost";
 import { useRecurringSchedules, type RecurringScheduleWithCustomer } from "@/ordre/hooks/useRecurringOrders";
 import { RecurringScheduleDialog } from "@/ordre/components/orders/RecurringScheduleDialog";
-import { ProductWeekEditor } from "@/ordre/components/orders/matrix/ProductWeekEditor";
 import {
   useDeliveryPausesForCustomer,
   isPaused,
@@ -1000,24 +999,22 @@ export default function MatrixPage() {
   const isEmptyMatrix = !!matrix && allProducts.length === 0;
 
   return (
-    <div className="-mx-4 -mt-8 -mb-12 flex h-full flex-col bg-background sm:-mx-6 lg:-mx-8">
+    <div className="-mt-8 -mb-12 flex h-full flex-col bg-background">
 
-      <div className="sticky top-0 z-40 w-full border-b border-border/60 bg-background/95 px-4 py-2 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-        <div className="rounded-[12px] border border-brand-bronze/30 bg-card/70 px-2 py-1.5 shadow-sm">
-        <div className="flex flex-nowrap items-center gap-2 overflow-x-auto">
-
+      <div className="mx-auto w-[95%] max-w-[1800px] px-2 py-5">
+        <div className="rounded-[16px] border-2 border-brand-bronze/40 bg-gradient-to-br from-card to-brand-cream/20 p-5 shadow-lg ring-1 ring-inset ring-brand-bronze/10 px-[10px] py-[20px]">
+        <div className="flex flex-wrap items-center gap-3">
           <Button
             variant="outline"
             size="icon"
             disabled={!selectedCustomer}
             aria-label="Vis kundekort"
             title="Vis kundekort"
-            className="h-8 w-8 shrink-0 border border-brand-bronze/30 hover:border-brand-bronze/60"
+            className="border-2 border-brand-bronze/30 hover:border-brand-bronze/60"
             onClick={() => setCustomerCardOpen(true)}
           >
             <Eye className="h-4 w-4" />
           </Button>
-
           <Dialog open={customerCardOpen} onOpenChange={setCustomerCardOpen}>
             <DialogContent className="max-w-3xl">
               <DialogHeader>
@@ -1123,15 +1120,14 @@ export default function MatrixPage() {
           </Dialog>
 
 
-          <div className="flex items-center gap-1.5">
+          <div className="flex flex-col items-start gap-1.5">
             <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
               <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" className="h-8 min-w-[230px] justify-start text-sm font-semibold border border-brand-bronze/30 hover:border-brand-bronze/60">
+                <Button variant="outline" size="lg" className="min-w-[320px] justify-start text-base font-semibold border-2 border-brand-bronze/30 hover:border-brand-bronze/60 shadow-sm">
                   {selectedCustomer
                     ? `${selectedCustomer.customer_number} — ${selectedCustomer.display_name}`
                     : "Velg kunde …"}
                 </Button>
-
               </PopoverTrigger>
               <PopoverContent className="w-[420px] p-0" align="start">
                 <Command shouldFilter={false}>
@@ -1164,31 +1160,29 @@ export default function MatrixPage() {
                 size="sm"
                 onClick={() => setRecurringDialogOpen(true)}
                 title="Klikk for å redigere fastordre"
-                className="h-8 gap-1.5 px-2 text-xs font-semibold"
+                className="h-8 gap-1.5 px-3 text-sm font-semibold"
               >
                 <Repeat className="h-3.5 w-3.5" />
-                Fastordre
+                Fastordre aktiv
               </Button>
             )}
           </div>
 
 
-          <div className="relative flex items-center gap-2 self-center">
-            <div className="flex items-center gap-1 rounded-md border border-brand-bronze/30 bg-card/60 px-1.5 py-0.5 text-sm">
-
+          <div className="relative flex flex-col gap-0.5 self-start">
+            <div className="flex items-center gap-1 rounded-md border border-brand-bronze/30 bg-card/60 px-2 py-1 text-sm">
               <Popover open={fromDateOpen} onOpenChange={setFromDateOpen}>
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
-                    size="icon"
+                    size="sm"
                     disabled={!customerId}
-                    className="h-7 w-7"
+                    className="h-7 gap-1.5 px-2 text-xs font-medium"
                     aria-label="Ordre fra dato"
-                    title="Ordre fra dato"
                   >
                     <CalendarIcon className="h-3.5 w-3.5" />
+                    Ordre fra dato
                   </Button>
-
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
                   <Calendar
@@ -1217,12 +1211,11 @@ export default function MatrixPage() {
               <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => shiftWeek(1)} aria-label="Neste uke">
                 <ChevronRight />
               </Button>
-              <Button variant="ghost" size="sm" className="h-7 px-1.5 text-xs" onClick={jumpToday}>
-                I dag
+              <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={jumpToday}>
+                Hopp til i dag
               </Button>
             </div>
-            <div className="flex items-center gap-2 whitespace-nowrap text-xs">
-
+            <div className="flex items-center gap-3 px-3 text-xs">
               {([
                 ["today", "I morgen"],
                 ["this_week", "Denne uken"],
@@ -1248,9 +1241,8 @@ export default function MatrixPage() {
           </div>
 
 
-          <div className="flex shrink-0 items-center gap-1.5 rounded-md border border-brand-bronze/30 bg-card/60 px-1.5 py-0.5 text-xs">
+          <div className="flex items-center gap-2 rounded-md border border-brand-bronze/30 bg-card/60 px-2 py-1 text-sm">
             <span className="text-muted-foreground">vis</span>
-
             <Select
               value={String(daysCount)}
               onValueChange={(v) => setDaysCount(parseInt(v, 10))}
@@ -1268,9 +1260,8 @@ export default function MatrixPage() {
             <span className="text-muted-foreground">dager</span>
           </div>
 
-          <div className="flex shrink-0 items-center gap-1.5 rounded-md border border-brand-bronze/30 bg-card/60 px-1.5 py-0.5 text-xs">
-            <span className="text-muted-foreground">turer</span>
-
+          <div className="flex items-center gap-2 rounded-md border border-brand-bronze/30 bg-card/60 px-2 py-1 text-sm">
+            <span className="text-muted-foreground">vis turer</span>
             <div className="flex items-center gap-1">
               {(matrix?.tours ?? []).map((t) => {
                 const checked = !hiddenTourIds.has(t.id);
@@ -1301,9 +1292,8 @@ export default function MatrixPage() {
             </div>
           </div>
 
-          <div className="flex shrink-0 items-center gap-1.5 rounded-md border border-brand-bronze/30 bg-card/60 px-1.5 py-0.5 text-xs">
-            <span className="text-muted-foreground">retur</span>
-
+          <div className="flex items-center gap-2 rounded-md border border-brand-bronze/30 bg-card/60 px-2 py-1 text-sm">
+            <span className="text-muted-foreground">vis retur</span>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm" className="h-7 px-2 text-xs">
@@ -1320,7 +1310,6 @@ export default function MatrixPage() {
           <Button
             variant="brand"
             size="sm"
-            className="h-8 shrink-0"
             disabled={!customerId}
             onClick={() => navigate(`/ordre/ordrer/ny?customer_id=${customerId}`)}
           >
@@ -1328,7 +1317,7 @@ export default function MatrixPage() {
             Ny ordre
           </Button>
 
-          <div className="ml-auto flex shrink-0 items-center gap-1.5">
+          <div className="ml-auto flex items-center gap-2">
             {(dirtyCount > 0 || addedProducts.length > 0) && (
               <>
                 {dirtyCount > 0 && (
@@ -1337,22 +1326,21 @@ export default function MatrixPage() {
                 {addedProducts.length > 0 && (
                   <Badge variant="outline">+{addedProducts.length} ny rad{addedProducts.length === 1 ? "" : "er"}</Badge>
                 )}
-                <Button variant="ghost" size="sm" className="h-8" onClick={handleDiscardClick}>
+                <Button variant="ghost" size="sm" onClick={handleDiscardClick}>
                   <RotateCcw />
                   Forkast
                 </Button>
               </>
             )}
-            <Button size="sm" className="h-8" onClick={handleSave} disabled={dirtyCount === 0 || saveMatrix.isPending || !canEdit}>
+            <Button onClick={handleSave} disabled={dirtyCount === 0 || saveMatrix.isPending || !canEdit}>
               {saveMatrix.isPending ? <Loader2 className="animate-spin" /> : <Save />}
               Lagre
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="h-8" disabled={!customerId}>
+                <Button variant="outline" disabled={!customerId}>
                   Handling <ChevronDown className="ml-1 h-4 w-4" />
                 </Button>
-
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-64">
                 <DropdownMenuLabel>Opprette nytt</DropdownMenuLabel>
@@ -1437,7 +1425,7 @@ export default function MatrixPage() {
         </div>
       </div>
 
-      <div className="w-full flex-1 overflow-auto px-4">
+      <div className="mx-auto w-[95%] max-w-[1800px] flex-1 overflow-auto px-2">
         {!customerId ? (
           <div className="grid h-full place-items-center p-10 text-center text-muted-foreground">
             <div className="max-w-2xl">
@@ -1547,7 +1535,6 @@ export default function MatrixPage() {
               canEdit={canEdit}
               onOpenTourOrder={(date, tour) => setTourOrderCol({ date, tour })}
               onOpenWeekEditor={(p) => setWeekEditorProduct(p)}
-
             />
             <div className="sticky left-0 flex flex-wrap items-center gap-2 border-t border-border bg-card px-4 py-3 sm:px-6">
               {hasAddable ? (
@@ -1566,8 +1553,8 @@ export default function MatrixPage() {
                 <LegendSwatch className="bg-muted/60 border-border" label="Helg" />
                 <LegendSwatch className="bg-muted border-border" label="Sum-rad/kolonne" />
                 <span className="text-muted-foreground/70">
-                  Værvarsel fra Yr levert av Meteorologisk institutt og NRK · Historiske værdata fra
-                  Open-Meteo (CC BY 4.0)
+                  Værvarsel fra Yr levert av Meteorologisk institutt og NRK · Historiske værdata
+                  fra Open-Meteo (CC BY 4.0)
                 </span>
               </div>
             </div>
@@ -1851,7 +1838,6 @@ function MatrixGrid({
   canEdit,
   onOpenTourOrder,
   onOpenWeekEditor,
-
 }: {
   columns: { date: string; tour: MatrixTour }[];
   products: MatrixProduct[];
@@ -1879,7 +1865,6 @@ function MatrixGrid({
   canEdit: boolean;
   onOpenTourOrder: (date: string, tour: MatrixTour) => void;
   onOpenWeekEditor: (product: MatrixProduct) => void;
-
 }) {
   const [infoProduct, setInfoProduct] = useState<{
     id: string;
@@ -1888,14 +1873,6 @@ function MatrixGrid({
     unit: string | null;
     price: number | null;
   } | null>(null);
-  const [hoverCol, setHoverCol] = useState<number | null>(null);
-  const gridRef = useRef<HTMLDivElement>(null);
-
-  const todayIso = useMemo(
-    () => new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Oslo" }).format(new Date()),
-    [],
-  );
-
   const dateGroups = useMemo(() => {
     const groups: { date: string; count: number }[] = [];
     for (const c of columns) {
@@ -1906,61 +1883,7 @@ function MatrixGrid({
     return groups;
   }, [columns]);
 
-  /** Siste kolonne i hver dag-gruppe → tydeligere vertikal delelinje. */
-  const dayEndIdx = useMemo(() => {
-    const s = new Set<number>();
-    columns.forEach((c, i) => {
-      if (i === columns.length - 1 || columns[i + 1].date !== c.date) s.add(i);
-    });
-    return s;
-  }, [columns]);
-
-  const focusCell = (r: number, c: number) => {
-    const el = gridRef.current?.querySelector<HTMLInputElement>(`[data-cell="${r}-${c}"]`);
-    if (el) {
-      el.focus();
-      el.select();
-    }
-  };
-
-  const onCellKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, r: number, c: number) => {
-    switch (e.key) {
-      case "ArrowDown":
-      case "Enter":
-        e.preventDefault();
-        focusCell(r + 1, c);
-        break;
-      case "ArrowUp":
-        e.preventDefault();
-        focusCell(r - 1, c);
-        break;
-      case "ArrowRight":
-        e.preventDefault();
-        focusCell(r, c + 1);
-        break;
-      case "ArrowLeft":
-        e.preventDefault();
-        focusCell(r, c - 1);
-        break;
-      default:
-        break;
-    }
-  };
-
-  const lineCounts = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const c of columns) {
-      let n = 0;
-      for (const p of products) {
-        const v = getValue(ckey(c.date, c.tour.id, p.id));
-        if (v && Number(v.replace(",", ".")) > 0) n++;
-      }
-      m.set(`${c.date}|${c.tour.id}`, n);
-    }
-    return m;
-  }, [columns, products, getValue]);
-
-  /** Antall-summer: per rad (uke) og per kolonne (dag × tur). */
+  /** Antall-summer: per rad (uke) og per kolonne (dag × tur) — dempet, sekundær info. */
   const qtySums = useMemo(() => {
     const rows: Record<string, number> = {};
     const cols: Record<string, number> = {};
@@ -1979,14 +1902,13 @@ function MatrixGrid({
     return { rows, cols };
   }, [columns, products, getValue]);
 
-
   return (
-    <div className="w-full" ref={gridRef} onMouseLeave={() => setHoverCol(null)}>
-      <table className="w-full border-separate border-spacing-0 text-[13px]">
+    <div className="min-w-max">
+      <table className="border-separate border-spacing-0 text-sm">
         <thead className="sticky top-0 z-20 bg-card">
           <tr>
             <th
-              className="sticky left-0 z-30 w-[220px] min-w-[220px] border-b border-r-2 border-border px-2 py-1 text-left text-xs font-semibold bg-card"
+              className="sticky left-0 z-30 w-[320px] min-w-[320px] border-b border-r border-border bg-card px-3 py-2 text-left"
               rowSpan={2}
             >
               Produkt
@@ -1995,169 +1917,150 @@ function MatrixGrid({
               const d = new Date(g.date + "T12:00:00");
               const dow = (d.getDay() === 0 ? 7 : d.getDay()) - 1;
               const isWeekend = dow >= 5;
-              const isToday = g.date === todayIso;
               return (
                 <th
                   key={g.date}
                   colSpan={g.count}
                   className={cn(
-                    "border-b border-r-2 border-border px-1 py-0.5 text-center text-[11px] font-semibold",
-                    isToday
-                      ? "bg-warning/25"
-                      : isWeekend
-                        ? "bg-muted/60"
-                        : "bg-card",
+                    "border-b border-r border-border px-2 py-1 text-center text-xs font-semibold",
+                    isWeekend ? "bg-muted/60" : "bg-card",
                   )}
                 >
-                  <div className="flex flex-col items-center gap-0.5 leading-tight">
-                    <WeatherCell forecast={weatherMap?.get(g.date)} />
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-[12px] font-semibold text-foreground">{DAY_LABELS[dow]}</span>
-                      <span className="text-[10px] font-normal text-muted-foreground tabular-nums">
-                        {new Intl.DateTimeFormat("nb-NO", { day: "2-digit", month: "2-digit" }).format(d)}
-                      </span>
-                    </div>
+                  <WeatherCell forecast={weatherMap?.get(g.date)} />
+                  <div className="text-muted-foreground">{DAY_LABELS[dow]}</div>
+                  <div className="tabular-nums">
+                    {new Intl.DateTimeFormat("nb-NO", { day: "2-digit", month: "2-digit" }).format(d)}
                   </div>
                 </th>
               );
             })}
-
             <th
               rowSpan={2}
-              className="border-b border-r border-border bg-card px-1 py-1 text-right text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
+              className="border-b border-r border-border bg-card px-2 py-2 text-right text-[11px] font-medium uppercase tracking-wide text-muted-foreground"
             >
               Uke
             </th>
             <th
               rowSpan={2}
-              className="border-b border-r border-border bg-card px-2 py-1 text-right text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
+              className="border-b border-r border-border bg-card px-3 py-2 text-right text-xs font-semibold"
             >
               Sum kr
             </th>
-
           </tr>
           <tr>
-            {columns.map((c, ci) => {
+            {columns.map((c) => {
               const pause = isPaused(pauseMap, c.date, c.tour.id);
               const hasComment = columnComments?.has(`${c.date}|${c.tour.id}`);
               const colHas = colHasData(c.date, c.tour.id);
-              const nLines = lineCounts.get(`${c.date}|${c.tour.id}`) ?? 0;
-              const isToday = c.date === todayIso;
+              const d = new Date(c.date + "T00:00:00");
+              const dow = (d.getDay() + 6) % 7;
+              const dayLabel = DAY_LABELS[dow];
               return (
                 <th
                   key={`${c.date}-${c.tour.id}`}
-                  onMouseEnter={() => setHoverCol(ci)}
                   className={cn(
-                    "w-[72px] min-w-[64px] border-b px-0.5 py-0.5 text-center text-[11px] font-medium text-muted-foreground",
-                    dayEndIdx.has(ci) ? "border-r-2 border-border" : "border-r border-border/50",
-                    pause
-                      ? "bg-sky-100 dark:bg-sky-950/40"
-                      : isToday
-                        ? "bg-warning/20"
-                        : hoverCol === ci
-                          ? "bg-muted/70"
-                          : "bg-card/80",
+                    "border-b border-r border-border px-1 py-1 text-center text-[11px] font-medium text-muted-foreground",
+                    pause ? "bg-sky-100 dark:bg-sky-950/40" : "bg-card/80",
                   )}
-
                   title={`${c.tour.display_name} (${c.tour.time_from.slice(0, 5)}–${c.tour.time_to.slice(0, 5)})${pause?.reason ? ` · Pause: ${pause.reason}` : pause ? " · Pause" : ""}${hasComment ? `\nKommentar: ${columnComments?.get(`${c.date}|${c.tour.id}`)}` : ""}`}
                 >
-                  <div className="flex items-center justify-center gap-0.5 leading-none">
-                    <button
-                      type="button"
-                      disabled={!colHas}
-                      onClick={() => onOpenTourOrder(c.date, c.tour)}
-                      className="rounded px-0.5 py-0.5 text-[11px] font-semibold text-foreground hover:bg-primary/10 hover:text-primary disabled:cursor-default disabled:opacity-60 disabled:hover:bg-transparent disabled:hover:text-foreground"
-                      title={colHas ? "Åpne ordre for denne turen" : "Ingen ordre på denne turen"}
-                    >
-                      T{c.tour.tour_number}
-                      {nLines > 0 && (
-                        <span className="ml-0.5 font-normal text-muted-foreground tabular-nums">({nLines})</span>
-                      )}
-                      {hasComment && <span className="ml-0.5 text-primary">•</span>}
-                    </button>
-                    <button type="button" disabled={!canEdit || !colHas} onClick={() => onColCopy(c.date, c.tour)} className="rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-30" title="Kopier kolonne">
-                      <Copy className="h-3 w-3" />
-                    </button>
-                    <button type="button" disabled={!canEdit || !colHas} onClick={() => onColDelete(c.date, c.tour)} className="rounded p-0.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-30" title="Slett kolonne">
-                      <Trash2 className="h-3 w-3" />
-                    </button>
-                    <button type="button" disabled={!colHas} onClick={() => onColPackingNote(c.date, c.tour)} className="rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-30" title="Lag pakkseddel">
-                      <PackageCheck className="h-3 w-3" />
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    disabled={!colHas}
+                    onClick={() => onOpenTourOrder(c.date, c.tour)}
+                    className="mx-auto block rounded px-1.5 py-0.5 text-[12px] font-semibold text-foreground hover:bg-primary/10 hover:text-primary disabled:cursor-default disabled:opacity-60 disabled:hover:bg-transparent disabled:hover:text-foreground"
+                    title={colHas ? "Åpne ordre for denne turen" : "Ingen ordre på denne turen"}
+                  >
+                    {dayLabel} ({c.tour.tour_number})
+                    {hasComment && <span className="ml-1 text-primary">•</span>}
+                  </button>
                   {pause && (
                     <div className="mt-0.5 inline-block rounded-sm bg-sky-200/80 px-1 text-[9px] font-semibold uppercase tracking-wide text-sky-900 dark:bg-sky-800/60 dark:text-sky-100">
                       Pause
                     </div>
                   )}
+                  <div className="mt-1 flex items-center justify-center gap-1.5">
+                    <button type="button" disabled={!canEdit || !colHas} onClick={() => onColCopy(c.date, c.tour)} className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-30" title="Kopier kolonne">
+                      <Copy className="h-4 w-4" />
+                    </button>
+                    <button type="button" disabled={!canEdit || !colHas} onClick={() => onColDelete(c.date, c.tour)} className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-30" title="Slett kolonne">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                    <button type="button" disabled={!colHas} onClick={() => onColPackingNote(c.date, c.tour)} className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-30" title="Lag pakkseddel">
+                      <PackageCheck className="h-4 w-4" />
+                    </button>
+                  </div>
                 </th>
               );
             })}
           </tr>
         </thead>
         <tbody>
-          {products.map((p, ri) => {
+          {products.map((p) => {
             const isAdded = addedIds.has(p.id);
-            const openInfo = () =>
-              setInfoProduct({
-                id: p.id,
-                name: p.display_name,
-                number: p.display_number ?? null,
-                unit: p.sales_unit ?? null,
-                price: p.unit_price ?? null,
-              });
-            const zebra = ri % 2 === 1;
             return (
-              <tr key={p.id} className={cn("group/row h-7", zebra && "bg-muted/25")}>
+              <tr key={p.id} className="hover:bg-muted/30">
                 <th
                   scope="row"
                   className={cn(
-                    "sticky left-0 z-10 w-[220px] min-w-[220px] border-b border-r-2 border-border px-1 py-0 text-left font-normal group-hover/row:bg-muted/60",
-                    isAdded ? "bg-accent/30" : zebra ? "bg-muted/25" : "bg-card",
+                    "sticky left-0 z-10 w-[320px] min-w-[320px] border-b border-r border-border px-3 py-1.5 text-left font-normal",
+                    isAdded ? "bg-accent/30" : "bg-card",
                   )}
                 >
-                  <div className="flex w-full items-center gap-1">
+                  <div className="flex items-stretch gap-2">
                     <button
                       type="button"
-                      onClick={openInfo}
-                      aria-label={`Produkthåndbok for ${p.display_name}`}
+                      onClick={() =>
+                        setInfoProduct({
+                          id: p.id,
+                          name: p.display_name,
+                          number: p.display_number,
+                          unit: p.sales_unit,
+                          price: p.unit_price ?? null,
+                        })
+                      }
+                      className="inline-flex w-9 shrink-0 items-center justify-center self-stretch rounded-md border border-brand-bronze/40 bg-brand-bronze/10 text-brand-bronze shadow-sm transition-colors hover:border-brand-bronze hover:bg-brand-bronze hover:text-brand-ink"
                       title="Produkthåndbok"
-                      className="shrink-0 rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-primary"
+                      aria-label={`Produkthåndbok for ${p.display_name}`}
                     >
-                      <Info className="h-3.5 w-3.5" />
+                      <BookOpen className="h-5 w-5" strokeWidth={2.25} />
                     </button>
-                    <TooltipProvider delayDuration={200}>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button
-                            type="button"
-                            onClick={() => onOpenWeekEditor(p)}
-                            className="flex min-w-0 flex-1 items-center gap-1.5 truncate text-left leading-tight hover:text-primary"
-                          >
-                            <span className="w-8 shrink-0 text-right font-mono text-[11px] text-muted-foreground tabular-nums">
-                              {p.display_number}
-                            </span>
-                            <span className="truncate font-medium">{p.display_name}</span>
-                            {isAdded && (
-                              <Badge variant="outline" className="ml-1 px-1 py-0 text-[9px]">Ny</Badge>
-                            )}
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent side="right" className="max-w-xs text-xs">
-                          Klikk for å redigere hele uken · {p.sales_unit} ·{" "}
-                          {p.unit_price == null
-                            ? "Ingen pris for denne kunden på valgt dato — settes i Varer-appen."
-                            : formatNOK(p.unit_price)}
-                        </TooltipContent>
-
-                      </Tooltip>
-                    </TooltipProvider>
+                    <div className="min-w-0 flex-1">
+                      <button
+                        type="button"
+                        onClick={() => onOpenWeekEditor(p)}
+                        title="Klikk for å redigere hele uken for denne varen"
+                        className="flex w-full items-center gap-1.5 truncate text-left font-medium hover:text-primary"
+                      >
+                        <span className="font-mono text-xs text-muted-foreground tabular-nums">
+                          {p.display_number}
+                        </span>
+                        <span className="truncate">{p.display_name}</span>
+                        {isAdded && (
+                          <Badge variant="outline" className="ml-1 text-[10px]">Ny</Badge>
+                        )}
+                      </button>
+                      <div className="text-[11px] text-muted-foreground">
+                        {p.sales_unit} ·{" "}
+                        {p.unit_price == null ? (
+                          <TooltipProvider delayDuration={150}>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="cursor-help text-muted-foreground/70">—</span>
+                              </TooltipTrigger>
+                              <TooltipContent side="right" className="max-w-xs text-xs">
+                                Ingen pris for denne kunden på valgt dato. Pris må settes i Varer-appen før ordren kan lagres.
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        ) : (
+                          formatNOK(p.unit_price)
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </th>
-
-
-
-                {columns.map((c, ci) => {
+                {columns.map((c) => {
                   const key = ckey(c.date, c.tour.id, p.id);
                   const value = getValue(key);
                   const dirty = isDirty(key);
@@ -2171,13 +2074,9 @@ function MatrixGrid({
                   return (
                     <td
                       key={key}
-                      onMouseEnter={() => setHoverCol(ci)}
                       className={cn(
-                        "group relative w-[72px] border-b border-border p-0 group-hover/row:bg-muted/40",
-                        dayEndIdx.has(ci) ? "border-r-2 border-r-border" : "border-r border-r-border/40",
-                        hoverCol === ci && "bg-muted/40",
-                        c.date === todayIso && "bg-warning/[0.06]",
-                        dirty && "bg-warning/30 group-hover/row:bg-warning/30",
+                        "group relative border-b border-r border-border p-0",
+                        dirty && "bg-warning/25",
                         pause && "bg-sky-50 dark:bg-sky-950/30",
                         fb && "outline outline-2 -outline-offset-2 outline-destructive/70",
                       )}
@@ -2188,9 +2087,9 @@ function MatrixGrid({
                             ? ghostOverridden
                               ? `Fastordre: ${ghost} stk — overstyrt til ${effectiveQty}`
                               : `Fastordre: ${ghost} stk`
-                            : pause
-                              ? pause.reason ? `Leveransepause: ${pause.reason}` : "Leveransepause"
-                              : undefined
+                          : pause
+                            ? pause.reason ? `Leveransepause: ${pause.reason}` : "Leveransepause"
+                            : undefined
                       }
                     >
                       <Input
@@ -2198,17 +2097,10 @@ function MatrixGrid({
                         inputMode="decimal"
                         value={value}
                         readOnly={!!pause}
-                        data-cell={`${ri}-${ci}`}
-                        onKeyDown={(e) => onCellKeyDown(e, ri, ci)}
                         onChange={(e) => {
                           if (pause) return;
                           onChange(key, e.target.value);
                         }}
-                        onFocus={(e) => {
-                          setHoverCol(ci);
-                          e.currentTarget.select();
-                        }}
-
                         onMouseDown={(e) => {
                           if (pause) {
                             e.preventDefault();
@@ -2219,14 +2111,13 @@ function MatrixGrid({
                         }}
                         placeholder={ghost ? String(ghost) : ""}
                         className={cn(
-                          "h-7 w-full rounded-none border-0 bg-transparent px-1 text-right text-[13px] tabular-nums shadow-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-0",
-                          value && "font-medium text-foreground",
-                          dirty && "font-semibold",
+                          "h-9 w-16 rounded-none border-0 bg-transparent px-1 text-center tabular-nums shadow-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-0",
+                          value && "text-base font-semibold text-foreground",
+                          dirty && "font-bold text-warning",
                           pause && "cursor-not-allowed",
                           ghost && !value && "placeholder:text-muted-foreground/60",
                         )}
                       />
-
                       {hasM && (
                         <span
                           className="pointer-events-none absolute right-0.5 top-0.5 text-primary"
@@ -2262,10 +2153,10 @@ function MatrixGrid({
                     </td>
                   );
                 })}
-                <td className="border-b border-r border-border/60 bg-card px-1 py-0 text-right text-[12px] font-medium tabular-nums text-muted-foreground">
-                  {qtySums.rows[p.id] ? qtySums.rows[p.id] : ""}
+                <td className="border-b border-r border-border/60 bg-card px-2 py-1.5 text-right text-xs tabular-nums text-muted-foreground">
+                  {qtySums.rows[p.id] || ""}
                 </td>
-                <td className="border-b border-r border-border bg-card px-2 py-0 text-right text-[12px] tabular-nums text-muted-foreground">
+                <td className="border-b border-r border-border bg-card px-3 py-1.5 text-right font-bold tabular-nums">
                   {formatKrNetto(rowTotals[p.id] ?? 0)}
                 </td>
               </tr>
@@ -2273,10 +2164,10 @@ function MatrixGrid({
           })}
         </tbody>
         <tfoot>
-          <tr className="bg-muted/60">
+          <tr className="bg-muted/40">
             <th
               scope="row"
-              className="sticky left-0 z-10 w-[220px] min-w-[220px] border-t border-b border-r-2 border-border bg-muted/60 px-2 py-1 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
+              className="sticky left-0 z-10 w-[320px] min-w-[320px] border-b border-r border-border bg-muted/40 px-3 py-1.5 text-left text-xs font-medium text-muted-foreground"
             >
               Dagsum (antall)
             </th>
@@ -2285,21 +2176,21 @@ function MatrixGrid({
               return (
                 <td
                   key={colKey}
-                  className="border-t border-b border-r border-border/60 bg-muted/60 px-1 py-1 text-right text-[11px] font-medium tabular-nums text-muted-foreground"
+                  className="border-b border-r border-border px-1 py-1.5 text-right text-xs tabular-nums text-muted-foreground"
                 >
-                  {qtySums.cols[colKey] ? qtySums.cols[colKey] : ""}
+                  {qtySums.cols[colKey] || ""}
                 </td>
               );
             })}
-            <td className="border-t border-b border-r border-border/60 bg-muted/60 px-1 py-1 text-right text-[11px] font-semibold tabular-nums text-muted-foreground">
+            <td className="border-b border-r border-border px-2 py-1.5 text-right text-xs font-medium tabular-nums text-muted-foreground">
               {Object.values(qtySums.rows).reduce((a, b) => a + b, 0) || ""}
             </td>
-            <td className="border-t border-b border-r border-border bg-muted/60 px-2 py-1 text-right text-[11px] font-semibold tabular-nums text-muted-foreground" />
+            <td className="border-b border-r border-border px-3 py-1.5" />
           </tr>
           <tr className="bg-muted">
             <th
               scope="row"
-              className="sticky left-0 z-10 w-[220px] min-w-[220px] border-b border-r-2 border-border bg-muted px-2 py-1 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
+              className="sticky left-0 z-10 w-[320px] min-w-[320px] border-b border-r border-border bg-muted px-3 py-2 text-left font-bold"
             >
               Sum kr
             </th>
@@ -2308,19 +2199,18 @@ function MatrixGrid({
               return (
                 <td
                   key={colKey}
-                  className="border-b border-r border-border/60 bg-muted px-1 py-1 text-right text-[11px] font-medium tabular-nums text-muted-foreground"
+                  className="border-b border-r border-border bg-muted px-1 py-2 text-right text-xs font-bold tabular-nums"
                 >
                   {formatKrNetto(colTotals[colKey] ?? 0)}
                 </td>
               );
             })}
-            <td className="border-b border-r border-border/60 bg-muted" />
-            <td className="border-b border-r border-border bg-muted px-2 py-1 text-right text-[11px] font-bold tabular-nums">
+            <td className="border-b border-r border-border bg-muted px-2 py-2" />
+            <td className="border-b border-r border-border bg-muted px-3 py-2 text-right font-bold tabular-nums">
               {formatKrNetto(grandTotal)}
             </td>
           </tr>
         </tfoot>
-
       </table>
       <ProductInfoDialog
         productId={infoProduct?.id ?? null}
@@ -2331,7 +2221,6 @@ function MatrixGrid({
         open={!!infoProduct}
         onClose={() => setInfoProduct(null)}
       />
-
     </div>
   );
 }
