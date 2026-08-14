@@ -1177,14 +1177,15 @@ export default function MatrixPage() {
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
-                    size="sm"
+                    size="icon"
                     disabled={!customerId}
-                    className="h-7 gap-1.5 px-2 text-xs font-medium"
+                    className="h-7 w-7"
                     aria-label="Ordre fra dato"
+                    title="Ordre fra dato"
                   >
                     <CalendarIcon className="h-3.5 w-3.5" />
-                    Ordre fra dato
                   </Button>
+
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
                   <Calendar
