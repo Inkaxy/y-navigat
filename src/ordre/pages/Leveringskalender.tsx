@@ -1583,6 +1583,7 @@ export default function MatrixPage() {
         customerId={customerId}
         scheduleId={existingSchedule?.id ?? null}
         getValue={(date, tourId, productId) => getCellValue(ckey(date, tourId, productId))}
+        getGhost={(date, tourId, productId) => ghostMap?.get(`${date}|${tourId}|${productId}`) ?? 0}
         onChange={(date, tourId, productId, value) =>
           setCellValue(ckey(date, tourId, productId), value)
         }
