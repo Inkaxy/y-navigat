@@ -1245,8 +1245,9 @@ export default function MatrixPage() {
           </div>
 
 
-          <div className="flex items-center gap-2 rounded-md border border-brand-bronze/30 bg-card/60 px-2 py-1 text-sm">
+          <div className="flex shrink-0 items-center gap-1.5 rounded-md border border-brand-bronze/30 bg-card/60 px-1.5 py-0.5 text-xs">
             <span className="text-muted-foreground">vis</span>
+
             <Select
               value={String(daysCount)}
               onValueChange={(v) => setDaysCount(parseInt(v, 10))}
