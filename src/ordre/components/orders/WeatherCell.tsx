@@ -16,12 +16,17 @@ const SYMBOL_LABEL_NB: Record<string, string> = {
   heavyrainshowers: "Kraftige regnbyger",
   drizzle: "Yr",
   sleet: "Sludd",
+  lightsleet: "Lett sludd",
+  heavysleet: "Kraftig sludd",
   snow: "Snø",
   lightsnow: "Lett snø",
   heavysnow: "Kraftig snø",
   snowshowers: "Snøbyger",
+  lightsnowshowers: "Lette snøbyger",
+  heavysnowshowers: "Kraftige snøbyger",
   thunderstorm: "Torden",
   rainandthunder: "Regn og torden",
+  heavyrainandthunder: "Kraftig regn og torden",
 };
 
 function labelFor(symbolCode: string): string {
@@ -36,32 +41,64 @@ type Props = {
 };
 
 export function WeatherCell({ forecast }: Props) {
-  // Ingen varsel (fortid eller utenfor varselhorisont) → ingen plassholder.
+  // Ingen data (utenfor varsel-/historikkhorisont) → ingen plassholder.
   if (!forecast) return null;
 
   const label = labelFor(forecast.symbolCode);
   const icon = weatherIconUrl(forecast.symbolCode);
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <div className="flex items-center gap-0.5 text-[11px] font-medium text-muted-foreground">
-          {icon && (
-            <img
-              src={icon}
-              alt={label}
-              width={22}
-              height={22}
-              loading="lazy"
-              className="h-[22px] w-[22px] shrink-0"
-            />
-          )}
+  const ly = forecast.lastYear;
+  const lyLabel = ly ? labelFor(ly.symbolCode) : null;
+  const lyIcon = ly ? weatherIconUrl(ly.symbolCode) : null;
 
-          <span className="tabular-nums text-foreground">{forecast.tempMax}°</span>
-        </div>
-      </TooltipTrigger>
-      <TooltipContent side="top">
-        Min {forecast.tempMin}° / Maks {forecast.tempMax}° · {label} (Yr / MET Norway)
-      </TooltipContent>
-    </Tooltip>
+  return (
+    <div className="flex items-center gap-1">
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className="flex items-center gap-0.5 text-[11px] font-medium text-muted-foreground">
+            {icon && (
+              <img
+                src={icon}
+                alt={label}
+                width={22}
+                height={22}
+                loading="lazy"
+                className="h-[22px] w-[22px] shrink-0"
+              />
+            )}
+
+            <span className="tabular-nums text-foreground">{forecast.tempMax}°</span>
+          </div>
+        </TooltipTrigger>
+        <TooltipContent side="top">
+          Min {forecast.tempMin}° / Maks {forecast.tempMax}° · {label} ·{" "}
+          {forecast.source === "observed"
+            ? "Observert (Open-Meteo)"
+            : "Varsel (Yr / MET Norway)"}
+        </TooltipContent>
+      </Tooltip>
+
+      {ly && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="flex items-center gap-0.5 text-[10px] text-muted-foreground/60">
+              {lyIcon && (
+                <img
+                  src={lyIcon}
+                  alt={lyLabel ?? ""}
+                  width={14}
+                  height={14}
+                  loading="lazy"
+                  className="h-[14px] w-[14px] shrink-0 opacity-60"
+                />
+              )}
+              <span className="tabular-nums">{ly.tempMax}°</span>
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="top">
+            Samme dag i fjor ({ly.date}): {ly.tempMax}° · {lyLabel} (Open-Meteo)
+          </TooltipContent>
+        </Tooltip>
+      )}
+    </div>
   );
 }
