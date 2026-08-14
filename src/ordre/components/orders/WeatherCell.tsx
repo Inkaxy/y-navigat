@@ -51,10 +51,10 @@ export function WeatherCell({ forecast }: Props) {
   const lyIcon = ly ? weatherIconUrl(ly.symbolCode) : null;
 
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex flex-col items-center leading-tight">
       <Tooltip>
         <TooltipTrigger asChild>
-          <div className="flex items-center gap-0.5 text-[11px] font-medium text-muted-foreground">
+          <div className="flex items-center gap-1 text-xs font-medium">
             {icon && (
               <img
                 src={icon}
@@ -62,10 +62,12 @@ export function WeatherCell({ forecast }: Props) {
                 width={22}
                 height={22}
                 loading="lazy"
-                className="h-[22px] w-[22px] shrink-0"
+                className={cn(
+                  "h-[22px] w-[22px] shrink-0",
+                  forecast.source === "observed" && "opacity-80",
+                )}
               />
             )}
-
             <span className="tabular-nums text-foreground">{forecast.tempMax}°</span>
           </div>
         </TooltipTrigger>
@@ -80,25 +82,27 @@ export function WeatherCell({ forecast }: Props) {
       {ly && (
         <Tooltip>
           <TooltipTrigger asChild>
-            <div className="flex items-center gap-0.5 text-[10px] text-muted-foreground/60">
+            <div className="flex items-center gap-0.5 text-[10px] font-normal text-muted-foreground/70">
+              <span>i fjor</span>
               {lyIcon && (
                 <img
                   src={lyIcon}
                   alt={lyLabel ?? ""}
-                  width={14}
-                  height={14}
+                  width={12}
+                  height={12}
                   loading="lazy"
-                  className="h-[14px] w-[14px] shrink-0 opacity-60"
+                  className="h-3 w-3 shrink-0 opacity-70"
                 />
               )}
               <span className="tabular-nums">{ly.tempMax}°</span>
             </div>
           </TooltipTrigger>
           <TooltipContent side="top">
-            Samme dag i fjor ({ly.date}): {ly.tempMax}° · {lyLabel} (Open-Meteo)
+            Samme dag i fjor ({ly.date}): {lyLabel}, {ly.tempMax}° (Open-Meteo)
           </TooltipContent>
         </Tooltip>
       )}
     </div>
   );
 }
+
