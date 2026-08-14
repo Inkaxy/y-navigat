@@ -1544,6 +1544,8 @@ export default function MatrixPage() {
               colHasData={colHasAnyData}
               canEdit={canEdit}
               onOpenTourOrder={(date, tour) => setTourOrderCol({ date, tour })}
+              onOpenWeekEditor={(p) => setWeekEditorProduct(p)}
+
             />
             <div className="sticky left-0 flex flex-wrap items-center gap-2 border-t border-border bg-card px-4 py-3 sm:px-6">
               {hasAddable ? (
