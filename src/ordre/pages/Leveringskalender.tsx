@@ -1857,6 +1857,8 @@ function MatrixGrid({
   colHasData: (date: string, tourId: string) => boolean;
   canEdit: boolean;
   onOpenTourOrder: (date: string, tour: MatrixTour) => void;
+  onOpenWeekEditor: (product: MatrixProduct) => void;
+
 }) {
   const [infoProduct, setInfoProduct] = useState<{
     id: string;
