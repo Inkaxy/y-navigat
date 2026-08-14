@@ -1829,6 +1829,8 @@ function MatrixGrid({
   colHasData,
   canEdit,
   onOpenTourOrder,
+  onOpenWeekEditor,
+
 }: {
   columns: { date: string; tour: MatrixTour }[];
   products: MatrixProduct[];
