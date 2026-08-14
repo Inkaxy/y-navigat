@@ -2241,7 +2241,10 @@ function MatrixGrid({
                     </td>
                   );
                 })}
-                <td className="border-b border-r border-border bg-card px-2 py-0 text-right text-[12px] font-semibold tabular-nums">
+                <td className="border-b border-r border-border/60 bg-card px-1 py-0 text-right text-[12px] font-medium tabular-nums text-muted-foreground">
+                  {qtySums.rows[p.id] ? qtySums.rows[p.id] : ""}
+                </td>
+                <td className="border-b border-r border-border bg-card px-2 py-0 text-right text-[12px] tabular-nums text-muted-foreground">
                   {formatKrNetto(rowTotals[p.id] ?? 0)}
                 </td>
               </tr>
@@ -2249,10 +2252,33 @@ function MatrixGrid({
           })}
         </tbody>
         <tfoot>
+          <tr className="bg-muted/60">
+            <th
+              scope="row"
+              className="sticky left-0 z-10 w-[220px] min-w-[220px] border-t border-b border-r-2 border-border bg-muted/60 px-2 py-1 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
+            >
+              Dagsum (antall)
+            </th>
+            {columns.map((c) => {
+              const colKey = `${c.date}|${c.tour.id}`;
+              return (
+                <td
+                  key={colKey}
+                  className="border-t border-b border-r border-border/60 bg-muted/60 px-1 py-1 text-right text-[11px] font-medium tabular-nums text-muted-foreground"
+                >
+                  {qtySums.cols[colKey] ? qtySums.cols[colKey] : ""}
+                </td>
+              );
+            })}
+            <td className="border-t border-b border-r border-border/60 bg-muted/60 px-1 py-1 text-right text-[11px] font-semibold tabular-nums text-muted-foreground">
+              {Object.values(qtySums.rows).reduce((a, b) => a + b, 0) || ""}
+            </td>
+            <td className="border-t border-b border-r border-border bg-muted/60 px-2 py-1 text-right text-[11px] font-semibold tabular-nums text-muted-foreground" />
+          </tr>
           <tr className="bg-muted">
             <th
               scope="row"
-              className="sticky left-0 z-10 w-[320px] min-w-[320px] border-b border-r border-border bg-muted px-3 py-2 text-left font-bold"
+              className="sticky left-0 z-10 w-[220px] min-w-[220px] border-b border-r-2 border-border bg-muted px-2 py-1 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
             >
               Sum kr
             </th>
@@ -2261,17 +2287,19 @@ function MatrixGrid({
               return (
                 <td
                   key={colKey}
-                  className="border-b border-r border-border bg-muted px-1 py-2 text-right text-xs font-bold tabular-nums"
+                  className="border-b border-r border-border/60 bg-muted px-1 py-1 text-right text-[11px] font-medium tabular-nums text-muted-foreground"
                 >
                   {formatKrNetto(colTotals[colKey] ?? 0)}
                 </td>
               );
             })}
-            <td className="border-b border-r border-border bg-muted px-3 py-2 text-right font-bold tabular-nums">
+            <td className="border-b border-r border-border/60 bg-muted" />
+            <td className="border-b border-r border-border bg-muted px-2 py-1 text-right text-[11px] font-bold tabular-nums">
               {formatKrNetto(grandTotal)}
             </td>
           </tr>
         </tfoot>
+
       </table>
       <ProductInfoDialog
         productId={infoProduct?.id ?? null}
