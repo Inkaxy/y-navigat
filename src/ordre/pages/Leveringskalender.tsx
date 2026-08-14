@@ -1010,11 +1010,12 @@ export default function MatrixPage() {
             disabled={!selectedCustomer}
             aria-label="Vis kundekort"
             title="Vis kundekort"
-            className="border-2 border-brand-bronze/30 hover:border-brand-bronze/60"
+            className="h-8 w-8 shrink-0 border border-brand-bronze/30 hover:border-brand-bronze/60"
             onClick={() => setCustomerCardOpen(true)}
           >
             <Eye className="h-4 w-4" />
           </Button>
+
           <Dialog open={customerCardOpen} onOpenChange={setCustomerCardOpen}>
             <DialogContent className="max-w-3xl">
               <DialogHeader>
