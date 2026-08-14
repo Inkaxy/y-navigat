@@ -102,6 +102,7 @@ import { WeatherCell } from "@/ordre/components/orders/WeatherCell";
 import { useRecurringGhost, type RecurringGhostMap } from "@/ordre/hooks/useRecurringGhost";
 import { useRecurringSchedules, type RecurringScheduleWithCustomer } from "@/ordre/hooks/useRecurringOrders";
 import { RecurringScheduleDialog } from "@/ordre/components/orders/RecurringScheduleDialog";
+import { ProductWeekEditor } from "@/ordre/components/orders/matrix/ProductWeekEditor";
 import {
   useDeliveryPausesForCustomer,
   isPaused,
@@ -211,6 +212,7 @@ export default function MatrixPage() {
   const [commentCol, setCommentCol] = useState<{ date: string; tour: MatrixTour } | null>(null);
   const [deleteColConfirm, setDeleteColConfirm] = useState<{ date: string; tour: MatrixTour } | null>(null);
   const [tourOrderCol, setTourOrderCol] = useState<{ date: string; tour: MatrixTour } | null>(null);
+  const [weekEditorProduct, setWeekEditorProduct] = useState<MatrixProduct | null>(null);
 
   // Handling-meny dialog state
   const [setForAllOpen, setSetForAllOpen] = useState(false);
@@ -998,22 +1000,24 @@ export default function MatrixPage() {
   const isEmptyMatrix = !!matrix && allProducts.length === 0;
 
   return (
-    <div className="-mt-8 -mb-12 flex h-full flex-col bg-background">
+    <div className="-mx-4 -mt-8 -mb-12 flex h-full flex-col bg-background sm:-mx-6 lg:-mx-8">
 
-      <div className="mx-auto w-full max-w-[1400px] px-6 py-5">
-        <div className="rounded-[16px] border-2 border-brand-bronze/40 bg-gradient-to-br from-card to-brand-cream/20 p-5 shadow-lg ring-1 ring-inset ring-brand-bronze/10 px-[10px] py-[20px]">
-        <div className="flex flex-wrap items-center gap-3">
+      <div className="sticky top-0 z-40 w-full border-b border-border/60 bg-background/95 px-4 py-2 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+        <div className="rounded-[12px] border border-brand-bronze/30 bg-card/70 px-2 py-1.5 shadow-sm">
+        <div className="flex flex-nowrap items-center gap-2 overflow-x-auto">
+
           <Button
             variant="outline"
             size="icon"
             disabled={!selectedCustomer}
             aria-label="Vis kundekort"
             title="Vis kundekort"
-            className="border-2 border-brand-bronze/30 hover:border-brand-bronze/60"
+            className="h-8 w-8 shrink-0 border border-brand-bronze/30 hover:border-brand-bronze/60"
             onClick={() => setCustomerCardOpen(true)}
           >
             <Eye className="h-4 w-4" />
           </Button>
+
           <Dialog open={customerCardOpen} onOpenChange={setCustomerCardOpen}>
             <DialogContent className="max-w-3xl">
               <DialogHeader>
@@ -1119,14 +1123,15 @@ export default function MatrixPage() {
           </Dialog>
 
 
-          <div className="flex flex-col items-start gap-1.5">
+          <div className="flex items-center gap-1.5">
             <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
               <PopoverTrigger asChild>
-                <Button variant="outline" size="lg" className="min-w-[320px] justify-start text-base font-semibold border-2 border-brand-bronze/30 hover:border-brand-bronze/60 shadow-sm">
+                <Button variant="outline" size="sm" className="h-8 min-w-[230px] justify-start text-sm font-semibold border border-brand-bronze/30 hover:border-brand-bronze/60">
                   {selectedCustomer
                     ? `${selectedCustomer.customer_number} — ${selectedCustomer.display_name}`
                     : "Velg kunde …"}
                 </Button>
+
               </PopoverTrigger>
               <PopoverContent className="w-[420px] p-0" align="start">
                 <Command shouldFilter={false}>
@@ -1159,29 +1164,31 @@ export default function MatrixPage() {
                 size="sm"
                 onClick={() => setRecurringDialogOpen(true)}
                 title="Klikk for å redigere fastordre"
-                className="h-8 gap-1.5 px-3 text-sm font-semibold"
+                className="h-8 gap-1.5 px-2 text-xs font-semibold"
               >
                 <Repeat className="h-3.5 w-3.5" />
-                Fastordre aktiv
+                Fastordre
               </Button>
             )}
           </div>
 
 
-          <div className="relative flex flex-col gap-0.5 self-start">
-            <div className="flex items-center gap-1 rounded-md border border-brand-bronze/30 bg-card/60 px-2 py-1 text-sm">
+          <div className="relative flex items-center gap-2 self-center">
+            <div className="flex items-center gap-1 rounded-md border border-brand-bronze/30 bg-card/60 px-1.5 py-0.5 text-sm">
+
               <Popover open={fromDateOpen} onOpenChange={setFromDateOpen}>
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
-                    size="sm"
+                    size="icon"
                     disabled={!customerId}
-                    className="h-7 gap-1.5 px-2 text-xs font-medium"
+                    className="h-7 w-7"
                     aria-label="Ordre fra dato"
+                    title="Ordre fra dato"
                   >
                     <CalendarIcon className="h-3.5 w-3.5" />
-                    Ordre fra dato
                   </Button>
+
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
                   <Calendar
@@ -1210,11 +1217,12 @@ export default function MatrixPage() {
               <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => shiftWeek(1)} aria-label="Neste uke">
                 <ChevronRight />
               </Button>
-              <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={jumpToday}>
-                Hopp til i dag
+              <Button variant="ghost" size="sm" className="h-7 px-1.5 text-xs" onClick={jumpToday}>
+                I dag
               </Button>
             </div>
-            <div className="flex items-center gap-3 px-3 text-xs">
+            <div className="flex items-center gap-2 whitespace-nowrap text-xs">
+
               {([
                 ["today", "I morgen"],
                 ["this_week", "Denne uken"],
@@ -1240,8 +1248,9 @@ export default function MatrixPage() {
           </div>
 
 
-          <div className="flex items-center gap-2 rounded-md border border-brand-bronze/30 bg-card/60 px-2 py-1 text-sm">
+          <div className="flex shrink-0 items-center gap-1.5 rounded-md border border-brand-bronze/30 bg-card/60 px-1.5 py-0.5 text-xs">
             <span className="text-muted-foreground">vis</span>
+
             <Select
               value={String(daysCount)}
               onValueChange={(v) => setDaysCount(parseInt(v, 10))}
@@ -1259,8 +1268,9 @@ export default function MatrixPage() {
             <span className="text-muted-foreground">dager</span>
           </div>
 
-          <div className="flex items-center gap-2 rounded-md border border-brand-bronze/30 bg-card/60 px-2 py-1 text-sm">
-            <span className="text-muted-foreground">vis turer</span>
+          <div className="flex shrink-0 items-center gap-1.5 rounded-md border border-brand-bronze/30 bg-card/60 px-1.5 py-0.5 text-xs">
+            <span className="text-muted-foreground">turer</span>
+
             <div className="flex items-center gap-1">
               {(matrix?.tours ?? []).map((t) => {
                 const checked = !hiddenTourIds.has(t.id);
@@ -1291,8 +1301,9 @@ export default function MatrixPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 rounded-md border border-brand-bronze/30 bg-card/60 px-2 py-1 text-sm">
-            <span className="text-muted-foreground">vis retur</span>
+          <div className="flex shrink-0 items-center gap-1.5 rounded-md border border-brand-bronze/30 bg-card/60 px-1.5 py-0.5 text-xs">
+            <span className="text-muted-foreground">retur</span>
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm" className="h-7 px-2 text-xs">
@@ -1309,6 +1320,7 @@ export default function MatrixPage() {
           <Button
             variant="brand"
             size="sm"
+            className="h-8 shrink-0"
             disabled={!customerId}
             onClick={() => navigate(`/ordre/ordrer/ny?customer_id=${customerId}`)}
           >
@@ -1316,7 +1328,7 @@ export default function MatrixPage() {
             Ny ordre
           </Button>
 
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex shrink-0 items-center gap-1.5">
             {(dirtyCount > 0 || addedProducts.length > 0) && (
               <>
                 {dirtyCount > 0 && (
@@ -1325,21 +1337,22 @@ export default function MatrixPage() {
                 {addedProducts.length > 0 && (
                   <Badge variant="outline">+{addedProducts.length} ny rad{addedProducts.length === 1 ? "" : "er"}</Badge>
                 )}
-                <Button variant="ghost" size="sm" onClick={handleDiscardClick}>
+                <Button variant="ghost" size="sm" className="h-8" onClick={handleDiscardClick}>
                   <RotateCcw />
                   Forkast
                 </Button>
               </>
             )}
-            <Button onClick={handleSave} disabled={dirtyCount === 0 || saveMatrix.isPending || !canEdit}>
+            <Button size="sm" className="h-8" onClick={handleSave} disabled={dirtyCount === 0 || saveMatrix.isPending || !canEdit}>
               {saveMatrix.isPending ? <Loader2 className="animate-spin" /> : <Save />}
               Lagre
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" disabled={!customerId}>
+                <Button variant="outline" size="sm" className="h-8" disabled={!customerId}>
                   Handling <ChevronDown className="ml-1 h-4 w-4" />
                 </Button>
+
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-64">
                 <DropdownMenuLabel>Opprette nytt</DropdownMenuLabel>
@@ -1533,6 +1546,8 @@ export default function MatrixPage() {
               colHasData={colHasAnyData}
               canEdit={canEdit}
               onOpenTourOrder={(date, tour) => setTourOrderCol({ date, tour })}
+              onOpenWeekEditor={(p) => setWeekEditorProduct(p)}
+
             />
             <div className="sticky left-0 flex flex-wrap items-center gap-2 border-t border-border bg-card px-4 py-3 sm:px-6">
               {hasAddable ? (
@@ -1559,6 +1574,22 @@ export default function MatrixPage() {
           </>
         )}
       </div>
+
+      <ProductWeekEditor
+        open={!!weekEditorProduct}
+        onOpenChange={(v) => !v && setWeekEditorProduct(null)}
+        product={weekEditorProduct}
+        columns={columns}
+        customerId={customerId}
+        scheduleId={existingSchedule?.id ?? null}
+        getValue={(date, tourId, productId) => getCellValue(ckey(date, tourId, productId))}
+        onChange={(date, tourId, productId, value) =>
+          setCellValue(ckey(date, tourId, productId), value)
+        }
+        onSaveWeek={handleSave}
+        isSaving={saveMatrix.isPending}
+        canEdit={canEdit}
+      />
 
       <AddProductDialog
         open={addOpen}
@@ -1818,6 +1849,8 @@ function MatrixGrid({
   colHasData,
   canEdit,
   onOpenTourOrder,
+  onOpenWeekEditor,
+
 }: {
   columns: { date: string; tour: MatrixTour }[];
   products: MatrixProduct[];
@@ -1844,6 +1877,8 @@ function MatrixGrid({
   colHasData: (date: string, tourId: string) => boolean;
   canEdit: boolean;
   onOpenTourOrder: (date: string, tour: MatrixTour) => void;
+  onOpenWeekEditor: (product: MatrixProduct) => void;
+
 }) {
   const [infoProduct, setInfoProduct] = useState<{
     id: string;
@@ -1924,6 +1959,25 @@ function MatrixGrid({
     return m;
   }, [columns, products, getValue]);
 
+  /** Antall-summer: per rad (uke) og per kolonne (dag × tur). */
+  const qtySums = useMemo(() => {
+    const rows: Record<string, number> = {};
+    const cols: Record<string, number> = {};
+    for (const p of products) {
+      let rowSum = 0;
+      for (const c of columns) {
+        const v = getValue(ckey(c.date, c.tour.id, p.id));
+        const n = v ? Number(v.replace(",", ".")) || 0 : 0;
+        if (!n) continue;
+        rowSum += n;
+        const k = `${c.date}|${c.tour.id}`;
+        cols[k] = (cols[k] ?? 0) + n;
+      }
+      rows[p.id] = rowSum;
+    }
+    return { rows, cols };
+  }, [columns, products, getValue]);
+
 
   return (
     <div className="w-full" ref={gridRef} onMouseLeave={() => setHoverCol(null)}>
@@ -1954,12 +2008,14 @@ function MatrixGrid({
                         : "bg-card",
                   )}
                 >
-                  <div className="flex items-center justify-center gap-1 leading-tight">
+                  <div className="flex flex-col items-center gap-0.5 leading-tight">
                     <WeatherCell forecast={weatherMap?.get(g.date)} />
-                    <span className="text-muted-foreground">{DAY_LABELS[dow]}</span>
-                    <span className="tabular-nums">
-                      {new Intl.DateTimeFormat("nb-NO", { day: "2-digit", month: "2-digit" }).format(d)}
-                    </span>
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-[12px] font-semibold text-foreground">{DAY_LABELS[dow]}</span>
+                      <span className="text-[10px] font-normal text-muted-foreground tabular-nums">
+                        {new Intl.DateTimeFormat("nb-NO", { day: "2-digit", month: "2-digit" }).format(d)}
+                      </span>
+                    </div>
                   </div>
                 </th>
               );
@@ -1967,10 +2023,17 @@ function MatrixGrid({
 
             <th
               rowSpan={2}
-              className="border-b border-r border-border bg-card px-2 py-1 text-right text-[11px] font-semibold"
+              className="border-b border-r border-border bg-card px-1 py-1 text-right text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
+            >
+              Uke
+            </th>
+            <th
+              rowSpan={2}
+              className="border-b border-r border-border bg-card px-2 py-1 text-right text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
             >
               Sum kr
             </th>
+
           </tr>
           <tr>
             {columns.map((c, ci) => {
@@ -2067,24 +2130,25 @@ function MatrixGrid({
                         <TooltipTrigger asChild>
                           <button
                             type="button"
-                            onClick={openInfo}
+                            onClick={() => onOpenWeekEditor(p)}
                             className="flex min-w-0 flex-1 items-center gap-1.5 truncate text-left leading-tight hover:text-primary"
                           >
                             <span className="w-8 shrink-0 text-right font-mono text-[11px] text-muted-foreground tabular-nums">
                               {p.display_number}
                             </span>
-                            <span className="truncate">{p.display_name}</span>
+                            <span className="truncate font-medium">{p.display_name}</span>
                             {isAdded && (
                               <Badge variant="outline" className="ml-1 px-1 py-0 text-[9px]">Ny</Badge>
                             )}
                           </button>
                         </TooltipTrigger>
                         <TooltipContent side="right" className="max-w-xs text-xs">
-                          {p.sales_unit} ·{" "}
+                          Klikk for å redigere hele uken · {p.sales_unit} ·{" "}
                           {p.unit_price == null
                             ? "Ingen pris for denne kunden på valgt dato — settes i Varer-appen."
                             : formatNOK(p.unit_price)}
                         </TooltipContent>
+
                       </Tooltip>
                     </TooltipProvider>
                   </div>
@@ -2197,7 +2261,10 @@ function MatrixGrid({
                     </td>
                   );
                 })}
-                <td className="border-b border-r border-border bg-card px-2 py-0 text-right text-[12px] font-semibold tabular-nums">
+                <td className="border-b border-r border-border/60 bg-card px-1 py-0 text-right text-[12px] font-medium tabular-nums text-muted-foreground">
+                  {qtySums.rows[p.id] ? qtySums.rows[p.id] : ""}
+                </td>
+                <td className="border-b border-r border-border bg-card px-2 py-0 text-right text-[12px] tabular-nums text-muted-foreground">
                   {formatKrNetto(rowTotals[p.id] ?? 0)}
                 </td>
               </tr>
@@ -2205,10 +2272,33 @@ function MatrixGrid({
           })}
         </tbody>
         <tfoot>
+          <tr className="bg-muted/60">
+            <th
+              scope="row"
+              className="sticky left-0 z-10 w-[220px] min-w-[220px] border-t border-b border-r-2 border-border bg-muted/60 px-2 py-1 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
+            >
+              Dagsum (antall)
+            </th>
+            {columns.map((c) => {
+              const colKey = `${c.date}|${c.tour.id}`;
+              return (
+                <td
+                  key={colKey}
+                  className="border-t border-b border-r border-border/60 bg-muted/60 px-1 py-1 text-right text-[11px] font-medium tabular-nums text-muted-foreground"
+                >
+                  {qtySums.cols[colKey] ? qtySums.cols[colKey] : ""}
+                </td>
+              );
+            })}
+            <td className="border-t border-b border-r border-border/60 bg-muted/60 px-1 py-1 text-right text-[11px] font-semibold tabular-nums text-muted-foreground">
+              {Object.values(qtySums.rows).reduce((a, b) => a + b, 0) || ""}
+            </td>
+            <td className="border-t border-b border-r border-border bg-muted/60 px-2 py-1 text-right text-[11px] font-semibold tabular-nums text-muted-foreground" />
+          </tr>
           <tr className="bg-muted">
             <th
               scope="row"
-              className="sticky left-0 z-10 w-[320px] min-w-[320px] border-b border-r border-border bg-muted px-3 py-2 text-left font-bold"
+              className="sticky left-0 z-10 w-[220px] min-w-[220px] border-b border-r-2 border-border bg-muted px-2 py-1 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
             >
               Sum kr
             </th>
@@ -2217,17 +2307,19 @@ function MatrixGrid({
               return (
                 <td
                   key={colKey}
-                  className="border-b border-r border-border bg-muted px-1 py-2 text-right text-xs font-bold tabular-nums"
+                  className="border-b border-r border-border/60 bg-muted px-1 py-1 text-right text-[11px] font-medium tabular-nums text-muted-foreground"
                 >
                   {formatKrNetto(colTotals[colKey] ?? 0)}
                 </td>
               );
             })}
-            <td className="border-b border-r border-border bg-muted px-3 py-2 text-right font-bold tabular-nums">
+            <td className="border-b border-r border-border/60 bg-muted" />
+            <td className="border-b border-r border-border bg-muted px-2 py-1 text-right text-[11px] font-bold tabular-nums">
               {formatKrNetto(grandTotal)}
             </td>
           </tr>
         </tfoot>
+
       </table>
       <ProductInfoDialog
         productId={infoProduct?.id ?? null}
