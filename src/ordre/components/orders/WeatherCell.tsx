@@ -1,3 +1,4 @@
+import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { weatherIconUrl } from "@/assets/weather";
 import type { DayForecast } from "@/ordre/hooks/useCustomerWeather";
