@@ -1265,8 +1265,9 @@ export default function MatrixPage() {
             <span className="text-muted-foreground">dager</span>
           </div>
 
-          <div className="flex items-center gap-2 rounded-md border border-brand-bronze/30 bg-card/60 px-2 py-1 text-sm">
-            <span className="text-muted-foreground">vis turer</span>
+          <div className="flex shrink-0 items-center gap-1.5 rounded-md border border-brand-bronze/30 bg-card/60 px-1.5 py-0.5 text-xs">
+            <span className="text-muted-foreground">turer</span>
+
             <div className="flex items-center gap-1">
               {(matrix?.tours ?? []).map((t) => {
                 const checked = !hiddenTourIds.has(t.id);
