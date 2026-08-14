@@ -1214,11 +1214,12 @@ export default function MatrixPage() {
               <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => shiftWeek(1)} aria-label="Neste uke">
                 <ChevronRight />
               </Button>
-              <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={jumpToday}>
-                Hopp til i dag
+              <Button variant="ghost" size="sm" className="h-7 px-1.5 text-xs" onClick={jumpToday}>
+                I dag
               </Button>
             </div>
-            <div className="flex items-center gap-3 px-3 text-xs">
+            <div className="flex items-center gap-2 whitespace-nowrap text-xs">
+
               {([
                 ["today", "I morgen"],
                 ["this_week", "Denne uken"],
