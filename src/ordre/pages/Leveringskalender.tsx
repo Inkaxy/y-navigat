@@ -998,11 +998,12 @@ export default function MatrixPage() {
   const isEmptyMatrix = !!matrix && allProducts.length === 0;
 
   return (
-    <div className="-mt-8 -mb-12 flex h-full flex-col bg-background">
+    <div className="-mx-4 -mt-8 -mb-12 flex h-full flex-col bg-background sm:-mx-6 lg:-mx-8">
 
-      <div className="mx-auto w-full max-w-[1400px] px-6 py-5">
-        <div className="rounded-[16px] border-2 border-brand-bronze/40 bg-gradient-to-br from-card to-brand-cream/20 p-5 shadow-lg ring-1 ring-inset ring-brand-bronze/10 px-[10px] py-[20px]">
-        <div className="flex flex-wrap items-center gap-3">
+      <div className="sticky top-0 z-40 w-full border-b border-border/60 bg-background/95 px-4 py-2 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+        <div className="rounded-[12px] border border-brand-bronze/30 bg-card/70 px-2 py-1.5 shadow-sm">
+        <div className="flex flex-nowrap items-center gap-2 overflow-x-auto">
+
           <Button
             variant="outline"
             size="icon"
