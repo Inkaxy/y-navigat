@@ -102,6 +102,7 @@ import { WeatherCell } from "@/ordre/components/orders/WeatherCell";
 import { useRecurringGhost, type RecurringGhostMap } from "@/ordre/hooks/useRecurringGhost";
 import { useRecurringSchedules, type RecurringScheduleWithCustomer } from "@/ordre/hooks/useRecurringOrders";
 import { RecurringScheduleDialog } from "@/ordre/components/orders/RecurringScheduleDialog";
+import { ProductWeekEditor } from "@/ordre/components/orders/matrix/ProductWeekEditor";
 import {
   useDeliveryPausesForCustomer,
   isPaused,
@@ -211,6 +212,7 @@ export default function MatrixPage() {
   const [commentCol, setCommentCol] = useState<{ date: string; tour: MatrixTour } | null>(null);
   const [deleteColConfirm, setDeleteColConfirm] = useState<{ date: string; tour: MatrixTour } | null>(null);
   const [tourOrderCol, setTourOrderCol] = useState<{ date: string; tour: MatrixTour } | null>(null);
+  const [weekEditorProduct, setWeekEditorProduct] = useState<MatrixProduct | null>(null);
 
   // Handling-meny dialog state
   const [setForAllOpen, setSetForAllOpen] = useState(false);
@@ -1572,6 +1574,22 @@ export default function MatrixPage() {
           </>
         )}
       </div>
+
+      <ProductWeekEditor
+        open={!!weekEditorProduct}
+        onOpenChange={(v) => !v && setWeekEditorProduct(null)}
+        product={weekEditorProduct}
+        columns={columns}
+        customerId={customerId}
+        scheduleId={existingSchedule?.id ?? null}
+        getValue={(date, tourId, productId) => getCellValue(ckey(date, tourId, productId))}
+        onChange={(date, tourId, productId, value) =>
+          setCellValue(ckey(date, tourId, productId), value)
+        }
+        onSaveWeek={handleSave}
+        isSaving={saveMatrix.isPending}
+        canEdit={canEdit}
+      />
 
       <AddProductDialog
         open={addOpen}
