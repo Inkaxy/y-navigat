@@ -1551,7 +1551,8 @@ export default function MatrixPage() {
                 <LegendSwatch className="bg-muted/60 border-border" label="Helg" />
                 <LegendSwatch className="bg-muted border-border" label="Sum-rad/kolonne" />
                 <span className="text-muted-foreground/70">
-                  Værvarsel fra Yr levert av Meteorologisk institutt og NRK
+                  Værvarsel fra Yr levert av Meteorologisk institutt og NRK · Historiske værdata fra
+                  Open-Meteo (CC BY 4.0)
                 </span>
               </div>
             </div>
