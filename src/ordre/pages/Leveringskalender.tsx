@@ -1939,6 +1939,25 @@ function MatrixGrid({
     return m;
   }, [columns, products, getValue]);
 
+  /** Antall-summer: per rad (uke) og per kolonne (dag × tur). */
+  const qtySums = useMemo(() => {
+    const rows: Record<string, number> = {};
+    const cols: Record<string, number> = {};
+    for (const p of products) {
+      let rowSum = 0;
+      for (const c of columns) {
+        const v = getValue(ckey(c.date, c.tour.id, p.id));
+        const n = v ? Number(v.replace(",", ".")) || 0 : 0;
+        if (!n) continue;
+        rowSum += n;
+        const k = `${c.date}|${c.tour.id}`;
+        cols[k] = (cols[k] ?? 0) + n;
+      }
+      rows[p.id] = rowSum;
+    }
+    return { rows, cols };
+  }, [columns, products, getValue]);
+
 
   return (
     <div className="w-full" ref={gridRef} onMouseLeave={() => setHoverCol(null)}>
