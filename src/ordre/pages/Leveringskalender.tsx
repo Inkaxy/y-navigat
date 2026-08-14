@@ -1120,14 +1120,15 @@ export default function MatrixPage() {
           </Dialog>
 
 
-          <div className="flex flex-col items-start gap-1.5">
+          <div className="flex items-center gap-1.5">
             <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
               <PopoverTrigger asChild>
-                <Button variant="outline" size="lg" className="min-w-[320px] justify-start text-base font-semibold border-2 border-brand-bronze/30 hover:border-brand-bronze/60 shadow-sm">
+                <Button variant="outline" size="sm" className="h-8 min-w-[230px] justify-start text-sm font-semibold border border-brand-bronze/30 hover:border-brand-bronze/60">
                   {selectedCustomer
                     ? `${selectedCustomer.customer_number} — ${selectedCustomer.display_name}`
                     : "Velg kunde …"}
                 </Button>
+
               </PopoverTrigger>
               <PopoverContent className="w-[420px] p-0" align="start">
                 <Command shouldFilter={false}>
