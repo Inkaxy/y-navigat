@@ -1161,17 +1161,18 @@ export default function MatrixPage() {
                 size="sm"
                 onClick={() => setRecurringDialogOpen(true)}
                 title="Klikk for å redigere fastordre"
-                className="h-8 gap-1.5 px-3 text-sm font-semibold"
+                className="h-8 gap-1.5 px-2 text-xs font-semibold"
               >
                 <Repeat className="h-3.5 w-3.5" />
-                Fastordre aktiv
+                Fastordre
               </Button>
             )}
           </div>
 
 
-          <div className="relative flex flex-col gap-0.5 self-start">
-            <div className="flex items-center gap-1 rounded-md border border-brand-bronze/30 bg-card/60 px-2 py-1 text-sm">
+          <div className="relative flex items-center gap-2 self-center">
+            <div className="flex items-center gap-1 rounded-md border border-brand-bronze/30 bg-card/60 px-1.5 py-0.5 text-sm">
+
               <Popover open={fromDateOpen} onOpenChange={setFromDateOpen}>
                 <PopoverTrigger asChild>
                   <Button
