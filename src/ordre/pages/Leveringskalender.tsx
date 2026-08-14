@@ -2110,24 +2110,25 @@ function MatrixGrid({
                         <TooltipTrigger asChild>
                           <button
                             type="button"
-                            onClick={openInfo}
+                            onClick={() => onOpenWeekEditor(p)}
                             className="flex min-w-0 flex-1 items-center gap-1.5 truncate text-left leading-tight hover:text-primary"
                           >
                             <span className="w-8 shrink-0 text-right font-mono text-[11px] text-muted-foreground tabular-nums">
                               {p.display_number}
                             </span>
-                            <span className="truncate">{p.display_name}</span>
+                            <span className="truncate font-medium">{p.display_name}</span>
                             {isAdded && (
                               <Badge variant="outline" className="ml-1 px-1 py-0 text-[9px]">Ny</Badge>
                             )}
                           </button>
                         </TooltipTrigger>
                         <TooltipContent side="right" className="max-w-xs text-xs">
-                          {p.sales_unit} ·{" "}
+                          Klikk for å redigere hele uken · {p.sales_unit} ·{" "}
                           {p.unit_price == null
                             ? "Ingen pris for denne kunden på valgt dato — settes i Varer-appen."
                             : formatNOK(p.unit_price)}
                         </TooltipContent>
+
                       </Tooltip>
                     </TooltipProvider>
                   </div>
