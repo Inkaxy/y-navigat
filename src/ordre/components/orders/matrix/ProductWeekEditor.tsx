@@ -48,6 +48,7 @@ export function ProductWeekEditor({
   customerId,
   scheduleId,
   getValue,
+  getGhost,
   onChange,
   onSaveWeek,
   isSaving,
@@ -61,6 +62,8 @@ export function ProductWeekEditor({
   scheduleId?: string | null;
   /** Leser gjeldende (evt. redigert) verdi for en celle. */
   getValue: (date: string, tourId: string, productId: string) => string;
+  /** Fastordre-grunnlag (dempet) for cellen, 0 hvis ingen. */
+  getGhost?: (date: string, tourId: string, productId: string) => number;
   /** Skriver verdi tilbake til matrisens edit-state. */
   onChange: (date: string, tourId: string, productId: string, value: string) => void;
   /** Lagrer alle ulagrede endringer (matrisens vanlige lagring). */
@@ -102,9 +105,20 @@ export function ProductWeekEditor({
 
   const num = (v: string | undefined) => Number((v ?? "").replace(",", ".") || 0) || 0;
 
+  const ghostFor = (date: string, tourId: string) =>
+    product && getGhost ? getGhost(date, tourId, product.id) || 0 : 0;
+
+  /** Effektiv mengde: eksplisitt verdi hvis satt, ellers fastordre-grunnlaget. */
+  const eff = (date: string, tourId: string) => {
+    const raw = local[`${date}|${tourId}`];
+    if (raw !== undefined && raw !== "") return num(raw);
+    return ghostFor(date, tourId);
+  };
+
   const weekTotal = useMemo(
-    () => Object.values(local).reduce((a, b) => a + num(b), 0),
-    [local],
+    () => columns.reduce((a, c) => a + eff(c.date, c.tour.id), 0),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [local, columns, product?.id],
   );
 
   if (!product) return null;
@@ -123,7 +137,7 @@ export function ProductWeekEditor({
     if (!customerId) return;
     const byWeekday = new Map<string, { weekday: number; tour_id: string; quantity: number }>();
     for (const c of columns) {
-      const qty = num(local[`${c.date}|${c.tour.id}`]);
+      const qty = eff(c.date, c.tour.id);
       if (qty <= 0) continue;
       const wd = isoDow(c.date);
       byWeekday.set(`${wd}|${c.tour.id}`, { weekday: wd, tour_id: c.tour.id, quantity: qty });
@@ -192,7 +206,7 @@ export function ProductWeekEditor({
               <tbody>
                 {tours.map((t) => {
                   const rowSum = dates.reduce(
-                    (a, d) => a + num(local[`${d}|${t.id}`]),
+                    (a, d) => a + (columnKeys.has(`${d}|${t.id}`) ? eff(d, t.id) : 0),
                     0,
                   );
                   return (
@@ -222,9 +236,15 @@ export function ProductWeekEditor({
                                 inputMode="decimal"
                                 disabled={!canEdit}
                                 value={local[`${d}|${t.id}`] ?? ""}
+                                placeholder={ghostFor(d, t.id) ? String(ghostFor(d, t.id)) : ""}
                                 onChange={(e) => setCell(d, t.id, e.target.value)}
                                 onFocus={(e) => e.currentTarget.select()}
-                                className="h-8 w-full rounded-none border-0 bg-transparent px-2 text-right tabular-nums shadow-none focus-visible:ring-1"
+                                className={cn(
+                                  "h-8 w-full rounded-none border-0 bg-transparent px-2 text-right tabular-nums shadow-none focus-visible:ring-1",
+                                  !local[`${d}|${t.id}`] &&
+                                    ghostFor(d, t.id) &&
+                                    "placeholder:text-muted-foreground/60",
+                                )}
                               />
                             ) : (
                               <div className="h-8" />
@@ -243,7 +263,10 @@ export function ProductWeekEditor({
                 <tr className="bg-muted/40">
                   <th className="px-3 py-1.5 text-left text-xs font-semibold">Dagsum</th>
                   {dates.map((d) => {
-                    const s = tours.reduce((a, t) => a + num(local[`${d}|${t.id}`]), 0);
+                    const s = tours.reduce(
+                      (a, t) => a + (columnKeys.has(`${d}|${t.id}`) ? eff(d, t.id) : 0),
+                      0,
+                    );
                     return (
                       <td
                         key={d}
