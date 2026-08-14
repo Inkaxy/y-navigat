@@ -313,3 +313,85 @@ export const WEEKDAY_LONG = [
   "Lørdag",
   "Søndag",
 ] as const;
+
+/**
+ * Skriver ukens antall for ÉN vare inn i kundens fastordre.
+ * Erstatter alle recurring_order_items for (schedule, product) med de oppgitte
+ * (weekday, tour_id, quantity)-radene. Oppretter en aktiv mal om kunden ikke har en.
+ */
+export function useUpsertRecurringForProduct() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      customerId: string;
+      productId: string;
+      scheduleId?: string | null;
+      items: Array<{ weekday: number; tour_id: string | null; quantity: number }>;
+    }): Promise<{ scheduleId: string; written: number }> => {
+      let scheduleId = input.scheduleId ?? null;
+
+      if (!scheduleId) {
+        const { data: existing, error: exErr } = await supabase
+          .from("recurring_order_schedules")
+          .select("id")
+          .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
+          .eq("customer_id", input.customerId)
+          .eq("is_active", true)
+          .order("created_at", { ascending: true })
+          .limit(1);
+        if (exErr) throw exErr;
+        scheduleId = existing?.[0]?.id ?? null;
+      }
+
+      if (!scheduleId) {
+        const { data: userRes } = await supabase.auth.getUser();
+        const { data: created, error: cErr } = await supabase
+          .from("recurring_order_schedules")
+          .insert({
+            customer_id: input.customerId,
+            legal_entity_id: NB_LEGAL_ENTITY_ID,
+            name: "Fastordre",
+            is_active: true,
+            valid_from: null,
+            valid_to: null,
+            notes: null,
+            created_by: userRes.user?.id ?? null,
+          })
+          .select("id")
+          .single();
+        if (cErr) throw cErr;
+        scheduleId = created.id;
+      }
+
+      const { error: delErr } = await supabase
+        .from("recurring_order_items")
+        .delete()
+        .eq("schedule_id", scheduleId)
+        .eq("product_id", input.productId);
+      if (delErr) throw delErr;
+
+      const rows = input.items
+        .filter((i) => i.quantity > 0)
+        .map((i) => ({
+          schedule_id: scheduleId!,
+          product_id: input.productId,
+          weekday: i.weekday,
+          tour_id: i.tour_id,
+          quantity: i.quantity,
+          notes: null as string | null,
+        }));
+
+      if (rows.length > 0) {
+        const { error: insErr } = await supabase.from("recurring_order_items").insert(rows);
+        if (insErr) throw insErr;
+      }
+
+      return { scheduleId, written: rows.length };
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["recurring-schedules"] });
+      void qc.invalidateQueries({ queryKey: ["recurring-schedule-detail"] });
+      void qc.invalidateQueries({ queryKey: ["recurring-ghost"] });
+    },
+  });
+}
