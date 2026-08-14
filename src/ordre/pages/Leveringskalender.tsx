@@ -1317,6 +1317,7 @@ export default function MatrixPage() {
           <Button
             variant="brand"
             size="sm"
+            className="h-8 shrink-0"
             disabled={!customerId}
             onClick={() => navigate(`/ordre/ordrer/ny?customer_id=${customerId}`)}
           >
@@ -1324,7 +1325,7 @@ export default function MatrixPage() {
             Ny ordre
           </Button>
 
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex shrink-0 items-center gap-1.5">
             {(dirtyCount > 0 || addedProducts.length > 0) && (
               <>
                 {dirtyCount > 0 && (
@@ -1333,21 +1334,22 @@ export default function MatrixPage() {
                 {addedProducts.length > 0 && (
                   <Badge variant="outline">+{addedProducts.length} ny rad{addedProducts.length === 1 ? "" : "er"}</Badge>
                 )}
-                <Button variant="ghost" size="sm" onClick={handleDiscardClick}>
+                <Button variant="ghost" size="sm" className="h-8" onClick={handleDiscardClick}>
                   <RotateCcw />
                   Forkast
                 </Button>
               </>
             )}
-            <Button onClick={handleSave} disabled={dirtyCount === 0 || saveMatrix.isPending || !canEdit}>
+            <Button size="sm" className="h-8" onClick={handleSave} disabled={dirtyCount === 0 || saveMatrix.isPending || !canEdit}>
               {saveMatrix.isPending ? <Loader2 className="animate-spin" /> : <Save />}
               Lagre
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" disabled={!customerId}>
+                <Button variant="outline" size="sm" className="h-8" disabled={!customerId}>
                   Handling <ChevronDown className="ml-1 h-4 w-4" />
                 </Button>
+
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-64">
                 <DropdownMenuLabel>Opprette nytt</DropdownMenuLabel>
