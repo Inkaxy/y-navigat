@@ -1988,12 +1988,14 @@ function MatrixGrid({
                         : "bg-card",
                   )}
                 >
-                  <div className="flex items-center justify-center gap-1 leading-tight">
+                  <div className="flex flex-col items-center gap-0.5 leading-tight">
                     <WeatherCell forecast={weatherMap?.get(g.date)} />
-                    <span className="text-muted-foreground">{DAY_LABELS[dow]}</span>
-                    <span className="tabular-nums">
-                      {new Intl.DateTimeFormat("nb-NO", { day: "2-digit", month: "2-digit" }).format(d)}
-                    </span>
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-[12px] font-semibold text-foreground">{DAY_LABELS[dow]}</span>
+                      <span className="text-[10px] font-normal text-muted-foreground tabular-nums">
+                        {new Intl.DateTimeFormat("nb-NO", { day: "2-digit", month: "2-digit" }).format(d)}
+                      </span>
+                    </div>
                   </div>
                 </th>
               );
@@ -2001,10 +2003,17 @@ function MatrixGrid({
 
             <th
               rowSpan={2}
-              className="border-b border-r border-border bg-card px-2 py-1 text-right text-[11px] font-semibold"
+              className="border-b border-r border-border bg-card px-1 py-1 text-right text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
+            >
+              Uke
+            </th>
+            <th
+              rowSpan={2}
+              className="border-b border-r border-border bg-card px-2 py-1 text-right text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
             >
               Sum kr
             </th>
+
           </tr>
           <tr>
             {columns.map((c, ci) => {
