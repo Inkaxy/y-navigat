@@ -413,18 +413,24 @@ function NavBar({ appSlug, items }: { appSlug: string; items: NavItem[] }) {
   return (
     <nav
       className={cn(
-        "border-b border-brand-cream/10",
+        "border-b border-brand-cream/10 px-3 py-2 md:px-5 md:py-2.5",
         isOrdre && "hidden md:block",
       )}
       style={{
-        padding: "10px 20px",
         background: "hsl(var(--brand-ink-raised))",
         backgroundImage:
           "linear-gradient(180deg, hsl(var(--brand-cream) / 0.08) 0%, hsl(var(--brand-cream) / 0.02) 100%)",
         boxShadow: "inset 0 1px 0 0 hsl(var(--brand-cream) / 0.12)",
       }}
     >
-      <ul className="no-scrollbar mx-auto flex w-full max-w-[1600px] items-stretch justify-center gap-0.5 overflow-x-auto xl:flex-wrap xl:justify-center xl:overflow-visible">
+      <MobileSubNav
+        items={items}
+        color={color}
+        isLinkActive={isLinkActive}
+        isDropdownActive={isDropdownActive}
+      />
+
+      <ul className="no-scrollbar mx-auto hidden w-full max-w-[1600px] items-stretch justify-center gap-0.5 overflow-x-auto md:flex xl:flex-wrap xl:justify-center xl:overflow-visible">
         {items.map((item) => {
           const Icon = item.icon;
           if (item.kind === "link") {
