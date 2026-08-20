@@ -480,6 +480,119 @@ function NavBar({ appSlug, items }: { appSlug: string; items: NavItem[] }) {
   );
 }
 
+/** Mobilvariant: kompakt knapp med aktiv side + bunn-sheet med alle valg. */
+function MobileSubNav({
+  items,
+  color,
+  isLinkActive,
+  isDropdownActive,
+}: {
+  items: NavItem[];
+  color: string;
+  isLinkActive: (to: string) => boolean;
+  isDropdownActive: (basePath: string) => boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const navigate = useNavigate();
+
+  let current: { label: string; icon: LucideIcon } | null = null;
+  for (const item of items) {
+    if (item.kind === "link" ? isLinkActive(item.to) : isDropdownActive(item.basePath)) {
+      current = { label: item.label, icon: item.icon };
+      break;
+    }
+  }
+  const CurrentIcon = current?.icon ?? LayoutGrid;
+
+  const go = (to: string) => {
+    setOpen(false);
+    navigate(to);
+  };
+
+  return (
+    <div className="md:hidden">
+      <Sheet open={open} onOpenChange={setOpen}>
+        <SheetTrigger
+          className="flex w-full items-center gap-2 rounded-xl border border-brand-cream/15 px-3 py-2.5 text-left text-sm font-semibold text-brand-cream"
+          style={{ backgroundColor: `${color}1f` }}
+        >
+          <CurrentIcon className="h-5 w-5 shrink-0" strokeWidth={2.25} />
+          <span className="flex-1 truncate">{current?.label ?? "Meny"}</span>
+          <ChevronDown className="h-4 w-4 opacity-70" />
+        </SheetTrigger>
+
+        <SheetContent side="bottom" className="max-h-[80vh] overflow-y-auto rounded-t-2xl">
+          <SheetHeader className="text-left">
+            <SheetTitle className="text-sm">Naviger</SheetTitle>
+          </SheetHeader>
+
+          <div className="mt-3 space-y-4 pb-[env(safe-area-inset-bottom)]">
+            <ul className="grid grid-cols-2 gap-2">
+              {items
+                .filter((i): i is SimpleItem => i.kind === "link")
+                .map((item) => {
+                  const Icon = item.icon;
+                  const active = isLinkActive(item.to);
+                  return (
+                    <li key={item.to}>
+                      <button
+                        type="button"
+                        onClick={() => go(item.to)}
+                        className={cn(
+                          "flex min-h-[52px] w-full items-center gap-2 rounded-xl border px-3 text-left text-sm",
+                          active
+                            ? "border-primary/40 bg-primary/10 font-semibold text-primary"
+                            : "border-border bg-surface-raised font-medium text-ink-primary",
+                        )}
+                      >
+                        <Icon className="h-4 w-4 shrink-0" />
+                        <span className="flex-1 truncate">{item.label}</span>
+                        {item.badge != null && item.badge > 0 && <CountBadge value={item.badge} />}
+                      </button>
+                    </li>
+                  );
+                })}
+            </ul>
+
+            {items
+              .filter((i): i is DropdownItem => i.kind === "dropdown")
+              .map((group) => (
+                <section key={group.label} className="space-y-2">
+                  <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-ink-tertiary">
+                    <group.icon className="h-3.5 w-3.5" />
+                    {group.label}
+                  </div>
+                  <ul className="space-y-1.5">
+                    {group.links.map((l) => {
+                      const active = isLinkActive(l.to);
+                      return (
+                        <li key={l.to}>
+                          <button
+                            type="button"
+                            onClick={() => go(l.to)}
+                            className={cn(
+                              "flex min-h-[48px] w-full items-center gap-2 rounded-xl border px-3 text-left text-sm",
+                              active
+                                ? "border-primary/40 bg-primary/10 font-semibold text-primary"
+                                : "border-border bg-surface-raised font-medium text-ink-primary",
+                            )}
+                          >
+                            <span className="flex-1 truncate">{l.label}</span>
+                            {l.badge != null && l.badge > 0 && <CountBadge value={l.badge} />}
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </section>
+              ))}
+          </div>
+        </SheetContent>
+      </Sheet>
+    </div>
+  );
+}
+
 function CountBadge({ value }: { value: number }) {
   return (
     <span
