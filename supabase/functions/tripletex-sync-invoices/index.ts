@@ -137,11 +137,18 @@ Deno.serve(async (req) => {
       start.setUTCMonth(start.getUTCMonth() - months);
       windowFrom = iso(start);
       windowTo = addDays(today, 1);
-    } else {
+    } else if (body.from || body.to) {
       windowFrom = body.from ?? cred.last_invoice_synced_date ?? fallbackStart;
       windowTo = body.to ?? addDays(today, 1);
+      if (windowTo <= windowFrom) windowTo = addDays(windowFrom, 1);
+    } else {
+      // Løpende kjøring: klamp cursor til i dag (aldri framtid) og ta 7 dagers overlapp.
+      const rawCursor = cred.last_invoice_synced_date ?? fallbackStart;
+      const clamped = rawCursor > today ? today : rawCursor;
+      windowFrom = addDays(clamped, -7);
+      windowTo = addDays(today, 1);
     }
-    if (windowTo <= windowFrom) windowTo = addDays(windowFrom, 1);
+
 
     // Del i biter på maks 31 dager, maks 3 biter per kjøring (alle biter ved etterhenting).
     const chunks: Array<{ from: string; to: string }> = [];
