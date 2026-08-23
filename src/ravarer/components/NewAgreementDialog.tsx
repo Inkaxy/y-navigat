@@ -10,7 +10,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2 } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Check, ChevronsUpDown, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { osloTodayISO } from "@/lib/osloDate";
 
@@ -40,6 +42,7 @@ export function NewAgreementDialog({ open, onOpenChange, defaultRawMaterialId, d
   const [validTo, setValidTo] = useState<string>("");
   const [setPrimary, setSetPrimary] = useState(true);
   const [docFile, setDocFile] = useState<File | null>(null);
+  const [rmOpen, setRmOpen] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -54,6 +57,7 @@ export function NewAgreementDialog({ open, onOpenChange, defaultRawMaterialId, d
   }, [open, defaultRawMaterialId, defaultSupplierId]);
 
   const selectedRm = useMemo(() => rms.find((r) => r.id === rawMaterialId), [rms, rawMaterialId]);
+  const activeRms = useMemo(() => rms.filter((r) => r.is_active), [rms]);
 
   // Auto-beregn pris pr base unit
   useEffect(() => {
@@ -146,13 +150,44 @@ export function NewAgreementDialog({ open, onOpenChange, defaultRawMaterialId, d
         </DialogHeader>
         <div className="grid grid-cols-2 gap-3">
           <div className="col-span-2">
-            <Label>Råvare *</Label>
-            <Select value={rawMaterialId} onValueChange={setRawMaterialId} disabled={!!defaultRawMaterialId}>
-              <SelectTrigger><SelectValue placeholder="Velg råvare…" /></SelectTrigger>
-              <SelectContent>
-                {rms.map((r) => <SelectItem key={r.id} value={r.id}>{r.name} ({r.sku})</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <Label>Vare *</Label>
+            <Popover open={rmOpen} onOpenChange={setRmOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  role="combobox"
+                  disabled={!!defaultRawMaterialId}
+                  className="w-full justify-between font-normal"
+                >
+                  <span className="truncate">
+                    {selectedRm ? `${selectedRm.name} (${selectedRm.sku})` : "Velg vare…"}
+                  </span>
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                <Command>
+                  <CommandInput placeholder="Søk navn eller SKU…" />
+                  <CommandList>
+                    <CommandEmpty>Ingen treff</CommandEmpty>
+                    <CommandGroup>
+                      {activeRms.map((r) => (
+                        <CommandItem
+                          key={r.id}
+                          value={`${r.name} ${r.sku}`}
+                          onSelect={() => { setRawMaterialId(r.id); setRmOpen(false); }}
+                        >
+                          <Check className={rawMaterialId === r.id ? "mr-2 h-4 w-4 opacity-100" : "mr-2 h-4 w-4 opacity-0"} />
+                          <span className="truncate">{r.name}</span>
+                          <span className="ml-2 font-mono text-xs text-ink-secondary">{r.sku}</span>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           </div>
           <div className="col-span-2">
             <Label>Leverandør *</Label>
