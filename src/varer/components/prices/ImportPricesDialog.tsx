@@ -370,7 +370,9 @@ export function ImportPricesDialog({ open, onOpenChange, onComplete }: Props) {
               setFile={setFile}
               legalEntityId={legalEntityId}
               setLegalEntityId={setLegalEntityId}
-              entities={entitiesQuery.data ?? []}
+              entities={entities}
+              selectedEntity={selectedEntity}
+              entityValid={entityValid}
             />
           )}
 
@@ -383,11 +385,19 @@ export function ImportPricesDialog({ open, onOpenChange, onComplete }: Props) {
               setFilter={setFilter}
               toggleMomskode={toggleMomskode}
               loadingExisting={existingQuery.isLoading}
+              conflictResolution={conflictResolution}
+              setConflictResolution={setConflictResolution}
+              rowDecisions={rowDecisions}
+              setRowDecisions={setRowDecisions}
             />
           )}
 
           {step === 3 && stats && (
-            <Step3Confirm stats={stats} fileName={file?.name ?? ""} />
+            <Step3Confirm
+              stats={stats}
+              fileName={file?.name ?? ""}
+              conflictSummary={conflictSummary}
+            />
           )}
 
           {step === 4 && (
@@ -422,7 +432,8 @@ export function ImportPricesDialog({ open, onOpenChange, onComplete }: Props) {
               <Button
                 size="sm"
                 onClick={handleParse}
-                disabled={!file || parsing}
+                disabled={!file || parsing || !entityValid}
+                title={!entityValid ? "Valgt selskap mangler base-prislistene" : undefined}
                 className="bg-app hover:bg-app-dark text-app-foreground"
               >
                 {parsing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
