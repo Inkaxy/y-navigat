@@ -185,7 +185,7 @@ export default function RefundsQueue() {
                         <>
                           <span className="text-sm text-muted-foreground">·</span>
                           <Link
-                            to={`/ordre/${r.order.id}`}
+                            to={`/ordre/ordrer/${r.order.id}`}
                             className="text-sm font-medium text-foreground hover:underline"
                           >
                             Faktura {r.order.order_number}
