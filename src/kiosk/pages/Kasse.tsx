@@ -285,7 +285,7 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
               "id, receipt_number, receipt_sequence, created_at, dining_mode, subtotal_excl_mva, total_mva, total_incl_mva, mva_breakdown, payment_summary, transaction_type, reference_transaction_id",
             )
             .eq("id", id)
-            .single(),
+            .maybeSingle(),
           kioskSupabase
             .from("pos_transaction_lines")
             .select(
@@ -296,7 +296,20 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
         ]);
       if (txErr) throw txErr;
       if (linesErr) throw linesErr;
-      if (!tx) throw new Error("Fant ikke transaksjonen etter insert");
+      if (!tx) {
+        // Betalingen ER journalført (pos_record_sale returnerte id). Kvitteringen
+        // kunne bare ikke hentes — operatøren må ikke tro at salget feilet.
+        const msg =
+          `Betalingen er registrert (salgs-ID ${id}), men kvitteringen kunne ikke hentes fram. ` +
+          "Ikke ta betalt på nytt. Fullfør salget, og skriv ut kvitteringen fra POS Styring → Journal, " +
+          "eller be kunden om en e-postkvittering.";
+        setRpcError(msg);
+        toast.warning("Betaling registrert — kvittering mangler", { description: msg, duration: 15000 });
+        setPayOpen(false);
+        cart.clear();
+        nav.reset();
+        return;
+      }
 
       const r = { tx, lines: lines ?? [] };
       setReceipt(r);
@@ -436,9 +449,16 @@ function SaleFlow({ data, loading, loadError }: SaleFlowProps) {
           status: "printing",
         })
         .select("id")
-        .single();
+        .maybeSingle();
 
       if (jErr) throw jErr;
+      if (!job) {
+        toast.error("Utskriften ble ikke lagt i kø", {
+          description:
+            "Print-jobben ble ikke opprettet i databasen. Salget og kvitteringen er uendret — prøv «Skriv ut» igjen, eller sjekk skriveroppsettet i POS Styring → Terminaler.",
+        });
+        return;
+      }
 
       // 2) Journalfør original/KOPI. Feiler dette (f.eks. kopi allerede
       //    utstedt) avbrytes print-jobben — ingen ugyldig utskrift.

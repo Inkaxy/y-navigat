@@ -214,7 +214,7 @@ function SelfServiceFlow({ data, loading, loadError }: FlowProps) {
               "id, receipt_number, receipt_sequence, created_at, dining_mode, subtotal_excl_mva, total_mva, total_incl_mva, mva_breakdown, payment_summary",
             )
             .eq("id", id)
-            .single(),
+            .maybeSingle(),
           kioskSupabase
             .from("pos_transaction_lines")
             .select(
@@ -225,7 +225,18 @@ function SelfServiceFlow({ data, loading, loadError }: FlowProps) {
         ]);
       if (txErr) throw txErr;
       if (linesErr) throw linesErr;
-      if (!tx) throw new Error("Fant ikke transaksjonen");
+      if (!tx) {
+        // Salget er journalført — bare kvitteringen mangler.
+        toast.warning("Betaling registrert — kvittering mangler", {
+          description:
+            `Salget er registrert (salgs-ID ${id}), men kvitteringen kunne ikke hentes. Ikke betal på nytt — ` +
+            "tilkall betjeningen, som kan hente kvitteringen i POS Styring → Journal.",
+          duration: 20000,
+        });
+        cart.clear();
+        nav.reset();
+        return;
+      }
 
       const r = { tx, lines: lines ?? [] };
       setReceipt(r);
@@ -310,8 +321,13 @@ function SelfServiceFlow({ data, loading, loadError }: FlowProps) {
               status: "printing",
             })
             .select("id")
-            .single();
+            .maybeSingle();
           if (jErr) throw jErr;
+          if (!job) {
+            throw new Error(
+              "Print-jobben ble ikke opprettet i databasen — kvitteringen kunne ikke legges i utskriftskøen.",
+            );
+          }
 
           try {
             const { error: pkErr } = await kioskSupabase.rpc("pos_record_receipt_print" as never, {
