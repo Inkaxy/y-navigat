@@ -73,6 +73,24 @@ interface ImportResult {
 
 type Step = 1 | 2 | 3 | 4;
 
+type ConflictChoice = "keep" | "overwrite" | "skip";
+
+const CONFLICT_LABEL: Record<ConflictChoice, string> = {
+  keep: "Behold NBOS-navn",
+  overwrite: "Overskriv med Tedebe-navn",
+  skip: "Hopp over raden",
+};
+
+/** RPC-en krever at selskapet har begge base-prislistene. */
+const REQUIRED_PRICE_LIST_CODES = ["engros_base", "utsalg_base"] as const;
+
+interface EntityOption {
+  id: string;
+  short_code: string;
+  legal_name: string;
+  hasBasePriceLists: boolean;
+}
+
 const ALL_MOMSKODER: Array<"F" | "H" | "P" | "null"> = ["F", "H", "P", "null"];
 const MOMSKODE_LABEL: Record<"F" | "H" | "P" | "null", string> = {
   F: "F (0%)",
@@ -105,20 +123,56 @@ export function ImportPricesDialog({ open, onOpenChange, onComplete }: Props) {
     import_prices: true,
   });
 
+  // Navnekonflikt-håndtering
+  const [conflictResolution, setConflictResolution] = useState<ConflictChoice>("keep");
+  const [rowDecisions, setRowDecisions] = useState<Record<number, ConflictChoice>>({});
+
   /* ---- Hent legal entities for selskap-velger ---- */
   const entitiesQuery = useQuery({
-    queryKey: ["import-legal-entities"],
+    queryKey: ["import-legal-entities-with-price-lists"],
     enabled: open,
-    queryFn: async () => {
+    queryFn: async (): Promise<EntityOption[]> => {
       const { data, error } = await supabase
         .from("legal_entities")
         .select("id, short_code, legal_name")
         .eq("status", "active")
         .order("short_code");
       if (error) throw error;
-      return data ?? [];
+      const rows = data ?? [];
+
+      // Én ekstra spørring — ikke N+1
+      const { data: lists, error: listErr } = await supabase
+        .from("price_lists")
+        .select("legal_entity_id, code")
+        .in("code", REQUIRED_PRICE_LIST_CODES as unknown as string[]);
+      if (listErr) throw listErr;
+
+      const byEntity = new Map<string, Set<string>>();
+      for (const l of lists ?? []) {
+        if (!l.legal_entity_id) continue;
+        const s = byEntity.get(l.legal_entity_id) ?? new Set<string>();
+        s.add(l.code);
+        byEntity.set(l.legal_entity_id, s);
+      }
+
+      return rows.map((e) => {
+        const codes = byEntity.get(e.id) ?? new Set<string>();
+        return { ...e, hasBasePriceLists: REQUIRED_PRICE_LIST_CODES.every((c) => codes.has(c)) };
+      });
     },
   });
+
+  const entities: EntityOption[] = entitiesQuery.data ?? [];
+  const selectedEntity = entities.find((e) => e.id === legalEntityId) ?? null;
+  const entityValid = !!selectedEntity?.hasBasePriceLists;
+
+  /* ---- Default til et selskap som faktisk KAN importere ---- */
+  useEffect(() => {
+    if (!open || entities.length === 0) return;
+    if (entities.find((e) => e.id === legalEntityId)?.hasBasePriceLists) return;
+    const firstValid = entities.find((e) => e.hasBasePriceLists);
+    if (firstValid && firstValid.id !== legalEntityId) setLegalEntityId(firstValid.id);
+  }, [open, entities, legalEntityId]);
 
   /* ---- Hent eksisterende produkter for valgt entity ---- */
   const existingQuery = useQuery({
@@ -163,6 +217,8 @@ export function ImportPricesDialog({ open, onOpenChange, onComplete }: Props) {
           update_existing: true,
           import_prices: true,
         });
+        setConflictResolution("keep");
+        setRowDecisions({});
       }, 200);
       return () => clearTimeout(t);
     }
@@ -210,10 +266,20 @@ export function ImportPricesDialog({ open, onOpenChange, onComplete }: Props) {
     });
   }
 
-  /* ---- Import-handler: IKKE aktiv ennå (edge-funksjonen finnes ikke) ---- */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async function handleImport() {
+  /* ---- Navnekonflikter ---- */
+  const conflictRows = useMemo(
+    () => classified.filter((r) => r.action === "update_name_conflict"),
+    [classified],
+  );
 
+  const conflictSummary = useMemo(() => {
+    const s: Record<ConflictChoice, number> = { keep: 0, overwrite: 0, skip: 0 };
+    for (const r of conflictRows) s[rowDecisions[r.row_index] ?? conflictResolution]++;
+    return s;
+  }, [conflictRows, rowDecisions, conflictResolution]);
+
+  /* ---- Import-handler ---- */
+  async function handleImport() {
     if (!file || classified.length === 0) return;
     setImporting(true);
     setImportError(null);
@@ -238,6 +304,17 @@ export function ImportPricesDialog({ open, onOpenChange, onComplete }: Props) {
         momskode: r.momskode,
       }));
 
+    // Per-rad-overstyring: bruk «per_row» kun når minst én rad avviker fra det globale valget
+    const hasOverride = conflictRows.some(
+      (r) => rowDecisions[r.row_index] && rowDecisions[r.row_index] !== conflictResolution,
+    );
+    const perRowDecisions: Record<string, ConflictChoice> = {};
+    if (hasOverride) {
+      for (const r of conflictRows) {
+        perRowDecisions[String(r.row_index)] = rowDecisions[r.row_index] ?? conflictResolution;
+      }
+    }
+
     try {
       const { data, error } = await supabase.functions.invoke("import_products_prices", {
         body: {
@@ -247,7 +324,8 @@ export function ImportPricesDialog({ open, onOpenChange, onComplete }: Props) {
             create_new: filter.create_new,
             update_existing: filter.update_existing,
             import_prices: filter.import_prices,
-            name_conflict_resolution: "keep" as const,
+            name_conflict_resolution: hasOverride ? "per_row" : conflictResolution,
+            ...(hasOverride ? { per_row_decisions: perRowDecisions } : {}),
           },
           source_filename: file.name,
         },
@@ -292,7 +370,9 @@ export function ImportPricesDialog({ open, onOpenChange, onComplete }: Props) {
               setFile={setFile}
               legalEntityId={legalEntityId}
               setLegalEntityId={setLegalEntityId}
-              entities={entitiesQuery.data ?? []}
+              entities={entities}
+              selectedEntity={selectedEntity}
+              entityValid={entityValid}
             />
           )}
 
@@ -305,11 +385,19 @@ export function ImportPricesDialog({ open, onOpenChange, onComplete }: Props) {
               setFilter={setFilter}
               toggleMomskode={toggleMomskode}
               loadingExisting={existingQuery.isLoading}
+              conflictResolution={conflictResolution}
+              setConflictResolution={setConflictResolution}
+              rowDecisions={rowDecisions}
+              setRowDecisions={setRowDecisions}
             />
           )}
 
           {step === 3 && stats && (
-            <Step3Confirm stats={stats} fileName={file?.name ?? ""} />
+            <Step3Confirm
+              stats={stats}
+              fileName={file?.name ?? ""}
+              conflictSummary={conflictSummary}
+            />
           )}
 
           {step === 4 && (
@@ -344,7 +432,8 @@ export function ImportPricesDialog({ open, onOpenChange, onComplete }: Props) {
               <Button
                 size="sm"
                 onClick={handleParse}
-                disabled={!file || parsing}
+                disabled={!file || parsing || !entityValid}
+                title={!entityValid ? "Valgt selskap mangler base-prislistene" : undefined}
                 className="bg-app hover:bg-app-dark text-app-foreground"
               >
                 {parsing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -362,14 +451,15 @@ export function ImportPricesDialog({ open, onOpenChange, onComplete }: Props) {
               </Button>
             )}
             {step === 3 && (
-              <div className="flex items-center gap-3">
-                <span className="text-xs text-muted-foreground">
-                  Selve importen er ikke koblet på ennå — analysen over er ekte, skrivingen kommer.
-                </span>
-                <Button size="sm" disabled title="Importmotoren er ikke ferdig ennå">
-                  Bekreft og start import (kommer)
-                </Button>
-              </div>
+              <Button
+                size="sm"
+                onClick={handleImport}
+                disabled={!file || !entityValid || !stats || stats.total === 0 || importing}
+                className="bg-app hover:bg-app-dark text-app-foreground"
+              >
+                {importing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Bekreft og start import
+              </Button>
             )}
 
             {step === 4 && importResult && (
@@ -436,12 +526,16 @@ function Step1Upload({
   legalEntityId,
   setLegalEntityId,
   entities,
+  selectedEntity,
+  entityValid,
 }: {
   file: File | null;
   setFile: (f: File | null) => void;
   legalEntityId: string;
   setLegalEntityId: (s: string) => void;
-  entities: { id: string; short_code: string; legal_name: string }[];
+  entities: EntityOption[];
+  selectedEntity: EntityOption | null;
+  entityValid: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -463,8 +557,14 @@ function Step1Upload({
           </SelectTrigger>
           <SelectContent>
             {entities.map((e) => (
-              <SelectItem key={e.id} value={e.id}>
+              <SelectItem key={e.id} value={e.id} disabled={!e.hasBasePriceLists}>
                 {e.short_code} — {e.legal_name}
+                {!e.hasBasePriceLists && (
+                  <span className="text-xs text-muted-foreground">
+                    {" "}
+                    · ingen prislister — import ikke mulig
+                  </span>
+                )}
               </SelectItem>
             ))}
           </SelectContent>
@@ -473,6 +573,18 @@ function Step1Upload({
           Importerte produkter og priser tilknyttes dette selskapet.
         </p>
       </div>
+
+      {!entityValid && (
+        <Alert variant="destructive">
+          <XCircle className="h-4 w-4" />
+          <AlertTitle>Import ikke mulig for dette selskapet</AlertTitle>
+          <AlertDescription>
+            {selectedEntity
+              ? `${selectedEntity.short_code} — ${selectedEntity.legal_name} mangler base-prislistene (engros_base og utsalg_base). Importen kan ikke kjøres for dette selskapet.`
+              : "Velg et selskap som har base-prislistene (engros_base og utsalg_base)."}
+          </AlertDescription>
+        </Alert>
+      )}
 
       <div
         onClick={() => inputRef.current?.click()}
@@ -523,6 +635,10 @@ function Step2Preview({
   setFilter,
   toggleMomskode,
   loadingExisting,
+  conflictResolution,
+  setConflictResolution,
+  rowDecisions,
+  setRowDecisions,
 }: {
   parseResult: ParseResult;
   classified: ClassifiedRow[];
@@ -531,6 +647,10 @@ function Step2Preview({
   setFilter: React.Dispatch<React.SetStateAction<FilterOptions>>;
   toggleMomskode: (m: "F" | "H" | "P" | "null") => void;
   loadingExisting: boolean;
+  conflictResolution: ConflictChoice;
+  setConflictResolution: (c: ConflictChoice) => void;
+  rowDecisions: Record<number, ConflictChoice>;
+  setRowDecisions: React.Dispatch<React.SetStateAction<Record<number, ConflictChoice>>>;
 }) {
   if (parseResult.missing_columns.length > 0) {
     return (
@@ -576,9 +696,33 @@ function Step2Preview({
         <Alert>
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>{conflictCount} navnekonflikt(er) funnet</AlertTitle>
-          <AlertDescription>
-            Tedebe-navn skiller seg fra eksisterende NBOS-navn. I Del 2 vil du kunne velge per rad
-            om du vil beholde NBOS-navn, overskrive med Tedebe-navn, eller hoppe over raden.
+          <AlertDescription className="space-y-2">
+            <p>
+              Tedebe-navn skiller seg fra eksisterende NBOS-navn. Velg hva som skal skje med alle
+              konflikter — du kan overstyre enkeltrader i tabellen under.
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <Select
+                value={conflictResolution}
+                onValueChange={(v) => setConflictResolution(v as ConflictChoice)}
+              >
+                <SelectTrigger className="h-8 w-64">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {(Object.keys(CONFLICT_LABEL) as ConflictChoice[]).map((c) => (
+                    <SelectItem key={c} value={c}>
+                      {CONFLICT_LABEL[c]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {Object.keys(rowDecisions).length > 0 && (
+                <Button variant="ghost" size="sm" onClick={() => setRowDecisions({})}>
+                  Nullstill {Object.keys(rowDecisions).length} overstyring(er)
+                </Button>
+              )}
+            </div>
           </AlertDescription>
         </Alert>
       )}
@@ -688,24 +832,77 @@ function Step2Preview({
               </tr>
             </thead>
             <tbody>
-              {previewRows.map((r) => (
-                <tr key={r.row_index} className="border-b last:border-0 hover:bg-muted/30">
-                  <td className="px-3 py-1.5 font-mono text-xs">{r.varenummer ?? "—"}</td>
-                  <td className="px-3 py-1.5">{r.varenavn || <em className="text-muted-foreground">tom</em>}</td>
-                  <td className="px-3 py-1.5 text-xs text-muted-foreground">
-                    {r.momskode ?? "null"} → {r.mva_rate}%
-                  </td>
-                  <td className="px-3 py-1.5 text-right font-mono text-xs">
-                    {r.utsalgspris != null ? r.utsalgspris.toFixed(2).replace(".", ",") : "—"}
-                  </td>
-                  <td className="px-3 py-1.5 text-right font-mono text-xs">
-                    {r.engrospris != null ? r.engrospris.toFixed(2).replace(".", ",") : "—"}
-                  </td>
-                  <td className="px-3 py-1.5">
-                    <ActionCell action={r.action} />
-                  </td>
-                </tr>
-              ))}
+              {previewRows.map((r) => {
+                const isConflict = r.action === "update_name_conflict";
+                const decision = rowDecisions[r.row_index] ?? conflictResolution;
+                return (
+                  <tr key={r.row_index} className="border-b last:border-0 hover:bg-muted/30">
+                    <td className="px-3 py-1.5 font-mono text-xs align-top">{r.varenummer ?? "—"}</td>
+                    <td className="px-3 py-1.5">
+                      {isConflict ? (
+                        <div className="space-y-0.5">
+                          <div className="text-xs">
+                            <span className="text-muted-foreground">NBOS: </span>
+                            <span
+                              className={cn(
+                                decision === "overwrite" && "line-through text-muted-foreground",
+                              )}
+                            >
+                              {r.existing?.display_name ?? "—"}
+                            </span>
+                          </div>
+                          <div className="text-xs">
+                            <span className="text-muted-foreground">Tedebe: </span>
+                            <span
+                              className={cn(
+                                decision !== "overwrite" && "line-through text-muted-foreground",
+                              )}
+                            >
+                              {r.varenavn}
+                            </span>
+                          </div>
+                        </div>
+                      ) : (
+                        r.varenavn || <em className="text-muted-foreground">tom</em>
+                      )}
+                    </td>
+                    <td className="px-3 py-1.5 text-xs text-muted-foreground align-top">
+                      {r.momskode ?? "null"} → {r.mva_rate}%
+                    </td>
+                    <td className="px-3 py-1.5 text-right font-mono text-xs align-top">
+                      {r.utsalgspris != null ? r.utsalgspris.toFixed(2).replace(".", ",") : "—"}
+                    </td>
+                    <td className="px-3 py-1.5 text-right font-mono text-xs align-top">
+                      {r.engrospris != null ? r.engrospris.toFixed(2).replace(".", ",") : "—"}
+                    </td>
+                    <td className="px-3 py-1.5 align-top">
+                      <ActionCell action={r.action} />
+                      {isConflict && (
+                        <Select
+                          value={decision}
+                          onValueChange={(v) =>
+                            setRowDecisions((prev) => ({
+                              ...prev,
+                              [r.row_index]: v as ConflictChoice,
+                            }))
+                          }
+                        >
+                          <SelectTrigger className="mt-1 h-7 w-52 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {(Object.keys(CONFLICT_LABEL) as ConflictChoice[]).map((c) => (
+                              <SelectItem key={c} value={c} className="text-xs">
+                                {CONFLICT_LABEL[c]}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </ScrollArea>
@@ -786,7 +983,15 @@ function ActionCell({ action }: { action: RowAction }) {
 
 /* ============== STEG 3: BEKREFT ============== */
 
-function Step3Confirm({ stats, fileName }: { stats: ClassificationStats; fileName: string }) {
+function Step3Confirm({
+  stats,
+  fileName,
+  conflictSummary,
+}: {
+  stats: ClassificationStats;
+  fileName: string;
+  conflictSummary: Record<ConflictChoice, number>;
+}) {
   return (
     <div className="space-y-4">
       <Alert>
@@ -813,6 +1018,18 @@ function Step3Confirm({ stats, fileName }: { stats: ClassificationStats; fileNam
           <div className="font-mono tabular-nums">{stats.to_skip}</div>
         </div>
       </div>
+
+      {stats.conflicts > 0 && (
+        <Alert>
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Slik løses navnekonfliktene</AlertTitle>
+          <AlertDescription>
+            {stats.conflicts} navnekonflikt(er): {conflictSummary.keep} beholder NBOS-navn,{" "}
+            {conflictSummary.overwrite} overskrives med Tedebe-navn, {conflictSummary.skip} hoppes
+            over.
+          </AlertDescription>
+        </Alert>
+      )}
     </div>
   );
 }
