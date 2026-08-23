@@ -60,10 +60,13 @@ export async function acceptMatch(opts: AcceptMatchOptions): Promise<{ lineIds: 
     agreedPricePerBaseUnit != null && Number.isFinite(agreedPricePerBaseUnit) ? agreedPricePerBaseUnit : null;
 
   // 1) Sørg for kobling mellom vare og leverandør
-  const { data: existingLinks } = await supabase
+  const { data: existingLinks, error: linksErr } = await supabase
     .from("raw_material_suppliers")
     .select("id, supplier_id, agreed_price_per_base_unit, is_primary")
     .eq("raw_material_id", rawMaterialId);
+  if (linksErr) {
+    throw new Error(`Kunne ikke hente eksisterende leverandørkoblinger for varen: ${linksErr.message}`);
+  }
 
   const links = existingLinks ?? [];
   const anyPrimary = links.some((l) => l.is_primary);
@@ -84,7 +87,7 @@ export async function acceptMatch(opts: AcceptMatchOptions): Promise<{ lineIds: 
       })
       .select("id")
       .single();
-    if (error) throw error;
+    if (error) throw new Error(`Kunne ikke opprette leverandørkobling for varen: ${error.message}`);
     rmsId = ins.id;
   } else {
     const upd: { package_size?: number; package_unit?: string; agreed_price_per_base_unit?: number } = {};
@@ -92,18 +95,43 @@ export async function acceptMatch(opts: AcceptMatchOptions): Promise<{ lineIds: 
     if (pkgUnit) upd.package_unit = pkgUnit;
     if (agreed != null) upd.agreed_price_per_base_unit = agreed;
     if (Object.keys(upd).length > 0) {
-      await supabase.from("raw_material_suppliers").update(upd).eq("id", rmsId);
+      const { error: updLinkErr } = await supabase.from("raw_material_suppliers").update(upd).eq("id", rmsId);
+      if (updLinkErr) {
+        throw new Error(`Kunne ikke oppdatere leverandørkoblingen (pakning/avtalepris): ${updLinkErr.message}`);
+      }
     }
   }
 
   if (setAsPrimary && !anyPrimary) {
-    await supabase
+    // Opprydning: at hovedleverandøren ikke ble satt gjør ikke matchen ugyldig.
+    const { error: clearErr } = await supabase
       .from("raw_material_suppliers")
       .update({ is_primary: false })
       .eq("raw_material_id", rawMaterialId)
       .neq("id", rmsId);
-    await supabase.from("raw_material_suppliers").update({ is_primary: true }).eq("id", rmsId);
-    await supabase.from("raw_materials").update({ primary_supplier_id: supplierId }).eq("id", rawMaterialId);
+    if (clearErr) {
+      console.warn(
+        `acceptMatch: kunne ikke nullstille tidligere hovedleverandør for vare ${rawMaterialId}: ${clearErr.message}`,
+      );
+    }
+    const { error: setErr } = await supabase
+      .from("raw_material_suppliers")
+      .update({ is_primary: true })
+      .eq("id", rmsId);
+    if (setErr) {
+      console.warn(
+        `acceptMatch: kunne ikke sette leverandørkobling ${rmsId} som hovedleverandør: ${setErr.message}`,
+      );
+    }
+    const { error: rmErr } = await supabase
+      .from("raw_materials")
+      .update({ primary_supplier_id: supplierId })
+      .eq("id", rawMaterialId);
+    if (rmErr) {
+      console.warn(
+        `acceptMatch: kunne ikke oppdatere hovedleverandør på vare ${rawMaterialId}: ${rmErr.message}`,
+      );
+    }
   }
 
   // 2) Alias
@@ -131,29 +159,43 @@ export async function acceptMatch(opts: AcceptMatchOptions): Promise<{ lineIds: 
     });
   }
   for (const a of aliasInserts) {
-    await supabase.from("raw_material_supplier_aliases").upsert(a, {
+    const { error: aliasErr } = await supabase.from("raw_material_supplier_aliases").upsert(a, {
       onConflict: "alias_type,alias_value_normalized,raw_material_supplier_id",
     });
+    if (aliasErr) {
+      const what = a.alias_type === "supplier_sku" ? "leverandør-SKU" : "produktnavn";
+      throw new Error(`Kunne ikke lagre alias (${what}: «${a.alias_value}»): ${aliasErr.message}`);
+    }
   }
 
   // 2b) Pensjonér motstridende alias hos samme leverandør som peker på ANDRE varer.
   if (aliasInserts.length > 0 && supplierId) {
-    const { data: supplierRms } = await supabase
+    const { data: supplierRms, error: supplierRmsErr } = await supabase
       .from("raw_material_suppliers")
       .select("id, raw_material_id")
       .eq("supplier_id", supplierId);
+    if (supplierRmsErr) {
+      console.warn(
+        `acceptMatch: kunne ikke hente leverandørens øvrige varekoblinger for opprydning av alias: ${supplierRmsErr.message}`,
+      );
+    }
     const otherRmsIds = (supplierRms ?? [])
       .filter((r) => r.raw_material_id !== rawMaterialId)
       .map((r) => r.id);
     if (otherRmsIds.length > 0) {
       for (const a of aliasInserts) {
-        await supabase
+        const { error: supErr } = await supabase
           .from("raw_material_supplier_aliases")
           .update({ status: "superseded" })
           .in("raw_material_supplier_id", otherRmsIds)
           .eq("alias_type", a.alias_type)
           .eq("alias_value", a.alias_value)
           .eq("status", "confirmed");
+        if (supErr) {
+          console.warn(
+            `acceptMatch: kunne ikke pensjonere motstridende alias «${a.alias_value}» (${a.alias_type}) hos leverandøren: ${supErr.message}`,
+          );
+        }
       }
     }
   }
@@ -161,10 +203,13 @@ export async function acceptMatch(opts: AcceptMatchOptions): Promise<{ lineIds: 
   // 3) Skriv matchen på linjen (og evt. søsterlinjer)
   const lineIds: string[] = [line.id];
   if (applyToAll) {
-    const { data: sib } = await supabase
+    const { data: sib, error: sibErr } = await supabase
       .from("invoice_lines")
       .select("id, supplier_sku, description")
       .eq("invoice_id", line.invoice_id);
+    if (sibErr) {
+      throw new Error(`Kunne ikke hente søsterlinjer på fakturaen for «match alle like»: ${sibErr.message}`);
+    }
     (sib ?? []).forEach((s) => {
       if (s.id === line.id) return;
       const bothHaveSku = !!line.supplier_sku && !!s.supplier_sku;
@@ -186,12 +231,19 @@ export async function acceptMatch(opts: AcceptMatchOptions): Promise<{ lineIds: 
       resolved_at: nowIso,
     })
     .in("id", lineIds);
-  if (updErr) throw updErr;
+  if (updErr) throw new Error(`Kunne ikke lagre matchen på fakturalinjen(e): ${updErr.message}`);
 
-  // 4) Kjør pipeline på nytt for linjene (prisavvik regnes om)
-  await supabase.functions.invoke("match-invoice-lines", {
+  // 4) Kjør pipeline på nytt for linjene (prisavvik regnes om).
+  //    Feiler dette er matchen likevel lagret — logg og gå videre.
+  const { error: fnErr } = await supabase.functions.invoke("match-invoice-lines", {
     body: { invoice_id: line.invoice_id, line_ids: lineIds },
   });
+  if (fnErr) {
+    console.warn(
+      `acceptMatch: matchen er lagret, men reberegning av prisavvik (match-invoice-lines) feilet: ${fnErr.message}`,
+    );
+  }
 
   return { lineIds };
 }
+

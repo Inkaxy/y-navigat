@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -107,6 +107,7 @@ function derivePricePerBaseUnit(l: BulkLine, baseUnit: string, pkgSize: number |
 }
 
 export function BulkImportRawMaterialsDrawer({ open, onOpenChange, invoiceId, legalEntityId, lines, onComplete }: Props) {
+  const qc = useQueryClient();
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [rows, setRows] = useState<Record<string, RowState>>({});
   const [skipped, setSkipped] = useState<Array<{ line_id: string; reason: string }>>([]);
@@ -270,6 +271,17 @@ export function BulkImportRawMaterialsDrawer({ open, onOpenChange, invoiceId, le
           action: { label: "Vis", onClick: () => window.location.assign("/ravarer/vareliste") },
         });
       }
+      // Samme invalidering som enkeltopprettelse (CreateRawMaterialDialog/MatchDrawer),
+      // slik at vareliste, behandlingskø og fakturaen viser fersk tilstand.
+      qc.invalidateQueries({ queryKey: ["fakturaer-review-lines"] });
+      qc.invalidateQueries({ queryKey: ["fakturaer-review-count"] });
+      qc.invalidateQueries({ queryKey: ["rm-categories"] });
+      qc.invalidateQueries({ queryKey: ["raw-material-categories"] });
+      qc.invalidateQueries({ queryKey: ["raw-materials"] });
+      qc.invalidateQueries({ queryKey: ["invoice", invoiceId] });
+      qc.invalidateQueries({ queryKey: ["invoice-lines", invoiceId] });
+      qc.invalidateQueries({ queryKey: ["fakturaer-invoices"] });
+
       setSkipped(skippedRows);
       if (skippedRows.length > 0) {
         toast.warning(`${skippedRows.length} linjer ble hoppet over — se årsakene i skuffen.`);

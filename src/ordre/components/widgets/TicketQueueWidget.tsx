@@ -63,7 +63,7 @@ export function TicketQueueWidget() {
           {INTENTS.map((k) => (
             <Link
               key={k}
-              to="/ordre/tickets"
+              to="/ordre/ticket"
               className="rounded-md border bg-muted/30 px-3 py-2 text-sm transition-colors hover:bg-muted/60"
             >
               <div className="text-xs uppercase tracking-wider text-muted-foreground">
@@ -75,7 +75,7 @@ export function TicketQueueWidget() {
         </div>
         <div className="grid grid-cols-2 gap-2">
           <Link
-            to="/ordre/tickets"
+            to="/ordre/ticket"
             className={cn(
               "flex items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors",
               overdue > 0
