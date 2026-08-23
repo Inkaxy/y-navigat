@@ -218,7 +218,9 @@ export function CreateRawMaterialDialog({ open, onOpenChange, line, onCreated }:
               >
                 <SelectTrigger><SelectValue placeholder="Velg kategori…" /></SelectTrigger>
                 <SelectContent>
-                  {categories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  {Array.from(new Set([...(category ? [category] : []), ...categories])).map((c) => (
+                    <SelectItem key={c} value={c}>{c}</SelectItem>
+                  ))}
                   <SelectItem value="__new__">+ Ny kategori…</SelectItem>
                 </SelectContent>
               </Select>
