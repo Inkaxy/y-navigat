@@ -23,6 +23,7 @@ export interface ReviewLineRow {
   package_size: number | null;
   package_unit: string | null;
   count_per_package: number | null;
+  base_quantity: number | null;
   match_confidence: string | null;
   raw_material_id: string | null;
   price_per_base_unit: number | null;
@@ -39,9 +40,16 @@ export interface ReviewLineRow {
     supplier_id: string;
     source: string | null;
     source_document_url: string | null;
+    total_amount: number | null;
+    total_vat: number | null;
+    lines_sum_status: string | null;
+    lines_sum_excl_vat: number | null;
+    lines_sum_variance_pct: number | null;
+    extraction_confidence: number | null;
     supplier: { name: string; contact_email: string | null } | null;
     legal_entity: { legal_name: string; short_code: string | null } | null;
   };
+
   suggestions: Array<{
     raw_material_id: string;
     confidence: number;
