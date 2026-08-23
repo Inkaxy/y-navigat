@@ -291,7 +291,9 @@ export default function InvoiceDetailPage() {
         />
       )}
 
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+      {(() => {
+      const mainContent = (
+      <div className={docOpen && !isMobile ? "grid grid-cols-1 gap-5" : "grid grid-cols-1 gap-5 lg:grid-cols-3"}>
         <Card className="p-6 lg:col-span-1">
           <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-ink-secondary">Detaljer</h3>
           <dl className="space-y-3 text-sm">
