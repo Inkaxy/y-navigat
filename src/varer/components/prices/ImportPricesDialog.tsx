@@ -832,24 +832,77 @@ function Step2Preview({
               </tr>
             </thead>
             <tbody>
-              {previewRows.map((r) => (
-                <tr key={r.row_index} className="border-b last:border-0 hover:bg-muted/30">
-                  <td className="px-3 py-1.5 font-mono text-xs">{r.varenummer ?? "—"}</td>
-                  <td className="px-3 py-1.5">{r.varenavn || <em className="text-muted-foreground">tom</em>}</td>
-                  <td className="px-3 py-1.5 text-xs text-muted-foreground">
-                    {r.momskode ?? "null"} → {r.mva_rate}%
-                  </td>
-                  <td className="px-3 py-1.5 text-right font-mono text-xs">
-                    {r.utsalgspris != null ? r.utsalgspris.toFixed(2).replace(".", ",") : "—"}
-                  </td>
-                  <td className="px-3 py-1.5 text-right font-mono text-xs">
-                    {r.engrospris != null ? r.engrospris.toFixed(2).replace(".", ",") : "—"}
-                  </td>
-                  <td className="px-3 py-1.5">
-                    <ActionCell action={r.action} />
-                  </td>
-                </tr>
-              ))}
+              {previewRows.map((r) => {
+                const isConflict = r.action === "update_name_conflict";
+                const decision = rowDecisions[r.row_index] ?? conflictResolution;
+                return (
+                  <tr key={r.row_index} className="border-b last:border-0 hover:bg-muted/30">
+                    <td className="px-3 py-1.5 font-mono text-xs align-top">{r.varenummer ?? "—"}</td>
+                    <td className="px-3 py-1.5">
+                      {isConflict ? (
+                        <div className="space-y-0.5">
+                          <div className="text-xs">
+                            <span className="text-muted-foreground">NBOS: </span>
+                            <span
+                              className={cn(
+                                decision === "overwrite" && "line-through text-muted-foreground",
+                              )}
+                            >
+                              {r.existing?.display_name ?? "—"}
+                            </span>
+                          </div>
+                          <div className="text-xs">
+                            <span className="text-muted-foreground">Tedebe: </span>
+                            <span
+                              className={cn(
+                                decision !== "overwrite" && "line-through text-muted-foreground",
+                              )}
+                            >
+                              {r.varenavn}
+                            </span>
+                          </div>
+                        </div>
+                      ) : (
+                        r.varenavn || <em className="text-muted-foreground">tom</em>
+                      )}
+                    </td>
+                    <td className="px-3 py-1.5 text-xs text-muted-foreground align-top">
+                      {r.momskode ?? "null"} → {r.mva_rate}%
+                    </td>
+                    <td className="px-3 py-1.5 text-right font-mono text-xs align-top">
+                      {r.utsalgspris != null ? r.utsalgspris.toFixed(2).replace(".", ",") : "—"}
+                    </td>
+                    <td className="px-3 py-1.5 text-right font-mono text-xs align-top">
+                      {r.engrospris != null ? r.engrospris.toFixed(2).replace(".", ",") : "—"}
+                    </td>
+                    <td className="px-3 py-1.5 align-top">
+                      <ActionCell action={r.action} />
+                      {isConflict && (
+                        <Select
+                          value={decision}
+                          onValueChange={(v) =>
+                            setRowDecisions((prev) => ({
+                              ...prev,
+                              [r.row_index]: v as ConflictChoice,
+                            }))
+                          }
+                        >
+                          <SelectTrigger className="mt-1 h-7 w-52 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {(Object.keys(CONFLICT_LABEL) as ConflictChoice[]).map((c) => (
+                              <SelectItem key={c} value={c} className="text-xs">
+                                {CONFLICT_LABEL[c]}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </ScrollArea>
