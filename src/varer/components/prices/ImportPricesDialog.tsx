@@ -526,12 +526,16 @@ function Step1Upload({
   legalEntityId,
   setLegalEntityId,
   entities,
+  selectedEntity,
+  entityValid,
 }: {
   file: File | null;
   setFile: (f: File | null) => void;
   legalEntityId: string;
   setLegalEntityId: (s: string) => void;
-  entities: { id: string; short_code: string; legal_name: string }[];
+  entities: EntityOption[];
+  selectedEntity: EntityOption | null;
+  entityValid: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -553,8 +557,14 @@ function Step1Upload({
           </SelectTrigger>
           <SelectContent>
             {entities.map((e) => (
-              <SelectItem key={e.id} value={e.id}>
+              <SelectItem key={e.id} value={e.id} disabled={!e.hasBasePriceLists}>
                 {e.short_code} — {e.legal_name}
+                {!e.hasBasePriceLists && (
+                  <span className="text-xs text-muted-foreground">
+                    {" "}
+                    · ingen prislister — import ikke mulig
+                  </span>
+                )}
               </SelectItem>
             ))}
           </SelectContent>
@@ -563,6 +573,18 @@ function Step1Upload({
           Importerte produkter og priser tilknyttes dette selskapet.
         </p>
       </div>
+
+      {!entityValid && (
+        <Alert variant="destructive">
+          <XCircle className="h-4 w-4" />
+          <AlertTitle>Import ikke mulig for dette selskapet</AlertTitle>
+          <AlertDescription>
+            {selectedEntity
+              ? `${selectedEntity.short_code} — ${selectedEntity.legal_name} mangler base-prislistene (engros_base og utsalg_base). Importen kan ikke kjøres for dette selskapet.`
+              : "Velg et selskap som har base-prislistene (engros_base og utsalg_base)."}
+          </AlertDescription>
+        </Alert>
+      )}
 
       <div
         onClick={() => inputRef.current?.click()}
