@@ -92,7 +92,7 @@ export function CreateRawMaterialDialog({ open, onOpenChange, line, onCreated }:
         package_unit: packageUnit || null,
         current_cost_price: pricePerBase ?? 0, price_source: "invoice", price_updated_at: nowIso,
         primary_supplier_id: line.invoice.supplier_id, is_active: true, created_by: user?.id,
-      }).select().single();
+      } as never).select().single();
       if (rmErr) throw rmErr;
 
       // 2) raw_material_suppliers
