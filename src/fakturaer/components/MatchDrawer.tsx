@@ -273,6 +273,9 @@ export function MatchDrawer({ open, onOpenChange, line }: Props) {
       <SheetContent className="w-full max-w-[60vw] sm:max-w-[60vw] overflow-y-auto">
         <SheetHeader>
           <SheetTitle>Match fakturalinje</SheetTitle>
+          <div className="pt-1">
+            <InvoiceDocumentButton path={line?.invoice.source_document_url} label="Åpne faktura" />
+          </div>
         </SheetHeader>
 
         <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[2fr_3fr]">
