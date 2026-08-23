@@ -70,19 +70,28 @@ export function useInvoices(filters: InvoiceFilters) {
 
       const search = filters.search?.trim();
       if (search) {
-        const escaped = search.replace(/[%,()]/g, " ").trim();
-        if (escaped) {
-          // Fakturanummer på fakturaen, eller leverandørnavn via inner-joinet leverandør.
-          q = q.or(`invoice_number.ilike.%${escaped}%,suppliers.name.ilike.%${escaped}%`);
+        const term = search.replace(/[%,().]/g, " ").trim();
+        if (term) {
+          // Treff på fakturanummer ELLER leverandørnavn: slå opp matchende
+          // leverandører først, og kombiner i én or-filtrering.
+          let sq = supabase.from("suppliers").select("id").ilike("name", `%${term}%`).limit(200);
+          if (filters.legalEntityId) sq = sq.eq("legal_entity_id", filters.legalEntityId);
+          const { data: sup, error: supErr } = await sq;
+          if (supErr) throw supErr;
+          const ids = (sup ?? []).map((s) => s.id as string);
+          q = ids.length
+            ? q.or(`invoice_number.ilike.%${term}%,supplier_id.in.(${ids.join(",")})`)
+            : q.ilike("invoice_number", `%${term}%`);
         }
       }
 
       if (sortKey === "supplier") {
-        q = q.order("name", { referencedTable: "suppliers", ascending: sortDir === "asc" });
+        q = q.order("suppliers(name)", { ascending: sortDir === "asc" });
       } else {
         q = q.order(sortKey, { ascending: sortDir === "asc", nullsFirst: false });
       }
       q = q.order("invoice_number", { ascending: true });
+
 
       const from = (page - 1) * pageSize;
       q = q.range(from, from + pageSize - 1);
