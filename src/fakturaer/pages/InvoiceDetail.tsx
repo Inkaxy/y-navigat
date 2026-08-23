@@ -101,6 +101,7 @@ export default function InvoiceDetailPage() {
         package_size: matchLineRaw.package_size ?? null,
         package_unit: matchLineRaw.package_unit ?? null,
         count_per_package: matchLineRaw.count_per_package ?? null,
+        base_quantity: matchLineRaw.base_quantity ?? null,
         match_confidence: matchLineRaw.match_confidence,
         raw_material_id: matchLineRaw.raw_material_id,
         price_per_base_unit: matchLineRaw.price_per_base_unit,
@@ -117,9 +118,16 @@ export default function InvoiceDetailPage() {
           supplier_id: data.supplier_id,
           source: data.source,
           source_document_url: data.source_document_url,
+          total_amount: data.total_amount ?? null,
+          total_vat: data.total_vat ?? null,
+          lines_sum_status: data.lines_sum_status ?? null,
+          lines_sum_excl_vat: data.lines_sum_excl_vat ?? null,
+          lines_sum_variance_pct: data.lines_sum_variance_pct ?? null,
+          extraction_confidence: data.extraction_confidence ?? null,
           supplier: data.suppliers ? { name: data.suppliers.name, contact_email: data.suppliers.contact_email ?? null } : null,
           legal_entity: data.legal_entities ? { legal_name: data.legal_entities.legal_name, short_code: null } : null,
         },
+
         suggestions: (matchLineSuggestions ?? []) as any,
       }
     : null;
