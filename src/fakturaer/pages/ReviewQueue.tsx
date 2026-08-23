@@ -293,7 +293,12 @@ function ReviewTable({ lines, reason, onAction, onOpenInvoice }: {
                   </td>
                 )}
                 {reason === "no_baseline" && (
-                  <td className="px-3 py-3">{l.matched_raw_material?.name ?? "—"}</td>
+                  <td className="px-3 py-3">
+                    <span className="inline-flex items-center gap-1.5">
+                      {l.matched_raw_material?.name ?? "—"}
+                      <ItemTypeBadge itemType={l.matched_raw_material?.item_type} />
+                    </span>
+                  </td>
                 )}
                 {(reason === "price_variance" || reason === "price_increase") && (
                   <td className={`px-3 py-3 text-right tabular-nums font-medium ${varColor}`}>
@@ -305,6 +310,7 @@ function ReviewTable({ lines, reason, onAction, onOpenInvoice }: {
                     <div className="flex items-center gap-1 text-warning">
                       <AlertTriangle className="h-3.5 w-3.5" />
                       {top?.raw_material?.name ?? "—"}
+                      <ItemTypeBadge itemType={top?.raw_material?.item_type} />
                     </div>
                   </td>
                 )}
@@ -315,7 +321,7 @@ function ReviewTable({ lines, reason, onAction, onOpenInvoice }: {
                     ) : (
                       <>
                         <Button size="sm" onClick={() => onAction("match", l)}>Match</Button>
-                        <Button size="sm" variant="outline" onClick={() => onAction("create", l)}>Ny råvare</Button>
+                        <Button size="sm" variant="outline" onClick={() => onAction("create", l)}>Ny vare</Button>
                         <Button size="sm" variant="ghost" onClick={() => onAction("not_rm", l)}>Ikke råvare</Button>
                       </>
                     )}
