@@ -37,6 +37,8 @@ export default function InvoiceDetailPage() {
   const [matchLineId, setMatchLineId] = useState<string | null>(null);
   const [rematching, setRematching] = useState(false);
   const [fetchingLines, setFetchingLines] = useState(false);
+  const [docOpen, setDocOpen] = useState(false);
+  const isMobile = useIsMobile();
 
   const { data, isLoading } = useQuery({
     queryKey: ["invoice", id],
