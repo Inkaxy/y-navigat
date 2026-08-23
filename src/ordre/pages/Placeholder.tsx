@@ -12,11 +12,11 @@ export default function Placeholder({ title, subtitle, body }: { title: string; 
             <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-lg bg-muted text-muted-foreground">
               <Construction className="h-6 w-6" />
             </div>
-            <CardTitle>Kommer i en senere fase</CardTitle>
-            <CardDescription>{subtitle ?? "Denne seksjonen er ikke bygget ennå."}</CardDescription>
+            <CardTitle>Ikke tilgjengelig</CardTitle>
+            <CardDescription>{subtitle ?? "Denne seksjonen er ikke tilgjengelig."}</CardDescription>
           </CardHeader>
           <CardContent className="text-center text-sm text-muted-foreground">
-            {body ?? "Fase A leverer kjerne-datamodell, ordreliste og manuell ordreinntasting. Resten kommer i Fase B–E."}
+            {body ?? "Denne seksjonen er ikke tilgjengelig."}
           </CardContent>
         </Card>
       </div>

@@ -498,7 +498,7 @@ export default function SesjonDetalj() {
                           </Button>
                         </span>
                       </TooltipTrigger>
-                      <TooltipContent>Bygges i F5 (Rapporter)</TooltipContent>
+                      <TooltipContent>Full rapport er ikke tilgjengelig for denne sesjonen.</TooltipContent>
                     </Tooltip>
                   </div>
                 </div>

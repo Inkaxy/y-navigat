@@ -19,6 +19,7 @@ export const APP_INTERNAL_ROUTES: Record<string, string> = {
   pos_styring: "/pos-styring",
   faktura: "/fakturering",
   rapporter: "/rapporter/dashbord",
+  kundeportal_admin: "/kunder/portaltilgang",
 };
 
 export function getAppInternalRoute(slug: string): string | null {

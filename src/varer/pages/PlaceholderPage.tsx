@@ -10,7 +10,7 @@ export function PlaceholderPage({ title, subtitle, body }: { title: string; subt
         <Card>
           <CardContent className="flex flex-col items-center gap-3 py-16 text-center">
             <Construction className="h-10 w-10 text-app/60" />
-            <h2 className="text-lg font-medium">Kommer snart</h2>
+            <h2 className="text-lg font-medium">Ikke tilgjengelig</h2>
             <p className="max-w-md text-sm text-muted-foreground">{body}</p>
           </CardContent>
         </Card>

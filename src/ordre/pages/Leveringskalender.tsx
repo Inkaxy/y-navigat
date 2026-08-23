@@ -1412,10 +1412,10 @@ export default function MatrixPage() {
                   {flatView ? "Til matrise" : "Til enkel tabell"}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem disabled title="Kommer i senere fase">
+                <DropdownMenuItem disabled title="Ikke tilgjengelig">
                   Utsalgssteder
                 </DropdownMenuItem>
-                <DropdownMenuItem disabled title="Kommer i senere fase">
+                <DropdownMenuItem disabled title="Ikke tilgjengelig">
                   Importere ordre
                 </DropdownMenuItem>
               </DropdownMenuContent>

@@ -259,7 +259,7 @@ export default function TransaksjonDetalj() {
               </Button>
             </span>
           </TooltipTrigger>
-          <TooltipContent>Bygges i F4.2</TooltipContent>
+          <TooltipContent>Utskrift av kvittering er ikke tilgjengelig fra denne visningen.</TooltipContent>
         </Tooltip>
       </div>
 
