@@ -15,6 +15,7 @@ import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
 import { isBaseUnit, normalizeUnit, parsePackageFromDescription, quantityToBase } from "@/fakturaer/lib/units";
 import { CreateRawMaterialDialog } from "@/fakturaer/components/CreateRawMaterialDialog";
 import { ItemTypeBadge } from "@/ravarer/components/ItemTypeBadge";
+import { InvoiceDocumentButton } from "@/fakturaer/components/InvoiceDocumentButton";
 
 interface Props {
   open: boolean;
