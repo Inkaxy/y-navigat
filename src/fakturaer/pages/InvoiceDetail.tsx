@@ -5,7 +5,12 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Loader2, LineChart as LineChartIcon, CheckCircle2, Flag, Sparkles, Link2, Pencil, RefreshCw } from "lucide-react";
+import { ArrowLeft, Loader2, LineChart as LineChartIcon, CheckCircle2, Flag, Sparkles, Link2, Pencil, RefreshCw, FileText } from "lucide-react";
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { InvoiceDocumentPanel } from "@/fakturaer/components/InvoiceDocumentPanel";
+import { InvoiceDocumentButton } from "@/fakturaer/components/InvoiceDocumentButton";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { FakturaerHeaderBanner } from "@/fakturaer/components/FakturaerHeaderBanner";
@@ -32,6 +37,8 @@ export default function InvoiceDetailPage() {
   const [matchLineId, setMatchLineId] = useState<string | null>(null);
   const [rematching, setRematching] = useState(false);
   const [fetchingLines, setFetchingLines] = useState(false);
+  const [docOpen, setDocOpen] = useState(false);
+  const isMobile = useIsMobile();
 
   const { data, isLoading } = useQuery({
     queryKey: ["invoice", id],
@@ -101,6 +108,7 @@ export default function InvoiceDetailPage() {
         package_size: matchLineRaw.package_size ?? null,
         package_unit: matchLineRaw.package_unit ?? null,
         count_per_package: matchLineRaw.count_per_package ?? null,
+        base_quantity: matchLineRaw.base_quantity ?? null,
         match_confidence: matchLineRaw.match_confidence,
         raw_material_id: matchLineRaw.raw_material_id,
         price_per_base_unit: matchLineRaw.price_per_base_unit,
@@ -117,9 +125,16 @@ export default function InvoiceDetailPage() {
           supplier_id: data.supplier_id,
           source: data.source,
           source_document_url: data.source_document_url,
+          total_amount: data.total_amount ?? null,
+          total_vat: data.total_vat ?? null,
+          lines_sum_status: data.lines_sum_status ?? null,
+          lines_sum_excl_vat: data.lines_sum_excl_vat ?? null,
+          lines_sum_variance_pct: data.lines_sum_variance_pct ?? null,
+          extraction_confidence: data.extraction_confidence ?? null,
           supplier: data.suppliers ? { name: data.suppliers.name, contact_email: data.suppliers.contact_email ?? null } : null,
           legal_entity: data.legal_entities ? { legal_name: data.legal_entities.legal_name, short_code: null } : null,
         },
+
         suggestions: (matchLineSuggestions ?? []) as any,
       }
     : null;
@@ -177,6 +192,18 @@ export default function InvoiceDetailPage() {
         actions={
           <div className="flex items-center gap-2">
             <InvoiceStatusBadge status={data.status} />
+            {data.source_document_url && (
+              <Button
+                variant={docOpen ? "default" : "outline"}
+                size="sm"
+                onClick={() => setDocOpen((v) => !v)}
+                className="gap-1.5"
+              >
+                <FileText className="h-4 w-4" />
+                {docOpen ? "Skjul originalfaktura" : "Vis originalfaktura"}
+              </Button>
+            )}
+            <InvoiceDocumentButton path={data.source_document_url} label="Ny fane" variant="ghost" />
             {canWrite && ["pending", "failed"].includes(data.line_extraction_status ?? "") && (
               <Button
                 variant="outline"
@@ -278,7 +305,9 @@ export default function InvoiceDetailPage() {
         />
       )}
 
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+      {(() => {
+      const mainContent = (
+      <div className={docOpen && !isMobile ? "grid grid-cols-1 gap-5" : "grid grid-cols-1 gap-5 lg:grid-cols-3"}>
         <Card className="p-6 lg:col-span-1">
           <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-ink-secondary">Detaljer</h3>
           <dl className="space-y-3 text-sm">
@@ -416,6 +445,50 @@ export default function InvoiceDetailPage() {
           )}
         </Card>
       </div>
+      );
+      if (!docOpen) return mainContent;
+      const docPanel = (
+        <InvoiceDocumentPanel
+          invoice={{
+            invoice_number: data.invoice_number,
+            invoice_date: data.invoice_date,
+            supplier_name: data.suppliers?.name ?? null,
+            source_document_url: data.source_document_url,
+            total_amount: data.total_amount,
+            total_vat: data.total_vat,
+            lines_sum_status: data.lines_sum_status,
+            lines_sum_excl_vat: data.lines_sum_excl_vat,
+            lines_sum_variance_pct: data.lines_sum_variance_pct,
+            extraction_confidence: data.extraction_confidence,
+          }}
+          onClose={() => setDocOpen(false)}
+          className="h-full"
+        />
+      );
+      if (isMobile) {
+        return (
+          <>
+            {mainContent}
+            <Sheet open onOpenChange={(v) => { if (!v) setDocOpen(false); }}>
+              <SheetContent side="bottom" className="h-[92vh] p-0">
+                {docPanel}
+              </SheetContent>
+            </Sheet>
+          </>
+        );
+      }
+      return (
+        <ResizablePanelGroup direction="horizontal" className="min-h-[70vh] items-stretch">
+          <ResizablePanel defaultSize={58} minSize={35}>
+            <div className="pr-3">{mainContent}</div>
+          </ResizablePanel>
+          <ResizableHandle withHandle />
+          <ResizablePanel defaultSize={42} minSize={30} maxSize={65}>
+            <div className="sticky top-4 h-[calc(100vh-8rem)] pl-3">{docPanel}</div>
+          </ResizablePanel>
+        </ResizablePanelGroup>
+      );
+      })()}
 
       <MatchDrawer
         open={!!matchLineId}

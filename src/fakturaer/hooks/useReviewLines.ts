@@ -23,6 +23,7 @@ export interface ReviewLineRow {
   package_size: number | null;
   package_unit: string | null;
   count_per_package: number | null;
+  base_quantity: number | null;
   match_confidence: string | null;
   raw_material_id: string | null;
   price_per_base_unit: number | null;
@@ -39,9 +40,16 @@ export interface ReviewLineRow {
     supplier_id: string;
     source: string | null;
     source_document_url: string | null;
+    total_amount: number | null;
+    total_vat: number | null;
+    lines_sum_status: string | null;
+    lines_sum_excl_vat: number | null;
+    lines_sum_variance_pct: number | null;
+    extraction_confidence: number | null;
     supplier: { name: string; contact_email: string | null } | null;
     legal_entity: { legal_name: string; short_code: string | null } | null;
   };
+
   suggestions: Array<{
     raw_material_id: string;
     confidence: number;
@@ -65,15 +73,17 @@ export function useReviewLines(filters: Filters) {
         .from("invoice_lines")
         .select(
           `id, invoice_id, line_number, supplier_sku, description, quantity, unit, unit_price, total_amount,
-           package_size, package_unit, count_per_package,
+           package_size, package_unit, count_per_package, base_quantity,
            match_confidence, raw_material_id, price_per_base_unit, expected_price_per_base_unit, price_variance_pct,
            variance_status, review_reason, requires_review,
            invoice:invoices!inner(id, invoice_number, invoice_date, legal_entity_id, supplier_id, source, source_document_url,
+             total_amount, total_vat, lines_sum_status, lines_sum_excl_vat, lines_sum_variance_pct, extraction_confidence,
              supplier:suppliers(name, contact_email),
              legal_entity:legal_entities(legal_name, short_code)),
            suggestions:invoice_line_match_suggestions(raw_material_id, confidence, match_reason, rank,
              raw_material:raw_materials(name, sku, category, current_cost_price, item_type)),
            matched_raw_material:raw_materials!invoice_lines_raw_material_id_fkey(name, sku, category, item_type)`,
+
           { count: "exact" },
         )
         // Ta også med matchede linjer uten avtalepris — de utgjør arbeidslisten
