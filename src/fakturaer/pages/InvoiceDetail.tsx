@@ -192,6 +192,18 @@ export default function InvoiceDetailPage() {
         actions={
           <div className="flex items-center gap-2">
             <InvoiceStatusBadge status={data.status} />
+            {data.source_document_url && (
+              <Button
+                variant={docOpen ? "default" : "outline"}
+                size="sm"
+                onClick={() => setDocOpen((v) => !v)}
+                className="gap-1.5"
+              >
+                <FileText className="h-4 w-4" />
+                {docOpen ? "Skjul originalfaktura" : "Vis originalfaktura"}
+              </Button>
+            )}
+            <InvoiceDocumentButton path={data.source_document_url} label="Ny fane" variant="ghost" />
             {canWrite && ["pending", "failed"].includes(data.line_extraction_status ?? "") && (
               <Button
                 variant="outline"
