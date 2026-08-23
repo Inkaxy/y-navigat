@@ -16,6 +16,7 @@ import { isBaseUnit, normalizeUnit, parsePackageFromDescription, quantityToBase 
 import { CreateRawMaterialDialog } from "@/fakturaer/components/CreateRawMaterialDialog";
 import { ItemTypeBadge } from "@/ravarer/components/ItemTypeBadge";
 import { InvoiceDocumentButton } from "@/fakturaer/components/InvoiceDocumentButton";
+import { acceptMatch } from "@/fakturaer/lib/acceptMatch";
 
 interface Props {
   open: boolean;
