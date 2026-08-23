@@ -200,14 +200,16 @@ export async function acceptMatch(opts: AcceptMatchOptions): Promise<{ lineIds: 
     }
   }
 
-
   // 3) Skriv matchen på linjen (og evt. søsterlinjer)
   const lineIds: string[] = [line.id];
   if (applyToAll) {
-    const { data: sib } = await supabase
+    const { data: sib, error: sibErr } = await supabase
       .from("invoice_lines")
       .select("id, supplier_sku, description")
       .eq("invoice_id", line.invoice_id);
+    if (sibErr) {
+      throw new Error(`Kunne ikke hente søsterlinjer på fakturaen for «match alle like»: ${sibErr.message}`);
+    }
     (sib ?? []).forEach((s) => {
       if (s.id === line.id) return;
       const bothHaveSku = !!line.supplier_sku && !!s.supplier_sku;
@@ -229,12 +231,19 @@ export async function acceptMatch(opts: AcceptMatchOptions): Promise<{ lineIds: 
       resolved_at: nowIso,
     })
     .in("id", lineIds);
-  if (updErr) throw updErr;
+  if (updErr) throw new Error(`Kunne ikke lagre matchen på fakturalinjen(e): ${updErr.message}`);
 
-  // 4) Kjør pipeline på nytt for linjene (prisavvik regnes om)
-  await supabase.functions.invoke("match-invoice-lines", {
+  // 4) Kjør pipeline på nytt for linjene (prisavvik regnes om).
+  //    Feiler dette er matchen likevel lagret — logg og gå videre.
+  const { error: fnErr } = await supabase.functions.invoke("match-invoice-lines", {
     body: { invoice_id: line.invoice_id, line_ids: lineIds },
   });
+  if (fnErr) {
+    console.warn(
+      `acceptMatch: matchen er lagret, men reberegning av prisavvik (match-invoice-lines) feilet: ${fnErr.message}`,
+    );
+  }
 
   return { lineIds };
 }
+
