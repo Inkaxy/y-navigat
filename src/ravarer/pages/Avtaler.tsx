@@ -10,7 +10,7 @@ import { RavarerHeaderBanner } from "@/ravarer/components/RavarerHeaderBanner";
 import { useAgreements, type AgreementRow } from "@/ravarer/hooks/useAgreements";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { NewAgreementDialog } from "@/ravarer/components/NewAgreementDialog";
-import { formatNok, formatDate } from "@/fakturaer/lib/constants";
+import { formatNok, formatDate } from "@/ravarer/lib/constants";
 
 type Status = "active" | "expiring_soon" | "expiring" | "expired";
 
@@ -34,7 +34,9 @@ const STATUS_META: Record<Status, { label: string; className: string }> = {
 
 export default function AvtalerPage() {
   const navigate = useNavigate();
+  const { canWrite } = useRavarer();
   const { data: rows = [], isLoading } = useAgreements();
+  const [newOpen, setNewOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [supplierFilter, setSupplierFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
@@ -68,7 +70,19 @@ export default function AvtalerPage() {
 
   return (
     <div className="space-y-5">
-      <RavarerHeaderBanner title="Avtaler" subtitle="Alle aktive leverandøravtaler med avtalt pris og gyldighetsdato" />
+      <RavarerHeaderBanner
+        title="Avtaler"
+        subtitle="Alle aktive leverandøravtaler med avtalt pris og gyldighetsdato"
+        actions={
+          canWrite && (
+            <Button size="sm" className="rounded-full" onClick={() => setNewOpen(true)}>
+              <Plus className="mr-1.5 h-4 w-4" /> Ny avtale
+            </Button>
+          )
+        }
+      />
+
+      <NewAgreementDialog open={newOpen} onOpenChange={setNewOpen} />
 
       <Card className="p-4">
         <div className="flex flex-wrap items-center gap-3">
