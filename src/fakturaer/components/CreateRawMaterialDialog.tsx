@@ -87,6 +87,7 @@ export function CreateRawMaterialDialog({ open, onOpenChange, line, onCreated }:
         legal_entity_id: line.invoice.legal_entity_id,
         sku: skuGen,
         name: name.trim(), category: category.trim(), base_unit: baseUnit,
+        item_type: itemType,
         package_size: packageSize ? Number(packageSize) : null,
         package_unit: packageUnit || null,
         current_cost_price: pricePerBase ?? 0, price_source: "invoice", price_updated_at: nowIso,
