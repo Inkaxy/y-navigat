@@ -14,6 +14,7 @@ import { formatNok, formatDate } from "@/fakturaer/lib/constants";
 import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
 import { isBaseUnit, normalizeUnit, parsePackageFromDescription, quantityToBase } from "@/fakturaer/lib/units";
 import { CreateRawMaterialDialog } from "@/fakturaer/components/CreateRawMaterialDialog";
+import { ItemTypeBadge } from "@/ravarer/components/ItemTypeBadge";
 
 interface Props {
   open: boolean;
@@ -29,6 +30,7 @@ interface RmRow {
   current_cost_price: number | null;
   base_unit: string | null;
   primary_supplier_id: string | null;
+  item_type?: string | null;
 }
 
 export function MatchDrawer({ open, onOpenChange, line }: Props) {
@@ -67,7 +69,7 @@ export function MatchDrawer({ open, onOpenChange, line }: Props) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("raw_materials")
-        .select("id, name, sku, category, current_cost_price, base_unit, primary_supplier_id")
+        .select("id, name, sku, category, current_cost_price, base_unit, primary_supplier_id, item_type")
         .eq("legal_entity_id", legalEntityId!)
         .eq("is_active", true)
         .or(`name.ilike.%${search}%,sku.ilike.%${search}%`)
@@ -83,7 +85,7 @@ export function MatchDrawer({ open, onOpenChange, line }: Props) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("raw_materials")
-        .select("id, name, sku, category, current_cost_price, base_unit, primary_supplier_id")
+        .select("id, name, sku, category, current_cost_price, base_unit, primary_supplier_id, item_type")
         .eq("id", selectedRmId!)
         .single();
       if (error) throw error;
@@ -306,7 +308,10 @@ export function MatchDrawer({ open, onOpenChange, line }: Props) {
                       className="flex cursor-pointer items-start gap-3 rounded-lg border border-line-subtle p-3 hover:bg-muted/30">
                       <RadioGroupItem value={s.raw_material_id} className="mt-1" />
                       <div className="flex-1">
-                        <div className="font-medium">{s.raw_material?.name ?? "Ukjent"}</div>
+                        <div className="flex items-center gap-1.5 font-medium">
+                          {s.raw_material?.name ?? "Ukjent"}
+                          <ItemTypeBadge itemType={(s.raw_material as any)?.item_type} />
+                        </div>
                         <div className="text-xs text-ink-secondary">
                           {s.raw_material?.category ?? "—"} • Kostpris {formatNok(s.raw_material?.current_cost_price)}
                         </div>
@@ -322,14 +327,14 @@ export function MatchDrawer({ open, onOpenChange, line }: Props) {
 
             <div>
               <div className="mb-1.5 flex items-center justify-between gap-2">
-                <Label>Søk etter råvare</Label>
+                <Label>Søk etter vare</Label>
                 <Button type="button" variant="outline" size="sm" onClick={() => setCreateOpen(true)}>
-                  <Plus className="h-3.5 w-3.5" /> Opprett ny råvare
+                  <Plus className="h-3.5 w-3.5" /> Opprett ny vare
                 </Button>
               </div>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-secondary" />
-                <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Navn eller SKU…" className="pl-9" />
+                <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Navn eller SKU — søker i alle varetyper…" className="pl-9" />
               </div>
               {searching && <Loader2 className="mx-auto my-3 h-4 w-4 animate-spin text-ink-secondary" />}
               {rmResults.length > 0 && (
@@ -339,7 +344,10 @@ export function MatchDrawer({ open, onOpenChange, line }: Props) {
                       onClick={() => { setSelectedRmId(r.id); setSearch(r.name); }}
                       className="flex w-full items-center justify-between gap-3 border-b border-line-subtle p-2.5 text-left text-sm last:border-0 hover:bg-muted/40">
                       <div>
-                        <div className="font-medium">{r.name}</div>
+                        <div className="flex items-center gap-1.5 font-medium">
+                          {r.name}
+                          <ItemTypeBadge itemType={r.item_type} />
+                        </div>
                         <div className="text-xs text-ink-secondary">{r.sku ?? "—"} • {r.category ?? "—"}</div>
                       </div>
                       <div className="text-xs tabular-nums text-ink-secondary">{formatNok(r.current_cost_price)}</div>
@@ -351,7 +359,10 @@ export function MatchDrawer({ open, onOpenChange, line }: Props) {
 
             {selectedRm && (
               <div className="rounded-lg border border-line-subtle p-4">
-                <div className="font-medium">{selectedRm.name}</div>
+                <div className="flex items-center gap-1.5 font-medium">
+                  {selectedRm.name}
+                  <ItemTypeBadge itemType={selectedRm.item_type} />
+                </div>
                 <div className="text-xs text-ink-secondary">{selectedRm.category ?? "—"} • {selectedRm.sku ?? "—"}</div>
                 <div className="mt-3 text-sm">
                   {linkExists ? (

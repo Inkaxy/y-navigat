@@ -87,6 +87,8 @@ export function RawMaterialAutocomplete({
         .select("id, sku, name, category, base_unit, current_cost_price, is_composite, produced_by_recipe_id")
         .eq("legal_entity_id", legalEntityId!)
         .eq("is_active", true)
+        // Emballasje og forbruksvarer er ikke mulige ingredienser
+        .not("item_type", "in", "(emballasje,forbruksvare)")
         .order("name", { ascending: true });
       if (error) throw error;
       return (data ?? []) as RawMaterialOption[];

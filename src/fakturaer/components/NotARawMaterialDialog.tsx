@@ -69,6 +69,10 @@ export function NotARawMaterialDialog({ open, onOpenChange, line }: { open: bool
       <DialogContent>
         <DialogHeader><DialogTitle>Ikke en råvare</DialogTitle></DialogHeader>
         <div className="space-y-4">
+          <p className="rounded-lg border border-line-subtle bg-muted/30 p-3 text-xs text-ink-secondary">
+            Gjelder linjer som ikke er varer (frakt, gebyr, pant). Er dette emballasje eller forbruksvarer?
+            Bruk <span className="font-medium text-ink">Ny vare</span> i stedet.
+          </p>
           <div>
             <Label className="mb-1.5 block">Grunn</Label>
             <Select value={reason} onValueChange={setReason}>
