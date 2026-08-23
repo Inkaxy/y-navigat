@@ -451,14 +451,15 @@ export function ImportPricesDialog({ open, onOpenChange, onComplete }: Props) {
               </Button>
             )}
             {step === 3 && (
-              <div className="flex items-center gap-3">
-                <span className="text-xs text-muted-foreground">
-                  Selve importen er ikke koblet på ennå — analysen over er ekte, skrivingen kommer.
-                </span>
-                <Button size="sm" disabled title="Importmotoren er ikke ferdig ennå">
-                  Bekreft og start import (kommer)
-                </Button>
-              </div>
+              <Button
+                size="sm"
+                onClick={handleImport}
+                disabled={!file || !entityValid || !stats || stats.total === 0 || importing}
+                className="bg-app hover:bg-app-dark text-app-foreground"
+              >
+                {importing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Bekreft og start import
+              </Button>
             )}
 
             {step === 4 && importResult && (
