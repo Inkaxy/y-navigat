@@ -73,6 +73,24 @@ interface ImportResult {
 
 type Step = 1 | 2 | 3 | 4;
 
+type ConflictChoice = "keep" | "overwrite" | "skip";
+
+const CONFLICT_LABEL: Record<ConflictChoice, string> = {
+  keep: "Behold NBOS-navn",
+  overwrite: "Overskriv med Tedebe-navn",
+  skip: "Hopp over raden",
+};
+
+/** RPC-en krever at selskapet har begge base-prislistene. */
+const REQUIRED_PRICE_LIST_CODES = ["engros_base", "utsalg_base"] as const;
+
+interface EntityOption {
+  id: string;
+  short_code: string;
+  legal_name: string;
+  hasBasePriceLists: boolean;
+}
+
 const ALL_MOMSKODER: Array<"F" | "H" | "P" | "null"> = ["F", "H", "P", "null"];
 const MOMSKODE_LABEL: Record<"F" | "H" | "P" | "null", string> = {
   F: "F (0%)",
@@ -105,20 +123,56 @@ export function ImportPricesDialog({ open, onOpenChange, onComplete }: Props) {
     import_prices: true,
   });
 
+  // Navnekonflikt-håndtering
+  const [conflictResolution, setConflictResolution] = useState<ConflictChoice>("keep");
+  const [rowDecisions, setRowDecisions] = useState<Record<number, ConflictChoice>>({});
+
   /* ---- Hent legal entities for selskap-velger ---- */
   const entitiesQuery = useQuery({
-    queryKey: ["import-legal-entities"],
+    queryKey: ["import-legal-entities-with-price-lists"],
     enabled: open,
-    queryFn: async () => {
+    queryFn: async (): Promise<EntityOption[]> => {
       const { data, error } = await supabase
         .from("legal_entities")
         .select("id, short_code, legal_name")
         .eq("status", "active")
         .order("short_code");
       if (error) throw error;
-      return data ?? [];
+      const rows = data ?? [];
+
+      // Én ekstra spørring — ikke N+1
+      const { data: lists, error: listErr } = await supabase
+        .from("price_lists")
+        .select("legal_entity_id, code")
+        .in("code", REQUIRED_PRICE_LIST_CODES as unknown as string[]);
+      if (listErr) throw listErr;
+
+      const byEntity = new Map<string, Set<string>>();
+      for (const l of lists ?? []) {
+        if (!l.legal_entity_id) continue;
+        const s = byEntity.get(l.legal_entity_id) ?? new Set<string>();
+        s.add(l.code);
+        byEntity.set(l.legal_entity_id, s);
+      }
+
+      return rows.map((e) => {
+        const codes = byEntity.get(e.id) ?? new Set<string>();
+        return { ...e, hasBasePriceLists: REQUIRED_PRICE_LIST_CODES.every((c) => codes.has(c)) };
+      });
     },
   });
+
+  const entities: EntityOption[] = entitiesQuery.data ?? [];
+  const selectedEntity = entities.find((e) => e.id === legalEntityId) ?? null;
+  const entityValid = !!selectedEntity?.hasBasePriceLists;
+
+  /* ---- Default til et selskap som faktisk KAN importere ---- */
+  useEffect(() => {
+    if (!open || entities.length === 0) return;
+    if (entities.find((e) => e.id === legalEntityId)?.hasBasePriceLists) return;
+    const firstValid = entities.find((e) => e.hasBasePriceLists);
+    if (firstValid && firstValid.id !== legalEntityId) setLegalEntityId(firstValid.id);
+  }, [open, entities, legalEntityId]);
 
   /* ---- Hent eksisterende produkter for valgt entity ---- */
   const existingQuery = useQuery({
@@ -163,6 +217,8 @@ export function ImportPricesDialog({ open, onOpenChange, onComplete }: Props) {
           update_existing: true,
           import_prices: true,
         });
+        setConflictResolution("keep");
+        setRowDecisions({});
       }, 200);
       return () => clearTimeout(t);
     }
@@ -210,10 +266,20 @@ export function ImportPricesDialog({ open, onOpenChange, onComplete }: Props) {
     });
   }
 
-  /* ---- Import-handler: IKKE aktiv ennå (edge-funksjonen finnes ikke) ---- */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async function handleImport() {
+  /* ---- Navnekonflikter ---- */
+  const conflictRows = useMemo(
+    () => classified.filter((r) => r.action === "update_name_conflict"),
+    [classified],
+  );
 
+  const conflictSummary = useMemo(() => {
+    const s: Record<ConflictChoice, number> = { keep: 0, overwrite: 0, skip: 0 };
+    for (const r of conflictRows) s[rowDecisions[r.row_index] ?? conflictResolution]++;
+    return s;
+  }, [conflictRows, rowDecisions, conflictResolution]);
+
+  /* ---- Import-handler ---- */
+  async function handleImport() {
     if (!file || classified.length === 0) return;
     setImporting(true);
     setImportError(null);
@@ -238,6 +304,17 @@ export function ImportPricesDialog({ open, onOpenChange, onComplete }: Props) {
         momskode: r.momskode,
       }));
 
+    // Per-rad-overstyring: bruk «per_row» kun når minst én rad avviker fra det globale valget
+    const hasOverride = conflictRows.some(
+      (r) => rowDecisions[r.row_index] && rowDecisions[r.row_index] !== conflictResolution,
+    );
+    const perRowDecisions: Record<string, ConflictChoice> = {};
+    if (hasOverride) {
+      for (const r of conflictRows) {
+        perRowDecisions[String(r.row_index)] = rowDecisions[r.row_index] ?? conflictResolution;
+      }
+    }
+
     try {
       const { data, error } = await supabase.functions.invoke("import_products_prices", {
         body: {
@@ -247,7 +324,8 @@ export function ImportPricesDialog({ open, onOpenChange, onComplete }: Props) {
             create_new: filter.create_new,
             update_existing: filter.update_existing,
             import_prices: filter.import_prices,
-            name_conflict_resolution: "keep" as const,
+            name_conflict_resolution: hasOverride ? "per_row" : conflictResolution,
+            ...(hasOverride ? { per_row_decisions: perRowDecisions } : {}),
           },
           source_filename: file.name,
         },
