@@ -283,7 +283,10 @@ function ReviewTable({ lines, reason, onAction, onOpenInvoice }: {
                   <td className="px-3 py-3">
                     {top ? (
                       <div>
-                        <div className="font-medium">{top.raw_material?.name ?? "—"}</div>
+                        <div className="flex items-center gap-1.5 font-medium">
+                          {top.raw_material?.name ?? "—"}
+                          <ItemTypeBadge itemType={top.raw_material?.item_type} />
+                        </div>
                         <div className="text-xs text-ink-secondary">{Math.round((top.confidence ?? 0) * 100)}%</div>
                       </div>
                     ) : <span className="text-ink-secondary">—</span>}
