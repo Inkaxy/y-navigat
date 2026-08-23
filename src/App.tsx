@@ -189,6 +189,7 @@ const AiServicesSettings = lazy(() => import("@/ravarer/pages/innstillinger/AiSe
 const MatchToleranserSettings = lazy(() => import("@/ravarer/pages/innstillinger/MatchToleranser"));
 const KategorierSettings = lazy(() => import("@/ravarer/pages/innstillinger/KategorierSettings"));
 const RavarerLeverandorer = lazy(() => import("@/ravarer/pages/Leverandorer"));
+const RavarerLeverandorDetail = lazy(() => import("@/ravarer/pages/LeverandorDetail"));
 const RavarerAvtaler = lazy(() => import("@/ravarer/pages/Avtaler"));
 const RavarerDatabladEndringer = lazy(() => import("@/ravarer/pages/DatabladEndringer"));
 const RavarerDatabladBulk = lazy(() => import("@/ravarer/pages/DatabladBulk"));
@@ -392,6 +393,7 @@ const App = () => (
               <Route path="/ravarer/fakturaer/:id" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><InvoiceAccessGuard><FakturaerProvider><FakturaerDetail /></FakturaerProvider></InvoiceAccessGuard></RavarerProvider></AppAccessGuard></Shell>} />
               <Route path="/ravarer/innstillinger" element={<Navigate to="/ravarer/innstillinger/tripletex" replace />} />
               <Route path="/ravarer/leverandorer" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><RavarerLeverandorer /></RavarerProvider></AppAccessGuard></Shell>} />
+              <Route path="/ravarer/leverandorer/:id" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><RavarerLeverandorDetail /></RavarerProvider></AppAccessGuard></Shell>} />
               <Route path="/ravarer/avtaler" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><RavarerAvtaler /></RavarerProvider></AppAccessGuard></Shell>} />
               <Route path="/ravarer/datablad-endringer" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><RavarerDatabladEndringer /></RavarerProvider></AppAccessGuard></Shell>} />
               <Route path="/ravarer/datablad-bulk" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><RavarerDatabladBulk /></RavarerProvider></AppAccessGuard></Shell>} />

@@ -30,29 +30,82 @@ export interface InvoiceListResult {
   totalCount: number;
 }
 
-export function useInvoices(filters: { legalEntityId?: string | null; status?: string | null; supplierId?: string | null; search?: string }) {
+export type InvoiceSortKey = "invoice_date" | "total_amount" | "supplier";
+export type SortDir = "asc" | "desc";
+
+export interface InvoiceFilters {
+  legalEntityId?: string | null;
+  status?: string | null;
+  supplierId?: string | null;
+  search?: string;
+  dateFrom?: string | null;
+  dateTo?: string | null;
+  onlyMismatch?: boolean;
+  sortKey?: InvoiceSortKey;
+  sortDir?: SortDir;
+  page?: number;
+  pageSize?: number;
+}
+
+const SELECT =
+  "id, legal_entity_id, supplier_id, invoice_number, invoice_date, due_date, total_amount, currency, status, source, imported_at, line_extraction_status, line_extraction_error, extraction_confidence, lines_sum_status, suppliers!inner(name), legal_entities(legal_name, short_code), invoice_lines(id, requires_review)";
+
+export function useInvoices(filters: InvoiceFilters) {
+  const page = filters.page ?? 1;
+  const pageSize = filters.pageSize ?? 50;
+  const sortKey = filters.sortKey ?? "invoice_date";
+  const sortDir = filters.sortDir ?? "desc";
+
   return useQuery({
     queryKey: ["fakturaer", filters],
     queryFn: async (): Promise<InvoiceListResult> => {
-      let q = supabase
-        .from("invoices")
-        .select(
-          "id, legal_entity_id, supplier_id, invoice_number, invoice_date, due_date, total_amount, currency, status, source, imported_at, line_extraction_status, line_extraction_error, extraction_confidence, lines_sum_status, suppliers(name), legal_entities(legal_name, short_code), invoice_lines(id, requires_review)",
-          { count: "exact" },
-        )
-        .order("invoice_date", { ascending: false })
-        .limit(500);
+      let q = supabase.from("invoices").select(SELECT, { count: "exact" });
 
       if (filters.legalEntityId) q = q.eq("legal_entity_id", filters.legalEntityId);
       if (filters.status) q = q.eq("status", filters.status);
       if (filters.supplierId) q = q.eq("supplier_id", filters.supplierId);
-      if (filters.search) q = q.ilike("invoice_number", `%${filters.search}%`);
+      if (filters.dateFrom) q = q.gte("invoice_date", filters.dateFrom);
+      if (filters.dateTo) q = q.lte("invoice_date", filters.dateTo);
+      if (filters.onlyMismatch) q = q.eq("lines_sum_status", "mismatch");
+
+      const search = filters.search?.trim();
+      if (search) {
+        const term = search.replace(/[%,().]/g, " ").trim();
+        if (term) {
+          // Treff på fakturanummer ELLER leverandørnavn: slå opp matchende
+          // leverandører først, og kombiner i én or-filtrering.
+          let sq = supabase.from("suppliers").select("id").ilike("name", `%${term}%`).limit(200);
+          if (filters.legalEntityId) sq = sq.eq("legal_entity_id", filters.legalEntityId);
+          const { data: sup, error: supErr } = await sq;
+          if (supErr) throw supErr;
+          const ids = (sup ?? []).map((s) => s.id as string);
+          q = ids.length
+            ? q.or(`invoice_number.ilike.%${term}%,supplier_id.in.(${ids.join(",")})`)
+            : q.ilike("invoice_number", `%${term}%`);
+        }
+      }
+
+      if (sortKey === "supplier") {
+        q = q.order("suppliers(name)", { ascending: sortDir === "asc" });
+      } else {
+        q = q.order(sortKey, { ascending: sortDir === "asc", nullsFirst: false });
+      }
+      q = q.order("invoice_number", { ascending: true });
+
+
+      const from = (page - 1) * pageSize;
+      q = q.range(from, from + pageSize - 1);
 
       const { data, error, count } = await q;
       if (error) throw error;
-      const rows = (data ?? []).map((r: any) => ({
-        extraction_confidence: r.extraction_confidence,
-        lines_sum_status: r.lines_sum_status,
+
+      type Raw = Omit<InvoiceListRow, "supplier" | "legal_entity" | "line_count" | "review_count"> & {
+        suppliers: { name: string } | null;
+        legal_entities: { legal_name: string; short_code: string | null } | null;
+        invoice_lines: { id: string; requires_review: boolean | null }[] | null;
+      };
+
+      const rows = ((data ?? []) as unknown as Raw[]).map((r) => ({
         id: r.id,
         legal_entity_id: r.legal_entity_id,
         supplier_id: r.supplier_id,
@@ -64,14 +117,38 @@ export function useInvoices(filters: { legalEntityId?: string | null; status?: s
         status: r.status,
         source: r.source,
         imported_at: r.imported_at,
+        extraction_confidence: r.extraction_confidence,
+        lines_sum_status: r.lines_sum_status,
         line_extraction_status: r.line_extraction_status ?? null,
         line_extraction_error: r.line_extraction_error ?? null,
         supplier: r.suppliers ? { name: r.suppliers.name } : null,
-        legal_entity: r.legal_entities ? { legal_name: r.legal_entities.legal_name, short_code: r.legal_entities.short_code } : null,
+        legal_entity: r.legal_entities
+          ? { legal_name: r.legal_entities.legal_name, short_code: r.legal_entities.short_code }
+          : null,
         line_count: (r.invoice_lines ?? []).length,
-        review_count: (r.invoice_lines ?? []).filter((l: any) => l.requires_review).length,
+        review_count: (r.invoice_lines ?? []).filter((l) => l.requires_review).length,
       })) as InvoiceListRow[];
+
       return { rows, totalCount: count ?? rows.length };
+    },
+  });
+}
+
+export interface InvoiceSupplierOption {
+  id: string;
+  name: string;
+}
+
+/** Leverandører som faktisk har fakturaer — til filtervelgeren. */
+export function useInvoiceSuppliers(legalEntityId?: string | null) {
+  return useQuery({
+    queryKey: ["fakturaer-leverandorer", legalEntityId ?? "all"],
+    queryFn: async (): Promise<InvoiceSupplierOption[]> => {
+      let q = supabase.from("suppliers").select("id, name").order("name");
+      if (legalEntityId) q = q.eq("legal_entity_id", legalEntityId);
+      const { data, error } = await q;
+      if (error) throw error;
+      return (data ?? []) as InvoiceSupplierOption[];
     },
   });
 }
