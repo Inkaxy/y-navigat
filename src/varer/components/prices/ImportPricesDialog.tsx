@@ -983,7 +983,15 @@ function ActionCell({ action }: { action: RowAction }) {
 
 /* ============== STEG 3: BEKREFT ============== */
 
-function Step3Confirm({ stats, fileName }: { stats: ClassificationStats; fileName: string }) {
+function Step3Confirm({
+  stats,
+  fileName,
+  conflictSummary,
+}: {
+  stats: ClassificationStats;
+  fileName: string;
+  conflictSummary: Record<ConflictChoice, number>;
+}) {
   return (
     <div className="space-y-4">
       <Alert>
