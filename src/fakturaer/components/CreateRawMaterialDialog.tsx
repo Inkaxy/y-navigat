@@ -163,8 +163,33 @@ export function CreateRawMaterialDialog({ open, onOpenChange, line, onCreated }:
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
-        <DialogHeader><DialogTitle>Opprett ny råvare</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>Opprett ny vare</DialogTitle></DialogHeader>
         <div className="space-y-3">
+          <Field label="Varetype">
+            <div className="grid grid-cols-2 gap-2">
+              {ITEM_TYPES.map((t) => {
+                const active = itemType === t.value;
+                return (
+                  <button
+                    key={t.value}
+                    type="button"
+                    onClick={() => {
+                      setItemType(t.value);
+                      const def = defaultCategoryFor(t.value);
+                      setNewCategory(false);
+                      setCategory(def ?? "");
+                    }}
+                    className={`rounded-lg border p-2.5 text-left transition-colors ${
+                      active ? "border-primary bg-primary/5" : "border-line-subtle hover:bg-muted/40"
+                    }`}
+                  >
+                    <div className="text-sm font-medium">{t.label}</div>
+                    <div className="mt-0.5 text-xs text-muted-foreground">{t.hint}</div>
+                  </button>
+                );
+              })}
+            </div>
+          </Field>
           <Field label="Navn"><Input value={name} onChange={(e) => setName(e.target.value)} /></Field>
           <Field label="Kategori">
             {newCategory ? (
