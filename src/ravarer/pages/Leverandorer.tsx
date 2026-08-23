@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -42,6 +43,7 @@ function formatDate(iso: string | null) {
 }
 
 export default function LeverandorerPage() {
+  const navigate = useNavigate();
   const { canWrite } = useRavarer();
   const { data: rows = [], isLoading } = useSuppliers();
   const [search, setSearch] = useState("");
@@ -189,7 +191,11 @@ export default function LeverandorerPage() {
                 </thead>
                 <tbody>
                   {filtered.map((r) => (
-                    <tr key={r.id} className="border-t border-line-subtle hover:bg-muted/40">
+                    <tr
+                      key={r.id}
+                      onClick={() => navigate(`/ravarer/leverandorer/${r.id}`)}
+                      className="cursor-pointer border-t border-line-subtle hover:bg-muted/40"
+                    >
                       <td className="px-4 py-3 font-medium">{r.name}</td>
                       <td className="px-4 py-3 font-mono text-xs text-ink-secondary">
                         {r.org_number ?? "—"}
@@ -214,7 +220,7 @@ export default function LeverandorerPage() {
                           </Badge>
                         )}
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                         <Switch
                           checked={!!r.track_invoice_lines}
                           disabled={!canWrite || setTracking.isPending || backfill.isPending}
