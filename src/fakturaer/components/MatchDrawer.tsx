@@ -16,6 +16,7 @@ import { isBaseUnit, normalizeUnit, parsePackageFromDescription, quantityToBase 
 import { CreateRawMaterialDialog } from "@/fakturaer/components/CreateRawMaterialDialog";
 import { ItemTypeBadge } from "@/ravarer/components/ItemTypeBadge";
 import { InvoiceDocumentButton } from "@/fakturaer/components/InvoiceDocumentButton";
+import { acceptMatch } from "@/fakturaer/lib/acceptMatch";
 
 interface Props {
   open: boolean;
@@ -148,113 +149,20 @@ export function MatchDrawer({ open, onOpenChange, line }: Props) {
       const pkgUnit = packageUnit.trim() || null;
       const agreed = agreedPrice.trim() ? Number(agreedPrice.replace(",", ".")) : null;
 
-      // 1) Ensure raw_material_suppliers link
-      let rmsRow = linkExists as any;
-      if (!rmsRow) {
-        const { data: ins, error } = await supabase.from("raw_material_suppliers").insert({
-          raw_material_id: selectedRmId,
-          supplier_id: supplierId!,
-          supplier_sku: line.supplier_sku,
-          supplier_product_name: line.description,
-          package_size: pkgSize,
-          package_unit: pkgUnit,
-          // Avtaleprisen skrives KUN når brukeren faktisk har fylt den ut.
-          ...(agreed != null && Number.isFinite(agreed) ? { agreed_price_per_base_unit: agreed } : {}),
-          is_primary: setAsPrimary && !anyPrimary ? true : false,
-        }).select().single();
-        if (error) throw error;
-        rmsRow = ins;
-      } else {
-        const upd: {
-          package_size?: number;
-          package_unit?: string;
-          agreed_price_per_base_unit?: number;
-        } = {};
-        if (pkgSize != null) upd.package_size = pkgSize;
-        if (pkgUnit) upd.package_unit = pkgUnit;
-        if (agreed != null && Number.isFinite(agreed)) upd.agreed_price_per_base_unit = agreed;
-        if (Object.keys(upd).length > 0) {
-          await supabase.from("raw_material_suppliers").update(upd).eq("id", rmsRow.id);
-        }
-      }
-
-      if (setAsPrimary && !anyPrimary) {
-        await supabase.from("raw_material_suppliers")
-          .update({ is_primary: false })
-          .eq("raw_material_id", selectedRmId)
-          .neq("id", rmsRow.id);
-        await supabase.from("raw_material_suppliers").update({ is_primary: true }).eq("id", rmsRow.id);
-        await supabase.from("raw_materials").update({ primary_supplier_id: supplierId }).eq("id", selectedRmId);
-      }
-
-      // 2) Aliases
-      const nowIso = new Date().toISOString();
-      const aliasInserts: any[] = [];
-      if (rememberSku && line.supplier_sku) aliasInserts.push({
-        raw_material_supplier_id: rmsRow.id, alias_type: "supplier_sku",
-        alias_value: line.supplier_sku, status: "confirmed",
-        confirmed_by: user.id, confirmed_at: nowIso, first_seen_invoice_id: line.invoice_id,
+      // Én felles implementasjon for både enkelt- og massegodkjenning.
+      const { lineIds } = await acceptMatch({
+        line,
+        rawMaterialId: selectedRmId,
+        userId: user.id,
+        packageSize: pkgSize,
+        packageUnit: pkgUnit,
+        agreedPricePerBaseUnit: agreed,
+        rememberSku,
+        rememberName,
+        setAsPrimary,
+        applyToAll,
       });
-      if (rememberName && line.description) aliasInserts.push({
-        raw_material_supplier_id: rmsRow.id, alias_type: "product_name",
-        alias_value: line.description, status: "confirmed",
-        confirmed_by: user.id, confirmed_at: nowIso, first_seen_invoice_id: line.invoice_id,
-      });
-      for (const a of aliasInserts) {
-        await supabase.from("raw_material_supplier_aliases").upsert(a, {
-          onConflict: "alias_type,alias_value_normalized,raw_material_supplier_id",
-        });
-      }
 
-      // 2b) Pensjonér motstridende alias hos samme leverandør som peker på ANDRE råvarer.
-      // Uten dette blir aliaset tvetydig (dubletter i råvareregisteret) og linjen havner
-      // rett tilbake i «til behandling» ved neste kjøring.
-      if (aliasInserts.length > 0 && supplierId) {
-        const { data: supplierRms } = await supabase
-          .from("raw_material_suppliers")
-          .select("id, raw_material_id")
-          .eq("supplier_id", supplierId);
-        const otherRmsIds = (supplierRms ?? [])
-          .filter((r: any) => r.raw_material_id !== selectedRmId)
-          .map((r: any) => r.id);
-        if (otherRmsIds.length > 0) {
-          for (const a of aliasInserts) {
-            await supabase
-              .from("raw_material_supplier_aliases")
-              .update({ status: "superseded" })
-              .in("raw_material_supplier_id", otherRmsIds)
-              .eq("alias_type", a.alias_type)
-              .eq("alias_value", a.alias_value)
-              .eq("status", "confirmed");
-          }
-        }
-      }
-
-
-      // 3) Set match on this line (or all matching lines in invoice)
-      const lineIds: string[] = [line.id];
-      if (applyToAll) {
-        const { data: sib } = await supabase.from("invoice_lines")
-          .select("id, supplier_sku, description")
-          .eq("invoice_id", line.invoice_id);
-        (sib ?? []).forEach((s: any) => {
-          if (s.id === line.id) return;
-          // Krev lik SKU når begge linjene har SKU. Beskrivelse alene er bare trygt
-          // når SKU mangler — ellers blir to ulike varer matchet til samme råvare.
-          const bothHaveSku = !!line.supplier_sku && !!s.supplier_sku;
-          const same = bothHaveSku
-            ? s.supplier_sku === line.supplier_sku
-            : !line.supplier_sku && !s.supplier_sku && !!line.description && s.description === line.description;
-          if (same) lineIds.push(s.id);
-        });
-      }
-      await supabase.from("invoice_lines")
-        .update({ raw_material_id: selectedRmId, match_confidence: "manual", requires_review: false, review_reason: null,
-                  resolved_by: user.id, resolved_at: nowIso })
-        .in("id", lineIds);
-
-      // 4) Re-run pipeline for these lines (reapplies price variance check)
-      await supabase.functions.invoke("match-invoice-lines", { body: { invoice_id: line.invoice_id, line_ids: lineIds } });
 
       toast.success(applyToAll ? `Matchet ${lineIds.length} linjer` : "Linje matchet");
       qc.invalidateQueries({ queryKey: ["fakturaer-review-lines"] });

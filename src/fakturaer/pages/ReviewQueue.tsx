@@ -24,6 +24,8 @@ import { SkuConflictDialog } from "@/fakturaer/components/SkuConflictDialog";
 import { ItemTypeBadge } from "@/ravarer/components/ItemTypeBadge";
 import { InvoiceDocumentPanel } from "@/fakturaer/components/InvoiceDocumentPanel";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useMatchTolerances } from "@/fakturaer/hooks/useMatchTolerances";
+import { BulkAcceptSuggestionsDialog } from "@/fakturaer/components/BulkAcceptSuggestionsDialog";
 import { cn } from "@/lib/utils";
 
 const TABS: { value: ReviewReason; label: string }[] = [
@@ -98,6 +100,20 @@ export default function FakturaerReviewQueuePage() {
 
   const filteredLines = useMemo(() => lines.filter((l) => matchesTab(l, tab)), [lines, tab]);
 
+  // Reelle toleranser fra innstillingene (kategori-override → default → 5 %).
+  const toleranceEntityId = legalEntityId !== "all" ? legalEntityId : entities.length === 1 ? entities[0].id : null;
+  const { toleranceFor } = useMatchTolerances(toleranceEntityId);
+
+  // Masse-godkjenning av forslag i «Lav tillit»
+  const [bulkThreshold, setBulkThreshold] = useState("90");
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const bulkCandidates = useMemo(() => {
+    const min = Number(bulkThreshold) / 100;
+    return lines
+      .filter((l) => matchesTab(l, "low_confidence"))
+      .filter((l) => (l.suggestions?.[0]?.confidence ?? 0) >= min);
+  }, [lines, bulkThreshold]);
+
   // Action dialogs
   const [activeLine, setActiveLine] = useState<ReviewLineRow | null>(null);
   const [matchOpen, setMatchOpen] = useState(false);
@@ -168,8 +184,26 @@ export default function FakturaerReviewQueuePage() {
             ) : filteredLines.length === 0 ? (
               <div className="p-12 text-center text-sm text-ink-secondary">Ingenting her — godt jobbet!</div>
             ) : (
+              <>
+                {t.value === "low_confidence" && (
+                  <div className="flex flex-wrap items-center gap-3 border-b border-line-subtle bg-muted/20 px-4 py-3">
+                    <span className="text-sm text-ink-secondary">Godta alle forslag over</span>
+                    <Select value={bulkThreshold} onValueChange={setBulkThreshold}>
+                      <SelectTrigger className="w-[100px]"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {["80", "85", "90", "95"].map((v) => (
+                          <SelectItem key={v} value={v}>{v} %</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button size="sm" disabled={bulkCandidates.length === 0} onClick={() => setBulkOpen(true)}>
+                      Godta {bulkCandidates.length} linjer
+                    </Button>
+                  </div>
+                )}
               <ReviewTable
                 lines={filteredLines}
+                toleranceFor={toleranceFor}
                 reason={t.value}
                 onAction={open}
                 onOpenInvoice={(id) => navigate(`/ravarer/fakturaer/${id}`)}
@@ -177,6 +211,7 @@ export default function FakturaerReviewQueuePage() {
                 docOpen={docOpen}
                 activeLineId={docLineId}
               />
+              </>
             )}
           </Card>
         </TabsContent>
@@ -311,6 +346,13 @@ export default function FakturaerReviewQueuePage() {
         </Sheet>
       )}
 
+      <BulkAcceptSuggestionsDialog
+        open={bulkOpen}
+        onOpenChange={setBulkOpen}
+        candidates={bulkCandidates}
+        thresholdPct={Number(bulkThreshold)}
+      />
+
       <MatchDrawer open={matchOpen} onOpenChange={setMatchOpen} line={activeLine} />
       <CreateRawMaterialDialog open={createOpen} onOpenChange={setCreateOpen} line={activeLine} />
       <NotARawMaterialDialog open={notRmOpen} onOpenChange={setNotRmOpen} line={activeLine} />
@@ -319,8 +361,9 @@ export default function FakturaerReviewQueuePage() {
   );
 }
 
-function ReviewTable({ lines, reason, onAction, onOpenInvoice, onShowDocument, docOpen, activeLineId }: {
+function ReviewTable({ lines, reason, toleranceFor, onAction, onOpenInvoice, onShowDocument, docOpen, activeLineId }: {
   lines: ReviewLineRow[]; reason: ReviewReason;
+  toleranceFor: (category?: string | null) => number;
   onAction: (a: "match" | "create" | "not_rm" | "conflict", l: ReviewLineRow) => void;
   onOpenInvoice: (id: string) => void;
   onShowDocument: (l: ReviewLineRow) => void;
@@ -352,8 +395,10 @@ function ReviewTable({ lines, reason, onAction, onOpenInvoice, onShowDocument, d
           {lines.map((l) => {
             const top = l.suggestions?.[0];
             const variance = l.price_variance_pct ?? 0;
-            const tolMul = 2; // approx; we don't have real tol here
-            const varColor = Math.abs(variance) > tolMul * 2 ? "text-destructive" : "text-warning";
+            const category = l.matched_raw_material?.category ?? top?.raw_material?.category ?? null;
+            const tol = toleranceFor(category);
+            const absVar = Math.abs(variance);
+            const varColor = absVar > tol * 2 ? "text-destructive" : absVar > tol ? "text-warning" : "text-ink-primary";
             const isActive = docOpen && activeLineId === l.id;
             return (
               <tr
@@ -451,7 +496,16 @@ function ReviewTable({ lines, reason, onAction, onOpenInvoice, onShowDocument, d
                 )}
                 {(reason === "price_variance" || reason === "price_increase") && (
                   <td className={`px-3 py-3 text-right tabular-nums font-medium ${varColor}`}>
-                    {variance > 0 ? "+" : ""}{variance.toFixed(1)}%
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span>{variance > 0 ? "+" : ""}{variance.toFixed(1)}%</span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          Toleranse for {category ?? "uten kategori"}: {tol} %
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   </td>
                 )}
                 {reason === "sku_collision" && (

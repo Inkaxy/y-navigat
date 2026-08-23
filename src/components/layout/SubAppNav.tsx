@@ -243,7 +243,8 @@ function RavarerNav() {
 
   const items: NavItem[] = [
     { kind: "link", to: "/ravarer/vareliste", label: "Vareliste", icon: Boxes },
-    { kind: "link", to: "/ravarer/pakninger", label: "Pakningsstørrelser", icon: Package },
+    { kind: "link", to: "/ravarer/pakninger", label: "Pakninger", icon: Package },
+    { kind: "link", to: "/ravarer/pakningsstorrelser", label: "Pakningsstørrelser", icon: Package },
     { kind: "link", to: "/ravarer/lager", label: "Lager", icon: Warehouse },
 
     { kind: "link", to: "/ravarer/leverandorer", label: "Leverandører", icon: Building2 },

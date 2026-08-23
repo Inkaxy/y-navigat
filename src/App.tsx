@@ -173,7 +173,8 @@ const OrdreWebsiteOrders = lazy(() => import("@/ordre/pages/WebsiteOrders"));
 const RavarerVareliste = lazy(() => import("@/ravarer/pages/Vareliste"));
 const RavarerDetail = lazy(() => import("@/ravarer/pages/RawMaterialDetail"));
 const RavarerLager = lazy(() => import("@/ravarer/pages/Lager"));
-const RavarerPakninger = lazy(() => import("@/ravarer/pages/PackageSizes"));
+const RavarerPakningsstorrelser = lazy(() => import("@/ravarer/pages/PackageSizes"));
+const RavarerPakninger = lazy(() => import("@/ravarer/pages/Pakninger"));
 
 const FakturaerList = lazy(() => import("@/fakturaer/pages/FakturaerList"));
 const FakturaerNew = lazy(() => import("@/fakturaer/pages/NewInvoice"));
@@ -375,6 +376,7 @@ const App = () => (
               <Route path="/ravarer/vareliste/:id" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><RavarerDetail /></RavarerProvider></AppAccessGuard></Shell>} />
               <Route path="/ravarer/lager" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><RavarerLager /></RavarerProvider></AppAccessGuard></Shell>} />
               <Route path="/ravarer/pakninger" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><RavarerPakninger /></RavarerProvider></AppAccessGuard></Shell>} />
+              <Route path="/ravarer/pakningsstorrelser" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><RavarerPakningsstorrelser /></RavarerProvider></AppAccessGuard></Shell>} />
 
 
               {/* Fakturaer flyttet inn under Råvarer-appen (granulær invoice_access) */}
