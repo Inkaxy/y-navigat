@@ -163,7 +163,12 @@ export function CreateRawMaterialDialog({ open, onOpenChange, line, onCreated }:
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
-        <DialogHeader><DialogTitle>Opprett ny vare</DialogTitle></DialogHeader>
+        <DialogHeader>
+          <DialogTitle>Opprett ny vare</DialogTitle>
+          <div className="pt-1">
+            <InvoiceDocumentButton path={line?.invoice.source_document_url} label="Åpne faktura" />
+          </div>
+        </DialogHeader>
         <div className="space-y-3">
           <Field label="Varetype">
             <div className="grid grid-cols-2 gap-2">
