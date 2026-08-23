@@ -55,7 +55,6 @@ const KunderEntityProvider = ({ children }: { children: React.ReactNode }) => {
 
 // Kodesplitting: hver app-side lastes først når ruten treffes.
 const AdminIndex = lazy(() => import("./pages/admin/AdminIndex"));
-const AdminPlaceholder = lazy(() => import("./pages/admin/AdminPlaceholder"));
 const Integrasjoner = lazy(() => import("./pages/admin/Integrasjoner"));
 const IntegrasjonDetalj = lazy(() => import("./pages/admin/IntegrasjonDetalj"));
 const TripletexIntegrasjon = lazy(() => import("./pages/admin/TripletexIntegrasjon"));
@@ -112,7 +111,6 @@ const KunderPickupLocations = lazy(() => import("@/kunder/pages/PickupLocations"
 const KunderInnstillinger = lazy(() => import("@/kunder/pages/Innstillinger"));
 const KunderCustomerGroups = lazy(() => import("@/kunder/pages/CustomerGroups"));
 const KunderCustomerHistory = lazy(() => import("@/kunder/pages/CustomerHistory"));
-const KunderPlaceholder = lazy(() => import("@/kunder/pages/Placeholder"));
 const KunderPortalUsers = lazy(() => import("@/kunder/pages/PortalUsers"));
 const ProduksjonOversikt = lazy(() => import("@/produksjon/pages/OversiktPage"));
 const ProduksjonLager = lazy(() => import("@/produksjon/pages/LagerPage"));
@@ -162,7 +160,6 @@ const OrdreCakeImagesPrint = lazy(() => import("@/ordre/pages/CakeImagesPrint"))
 const OrdrePlaceholder = lazy(() => import("@/ordre/pages/Placeholder"));
 const OrdreInnstillinger = lazy(() => import("@/ordre/pages/Innstillinger"));
 const M365Callback = lazy(() => import("@/ordre/pages/M365Callback"));
-const OrdrePortalTest = lazy(() => import("@/ordre/pages/PortalTest"));
 const OrdreTicketsList = lazy(() => import("@/ordre/pages/TicketsInbox"));
 const OrdreTicketDetail = lazy(() => import("@/ordre/pages/TicketDetail"));
 const OrdreAiForslag = lazy(() => import("@/ordre/pages/AiForslag"));
@@ -347,8 +344,8 @@ const App = () => (
               <Route path="/varer/oppskrifter/:id" element={<Shell><AppAccessGuard appCode="varer" appName="Varer"><VarerAppProvider><VarerRecipeDetail /></VarerAppProvider></AppAccessGuard></Shell>} />
               <Route path="/varer/kakebygger" element={<Shell><AppAccessGuard appCode="varer" appName="Varer"><VarerAppProvider><VarerCakeBuilderList /></VarerAppProvider></AppAccessGuard></Shell>} />
               <Route path="/varer/kakebygger/:id" element={<Shell><AppAccessGuard appCode="varer" appName="Varer"><VarerAppProvider><VarerCakeBuilderDetail /></VarerAppProvider></AppAccessGuard></Shell>} />
-              <Route path="/varer/sortiment" element={<Shell><AppAccessGuard appCode="varer" appName="Varer"><VarerAppProvider><VarerPlaceholder title="Sortiment" subtitle="Kanaler og kunder" body="Sortimentsstyring kommer når Kunder-appen er bygget." /></VarerAppProvider></AppAccessGuard></Shell>} />
-              <Route path="/varer/avvik" element={<Shell><AppAccessGuard appCode="varer" appName="Varer"><VarerAppProvider><VarerPlaceholder title="Avvik" subtitle="Avviksregistrering" body="Avviksregistrering for varer kommer i fremtidig iterasjon." /></VarerAppProvider></AppAccessGuard></Shell>} />
+              <Route path="/varer/sortiment" element={<Shell><AppAccessGuard appCode="varer" appName="Varer"><VarerAppProvider><VarerPlaceholder title="Sortiment" subtitle="Kanaler og kunder" body="Sortimentsstyring er ikke tilgjengelig ennå. Kanal- og kundesortiment styres inntil videre via prislister og spesialpriser." /></VarerAppProvider></AppAccessGuard></Shell>} />
+              <Route path="/varer/avvik" element={<Shell><AppAccessGuard appCode="varer" appName="Varer"><VarerAppProvider><VarerPlaceholder title="Avvik" subtitle="Avviksregistrering" body="Avviksregistrering for varer er ikke tilgjengelig. Meld avvik via ordre- eller produksjonsmodulen inntil videre." /></VarerAppProvider></AppAccessGuard></Shell>} />
               <Route path="/varer/innstillinger" element={<Shell><AppAccessGuard appCode="varer" appName="Varer"><VarerAppProvider><VarerSettingsLayout /></VarerAppProvider></AppAccessGuard></Shell>}>
                 <Route index element={<Navigate to="/varer/innstillinger/hovedvaregrupper" replace />} />
                 <Route path="generelt" element={<VarerSettingsGeneral />} />
@@ -443,11 +440,10 @@ const App = () => (
               <Route path="/ordre/tilbakebetalinger" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreRefundsQueue /></AppAccessGuard></Shell>} />
               <Route path="/ordre/ai-forslag" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreAiForslag /></AppAccessGuard></Shell>} />
               <Route path="/ordre/ticket-rapporter" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreTicketReports /></AppAccessGuard></Shell>} />
-              <Route path="/ordre/avvik" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdrePlaceholder title="Avvik" subtitle="Kommer i en senere fase" /></AppAccessGuard></Shell>} />
+              <Route path="/ordre/avvik" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdrePlaceholder title="Avvik" subtitle="Avviksregistrering" body="Avviksregistrering er ikke tilgjengelig i ordremodulen." /></AppAccessGuard></Shell>} />
               <Route path="/ordre/pakkesystem" element={<Navigate to="/produksjon/pakkesystem" replace />} />
               <Route path="/ordre/innstillinger" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreInnstillinger /></AppAccessGuard></Shell>} />
               <Route path="/ordre/innstillinger/m365-callback" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><M365Callback /></AppAccessGuard></Shell>} />
-              <Route path="/ordre/portal-test" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdrePortalTest /></AppAccessGuard></Shell>} />
               <Route path="/produksjon" element={<Shell><AppAccessGuard appCode="produksjon" appName="Produksjon"><Navigate to="/produksjon/oversikt" replace /></AppAccessGuard></Shell>} />
               <Route path="/produksjon/oversikt" element={<Shell><AppAccessGuard appCode="produksjon" appName="Produksjon"><ProduksjonOversikt /></AppAccessGuard></Shell>} />
               <Route path="/produksjon/produksjonsplan" element={<Shell><AppAccessGuard appCode="produksjon" appName="Produksjon"><ProduksjonsplanPage /></AppAccessGuard></Shell>} />

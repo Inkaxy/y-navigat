@@ -360,8 +360,6 @@ function VarerNav() {
         { to: "/varer/oppskrifter/krever-opprydding", label: "Krever opprydding", badge: cleanupCount },
       ],
     },
-    { kind: "link", to: "/varer/sortiment", label: "Sortiment", icon: ListChecks },
-    { kind: "link", to: "/varer/avvik", label: "Avvik", icon: AlertTriangle },
     { kind: "link", to: "/varer/innstillinger", label: "Innstillinger", icon: Settings },
   ];
 

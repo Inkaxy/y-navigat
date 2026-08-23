@@ -1,7 +1,6 @@
 import { useParams } from "react-router-dom";
 import { KioskShell } from "@/kiosk/components/KioskShell";
 import OperatorLogin from "@/kiosk/pages/OperatorLogin";
-import OperatorHome from "@/kiosk/pages/OperatorHome";
 import OpenSessionView from "@/kiosk/pages/OpenSessionView";
 import Kasse from "@/kiosk/pages/Kasse";
 import SelfServiceKasse from "@/kiosk/pages/SelfServiceKasse";
@@ -82,7 +81,4 @@ export function KioskCustomerRoute() {
     </KioskShell>
   );
 }
-
-// Keep export for potential external imports
-export { OperatorHome };
 
