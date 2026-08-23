@@ -47,9 +47,9 @@ export interface ReviewLineRow {
     confidence: number;
     match_reason: string | null;
     rank: number;
-    raw_material: { name: string; sku: string | null; category: string | null; current_cost_price: number | null } | null;
+    raw_material: { name: string; sku: string | null; category: string | null; current_cost_price: number | null; item_type?: string | null } | null;
   }>;
-  matched_raw_material?: { name: string; sku: string | null; category: string | null } | null;
+  matched_raw_material?: { name: string; sku: string | null; category: string | null; item_type?: string | null } | null;
 }
 
 interface Filters {
