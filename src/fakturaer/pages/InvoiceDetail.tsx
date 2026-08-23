@@ -431,6 +431,50 @@ export default function InvoiceDetailPage() {
           )}
         </Card>
       </div>
+      );
+      if (!docOpen) return mainContent;
+      const docPanel = (
+        <InvoiceDocumentPanel
+          invoice={{
+            invoice_number: data.invoice_number,
+            invoice_date: data.invoice_date,
+            supplier_name: data.suppliers?.name ?? null,
+            source_document_url: data.source_document_url,
+            total_amount: data.total_amount,
+            total_vat: data.total_vat,
+            lines_sum_status: data.lines_sum_status,
+            lines_sum_excl_vat: data.lines_sum_excl_vat,
+            lines_sum_variance_pct: data.lines_sum_variance_pct,
+            extraction_confidence: data.extraction_confidence,
+          }}
+          onClose={() => setDocOpen(false)}
+          className="h-full"
+        />
+      );
+      if (isMobile) {
+        return (
+          <>
+            {mainContent}
+            <Sheet open onOpenChange={(v) => { if (!v) setDocOpen(false); }}>
+              <SheetContent side="bottom" className="h-[92vh] p-0">
+                {docPanel}
+              </SheetContent>
+            </Sheet>
+          </>
+        );
+      }
+      return (
+        <ResizablePanelGroup direction="horizontal" className="min-h-[70vh] items-stretch">
+          <ResizablePanel defaultSize={58} minSize={35}>
+            <div className="pr-3">{mainContent}</div>
+          </ResizablePanel>
+          <ResizableHandle withHandle />
+          <ResizablePanel defaultSize={42} minSize={30} maxSize={65}>
+            <div className="sticky top-4 h-[calc(100vh-8rem)] pl-3">{docPanel}</div>
+          </ResizablePanel>
+        </ResizablePanelGroup>
+      );
+      })()}
 
       <MatchDrawer
         open={!!matchLineId}
