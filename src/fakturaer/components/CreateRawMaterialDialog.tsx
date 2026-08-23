@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { formatNok } from "@/fakturaer/lib/constants";
 import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
+import { ITEM_TYPES, defaultCategoryFor, type ItemType } from "@/ravarer/lib/itemTypes";
 
 interface Props {
   open: boolean;
@@ -37,9 +38,11 @@ export function CreateRawMaterialDialog({ open, onOpenChange, line, onCreated }:
   const [packageSize, setPackageSize] = useState<string>("");
   const [packageUnit, setPackageUnit] = useState<string>("");
   const [busy, setBusy] = useState(false);
+  const [itemType, setItemType] = useState<ItemType>("ravare");
 
   useEffect(() => {
     if (!line || !open) return;
+    setItemType("ravare");
     setName(line.description ?? "");
     const inferred = UNIT_TO_BASE[(line.unit ?? "").toLowerCase()] ?? "kg";
     setBaseUnit(inferred);
@@ -84,11 +87,12 @@ export function CreateRawMaterialDialog({ open, onOpenChange, line, onCreated }:
         legal_entity_id: line.invoice.legal_entity_id,
         sku: skuGen,
         name: name.trim(), category: category.trim(), base_unit: baseUnit,
+        item_type: itemType,
         package_size: packageSize ? Number(packageSize) : null,
         package_unit: packageUnit || null,
         current_cost_price: pricePerBase ?? 0, price_source: "invoice", price_updated_at: nowIso,
         primary_supplier_id: line.invoice.supplier_id, is_active: true, created_by: user?.id,
-      }).select().single();
+      } as never).select().single();
       if (rmErr) throw rmErr;
 
       // 2) raw_material_suppliers
@@ -159,8 +163,33 @@ export function CreateRawMaterialDialog({ open, onOpenChange, line, onCreated }:
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
-        <DialogHeader><DialogTitle>Opprett ny råvare</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>Opprett ny vare</DialogTitle></DialogHeader>
         <div className="space-y-3">
+          <Field label="Varetype">
+            <div className="grid grid-cols-2 gap-2">
+              {ITEM_TYPES.map((t) => {
+                const active = itemType === t.value;
+                return (
+                  <button
+                    key={t.value}
+                    type="button"
+                    onClick={() => {
+                      setItemType(t.value);
+                      const def = defaultCategoryFor(t.value);
+                      setNewCategory(false);
+                      setCategory(def ?? "");
+                    }}
+                    className={`rounded-lg border p-2.5 text-left transition-colors ${
+                      active ? "border-primary bg-primary/5" : "border-line-subtle hover:bg-muted/40"
+                    }`}
+                  >
+                    <div className="text-sm font-medium">{t.label}</div>
+                    <div className="mt-0.5 text-xs text-muted-foreground">{t.hint}</div>
+                  </button>
+                );
+              })}
+            </div>
+          </Field>
           <Field label="Navn"><Input value={name} onChange={(e) => setName(e.target.value)} /></Field>
           <Field label="Kategori">
             {newCategory ? (
@@ -189,7 +218,9 @@ export function CreateRawMaterialDialog({ open, onOpenChange, line, onCreated }:
               >
                 <SelectTrigger><SelectValue placeholder="Velg kategori…" /></SelectTrigger>
                 <SelectContent>
-                  {categories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  {Array.from(new Set([...(category ? [category] : []), ...categories])).map((c) => (
+                    <SelectItem key={c} value={c}>{c}</SelectItem>
+                  ))}
                   <SelectItem value="__new__">+ Ny kategori…</SelectItem>
                 </SelectContent>
               </Select>

@@ -12,6 +12,7 @@ export interface RawMaterialRow {
   description: string | null;
   category: string | null;
   categories: string[];
+  item_type: "ravare" | "emballasje" | "forbruksvare" | "videresalg";
   is_packaging: boolean;
   is_resale_item: boolean;
   stock_tracking: boolean;

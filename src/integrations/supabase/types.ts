@@ -9693,6 +9693,7 @@ export type Database = {
           is_composite: boolean
           is_packaging: boolean
           is_resale_item: boolean
+          item_type: string
           legal_entity_id: string
           min_stock: number | null
           name: string
@@ -9730,6 +9731,7 @@ export type Database = {
           is_composite?: boolean
           is_packaging?: boolean
           is_resale_item?: boolean
+          item_type?: string
           legal_entity_id: string
           min_stock?: number | null
           name: string
@@ -9767,6 +9769,7 @@ export type Database = {
           is_composite?: boolean
           is_packaging?: boolean
           is_resale_item?: boolean
+          item_type?: string
           legal_entity_id?: string
           min_stock?: number | null
           name?: string
@@ -14350,6 +14353,7 @@ export type Database = {
           is_composite: boolean
           is_packaging: boolean
           is_resale_item: boolean
+          item_type: string
           legal_entity_id: string
           min_stock: number | null
           name: string

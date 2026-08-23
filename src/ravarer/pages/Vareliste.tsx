@@ -12,6 +12,7 @@ import { useSuppliers } from "@/ravarer/hooks/useSuppliers";
 import { useAllRawMaterialPurchaseStats } from "@/ravarer/hooks/usePurchaseStats";
 import { formatNok, formatNumber, formatDate } from "@/ravarer/lib/constants";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
+import { ItemTypeBadge } from "@/ravarer/components/ItemTypeBadge";
 
 type SortKey = "name" | "volume_12m";
 
@@ -48,8 +49,7 @@ export default function VarelistePage() {
     const arr = rows.filter(r => {
       if (active === "active" && !r.is_active) return false;
       if (active === "inactive" && r.is_active) return false;
-      if (kind === "resale" && !r.is_resale_item) return false;
-      if (kind === "raw" && r.is_resale_item) return false;
+      if (kind !== "all" && (r.item_type ?? "ravare") !== kind) return false;
       if (cat !== "all" && !allCatsOf(r).includes(cat)) return false;
       if (needle && !`${r.name} ${r.sku}`.toLowerCase().includes(needle)) return false;
       return true;
@@ -93,9 +93,11 @@ export default function VarelistePage() {
           <Select value={kind} onValueChange={setKind}>
             <SelectTrigger className="w-[170px]"><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Alle varer</SelectItem>
-              <SelectItem value="raw">Kun råvarer</SelectItem>
-              <SelectItem value="resale">Kun handelsvarer</SelectItem>
+              <SelectItem value="all">Alle varetyper</SelectItem>
+              <SelectItem value="ravare">Råvarer</SelectItem>
+              <SelectItem value="emballasje">Emballasje</SelectItem>
+              <SelectItem value="forbruksvare">Forbruksvarer</SelectItem>
+              <SelectItem value="videresalg">Videresalg</SelectItem>
             </SelectContent>
           </Select>
 
@@ -188,8 +190,7 @@ export default function VarelistePage() {
                     <td className="px-4 py-3 text-ink-secondary">{formatDate(r.price_updated_at)}</td>
 
                     <td className="px-4 py-3">
-                      {r.is_packaging && <Badge variant="outline" className="mr-1">Emballasje</Badge>}
-                      {r.is_resale_item && <Badge variant="outline" className="mr-1">Handelsvare</Badge>}
+                      <ItemTypeBadge itemType={r.item_type} className="mr-1" />
 
                       {r.is_active ? (
                         <Badge className="bg-success/15 text-success border-success/30">Aktiv</Badge>

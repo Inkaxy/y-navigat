@@ -19,6 +19,7 @@ import { MatchDrawer } from "@/fakturaer/components/MatchDrawer";
 import { CreateRawMaterialDialog } from "@/fakturaer/components/CreateRawMaterialDialog";
 import { NotARawMaterialDialog } from "@/fakturaer/components/NotARawMaterialDialog";
 import { SkuConflictDialog } from "@/fakturaer/components/SkuConflictDialog";
+import { ItemTypeBadge } from "@/ravarer/components/ItemTypeBadge";
 
 const TABS: { value: ReviewReason; label: string }[] = [
   { value: "unmatched", label: "Umatchet" },
@@ -282,14 +283,22 @@ function ReviewTable({ lines, reason, onAction, onOpenInvoice }: {
                   <td className="px-3 py-3">
                     {top ? (
                       <div>
-                        <div className="font-medium">{top.raw_material?.name ?? "—"}</div>
+                        <div className="flex items-center gap-1.5 font-medium">
+                          {top.raw_material?.name ?? "—"}
+                          <ItemTypeBadge itemType={top.raw_material?.item_type} />
+                        </div>
                         <div className="text-xs text-ink-secondary">{Math.round((top.confidence ?? 0) * 100)}%</div>
                       </div>
                     ) : <span className="text-ink-secondary">—</span>}
                   </td>
                 )}
                 {reason === "no_baseline" && (
-                  <td className="px-3 py-3">{l.matched_raw_material?.name ?? "—"}</td>
+                  <td className="px-3 py-3">
+                    <span className="inline-flex items-center gap-1.5">
+                      {l.matched_raw_material?.name ?? "—"}
+                      <ItemTypeBadge itemType={l.matched_raw_material?.item_type} />
+                    </span>
+                  </td>
                 )}
                 {(reason === "price_variance" || reason === "price_increase") && (
                   <td className={`px-3 py-3 text-right tabular-nums font-medium ${varColor}`}>
@@ -301,6 +310,7 @@ function ReviewTable({ lines, reason, onAction, onOpenInvoice }: {
                     <div className="flex items-center gap-1 text-warning">
                       <AlertTriangle className="h-3.5 w-3.5" />
                       {top?.raw_material?.name ?? "—"}
+                      <ItemTypeBadge itemType={top?.raw_material?.item_type} />
                     </div>
                   </td>
                 )}
@@ -311,7 +321,7 @@ function ReviewTable({ lines, reason, onAction, onOpenInvoice }: {
                     ) : (
                       <>
                         <Button size="sm" onClick={() => onAction("match", l)}>Match</Button>
-                        <Button size="sm" variant="outline" onClick={() => onAction("create", l)}>Ny råvare</Button>
+                        <Button size="sm" variant="outline" onClick={() => onAction("create", l)}>Ny vare</Button>
                         <Button size="sm" variant="ghost" onClick={() => onAction("not_rm", l)}>Ikke råvare</Button>
                       </>
                     )}
