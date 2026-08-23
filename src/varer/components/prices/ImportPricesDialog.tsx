@@ -635,6 +635,10 @@ function Step2Preview({
   setFilter,
   toggleMomskode,
   loadingExisting,
+  conflictResolution,
+  setConflictResolution,
+  rowDecisions,
+  setRowDecisions,
 }: {
   parseResult: ParseResult;
   classified: ClassifiedRow[];
@@ -643,6 +647,10 @@ function Step2Preview({
   setFilter: React.Dispatch<React.SetStateAction<FilterOptions>>;
   toggleMomskode: (m: "F" | "H" | "P" | "null") => void;
   loadingExisting: boolean;
+  conflictResolution: ConflictChoice;
+  setConflictResolution: (c: ConflictChoice) => void;
+  rowDecisions: Record<number, ConflictChoice>;
+  setRowDecisions: React.Dispatch<React.SetStateAction<Record<number, ConflictChoice>>>;
 }) {
   if (parseResult.missing_columns.length > 0) {
     return (
@@ -688,9 +696,33 @@ function Step2Preview({
         <Alert>
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>{conflictCount} navnekonflikt(er) funnet</AlertTitle>
-          <AlertDescription>
-            Tedebe-navn skiller seg fra eksisterende NBOS-navn. I Del 2 vil du kunne velge per rad
-            om du vil beholde NBOS-navn, overskrive med Tedebe-navn, eller hoppe over raden.
+          <AlertDescription className="space-y-2">
+            <p>
+              Tedebe-navn skiller seg fra eksisterende NBOS-navn. Velg hva som skal skje med alle
+              konflikter — du kan overstyre enkeltrader i tabellen under.
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <Select
+                value={conflictResolution}
+                onValueChange={(v) => setConflictResolution(v as ConflictChoice)}
+              >
+                <SelectTrigger className="h-8 w-64">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {(Object.keys(CONFLICT_LABEL) as ConflictChoice[]).map((c) => (
+                    <SelectItem key={c} value={c}>
+                      {CONFLICT_LABEL[c]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {Object.keys(rowDecisions).length > 0 && (
+                <Button variant="ghost" size="sm" onClick={() => setRowDecisions({})}>
+                  Nullstill {Object.keys(rowDecisions).length} overstyring(er)
+                </Button>
+              )}
+            </div>
           </AlertDescription>
         </Alert>
       )}
