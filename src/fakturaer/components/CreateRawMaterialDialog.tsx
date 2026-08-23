@@ -38,9 +38,11 @@ export function CreateRawMaterialDialog({ open, onOpenChange, line, onCreated }:
   const [packageSize, setPackageSize] = useState<string>("");
   const [packageUnit, setPackageUnit] = useState<string>("");
   const [busy, setBusy] = useState(false);
+  const [itemType, setItemType] = useState<ItemType>("ravare");
 
   useEffect(() => {
     if (!line || !open) return;
+    setItemType("ravare");
     setName(line.description ?? "");
     const inferred = UNIT_TO_BASE[(line.unit ?? "").toLowerCase()] ?? "kg";
     setBaseUnit(inferred);
