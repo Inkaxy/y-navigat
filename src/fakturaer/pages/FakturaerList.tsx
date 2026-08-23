@@ -44,6 +44,8 @@ export default function FakturaerListPage() {
   const rows = invoicesResult?.rows ?? [];
   const totalCount = invoicesResult?.totalCount ?? 0;
 
+  const hasFilters = status !== "all" || legalEntityId !== "all" || search.trim().length > 0;
+
   const totalReview = useMemo(() => rows.reduce((sum, r) => sum + r.review_count, 0), [rows]);
 
   return (
@@ -113,10 +115,21 @@ export default function FakturaerListPage() {
           <div className="flex items-center justify-center p-12 text-ink-secondary">
             <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Laster…
           </div>
+        ) : rows.length === 0 && hasFilters ? (
+          <div className="flex flex-col items-center justify-center p-12 text-center">
+            <FileText className="mb-3 h-10 w-10 text-ink-secondary" />
+            <p className="text-ink-secondary">Ingen treff for søket eller filtrene.</p>
+            <button
+              onClick={() => { setSearch(""); setStatus("all"); setLegalEntityId("all"); }}
+              className="mt-3 text-sm font-medium text-primary hover:underline"
+            >
+              Nullstill filtre
+            </button>
+          </div>
         ) : rows.length === 0 ? (
           <div className="flex flex-col items-center justify-center p-12 text-center">
             <FileText className="mb-3 h-10 w-10 text-ink-secondary" />
-            <p className="text-ink-secondary">Ingen fakturaer enda.</p>
+            <p className="text-ink-secondary">Ingen fakturaer ennå.</p>
             {canWrite && (
               <button onClick={() => navigate("/ravarer/fakturaer/import")} className="mt-3 text-sm font-medium text-primary hover:underline">
                 Registrer første faktura

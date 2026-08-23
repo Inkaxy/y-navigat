@@ -118,11 +118,22 @@ export default function VarelistePage() {
           <div className="flex items-center justify-center p-12 text-ink-secondary">
             <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Laster…
           </div>
+        ) : rows.length === 0 ? (
+          <div className="flex flex-col items-center justify-center p-12 text-center">
+            <Package className="mb-3 h-10 w-10 text-ink-secondary" />
+            <p className="text-ink-secondary">Ingen varer ennå.</p>
+            {canWrite && <button onClick={() => setOpen(true)} className="mt-3 text-sm font-medium text-primary hover:underline">Opprett din første vare</button>}
+          </div>
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center p-12 text-center">
             <Package className="mb-3 h-10 w-10 text-ink-secondary" />
-            <p className="text-ink-secondary">Ingen råvarer ennå.</p>
-            {canWrite && <button onClick={() => setOpen(true)} className="mt-3 text-sm font-medium text-primary hover:underline">Opprett din første råvare</button>}
+            <p className="text-ink-secondary">Ingen treff for søket eller filtrene.</p>
+            <button
+              onClick={() => { setQ(""); setCat("all"); setKind("all"); setActive("active"); }}
+              className="mt-3 text-sm font-medium text-primary hover:underline"
+            >
+              Nullstill filtre
+            </button>
           </div>
         ) : (
           <div className="overflow-x-auto">
