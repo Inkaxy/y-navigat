@@ -11,6 +11,7 @@ import { Loader2 } from "lucide-react";
 import { formatNok } from "@/fakturaer/lib/constants";
 import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
 import { ITEM_TYPES, defaultCategoryFor, type ItemType } from "@/ravarer/lib/itemTypes";
+import { InvoiceDocumentButton } from "@/fakturaer/components/InvoiceDocumentButton";
 
 interface Props {
   open: boolean;
