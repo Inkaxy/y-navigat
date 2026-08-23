@@ -1018,6 +1018,18 @@ function Step3Confirm({
           <div className="font-mono tabular-nums">{stats.to_skip}</div>
         </div>
       </div>
+
+      {stats.conflicts > 0 && (
+        <Alert>
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Slik løses navnekonfliktene</AlertTitle>
+          <AlertDescription>
+            {stats.conflicts} navnekonflikt(er): {conflictSummary.keep} beholder NBOS-navn,{" "}
+            {conflictSummary.overwrite} overskrives med Tedebe-navn, {conflictSummary.skip} hoppes
+            over.
+          </AlertDescription>
+        </Alert>
+      )}
     </div>
   );
 }
