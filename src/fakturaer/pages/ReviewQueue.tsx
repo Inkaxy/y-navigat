@@ -19,6 +19,7 @@ import { MatchDrawer } from "@/fakturaer/components/MatchDrawer";
 import { CreateRawMaterialDialog } from "@/fakturaer/components/CreateRawMaterialDialog";
 import { NotARawMaterialDialog } from "@/fakturaer/components/NotARawMaterialDialog";
 import { SkuConflictDialog } from "@/fakturaer/components/SkuConflictDialog";
+import { ItemTypeBadge } from "@/ravarer/components/ItemTypeBadge";
 
 const TABS: { value: ReviewReason; label: string }[] = [
   { value: "unmatched", label: "Umatchet" },
