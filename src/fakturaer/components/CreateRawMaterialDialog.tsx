@@ -62,7 +62,7 @@ export function CreateRawMaterialDialog({ open, onOpenChange, line, onCreated }:
     queryFn: async () => {
       const { data } = await supabase.from("raw_materials")
         .select("category").eq("legal_entity_id", line!.invoice.legal_entity_id).not("category", "is", null);
-      return Array.from(new Set((data ?? []).map((d: any) => d.category as string))).sort();
+      return Array.from(new Set(((data ?? []) as { category: string | null }[]).map((d) => d.category).filter((c): c is string => !!c)));
     },
   });
 
