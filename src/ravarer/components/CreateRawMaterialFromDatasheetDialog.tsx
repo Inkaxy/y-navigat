@@ -5,7 +5,8 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { BASE_UNITS, PACKAGE_UNITS, DEFAULT_CATEGORIES } from "@/ravarer/lib/constants";
+import { BASE_UNITS, PACKAGE_UNITS } from "@/ravarer/lib/constants";
+import { CategorySelectItems } from "@/ravarer/components/CategorySelectItems";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -103,7 +104,7 @@ export function CreateRawMaterialFromDatasheetDialog({ open, onOpenChange, datas
               <Select value={category || undefined} onValueChange={setCategory}>
                 <SelectTrigger><SelectValue placeholder="Velg" /></SelectTrigger>
                 <SelectContent>
-                  {DEFAULT_CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  <CategorySelectItems existing={[category]} />
                 </SelectContent>
               </Select>
             </div>

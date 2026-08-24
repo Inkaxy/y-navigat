@@ -1,3 +1,5 @@
+import { CATEGORY_CONSUMABLES, CATEGORY_PACKAGING } from "@/ravarer/lib/categories";
+
 export type ItemType = "ravare" | "emballasje" | "forbruksvare" | "videresalg";
 
 export const ITEM_TYPES: { value: ItemType; label: string; hint: string }[] = [
@@ -13,8 +15,8 @@ export function itemTypeLabel(t?: string | null): string {
 
 /** Standard kategori-forslag ved oppretting. Videresalg lar kategori stå åpen. */
 export function defaultCategoryFor(t: ItemType): string | null {
-  if (t === "emballasje") return "Emballasje";
-  if (t === "forbruksvare") return "Forbruksvare";
+  if (t === "emballasje") return CATEGORY_PACKAGING;
+  if (t === "forbruksvare") return CATEGORY_CONSUMABLES;
   return null;
 }
 

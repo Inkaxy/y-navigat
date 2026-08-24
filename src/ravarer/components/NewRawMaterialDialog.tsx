@@ -10,7 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useCreateRawMaterial } from "@/ravarer/hooks/useRawMaterials";
-import { BASE_UNITS, PACKAGE_UNITS, DEFAULT_CATEGORIES } from "@/ravarer/lib/constants";
+import { BASE_UNITS, PACKAGE_UNITS } from "@/ravarer/lib/constants";
+import { CategorySelectItems } from "@/ravarer/components/CategorySelectItems";
 import { useNavigate } from "react-router-dom";
 
 const schema = z.object({
@@ -93,7 +94,7 @@ export function NewRawMaterialDialog({ open, onOpenChange, onCreated }: Props) {
                   <Select value={field.value || undefined} onValueChange={field.onChange}>
                     <FormControl><SelectTrigger><SelectValue placeholder="Velg" /></SelectTrigger></FormControl>
                     <SelectContent>
-                      {DEFAULT_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                      <CategorySelectItems existing={[field.value]} />
                     </SelectContent>
                   </Select>
                 </FormItem>

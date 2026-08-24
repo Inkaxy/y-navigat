@@ -13,6 +13,7 @@ import { useAllRawMaterialPurchaseStats } from "@/ravarer/hooks/usePurchaseStats
 import { formatNok, formatNumber, formatDate } from "@/ravarer/lib/constants";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { ItemTypeBadge } from "@/ravarer/components/ItemTypeBadge";
+import { CategorySelectItems } from "@/ravarer/components/CategorySelectItems";
 
 type SortKey = "name" | "volume_12m";
 
@@ -38,10 +39,10 @@ export default function VarelistePage() {
     return list.length > 0 ? list : (r.category ? [r.category] : []);
   };
 
-  const categories = useMemo(() => {
+  const existingCategories = useMemo(() => {
     const set = new Set<string>();
     rows.forEach(r => allCatsOf(r).forEach(c => set.add(c)));
-    return Array.from(set).sort();
+    return Array.from(set);
   }, [rows]);
 
   const filtered = useMemo(() => {
@@ -87,7 +88,7 @@ export default function VarelistePage() {
             <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Alle kategorier</SelectItem>
-              {categories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+              <CategorySelectItems existing={existingCategories} />
             </SelectContent>
           </Select>
           <Select value={kind} onValueChange={setKind}>

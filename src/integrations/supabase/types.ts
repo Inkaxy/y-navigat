@@ -35,6 +35,27 @@ export type Database = {
         }
         Relationships: []
       }
+      _raw_material_category_backup: {
+        Row: {
+          gammel_categories: string[] | null
+          gammel_category: string | null
+          raw_material_id: string
+          sikkerhetskopiert_at: string
+        }
+        Insert: {
+          gammel_categories?: string[] | null
+          gammel_category?: string | null
+          raw_material_id: string
+          sikkerhetskopiert_at?: string
+        }
+        Update: {
+          gammel_categories?: string[] | null
+          gammel_category?: string | null
+          raw_material_id?: string
+          sikkerhetskopiert_at?: string
+        }
+        Relationships: []
+      }
       _x_audit: {
         Row: {
           result: Json | null
