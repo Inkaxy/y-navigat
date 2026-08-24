@@ -11,6 +11,7 @@ import { Loader2 } from "lucide-react";
 import { formatNok } from "@/fakturaer/lib/constants";
 import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
 import { ITEM_TYPES, defaultCategoryFor, type ItemType } from "@/ravarer/lib/itemTypes";
+import { CategorySelectItems, NEW_CATEGORY_VALUE } from "@/ravarer/components/CategorySelectItems";
 import { InvoiceDocumentButton } from "@/fakturaer/components/InvoiceDocumentButton";
 
 interface Props {
@@ -214,20 +215,22 @@ export function CreateRawMaterialDialog({ open, onOpenChange, line, onCreated }:
                   Avbryt
                 </Button>
               </div>
+            ) : null}
+            {newCategory ? (
+              <p className="mt-1.5 text-xs text-muted-foreground">
+                Bruk helst en av standardkategoriene — da kan innkjøpsstatistikk og prisoppfølging sammenlignes på tvers av varer.
+              </p>
             ) : (
               <Select
                 value={category}
                 onValueChange={(v) => {
-                  if (v === "__new__") { setNewCategory(true); setCategory(""); }
+                  if (v === NEW_CATEGORY_VALUE) { setNewCategory(true); setCategory(""); }
                   else setCategory(v);
                 }}
               >
                 <SelectTrigger><SelectValue placeholder="Velg kategori…" /></SelectTrigger>
                 <SelectContent>
-                  {Array.from(new Set([...(category ? [category] : []), ...categories])).map((c) => (
-                    <SelectItem key={c} value={c}>{c}</SelectItem>
-                  ))}
-                  <SelectItem value="__new__">+ Ny kategori…</SelectItem>
+                  <CategorySelectItems existing={[category, ...categories]} allowNew />
                 </SelectContent>
               </Select>
             )}
