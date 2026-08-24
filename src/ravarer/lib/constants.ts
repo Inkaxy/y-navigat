@@ -9,19 +9,7 @@ export type BaseUnit = (typeof BASE_UNITS)[number];
 
 export const PACKAGE_UNITS = ["sekk", "kartong", "pall", "konteiner", "spann", "pakke", "flaske", "boks", "stk", "bulk"] as const;
 
-export const DEFAULT_CATEGORIES = [
-  "Mel",
-  "Sukker",
-  "Fett",
-  "Frø og kjerner",
-  "Frukt og bær",
-  "Smaksetting",
-  "Melkeprodukter",
-  "Egg",
-  "Sjokolade",
-  "Halvfabrikat",
-  "Emballasje",
-] as const;
+export { RAW_MATERIAL_CATEGORIES } from "@/ravarer/lib/categories";
 
 export const PRICE_SOURCES = [
   { value: "manual", label: "Manuell" },

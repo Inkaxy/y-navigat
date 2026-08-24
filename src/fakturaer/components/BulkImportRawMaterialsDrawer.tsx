@@ -49,11 +49,8 @@ interface RowState {
   ai_base_unit: boolean;
 }
 
-const CATEGORIES = [
-  "mel", "sukker", "fett", "frø", "frukt_baer", "smaksetting",
-  "gjær", "salt", "egg", "meieri", "sjokolade", "noetter",
-  "krydder", "konserveringsmiddel", "emballasje", "annet",
-];
+import { CategorySelectItems } from "@/ravarer/components/CategorySelectItems";
+
 const FALLBACK_CATEGORY = "Importert – ikke kategorisert";
 
 interface Props {
@@ -349,8 +346,7 @@ export function BulkImportRawMaterialsDrawer({ open, onOpenChange, invoiceId, le
                 <Select onValueChange={(v) => applyToAll("category", v)}>
                   <SelectTrigger className="h-8 w-[180px]"><SelectValue placeholder="Velg…" /></SelectTrigger>
                   <SelectContent>
-                    {CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                    <SelectItem value={FALLBACK_CATEGORY}>{FALLBACK_CATEGORY}</SelectItem>
+                    <CategorySelectItems existing={[FALLBACK_CATEGORY]} />
                   </SelectContent>
                 </Select>
               </div>
@@ -425,8 +421,7 @@ export function BulkImportRawMaterialsDrawer({ open, onOpenChange, invoiceId, le
                         <Select value={r.category} onValueChange={(v) => patch(l.id, { category: v, ai_category: false })}>
                           <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
                           <SelectContent>
-                            {CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                            <SelectItem value={FALLBACK_CATEGORY}>{FALLBACK_CATEGORY}</SelectItem>
+                            <CategorySelectItems existing={[FALLBACK_CATEGORY, r.category]} />
                           </SelectContent>
                         </Select>
                       </div>

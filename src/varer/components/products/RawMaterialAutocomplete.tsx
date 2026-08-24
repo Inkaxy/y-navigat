@@ -16,6 +16,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { CategorySelectItems } from "@/ravarer/components/CategorySelectItems";
 import { cn } from "@/lib/utils";
 import { hasCircularReference } from "@/varer/lib/halvfabrikat";
 
@@ -49,19 +50,6 @@ interface Props {
 
 
 const BASE_UNITS = ["kg", "g", "liter", "ml", "stk"];
-const DEFAULT_CATEGORIES = [
-  "Mel & korn",
-  "Sukker & søtning",
-  "Fett & olje",
-  "Meieri",
-  "Egg",
-  "Gjær & hevemiddel",
-  "Frukt & bær",
-  "Nøtter & frø",
-  "Krydder",
-  "Sjokolade",
-  "Annet",
-];
 
 export function RawMaterialAutocomplete({
   value,
@@ -372,7 +360,7 @@ function QuickCreateRawMaterialDialog({
               <Select value={category} onValueChange={setCategory}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {DEFAULT_CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  <CategorySelectItems existing={[category]} />
                 </SelectContent>
               </Select>
             </div>
