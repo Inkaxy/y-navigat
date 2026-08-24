@@ -79,7 +79,7 @@ export function OverviewTab({ rm }: Props) {
             >
               <SelectTrigger><SelectValue placeholder="Velg" /></SelectTrigger>
               <SelectContent>
-                {DEFAULT_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                <CategorySelectItems existing={[draft.category, ...cats]} />
               </SelectContent>
             </Select>
           </div>
