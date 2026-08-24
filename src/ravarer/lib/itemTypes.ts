@@ -1,3 +1,5 @@
+import { CATEGORY_CONSUMABLES, CATEGORY_PACKAGING } from "@/ravarer/lib/categories";
+
 export type ItemType = "ravare" | "emballasje" | "forbruksvare" | "videresalg";
 
 export const ITEM_TYPES: { value: ItemType; label: string; hint: string }[] = [
