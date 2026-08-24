@@ -381,7 +381,13 @@ export function cakeItemLabel(item: CakePrintItem): string {
   );
 }
 
-/** Åpner et utskriftsvindu med arkene og kaller `onPrinted` etter faktisk utskrift. */
+/**
+ * Åpner utskriftsdialogen med arkene.
+ *
+ * Vi bygger nøyaktig samme PDF som «Last ned PDF» og sender den til skriveren.
+ * HTML-arket i et about:blank-vindu droppet bildet i Chrome (kun ramme og
+ * hjelpelinjer kom ut på papir), mens PDF-en alltid har bildet med.
+ */
 export async function openCakePrintWindow(
   items: CakePrintItem[],
   opts: {
@@ -407,64 +413,26 @@ export async function openCakePrintWindow(
     sheets = res.items;
   }
 
-  const w = window.open("", "_blank", "width=900,height=1100");
+  const missing = sheets.filter((s) => !s.url);
+  if (missing.length > 0) {
+    throw new Error(
+      `${missing.length} bilde(r) kunne ikke vises. Utskriften ble ikke startet.`,
+    );
+  }
+
+  const pdf = await buildCakePdf(sheets, { scale: opts.scale, scaleY: opts.scaleY });
+  pdf.autoPrint();
+  const url = URL.createObjectURL(pdf.output("blob"));
+  const w = window.open(url, "_blank");
   if (!w) {
+    URL.revokeObjectURL(url);
     throw new Error("Nettleseren blokkerte utskriftsvinduet");
   }
-  const doc = w.document;
-  doc.title = opts.title ?? "Kakebilder";
-  const style = doc.createElement("style");
-  style.textContent = CAKE_PRINT_CSS;
-  doc.head.appendChild(style);
-  for (const item of sheets) {
-    doc.body.appendChild(
-      buildCakeSheet(doc, item, opts.scale ?? 1, opts.scaleY ?? opts.scale ?? 1),
-    );
-  }
-
-  // Vent til bildene faktisk er dekodet — `complete` er upålitelig i et
-  // nyåpnet about:blank-vindu.
-  const imgs = Array.from(doc.images);
-  const broken: HTMLImageElement[] = [];
-  await Promise.all(
-    imgs.map(async (img) => {
-      try {
-        if (typeof img.decode === "function") {
-          await img.decode();
-        } else {
-          await new Promise<void>((resolve) => {
-            img.onload = () => resolve();
-            img.onerror = () => resolve();
-          });
-        }
-      } catch {
-        /* håndteres av naturalWidth-sjekken under */
-      }
-      if (!img.naturalWidth) broken.push(img);
-    }),
-  );
-
-  if (broken.length > 0) {
-    for (const img of broken) {
-      const art = img.parentElement;
-      img.remove();
-      const holder = art?.parentElement ?? doc.body;
-      const warn = el(doc, "div", "cake-missing", "BILDE MANGLER — ikke bruk dette arket");
-      holder.appendChild(warn);
-    }
-    w.close();
-    throw new Error(
-      `${broken.length} bilde(r) kunne ikke vises. Utskriften ble ikke startet.`,
-    );
-  }
-
-  // Avbrutt dialog skal ikke registreres — derfor onafterprint, ikke et løfte.
-  if (opts.onPrinted) {
-    w.onafterprint = () => opts.onPrinted?.();
-  }
   w.focus();
-  w.print();
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  opts.onPrinted?.();
 }
+
 
 
 /** Samme ark som på papir, men som PDF. Millimeter, ikke punkter. */
