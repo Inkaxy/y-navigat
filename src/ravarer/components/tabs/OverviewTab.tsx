@@ -89,7 +89,7 @@ export function OverviewTab({ rm }: Props) {
         <div>
           <Label>Flere kategorier</Label>
           <div className="mt-1.5 flex flex-wrap gap-1.5">
-            {DEFAULT_CATEGORIES.map(c => {
+            {categoryOptions([draft.category, ...cats]).map(c => {
               const active = cats.includes(c);
               const isPrimary = draft.category === c;
               return (
