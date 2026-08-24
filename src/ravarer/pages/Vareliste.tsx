@@ -38,10 +38,10 @@ export default function VarelistePage() {
     return list.length > 0 ? list : (r.category ? [r.category] : []);
   };
 
-  const categories = useMemo(() => {
+  const existingCategories = useMemo(() => {
     const set = new Set<string>();
     rows.forEach(r => allCatsOf(r).forEach(c => set.add(c)));
-    return Array.from(set).sort();
+    return Array.from(set);
   }, [rows]);
 
   const filtered = useMemo(() => {
