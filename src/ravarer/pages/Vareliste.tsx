@@ -87,7 +87,7 @@ export default function VarelistePage() {
             <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Alle kategorier</SelectItem>
-              {categories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+              <CategorySelectItems existing={existingCategories} />
             </SelectContent>
           </Select>
           <Select value={kind} onValueChange={setKind}>
