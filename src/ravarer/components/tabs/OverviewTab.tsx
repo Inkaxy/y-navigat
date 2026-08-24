@@ -9,7 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { BASE_UNITS, PACKAGE_UNITS, DEFAULT_CATEGORIES, formatNok, formatDate } from "@/ravarer/lib/constants";
+import { BASE_UNITS, PACKAGE_UNITS, formatNok, formatDate } from "@/ravarer/lib/constants";
+import { CategorySelectItems } from "@/ravarer/components/CategorySelectItems";
+import { categoryOptions } from "@/ravarer/lib/categories";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { RecalcHistory } from "@/ravarer/components/packages/RecalcHistory";
 
