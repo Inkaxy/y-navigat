@@ -556,8 +556,18 @@ export async function buildCakePdf(
       { align: "right" },
     );
   }
+  return pdf;
+}
+
+/** Laster ned arkene som PDF. */
+export async function cakeSheetsToPdf(
+  items: CakePrintItem[],
+  opts: { scale?: number; scaleY?: number; fileName?: string } = {},
+): Promise<void> {
+  const pdf = await buildCakePdf(items, opts);
   pdf.save(opts.fileName ?? "kakebilder.pdf");
 }
+
 
 /**
  * Testark for kalibrering: en rute med kjente mål. Måler man noe annet enn
