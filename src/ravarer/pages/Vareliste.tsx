@@ -13,6 +13,7 @@ import { useAllRawMaterialPurchaseStats } from "@/ravarer/hooks/usePurchaseStats
 import { formatNok, formatNumber, formatDate } from "@/ravarer/lib/constants";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { ItemTypeBadge } from "@/ravarer/components/ItemTypeBadge";
+import { CategorySelectItems } from "@/ravarer/components/CategorySelectItems";
 
 type SortKey = "name" | "volume_12m";
 
