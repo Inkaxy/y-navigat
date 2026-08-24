@@ -468,13 +468,14 @@ export async function openCakePrintWindow(
 
 
 /** Samme ark som på papir, men som PDF. Millimeter, ikke punkter. */
-export async function cakeSheetsToPdf(
+export async function buildCakePdf(
   items: CakePrintItem[],
-  opts: { scale?: number; scaleY?: number; fileName?: string } = {},
-): Promise<void> {
+  opts: { scale?: number; scaleY?: number } = {},
+): Promise<jsPDF> {
   const scale = opts.scale ?? 1;
   const scaleY = opts.scaleY ?? scale;
   const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+
   for (let i = 0; i < items.length; i++) {
     if (i > 0) pdf.addPage();
     const item = items[i];
