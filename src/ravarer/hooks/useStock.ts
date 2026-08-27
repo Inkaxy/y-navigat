@@ -118,7 +118,20 @@ export function useStockMovements(rawMaterialId: string | undefined) {
           .in("id", Array.from(new Set(lineIds)));
         (lines ?? []).forEach(l => invoiceIdByLineId.set(l.id, l.invoice_id));
       }
-      return { rows, invoiceIdByLineId };
+
+      // Samme for oppskriftsuttrekk fra pakkseddellinjer.
+      const dnLineIds = rows
+        .filter(r => r.source_table === "delivery_note_lines" && r.source_id)
+        .map(r => r.source_id!) as string[];
+      const deliveryNoteIdByLineId = new Map<string, string>();
+      if (dnLineIds.length > 0) {
+        const { data: dnLines } = await supabase
+          .from("delivery_note_lines")
+          .select("id, delivery_note_id")
+          .in("id", Array.from(new Set(dnLineIds)));
+        (dnLines ?? []).forEach(l => deliveryNoteIdByLineId.set(l.id, l.delivery_note_id));
+      }
+      return { rows, invoiceIdByLineId, deliveryNoteIdByLineId };
     },
   });
 }
