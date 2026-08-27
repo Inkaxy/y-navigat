@@ -68,7 +68,7 @@ export function useSuspiciousPackages() {
         if (!(suggested > 0)) continue;
 
         const size = r.package_size == null ? null : Number(r.package_size);
-        const unit = normalizeUnit(r.package_unit) ?? (r.package_unit ?? "").toLowerCase() || null;
+        const unit = (normalizeUnit(r.package_unit) ?? (r.package_unit ?? "").toLowerCase()) || null;
         const unitFactor = unit ? toBaseFactor(unit, base) : null;
         const supplierBaseUnits =
           size != null && size > 0 && unitFactor != null
