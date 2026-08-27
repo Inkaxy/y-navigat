@@ -277,6 +277,7 @@ function RavarerNav() {
         { to: "/ravarer/fakturaer/til-behandling", label: "Til behandling", badge: reviewCount },
         { to: "/ravarer/fakturaer?status=ready", label: "Klar for prismatch" },
         { to: "/ravarer/fakturaer/import", label: "Importer manuelt" },
+        { to: "/ravarer/fakturaer/reberegn-kostpriser", label: "Reberegn kostpriser" },
       ],
     });
   }
