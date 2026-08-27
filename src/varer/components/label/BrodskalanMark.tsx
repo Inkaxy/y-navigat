@@ -21,7 +21,14 @@ export function BrodskalanMark({ category, sizeMm, className, showText = false, 
   const sizeStyle = sizeMm ? { width: `${sizeMm}mm`, height: `${sizeMm}mm` } : undefined;
 
   return (
-    <figure className={cn("flex flex-col items-center gap-1", muted && "opacity-50", className)}>
+    <figure
+      className={cn(
+        "flex flex-col items-center gap-1",
+        !sizeMm && !className && "h-16 w-16",
+        muted && "opacity-50",
+        className,
+      )}
+    >
       <img
         src={mark.src}
         alt={mark.alt}
@@ -30,7 +37,7 @@ export function BrodskalanMark({ category, sizeMm, className, showText = false, 
           printColorAdjust: "exact",
           WebkitPrintColorAdjust: "exact",
         }}
-        className={cn("object-contain", !sizeMm && !className && "h-16 w-16")}
+        className={cn("object-contain", !sizeMm && "h-full w-full min-h-0")}
       />
       {showText && (
         <figcaption className="text-center text-xs leading-tight text-muted-foreground">
