@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
 import { acceptMatch } from "@/fakturaer/lib/acceptMatch";
 import { ItemTypeBadge } from "@/ravarer/components/ItemTypeBadge";
+import { deriveLinePackage, resolveLineCost } from "@/fakturaer/lib/units";
 
 interface Props {
   open: boolean;
@@ -62,12 +63,39 @@ export function BulkAcceptSuggestionsDialog({ open, onOpenChange, candidates, th
         const top = line.suggestions?.[0];
         try {
           if (!top) throw new Error("Ingen forslag");
+          // invoice_lines.package_size er PER sub-enhet — den må ganges med
+          // count_per_package før den lagres som TOTAL på leverandørkoblingen.
+          const pkg = deriveLinePackage({
+            package_size: line.package_size,
+            package_unit: line.package_unit,
+            count_per_package: line.count_per_package,
+            description: line.description,
+          });
+          const baseUnit = top.raw_material?.base_unit ?? null;
+          const cost = baseUnit
+            ? resolveLineCost({
+                quantity: line.quantity,
+                unit: line.unit,
+                unitPrice: line.unit_price,
+                totalAmount: line.total_amount,
+                packageSize: line.package_size,
+                packageUnit: line.package_unit,
+                countPerPackage: line.count_per_package,
+                description: line.description,
+                baseUnit,
+                knownPricePerBaseUnit: top.raw_material?.current_cost_price ?? null,
+              })
+            : null;
+          if (cost?.needsInput) {
+            throw new Error(cost.reason ?? "Mangler pakningsstørrelse");
+          }
           await acceptMatch({
             line,
             rawMaterialId: top.raw_material_id,
             userId: user.id,
-            packageSize: line.package_size,
-            packageUnit: line.package_unit,
+            packageSize: pkg?.size ?? null,
+            packageUnit: pkg?.unit ?? null,
+            baseUnitsPerPackage: cost?.baseUnitsPerPackage ?? null,
             rememberSku: !!line.supplier_sku,
             rememberName: !!line.description && line.description !== line.supplier_sku,
           });

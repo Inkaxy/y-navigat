@@ -55,7 +55,7 @@ export interface ReviewLineRow {
     confidence: number;
     match_reason: string | null;
     rank: number;
-    raw_material: { name: string; sku: string | null; category: string | null; current_cost_price: number | null; item_type?: string | null } | null;
+    raw_material: { name: string; sku: string | null; category: string | null; current_cost_price: number | null; base_unit?: string | null; item_type?: string | null } | null;
   }>;
   matched_raw_material?: { name: string; sku: string | null; category: string | null; item_type?: string | null } | null;
 }
@@ -81,7 +81,7 @@ export function useReviewLines(filters: Filters) {
              supplier:suppliers(name, contact_email),
              legal_entity:legal_entities(legal_name, short_code)),
            suggestions:invoice_line_match_suggestions(raw_material_id, confidence, match_reason, rank,
-             raw_material:raw_materials(name, sku, category, current_cost_price, item_type)),
+             raw_material:raw_materials(name, sku, category, current_cost_price, base_unit, item_type)),
            matched_raw_material:raw_materials!invoice_lines_raw_material_id_fkey(name, sku, category, item_type)`,
 
           { count: "exact" },
