@@ -11,6 +11,8 @@ import { NutritionTab } from "@/ravarer/components/tabs/NutritionTab";
 import { SuppliersTab } from "@/ravarer/components/tabs/SuppliersTab";
 import { ResaleSettingsCard } from "@/ravarer/components/stock/ResaleSettingsCard";
 import { SellsAsSection } from "@/ravarer/components/stock/SellsAsSection";
+import { UnitsAndPriceCard } from "@/ravarer/components/stock/UnitsAndPriceCard";
+import { StockTrackingCard } from "@/ravarer/components/stock/StockTrackingCard";
 
 
 export default function RawMaterialDetail() {
