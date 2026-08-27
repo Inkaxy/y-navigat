@@ -261,7 +261,14 @@ export default function ForhandlingDetail() {
               const winner = bestByItem.get(it.id);
               return (
                 <tr key={it.id} className="border-t border-line-subtle">
-                  <td className="px-4 py-2 font-medium">{rmName(it.raw_material_id)}</td>
+                  <td className="px-4 py-2 font-medium">
+                    <div>{rmName(it.raw_material_id)}</div>
+                    <UnitPriceHint
+                      rawMaterialId={it.raw_material_id}
+                      pricePerBase={it.actual_avg_price_baseline == null ? null : Number(it.actual_avg_price_baseline)}
+                      baseUnit={rmBaseUnit(it.raw_material_id)}
+                    />
+                  </td>
                   <td className="px-4 py-2 text-right tabular-nums text-ink-secondary">
                     {formatNok(it.actual_avg_price_baseline)}
                   </td>
