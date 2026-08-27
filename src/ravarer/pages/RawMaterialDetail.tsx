@@ -82,6 +82,8 @@ export default function RawMaterialDetail() {
         </TabsList>
         <TabsContent value="overview" className="mt-5 space-y-5">
           <OverviewTab rm={rm} />
+          <UnitsAndPriceCard rm={rm} />
+          <StockTrackingCard rm={rm} />
           <ResaleSettingsCard rm={rm} />
           {rm.is_resale_item && <SellsAsSection rm={rm} />}
         </TabsContent>
