@@ -73,7 +73,7 @@ export function StockAdjustDialog({ open, onOpenChange, mode, rawMaterial }: Pro
     if (mode === "count") {
       await create.mutateAsync({
         raw_material_id: rawMaterial.id,
-        movement_type: "count_adjust",
+        movement_type: "adjustment",
         quantity_base: diff,
         note: note.trim(),
       });
