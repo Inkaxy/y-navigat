@@ -311,7 +311,14 @@ export default function ForhandlingWizard() {
                             }}
                           />
                         </td>
-                        <td className="px-3 py-2 font-medium text-ink-primary">{r.name}</td>
+                        <td className="px-3 py-2 font-medium text-ink-primary">
+                          <div>{r.name}</div>
+                          <UnitPriceHint
+                            rawMaterialId={r.id}
+                            pricePerBase={s?.avg_price_365 == null ? null : Number(s.avg_price_365)}
+                            baseUnit={r.base_unit}
+                          />
+                        </td>
                         <td className="px-3 py-2 text-right tabular-nums">
                           {formatNumber(s?.volume_365)} {r.base_unit}
                         </td>
