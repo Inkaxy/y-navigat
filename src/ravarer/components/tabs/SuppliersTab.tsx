@@ -117,8 +117,8 @@ export function SuppliersTab({ rm }: Props) {
                         )}
                       </td>
                       <td className="py-3 text-right tabular-nums">{formatNok(l.agreed_price)}</td>
-                      <td className="py-3 text-right tabular-nums text-ink-secondary">{formatNok(l.agreed_price_per_base_unit)}</td>
-                      <td className="py-3 text-right tabular-nums text-ink-secondary">{formatNok(l.last_invoice_price)}</td>
+                      <td className="py-3 text-right tabular-nums text-ink-secondary">{l.agreed_price_per_base_unit == null ? "—" : formatNok(Number(l.agreed_price_per_base_unit) * unitFactor)}</td>
+                      <td className="py-3 text-right tabular-nums text-ink-secondary">{l.last_invoice_price == null ? "—" : formatNok(Number(l.last_invoice_price) * unitFactor)}</td>
                       <td className={`py-3 ${expiryClass}`}>{formatDate(l.agreement_valid_to)}</td>
                       <td className="py-3 text-right">
                         {canWrite && (
