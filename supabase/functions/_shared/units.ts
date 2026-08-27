@@ -658,10 +658,28 @@ export function resolveLineCost(input: ResolveLineCostInput): ResolveLineCostRes
   if (checks.matchesHistory === true) confidence = Math.min(1, confidence + 0.05);
   if (checks.matchesHistory === false) confidence -= 0.3;
   if (chosen.baseUnitsPerPackage && !checks.wholePackages && chosen.basis === "fakturaenhet") confidence -= 0.05;
+
+  // Uenighet mellom en ubekreftet leverandørpakning og varenavnet: beskrivelsen
+  // ble brukt, men resultatet må bekreftes av et menneske.
+  let packageNote: string | null = null;
+  if (pkg?.disagreement && chosen.basis === "pakning") {
+    const d = pkg.disagreement;
+    packageNote =
+      `Leverandørkoblingen sier ${fmtNum(d.supplierUnits)} ${d.supplierUnitLabel ?? base} per pakning, ` +
+      `men varenavnet sier ${fmtNum(d.descriptionUnits)} ${base} — bruker ${fmtNum(d.descriptionUnits)} ${base}. Bekreft pakningen.`;
+    confidence = Math.min(confidence, 0.7);
+  } else if (pkg?.ignoredSupplierOne && chosen.basis === "pakning") {
+    packageNote =
+      `Leverandørkoblingen står oppført med 1 ${pkg.packageUnitLabel ?? "pakning"} per pakning, som ikke kan stemme — ` +
+      `bruker ${fmtNum(chosen.baseUnitsPerPackage ?? 0)} ${base} fra varenavnet. Bekreft pakningen.`;
+    confidence = Math.min(confidence, 0.7);
+  }
+
   confidence = Math.max(0, Math.min(1, confidence - amountPenalty));
 
   const alternatives = candidates.filter((c) => c !== chosen);
   let explanation = chosen.explanation;
+
   if (chosen.basis === "fakturaenhet" && chosen.baseUnitsPerPackage && checks.wholePackages) {
     const count = Math.round(chosen.baseQuantity / chosen.baseUnitsPerPackage);
     explanation += ` (= ${count} ${plural(pkg?.packageUnitLabel && !isBaseUnit(pkg.packageUnitLabel) ? pkg.packageUnitLabel : "pakning", count)})`;
