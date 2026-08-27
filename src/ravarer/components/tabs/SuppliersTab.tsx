@@ -185,7 +185,7 @@ export function SuppliersTab({ rm }: Props) {
                 <tr>
                   <th className="pb-2">Dato</th>
                   <th className="pb-2">Leverandør</th>
-                  <th className="pb-2 text-right">Pris</th>
+                  <th className="pb-2 text-right">Pris per {unitLabel}</th>
                   <th className="pb-2">Kilde</th>
                   <th className="pb-2">Faktura</th>
                   <th className="pb-2">Notat</th>
