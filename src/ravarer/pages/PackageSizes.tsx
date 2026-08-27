@@ -185,7 +185,10 @@ export default function PackageSizesPage() {
         })}
       </div>
 
+      <SuspiciousPackagesCard />
+
       <Card className="p-4">
+
         <div className="mb-3 flex items-center gap-2">
           <div className="relative w-full max-w-sm">
             <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-secondary" />
