@@ -230,6 +230,7 @@ export function LabelTab({ recipeId, recipeName, recipe, flourLines, legalEntity
         coarseWeightedGrams={label.whole_grain_grams}
         flourLines={flourLines}
         marks={marksQuery.data ?? []}
+        warnings={label.warnings}
       />
 
       <KeyholeSection

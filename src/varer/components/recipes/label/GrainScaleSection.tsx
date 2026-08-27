@@ -7,7 +7,6 @@ import { cn } from "@/lib/utils";
 import {
   COARSE_CLASSIFICATIONS,
   GRAIN_LEVELS,
-  GRAIN_MARK_KEY,
   SIFTED_CLASSIFICATIONS,
   fmtGrams,
   fmtPct,
@@ -89,7 +88,6 @@ export function GrainScaleSection({
   warnings,
 }: Props) {
   const category = (grainCategory as GrainCategory | null) ?? (grainPct != null ? grainCategoryFromPct(grainPct) : null);
-  const mark = category ? marks.find((m) => m.mark_key === GRAIN_MARK_KEY[category]) : undefined;
 
   const siftedLines = useMemo(
     () => flourLines.filter((l) => l.classification && SIFTED_CLASSIFICATIONS.includes(l.classification) && l.grams > 0),
