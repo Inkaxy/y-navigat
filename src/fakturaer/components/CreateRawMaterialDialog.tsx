@@ -66,21 +66,42 @@ export function CreateRawMaterialDialog({ open, onOpenChange, line, onCreated }:
     },
   });
 
+  const sizeInputRef = useRef<HTMLInputElement>(null);
+
+  /**
+   * Én motor for kostpris — samme som matching og masse-import bruker.
+   * Pakningsstørrelsen er lager- og bestillingsinformasjon; den endrer bare
+   * kostprisen når fakturaen faktisk er priset per pakning.
+   */
+  const cost = useMemo(() => {
+    if (!line) return null;
+    const size = packageSize.trim() ? Number(packageSize.replace(",", ".")) : null;
+    return resolveLineCost({
+      quantity: line.quantity,
+      unit: line.unit,
+      unitPrice: line.unit_price,
+      totalAmount: line.total_amount,
+      packageSize: line.package_size,
+      packageUnit: line.package_unit,
+      countPerPackage: line.count_per_package,
+      description: line.description,
+      baseUnit,
+      supplierPackage: size && size > 0 ? { packageSize: size, packageUnit: packageUnit || baseUnit } : null,
+    });
+  }, [line, baseUnit, packageSize, packageUnit]);
+
+  const pricePerBase = cost && !cost.needsInput ? Number(cost.pricePerBaseUnit.toFixed(4)) : null;
+  const needsPackage = cost?.needsInput === "package_size";
+
+  useEffect(() => {
+    if (needsPackage) sizeInputRef.current?.focus();
+  }, [needsPackage]);
+
   async function submit() {
     if (!line || !name.trim() || !category.trim()) { toast.error("Navn og kategori er påkrevd"); return; }
     setBusy(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      // Kostpris pr baseenhet = pris pr pakning / pakningsstørrelse omregnet til baseenhet.
-      // («10 sekker à 25 kg» til 450 kr/sekk => 18 kr/kg, ikke 450 kr/kg.)
-      const sizeNum = packageSize ? Number(packageSize) : null;
-      const unitForSize = (packageUnit || line.unit || "").toLowerCase();
-      const sizeInBase =
-        sizeNum && sizeNum > 0 ? sizeNum * toBaseFactor(unitForSize, baseUnit) : null;
-      const fallbackFactor = toBaseFactor((line.unit ?? "").toLowerCase(), baseUnit);
-      const divisor = sizeInBase && sizeInBase > 0 ? sizeInBase : fallbackFactor;
-      const pricePerBase =
-        line.unit_price != null && divisor > 0 ? Number(line.unit_price) / divisor : null;
       const nowIso = new Date().toISOString();
 
       // 1) Raw material
@@ -93,6 +114,7 @@ export function CreateRawMaterialDialog({ open, onOpenChange, line, onCreated }:
         package_size: packageSize ? Number(packageSize) : null,
         package_unit: packageUnit || null,
         current_cost_price: pricePerBase ?? 0, price_source: "invoice", price_updated_at: nowIso,
+        base_units_per_package: cost?.baseUnitsPerPackage ?? null,
         primary_supplier_id: line.invoice.supplier_id, is_active: true, created_by: user?.id,
       } as never).select().single();
       if (rmErr) throw rmErr;
@@ -103,6 +125,8 @@ export function CreateRawMaterialDialog({ open, onOpenChange, line, onCreated }:
         supplier_sku: line.supplier_sku, supplier_product_name: line.description,
         agreed_price: line.unit_price, agreed_price_per_base_unit: pricePerBase,
         package_size: packageSize ? Number(packageSize) : null, package_unit: packageUnit || null,
+        base_units_per_package: cost?.baseUnitsPerPackage ?? null,
+        ...(packageSize ? { package_confirmed_at: nowIso, package_confirmed_by: user?.id ?? null } : {}),
         last_invoice_price: line.unit_price, last_invoice_date: line.invoice.invoice_date,
       }).select().single();
       if (rmsErr) throw rmsErr;
@@ -121,17 +145,20 @@ export function CreateRawMaterialDialog({ open, onOpenChange, line, onCreated }:
       });
       if (aliases.length) await supabase.from("raw_material_supplier_aliases").insert(aliases);
 
-      // 4) Price history
-      await supabase.from("raw_material_price_history").insert({
-        raw_material_id: rm.id, supplier_id: line.invoice.supplier_id, price: pricePerBase ?? 0,
-        effective_date: line.invoice.invoice_date, source: "invoice", invoice_id: line.invoice_id, created_by: user?.id,
-      });
+      // 4) Prishistorikk — kun når vi faktisk har en pris per baseenhet.
+      if (pricePerBase != null) {
+        await supabase.from("raw_material_price_history").insert({
+          raw_material_id: rm.id, supplier_id: line.invoice.supplier_id, price: pricePerBase,
+          effective_date: line.invoice.invoice_date, source: "invoice", invoice_id: line.invoice_id, created_by: user?.id,
+        });
+      }
 
       // 5) Match line
       await supabase.from("invoice_lines").update({
         raw_material_id: rm.id, match_confidence: "manual", requires_review: false,
         review_reason: null, resolved_by: user?.id, resolved_at: nowIso,
-        price_per_base_unit: pricePerBase, expected_price_per_base_unit: pricePerBase, variance_status: "within_tolerance",
+        // Dialogen setter ALDRI sin egen beregning som fasit for avviksovervåkingen.
+        price_per_base_unit: pricePerBase, base_quantity: cost?.baseQuantity ?? null,
       }).eq("id", line.id);
 
       toast.success(`Råvare «${name}» opprettet`, { description: "Husk å fylle inn næringsinnhold senere." });
@@ -147,20 +174,6 @@ export function CreateRawMaterialDialog({ open, onOpenChange, line, onCreated }:
       toast.error(e.message ?? "Kunne ikke opprette");
     } finally { setBusy(false); }
   }
-
-  const previewPricePerBase = (() => {
-    if (!line || line.unit_price == null) return null;
-    const sizeNum = packageSize ? Number(packageSize) : null;
-    const sizeInBase =
-      sizeNum && sizeNum > 0
-        ? sizeNum * toBaseFactor((packageUnit || line.unit || "").toLowerCase(), baseUnit)
-        : null;
-    const divisor =
-      sizeInBase && sizeInBase > 0
-        ? sizeInBase
-        : toBaseFactor((line.unit ?? "").toLowerCase(), baseUnit);
-    return divisor > 0 ? Number(line.unit_price) / divisor : null;
-  })();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
