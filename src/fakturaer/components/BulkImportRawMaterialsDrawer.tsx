@@ -43,8 +43,6 @@ interface RowState {
   price_per_base_unit: string;
   /** Hvor pakningsinformasjonen kom fra, for å forklare verdien i grensesnittet. */
   package_source: "line" | "description" | null;
-  /** Ferdig norsk forklaring på regnestykket — vises i lista. */
-  explanation: string;
   set_primary: boolean;
   ai_sku: boolean;
   ai_category: boolean;
@@ -128,7 +126,6 @@ export function BulkImportRawMaterialsDrawer({ open, onOpenChange, invoiceId, le
         // Pris per baseenhet kan først regnes ut når baseenhet er valgt (AI-forslag eller manuelt).
         price_per_base_unit: "",
         package_source: pkg?.source ?? null,
-        explanation: "",
         set_primary: true,
         ai_sku: false,
         ai_category: false,
