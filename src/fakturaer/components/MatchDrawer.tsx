@@ -12,7 +12,7 @@ import { Loader2, ExternalLink, Search, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { formatNok, formatDate } from "@/fakturaer/lib/constants";
 import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
-import { isBaseUnit, normalizeUnit, parsePackageFromDescription, quantityToBase } from "@/fakturaer/lib/units";
+import { CANONICAL_BASE_UNITS, CANONICAL_PACKAGE_UNITS, deriveLinePackage, resolveLineCost } from "@/fakturaer/lib/units";
 import { CreateRawMaterialDialog } from "@/fakturaer/components/CreateRawMaterialDialog";
 import { ItemTypeBadge } from "@/ravarer/components/ItemTypeBadge";
 import { InvoiceDocumentButton } from "@/fakturaer/components/InvoiceDocumentButton";
@@ -57,7 +57,12 @@ export function MatchDrawer({ open, onOpenChange, line }: Props) {
     setSetAsPrimary(false);
     setAgreedPrice("");
     // Forhåndsutfyll pakning fra linjens lagrede felter, ellers fra beskrivelsen.
-    const pkg = derivePackage(line);
+    const pkg = line ? deriveLinePackage({
+      package_size: line.package_size,
+      package_unit: line.package_unit,
+      count_per_package: line.count_per_package,
+      description: line.description,
+    }) : null;
     setPackageSize(pkg ? String(pkg.size) : "");
     setPackageUnit(pkg?.unit ?? "");
   }, [open, line?.id]);
@@ -118,25 +123,27 @@ export function MatchDrawer({ open, onOpenChange, line }: Props) {
 
   const suggestions = line?.suggestions ?? [];
 
-  /** Pris per baseenhet regnet ut fra denne fakturalinjen — kun til sammenligning. */
-  const linePricePerBaseUnit = useMemo(() => {
+  /** Kostpris per baseenhet fra kostprismotoren — samme beregning som overalt ellers. */
+  const cost = useMemo(() => {
     const baseUnit = selectedRm?.base_unit;
-    if (!line || !baseUnit || line.unit_price == null) return null;
-    const conv = quantityToBase({
-      quantity: 1,
+    if (!line || !baseUnit) return null;
+    const size = packageSize.trim() ? Number(packageSize.replace(",", ".")) : null;
+    return resolveLineCost({
+      quantity: line.quantity,
       unit: line.unit,
+      unitPrice: line.unit_price,
+      totalAmount: line.total_amount,
+      packageSize: line.package_size,
+      packageUnit: line.package_unit,
+      countPerPackage: line.count_per_package,
       description: line.description,
       baseUnit,
-      rmsPackageSize: packageSize ? Number(packageSize.replace(",", ".")) : null,
-      rmsPackageUnit: packageUnit || null,
-      linePackageSize: line.package_size,
-      linePackageUnit: line.package_unit,
-      lineCountPerPackage: line.count_per_package,
+      supplierPackage: size && size > 0 ? { packageSize: size, packageUnit: packageUnit || baseUnit } : null,
+      knownPricePerBaseUnit: selectedRm?.current_cost_price ?? null,
     });
-    if (!conv?.factor || conv.factor <= 0) return null;
-    const p = Number(line.unit_price) / conv.factor;
-    return Number.isFinite(p) ? p : null;
-  }, [line, selectedRm?.base_unit, packageSize, packageUnit]);
+  }, [line, selectedRm?.base_unit, selectedRm?.current_cost_price, packageSize, packageUnit]);
+
+  const linePricePerBaseUnit = cost && !cost.needsInput ? cost.pricePerBaseUnit : null;
 
   async function performMatch(applyToAll: boolean) {
     if (!line || !selectedRmId) return;
@@ -156,6 +163,7 @@ export function MatchDrawer({ open, onOpenChange, line }: Props) {
         userId: user.id,
         packageSize: pkgSize,
         packageUnit: pkgUnit,
+        baseUnitsPerPackage: cost?.baseUnitsPerPackage ?? null,
         agreedPricePerBaseUnit: agreed,
         rememberSku,
         rememberName,
@@ -297,10 +305,15 @@ export function MatchDrawer({ open, onOpenChange, line }: Props) {
                     <p className="mt-1 text-xs text-ink-secondary">tom = ingen avtale registrert</p>
                   </div>
                   <div className="text-xs text-ink-secondary">
-                    Pris pr {selectedRm.base_unit ?? "baseenhet"} fra denne fakturalinjen:{" "}
+                    Kostpris pr {selectedRm.base_unit ?? "baseenhet"} fra denne fakturalinjen:{" "}
                     <span className="font-medium text-ink">
                       {linePricePerBaseUnit != null ? formatNok(linePricePerBaseUnit) : "kunne ikke beregnes"}
                     </span>
+                    {cost && (
+                      <p className={`mt-1 ${cost.needsInput || cost.confidenceLevel === "low" ? "text-warning" : ""}`}>
+                        {cost.needsInput ? cost.reason : cost.explanation}
+                      </p>
+                    )}
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <div>
@@ -312,7 +325,7 @@ export function MatchDrawer({ open, onOpenChange, line }: Props) {
                       <Select value={packageUnit} onValueChange={setPackageUnit}>
                         <SelectTrigger className="mt-1 h-8"><SelectValue placeholder="Velg" /></SelectTrigger>
                         <SelectContent>
-                          {["g", "kg", "ml", "cl", "dl", "l", "stk"].map((u) => (
+                          {[...CANONICAL_BASE_UNITS, ...CANONICAL_PACKAGE_UNITS].map((u) => (
                             <SelectItem key={u} value={u}>{u}</SelectItem>
                           ))}
                         </SelectContent>
@@ -364,21 +377,6 @@ export function MatchDrawer({ open, onOpenChange, line }: Props) {
       </SheetContent>
     </Sheet>
   );
-}
-
-/** Pakning fra linjens lagrede felter, ellers tolket fra beskrivelsen. */
-function derivePackage(line: ReviewLineRow | null): { size: number; unit: string } | null {
-  if (!line) return null;
-  const ps = line.package_size;
-  const pu = line.package_unit;
-  if (ps && pu && isBaseUnit(normalizeUnit(pu))) {
-    const cnt = Number(line.count_per_package);
-    const mult = Number.isFinite(cnt) && cnt > 0 ? cnt : 1;
-    return { size: Number(ps) * mult, unit: normalizeUnit(pu)! };
-  }
-  const parsed = parsePackageFromDescription(line.description);
-  if (parsed) return { size: parsed.size * (parsed.count || 1), unit: parsed.unit };
-  return null;
 }
 
 function KV({ k, v, mono }: { k: string; v: string; mono?: boolean }) {
