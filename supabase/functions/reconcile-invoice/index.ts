@@ -46,13 +46,19 @@ Deno.serve(async (req) => {
       return json({ error: `${stillReview.length} linjer krever fortsatt gjennomgang` }, 400);
     }
 
-    // Skriv prishistorikk for matchede linjer
+    // Skriv prishistorikk for matchede linjer.
+    // KUN price_per_base_unit — unit_price er leverandørens fakturaenhet og kan ikke
+    // brukes som kostpris (Regal fakturerer sekk, Norgesmøllene kg). Linjer uten
+    // beregnet kostpris hoppes over i stedet for å forgifte historikken.
+    const skippedNoBasePrice = lines.filter(
+      (l: any) => l.raw_material_id && l.price_per_base_unit == null,
+    ).length;
     const historyRows = lines
-      .filter((l: any) => l.raw_material_id && (l.price_per_base_unit ?? l.unit_price))
+      .filter((l: any) => l.raw_material_id && l.price_per_base_unit != null)
       .map((l: any) => ({
         raw_material_id: l.raw_material_id,
         supplier_id: invoice.supplier_id,
-        price: l.price_per_base_unit ?? l.unit_price,
+        price: l.price_per_base_unit,
         source: "invoice",
         invoice_id: invoice.id,
         effective_date: invoice.invoice_date,
@@ -63,6 +69,11 @@ Deno.serve(async (req) => {
     if (historyRows.length > 0) {
       const { error: histErr } = await svc.from("raw_material_price_history").insert(historyRows);
       if (histErr) console.error("price history insert", histErr);
+    }
+    if (skippedNoBasePrice > 0) {
+      console.warn(
+        `reconcile-invoice: ${skippedNoBasePrice} linjer uten price_per_base_unit ble utelatt fra prishistorikken`,
+      );
     }
 
     const { error: updErr } = await svc
