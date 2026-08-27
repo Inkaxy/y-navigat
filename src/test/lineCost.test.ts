@@ -1,5 +1,6 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { normalizeUnit, resolveLineCost, deriveLinePackage } from "@/fakturaer/lib/units";
+import { normalizeUnit, parseDecimal, resolveLineCost, deriveLinePackage } from "@/fakturaer/lib/units";
 
 describe("resolveLineCost", () => {
   it("Norgesmøllene: 600 kg à 20,18 kr — pakningen skal ikke brukes", () => {
@@ -102,19 +103,78 @@ describe("resolveLineCost", () => {
     expect(r.reason).toContain("sekk");
   });
 
-  it("historikken avslører feil kandidat", () => {
-    // Prisen er oppgitt per sekk, men enheten sier kg. Historikken sier ~15 kr/kg.
+  it("historikken velger riktig av to gyldige tolkninger", () => {
+    // Begge kandidatene finnes: enheten er kg (fakturaenhet) OG beskrivelsen gir 25 kg/pakning.
+    // A = 753,50 / 2 kg = 376,75 kr/kg. B = 753,50 / 50 kg = 15,07 kr/kg.
+    // Historikken ligger på ~15 kr/kg, så B skal vinne.
     const r = resolveLineCost({
       quantity: 2,
-      unit: "stk",
+      unit: "kg",
       unitPrice: 376.75,
       totalAmount: 753.5,
       description: "RUGMEL 25KG",
       baseUnit: "kg",
       knownPricePerBaseUnit: 15.1,
     });
+    expect(r.basis).toBe("pakning");
     expect(r.pricePerBaseUnit).toBeCloseTo(15.07, 2);
     expect(r.checks.matchesHistory).toBe(true);
+    expect(r.checks.historyOffByPackage).toBe(true);
+    expect(r.explanation).toContain("Historikken");
+  });
+
+  it("swapNote settes når regnestykket er per baseenhet", () => {
+    // 2 stk à 25 kg, enhetsprisen er per kg: 2 × 25 × 15,07 = 753,50.
+    const r = resolveLineCost({
+      quantity: 2,
+      unit: "stk",
+      unitPrice: 15.07,
+      totalAmount: 753.5,
+      description: "RUGMEL 25KG",
+      baseUnit: "kg",
+    });
+    expect(r.checks.arithmeticPerBaseUnit).toBe(true);
+    expect(r.checks.arithmeticPerInvoiceUnit).toBe(false);
+    expect(r.basis).toBe("pakning");
+  });
+
+  it("manglende beløp gir needsInput: amount", () => {
+    const r = resolveLineCost({
+      quantity: 10,
+      unit: "kg",
+      unitPrice: null,
+      totalAmount: null,
+      baseUnit: "kg",
+    });
+    expect(r.needsInput).toBe("amount");
+    expect(r.pricePerBaseUnit).toBe(0);
+  });
+
+  it("kreditnota gir negativ kostpris og forstyrrer ikke historikk-kontrollen", () => {
+    const r = resolveLineCost({
+      quantity: 600,
+      unit: "KG",
+      unitPrice: -20.18,
+      totalAmount: -12107.49,
+      description: "HVETEMEL SIKTET 25KG",
+      baseUnit: "kg",
+      knownPricePerBaseUnit: 20.18,
+    });
+    expect(r.needsInput).toBeNull();
+    expect(r.pricePerBaseUnit).toBeCloseTo(-20.18, 2);
+    expect(r.checks.arithmeticPerInvoiceUnit).toBe(true);
+    expect(r.checks.matchesHistory).toBe(false);
+  });
+
+  it("parseDecimal takler komma, punktum og tomt felt", () => {
+    expect(parseDecimal("3,24")).toBeCloseTo(3.24, 4);
+    expect(parseDecimal("3.24")).toBeCloseTo(3.24, 4);
+    expect(parseDecimal("1 000,5")).toBeCloseTo(1000.5, 4);
+    expect(parseDecimal("")).toBeNull();
+    expect(parseDecimal("  ")).toBeNull();
+    expect(parseDecimal("abc")).toBeNull();
+    expect(parseDecimal(12)).toBe(12);
+    expect(parseDecimal(null)).toBeNull();
   });
 
   it("deriveLinePackage ganger med count_per_package", () => {
@@ -127,5 +187,14 @@ describe("resolveLineCost", () => {
     expect(normalizeUnit("container")).toBe("konteiner");
     expect(normalizeUnit("KRG")).toBe("eske");
     expect(normalizeUnit("bulk")).toBe("bulk");
+  });
+});
+
+describe("units.ts-speilet", () => {
+  it("frontend-speilet er identisk med edge-versjonen", () => {
+    const front = readFileSync("src/fakturaer/lib/units.ts", "utf8").split("\n");
+    const shared = readFileSync("supabase/functions/_shared/units.ts", "utf8");
+    // De to første linjene i speilet er en henvisning til kilden.
+    expect(front.slice(2).join("\n")).toBe(shared);
   });
 });
