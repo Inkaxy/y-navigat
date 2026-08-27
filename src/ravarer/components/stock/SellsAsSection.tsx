@@ -5,6 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useRawMaterialUnits } from "@/ravarer/hooks/useRawMaterialUnits";
 import { AlertTriangle, Plus, Trash2 } from "lucide-react";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import type { RawMaterialRow } from "@/ravarer/hooks/useRawMaterials";
