@@ -7,7 +7,6 @@ import {
   Tag,
   Factory,
   Sparkles,
-  Stamp,
   Calculator,
 } from "lucide-react";
 import { AppHeaderBanner } from "@/varer/components/layout/AppHeaderBanner";
