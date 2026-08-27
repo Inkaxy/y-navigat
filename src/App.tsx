@@ -170,6 +170,7 @@ const RavarerVareliste = lazy(() => import("@/ravarer/pages/Vareliste"));
 const RavarerDetail = lazy(() => import("@/ravarer/pages/RawMaterialDetail"));
 const RavarerLager = lazy(() => import("@/ravarer/pages/Lager"));
 const RavarerPakningsstorrelser = lazy(() => import("@/ravarer/pages/PackageSizes"));
+const RavarerReberegnKostpriser = lazy(() => import("@/ravarer/pages/ReberegnKostpriser"));
 const RavarerPakninger = lazy(() => import("@/ravarer/pages/Pakninger"));
 
 const FakturaerList = lazy(() => import("@/fakturaer/pages/FakturaerList"));
