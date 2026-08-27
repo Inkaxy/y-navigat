@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
-import { AlertTriangle, ImageOff } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   COARSE_CLASSIFICATIONS,
@@ -17,6 +17,8 @@ import {
   type GrainCategory,
 } from "@/varer/lib/breadscale";
 import type { LabelMark } from "@/varer/hooks/useLabelMarks";
+import { BrodskalanMark } from "@/varer/components/label/BrodskalanMark";
+import { brodskalanFor, hasBrodskalanWarning } from "@/varer/lib/brodskalan";
 
 interface Props {
   grainPct: number | null;
@@ -25,6 +27,8 @@ interface Props {
   coarseWeightedGrams: number | null;
   flourLines: FlourLine[];
   marks: LabelMark[];
+  /** Advarsler fra compute-recipe-label — brukes til forbehold på merket. */
+  warnings?: string[] | null;
 }
 
 /** NBhubs egen strektegning av Brødskala'n — ikke merkeordningens offisielle logo. */
@@ -82,6 +86,7 @@ export function GrainScaleSection({
   coarseWeightedGrams,
   flourLines,
   marks,
+  warnings,
 }: Props) {
   const category = (grainCategory as GrainCategory | null) ?? (grainPct != null ? grainCategoryFromPct(grainPct) : null);
   const mark = category ? marks.find((m) => m.mark_key === GRAIN_MARK_KEY[category]) : undefined;
@@ -100,6 +105,8 @@ export function GrainScaleSection({
 
   const from = siftedLines.find((l) => (l.raw_material_id ?? l.name) === fromId) ?? siftedLines[0];
   const target = coarseLines.find((l) => l.name === toName) ?? coarseLines[0];
+
+  const uncertain = hasBrodskalanWarning(warnings);
 
   const next = gramsToNextLevel(coarseWeightedGrams ?? 0, flourGrams ?? 0);
   const enough = next && from ? from.grams >= next.gramsNeeded : false;
@@ -125,28 +132,34 @@ export function GrainScaleSection({
           {" "}{fmtGrams(coarseWeightedGrams ?? 0)} vektet grovt korn på {fmtGrams(flourGrams ?? 0)} mel.
         </p>
 
-        {mark ? (
-          <div className="flex items-center gap-3 rounded-md border p-2">
-            {mark.signedUrl ? (
-              <img src={mark.signedUrl} alt={`Brødskala'n ${category}`} className="h-12 w-12 object-contain" />
+        <div className="flex flex-wrap items-center gap-4 rounded-md border p-3">
+          <BrodskalanMark category={category} sizeMm={22} showText muted={uncertain} />
+          <div className="min-w-[200px] flex-1 text-sm">
+            {brodskalanFor(category) ? (
+              <>
+                <div className="font-medium">
+                  {fmtPct(grainPct)} grovhet — {brodskalanFor(category)!.label}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Offisielt Brødskala'n-merke fra Baker- og Konditorbransjens Landsforening.
+                </p>
+              </>
             ) : (
-              <ImageOff className="h-6 w-6 text-muted-foreground" />
+              <p className="text-xs text-muted-foreground">
+                Grovheten er ikke beregnet — merket vises ikke før beregningen er kjørt.
+              </p>
             )}
-            <div className="text-xs text-muted-foreground">
-              Bakeriets egen opplastede merkefil brukes på forbrukeretiketten.
-              {mark.valid_to && <> Avtalen utløper {new Date(mark.valid_to).toLocaleDateString("nb-NO")}.</>}
-            </div>
+            {uncertain && (
+              <div className="mt-2 flex items-start gap-2 rounded-md border border-amber-500/50 bg-amber-500/10 p-2 text-xs">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                <span>
+                  Forbehold: noen ingredienser mangler kornklassifisering, så grovheten kan være feil.
+                  Brødskala'n er en lisensiert merkeordning — rett opp klassifiseringen før merket trykkes.
+                </span>
+              </div>
+            )}
           </div>
-        ) : (
-          <div className="flex items-start gap-2 rounded-md border border-amber-500/50 bg-amber-500/10 p-2 text-xs">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-            <span>
-              Offisiell Brødskala'n-logo mangler for dette nivået. Etiketten bruker vår egen strektegning.
-              Brødskala'n eies av Baker- og Konditorbransjens Landsforening — last opp filen dere har rett til å
-              bruke under <b>Innstillinger → Merking</b>.
-            </span>
-          </div>
-        )}
+        </div>
 
         {next && (
           <div className="space-y-2 rounded-md border bg-muted/30 p-3">
