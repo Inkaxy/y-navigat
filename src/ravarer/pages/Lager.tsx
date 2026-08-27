@@ -283,6 +283,10 @@ export default function LagerPage() {
             )}
           </TabsContent>
 
+          <TabsContent value="alle">
+            <AllStockTable />
+          </TabsContent>
+
           <TabsContent value="fortjeneste">
             <MarginTable />
           </TabsContent>
