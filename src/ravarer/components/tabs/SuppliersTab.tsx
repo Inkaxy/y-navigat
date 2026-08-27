@@ -17,6 +17,9 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { Link } from "react-router-dom";
 import { PurchaseStatsCard } from "@/ravarer/components/PurchaseStatsCard";
 import { osloTodayISO } from "@/lib/osloDate";
+import { useRawMaterialUnits } from "@/ravarer/hooks/useRawMaterialUnits";
+
+const BASE_UNIT_KEY = "__base";
 
 interface Props { rm: RawMaterialRow; }
 
@@ -29,20 +32,27 @@ export function SuppliersTab({ rm }: Props) {
   const [linkOpen, setLinkOpen] = useState<{ open: boolean; existingId?: string }>({ open: false });
   const [supplierOpen, setSupplierOpen] = useState(false);
   const [priceOpen, setPriceOpen] = useState(false);
+  const [priceUnitId, setPriceUnitId] = useState<string>(BASE_UNIT_KEY);
+
+  const { data: units = [] } = useRawMaterialUnits(rm.id);
+  const selectedUnit = units.find(u => u.id === priceUnitId) ?? null;
+  const unitFactor = selectedUnit ? Number(selectedUnit.units_in_base) || 1 : 1;
+  const unitLabel = selectedUnit ? selectedUnit.unit_label : rm.base_unit;
+  const unitSuffix = selectedUnit ? ` (${selectedUnit.units_in_base} ${rm.base_unit})` : "";
 
   const supplierMap = useMemo(() => new Map(allSuppliers.map(s => [s.id, s])), [allSuppliers]);
 
   const chartData = useMemo(() => {
     const sorted = [...history].sort((a, b) => a.effective_date.localeCompare(b.effective_date));
-    const grouped: Record<string, any> = {};
+    const grouped: Record<string, Record<string, string | number>> = {};
     for (const h of sorted) {
       const key = h.effective_date;
       grouped[key] ??= { date: key };
       const supplier = h.supplier_id ? supplierMap.get(h.supplier_id)?.name ?? "Ukjent" : "Manuell";
-      grouped[key][supplier] = Number(h.price);
+      grouped[key][supplier] = Number(h.price) * unitFactor;
     }
     return Object.values(grouped);
-  }, [history, supplierMap]);
+  }, [history, supplierMap, unitFactor]);
 
   const supplierLines = useMemo(() => {
     const set = new Set<string>();
@@ -80,8 +90,8 @@ export function SuppliersTab({ rm }: Props) {
                   <th className="pb-2">Leverandør-SKU</th>
                   <th className="pb-2">Pakning</th>
                   <th className="pb-2 text-right">Avtalt pris</th>
-                  <th className="pb-2 text-right">Avtalt pris/baseenhet</th>
-                  <th className="pb-2 text-right">Siste fakturapris</th>
+                  <th className="pb-2 text-right">Avtalt pris per {unitLabel}</th>
+                  <th className="pb-2 text-right">Siste fakturapris per {unitLabel}</th>
                   <th className="pb-2">Avtale gyldig til</th>
                   <th className="pb-2"></th>
                 </tr>
@@ -107,8 +117,8 @@ export function SuppliersTab({ rm }: Props) {
                         )}
                       </td>
                       <td className="py-3 text-right tabular-nums">{formatNok(l.agreed_price)}</td>
-                      <td className="py-3 text-right tabular-nums text-ink-secondary">{formatNok(l.agreed_price_per_base_unit)}</td>
-                      <td className="py-3 text-right tabular-nums text-ink-secondary">{formatNok(l.last_invoice_price)}</td>
+                      <td className="py-3 text-right tabular-nums text-ink-secondary">{l.agreed_price_per_base_unit == null ? "—" : formatNok(Number(l.agreed_price_per_base_unit) * unitFactor)}</td>
+                      <td className="py-3 text-right tabular-nums text-ink-secondary">{l.last_invoice_price == null ? "—" : formatNok(Number(l.last_invoice_price) * unitFactor)}</td>
                       <td className={`py-3 ${expiryClass}`}>{formatDate(l.agreement_valid_to)}</td>
                       <td className="py-3 text-right">
                         {canWrite && (
@@ -127,13 +137,26 @@ export function SuppliersTab({ rm }: Props) {
       </Card>
 
       <Card className="p-5 space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-base font-semibold">Prishistorikk</h3>
-          {canWrite && (
-            <Button size="sm" onClick={() => setPriceOpen(true)}>
-              <TrendingUp className="mr-1.5 h-3.5 w-3.5" /> Registrer pris
-            </Button>
-          )}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h3 className="text-base font-semibold">Prisutvikling — kr per {unitLabel}{unitSuffix}</h3>
+          <div className="flex items-center gap-2">
+            <Select value={priceUnitId} onValueChange={setPriceUnitId}>
+              <SelectTrigger className="h-9 w-[200px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={BASE_UNIT_KEY}>Per {rm.base_unit} (baseenhet)</SelectItem>
+                {units.map(u => (
+                  <SelectItem key={u.id} value={u.id}>
+                    Per {u.unit_label} ({u.units_in_base} {rm.base_unit})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {canWrite && (
+              <Button size="sm" onClick={() => setPriceOpen(true)}>
+                <TrendingUp className="mr-1.5 h-3.5 w-3.5" /> Registrer pris
+              </Button>
+            )}
+          </div>
         </div>
         {chartData.length === 0 ? (
           <p className="py-8 text-center text-sm text-ink-secondary">Ingen prisobservasjoner ennå.</p>
@@ -146,7 +169,7 @@ export function SuppliersTab({ rm }: Props) {
                 <YAxis fontSize={11} tickFormatter={(v) => `${v} kr`} />
                 <Tooltip formatter={(v: any) => formatNok(Number(v))} />
                 <Legend />
-                {rm.agreed_price && <ReferenceLine y={Number(rm.agreed_price)} stroke="hsl(var(--primary))" strokeDasharray="4 4" label={{ value: "Avtalt", position: "right", fontSize: 11 }} />}
+                {rm.agreed_price && <ReferenceLine y={Number(rm.agreed_price) * unitFactor} stroke="hsl(var(--primary))" strokeDasharray="4 4" label={{ value: "Avtalt", position: "right", fontSize: 11 }} />}
                 {supplierLines.map((name, i) => (
                   <Line key={name} type="monotone" dataKey={name} stroke={`hsl(${(i * 67) % 360} 65% 50%)`} strokeWidth={2} dot={{ r: 3 }} connectNulls />
                 ))}
@@ -162,7 +185,7 @@ export function SuppliersTab({ rm }: Props) {
                 <tr>
                   <th className="pb-2">Dato</th>
                   <th className="pb-2">Leverandør</th>
-                  <th className="pb-2 text-right">Pris</th>
+                  <th className="pb-2 text-right">Pris per {unitLabel}</th>
                   <th className="pb-2">Kilde</th>
                   <th className="pb-2">Faktura</th>
                   <th className="pb-2">Notat</th>
@@ -173,7 +196,7 @@ export function SuppliersTab({ rm }: Props) {
                   <tr key={h.id} className="border-t border-line-subtle">
                     <td className="py-2">{formatDate(h.effective_date)}</td>
                     <td className="py-2 text-ink-secondary">{h.supplier_id ? supplierMap.get(h.supplier_id)?.name ?? "—" : "—"}</td>
-                    <td className="py-2 text-right tabular-nums">{formatNok(h.price)}</td>
+                    <td className="py-2 text-right tabular-nums">{formatNok(Number(h.price) * unitFactor)}</td>
                     <td className="py-2"><Badge variant="outline">{h.source}</Badge></td>
                     <td className="py-2">
                       {h.invoice_id ? (

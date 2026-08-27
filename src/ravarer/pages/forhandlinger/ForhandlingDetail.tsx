@@ -10,6 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, Trophy, Check, X, Loader2, Flag, History, Send, FileCheck, Clock, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
+import { UnitPriceHint } from "@/ravarer/components/forhandlinger/UnitPriceHint";
 import { LiveTidslinjeDrawer } from "./components/LiveTidslinjeDrawer";
 import { RavarerHeaderBanner } from "@/ravarer/components/RavarerHeaderBanner";
 import {
@@ -45,6 +46,7 @@ export default function ForhandlingDetail() {
   });
 
   const rmName = (rid: string) => rawMaterials.find((r) => r.id === rid)?.name ?? "—";
+  const rmBaseUnit = (rid: string) => rawMaterials.find((r) => r.id === rid)?.base_unit ?? null;
   const supName = (sid: string) => suppliers.find((s) => s.id === sid)?.name ?? "—";
   const recById = (rcId: string) => recipients.find((r) => r.id === rcId);
 
@@ -260,7 +262,14 @@ export default function ForhandlingDetail() {
               const winner = bestByItem.get(it.id);
               return (
                 <tr key={it.id} className="border-t border-line-subtle">
-                  <td className="px-4 py-2 font-medium">{rmName(it.raw_material_id)}</td>
+                  <td className="px-4 py-2 font-medium">
+                    <div>{rmName(it.raw_material_id)}</div>
+                    <UnitPriceHint
+                      rawMaterialId={it.raw_material_id}
+                      pricePerBase={it.actual_avg_price_baseline == null ? null : Number(it.actual_avg_price_baseline)}
+                      baseUnit={rmBaseUnit(it.raw_material_id)}
+                    />
+                  </td>
                   <td className="px-4 py-2 text-right tabular-nums text-ink-secondary">
                     {formatNok(it.actual_avg_price_baseline)}
                   </td>

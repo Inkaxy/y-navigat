@@ -75,10 +75,21 @@ export function SellsAsSection({ rm }: { rm: RawMaterialRow }) {
         )}
       </div>
 
+      <div className="rounded-md border border-line-subtle bg-surface-muted/40 p-3 text-xs text-ink-secondary">
+        <p className="font-medium text-ink-primary">Eksempel: bakeoff-baguetter</p>
+        <p className="mt-1">
+          Koble kasseproduktet «Baguette eske» med enhet eske (60) og «Baguette stk» med enhet stk. Da trekker kassa
+          60 baseenheter per solgte eske og 1 per enkeltbaguette.
+        </p>
+      </div>
+
       {rm.stock_tracking && links.length === 0 && (
         <div className="flex gap-2 rounded-md border border-warning/40 bg-warning/10 p-3 text-sm">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
-          <span>Lagerføring er på, men ingen vare er koblet — lageret fylles opp uten at noe trekkes fra.</span>
+          <span>
+            Lagerføring er på, men ingen vare er koblet — lageret fylles opp uten at noe trekkes fra. Koble minst ett
+            kasseprodukt for at salg skal redusere beholdningen.
+          </span>
         </div>
       )}
 

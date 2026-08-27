@@ -31,6 +31,7 @@ import { LiveItemSearch } from "./components/LiveItemSearch";
 import { LiveItemCard } from "./components/LiveItemCard";
 import { LiveTidslinjeDrawer } from "./components/LiveTidslinjeDrawer";
 import { formatNok } from "@/ravarer/lib/constants";
+import { UnitPriceHint } from "@/ravarer/components/forhandlinger/UnitPriceHint";
 
 export default function LiveForhandlingWorkspace() {
   const { id = "" } = useParams<{ id: string }>();
@@ -388,7 +389,16 @@ export default function LiveForhandlingWorkspace() {
                 >
                   <span className="flex items-center gap-2">
                     <Icon className={`h-4 w-4 ${cls}`} />
-                    <span className="font-medium">{rm?.name ?? "—"}</span>
+                    <span>
+                      <span className="font-medium">{rm?.name ?? "—"}</span>
+                      <span className="block">
+                        <UnitPriceHint
+                          rawMaterialId={it.raw_material_id}
+                          pricePerBase={newPrice == null ? (baseline == null ? null : Number(baseline)) : Number(newPrice)}
+                          baseUnit={rm?.base_unit ?? null}
+                        />
+                      </span>
+                    </span>
                     {reopenable && <RotateCcw className="h-3 w-3 text-ink-muted opacity-0 group-hover:opacity-100" />}
                   </span>
                   <span className="text-ink-secondary tabular-nums">
