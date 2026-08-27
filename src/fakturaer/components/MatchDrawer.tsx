@@ -12,7 +12,7 @@ import { Loader2, ExternalLink, Search, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { formatNok, formatDate } from "@/fakturaer/lib/constants";
 import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
-import { CANONICAL_BASE_UNITS, CANONICAL_PACKAGE_UNITS, deriveLinePackage, resolveLineCost } from "@/fakturaer/lib/units";
+import { CANONICAL_BASE_UNITS, CANONICAL_PACKAGE_UNITS, deriveLinePackage, parseDecimal, resolveLineCost } from "@/fakturaer/lib/units";
 import { CreateRawMaterialDialog } from "@/fakturaer/components/CreateRawMaterialDialog";
 import { ItemTypeBadge } from "@/ravarer/components/ItemTypeBadge";
 import { InvoiceDocumentButton } from "@/fakturaer/components/InvoiceDocumentButton";
