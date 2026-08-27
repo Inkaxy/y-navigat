@@ -190,6 +190,55 @@ describe("resolveLineCost", () => {
   });
 });
 
+describe("package_size = 1-fellen", () => {
+  it("ubekreftet 1 sekk forkastes — beskrivelsen gir 25 kg", () => {
+    const r = resolveLineCost({
+      quantity: 1,
+      unit: "sekk",
+      unitPrice: 789.5,
+      totalAmount: 789.5,
+      description: "DEMERARA SUKKER 25KG",
+      baseUnit: "kg",
+      supplierPackage: { packageSize: 1, packageUnit: "sekk" },
+    });
+    expect(r.baseUnitsPerPackage).toBe(25);
+    expect(r.baseQuantity).toBe(25);
+    expect(r.pricePerBaseUnit).toBeCloseTo(31.58, 2);
+  });
+
+  it("bekreftet pakning overstyrer alt — 1 sekk er da virkelig 1 kg", () => {
+    const r = resolveLineCost({
+      quantity: 1,
+      unit: "sekk",
+      unitPrice: 789.5,
+      totalAmount: 789.5,
+      description: "DEMERARA SUKKER 25KG",
+      baseUnit: "kg",
+      supplierPackage: { packageSize: 1, packageUnit: "sekk", packageConfirmedAt: "2026-01-01T00:00:00Z" },
+    });
+    expect(r.baseUnitsPerPackage).toBe(1);
+    expect(r.pricePerBaseUnit).toBeCloseTo(789.5, 2);
+  });
+
+  it("ubekreftet 1 kg mot «REGAL RUGMEL 25KG» — varenavnet vinner", () => {
+    const r = resolveLineCost({
+      quantity: 1,
+      unit: "sekk",
+      unitPrice: 379,
+      totalAmount: 379,
+      description: "REGAL RUGMEL 25KG",
+      baseUnit: "kg",
+      supplierPackage: { packageSize: 1, packageUnit: "kg" },
+    });
+    expect(r.baseUnitsPerPackage).toBe(25);
+    expect(r.pricePerBaseUnit).toBeCloseTo(15.16, 2);
+    expect(r.confidenceLevel).not.toBe("high");
+    expect(r.explanation).toContain("men varenavnet sier");
+    expect(r.reason).toContain("Bekreft pakningen");
+  });
+});
+
+
 describe("units.ts-speilet", () => {
   it("frontend-speilet er identisk med edge-versjonen", () => {
     const front = readFileSync("src/fakturaer/lib/units.ts", "utf8").split("\n");

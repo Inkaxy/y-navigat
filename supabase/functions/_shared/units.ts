@@ -211,7 +211,19 @@ export interface PackageResolution {
   source: PackageSource;
   /** Enheten pakningen er uttrykt i på kilden, for forklaringen. */
   packageUnitLabel: string | null;
+  /**
+   * Satt når en UBEKREFTET leverandørpakning er uenig med beskrivelsen og
+   * beskrivelsen vant. Brukes til å senke tilliten og forklare valget.
+   */
+  disagreement?: {
+    supplierUnits: number;
+    supplierUnitLabel: string | null;
+    descriptionUnits: number;
+  } | null;
+  /** Satt når leverandørens `package_size = 1` med pakke-enhet ble forkastet som «ikke satt». */
+  ignoredSupplierOne?: boolean;
 }
+
 
 export interface CostCandidate {
   basis: CostBasis;
@@ -389,39 +401,69 @@ export function resolvePackageContent(input: ResolveLineCostInput): PackageResol
   };
 
   const sp = input.supplierPackage;
-  // 1) Bekreftet av bruker på leverandørkoblingen — høyest tillit.
+  const spUnitRaw = sp?.packageUnit ?? null;
+  const spUnit = normalizeUnit(spUnitRaw) ?? (spUnitRaw ? String(spUnitRaw).toLowerCase() : null);
+  const spSize = toNum(sp?.packageSize);
   const confirmed = toNum(sp?.baseUnitsPerPackage);
-  if (confirmed && confirmed > 0 && sp?.packageConfirmedAt) {
-    return {
-      baseUnitsPerPackage: confirmed,
-      source: "rms_confirmed",
-      packageUnitLabel: normalizeUnit(sp?.packageUnit) ?? sp?.packageUnit ?? null,
-    };
+  const isConfirmed = !!sp?.packageConfirmedAt;
+
+  // Beskrivelsen tolkes alltid — den brukes både som fallback og som kontroll
+  // mot en ubekreftet leverandørpakning.
+  const parsed = parsePackageFromDescription(input.description);
+  const fromDesc = parsed
+    ? fromSizeUnit(parsed.size * (parsed.count || 1), parsed.unit, "description")
+    : null;
+
+  // 1) Bekreftet av bruker på leverandørkoblingen — høyest tillit, alltid vinner.
+  if (isConfirmed) {
+    if (confirmed && confirmed > 0) {
+      return { baseUnitsPerPackage: confirmed, source: "rms_confirmed", packageUnitLabel: spUnit };
+    }
+    if (spSize && spSize > 0) {
+      const r = fromSizeUnit(spSize, spUnitRaw, "rms_confirmed");
+      if (r) return r;
+      // Bekreftet størrelse oppgitt i en pakke-enhet: da er tallet innholdet i baseenheter.
+      return { baseUnitsPerPackage: spSize, source: "rms_confirmed", packageUnitLabel: spUnit };
+    }
   }
+
+  // Regel 1: en UBEKREFTET `package_size = 1` med pakke-enhet er en selvmotsigelse
+  // («én sekk er aldri ett kilo») — en gammel standardverdi, ikke data.
+  const bogusOne = !isConfirmed && spSize === 1 && isPackageUnit(spUnit);
+
   // 2) Leverandørkoblingens pakningsstørrelse.
-  const fromRms = fromSizeUnit(toNum(sp?.packageSize), sp?.packageUnit, "rms_package");
-  if (fromRms) return fromRms;
-  if (confirmed && confirmed > 0) {
-    return {
-      baseUnitsPerPackage: confirmed,
-      source: "rms_package",
-      packageUnitLabel: normalizeUnit(sp?.packageUnit) ?? sp?.packageUnit ?? null,
-    };
+  let fromRms: PackageResolution | null = bogusOne
+    ? null
+    : fromSizeUnit(spSize, spUnitRaw, "rms_package");
+  if (!fromRms && confirmed && confirmed > 0) {
+    fromRms = { baseUnitsPerPackage: confirmed, source: "rms_package", packageUnitLabel: spUnit };
   }
+
+  // Regel 2: ubekreftet leverandørpakning som er uenig med varenavnet med mer enn
+  // en faktor 1,5 — beskrivelsen er skrevet av leverandøren selv og vinner.
+  if (fromRms && fromDesc) {
+    const a = fromRms.baseUnitsPerPackage;
+    const b = fromDesc.baseUnitsPerPackage;
+    if (a > 0 && b > 0 && Math.max(a / b, b / a) > 1.5) {
+      return {
+        ...fromDesc,
+        disagreement: { supplierUnits: a, supplierUnitLabel: fromRms.packageUnitLabel, descriptionUnits: b },
+      };
+    }
+  }
+  if (fromRms) return fromRms;
+
   // 3) Linjens egne felter (package_size × count_per_package).
   const lineSize = toNum(input.packageSize);
   if (lineSize && lineSize > 0) {
     const cnt = toNum(input.countPerPackage);
     const mult = cnt && cnt > 0 ? cnt : 1;
     const r = fromSizeUnit(lineSize * mult, input.packageUnit, "line");
-    if (r) return r;
+    if (r) return bogusOne ? { ...r, ignoredSupplierOne: true } : r;
   }
   // 4) Tolket fra beskrivelsen.
-  const parsed = parsePackageFromDescription(input.description);
-  if (parsed) {
-    const r = fromSizeUnit(parsed.size * (parsed.count || 1), parsed.unit, "description");
-    if (r) return r;
-  }
+  if (fromDesc) return bogusOne ? { ...fromDesc, ignoredSupplierOne: true } : fromDesc;
+
   // 5) Varens egen pakning.
   const rmp = input.rawMaterialPackage;
   const rmUnits = toNum(rmp?.baseUnitsPerPackage);
@@ -616,14 +658,33 @@ export function resolveLineCost(input: ResolveLineCostInput): ResolveLineCostRes
   if (checks.matchesHistory === true) confidence = Math.min(1, confidence + 0.05);
   if (checks.matchesHistory === false) confidence -= 0.3;
   if (chosen.baseUnitsPerPackage && !checks.wholePackages && chosen.basis === "fakturaenhet") confidence -= 0.05;
+
+  // Uenighet mellom en ubekreftet leverandørpakning og varenavnet: beskrivelsen
+  // ble brukt, men resultatet må bekreftes av et menneske.
+  let packageNote: string | null = null;
+  if (pkg?.disagreement && chosen.basis === "pakning") {
+    const d = pkg.disagreement;
+    packageNote =
+      `Leverandørkoblingen sier ${fmtNum(d.supplierUnits)} ${d.supplierUnitLabel ?? base} per pakning, ` +
+      `men varenavnet sier ${fmtNum(d.descriptionUnits)} ${base} — bruker ${fmtNum(d.descriptionUnits)} ${base}. Bekreft pakningen.`;
+    confidence = Math.min(confidence, 0.7);
+  } else if (pkg?.ignoredSupplierOne && chosen.basis === "pakning") {
+    packageNote =
+      `Leverandørkoblingen står oppført med 1 ${pkg.packageUnitLabel ?? "pakning"} per pakning, som ikke kan stemme — ` +
+      `bruker ${fmtNum(chosen.baseUnitsPerPackage ?? 0)} ${base} fra varenavnet. Bekreft pakningen.`;
+    confidence = Math.min(confidence, 0.7);
+  }
+
   confidence = Math.max(0, Math.min(1, confidence - amountPenalty));
 
   const alternatives = candidates.filter((c) => c !== chosen);
   let explanation = chosen.explanation;
+
   if (chosen.basis === "fakturaenhet" && chosen.baseUnitsPerPackage && checks.wholePackages) {
     const count = Math.round(chosen.baseQuantity / chosen.baseUnitsPerPackage);
     explanation += ` (= ${count} ${plural(pkg?.packageUnitLabel && !isBaseUnit(pkg.packageUnitLabel) ? pkg.packageUnitLabel : "pakning", count)})`;
   }
+  if (packageNote) explanation += ` ${packageNote}`;
   if (swapNote) explanation += ` ${swapNote}`;
 
   return {
@@ -636,6 +697,7 @@ export function resolveLineCost(input: ResolveLineCostInput): ResolveLineCostRes
     checks,
     alternatives,
     needsInput: null,
-    reason: swapNote,
+    reason: packageNote ?? swapNote,
+
   };
 }

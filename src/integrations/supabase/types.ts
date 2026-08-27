@@ -12595,6 +12595,7 @@ export type Database = {
       }
       raw_material_monthly_purchases: {
         Row: {
+          alle_fra_motor: boolean | null
           avg_price_per_base_unit: number | null
           invoice_count: number | null
           legal_entity_id: string | null
@@ -12603,6 +12604,7 @@ export type Database = {
           supplier_id: string | null
           total_cost: number | null
           total_quantity: number | null
+          ukjent_mengde_linjer: number | null
         }
         Relationships: [
           {
