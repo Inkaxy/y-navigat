@@ -236,7 +236,37 @@ describe("package_size = 1-fellen", () => {
     expect(r.explanation).toContain("men varenavnet sier");
     expect(r.reason).toContain("Bekreft pakningen");
   });
+
+  it("ubekreftet «1 pose» forkastes — pose er en pakke-enhet", () => {
+    expect(normalizeUnit("pose")).toBe("sekk");
+    const r = resolveLineCost({
+      quantity: 1,
+      unit: "pose",
+      unitPrice: 250,
+      totalAmount: 250,
+      description: "SOLSIKKEKJERNER 10KG",
+      baseUnit: "kg",
+      supplierPackage: { packageSize: 1, packageUnit: "pose" },
+    });
+    expect(r.baseUnitsPerPackage).toBe(10);
+    expect(r.pricePerBaseUnit).toBeCloseTo(25, 2);
+  });
+
+  it("ubekreftet base_units_per_package slipper ikke inn bakveien ved bogus 1", () => {
+    const r = resolveLineCost({
+      quantity: 1,
+      unit: "sekk",
+      unitPrice: 789.5,
+      totalAmount: 789.5,
+      description: "DEMERARA SUKKER 25KG",
+      baseUnit: "kg",
+      supplierPackage: { packageSize: 1, packageUnit: "sekk", baseUnitsPerPackage: 1 },
+    });
+    expect(r.baseUnitsPerPackage).toBe(25);
+    expect(r.pricePerBaseUnit).toBeCloseTo(31.58, 2);
+  });
 });
+
 
 
 describe("units.ts-speilet", () => {

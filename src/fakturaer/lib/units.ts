@@ -42,7 +42,8 @@ const UNIT_ALIASES: Record<string, CanonicalUnit> = {
   esk: "eske", eske: "eske", ks: "eske", ksk: "eske", krt: "eske", krg: "eske",
   kart: "eske", kartong: "eske", bx: "eske", box: "eske", carton: "eske", ct: "eske",
   pk: "pakke", pak: "pakke", pakke: "pakke", pack: "pakke",
-  pos: "sekk", sk: "sekk", sekk: "sekk", bag: "sekk", sack: "sekk",
+  pos: "sekk", pose: "sekk", poser: "sekk", sk: "sekk", sekk: "sekk", sekker: "sekk",
+  bag: "sekk", bags: "sekk", sack: "sekk", sacks: "sekk",
   fl: "flaske", btl: "flaske", flaske: "flaske", bottle: "flaske",
   rl: "rull", rull: "rull", roll: "rull",
   spn: "spann", spann: "spann",
@@ -437,7 +438,7 @@ export function resolvePackageContent(input: ResolveLineCostInput): PackageResol
   let fromRms: PackageResolution | null = bogusOne
     ? null
     : fromSizeUnit(spSize, spUnitRaw, "rms_package");
-  if (!fromRms && confirmed && confirmed > 0) {
+  if (!bogusOne && !fromRms && confirmed && confirmed > 0) {
     fromRms = { baseUnitsPerPackage: confirmed, source: "rms_package", packageUnitLabel: spUnit };
   }
 
