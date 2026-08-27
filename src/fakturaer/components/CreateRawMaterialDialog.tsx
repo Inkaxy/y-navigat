@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -7,12 +7,13 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { AlertTriangle, Loader2 } from "lucide-react";
 import { formatNok } from "@/fakturaer/lib/constants";
 import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
 import { ITEM_TYPES, defaultCategoryFor, type ItemType } from "@/ravarer/lib/itemTypes";
 import { CategorySelectItems, NEW_CATEGORY_VALUE } from "@/ravarer/components/CategorySelectItems";
 import { InvoiceDocumentButton } from "@/fakturaer/components/InvoiceDocumentButton";
+import { CANONICAL_BASE_UNITS, CANONICAL_PACKAGE_UNITS, fmtNum, normalizeUnit, resolveLineCost } from "@/fakturaer/lib/units";
 
 interface Props {
   open: boolean;
@@ -22,13 +23,13 @@ interface Props {
   onCreated?: (rawMaterialId: string) => void;
 }
 
-const UNIT_TO_BASE: Record<string, string> = { g: "kg", kg: "kg", ml: "l", l: "l", stk: "stk", pakke: "stk" };
-function toBaseFactor(from: string | null, to: string): number {
-  if (!from) return 1;
-  if (from === to) return 1;
-  const m: Record<string, [string, number]> = { g: ["kg", 0.001], ml: ["l", 0.001] };
-  const e = m[from];
-  return e && e[0] === to ? e[1] : 1;
+/** Basisenhet utledet av fakturaenheten — kun et forslag brukeren kan overstyre. */
+function inferBaseUnit(unit: string | null | undefined): string {
+  const u = normalizeUnit(unit);
+  if (u === "g" || u === "kg") return "kg";
+  if (u === "ml" || u === "cl" || u === "dl" || u === "l") return "l";
+  if (u === "stk") return "stk";
+  return "kg";
 }
 
 export function CreateRawMaterialDialog({ open, onOpenChange, line, onCreated }: Props) {
@@ -46,12 +47,11 @@ export function CreateRawMaterialDialog({ open, onOpenChange, line, onCreated }:
     if (!line || !open) return;
     setItemType("ravare");
     setName(line.description ?? "");
-    const inferred = UNIT_TO_BASE[(line.unit ?? "").toLowerCase()] ?? "kg";
-    setBaseUnit(inferred);
+    setBaseUnit(inferBaseUnit(line.unit));
     // NB: line.quantity er ANTALL pakninger på fakturaen — ikke pakningsstørrelsen.
     // Pakningsstørrelsen må fylles inn manuelt (f.eks. 25 kg pr sekk).
     setPackageSize("");
-    setPackageUnit(line.unit ?? "");
+    setPackageUnit(normalizeUnit(line.unit) ?? "");
     setCategory("");
     setNewCategory(false);
   }, [line, open]);
@@ -66,21 +66,42 @@ export function CreateRawMaterialDialog({ open, onOpenChange, line, onCreated }:
     },
   });
 
+  const sizeInputRef = useRef<HTMLInputElement>(null);
+
+  /**
+   * Én motor for kostpris — samme som matching og masse-import bruker.
+   * Pakningsstørrelsen er lager- og bestillingsinformasjon; den endrer bare
+   * kostprisen når fakturaen faktisk er priset per pakning.
+   */
+  const cost = useMemo(() => {
+    if (!line) return null;
+    const size = packageSize.trim() ? Number(packageSize.replace(",", ".")) : null;
+    return resolveLineCost({
+      quantity: line.quantity,
+      unit: line.unit,
+      unitPrice: line.unit_price,
+      totalAmount: line.total_amount,
+      packageSize: line.package_size,
+      packageUnit: line.package_unit,
+      countPerPackage: line.count_per_package,
+      description: line.description,
+      baseUnit,
+      supplierPackage: size && size > 0 ? { packageSize: size, packageUnit: packageUnit || baseUnit } : null,
+    });
+  }, [line, baseUnit, packageSize, packageUnit]);
+
+  const pricePerBase = cost && !cost.needsInput ? Number(cost.pricePerBaseUnit.toFixed(4)) : null;
+  const needsPackage = cost?.needsInput === "package_size";
+
+  useEffect(() => {
+    if (needsPackage) sizeInputRef.current?.focus();
+  }, [needsPackage]);
+
   async function submit() {
     if (!line || !name.trim() || !category.trim()) { toast.error("Navn og kategori er påkrevd"); return; }
     setBusy(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      // Kostpris pr baseenhet = pris pr pakning / pakningsstørrelse omregnet til baseenhet.
-      // («10 sekker à 25 kg» til 450 kr/sekk => 18 kr/kg, ikke 450 kr/kg.)
-      const sizeNum = packageSize ? Number(packageSize) : null;
-      const unitForSize = (packageUnit || line.unit || "").toLowerCase();
-      const sizeInBase =
-        sizeNum && sizeNum > 0 ? sizeNum * toBaseFactor(unitForSize, baseUnit) : null;
-      const fallbackFactor = toBaseFactor((line.unit ?? "").toLowerCase(), baseUnit);
-      const divisor = sizeInBase && sizeInBase > 0 ? sizeInBase : fallbackFactor;
-      const pricePerBase =
-        line.unit_price != null && divisor > 0 ? Number(line.unit_price) / divisor : null;
       const nowIso = new Date().toISOString();
 
       // 1) Raw material
@@ -93,6 +114,7 @@ export function CreateRawMaterialDialog({ open, onOpenChange, line, onCreated }:
         package_size: packageSize ? Number(packageSize) : null,
         package_unit: packageUnit || null,
         current_cost_price: pricePerBase ?? 0, price_source: "invoice", price_updated_at: nowIso,
+        base_units_per_package: cost?.baseUnitsPerPackage ?? null,
         primary_supplier_id: line.invoice.supplier_id, is_active: true, created_by: user?.id,
       } as never).select().single();
       if (rmErr) throw rmErr;
@@ -103,6 +125,8 @@ export function CreateRawMaterialDialog({ open, onOpenChange, line, onCreated }:
         supplier_sku: line.supplier_sku, supplier_product_name: line.description,
         agreed_price: line.unit_price, agreed_price_per_base_unit: pricePerBase,
         package_size: packageSize ? Number(packageSize) : null, package_unit: packageUnit || null,
+        base_units_per_package: cost?.baseUnitsPerPackage ?? null,
+        ...(packageSize ? { package_confirmed_at: nowIso, package_confirmed_by: user?.id ?? null } : {}),
         last_invoice_price: line.unit_price, last_invoice_date: line.invoice.invoice_date,
       }).select().single();
       if (rmsErr) throw rmsErr;
@@ -121,17 +145,20 @@ export function CreateRawMaterialDialog({ open, onOpenChange, line, onCreated }:
       });
       if (aliases.length) await supabase.from("raw_material_supplier_aliases").insert(aliases);
 
-      // 4) Price history
-      await supabase.from("raw_material_price_history").insert({
-        raw_material_id: rm.id, supplier_id: line.invoice.supplier_id, price: pricePerBase ?? 0,
-        effective_date: line.invoice.invoice_date, source: "invoice", invoice_id: line.invoice_id, created_by: user?.id,
-      });
+      // 4) Prishistorikk — kun når vi faktisk har en pris per baseenhet.
+      if (pricePerBase != null) {
+        await supabase.from("raw_material_price_history").insert({
+          raw_material_id: rm.id, supplier_id: line.invoice.supplier_id, price: pricePerBase,
+          effective_date: line.invoice.invoice_date, source: "invoice", invoice_id: line.invoice_id, created_by: user?.id,
+        });
+      }
 
       // 5) Match line
       await supabase.from("invoice_lines").update({
         raw_material_id: rm.id, match_confidence: "manual", requires_review: false,
         review_reason: null, resolved_by: user?.id, resolved_at: nowIso,
-        price_per_base_unit: pricePerBase, expected_price_per_base_unit: pricePerBase, variance_status: "within_tolerance",
+        // Dialogen setter ALDRI sin egen beregning som fasit for avviksovervåkingen.
+        price_per_base_unit: pricePerBase, base_quantity: cost?.baseQuantity ?? null,
       }).eq("id", line.id);
 
       toast.success(`Råvare «${name}» opprettet`, { description: "Husk å fylle inn næringsinnhold senere." });
@@ -147,20 +174,6 @@ export function CreateRawMaterialDialog({ open, onOpenChange, line, onCreated }:
       toast.error(e.message ?? "Kunne ikke opprette");
     } finally { setBusy(false); }
   }
-
-  const previewPricePerBase = (() => {
-    if (!line || line.unit_price == null) return null;
-    const sizeNum = packageSize ? Number(packageSize) : null;
-    const sizeInBase =
-      sizeNum && sizeNum > 0
-        ? sizeNum * toBaseFactor((packageUnit || line.unit || "").toLowerCase(), baseUnit)
-        : null;
-    const divisor =
-      sizeInBase && sizeInBase > 0
-        ? sizeInBase
-        : toBaseFactor((line.unit ?? "").toLowerCase(), baseUnit);
-    return divisor > 0 ? Number(line.unit_price) / divisor : null;
-  })();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -240,25 +253,99 @@ export function CreateRawMaterialDialog({ open, onOpenChange, line, onCreated }:
               <Select value={baseUnit} onValueChange={setBaseUnit}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {["kg", "l", "stk"].map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                  {CANONICAL_BASE_UNITS.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
                 </SelectContent>
               </Select>
             </Field>
-            <Field label="Pakke størrelse"><Input type="number" value={packageSize} onChange={(e) => setPackageSize(e.target.value)} /></Field>
-            <Field label="Pakke enhet"><Input value={packageUnit} onChange={(e) => setPackageUnit(e.target.value)} /></Field>
+            <Field label={needsPackage ? "Pakke størrelse *" : "Pakke størrelse"}>
+              <Input
+                ref={sizeInputRef}
+                type="number"
+                value={packageSize}
+                onChange={(e) => setPackageSize(e.target.value)}
+                className={needsPackage ? "border-warning" : undefined}
+              />
+            </Field>
+            <Field label="Pakke enhet">
+              <Select value={packageUnit} onValueChange={setPackageUnit}>
+                <SelectTrigger><SelectValue placeholder="Velg…" /></SelectTrigger>
+                <SelectContent>
+                  {[...CANONICAL_BASE_UNITS, ...CANONICAL_PACKAGE_UNITS].map((u) => (
+                    <SelectItem key={u} value={u}>{u}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
           </div>
-          <div className="rounded-lg bg-muted/30 p-3 text-sm">
-            Beregnet kostpris/{baseUnit}: <strong>{formatNok(previewPricePerBase)}</strong>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Pakke størrelse = innhold pr pakning (f.eks. 25 kg pr sekk), ikke antall pakninger på fakturaen
-              {line?.quantity != null ? ` (fakturaen har ${line.quantity} stk)` : ""}.
-            </p>
+
+          {/* Regnestykket vises åpent — ikke bare svaret. */}
+          <div className="space-y-2 rounded-lg border border-line-subtle bg-muted/30 p-3 text-sm">
+            {line && (
+              <div className="text-ink-secondary">
+                Fakturalinje:{" "}
+                <span className="text-ink-primary">
+                  {fmtNum(Number(line.quantity ?? 0))} {normalizeUnit(line.unit) ?? line.unit ?? ""}
+                  {line.unit_price != null ? ` à ${formatNok(Number(line.unit_price))}` : ""} ={" "}
+                  {formatNok(line.total_amount != null ? Number(line.total_amount) : null)}
+                </span>
+              </div>
+            )}
+            {cost && !cost.needsInput ? (
+              <>
+                <div>
+                  → {fmtNum(cost.baseQuantity)} {baseUnit} mottatt · kostpris{" "}
+                  <strong>{formatNok(cost.pricePerBaseUnit)}/{baseUnit}</strong>
+                </div>
+                <p className="text-xs text-ink-secondary">{cost.explanation}</p>
+              </>
+            ) : (
+              <div className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning/10 p-2 text-warning">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>{cost?.reason ?? "Kostprisen kan ikke regnes ut ennå."}</span>
+              </div>
+            )}
+
+            <div className="border-t border-line-subtle pt-2 text-xs text-ink-secondary">
+              Pakning: {packageSize ? `${fmtNum(Number(packageSize.replace(",", ".")))} ${packageUnit || baseUnit} per pakning` : "ikke angitt"}
+              {cost && !cost.needsInput && cost.baseUnitsPerPackage
+                ? ` → ${fmtNum(cost.baseQuantity / cost.baseUnitsPerPackage)} pakninger`
+                : ""}
+              {" "}— brukes kun til lager og bestilling. Når fakturaen er priset per {baseUnit}, endrer den
+              ikke kostprisen.
+            </div>
+
+            {cost && !cost.needsInput && (cost.confidenceLevel === "low" || cost.checks.historyOffByPackage) && cost.alternatives.length > 0 && (
+              <div className="rounded-md border border-warning/40 bg-warning/10 p-2 text-xs">
+                <div className="mb-1 flex items-center gap-1.5 font-medium text-warning">
+                  <AlertTriangle className="h-3.5 w-3.5" /> Usikker tolkning
+                </div>
+                {cost.alternatives.map((alt, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    className="block w-full text-left underline-offset-2 hover:underline"
+                    onClick={() => {
+                      // Brukeren velger den forkastede tolkningen: sett pakning deretter.
+                      if (alt.basis === "pakning" && alt.baseUnitsPerPackage) {
+                        setPackageSize(String(alt.baseUnitsPerPackage));
+                        setPackageUnit(baseUnit);
+                      } else {
+                        setPackageSize("");
+                      }
+                    }}
+                  >
+                    Mente du {formatNok(alt.pricePerBaseUnit)}/{baseUnit}? {alt.explanation}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Avbryt</Button>
-          <Button onClick={submit} disabled={busy}>{busy && <Loader2 className="h-4 w-4 animate-spin" />} Opprett</Button>
+          <Button onClick={submit} disabled={busy || needsPackage}>{busy && <Loader2 className="h-4 w-4 animate-spin" />} Opprett</Button>
         </DialogFooter>
+
       </DialogContent>
     </Dialog>
   );

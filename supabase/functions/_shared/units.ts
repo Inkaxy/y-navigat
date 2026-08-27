@@ -5,13 +5,24 @@
 export type CanonicalUnit =
   | "g" | "kg" | "ml" | "cl" | "dl" | "l"
   | "stk"
-  | "eske" | "pakke" | "sekk" | "flaske" | "rull" | "spann" | "kanne" | "boks" | "brett";
+  | "eske" | "pakke" | "sekk" | "flaske" | "rull" | "spann" | "kanne" | "boks" | "brett"
+  | "pall" | "palleboks" | "konteiner" | "glass" | "beger" | "tube" | "bunt" | "par" | "kolli" | "bulk";
 
 const BASE_UNITS = new Set<CanonicalUnit>(["g", "kg", "ml", "cl", "dl", "l", "stk"]);
 
 const PACKAGE_UNITS = new Set<CanonicalUnit>([
   "eske", "pakke", "sekk", "flaske", "rull", "spann", "kanne", "boks", "brett",
+  "pall", "palleboks", "konteiner", "glass", "beger", "tube", "bunt", "par", "kolli", "bulk",
 ]);
+
+/** Kanoniske pakke-enheter, i visningsrekkefølge — brukes av nedtrekkene i Råvarer. */
+export const CANONICAL_PACKAGE_UNITS: CanonicalUnit[] = [
+  "sekk", "eske", "pakke", "spann", "boks", "flaske", "kanne", "glass", "beger",
+  "tube", "brett", "rull", "bunt", "par", "kolli", "pall", "palleboks", "konteiner", "bulk",
+];
+
+/** Kanoniske baseenheter, i visningsrekkefølge. */
+export const CANONICAL_BASE_UNITS: CanonicalUnit[] = ["kg", "g", "l", "dl", "cl", "ml", "stk"];
 
 const UNIT_ALIASES: Record<string, CanonicalUnit> = {
   // stk-familie
@@ -36,6 +47,17 @@ const UNIT_ALIASES: Record<string, CanonicalUnit> = {
   kanne: "kanne",
   boks: "boks", can: "boks",
   brett: "brett", tray: "brett",
+  // enheter som faktisk forekommer i fakturagrunnlaget vårt
+  pall: "pall", pallet: "pall", plt: "pall",
+  palleboks: "palleboks", pallebox: "palleboks",
+  konteiner: "konteiner", container: "konteiner", cont: "konteiner",
+  glass: "glass", gl: "glass",
+  beger: "beger", beg: "beger",
+  tube: "tube", tb: "tube",
+  bunt: "bunt", bundle: "bunt",
+  par: "par", pair: "par",
+  kolli: "kolli", coli: "kolli",
+  bulk: "bulk",
 };
 
 /** Normaliser en rå enhetskode til kanonisk form (lowercase). Returnerer null hvis ukjent. */
@@ -213,3 +235,451 @@ export function quantityToBase(input: {
   return null;
 }
 
+
+/* ============================================================================
+ * KOSTPRISMOTOREN
+ * ----------------------------------------------------------------------------
+ * Én regel, brukt overalt:
+ *
+ *     kostpris per baseenhet = linjens beløp ÷ mengden omregnet til baseenhet
+ *
+ * `unit_price` brukes ALDRI som prisgrunnlag — kun som kontrollverdi. Beløpet
+ * (`total_amount`) er alltid pengene som faktisk betales.
+ *
+ * Mengden i baseenhet bestemmes av FAKTURAENHETEN, ikke av pakningsstørrelsen:
+ *   - Fakturaenheten er samme dimensjon som basisenheten → ren enhetsomregning.
+ *     Pakningsstørrelsen skal da IKKE brukes.
+ *   - Fakturaenheten er en pakning (sekk/eske/pall …) eller krysser dimensjon
+ *     (f.eks. «stk» mot basisenhet kg) → gang med innholdet per pakning.
+ * ==========================================================================*/
+
+/** Hvor pakningsinformasjonen ble hentet fra. */
+export type PackageSource =
+  | "rms_confirmed"
+  | "rms_package"
+  | "line"
+  | "description"
+  | "raw_material";
+
+export type CostBasis = "fakturaenhet" | "pakning";
+
+export interface PackageResolution {
+  /** Antall baseenheter i én pakning (f.eks. 25 når basisenhet er kg og pakningen er en 25 kg sekk). */
+  baseUnitsPerPackage: number;
+  source: PackageSource;
+  /** Enheten pakningen er uttrykt i på kilden, for forklaringen. */
+  packageUnitLabel: string | null;
+}
+
+export interface CostCandidate {
+  basis: CostBasis;
+  baseQuantity: number;
+  pricePerBaseUnit: number;
+  baseUnitsPerPackage: number | null;
+  packageCount: number | null;
+  source: PackageSource | null;
+  explanation: string;
+}
+
+export interface CostChecks {
+  /** beløp ≈ quantity × unit_price → unit_price er per fakturaenhet. */
+  arithmeticPerInvoiceUnit: boolean;
+  /** beløp ≈ quantity × innhold per pakning × unit_price → antall i pakninger, pris per baseenhet. */
+  arithmeticPerBaseUnit: boolean;
+  /** baseQuantity ÷ innhold per pakning går opp i et helt tall. */
+  wholePackages: boolean;
+  /** Resultatet ligger nær kjent historikk. */
+  matchesHistory: boolean | null;
+  /** Resultatet ligger nær historikk × eller ÷ innhold per pakning — tegn på feil kandidat. */
+  historyOffByPackage: boolean;
+}
+
+export interface ResolveLineCostResult extends CostCandidate {
+  /** Beløpet som ble brukt som prisgrunnlag. */
+  amount: number | null;
+  amountSource: "total_amount" | "quantity_x_unit_price" | null;
+  confidence: number;
+  confidenceLevel: "high" | "medium" | "low";
+  checks: CostChecks;
+  /** Forkastede tolkninger, slik at brukeren kan velge om. */
+  alternatives: CostCandidate[];
+  /** Satt når motoren ikke kan avgjøre. Da er alle tallene 0/NaN-frie, men ugyldige. */
+  needsInput: "package_size" | "amount" | "base_unit" | null;
+  /** Norsk begrunnelse — kan vises rått i grensesnittet. */
+  reason: string | null;
+}
+
+export interface ResolveLineCostInput {
+  quantity: number | null | undefined;
+  unit: string | null | undefined;
+  unitPrice?: number | null;
+  totalAmount?: number | null;
+  /** Linjens pakningsfelter. `packageSize` er PER sub-enhet. */
+  packageSize?: number | null;
+  packageUnit?: string | null;
+  countPerPackage?: number | null;
+  description?: string | null;
+  /** Varens basisenhet (kg/l/stk …). */
+  baseUnit: string | null | undefined;
+  /** Kjent pakning fra leverandørkoblingen (raw_material_suppliers). */
+  supplierPackage?: {
+    baseUnitsPerPackage?: number | null;
+    packageSize?: number | null;
+    packageUnit?: string | null;
+    packageConfirmedAt?: string | null;
+  } | null;
+  /** Kjent pakning på varen selv (raw_materials). */
+  rawMaterialPackage?: {
+    baseUnitsPerPackage?: number | null;
+    packageSize?: number | null;
+    packageUnit?: string | null;
+  } | null;
+  /** Historisk pris per baseenhet — brukes kun som rimelighetssjekk. */
+  knownPricePerBaseUnit?: number | null;
+}
+
+const PLURALS: Record<string, string> = {
+  sekk: "sekker",
+  eske: "esker",
+  pakke: "pakker",
+  flaske: "flasker",
+  rull: "ruller",
+  spann: "spann",
+  kanne: "kanner",
+  boks: "bokser",
+  brett: "brett",
+  pall: "paller",
+  palleboks: "palleboks",
+  konteiner: "konteinere",
+  glass: "glass",
+  beger: "begre",
+  tube: "tuber",
+  bunt: "bunter",
+  par: "par",
+  kolli: "kolli",
+  bulk: "bulk",
+  stk: "stk",
+};
+
+function plural(unit: string | null, count: number): string {
+  if (!unit) return "pakninger";
+  if (count === 1) return unit;
+  return PLURALS[unit] ?? unit;
+}
+
+/** Norsk tallformat uten unødvendige desimaler. */
+export function fmtNum(n: number, maxDigits = 2): string {
+  if (!Number.isFinite(n)) return "—";
+  return new Intl.NumberFormat("nb-NO", { maximumFractionDigits: maxDigits }).format(n);
+}
+
+function nearlyEqual(a: number, b: number, tolPct = 1.5): boolean {
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return false;
+  if (b === 0) return Math.abs(a) < 1e-9;
+  return Math.abs((a - b) / b) * 100 <= tolPct;
+}
+
+function isWhole(n: number, tol = 0.02): boolean {
+  if (!Number.isFinite(n) || n <= 0) return false;
+  return Math.abs(n - Math.round(n)) <= tol;
+}
+
+function toNum(v: unknown): number | null {
+  if (v == null || v === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Total pakningsstørrelse fra en fakturalinje, uttrykt i pakningsenheten.
+ * `invoice_lines.package_size` er PER sub-enhet — den må ganges med
+ * `count_per_package` for å bli TOTAL, slik `raw_material_suppliers.package_size`
+ * leses. Brukes av både match-skuffen og masse-godkjenningen.
+ */
+export function deriveLinePackage(line: {
+  package_size?: number | null;
+  package_unit?: string | null;
+  count_per_package?: number | null;
+  description?: string | null;
+}): { size: number; unit: CanonicalUnit; source: "line" | "description" } | null {
+  const size = toNum(line.package_size);
+  const unit = normalizeUnit(line.package_unit);
+  if (size && size > 0 && unit && isBaseUnit(unit)) {
+    const cnt = toNum(line.count_per_package);
+    const mult = cnt && cnt > 0 ? cnt : 1;
+    return { size: size * mult, unit, source: "line" };
+  }
+  const parsed = parsePackageFromDescription(line.description);
+  if (parsed) return { size: parsed.size * (parsed.count || 1), unit: parsed.unit, source: "description" };
+  return null;
+}
+
+/** Innhold per pakning i baseenheter, hentet i prioritert rekkefølge. */
+export function resolvePackageContent(input: ResolveLineCostInput): PackageResolution | null {
+  const base = normalizeUnit(input.baseUnit) ?? (input.baseUnit ?? "").toLowerCase();
+  if (!base) return null;
+
+  const fromSizeUnit = (
+    size: number | null,
+    unit: string | null | undefined,
+    source: PackageSource,
+  ): PackageResolution | null => {
+    if (!size || size <= 0) return null;
+    const u = normalizeUnit(unit) ?? (unit ?? "").toLowerCase();
+    if (!u) return null;
+    const f = toBaseFactor(u, base);
+    if (f == null) return null;
+    return { baseUnitsPerPackage: size * f, source, packageUnitLabel: u };
+  };
+
+  const sp = input.supplierPackage;
+  // 1) Bekreftet av bruker på leverandørkoblingen — høyest tillit.
+  const confirmed = toNum(sp?.baseUnitsPerPackage);
+  if (confirmed && confirmed > 0 && sp?.packageConfirmedAt) {
+    return {
+      baseUnitsPerPackage: confirmed,
+      source: "rms_confirmed",
+      packageUnitLabel: normalizeUnit(sp?.packageUnit) ?? sp?.packageUnit ?? null,
+    };
+  }
+  // 2) Leverandørkoblingens pakningsstørrelse.
+  const fromRms = fromSizeUnit(toNum(sp?.packageSize), sp?.packageUnit, "rms_package");
+  if (fromRms) return fromRms;
+  if (confirmed && confirmed > 0) {
+    return {
+      baseUnitsPerPackage: confirmed,
+      source: "rms_package",
+      packageUnitLabel: normalizeUnit(sp?.packageUnit) ?? sp?.packageUnit ?? null,
+    };
+  }
+  // 3) Linjens egne felter (package_size × count_per_package).
+  const lineSize = toNum(input.packageSize);
+  if (lineSize && lineSize > 0) {
+    const cnt = toNum(input.countPerPackage);
+    const mult = cnt && cnt > 0 ? cnt : 1;
+    const r = fromSizeUnit(lineSize * mult, input.packageUnit, "line");
+    if (r) return r;
+  }
+  // 4) Tolket fra beskrivelsen.
+  const parsed = parsePackageFromDescription(input.description);
+  if (parsed) {
+    const r = fromSizeUnit(parsed.size * (parsed.count || 1), parsed.unit, "description");
+    if (r) return r;
+  }
+  // 5) Varens egen pakning.
+  const rmp = input.rawMaterialPackage;
+  const rmUnits = toNum(rmp?.baseUnitsPerPackage);
+  if (rmUnits && rmUnits > 0) {
+    return {
+      baseUnitsPerPackage: rmUnits,
+      source: "raw_material",
+      packageUnitLabel: normalizeUnit(rmp?.packageUnit) ?? rmp?.packageUnit ?? null,
+    };
+  }
+  const fromRm = fromSizeUnit(toNum(rmp?.packageSize), rmp?.packageUnit, "raw_material");
+  if (fromRm) return fromRm;
+
+  return null;
+}
+
+function emptyResult(needsInput: ResolveLineCostResult["needsInput"], reason: string, checks: CostChecks): ResolveLineCostResult {
+  return {
+    basis: "fakturaenhet",
+    baseQuantity: 0,
+    pricePerBaseUnit: 0,
+    baseUnitsPerPackage: null,
+    packageCount: null,
+    source: null,
+    explanation: reason,
+    amount: null,
+    amountSource: null,
+    confidence: 0,
+    confidenceLevel: "low",
+    checks,
+    alternatives: [],
+    needsInput,
+    reason,
+  };
+}
+
+/**
+ * Beregn kostpris per baseenhet for en fakturalinje.
+ * Dette er den ENESTE kostprisberegningen i systemet — ingen andre steder
+ * skal dele `unit_price` på noe som helst.
+ */
+export function resolveLineCost(input: ResolveLineCostInput): ResolveLineCostResult {
+  const checks: CostChecks = {
+    arithmeticPerInvoiceUnit: false,
+    arithmeticPerBaseUnit: false,
+    wholePackages: false,
+    matchesHistory: null,
+    historyOffByPackage: false,
+  };
+
+  const quantity = toNum(input.quantity);
+  const base = normalizeUnit(input.baseUnit) ?? (input.baseUnit ?? "").toLowerCase();
+  if (!base) {
+    return emptyResult("base_unit", "Varen mangler basisenhet, så kostprisen kan ikke regnes ut.", checks);
+  }
+  if (!quantity || quantity <= 0) {
+    return emptyResult("amount", "Fakturalinjen mangler mengde, så kostprisen kan ikke regnes ut.", checks);
+  }
+
+  const unitPrice = toNum(input.unitPrice);
+  const total = toNum(input.totalAmount);
+
+  // 1) Beløp
+  let amount: number | null = null;
+  let amountSource: ResolveLineCostResult["amountSource"] = null;
+  let amountPenalty = 0;
+  if (total != null && total !== 0) {
+    amount = Math.abs(total) === total ? total : total; // behold fortegn (kreditnota)
+    amountSource = "total_amount";
+  } else if (unitPrice != null) {
+    amount = quantity * unitPrice;
+    amountSource = "quantity_x_unit_price";
+    amountPenalty = 0.2;
+  }
+  if (amount == null || amount === 0) {
+    return emptyResult("amount", "Fakturalinjen mangler beløp, så kostprisen kan ikke regnes ut.", checks);
+  }
+
+  const invoiceUnit = normalizeUnit(input.unit);
+  const pkg = resolvePackageContent(input);
+  const bupp = pkg?.baseUnitsPerPackage ?? null;
+
+  // 2) Kandidater
+  const candidates: CostCandidate[] = [];
+
+  // A — fakturaenhet: gyldig når enheten er en baseenhet i samme dimensjon.
+  const directFactor = invoiceUnit && isBaseUnit(invoiceUnit) ? toBaseFactor(invoiceUnit, base) : null;
+  if (directFactor != null && directFactor > 0) {
+    const baseQty = quantity * directFactor;
+    const price = amount / baseQty;
+    const perUnit = amount / quantity;
+    candidates.push({
+      basis: "fakturaenhet",
+      baseQuantity: baseQty,
+      pricePerBaseUnit: price,
+      baseUnitsPerPackage: bupp,
+      packageCount: bupp && bupp > 0 ? baseQty / bupp : null,
+      source: null,
+      explanation:
+        `${fmtNum(quantity)} ${invoiceUnit} à ${fmtNum(perUnit)} kr = ${fmtNum(amount)} kr` +
+        ` → ${fmtNum(price, 4)} kr/${base}`,
+    });
+  }
+
+  // B — pakning: gyldig når vi kjenner innholdet per pakning.
+  if (bupp && bupp > 0) {
+    const baseQty = quantity * bupp;
+    const price = amount / baseQty;
+    const label = plural(invoiceUnit && !isBaseUnit(invoiceUnit) ? invoiceUnit : (pkg?.packageUnitLabel && !isBaseUnit(pkg.packageUnitLabel) ? pkg.packageUnitLabel : "pakning"), quantity);
+    candidates.push({
+      basis: "pakning",
+      baseQuantity: baseQty,
+      pricePerBaseUnit: price,
+      baseUnitsPerPackage: bupp,
+      packageCount: quantity,
+      source: pkg!.source,
+      explanation:
+        `${fmtNum(quantity)} ${label} × ${fmtNum(bupp)} ${base} = ${fmtNum(baseQty)} ${base}` +
+        ` → ${fmtNum(price, 4)} kr/${base}`,
+    });
+  }
+
+  if (candidates.length === 0) {
+    const unitTxt = invoiceUnit ?? (input.unit ?? "ukjent enhet");
+    return emptyResult(
+      "package_size",
+      `Fakturaen er i ${unitTxt}. Hvor mange ${base} er én ${unitTxt}? Uten innholdet per pakning kan ikke kostprisen regnes ut.`,
+      checks,
+    );
+  }
+
+  const candA = candidates.find((c) => c.basis === "fakturaenhet") ?? null;
+  const candB = candidates.find((c) => c.basis === "pakning") ?? null;
+
+  // 3) Kontroller
+  if (unitPrice != null) {
+    checks.arithmeticPerInvoiceUnit = nearlyEqual(quantity * unitPrice, amount);
+    if (bupp && bupp > 0) {
+      checks.arithmeticPerBaseUnit = nearlyEqual(quantity * bupp * unitPrice, amount);
+    }
+  }
+
+  // 4) Velg kandidat
+  let chosen: CostCandidate = candA ?? candB!;
+  let swapNote: string | null = null;
+
+  const crossesDimension = !invoiceUnit || !isBaseUnit(invoiceUnit) || directFactor == null;
+  if (crossesDimension && candB) chosen = candB;
+
+  // Sterkt bevis for pakning: antallet er i pakninger og unit_price er per baseenhet.
+  if (candB && checks.arithmeticPerBaseUnit && !checks.arithmeticPerInvoiceUnit && chosen !== candB) {
+    chosen = candB;
+    swapNote = "Antallet er i pakninger mens enhetsprisen er per baseenhet — regnestykket på fakturaen bekrefter det.";
+  }
+
+  // Historikk avgjør ved tvil.
+  const known = toNum(input.knownPricePerBaseUnit);
+  if (known && known > 0) {
+    const rel = (p: number) => Math.abs(p - known) / known;
+    checks.matchesHistory = rel(chosen.pricePerBaseUnit) <= 0.35;
+    if (!checks.matchesHistory) {
+      const other = chosen === candA ? candB : candA;
+      if (bupp && bupp > 0) {
+        const off =
+          nearlyEqual(chosen.pricePerBaseUnit, known * bupp, 35) ||
+          nearlyEqual(chosen.pricePerBaseUnit, known / bupp, 35);
+        checks.historyOffByPackage = off;
+      }
+      if (other && rel(other.pricePerBaseUnit) < rel(chosen.pricePerBaseUnit) && rel(other.pricePerBaseUnit) <= 0.35) {
+        swapNote =
+          `Historikken ligger på ${fmtNum(known, 4)} kr/${base}. Den andre tolkningen treffer den, så den er valgt.`;
+        chosen = other;
+        checks.matchesHistory = true;
+        checks.historyOffByPackage = true;
+      }
+    }
+  }
+
+  if (chosen.baseUnitsPerPackage && chosen.baseUnitsPerPackage > 0) {
+    checks.wholePackages = isWhole(chosen.baseQuantity / chosen.baseUnitsPerPackage);
+  }
+
+  // 5) Tillit
+  let confidence = 0.6;
+  if (chosen.basis === "fakturaenhet" && checks.arithmeticPerInvoiceUnit) confidence = 0.95;
+  else if (chosen.basis === "pakning" && checks.arithmeticPerBaseUnit) confidence = 0.95;
+  else if (chosen.basis === "pakning" && chosen.source === "rms_confirmed") confidence = 0.9;
+  else if (chosen.basis === "pakning" && checks.arithmeticPerInvoiceUnit) confidence = 0.8;
+  else if (chosen.basis === "fakturaenhet" && !candB) confidence = 0.85;
+
+  if (chosen.basis === "pakning" && chosen.source === "description") confidence -= 0.1;
+  if (checks.matchesHistory === true) confidence = Math.min(1, confidence + 0.05);
+  if (checks.matchesHistory === false) confidence -= 0.3;
+  if (chosen.baseUnitsPerPackage && !checks.wholePackages && chosen.basis === "fakturaenhet") confidence -= 0.05;
+  confidence = Math.max(0, Math.min(1, confidence - amountPenalty));
+
+  const alternatives = candidates.filter((c) => c !== chosen);
+  let explanation = chosen.explanation;
+  if (chosen.basis === "fakturaenhet" && chosen.baseUnitsPerPackage && checks.wholePackages) {
+    const count = Math.round(chosen.baseQuantity / chosen.baseUnitsPerPackage);
+    explanation += ` (= ${count} ${plural(pkg?.packageUnitLabel && !isBaseUnit(pkg.packageUnitLabel) ? pkg.packageUnitLabel : "pakning", count)})`;
+  }
+  if (swapNote) explanation += ` ${swapNote}`;
+
+  return {
+    ...chosen,
+    explanation,
+    amount,
+    amountSource,
+    confidence,
+    confidenceLevel: confidence >= 0.8 ? "high" : confidence >= 0.55 ? "medium" : "low",
+    checks,
+    alternatives,
+    needsInput: null,
+    reason: swapNote,
+  };
+}

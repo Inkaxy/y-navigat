@@ -1,13 +1,19 @@
 /** Sentral konstanter for Råvarer-appen. */
+import { CANONICAL_BASE_UNITS, CANONICAL_PACKAGE_UNITS } from "@/fakturaer/lib/units";
+
 export const APP_CODE = "ravarer" as const;
+
 
 /** Nøtterø Bakeri AS — default selskap (samme som Varer i Pulje 1). */
 export const NB_LEGAL_ENTITY_ID = "751709bc-04b3-4449-867d-b97faa9ab373" as const;
 
-export const BASE_UNITS = ["kg", "g", "l", "ml", "stk"] as const;
-export type BaseUnit = (typeof BASE_UNITS)[number];
+// Enhetene kommer fra den kanoniske lista i units.ts — samme som kostprismotoren
+// og `normalizeUnit` kjenner. Egne lister her ga stille ignorerte pakninger.
+export const BASE_UNITS = CANONICAL_BASE_UNITS;
+export type BaseUnit = (typeof CANONICAL_BASE_UNITS)[number];
 
-export const PACKAGE_UNITS = ["sekk", "kartong", "pall", "konteiner", "spann", "pakke", "flaske", "boks", "stk", "bulk"] as const;
+export const PACKAGE_UNITS = CANONICAL_PACKAGE_UNITS;
+
 
 export { RAW_MATERIAL_CATEGORIES } from "@/ravarer/lib/categories";
 

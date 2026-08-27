@@ -9,7 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, Sparkles, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
-import { isBaseUnit, normalizeUnit, parsePackageFromDescription, quantityToBase } from "@/fakturaer/lib/units";
+import { CANONICAL_BASE_UNITS, CANONICAL_PACKAGE_UNITS, deriveLinePackage, resolveLineCost } from "@/fakturaer/lib/units";
 
 export interface BulkLine {
   id: string;
@@ -69,38 +69,39 @@ function num(v: string): number | null {
 }
 
 /**
- * Finn total pakningsstørrelse for en linje.
- * Prioritet: lagrede felter på linjen (package_size × count_per_package),
- * deretter tolkning av beskrivelsen. Enheten skal alltid være en BASEENHET.
+ * Total pakningsstørrelse for en linje — felles utledning med match-skuffen.
+ * `package_size` er per sub-enhet og ganges med `count_per_package`.
  */
 function derivePackage(l: BulkLine): { size: number; unit: string; source: "line" | "description" } | null {
-  if (l.package_size && l.package_unit && isBaseUnit(normalizeUnit(l.package_unit))) {
-    const count = Number(l.count_per_package);
-    const mult = Number.isFinite(count) && count > 0 ? count : 1;
-    return { size: Number(l.package_size) * mult, unit: normalizeUnit(l.package_unit)!, source: "line" };
-  }
-  const parsed = parsePackageFromDescription(l.description);
-  if (parsed) return { size: parsed.size * (parsed.count || 1), unit: parsed.unit, source: "description" };
-  return null;
+  return deriveLinePackage({
+    package_size: l.package_size ?? null,
+    package_unit: l.package_unit ?? null,
+    count_per_package: l.count_per_package ?? null,
+    description: l.description ?? null,
+  });
 }
 
-/** Pris per baseenhet for linjen, eller null hvis den ikke kan regnes ut. */
-function derivePricePerBaseUnit(l: BulkLine, baseUnit: string, pkgSize: number | null, pkgUnit: string | null): number | null {
-  if (!baseUnit || l.unit_price == null || !Number.isFinite(Number(l.unit_price))) return null;
-  const conv = quantityToBase({
-    quantity: 1,
+/** Kostpris per baseenhet via kostprismotoren — beløp ÷ mengde i baseenhet. */
+function deriveCost(l: BulkLine, baseUnit: string, pkgSize: number | null, pkgUnit: string | null) {
+  if (!baseUnit) return null;
+  return resolveLineCost({
+    quantity: l.quantity,
     unit: l.unit,
-    description: l.description,
+    unitPrice: l.unit_price,
+    totalAmount: l.total_amount,
+    packageSize: l.package_size ?? null,
+    packageUnit: l.package_unit ?? null,
+    countPerPackage: l.count_per_package ?? null,
+    description: l.description ?? null,
     baseUnit,
-    rmsPackageSize: pkgSize,
-    rmsPackageUnit: pkgUnit,
-    linePackageSize: l.package_size ?? null,
-    linePackageUnit: l.package_unit ?? null,
-    lineCountPerPackage: l.count_per_package ?? null,
+    supplierPackage: pkgSize && pkgSize > 0 ? { packageSize: pkgSize, packageUnit: pkgUnit ?? baseUnit } : null,
   });
-  if (!conv || !conv.factor || !Number.isFinite(conv.factor) || conv.factor <= 0) return null;
-  const price = Number(l.unit_price) / conv.factor;
-  return Number.isFinite(price) ? Number(price.toFixed(4)) : null;
+}
+
+function derivePricePerBaseUnit(l: BulkLine, baseUnit: string, pkgSize: number | null, pkgUnit: string | null): number | null {
+  const c = deriveCost(l, baseUnit, pkgSize, pkgUnit);
+  if (!c || c.needsInput) return null;
+  return Number(c.pricePerBaseUnit.toFixed(4));
 }
 
 export function BulkImportRawMaterialsDrawer({ open, onOpenChange, invoiceId, legalEntityId, lines, onComplete }: Props) {
@@ -355,9 +356,7 @@ export function BulkImportRawMaterialsDrawer({ open, onOpenChange, invoiceId, le
                 <Select onValueChange={(v) => applyToAll("base_unit", v)}>
                   <SelectTrigger className="h-8 w-[120px]"><SelectValue placeholder="Velg…" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="kg">kg</SelectItem>
-                    <SelectItem value="l">l</SelectItem>
-                    <SelectItem value="stk">stk</SelectItem>
+                    {CANONICAL_BASE_UNITS.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -368,6 +367,9 @@ export function BulkImportRawMaterialsDrawer({ open, onOpenChange, invoiceId, le
                 const r = rows[l.id];
                 if (!r) return null;
                 const noPrice = !r.price_per_base_unit.trim();
+                const rowCost = r.base_unit
+                  ? deriveCost(l, r.base_unit, num(r.package_size), r.package_unit || null)
+                  : null;
                 return (
                   <div
                     key={l.id}
@@ -384,10 +386,15 @@ export function BulkImportRawMaterialsDrawer({ open, onOpenChange, invoiceId, le
                         )}
                       </div>
                     </div>
+                    {rowCost && !rowCost.needsInput && (
+                      <div className="mb-2 rounded border border-line-subtle bg-muted/30 px-2 py-1 text-xs text-ink-secondary">
+                        {rowCost.explanation}
+                      </div>
+                    )}
                     {noPrice && (
                       <div className="mb-2 flex items-center gap-1.5 rounded border border-warning/40 bg-warning/10 px-2 py-1 text-xs font-medium text-warning">
                         <AlertTriangle className="h-3.5 w-3.5" />
-                        Pris per baseenhet kunne ikke beregnes — fyll inn manuelt
+                        {rowCost?.reason ?? "Pris per baseenhet kunne ikke beregnes — fyll inn manuelt"}
                       </div>
                     )}
                     <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -408,9 +415,7 @@ export function BulkImportRawMaterialsDrawer({ open, onOpenChange, invoiceId, le
                         <Select value={r.base_unit} onValueChange={(v) => patch(l.id, { base_unit: v, ai_base_unit: false })}>
                           <SelectTrigger className="h-8"><SelectValue placeholder="Velg" /></SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="kg">kg</SelectItem>
-                            <SelectItem value="l">l</SelectItem>
-                            <SelectItem value="stk">stk</SelectItem>
+                            {CANONICAL_BASE_UNITS.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
                           </SelectContent>
                         </Select>
                       </div>
@@ -439,7 +444,7 @@ export function BulkImportRawMaterialsDrawer({ open, onOpenChange, invoiceId, le
                         <Select value={r.package_unit} onValueChange={(v) => patch(l.id, { package_unit: v })}>
                           <SelectTrigger className="h-8"><SelectValue placeholder="Velg" /></SelectTrigger>
                           <SelectContent>
-                            {["g", "kg", "ml", "cl", "dl", "l", "stk"].map((u) => (
+                            {[...CANONICAL_BASE_UNITS, ...CANONICAL_PACKAGE_UNITS].map((u) => (
                               <SelectItem key={u} value={u}>{u}</SelectItem>
                             ))}
                           </SelectContent>

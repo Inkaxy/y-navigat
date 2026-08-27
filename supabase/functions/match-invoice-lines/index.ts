@@ -2,7 +2,7 @@
 // Input: { invoice_id: string, line_ids?: string[] }
 import { createClient } from "npm:@supabase/supabase-js@2.95.0";
 import { corsHeaders } from "npm:@supabase/supabase-js@2.95.0/cors";
-import { normalizeUnit, isPackageUnit, quantityToBase } from "../_shared/units.ts";
+import { normalizeUnit, isPackageUnit, resolveLineCost } from "../_shared/units.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const ANON = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -91,7 +91,7 @@ Deno.serve(async (req) => {
 
     // Supplier's raw_material_suppliers (with aliases)
     const { data: rms } = await svc.from("raw_material_suppliers")
-      .select("id, raw_material_id, supplier_id, supplier_sku, supplier_product_name, agreed_price_per_base_unit, package_size, package_unit, is_primary")
+      .select("id, raw_material_id, supplier_id, supplier_sku, supplier_product_name, agreed_price_per_base_unit, package_size, package_unit, base_units_per_package, package_confirmed_at, is_primary")
       .eq("supplier_id", inv.supplier_id);
     const rmsList = rms ?? [];
     const rmsIds = rmsList.map((r: AnyRec) => r.id);
@@ -107,7 +107,7 @@ Deno.serve(async (req) => {
 
     // Raw materials in legal entity (active) — for fuzzy
     const { data: rmList } = await svc.from("raw_materials")
-      .select("id, name, sku, category, base_unit, current_cost_price, primary_supplier_id")
+      .select("id, name, sku, category, base_unit, current_cost_price, primary_supplier_id, package_size, package_unit, base_units_per_package")
       .eq("legal_entity_id", inv.legal_entity_id).eq("is_active", true);
     const rmById = new Map<string, AnyRec>((rmList ?? []).map((r: AnyRec) => [r.id, r]));
 
@@ -136,27 +136,22 @@ Deno.serve(async (req) => {
         const rmsRow = rmsList.find((r: AnyRec) => r.raw_material_id === line.raw_material_id && r.supplier_id === inv.supplier_id);
         const expected = rmsRow?.agreed_price_per_base_unit != null ? Number(rmsRow.agreed_price_per_base_unit) : null;
 
-        let actual: number | null = null;
-        if (line.unit_price != null && rm?.base_unit) {
-          const conv = quantityToBase({
-            quantity: 1,
-            unit: line.unit,
-            description: line.description,
-            baseUnit: rm.base_unit,
-            rmsPackageSize: rmsRow?.package_size ?? null,
-            rmsPackageUnit: rmsRow?.package_unit ?? null,
-            linePackageSize: line.package_size ?? null,
-            linePackageUnit: line.package_unit ?? null,
-            lineCountPerPackage: line.count_per_package ?? null,
-          });
-          if (conv && conv.factor !== 0) actual = Number(line.unit_price) / conv.factor;
-        }
+        const cost = costForLine(line, rm, rmsRow);
+        const usable = cost && !cost.needsInput && cost.confidenceLevel !== "low";
+        const actual: number | null = usable ? cost!.pricePerBaseUnit : null;
         manualUpdate.price_per_base_unit = actual;
+        manualUpdate.base_quantity = cost && !cost.needsInput ? cost.baseQuantity : null;
         manualUpdate.expected_price_per_base_unit = expected;
 
         const reviewReasons = new Set<string>();
         let requiresReview = false;
-        if (actual == null && isPackageUnit(normalizedUnitM) && rm?.base_unit) {
+        if (cost?.needsInput === "package_size") {
+          requiresReview = true;
+          reviewReasons.add("unknown_package_size");
+        } else if (cost && !cost.needsInput && cost.confidenceLevel === "low") {
+          requiresReview = true;
+          reviewReasons.add("uncertain_cost");
+        } else if (actual == null && isPackageUnit(normalizedUnitM) && rm?.base_unit) {
           requiresReview = true;
           reviewReasons.add("unknown_package_size");
         }
@@ -420,32 +415,24 @@ Deno.serve(async (req) => {
         const rmsRow = rmsList.find((r: AnyRec) => r.raw_material_id === update.raw_material_id && r.supplier_id === inv.supplier_id);
         const expected = rmsRow?.agreed_price_per_base_unit != null ? Number(rmsRow.agreed_price_per_base_unit) : null;
 
-        let actual: number | null = null;
-        let conv: ReturnType<typeof quantityToBase> = null;
-        if (line.unit_price != null && rm?.base_unit) {
-          conv = quantityToBase({
-            quantity: 1,
-            unit: line.unit,
-            description: line.description,
-            baseUnit: rm.base_unit,
-            rmsPackageSize: rmsRow?.package_size ?? null,
-            rmsPackageUnit: rmsRow?.package_unit ?? null,
-            linePackageSize: line.package_size ?? null,
-            linePackageUnit: line.package_unit ?? null,
-            lineCountPerPackage: line.count_per_package ?? null,
-          });
-          if (conv && conv.factor !== 0) actual = Number(line.unit_price) / conv.factor;
-        }
+        const cost = costForLine(line, rm, rmsRow);
+        const usable = cost && !cost.needsInput && cost.confidenceLevel !== "low";
+        const actual: number | null = usable ? cost!.pricePerBaseUnit : null;
         update.price_per_base_unit = actual;
+        update.base_quantity = cost && !cost.needsInput ? cost.baseQuantity : null;
         update.expected_price_per_base_unit = expected;
 
-        // Flagg ukjent pakke-størrelse for pakke-enheter
-        if (actual == null && isPackageUnit(normalizedUnit) && rm?.base_unit) {
+        const addReason = (reason: string) => {
           update.requires_review = true;
           update.review_reason = update.review_reason
-            ? Array.from(new Set(`${update.review_reason},unknown_package_size`.split(","))).join(",")
-            : "unknown_package_size";
-        }
+            ? Array.from(new Set(`${update.review_reason},${reason}`.split(","))).join(",")
+            : reason;
+        };
+
+        // Aldri gjett: uten kjent pakningsinnhold, eller ved lav tillit, skal linja til gjennomgang.
+        if (cost?.needsInput === "package_size") addReason("unknown_package_size");
+        else if (cost && !cost.needsInput && cost.confidenceLevel === "low") addReason("uncertain_cost");
+        else if (actual == null && isPackageUnit(normalizedUnit) && rm?.base_unit) addReason("unknown_package_size");
 
         if (expected != null && actual != null && expected !== 0) {
           const variance = ((actual - expected) / expected) * 100;
@@ -530,13 +517,19 @@ async function syncRegisteredPrices(svc: any, inv: AnyRec, line: AnyRec, rm: Any
 
   const registered = rm.current_cost_price != null ? Number(rm.current_cost_price) : null;
   const supplierRegistered = rmsRow?.agreed_price_per_base_unit != null ? Number(rmsRow.agreed_price_per_base_unit) : null;
-  const overTol = (base: number | null) =>
-    base != null && base !== 0 && ((actual - base) / base) * 100 > tolPct;
-  if (overTol(registered) || overTol(supplierRegistered)) {
+  // Både økning OG fall skal fanges: et prisfall på 96 % er signaturen til en pakningsfeil.
+  const deviation = (base: number | null): number | null =>
+    base != null && base !== 0 ? ((actual - base) / base) * 100 : null;
+  const devs = [deviation(registered), deviation(supplierRegistered)].filter(
+    (d): d is number => d != null && Math.abs(d) > tolPct,
+  );
+  if (devs.length > 0) {
+    const worst = devs.reduce((a, b) => (Math.abs(b) > Math.abs(a) ? b : a));
+    const reason = worst > 0 ? "price_increase" : "price_drop";
     update.requires_review = true;
     update.review_reason = update.review_reason
-      ? Array.from(new Set(`${update.review_reason},price_increase`.split(","))).join(",")
-      : "price_increase";
+      ? Array.from(new Set(`${update.review_reason},${reason}`.split(","))).join(",")
+      : reason;
   }
 
   const nowIso = new Date().toISOString();
@@ -567,6 +560,39 @@ async function syncRegisteredPrices(svc: any, inv: AnyRec, line: AnyRec, rm: Any
       primary_supplier_id: rm.primary_supplier_id ?? inv.supplier_id,
     }).eq("id", rm.id);
   }
+}
+
+/**
+ * Kostpris for en fakturalinje — ÉN motor, samme som grensesnittet bruker.
+ * Beløpet er grunnlaget; `unit_price` er kun kontrollverdi.
+ */
+function costForLine(line: AnyRec, rm: AnyRec | undefined, rmsRow: AnyRec | undefined) {
+  if (!rm?.base_unit) return null;
+  return resolveLineCost({
+    quantity: line.quantity,
+    unit: line.unit,
+    unitPrice: line.unit_price,
+    totalAmount: line.total_amount,
+    packageSize: line.package_size ?? null,
+    packageUnit: line.package_unit ?? null,
+    countPerPackage: line.count_per_package ?? null,
+    description: line.description,
+    baseUnit: rm.base_unit,
+    supplierPackage: rmsRow
+      ? {
+          baseUnitsPerPackage: rmsRow.base_units_per_package ?? null,
+          packageSize: rmsRow.package_size ?? null,
+          packageUnit: rmsRow.package_unit ?? null,
+          packageConfirmedAt: rmsRow.package_confirmed_at ?? null,
+        }
+      : null,
+    rawMaterialPackage: {
+      baseUnitsPerPackage: rm.base_units_per_package ?? null,
+      packageSize: rm.package_size ?? null,
+      packageUnit: rm.package_unit ?? null,
+    },
+    knownPricePerBaseUnit: rm.current_cost_price != null ? Number(rm.current_cost_price) : null,
+  });
 }
 
 function json(body: any, status = 200) {
