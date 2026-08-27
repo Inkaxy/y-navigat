@@ -211,7 +211,19 @@ export interface PackageResolution {
   source: PackageSource;
   /** Enheten pakningen er uttrykt i på kilden, for forklaringen. */
   packageUnitLabel: string | null;
+  /**
+   * Satt når en UBEKREFTET leverandørpakning er uenig med beskrivelsen og
+   * beskrivelsen vant. Brukes til å senke tilliten og forklare valget.
+   */
+  disagreement?: {
+    supplierUnits: number;
+    supplierUnitLabel: string | null;
+    descriptionUnits: number;
+  } | null;
+  /** Satt når leverandørens `package_size = 1` med pakke-enhet ble forkastet som «ikke satt». */
+  ignoredSupplierOne?: boolean;
 }
+
 
 export interface CostCandidate {
   basis: CostBasis;
