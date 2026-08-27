@@ -57,6 +57,8 @@ export function RecipeSummaryCard({ productId, productName, legalEntityId, canWr
     },
   });
 
+  const trackedQuery = useStockTrackedRawMaterials();
+
   async function createRecipe() {
     const { data, error } = await supabase
       .from("recipes")
