@@ -6,6 +6,8 @@ export const MOVEMENT_TYPES = [
   "return",
   "waste",
   "adjustment",
+  "count_adjust",
+  "recipe_use",
   "opening",
   "correction",
 ] as const;
@@ -18,6 +20,8 @@ const LABELS: Record<string, string> = {
   return: "Retur",
   waste: "Svinn",
   adjustment: "Justering",
+  count_adjust: "Telling",
+  recipe_use: "Oppskriftsuttrekk (pakkseddel)",
   opening: "Inngående",
   correction: "Rettelse",
 };
@@ -31,6 +35,7 @@ export function movementSourceLink(
   sourceTable: string | null,
   sourceId: string | null,
   invoiceIdByLineId?: Map<string, string>,
+  deliveryNoteIdByLineId?: Map<string, string>,
 ): { to: string; label: string } | null {
   if (!sourceId) return null;
   switch (sourceTable) {
@@ -40,6 +45,12 @@ export function movementSourceLink(
     }
     case "invoices":
       return { to: `/ravarer/fakturaer/${sourceId}`, label: "Faktura" };
+    case "delivery_note_lines": {
+      const noteId = deliveryNoteIdByLineId?.get(sourceId);
+      return noteId ? { to: `/ordre/pakksedler/${noteId}`, label: "Pakkseddel" } : null;
+    }
+    case "delivery_notes":
+      return { to: `/ordre/pakksedler/${sourceId}`, label: "Pakkseddel" };
     case "pos_transactions":
     case "pos_transaction_lines":
       return { to: `/pos-styring/transaksjoner/${sourceId}`, label: "Kassabilag" };

@@ -11,6 +11,8 @@ import { NutritionTab } from "@/ravarer/components/tabs/NutritionTab";
 import { SuppliersTab } from "@/ravarer/components/tabs/SuppliersTab";
 import { ResaleSettingsCard } from "@/ravarer/components/stock/ResaleSettingsCard";
 import { SellsAsSection } from "@/ravarer/components/stock/SellsAsSection";
+import { UnitsAndPriceCard } from "@/ravarer/components/stock/UnitsAndPriceCard";
+import { StockTrackingCard } from "@/ravarer/components/stock/StockTrackingCard";
 
 
 export default function RawMaterialDetail() {
@@ -82,6 +84,8 @@ export default function RawMaterialDetail() {
         </TabsList>
         <TabsContent value="overview" className="mt-5 space-y-5">
           <OverviewTab rm={rm} />
+          <UnitsAndPriceCard rm={rm} />
+          <StockTrackingCard rm={rm} />
           <ResaleSettingsCard rm={rm} />
           {rm.is_resale_item && <SellsAsSection rm={rm} />}
         </TabsContent>

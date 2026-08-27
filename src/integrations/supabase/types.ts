@@ -2850,6 +2850,13 @@ export type Database = {
             foreignKeyName: "invoice_line_match_suggestions_raw_material_id_fkey"
             columns: ["raw_material_id"]
             isOneToOne: false
+            referencedRelation: "raw_material_stock_status"
+            referencedColumns: ["raw_material_id"]
+          },
+          {
+            foreignKeyName: "invoice_line_match_suggestions_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
             referencedRelation: "raw_materials"
             referencedColumns: ["id"]
           },
@@ -2964,6 +2971,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "raw_material_package_worklist"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_lines_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "raw_material_stock_status"
+            referencedColumns: ["raw_material_id"]
           },
           {
             foreignKeyName: "invoice_lines_raw_material_id_fkey"
@@ -4060,6 +4074,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "raw_material_package_worklist"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "negotiation_items_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "raw_material_stock_status"
+            referencedColumns: ["raw_material_id"]
           },
           {
             foreignKeyName: "negotiation_items_raw_material_id_fkey"
@@ -7564,6 +7585,13 @@ export type Database = {
             foreignKeyName: "product_cost_additions_raw_material_id_fkey"
             columns: ["raw_material_id"]
             isOneToOne: false
+            referencedRelation: "raw_material_stock_status"
+            referencedColumns: ["raw_material_id"]
+          },
+          {
+            foreignKeyName: "product_cost_additions_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
             referencedRelation: "raw_materials"
             referencedColumns: ["id"]
           },
@@ -8797,6 +8825,13 @@ export type Database = {
             foreignKeyName: "raw_material_allergens_raw_material_id_fkey"
             columns: ["raw_material_id"]
             isOneToOne: false
+            referencedRelation: "raw_material_stock_status"
+            referencedColumns: ["raw_material_id"]
+          },
+          {
+            foreignKeyName: "raw_material_allergens_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
             referencedRelation: "raw_materials"
             referencedColumns: ["id"]
           },
@@ -8880,6 +8915,13 @@ export type Database = {
             foreignKeyName: "raw_material_changelog_raw_material_id_fkey"
             columns: ["raw_material_id"]
             isOneToOne: false
+            referencedRelation: "raw_material_stock_status"
+            referencedColumns: ["raw_material_id"]
+          },
+          {
+            foreignKeyName: "raw_material_changelog_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
             referencedRelation: "raw_materials"
             referencedColumns: ["id"]
           },
@@ -8947,6 +8989,13 @@ export type Database = {
             foreignKeyName: "raw_material_components_component_raw_material_id_fkey"
             columns: ["component_raw_material_id"]
             isOneToOne: false
+            referencedRelation: "raw_material_stock_status"
+            referencedColumns: ["raw_material_id"]
+          },
+          {
+            foreignKeyName: "raw_material_components_component_raw_material_id_fkey"
+            columns: ["component_raw_material_id"]
+            isOneToOne: false
             referencedRelation: "raw_materials"
             referencedColumns: ["id"]
           },
@@ -8963,6 +9012,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "raw_material_package_worklist"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "raw_material_components_parent_raw_material_id_fkey"
+            columns: ["parent_raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "raw_material_stock_status"
+            referencedColumns: ["raw_material_id"]
           },
           {
             foreignKeyName: "raw_material_components_parent_raw_material_id_fkey"
@@ -9038,6 +9094,13 @@ export type Database = {
             foreignKeyName: "raw_material_cost_recalcs_raw_material_id_fkey"
             columns: ["raw_material_id"]
             isOneToOne: false
+            referencedRelation: "raw_material_stock_status"
+            referencedColumns: ["raw_material_id"]
+          },
+          {
+            foreignKeyName: "raw_material_cost_recalcs_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
             referencedRelation: "raw_materials"
             referencedColumns: ["id"]
           },
@@ -9091,6 +9154,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "raw_material_package_worklist"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "raw_material_cost_reference_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "raw_material_stock_status"
+            referencedColumns: ["raw_material_id"]
           },
           {
             foreignKeyName: "raw_material_cost_reference_raw_material_id_fkey"
@@ -9197,6 +9267,13 @@ export type Database = {
             foreignKeyName: "raw_material_datasheets_raw_material_id_fkey"
             columns: ["raw_material_id"]
             isOneToOne: false
+            referencedRelation: "raw_material_stock_status"
+            referencedColumns: ["raw_material_id"]
+          },
+          {
+            foreignKeyName: "raw_material_datasheets_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
             referencedRelation: "raw_materials"
             referencedColumns: ["id"]
           },
@@ -9289,6 +9366,13 @@ export type Database = {
             foreignKeyName: "raw_material_nutrition_raw_material_id_fkey"
             columns: ["raw_material_id"]
             isOneToOne: true
+            referencedRelation: "raw_material_stock_status"
+            referencedColumns: ["raw_material_id"]
+          },
+          {
+            foreignKeyName: "raw_material_nutrition_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: true
             referencedRelation: "raw_materials"
             referencedColumns: ["id"]
           },
@@ -9348,6 +9432,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "raw_material_package_worklist"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "raw_material_price_history_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "raw_material_stock_status"
+            referencedColumns: ["raw_material_id"]
           },
           {
             foreignKeyName: "raw_material_price_history_raw_material_id_fkey"
@@ -9417,6 +9508,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "raw_material_package_worklist"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "raw_material_products_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "raw_material_stock_status"
+            referencedColumns: ["raw_material_id"]
           },
           {
             foreignKeyName: "raw_material_products_raw_material_id_fkey"
@@ -9504,6 +9602,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "raw_material_package_worklist"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "raw_material_purchases_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "raw_material_stock_status"
+            referencedColumns: ["raw_material_id"]
           },
           {
             foreignKeyName: "raw_material_purchases_raw_material_id_fkey"
@@ -9674,6 +9779,13 @@ export type Database = {
             foreignKeyName: "raw_material_suppliers_raw_material_id_fkey"
             columns: ["raw_material_id"]
             isOneToOne: false
+            referencedRelation: "raw_material_stock_status"
+            referencedColumns: ["raw_material_id"]
+          },
+          {
+            foreignKeyName: "raw_material_suppliers_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
             referencedRelation: "raw_materials"
             referencedColumns: ["id"]
           },
@@ -9690,6 +9802,77 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "suppliers"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      raw_material_units: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          is_default_count: boolean
+          is_default_purchase: boolean
+          is_sales_unit: boolean
+          note: string | null
+          raw_material_id: string
+          sort_order: number
+          unit_label: string
+          units_in_base: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_default_count?: boolean
+          is_default_purchase?: boolean
+          is_sales_unit?: boolean
+          note?: string | null
+          raw_material_id: string
+          sort_order?: number
+          unit_label: string
+          units_in_base: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_default_count?: boolean
+          is_default_purchase?: boolean
+          is_sales_unit?: boolean
+          note?: string | null
+          raw_material_id?: string
+          sort_order?: number
+          unit_label?: string
+          units_in_base?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "raw_material_units_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "raw_material_package_worklist"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "raw_material_units_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "raw_material_stock_status"
+            referencedColumns: ["raw_material_id"]
+          },
+          {
+            foreignKeyName: "raw_material_units_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "raw_materials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "raw_material_units_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "resale_stock_status"
+            referencedColumns: ["raw_material_id"]
           },
         ]
       }
@@ -10104,6 +10287,13 @@ export type Database = {
             foreignKeyName: "recipe_lines_raw_material_id_fkey"
             columns: ["raw_material_id"]
             isOneToOne: false
+            referencedRelation: "raw_material_stock_status"
+            referencedColumns: ["raw_material_id"]
+          },
+          {
+            foreignKeyName: "recipe_lines_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
             referencedRelation: "raw_materials"
             referencedColumns: ["id"]
           },
@@ -10185,6 +10375,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "raw_material_package_worklist"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipe_packaging_lines_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "raw_material_stock_status"
+            referencedColumns: ["raw_material_id"]
           },
           {
             foreignKeyName: "recipe_packaging_lines_raw_material_id_fkey"
@@ -11331,6 +11528,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "raw_material_package_worklist"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_movements_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "raw_material_stock_status"
+            referencedColumns: ["raw_material_id"]
           },
           {
             foreignKeyName: "stock_movements_raw_material_id_fkey"
@@ -12618,6 +12822,13 @@ export type Database = {
             foreignKeyName: "invoice_lines_raw_material_id_fkey"
             columns: ["raw_material_id"]
             isOneToOne: false
+            referencedRelation: "raw_material_stock_status"
+            referencedColumns: ["raw_material_id"]
+          },
+          {
+            foreignKeyName: "invoice_lines_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
             referencedRelation: "raw_materials"
             referencedColumns: ["id"]
           },
@@ -12707,6 +12918,13 @@ export type Database = {
             foreignKeyName: "invoice_lines_raw_material_id_fkey"
             columns: ["raw_material_id"]
             isOneToOne: false
+            referencedRelation: "raw_material_stock_status"
+            referencedColumns: ["raw_material_id"]
+          },
+          {
+            foreignKeyName: "invoice_lines_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
             referencedRelation: "raw_materials"
             referencedColumns: ["id"]
           },
@@ -12719,6 +12937,65 @@ export type Database = {
           },
           {
             foreignKeyName: "invoices_legal_entity_id_fkey"
+            columns: ["legal_entity_id"]
+            isOneToOne: false
+            referencedRelation: "legal_entities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      raw_material_stock_status: {
+        Row: {
+          base_unit: string | null
+          category: string | null
+          current_cost_price: number | null
+          current_stock: number | null
+          is_resale_item: boolean | null
+          item_type: string | null
+          last_in: string | null
+          last_out: string | null
+          legal_entity_id: string | null
+          min_stock: number | null
+          name: string | null
+          raw_material_id: string | null
+          sku: string | null
+          stock_value: number | null
+        }
+        Insert: {
+          base_unit?: string | null
+          category?: string | null
+          current_cost_price?: number | null
+          current_stock?: number | null
+          is_resale_item?: boolean | null
+          item_type?: string | null
+          last_in?: never
+          last_out?: never
+          legal_entity_id?: string | null
+          min_stock?: number | null
+          name?: string | null
+          raw_material_id?: string | null
+          sku?: string | null
+          stock_value?: never
+        }
+        Update: {
+          base_unit?: string | null
+          category?: string | null
+          current_cost_price?: number | null
+          current_stock?: number | null
+          is_resale_item?: boolean | null
+          item_type?: string | null
+          last_in?: never
+          last_out?: never
+          legal_entity_id?: string | null
+          min_stock?: number | null
+          name?: string | null
+          raw_material_id?: string | null
+          sku?: string | null
+          stock_value?: never
+        }
+        Relationships: [
+          {
+            foreignKeyName: "raw_materials_legal_entity_id_fkey"
             columns: ["legal_entity_id"]
             isOneToOne: false
             referencedRelation: "legal_entities"
@@ -12745,6 +13022,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "raw_material_package_worklist"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_lines_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "raw_material_stock_status"
+            referencedColumns: ["raw_material_id"]
           },
           {
             foreignKeyName: "invoice_lines_raw_material_id_fkey"
@@ -14482,6 +14766,10 @@ export type Database = {
           source: string
         }[]
       }
+      rm_stock_count_apply: {
+        Args: { p_lines: Json; p_note?: string }
+        Returns: Json
+      }
       rm_suggest_package_from_name: {
         Args: { p_base_unit: string; p_name: string }
         Returns: number
@@ -14574,6 +14862,14 @@ export type Database = {
         Returns: Json
       }
       stock_from_delivery_note_lines: {
+        Args: { p_note_id: string; p_remove: boolean }
+        Returns: undefined
+      }
+      stock_recipe_consume_line: {
+        Args: { p_line_id: string; p_remove: boolean }
+        Returns: undefined
+      }
+      stock_recipe_consume_note: {
         Args: { p_note_id: string; p_remove: boolean }
         Returns: undefined
       }

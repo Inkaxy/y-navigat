@@ -46,7 +46,12 @@ export function StockMovementsSheet({ open, onOpenChange, rawMaterial }: Props) 
               </thead>
               <tbody>
                 {rows.map(m => {
-                  const link = movementSourceLink(m.source_table, m.source_id, data?.invoiceIdByLineId);
+                  const link = movementSourceLink(
+                    m.source_table,
+                    m.source_id,
+                    data?.invoiceIdByLineId,
+                    data?.deliveryNoteIdByLineId,
+                  );
                   const qty = Number(m.quantity_base) || 0;
                   return (
                     <tr key={m.id} className="border-t border-line-subtle align-top">
