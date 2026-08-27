@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { BRODSKALAN_MARKS } from "@/varer/lib/brodskalan";
 import { cn } from "@/lib/utils";
 import {
   type FieldType,
@@ -674,6 +675,14 @@ function CanvasFieldBox({
       />
     ) : (
       `[${catalog.label(field.field_type)}]`
+    );
+  } else if (field.field_type === "brodskala") {
+    content = (
+      <img
+        src={BRODSKALAN_MARKS.grovt.src}
+        alt=""
+        className="pointer-events-none h-full w-full object-contain opacity-70"
+      />
     );
   } else if (field.field_type === "firmanavn" && companyName) {
     measureString = companyName;
