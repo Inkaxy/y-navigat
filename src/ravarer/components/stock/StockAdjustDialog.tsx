@@ -24,23 +24,42 @@ const TITLES: Record<AdjustMode, string> = {
   opening: "Hva står på lager nå?",
 };
 
+const BASE = "__base__";
+
 export function StockAdjustDialog({ open, onOpenChange, mode, rawMaterial }: Props) {
   const create = useCreateStockMovement();
+  const { data: units = [] } = useRawMaterialUnits(open ? rawMaterial?.id : undefined);
   const [value, setValue] = useState("");
+  const [extra, setExtra] = useState("");
+  const [unitId, setUnitId] = useState<string>(BASE);
   const [note, setNote] = useState("");
 
   useEffect(() => {
     if (open) {
       setValue("");
+      setExtra("");
       setNote("");
+      setUnitId(BASE);
     }
   }, [open, rawMaterial?.id, mode]);
 
+  useEffect(() => {
+    const def = units.find(u => u.is_default_count);
+    if (open && def) setUnitId(def.id);
+  }, [open, units]);
+
   if (!rawMaterial) return null;
 
-  const numeric = Number(String(value).replace(",", "."));
-  const valid = value.trim() !== "" && Number.isFinite(numeric);
-  const diff = mode === "count" ? numeric - rawMaterial.current_stock : 0;
+  const selectedUnit = units.find(u => u.id === unitId) ?? null;
+  const factor = selectedUnit ? Number(selectedUnit.units_in_base) || 1 : 1;
+
+  const parsed = Number(String(value).replace(",", "."));
+  const parsedExtra = extra.trim() === "" ? 0 : Number(String(extra).replace(",", "."));
+  const valid = value.trim() !== "" && Number.isFinite(parsed) && Number.isFinite(parsedExtra);
+  /** Mengden omregnet til baseenhet. */
+  const numeric = valid ? parsed * factor + parsedExtra : NaN;
+
+  const diff = mode === "count" && valid ? numeric - rawMaterial.current_stock : 0;
   const noteRequired = mode !== "opening";
   const canSubmit =
     valid &&
@@ -54,7 +73,7 @@ export function StockAdjustDialog({ open, onOpenChange, mode, rawMaterial }: Pro
     if (mode === "count") {
       await create.mutateAsync({
         raw_material_id: rawMaterial.id,
-        movement_type: "adjustment",
+        movement_type: "count_adjust",
         quantity_base: diff,
         note: note.trim(),
       });
@@ -99,23 +118,49 @@ export function StockAdjustDialog({ open, onOpenChange, mode, rawMaterial }: Pro
             </div>
           )}
 
-          <div>
-            <Label>
-              {mode === "count"
-                ? "Faktisk på hylla"
-                : mode === "waste"
-                  ? "Antall som er kastet"
-                  : "Beholdning nå"}{" "}
-              ({rawMaterial.base_unit})
-            </Label>
-            <Input
-              value={value}
-              onChange={e => setValue(e.target.value)}
-              inputMode="decimal"
-              autoFocus
-              placeholder="0"
-            />
+          <div className="flex items-end gap-2">
+            <div className="flex-1">
+              <Label>
+                {mode === "count" ? "Faktisk på hylla" : mode === "waste" ? "Antall som er kastet" : "Beholdning nå"}
+              </Label>
+              <Input
+                value={value}
+                onChange={e => setValue(e.target.value)}
+                inputMode="decimal"
+                autoFocus
+                placeholder="0"
+              />
+            </div>
+            <div className="w-[150px]">
+              <Label className="text-xs">Enhet</Label>
+              <Select value={unitId} onValueChange={setUnitId}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={BASE}>{rawMaterial.base_unit}</SelectItem>
+                  {units.map(u => (
+                    <SelectItem key={u.id} value={u.id}>
+                      {u.unit_label} ({formatNumber(u.units_in_base, 3)} {rawMaterial.base_unit})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
+
+          {selectedUnit && (
+            <div>
+              <Label className="text-xs">Løse {rawMaterial.base_unit} i tillegg (valgfritt)</Label>
+              <Input value={extra} onChange={e => setExtra(e.target.value)} inputMode="decimal" placeholder="0" />
+            </div>
+          )}
+
+          {valid && selectedUnit && (
+            <p className="text-xs text-ink-secondary">
+              Tilsvarer {formatNumber(numeric, 3)} {rawMaterial.base_unit}.
+            </p>
+          )}
 
           {mode === "count" && valid && (
             <div className="text-sm">
