@@ -9,7 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, Sparkles, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
-import { CANONICAL_BASE_UNITS, CANONICAL_PACKAGE_UNITS, deriveLinePackage, resolveLineCost } from "@/fakturaer/lib/units";
+import { CANONICAL_BASE_UNITS, CANONICAL_PACKAGE_UNITS, deriveLinePackage, parseDecimal, resolveLineCost } from "@/fakturaer/lib/units";
 
 export interface BulkLine {
   id: string;
@@ -62,11 +62,7 @@ interface Props {
   onComplete?: () => void;
 }
 
-function num(v: string): number | null {
-  if (!v?.trim()) return null;
-  const n = Number(v.replace(",", "."));
-  return Number.isFinite(n) ? n : null;
-}
+const num = parseDecimal;
 
 /**
  * Total pakningsstørrelse for en linje — felles utledning med match-skuffen.

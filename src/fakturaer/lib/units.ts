@@ -85,8 +85,10 @@ export function toBaseFactor(
   from: string | null | undefined,
   to: string | null | undefined,
 ): number | null {
-  const f = normalizeUnit(from) ?? (from ? String(from).trim().toLowerCase() : null);
-  const t = normalizeUnit(to) ?? (to ? String(to).trim().toLowerCase() : null);
+  const f = normalizeUnit(from);
+  const t = normalizeUnit(to);
+  // Kun kanoniske enheter gir en faktor. En identitets-snarvei på ukjente strenger
+  // ville stille gitt faktor 1 for f.eks. base_unit = 'sekk'.
   if (!f || !t) return null;
   if (f === t) return 1;
   // mass
@@ -177,66 +179,6 @@ function toNumber(s: string): number | null {
   const n = Number(cleaned);
   return Number.isFinite(n) ? n : null;
 }
-
-/**
- * Konverter en linje-mengde til base-enhet for en råvare.
- * Returnerer { baseQty, factor, source } eller null hvis vi ikke har nok info.
- *
- *  - quantity * factor = baseQty
- *  - unit_price / factor = price_per_base_unit
- */
-export function quantityToBase(input: {
-  quantity: number;
-  unit: string | null | undefined;
-  description?: string | null;
-  baseUnit: string | null | undefined;
-  /** Pakke-størrelse fra raw_material_suppliers (per "pakke" / "eske"). */
-  rmsPackageSize?: number | null;
-  rmsPackageUnit?: string | null;
-  /** AI-utledede felt på linjen. package_size er PER sub-enhet. */
-  linePackageSize?: number | null;
-  linePackageUnit?: string | null;
-  lineCountPerPackage?: number | null;
-}): { baseQty: number; factor: number; source: string } | null {
-  const { quantity, baseUnit } = input;
-  if (!Number.isFinite(quantity) || !baseUnit) return null;
-  const u = normalizeUnit(input.unit);
-  const b = normalizeUnit(baseUnit) ?? baseUnit.toLowerCase();
-
-  // Direkte base→base konvertering
-  if (u && isBaseUnit(u)) {
-    const f = toBaseFactor(u, b);
-    if (f != null) return { baseQty: quantity * f, factor: f, source: "direct" };
-    // u=stk og base=stk håndteres i toBaseFactor (=1). Mismatch (stk vs kg) trenger pakke.
-  }
-
-  // Pakke-enhet eller ukjent enhet → bruk pakke-størrelse.
-  // size er per sub-enhet; total pakningsstørrelse = size * (count ?? 1).
-  const pkgSources: Array<{ size: number; unit: string; src: string }> = [];
-  if (input.linePackageSize && input.linePackageUnit) {
-    const cnt = Number(input.lineCountPerPackage);
-    const count = Number.isFinite(cnt) && cnt > 0 ? cnt : 1;
-    pkgSources.push({ size: input.linePackageSize * count, unit: input.linePackageUnit, src: "ai_line" });
-  }
-  const fromDesc = parsePackageFromDescription(input.description);
-  if (fromDesc) {
-    pkgSources.push({ size: fromDesc.size * (fromDesc.count || 1), unit: fromDesc.unit, src: "description" });
-  }
-  if (input.rmsPackageSize && input.rmsPackageUnit) {
-    pkgSources.push({ size: input.rmsPackageSize, unit: input.rmsPackageUnit, src: "rms" });
-  }
-
-  for (const p of pkgSources) {
-    const pUnit = normalizeUnit(p.unit) ?? p.unit.toLowerCase();
-    const f = toBaseFactor(pUnit, b);
-    if (f != null) {
-      const factor = p.size * f;
-      return { baseQty: quantity * factor, factor, source: p.src };
-    }
-  }
-  return null;
-}
-
 
 /* ============================================================================
  * KOSTPRISMOTOREN
@@ -367,6 +309,20 @@ function plural(unit: string | null, count: number): string {
   if (!unit) return "pakninger";
   if (count === 1) return unit;
   return PLURALS[unit] ?? unit;
+}
+
+/**
+ * Tolk et tall brukeren har skrevet. Godtar både komma og punktum som
+ * desimalskilletegn, og mellomrom som tusenskille. Returnerer null når
+ * inndata er tom eller ikke lar seg tolke — ALDRI NaN.
+ */
+export function parseDecimal(input: string | number | null | undefined): number | null {
+  if (input == null) return null;
+  if (typeof input === "number") return Number.isFinite(input) ? input : null;
+  const cleaned = input.replace(/\s|\u00a0/g, "").replace(",", ".");
+  if (!cleaned) return null;
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? n : null;
 }
 
 /** Norsk tallformat uten unødvendige desimaler. */
@@ -535,7 +491,7 @@ export function resolveLineCost(input: ResolveLineCostInput): ResolveLineCostRes
   let amountSource: ResolveLineCostResult["amountSource"] = null;
   let amountPenalty = 0;
   if (total != null && total !== 0) {
-    amount = Math.abs(total) === total ? total : total; // behold fortegn (kreditnota)
+    amount = total; // behold fortegn — negativt beløp = kreditnota
     amountSource = "total_amount";
   } else if (unitPrice != null) {
     amount = quantity * unitPrice;

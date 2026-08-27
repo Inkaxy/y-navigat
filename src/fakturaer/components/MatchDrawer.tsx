@@ -12,7 +12,7 @@ import { Loader2, ExternalLink, Search, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { formatNok, formatDate } from "@/fakturaer/lib/constants";
 import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
-import { CANONICAL_BASE_UNITS, CANONICAL_PACKAGE_UNITS, deriveLinePackage, resolveLineCost } from "@/fakturaer/lib/units";
+import { CANONICAL_BASE_UNITS, CANONICAL_PACKAGE_UNITS, deriveLinePackage, parseDecimal, resolveLineCost } from "@/fakturaer/lib/units";
 import { CreateRawMaterialDialog } from "@/fakturaer/components/CreateRawMaterialDialog";
 import { ItemTypeBadge } from "@/ravarer/components/ItemTypeBadge";
 import { InvoiceDocumentButton } from "@/fakturaer/components/InvoiceDocumentButton";
@@ -127,7 +127,7 @@ export function MatchDrawer({ open, onOpenChange, line }: Props) {
   const cost = useMemo(() => {
     const baseUnit = selectedRm?.base_unit;
     if (!line || !baseUnit) return null;
-    const size = packageSize.trim() ? Number(packageSize.replace(",", ".")) : null;
+    const size = parseDecimal(packageSize);
     return resolveLineCost({
       quantity: line.quantity,
       unit: line.unit,
@@ -152,9 +152,9 @@ export function MatchDrawer({ open, onOpenChange, line }: Props) {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Ikke innlogget");
 
-      const pkgSize = packageSize.trim() ? Number(packageSize.replace(",", ".")) : null;
+      const pkgSize = parseDecimal(packageSize);
       const pkgUnit = packageUnit.trim() || null;
-      const agreed = agreedPrice.trim() ? Number(agreedPrice.replace(",", ".")) : null;
+      const agreed = parseDecimal(agreedPrice);
 
       // Én felles implementasjon for både enkelt- og massegodkjenning.
       const { lineIds } = await acceptMatch({

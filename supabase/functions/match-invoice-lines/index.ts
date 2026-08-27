@@ -167,14 +167,14 @@ Deno.serve(async (req) => {
             reviewReasons.add("price_variance");
           }
         } else {
-          manualUpdate.variance_status = expected == null ? "no_baseline" : "no_baseline";
+          manualUpdate.variance_status = "no_baseline";
           manualUpdate.price_variance_pct = null;
         }
-        await syncRegisteredPrices(svc, inv, line, rm, rmsRow, actual, manualUpdate, catTolMap.get(rm?.category ?? "") ?? tolDefault);
-        if (manualUpdate.requires_review) requiresReview = true;
-        if (manualUpdate.review_reason) manualUpdate.review_reason.split(",").forEach((r: string) => reviewReasons.add(r));
+        // Samme rekkefølge som i den automatiske grenen: sett flaggene først,
+        // så får syncRegisteredPrices legge sine egne årsaker oppå.
         manualUpdate.requires_review = requiresReview;
         manualUpdate.review_reason = reviewReasons.size ? Array.from(reviewReasons).join(",") : null;
+        await syncRegisteredPrices(svc, inv, line, rm, rmsRow, actual, manualUpdate, catTolMap.get(rm?.category ?? "") ?? tolDefault);
 
         await applyUpdate(svc, line.id, manualUpdate);
         results.push({ id: line.id, status: "manual", recomputed: true });

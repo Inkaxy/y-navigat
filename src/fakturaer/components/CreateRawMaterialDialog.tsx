@@ -13,7 +13,7 @@ import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
 import { ITEM_TYPES, defaultCategoryFor, type ItemType } from "@/ravarer/lib/itemTypes";
 import { CategorySelectItems, NEW_CATEGORY_VALUE } from "@/ravarer/components/CategorySelectItems";
 import { InvoiceDocumentButton } from "@/fakturaer/components/InvoiceDocumentButton";
-import { CANONICAL_BASE_UNITS, CANONICAL_PACKAGE_UNITS, fmtNum, normalizeUnit, resolveLineCost } from "@/fakturaer/lib/units";
+import { CANONICAL_BASE_UNITS, CANONICAL_PACKAGE_UNITS, fmtNum, normalizeUnit, parseDecimal, resolveLineCost } from "@/fakturaer/lib/units";
 
 interface Props {
   open: boolean;
@@ -75,7 +75,7 @@ export function CreateRawMaterialDialog({ open, onOpenChange, line, onCreated }:
    */
   const cost = useMemo(() => {
     if (!line) return null;
-    const size = packageSize.trim() ? Number(packageSize.replace(",", ".")) : null;
+    const size = parseDecimal(packageSize);
     return resolveLineCost({
       quantity: line.quantity,
       unit: line.unit,
@@ -92,6 +92,9 @@ export function CreateRawMaterialDialog({ open, onOpenChange, line, onCreated }:
 
   const pricePerBase = cost && !cost.needsInput ? Number(cost.pricePerBaseUnit.toFixed(4)) : null;
   const needsPackage = cost?.needsInput === "package_size";
+  // Alt som mangler — pakning, beløp eller basisenhet — skal sperre opprettelsen.
+  const blockedByInput = !!cost?.needsInput;
+  const parsedPackageSize = parseDecimal(packageSize);
 
   useEffect(() => {
     if (needsPackage) sizeInputRef.current?.focus();
@@ -111,9 +114,9 @@ export function CreateRawMaterialDialog({ open, onOpenChange, line, onCreated }:
         sku: skuGen,
         name: name.trim(), category: category.trim(), base_unit: baseUnit,
         item_type: itemType,
-        package_size: packageSize ? Number(packageSize) : null,
+        package_size: parsedPackageSize,
         package_unit: packageUnit || null,
-        current_cost_price: pricePerBase ?? 0, price_source: "invoice", price_updated_at: nowIso,
+        current_cost_price: pricePerBase, price_source: "invoice", price_updated_at: nowIso,
         base_units_per_package: cost?.baseUnitsPerPackage ?? null,
         primary_supplier_id: line.invoice.supplier_id, is_active: true, created_by: user?.id,
       } as never).select().single();
@@ -123,11 +126,11 @@ export function CreateRawMaterialDialog({ open, onOpenChange, line, onCreated }:
       const { data: rms, error: rmsErr } = await supabase.from("raw_material_suppliers").insert({
         raw_material_id: rm.id, supplier_id: line.invoice.supplier_id, is_primary: true,
         supplier_sku: line.supplier_sku, supplier_product_name: line.description,
-        agreed_price: line.unit_price, agreed_price_per_base_unit: pricePerBase,
-        package_size: packageSize ? Number(packageSize) : null, package_unit: packageUnit || null,
+        // Avtaleprisen er forbeholdt framforhandlede priser — dialogen rører den ikke.
+        package_size: parsedPackageSize, package_unit: packageUnit || null,
         base_units_per_package: cost?.baseUnitsPerPackage ?? null,
-        ...(packageSize ? { package_confirmed_at: nowIso, package_confirmed_by: user?.id ?? null } : {}),
-        last_invoice_price: line.unit_price, last_invoice_date: line.invoice.invoice_date,
+        ...(parsedPackageSize != null ? { package_confirmed_at: nowIso, package_confirmed_by: user?.id ?? null } : {}),
+        last_invoice_price: pricePerBase, last_invoice_date: line.invoice.invoice_date,
       }).select().single();
       if (rmsErr) throw rmsErr;
 
@@ -306,7 +309,7 @@ export function CreateRawMaterialDialog({ open, onOpenChange, line, onCreated }:
             )}
 
             <div className="border-t border-line-subtle pt-2 text-xs text-ink-secondary">
-              Pakning: {packageSize ? `${fmtNum(Number(packageSize.replace(",", ".")))} ${packageUnit || baseUnit} per pakning` : "ikke angitt"}
+              Pakning: {packageSize ? `${fmtNum(parsedPackageSize ?? 0)} ${packageUnit || baseUnit} per pakning` : "ikke angitt"}
               {cost && !cost.needsInput && cost.baseUnitsPerPackage
                 ? ` → ${fmtNum(cost.baseQuantity / cost.baseUnitsPerPackage)} pakninger`
                 : ""}
@@ -343,7 +346,7 @@ export function CreateRawMaterialDialog({ open, onOpenChange, line, onCreated }:
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Avbryt</Button>
-          <Button onClick={submit} disabled={busy || needsPackage}>{busy && <Loader2 className="h-4 w-4 animate-spin" />} Opprett</Button>
+          <Button onClick={submit} disabled={busy || blockedByInput}>{busy && <Loader2 className="h-4 w-4 animate-spin" />} Opprett</Button>
         </DialogFooter>
 
       </DialogContent>
