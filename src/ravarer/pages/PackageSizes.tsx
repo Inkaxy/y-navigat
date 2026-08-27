@@ -8,6 +8,8 @@ import { RavarerHeaderBanner } from "@/ravarer/components/RavarerHeaderBanner";
 import { formatNumber } from "@/ravarer/lib/constants";
 import { usePackageWorklist, type PackageWorklistRow } from "@/ravarer/hooks/usePackageSizes";
 import { SetPackageDialog } from "@/ravarer/components/packages/SetPackageDialog";
+import { SuspiciousPackagesCard } from "@/ravarer/components/packages/SuspiciousPackagesCard";
+
 
 type Tone = "red" | "yellow" | "grey" | "green";
 
