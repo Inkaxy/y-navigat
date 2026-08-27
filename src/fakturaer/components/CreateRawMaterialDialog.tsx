@@ -13,7 +13,7 @@ import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
 import { ITEM_TYPES, defaultCategoryFor, type ItemType } from "@/ravarer/lib/itemTypes";
 import { CategorySelectItems, NEW_CATEGORY_VALUE } from "@/ravarer/components/CategorySelectItems";
 import { InvoiceDocumentButton } from "@/fakturaer/components/InvoiceDocumentButton";
-import { CANONICAL_BASE_UNITS, CANONICAL_PACKAGE_UNITS, fmtNum, normalizeUnit, resolveLineCost } from "@/fakturaer/lib/units";
+import { CANONICAL_BASE_UNITS, CANONICAL_PACKAGE_UNITS, fmtNum, normalizeUnit, parseDecimal, resolveLineCost } from "@/fakturaer/lib/units";
 
 interface Props {
   open: boolean;

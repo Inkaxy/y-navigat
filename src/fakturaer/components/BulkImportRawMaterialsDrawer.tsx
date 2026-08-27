@@ -62,11 +62,7 @@ interface Props {
   onComplete?: () => void;
 }
 
-function num(v: string): number | null {
-  if (!v?.trim()) return null;
-  const n = Number(v.replace(",", "."));
-  return Number.isFinite(n) ? n : null;
-}
+const num = parseDecimal;
 
 /**
  * Total pakningsstørrelse for en linje — felles utledning med match-skuffen.

@@ -127,7 +127,7 @@ export function MatchDrawer({ open, onOpenChange, line }: Props) {
   const cost = useMemo(() => {
     const baseUnit = selectedRm?.base_unit;
     if (!line || !baseUnit) return null;
-    const size = packageSize.trim() ? Number(packageSize.replace(",", ".")) : null;
+    const size = parseDecimal(packageSize);
     return resolveLineCost({
       quantity: line.quantity,
       unit: line.unit,
@@ -152,9 +152,9 @@ export function MatchDrawer({ open, onOpenChange, line }: Props) {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Ikke innlogget");
 
-      const pkgSize = packageSize.trim() ? Number(packageSize.replace(",", ".")) : null;
+      const pkgSize = parseDecimal(packageSize);
       const pkgUnit = packageUnit.trim() || null;
-      const agreed = agreedPrice.trim() ? Number(agreedPrice.replace(",", ".")) : null;
+      const agreed = parseDecimal(agreedPrice);
 
       // Én felles implementasjon for både enkelt- og massegodkjenning.
       const { lineIds } = await acceptMatch({
