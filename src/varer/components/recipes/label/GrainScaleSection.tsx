@@ -15,7 +15,6 @@ import {
   type FlourLine,
   type GrainCategory,
 } from "@/varer/lib/breadscale";
-import type { LabelMark } from "@/varer/hooks/useLabelMarks";
 import { BrodskalanMark } from "@/varer/components/label/BrodskalanMark";
 import { brodskalanFor, hasBrodskalanWarning } from "@/varer/lib/brodskalan";
 
@@ -25,7 +24,6 @@ interface Props {
   flourGrams: number | null;
   coarseWeightedGrams: number | null;
   flourLines: FlourLine[];
-  marks: LabelMark[];
   /** Advarsler fra compute-recipe-label — brukes til forbehold på merket. */
   warnings?: string[] | null;
 }
@@ -84,7 +82,6 @@ export function GrainScaleSection({
   flourGrams,
   coarseWeightedGrams,
   flourLines,
-  marks,
   warnings,
 }: Props) {
   const category = (grainCategory as GrainCategory | null) ?? (grainPct != null ? grainCategoryFromPct(grainPct) : null);

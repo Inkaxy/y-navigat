@@ -37,7 +37,6 @@ export interface ConsumerLabelData {
   producerAddress: string | null;
   /** Data-URL-er for merker som er slått på og godkjent. */
   grainMarkImage: string | null;
-  grainMarkFallbackText: string | null;
   keyholeMark: boolean;
 }
 
@@ -123,7 +122,7 @@ export function ConsumerLabelPDFDocument({
           </Text>
         )}
 
-        {(data.grainMarkImage || data.grainMarkFallbackText || data.keyholeMark) && (
+        {(data.grainMarkImage || data.keyholeMark) && (
           <View style={styles.marks}>
             {data.grainMarkImage ? (
               <Image src={data.grainMarkImage} style={{ width: 34, height: 34, objectFit: "contain" }} />

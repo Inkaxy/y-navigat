@@ -6,10 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Loader2, Printer } from "lucide-react";
-import { useLabelMarks } from "@/varer/hooks/useLabelMarks";
 import { useComputeRecipeLabel, useRecipeLabelCalculated } from "@/varer/hooks/useRecipeLabel";
+import { BRODSKALAN_MARKS } from "@/varer/lib/brodskalan";
 import {
-  GRAIN_MARK_KEY,
   fmtNum,
   grainCategoryFromPct,
   type FlourLine,
@@ -63,7 +62,6 @@ export function LabelTab({ recipeId, recipeName, recipe, flourLines, legalEntity
   const qc = useQueryClient();
   const labelQuery = useRecipeLabelCalculated(recipeId);
   const compute = useComputeRecipeLabel();
-  const marksQuery = useLabelMarks(legalEntityId);
   const [size, setSize] = useState<LabelSizeKey>("100x70");
   const [printing, setPrinting] = useState(false);
 
@@ -127,11 +125,10 @@ export function LabelTab({ recipeId, recipeName, recipe, flourLines, legalEntity
     if (!label) return;
     setPrinting(true);
     try {
-      const grainMark =
-        recipe.label_claim_grain && grainCategory
-          ? marksQuery.data?.find((m) => m.mark_key === GRAIN_MARK_KEY[grainCategory])
-          : undefined;
-      const grainMarkImage = grainMark?.signedUrl ? await toDataUrl(grainMark.signedUrl) : null;
+      // Kun det offisielle BKLF-merket trykkes. Uten merke trykkes ingen påstand.
+      const grainMarkSrc =
+        recipe.label_claim_grain && grainCategory ? BRODSKALAN_MARKS[grainCategory].src : null;
+      const grainMarkImage = grainMarkSrc ? await toDataUrl(grainMarkSrc) : null;
       const entity = entityQuery.data;
 
       const [{ pdf }, mod] = await Promise.all([
@@ -160,10 +157,6 @@ export function LabelTab({ recipeId, recipeName, recipe, flourLines, legalEntity
                   .join(", ")
               : null,
             grainMarkImage,
-            grainMarkFallbackText:
-              recipe.label_claim_grain && !grainMarkImage && grainCategory
-                ? `Brødskala'n: ${grainCategory.replace("_", " ")}`
-                : null,
             keyholeMark: !!recipe.label_claim_keyhole,
           }}
         />,
@@ -229,7 +222,6 @@ export function LabelTab({ recipeId, recipeName, recipe, flourLines, legalEntity
         flourGrams={label.flour_grams}
         coarseWeightedGrams={label.whole_grain_grams}
         flourLines={flourLines}
-        marks={marksQuery.data ?? []}
         warnings={label.warnings}
       />
 
