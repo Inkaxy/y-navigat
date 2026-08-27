@@ -55,6 +55,7 @@ import {
   Printer,
   Globe,
   Warehouse,
+  ClipboardCheck,
   TrendingUp,
   GitCompareArrows,
   FileDown,
