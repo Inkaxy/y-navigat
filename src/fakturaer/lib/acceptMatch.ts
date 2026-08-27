@@ -10,6 +10,11 @@ export interface AcceptMatchOptions {
   userId: string;
   packageSize?: number | null;
   packageUnit?: string | null;
+  /**
+   * Innhold per pakning i varens BASEENHET. Lagres bekreftet på leverandørkoblingen,
+   * slik at neste faktura fra samme leverandør går gjennom automatisk.
+   */
+  baseUnitsPerPackage?: number | null;
   /** Avtalepris per baseenhet. Skrives kun når den er satt. */
   agreedPricePerBaseUnit?: number | null;
   rememberSku?: boolean;
@@ -45,6 +50,7 @@ export async function acceptMatch(opts: AcceptMatchOptions): Promise<{ lineIds: 
     userId,
     packageSize = null,
     packageUnit = null,
+    baseUnitsPerPackage = null,
     agreedPricePerBaseUnit = null,
     rememberSku = false,
     rememberName = false,
@@ -56,6 +62,10 @@ export async function acceptMatch(opts: AcceptMatchOptions): Promise<{ lineIds: 
   const nowIso = new Date().toISOString();
   const pkgSize = packageSize != null && Number.isFinite(packageSize) ? packageSize : null;
   const pkgUnit = packageUnit?.trim() ? packageUnit.trim() : null;
+  const bupp =
+    baseUnitsPerPackage != null && Number.isFinite(baseUnitsPerPackage) && baseUnitsPerPackage > 0
+      ? baseUnitsPerPackage
+      : null;
   const agreed =
     agreedPricePerBaseUnit != null && Number.isFinite(agreedPricePerBaseUnit) ? agreedPricePerBaseUnit : null;
 
@@ -82,6 +92,8 @@ export async function acceptMatch(opts: AcceptMatchOptions): Promise<{ lineIds: 
         supplier_product_name: line.description,
         package_size: pkgSize,
         package_unit: pkgUnit,
+        base_units_per_package: bupp,
+        ...(bupp != null ? { package_confirmed_at: nowIso, package_confirmed_by: userId } : {}),
         ...(agreed != null ? { agreed_price_per_base_unit: agreed } : {}),
         is_primary: setAsPrimary && !anyPrimary,
       })
@@ -90,9 +102,21 @@ export async function acceptMatch(opts: AcceptMatchOptions): Promise<{ lineIds: 
     if (error) throw new Error(`Kunne ikke opprette leverandørkobling for varen: ${error.message}`);
     rmsId = ins.id;
   } else {
-    const upd: { package_size?: number; package_unit?: string; agreed_price_per_base_unit?: number } = {};
+    const upd: {
+      package_size?: number;
+      package_unit?: string;
+      base_units_per_package?: number;
+      package_confirmed_at?: string;
+      package_confirmed_by?: string;
+      agreed_price_per_base_unit?: number;
+    } = {};
     if (pkgSize != null) upd.package_size = pkgSize;
     if (pkgUnit) upd.package_unit = pkgUnit;
+    if (bupp != null) {
+      upd.base_units_per_package = bupp;
+      upd.package_confirmed_at = nowIso;
+      upd.package_confirmed_by = userId;
+    }
     if (agreed != null) upd.agreed_price_per_base_unit = agreed;
     if (Object.keys(upd).length > 0) {
       const { error: updLinkErr } = await supabase.from("raw_material_suppliers").update(upd).eq("id", rmsId);
