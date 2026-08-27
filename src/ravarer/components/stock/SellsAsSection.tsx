@@ -86,9 +86,38 @@ export function SellsAsSection({ rm }: { rm: RawMaterialRow }) {
                 <p className="font-medium">{l.product?.display_name ?? "Ukjent vare"}</p>
                 <p className="font-mono text-xs text-ink-secondary">{l.product?.code}</p>
               </div>
+              <div className="w-[200px]">
+                <Label className="text-xs">Enhet</Label>
+                <Select
+                  value={
+                    units.find(u => Number(u.units_in_base) === Number(l.base_units_per_sold_unit))?.id ??
+                    (Number(l.base_units_per_sold_unit) === 1 ? BASE : CUSTOM)
+                  }
+                  onValueChange={v => {
+                    if (v === CUSTOM) return;
+                    const factor = v === BASE ? 1 : Number(units.find(u => u.id === v)?.units_in_base ?? 1);
+                    if (factor !== Number(l.base_units_per_sold_unit)) {
+                      updateLink.mutate({ id: l.id, raw_material_id: rm.id, base_units_per_sold_unit: factor });
+                    }
+                  }}
+                  disabled={!canWrite}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={BASE}>{rm.base_unit} (1)</SelectItem>
+                    {units.map(u => (
+                      <SelectItem key={u.id} value={u.id}>
+                        {u.unit_label} ({u.units_in_base} {rm.base_unit})
+                      </SelectItem>
+                    ))}
+                    <SelectItem value={CUSTOM}>Egendefinert</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="w-[220px]">
                 <Label className="text-xs">Enheter trukket per solgt vare</Label>
                 <Input
+                  key={l.base_units_per_sold_unit}
                   type="number"
                   step="0.001"
                   defaultValue={l.base_units_per_sold_unit}
