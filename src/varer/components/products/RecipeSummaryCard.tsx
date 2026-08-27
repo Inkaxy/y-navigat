@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ChefHat, ExternalLink, Loader2, Plus } from "lucide-react";
+import { useStockTrackedRawMaterials } from "@/varer/hooks/useStockTrackedRawMaterials";
 import { computeTotals, fmtG, fmtPercent, RECIPE_STATUS_LABEL, type BakersRawMaterial } from "@/varer/lib/bakers";
 
 interface Props {
@@ -96,6 +97,7 @@ export function RecipeSummaryCard({ productId, productName, legalEntityId, canWr
     );
   }
 
+  const trackedIds = trackedQuery.data;
   const lines = (recipe.recipe_lines ?? []).map((l: any) => ({
     ...l,
     _rm: l.raw_material_id ? (rmQuery.data ?? {})[l.raw_material_id] ?? null : null,
