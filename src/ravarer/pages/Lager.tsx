@@ -18,6 +18,7 @@ import { StockMovementsSheet } from "@/ravarer/components/stock/StockMovementsSh
 import { ReorderSuggestions } from "@/ravarer/components/stock/ReorderSuggestions";
 import { MarginTable } from "@/ravarer/components/stock/MarginTable";
 import { formatDate, formatNumber } from "@/ravarer/lib/constants";
+import { AllStockTable } from "@/ravarer/components/stock/AllStockTable";
 
 const kr = (n: number | null) =>
   n == null ? "—" : new Intl.NumberFormat("nb-NO", { style: "currency", currency: "NOK", maximumFractionDigits: 0 }).format(n);
