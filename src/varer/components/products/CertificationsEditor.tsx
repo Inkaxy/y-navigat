@@ -8,18 +8,20 @@ import { Button } from "@/components/ui/button";
 import { Loader2, Save, Award } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { BrodskalanMark } from "@/varer/components/label/BrodskalanMark";
+import type { GrainCategory } from "@/varer/lib/brodskalan";
 
 interface Props {
   productId: string;
   canWrite: boolean;
 }
 
-const BREADSCALE = [
-  { value: 1, label: "Fint", desc: "0–24 % grovt" },
-  { value: 2, label: "Halvgrovt", desc: "25–49 % grovt" },
-  { value: 3, label: "Grovt", desc: "50–74 % grovt" },
-  { value: 4, label: "Ekstra grovt", desc: "75–100 % grovt" },
-] as const;
+const BREADSCALE: Array<{ value: number; label: string; desc: string; category: GrainCategory }> = [
+  { value: 1, label: "Fint", desc: "0–25 % grovt", category: "fint" },
+  { value: 2, label: "Halvgrovt", desc: "26–50 % grovt", category: "halvgrovt" },
+  { value: 3, label: "Grovt", desc: "51–75 % grovt", category: "grovt" },
+  { value: 4, label: "Ekstra grovt", desc: "76–100 % grovt", category: "ekstra_grovt" },
+];
 
 export function CertificationsEditor({ productId, canWrite }: Props) {
   const qc = useQueryClient();
@@ -134,8 +136,11 @@ export function CertificationsEditor({ productId, canWrite }: Props) {
                       !canWrite && "cursor-not-allowed opacity-60",
                     )}
                   >
-                    <div className="flex items-baseline gap-1.5">
-                      <span className="text-base font-bold tabular-nums">{b.value}</span>
+                    <div className="flex items-center gap-2">
+                      <BrodskalanMark
+                        category={b.category}
+                        className={cn("h-8 w-8 shrink-0", breadscale !== b.value && "opacity-60")}
+                      />
                       <span className="font-semibold">{b.label}</span>
                     </div>
                     <div className="text-muted-foreground">{b.desc}</div>

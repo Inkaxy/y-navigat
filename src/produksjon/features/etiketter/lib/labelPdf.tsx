@@ -15,6 +15,10 @@ import { FALLBACK_FIELD_LABELS } from "@/produksjon/features/utskriftsprofiler/t
 import { fitFontSizePt } from "@/produksjon/features/utskriftsprofiler/lib/fitText";
 import type { LabelProductRow } from "../types";
 import { code128Modules } from "./code128";
+import {
+  brodskalanFor,
+  grainCategoryFromBreadscaleValue,
+} from "@/varer/lib/brodskalan";
 
 const MM_TO_PT = 2.83465;
 const mm = (v: number) => v * MM_TO_PT;
@@ -71,6 +75,13 @@ function valueFor(
       return { text: labelNumber || "—" };
     case "strekkode":
       return { text: barcodeText(data) };
+    case "brodskala": {
+      // Brødskala'n skal vises som det offisielle merket, ikke som et tall.
+      const mark = brodskalanFor(
+        grainCategoryFromBreadscaleValue(data.felter?.brodskala),
+      );
+      return { image: mark?.src ?? null, text: mark ? mark.label : "" };
+    }
     case "utskriftstidspunkt":
       return { text: new Date().toLocaleString("nb-NO") };
     default:
@@ -124,7 +135,9 @@ function renderField(field: ProfileField, data: LabelPdfData, key: string) {
   const v = valueFor(field.field_type, data);
   // Hopp over tomme felter med mindre profilen ber om å alltid tegne dem.
   const isEmpty =
-    field.field_type === "logo" ? !v.image : !(v.text ?? "").trim();
+    field.field_type === "logo" || field.field_type === "brodskala"
+      ? !v.image
+      : !(v.text ?? "").trim();
   if (isEmpty && !(field.always_show ?? false)) return null;
   const align: "left" | "center" | "right" =
     field.alignment === "center"
@@ -143,7 +156,8 @@ function renderField(field: ProfileField, data: LabelPdfData, key: string) {
   const showLabel =
     data.profile.include_field_labels &&
     (field.show_label ?? true) &&
-    field.field_type !== "logo";
+    field.field_type !== "logo" &&
+    field.field_type !== "brodskala";
   const labelText = showLabel ? `${fieldLabelFor(field.field_type, data)}: ` : "";
 
   // Etikettnummeret er hovedidentifikatoren i produksjon — det skal alltid
@@ -183,7 +197,7 @@ function renderField(field: ProfileField, data: LabelPdfData, key: string) {
     >
       {field.field_type === "strekkode" ? (
         <BarcodeView value={barcodeText(data)} heightMm={field.height_mm} />
-      ) : field.field_type === "logo" && v.image ? (
+      ) : (field.field_type === "logo" || field.field_type === "brodskala") && v.image ? (
         <Image
           src={v.image}
           style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
