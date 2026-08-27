@@ -253,25 +253,99 @@ export function CreateRawMaterialDialog({ open, onOpenChange, line, onCreated }:
               <Select value={baseUnit} onValueChange={setBaseUnit}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {["kg", "l", "stk"].map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                  {CANONICAL_BASE_UNITS.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
                 </SelectContent>
               </Select>
             </Field>
-            <Field label="Pakke størrelse"><Input type="number" value={packageSize} onChange={(e) => setPackageSize(e.target.value)} /></Field>
-            <Field label="Pakke enhet"><Input value={packageUnit} onChange={(e) => setPackageUnit(e.target.value)} /></Field>
+            <Field label={needsPackage ? "Pakke størrelse *" : "Pakke størrelse"}>
+              <Input
+                ref={sizeInputRef}
+                type="number"
+                value={packageSize}
+                onChange={(e) => setPackageSize(e.target.value)}
+                className={needsPackage ? "border-warning" : undefined}
+              />
+            </Field>
+            <Field label="Pakke enhet">
+              <Select value={packageUnit} onValueChange={setPackageUnit}>
+                <SelectTrigger><SelectValue placeholder="Velg…" /></SelectTrigger>
+                <SelectContent>
+                  {[...CANONICAL_BASE_UNITS, ...CANONICAL_PACKAGE_UNITS].map((u) => (
+                    <SelectItem key={u} value={u}>{u}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
           </div>
-          <div className="rounded-lg bg-muted/30 p-3 text-sm">
-            Beregnet kostpris/{baseUnit}: <strong>{formatNok(previewPricePerBase)}</strong>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Pakke størrelse = innhold pr pakning (f.eks. 25 kg pr sekk), ikke antall pakninger på fakturaen
-              {line?.quantity != null ? ` (fakturaen har ${line.quantity} stk)` : ""}.
-            </p>
+
+          {/* Regnestykket vises åpent — ikke bare svaret. */}
+          <div className="space-y-2 rounded-lg border border-line-subtle bg-muted/30 p-3 text-sm">
+            {line && (
+              <div className="text-ink-secondary">
+                Fakturalinje:{" "}
+                <span className="text-ink-primary">
+                  {fmtNum(Number(line.quantity ?? 0))} {normalizeUnit(line.unit) ?? line.unit ?? ""}
+                  {line.unit_price != null ? ` à ${formatNok(Number(line.unit_price))}` : ""} ={" "}
+                  {formatNok(line.total_amount != null ? Number(line.total_amount) : null)}
+                </span>
+              </div>
+            )}
+            {cost && !cost.needsInput ? (
+              <>
+                <div>
+                  → {fmtNum(cost.baseQuantity)} {baseUnit} mottatt · kostpris{" "}
+                  <strong>{formatNok(cost.pricePerBaseUnit)}/{baseUnit}</strong>
+                </div>
+                <p className="text-xs text-ink-secondary">{cost.explanation}</p>
+              </>
+            ) : (
+              <div className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning/10 p-2 text-warning">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>{cost?.reason ?? "Kostprisen kan ikke regnes ut ennå."}</span>
+              </div>
+            )}
+
+            <div className="border-t border-line-subtle pt-2 text-xs text-ink-secondary">
+              Pakning: {packageSize ? `${fmtNum(Number(packageSize.replace(",", ".")))} ${packageUnit || baseUnit} per pakning` : "ikke angitt"}
+              {cost && !cost.needsInput && cost.baseUnitsPerPackage
+                ? ` → ${fmtNum(cost.baseQuantity / cost.baseUnitsPerPackage)} pakninger`
+                : ""}
+              {" "}— brukes kun til lager og bestilling. Når fakturaen er priset per {baseUnit}, endrer den
+              ikke kostprisen.
+            </div>
+
+            {cost && !cost.needsInput && (cost.confidenceLevel === "low" || cost.checks.historyOffByPackage) && cost.alternatives.length > 0 && (
+              <div className="rounded-md border border-warning/40 bg-warning/10 p-2 text-xs">
+                <div className="mb-1 flex items-center gap-1.5 font-medium text-warning">
+                  <AlertTriangle className="h-3.5 w-3.5" /> Usikker tolkning
+                </div>
+                {cost.alternatives.map((alt, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    className="block w-full text-left underline-offset-2 hover:underline"
+                    onClick={() => {
+                      // Brukeren velger den forkastede tolkningen: sett pakning deretter.
+                      if (alt.basis === "pakning" && alt.baseUnitsPerPackage) {
+                        setPackageSize(String(alt.baseUnitsPerPackage));
+                        setPackageUnit(baseUnit);
+                      } else {
+                        setPackageSize("");
+                      }
+                    }}
+                  >
+                    Mente du {formatNok(alt.pricePerBaseUnit)}/{baseUnit}? {alt.explanation}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Avbryt</Button>
-          <Button onClick={submit} disabled={busy}>{busy && <Loader2 className="h-4 w-4 animate-spin" />} Opprett</Button>
+          <Button onClick={submit} disabled={busy || needsPackage}>{busy && <Loader2 className="h-4 w-4 animate-spin" />} Opprett</Button>
         </DialogFooter>
+
       </DialogContent>
     </Dialog>
   );
