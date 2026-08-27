@@ -24,7 +24,7 @@ export const GRAIN_LEVELS: Array<{
   { key: "fint", label: "Fint", min: 0, max: 26, rangeText: "under 26 %" },
   { key: "halvgrovt", label: "Halvgrovt", min: 26, max: 51, rangeText: "26–50,9 %" },
   { key: "grovt", label: "Grovt", min: 51, max: 76, rangeText: "51–75,9 %" },
-  { key: "ekstra_grovt", label: "Ekstra grovt", min: 76, max: null, rangeText: "fra 76 %" },
+  { key: "ekstra_grovt", label: "Ekstra grovt", min: 76, max: null, rangeText: "76 % og over" },
 ];
 
 export function grainCategoryFromPct(pct: number): GrainCategory {
@@ -37,14 +37,6 @@ export function grainCategoryFromPct(pct: number): GrainCategory {
 export function grainLevelLabel(key: string | null | undefined): string {
   return GRAIN_LEVELS.find((l) => l.key === key)?.label ?? "Ukjent";
 }
-
-/** Mark-nøkler i label_marks, én per grovhetsnivå. */
-export const GRAIN_MARK_KEY: Record<GrainCategory, string> = {
-  fint: "brodskalan_fint",
-  halvgrovt: "brodskalan_halvgrovt",
-  grovt: "brodskalan_grovt",
-  ekstra_grovt: "brodskalan_ekstra_grovt",
-};
 
 export const SIFTED_CLASSIFICATIONS = ["sifted_flour", "other_flour"];
 export const COARSE_CLASSIFICATIONS = ["whole_grain_flour", "whole_grains", "gluten_free_grain"];
