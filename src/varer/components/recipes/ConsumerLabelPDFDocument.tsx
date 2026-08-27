@@ -126,8 +126,6 @@ export function ConsumerLabelPDFDocument({
           <View style={styles.marks}>
             {data.grainMarkImage ? (
               <Image src={data.grainMarkImage} style={{ width: 34, height: 34, objectFit: "contain" }} />
-            ) : data.grainMarkFallbackText ? (
-              <Text style={styles.markBox}>{data.grainMarkFallbackText}</Text>
             ) : null}
             {data.keyholeMark && <Text style={styles.markBox}>Nøkkelhullet</Text>}
           </View>
