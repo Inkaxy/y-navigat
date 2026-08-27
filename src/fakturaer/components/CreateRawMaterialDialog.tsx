@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -7,12 +7,13 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { AlertTriangle, Loader2 } from "lucide-react";
 import { formatNok } from "@/fakturaer/lib/constants";
 import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
 import { ITEM_TYPES, defaultCategoryFor, type ItemType } from "@/ravarer/lib/itemTypes";
 import { CategorySelectItems, NEW_CATEGORY_VALUE } from "@/ravarer/components/CategorySelectItems";
 import { InvoiceDocumentButton } from "@/fakturaer/components/InvoiceDocumentButton";
+import { CANONICAL_BASE_UNITS, CANONICAL_PACKAGE_UNITS, fmtNum, normalizeUnit, resolveLineCost } from "@/fakturaer/lib/units";
 
 interface Props {
   open: boolean;
@@ -22,13 +23,13 @@ interface Props {
   onCreated?: (rawMaterialId: string) => void;
 }
 
-const UNIT_TO_BASE: Record<string, string> = { g: "kg", kg: "kg", ml: "l", l: "l", stk: "stk", pakke: "stk" };
-function toBaseFactor(from: string | null, to: string): number {
-  if (!from) return 1;
-  if (from === to) return 1;
-  const m: Record<string, [string, number]> = { g: ["kg", 0.001], ml: ["l", 0.001] };
-  const e = m[from];
-  return e && e[0] === to ? e[1] : 1;
+/** Basisenhet utledet av fakturaenheten — kun et forslag brukeren kan overstyre. */
+function inferBaseUnit(unit: string | null | undefined): string {
+  const u = normalizeUnit(unit);
+  if (u === "g" || u === "kg") return "kg";
+  if (u === "ml" || u === "cl" || u === "dl" || u === "l") return "l";
+  if (u === "stk") return "stk";
+  return "kg";
 }
 
 export function CreateRawMaterialDialog({ open, onOpenChange, line, onCreated }: Props) {
@@ -46,12 +47,11 @@ export function CreateRawMaterialDialog({ open, onOpenChange, line, onCreated }:
     if (!line || !open) return;
     setItemType("ravare");
     setName(line.description ?? "");
-    const inferred = UNIT_TO_BASE[(line.unit ?? "").toLowerCase()] ?? "kg";
-    setBaseUnit(inferred);
+    setBaseUnit(inferBaseUnit(line.unit));
     // NB: line.quantity er ANTALL pakninger på fakturaen — ikke pakningsstørrelsen.
     // Pakningsstørrelsen må fylles inn manuelt (f.eks. 25 kg pr sekk).
     setPackageSize("");
-    setPackageUnit(line.unit ?? "");
+    setPackageUnit(normalizeUnit(line.unit) ?? "");
     setCategory("");
     setNewCategory(false);
   }, [line, open]);
