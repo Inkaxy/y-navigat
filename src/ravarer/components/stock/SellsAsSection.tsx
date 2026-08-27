@@ -18,10 +18,14 @@ import {
   useUpdateProductLink,
 } from "@/ravarer/hooks/useStock";
 
+const BASE = "__base__";
+const CUSTOM = "__custom__";
+
 /** «Selges som» — kobling mellom innkjøpt handelsvare og varene som selges. */
 export function SellsAsSection({ rm }: { rm: RawMaterialRow }) {
   const { canWrite } = useRavarer();
   const { data: links = [] } = useRawMaterialProducts(rm.id);
+  const { data: units = [] } = useRawMaterialUnits(rm.id);
   const link = useLinkProduct();
   const updateLink = useUpdateProductLink();
   const removeLink = useDeleteProductLink();
