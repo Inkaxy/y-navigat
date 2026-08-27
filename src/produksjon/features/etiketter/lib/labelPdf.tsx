@@ -77,9 +77,10 @@ function valueFor(
       return { text: barcodeText(data) };
     case "brodskala": {
       // Brødskala'n skal vises som det offisielle merket, ikke som et tall.
-      const mark = brodskalanFor(
-        grainCategoryFromBreadscaleValue(data.felter?.brodskala),
-      );
+      // Beregnet grovhet vinner over manuelt satt `products.breadscale_value`.
+      const mark =
+        brodskalanFor(data.felter?.brodskala_beregnet as string | null | undefined) ??
+        brodskalanFor(grainCategoryFromBreadscaleValue(data.felter?.brodskala));
       return { image: mark?.src ?? null, text: mark ? mark.label : "" };
     }
     case "utskriftstidspunkt":
