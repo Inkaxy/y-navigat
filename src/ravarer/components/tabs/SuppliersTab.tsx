@@ -196,7 +196,7 @@ export function SuppliersTab({ rm }: Props) {
                   <tr key={h.id} className="border-t border-line-subtle">
                     <td className="py-2">{formatDate(h.effective_date)}</td>
                     <td className="py-2 text-ink-secondary">{h.supplier_id ? supplierMap.get(h.supplier_id)?.name ?? "—" : "—"}</td>
-                    <td className="py-2 text-right tabular-nums">{formatNok(h.price)}</td>
+                    <td className="py-2 text-right tabular-nums">{formatNok(Number(h.price) * unitFactor)}</td>
                     <td className="py-2"><Badge variant="outline">{h.source}</Badge></td>
                     <td className="py-2">
                       {h.invoice_id ? (
