@@ -2,7 +2,7 @@ import { useState } from "react";
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, Plus, Trash2, MoreVertical, Copy, ArrowUp, ArrowDown, FileText, Wheat } from "lucide-react";
+import { GripVertical, Plus, Trash2, MoreVertical, Copy, ArrowUp, ArrowDown, FileText, Wheat, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { RawMaterialAutocomplete } from "@/varer/components/products/RawMaterialAutocomplete";
+import { useStockTrackedRawMaterials } from "@/varer/hooks/useStockTrackedRawMaterials";
 import {
   PART_TYPE_OPTIONS, PREFERMENT_KIND_OPTIONS, bakersPercentFor, computePartSummary,
   fmtG, fmtPercent, gramsFromPercent, fromGrams, isFlourLine, toGrams,
@@ -227,6 +228,8 @@ function SortableLine({
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: line.id });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
+  const { data: trackedIds } = useStockTrackedRawMaterials();
+  const stockTracked = !!line.raw_material_id && !!trackedIds?.has(line.raw_material_id);
   const unmatched = !line.raw_material_id;
   const flour = isFlourLine(line);
   const computedPct = line._displayPercent ?? bakersPercentFor(line, totalFlourG);
@@ -299,6 +302,11 @@ function SortableLine({
           }}
           placeholder={line.ingredient_name ? `(ukoblet) ${line.ingredient_name}` : "Velg råvare…"}
         />
+        {stockTracked && (
+          <Badge variant="outline" className="mt-1 gap-1 text-[10px]" title="Trekkes fra lager ved kjørt pakkseddel">
+            <Package className="h-3 w-3" /> Lagerføres
+          </Badge>
+        )}
       </div>
 
       <div className="col-span-2">
