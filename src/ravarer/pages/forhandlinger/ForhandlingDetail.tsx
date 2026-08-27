@@ -45,6 +45,7 @@ export default function ForhandlingDetail() {
   });
 
   const rmName = (rid: string) => rawMaterials.find((r) => r.id === rid)?.name ?? "—";
+  const rmBaseUnit = (rid: string) => rawMaterials.find((r) => r.id === rid)?.base_unit ?? null;
   const supName = (sid: string) => suppliers.find((s) => s.id === sid)?.name ?? "—";
   const recById = (rcId: string) => recipients.find((r) => r.id === rcId);
 
