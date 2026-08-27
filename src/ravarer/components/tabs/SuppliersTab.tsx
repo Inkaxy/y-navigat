@@ -29,20 +29,27 @@ export function SuppliersTab({ rm }: Props) {
   const [linkOpen, setLinkOpen] = useState<{ open: boolean; existingId?: string }>({ open: false });
   const [supplierOpen, setSupplierOpen] = useState(false);
   const [priceOpen, setPriceOpen] = useState(false);
+  const [priceUnitId, setPriceUnitId] = useState<string>(BASE_UNIT_KEY);
+
+  const { data: units = [] } = useRawMaterialUnits(rm.id);
+  const selectedUnit = units.find(u => u.id === priceUnitId) ?? null;
+  const unitFactor = selectedUnit ? Number(selectedUnit.units_in_base) || 1 : 1;
+  const unitLabel = selectedUnit ? selectedUnit.unit_label : rm.base_unit;
+  const unitSuffix = selectedUnit ? ` (${selectedUnit.units_in_base} ${rm.base_unit})` : "";
 
   const supplierMap = useMemo(() => new Map(allSuppliers.map(s => [s.id, s])), [allSuppliers]);
 
   const chartData = useMemo(() => {
     const sorted = [...history].sort((a, b) => a.effective_date.localeCompare(b.effective_date));
-    const grouped: Record<string, any> = {};
+    const grouped: Record<string, Record<string, string | number>> = {};
     for (const h of sorted) {
       const key = h.effective_date;
       grouped[key] ??= { date: key };
       const supplier = h.supplier_id ? supplierMap.get(h.supplier_id)?.name ?? "Ukjent" : "Manuell";
-      grouped[key][supplier] = Number(h.price);
+      grouped[key][supplier] = Number(h.price) * unitFactor;
     }
     return Object.values(grouped);
-  }, [history, supplierMap]);
+  }, [history, supplierMap, unitFactor]);
 
   const supplierLines = useMemo(() => {
     const set = new Set<string>();
