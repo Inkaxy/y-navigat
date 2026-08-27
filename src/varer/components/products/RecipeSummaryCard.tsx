@@ -101,6 +101,7 @@ export function RecipeSummaryCard({ productId, productName, legalEntityId, canWr
     _rm: l.raw_material_id ? (rmQuery.data ?? {})[l.raw_material_id] ?? null : null,
   }));
   const totals = computeTotals(lines, recipe.unit_weight_grams);
+  const trackedCount = lines.filter((l: any) => l.raw_material_id && trackedIds?.has(l.raw_material_id)).length;
 
   return (
     <Card>
@@ -121,6 +122,11 @@ export function RecipeSummaryCard({ productId, productName, legalEntityId, canWr
         <Stat label="Deigvekt" value={`${fmtG(totals.totalDoughG)} g`} />
         <Stat label="Ingredienser" value={`${lines.length}`} />
       </CardContent>
+      {trackedCount > 0 && (
+        <CardContent className="pt-0 text-xs text-muted-foreground">
+          Lagertrekk aktivt: {trackedCount} av {lines.length} ingredienser lagerføres og trekkes ved kjørt pakkseddel.
+        </CardContent>
+      )}
     </Card>
   );
 }
