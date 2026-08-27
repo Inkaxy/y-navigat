@@ -1,5 +1,8 @@
 /** Sentral konstanter for Råvarer-appen. */
+import { CANONICAL_BASE_UNITS, CANONICAL_PACKAGE_UNITS } from "@/fakturaer/lib/units";
+
 export const APP_CODE = "ravarer" as const;
+
 
 /** Nøtterø Bakeri AS — default selskap (samme som Varer i Pulje 1). */
 export const NB_LEGAL_ENTITY_ID = "751709bc-04b3-4449-867d-b97faa9ab373" as const;
