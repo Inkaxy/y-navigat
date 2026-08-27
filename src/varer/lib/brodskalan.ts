@@ -10,7 +10,9 @@ import fintSrc from "@/assets/brodskalan/brodskalan-fint.png";
 import grovtSrc from "@/assets/brodskalan/brodskalan-grovt.png";
 import halvgrovtSrc from "@/assets/brodskalan/brodskalan-halvgrovt.png";
 
-export type GrainCategory = "fint" | "halvgrovt" | "grovt" | "ekstra_grovt";
+// Én felles definisjon av kategoriene — den bor i breadscale.ts.
+export type { GrainCategory } from "@/varer/lib/breadscale";
+import { GRAIN_LEVELS, type GrainCategory } from "@/varer/lib/breadscale";
 
 export interface BrodskalanMarkInfo {
   category: GrainCategory;
@@ -20,12 +22,17 @@ export interface BrodskalanMarkInfo {
   alt: string;
 }
 
-const BASE: Record<GrainCategory, { src: string; label: string; rangeText: string }> = {
-  fint: { src: fintSrc, label: "Fint", rangeText: "0–25 %" },
-  halvgrovt: { src: halvgrovtSrc, label: "Halvgrovt", rangeText: "26–50 %" },
-  grovt: { src: grovtSrc, label: "Grovt", rangeText: "51–75 %" },
-  ekstra_grovt: { src: ekstraGrovtSrc, label: "Ekstra grovt", rangeText: "76–100 %" },
+const SRC: Record<GrainCategory, string> = {
+  fint: fintSrc,
+  halvgrovt: halvgrovtSrc,
+  grovt: grovtSrc,
+  ekstra_grovt: ekstraGrovtSrc,
 };
+
+/** Etiketter og rekkevidder hentes fra GRAIN_LEVELS så tersklene aldri drifter. */
+const BASE = Object.fromEntries(
+  GRAIN_LEVELS.map((l) => [l.key, { src: SRC[l.key], label: l.label, rangeText: l.rangeText }]),
+) as Record<GrainCategory, { src: string; label: string; rangeText: string }>;
 
 export const BRODSKALAN_MARKS: Record<GrainCategory, BrodskalanMarkInfo> = Object.fromEntries(
   (Object.keys(BASE) as GrainCategory[]).map((key) => [
