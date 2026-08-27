@@ -31,6 +31,7 @@ import { LiveItemSearch } from "./components/LiveItemSearch";
 import { LiveItemCard } from "./components/LiveItemCard";
 import { LiveTidslinjeDrawer } from "./components/LiveTidslinjeDrawer";
 import { formatNok } from "@/ravarer/lib/constants";
+import { UnitPriceHint } from "@/ravarer/components/forhandlinger/UnitPriceHint";
 
 export default function LiveForhandlingWorkspace() {
   const { id = "" } = useParams<{ id: string }>();

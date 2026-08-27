@@ -27,6 +27,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { formatNok, formatNumber } from "@/ravarer/lib/constants";
+import { UnitPriceHint } from "@/ravarer/components/forhandlinger/UnitPriceHint";
 import { osloDateISO } from "@/lib/osloDate";
 
 type Step = 1 | 2 | 3 | 4 | 5;
