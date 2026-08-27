@@ -17,6 +17,9 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { Link } from "react-router-dom";
 import { PurchaseStatsCard } from "@/ravarer/components/PurchaseStatsCard";
 import { osloTodayISO } from "@/lib/osloDate";
+import { useRawMaterialUnits } from "@/ravarer/hooks/useRawMaterialUnits";
+
+const BASE_UNIT_KEY = "__base";
 
 interface Props { rm: RawMaterialRow; }
 
