@@ -88,7 +88,8 @@ export default function LagerPage() {
 
         <Tabs defaultValue="lager" className="space-y-5">
           <TabsList>
-            <TabsTrigger value="lager">Lager</TabsTrigger>
+            <TabsTrigger value="lager">Videresalg</TabsTrigger>
+            <TabsTrigger value="alle">Alle lagerførte varer</TabsTrigger>
             <TabsTrigger value="fortjeneste">Fortjeneste</TabsTrigger>
           </TabsList>
 
