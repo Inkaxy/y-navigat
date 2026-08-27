@@ -17,10 +17,10 @@ interface Props {
 }
 
 const BREADSCALE: Array<{ value: number; label: string; desc: string; category: GrainCategory }> = [
-  { value: 1, label: "Fint", desc: "0–25 % grovt", category: "fint" },
-  { value: 2, label: "Halvgrovt", desc: "26–50 % grovt", category: "halvgrovt" },
-  { value: 3, label: "Grovt", desc: "51–75 % grovt", category: "grovt" },
-  { value: 4, label: "Ekstra grovt", desc: "76–100 % grovt", category: "ekstra_grovt" },
+  { value: 1, label: "Fint", desc: "under 26 % grovt", category: "fint" },
+  { value: 2, label: "Halvgrovt", desc: "26–50,9 % grovt", category: "halvgrovt" },
+  { value: 3, label: "Grovt", desc: "51–75,9 % grovt", category: "grovt" },
+  { value: 4, label: "Ekstra grovt", desc: "76 % og over grovt", category: "ekstra_grovt" },
 ];
 
 export function CertificationsEditor({ productId, canWrite }: Props) {

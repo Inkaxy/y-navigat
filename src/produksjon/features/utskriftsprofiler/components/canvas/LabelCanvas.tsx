@@ -677,12 +677,18 @@ function CanvasFieldBox({
       `[${catalog.label(field.field_type)}]`
     );
   } else if (field.field_type === "brodskala") {
+    // Bare et eksempelbilde i designeren — varens faktiske trinn beregnes ved utskrift.
     content = (
-      <img
-        src={BRODSKALAN_MARKS.grovt.src}
-        alt=""
-        className="pointer-events-none h-full w-full object-contain opacity-70"
-      />
+      <div className="pointer-events-none relative h-full w-full">
+        <img
+          src={BRODSKALAN_MARKS.grovt.src}
+          alt="Eksempel på Brødskala'n-merke"
+          className="h-full w-full object-contain opacity-60"
+        />
+        <span className="absolute bottom-0 left-1/2 -translate-x-1/2 rounded-sm bg-foreground/80 px-1 text-[7px] font-semibold uppercase leading-tight tracking-wide text-background">
+          Eksempel
+        </span>
+      </div>
     );
   } else if (field.field_type === "firmanavn" && companyName) {
     measureString = companyName;
