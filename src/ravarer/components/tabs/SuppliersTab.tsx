@@ -169,7 +169,7 @@ export function SuppliersTab({ rm }: Props) {
                 <YAxis fontSize={11} tickFormatter={(v) => `${v} kr`} />
                 <Tooltip formatter={(v: any) => formatNok(Number(v))} />
                 <Legend />
-                {rm.agreed_price && <ReferenceLine y={Number(rm.agreed_price)} stroke="hsl(var(--primary))" strokeDasharray="4 4" label={{ value: "Avtalt", position: "right", fontSize: 11 }} />}
+                {rm.agreed_price && <ReferenceLine y={Number(rm.agreed_price) * unitFactor} stroke="hsl(var(--primary))" strokeDasharray="4 4" label={{ value: "Avtalt", position: "right", fontSize: 11 }} />}
                 {supplierLines.map((name, i) => (
                   <Line key={name} type="monotone" dataKey={name} stroke={`hsl(${(i * 67) % 360} 65% 50%)`} strokeWidth={2} dot={{ r: 3 }} connectNulls />
                 ))}
