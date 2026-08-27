@@ -137,13 +137,26 @@ export function SuppliersTab({ rm }: Props) {
       </Card>
 
       <Card className="p-5 space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-base font-semibold">Prishistorikk</h3>
-          {canWrite && (
-            <Button size="sm" onClick={() => setPriceOpen(true)}>
-              <TrendingUp className="mr-1.5 h-3.5 w-3.5" /> Registrer pris
-            </Button>
-          )}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h3 className="text-base font-semibold">Prisutvikling — kr per {unitLabel}{unitSuffix}</h3>
+          <div className="flex items-center gap-2">
+            <Select value={priceUnitId} onValueChange={setPriceUnitId}>
+              <SelectTrigger className="h-9 w-[200px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={BASE_UNIT_KEY}>Per {rm.base_unit} (baseenhet)</SelectItem>
+                {units.map(u => (
+                  <SelectItem key={u.id} value={u.id}>
+                    Per {u.unit_label} ({u.units_in_base} {rm.base_unit})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {canWrite && (
+              <Button size="sm" onClick={() => setPriceOpen(true)}>
+                <TrendingUp className="mr-1.5 h-3.5 w-3.5" /> Registrer pris
+              </Button>
+            )}
+          </div>
         </div>
         {chartData.length === 0 ? (
           <p className="py-8 text-center text-sm text-ink-secondary">Ingen prisobservasjoner ennå.</p>
