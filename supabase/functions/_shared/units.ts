@@ -684,6 +684,7 @@ export function resolveLineCost(input: ResolveLineCostInput): ResolveLineCostRes
     const count = Math.round(chosen.baseQuantity / chosen.baseUnitsPerPackage);
     explanation += ` (= ${count} ${plural(pkg?.packageUnitLabel && !isBaseUnit(pkg.packageUnitLabel) ? pkg.packageUnitLabel : "pakning", count)})`;
   }
+  if (packageNote) explanation += ` ${packageNote}`;
   if (swapNote) explanation += ` ${swapNote}`;
 
   return {
@@ -696,6 +697,7 @@ export function resolveLineCost(input: ResolveLineCostInput): ResolveLineCostRes
     checks,
     alternatives,
     needsInput: null,
-    reason: swapNote,
+    reason: packageNote ?? swapNote,
+
   };
 }
