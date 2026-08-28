@@ -69,16 +69,8 @@ const styles = StyleSheet.create({
   factLabel: { fontSize: 7.5, textTransform: "uppercase", letterSpacing: 0.6, color: "#8a8a8a" },
   factValue: { fontSize: 11, fontWeight: 700, marginTop: 1 },
 
-  footer: {
-    position: "absolute",
-    bottom: 24,
-    left: 56,
-    right: 56,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    fontSize: 8,
-    color: "#a0a0a0",
-  },
+  factsSeal: { width: 46, height: 46, objectFit: "contain", opacity: 0.85, marginLeft: "auto" },
+
 });
 
 function fmtDate(d: Date): string {
