@@ -7,6 +7,7 @@ import {
   NUT_FIELDS,
   type TopLine,
 } from "../_shared/declaration-core.ts";
+import { syncAutoProductsForRecipe } from "../_shared/effective-declaration.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -423,7 +424,21 @@ Deno.serve(async (req) => {
       return json({ error: "save_failed", detail: upsertErr.message }, 500);
     }
 
-    return json(row);
+    // Effektiv deklarasjon: produkter koblet til oppskriften der modus er «auto»
+    // får snapshotet oppdatert med den ferske beregningen.
+    let synced = 0;
+    try {
+      synced = await syncAutoProductsForRecipe(service, recipeId, {
+        ingredient_declaration: row.ingredient_declaration,
+        allergens: row.allergens,
+        nutrition_per_100g: row.nutrition_per_100g,
+        coverage_by_weight_pct: row.coverage_by_weight_pct,
+      });
+    } catch (e) {
+      console.error("compute-recipe-label sync", e);
+    }
+
+    return json({ ...row, synced_products: synced });
   } catch (e) {
     console.error("compute-recipe-label", e);
     return json({ error: "internal_error" }, 500);
