@@ -90,6 +90,25 @@ export default function RecipeDetail() {
   });
   const composite = compositeQuery.data ?? null;
 
+  /** Hvilke oppskrifter bruker denne grunnoppskriften som ingrediens? */
+  const usedInQuery = useQuery({
+    queryKey: ["recipe-used-in", composite?.id],
+    enabled: !!composite?.id,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("recipe_lines")
+        .select("recipe_id, recipes(id, name)")
+        .eq("raw_material_id", composite!.id);
+      const seen = new Map<string, string>();
+      for (const row of (data ?? []) as { recipe_id: string; recipes: { id: string; name: string | null } | null }[]) {
+        if (row.recipes?.id && row.recipes.id !== id) seen.set(row.recipes.id, row.recipes.name || "Uten navn");
+      }
+      return Array.from(seen, ([rid, name]) => ({ id: rid, name }));
+    },
+  });
+  const usedIn = usedInQuery.data ?? [];
+
+
   const recipe = recipeQuery.data;
 
   const [header, setHeader] = useState<any>({});
