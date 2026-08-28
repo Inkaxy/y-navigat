@@ -37,7 +37,7 @@ const styles = StyleSheet.create({
 
   tableHead: { flexDirection: "row", borderBottomWidth: 0.5, borderBottomColor: "#c9c2b6", paddingBottom: 3, marginBottom: 3 },
   th: { fontSize: 7.5, textTransform: "uppercase", letterSpacing: 0.6, color: "#8a8a8a" },
-  row: { flexDirection: "row", paddingVertical: 3.5, borderBottomWidth: 0.25, borderBottomColor: "#ece8e0" },
+  row: { flexDirection: "row", paddingVertical: 3.5, paddingHorizontal: 3, borderBottomWidth: 0.25, borderBottomColor: "#ece8e0" },
   colName: { flex: 1, paddingRight: 10 },
   colGrams: { width: 72, textAlign: "right" },
   colPct: { width: 62, textAlign: "right" },
