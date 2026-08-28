@@ -53,7 +53,7 @@ const styles = StyleSheet.create({
     marginBottom: 3,
   },
   th: { fontSize: 8, textTransform: "uppercase", color: "#555", letterSpacing: 0.4 },
-  row: { flexDirection: "row", alignItems: "center", paddingVertical: 4, borderBottomWidth: 0.5, borderBottomColor: "#ddd" },
+  row: { flexDirection: "row", alignItems: "center", paddingVertical: 4, paddingHorizontal: 3, borderBottomWidth: 0.5, borderBottomColor: "#ddd" },
   colCheck: { width: 22 },
   colName: { flex: 1, paddingRight: 8 },
   colGrams: { width: 78, textAlign: "right" },
@@ -63,6 +63,7 @@ const styles = StyleSheet.create({
   ingNameFlour: { fontSize: 12, fontWeight: 700 },
   ingGrams: { fontSize: 13, fontWeight: 700 },
   ingPct: { fontSize: 10, color: "#888" },
+
 
   totalRow: { flexDirection: "row", alignItems: "center", paddingTop: 5, marginTop: 1, borderTopWidth: 1, borderTopColor: "#111" },
   totalLabel: { flex: 1, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.4 },
