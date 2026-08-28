@@ -39,6 +39,30 @@ import { RecipeImageUpload } from "@/varer/components/recipes/RecipeImageUpload"
 import { BASE_RECIPE_CATEGORY, costPerKg } from "@/varer/lib/halvfabrikat";
 import { copyRecipe } from "@/varer/lib/copyRecipe";
 import { Switch } from "@/components/ui/switch";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
+/** Redigerbare felter på oppskriftshodet — speiler `recipes`-kolonnene vi eier her. */
+type HeaderState = {
+  name: string;
+  category: string;
+  status: string;
+  description: string;
+  dough_piece_grams: number | string;
+  dough_waste_pct: number | string;
+  finished_weight_grams: number | string;
+  measured_per_kg: boolean;
+  units_per_batch: number | string;
+  target_dough_temp_celsius: number | null;
+  friction_factor_celsius: number | null;
+  mixing_speed1_minutes: number | string;
+  mixing_speed2_minutes: number | string;
+  autolyse_minutes: number | string;
+  notes: string;
+  decor_notes: string;
+};
 
 
 export default function RecipeDetail() {
@@ -114,7 +138,7 @@ export default function RecipeDetail() {
 
   const recipe = recipeQuery.data;
 
-  const [header, setHeader] = useState<any>({});
+  const [header, setHeader] = useState<Partial<HeaderState>>({});
   const [parts, setParts] = useState<EditorPart[]>([]);
   const [lines, setLines] = useState<EditorLine[]>([]);
   const [steps, setSteps] = useState<EditorStep[]>([]);
@@ -126,6 +150,9 @@ export default function RecipeDetail() {
   const [copying, setCopying] = useState(false);
   /** Inline-redigering av tittelen øverst — samme felt som i Oppskriftsinfo. */
   const [titleEditing, setTitleEditing] = useState(false);
+  /** Bekreftelse når grunnoppskrift slås AV mens en råvare er koblet. */
+  const [baseOffOpen, setBaseOffOpen] = useState(false);
+  const [deactivating, setDeactivating] = useState(false);
 
   /** En fersk kopi åpnes rett i navneredigering (?rename=1). */
   const [searchParams, setSearchParams] = useSearchParams();
@@ -137,8 +164,9 @@ export default function RecipeDetail() {
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
 
-  /** Grunnoppskrift: kategorien er markøren, råvare-koblingen gjør den valgbar. */
-  const isBaseRecipe = (header.category ?? "") === BASE_RECIPE_CATEGORY || !!composite;
+  /** Grunnoppskrift: KATEGORIEN er sannheten. Råvare-koblingen er kun opplysning,
+   *  ellers ville bryteren sprette på igjen så lenge en råvare finnes. */
+  const isBaseRecipe = (header.category ?? "") === BASE_RECIPE_CATEGORY;
 
 
 
@@ -333,7 +361,7 @@ export default function RecipeDetail() {
   useUnsavedChangesWarning(dirty && canWrite);
 
 
-  function patchHeader(patch: Record<string, any>) {
+  function patchHeader(patch: Partial<HeaderState>) {
     setHeader((h: any) => ({ ...h, ...patch }));
     setDirty(true);
   }
@@ -642,9 +670,41 @@ export default function RecipeDetail() {
     if (on) {
       patchHeader({ category: BASE_RECIPE_CATEGORY });
       if (!composite) setRawMatOpen(true);
-    } else if ((header.category ?? "") === BASE_RECIPE_CATEGORY) {
-      patchHeader({ category: "" });
+      return;
     }
+    // Er en råvare koblet må brukeren si hva som skal skje med den.
+    if (composite) {
+      setBaseOffOpen(true);
+      return;
+    }
+    if ((header.category ?? "") === BASE_RECIPE_CATEGORY) patchHeader({ category: "" });
+  }
+
+  /** Fjern kun merket — råvaren består og kan fortsatt brukes. */
+  function clearBaseRecipeMark() {
+    patchHeader({ category: "" });
+    setBaseOffOpen(false);
+  }
+
+  /** Deaktiver den koblede råvaren. Aldri slett — den kan ligge i andre oppskrifter. */
+  async function deactivateComposite() {
+    if (!composite) return;
+    setDeactivating(true);
+    const { error } = await supabase
+      .from("raw_materials")
+      .update({ is_active: false } as never)
+      .eq("id", composite.id);
+    setDeactivating(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    patchHeader({ category: "" });
+    setBaseOffOpen(false);
+    qc.invalidateQueries({ queryKey: ["recipe-composite", recipe?.id] });
+    qc.invalidateQueries({ queryKey: ["raw_materials_autocomplete"] });
+    qc.invalidateQueries({ queryKey: ["raw_materials"] });
+    toast.success(`Råvaren «${composite.name}» er deaktivert`);
   }
 
 
