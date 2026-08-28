@@ -1129,6 +1129,42 @@ export default function RecipeDetail() {
         existing={composite}
       />
 
+      <AlertDialog open={baseOffOpen} onOpenChange={setBaseOffOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Slå av grunnoppskrift?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Råvaren «{composite?.name}» er koblet til denne oppskriften.
+              {usedIn.length > 0 && (
+                <>
+                  {" "}
+                  <b className="text-warning">
+                    Den brukes i {usedIn.length} annen oppskrift{usedIn.length === 1 ? "" : "er"}
+                  </b>{" "}
+                  — deaktivering gjør at den ikke kan velges i nye linjer.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col gap-2 sm:flex-row">
+            <AlertDialogCancel disabled={deactivating}>Avbryt</AlertDialogCancel>
+            <Button variant="outline" disabled={deactivating} onClick={clearBaseRecipeMark}>
+              Behold råvaren, fjern merket
+            </Button>
+            <AlertDialogAction
+              disabled={deactivating}
+              onClick={(e) => {
+                e.preventDefault();
+                void deactivateComposite();
+              }}
+            >
+              {deactivating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Deaktiver råvaren også
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <ShareRecipeDialog
         open={shareOpen}
         onOpenChange={setShareOpen}
@@ -1136,6 +1172,7 @@ export default function RecipeDetail() {
         recipeName={header.name || recipe.name || "Oppskrift"}
         canWrite={canWrite}
       />
+
     </>
 
 
