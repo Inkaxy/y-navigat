@@ -20,6 +20,8 @@ import { NutritionSection } from "./NutritionSection";
 import { GrainScaleSection } from "./GrainScaleSection";
 import { KeyholeSection, type KeyholeResult } from "./KeyholeSection";
 import { LABEL_SIZES, type LabelSizeKey } from "../ConsumerLabelPDFDocument";
+import { EffectiveSourceSection, buildEffectiveForRecipe, SourceBadge } from "./EffectiveSourceSection";
+import { NUTRITION_KEYS, type RecipeLabelSnapshot } from "@/varer/lib/effectiveDeclaration";
 
 interface Props {
   recipeId: string;
@@ -78,6 +80,17 @@ export function LabelTab({ recipeId, recipeName, recipe, flourLines, legalEntity
     },
   });
 
+  const linkedProductsQuery = useQuery({
+    queryKey: ["recipe-linked-products", recipeId],
+    queryFn: async () => {
+      const { count } = await supabase
+        .from("product_recipe_links")
+        .select("id", { count: "exact", head: true })
+        .eq("recipe_id", recipeId);
+      return count ?? 0;
+    },
+  });
+
   const saveClaim = useMutation({
     mutationFn: async (input: { field: "label_claim_keyhole" | "label_claim_grain"; value: boolean }) => {
       const { data: u } = await supabase.auth.getUser();
@@ -108,18 +121,24 @@ export function LabelTab({ recipeId, recipeName, recipe, flourLines, legalEntity
   const recompute = () =>
     compute.mutate(recipeId, { onSuccess: () => toast.success("Merkedata beregnet på nytt") });
 
-  const nutritionRows = useMemo(
-    () =>
-      NUT_ROWS.map((r) => ({
-        label: r.indent ? `— ${r.label}` : r.label,
-        value:
-          label?.nutrition_per_100g?.[r.key] == null
-            ? "—"
-            : `${fmtNum(label!.nutrition_per_100g![r.key], r.d)} ${r.unit}`,
-        indent: r.indent,
-      })),
-    [label],
+  /** Effektiv kilde: det som faktisk følger produktet (manuell eller beregnet). */
+  const effective = useMemo(
+    () => buildEffectiveForRecipe(recipe, (label ?? null) as RecipeLabelSnapshot | null),
+    [recipe, label],
   );
+  const manualMode = effective.mode === "manual";
+
+  const nutritionRows = useMemo(() => {
+    const src = manualMode ? effective.nutrition : label?.nutrition_per_100g;
+    return NUT_ROWS.map((r) => ({
+      label: r.indent ? `— ${r.label}` : r.label,
+      value:
+        src?.[r.key as (typeof NUTRITION_KEYS)[number]] == null
+          ? "—"
+          : `${fmtNum(Number(src[r.key as (typeof NUTRITION_KEYS)[number]]), r.d)} ${r.unit}`,
+      indent: r.indent,
+    }));
+  }, [label, effective, manualMode]);
 
   async function printLabel() {
     if (!label) return;
@@ -140,8 +159,8 @@ export function LabelTab({ recipeId, recipeName, recipe, flourLines, legalEntity
           size={size}
           data={{
             productName: recipeName,
-            ingredientText: (label.ingredient_declaration ?? "").replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim(),
-            allergenTerms: label.allergens?.contains ?? [],
+            ingredientText: effective.ingredientText ?? "",
+            allergenTerms: effective.contains,
             netWeightText: recipe.unit_weight_grams ? `${Math.round(recipe.unit_weight_grams)} g` : null,
             shelfLifeText: recipe.shelf_life_days
               ? `Best før: ${recipe.shelf_life_days} dager fra produksjonsdato`
@@ -149,7 +168,7 @@ export function LabelTab({ recipeId, recipeName, recipe, flourLines, legalEntity
             storageText: recipe.storage_instructions ?? null,
             originText: recipe.country_of_origin ?? null,
             nutritionRows,
-            nutritionUsable: coverageOk,
+            nutritionUsable: manualMode ? !!effective.nutrition : coverageOk,
             producerName: entity?.name ?? null,
             producerAddress: entity
               ? [entity.address_line1, [entity.postal_code, entity.city].filter(Boolean).join(" ")]
