@@ -16,6 +16,7 @@ import {
   type GrainCategory,
 } from "@/varer/lib/breadscale";
 import { CoverageSection } from "./CoverageSection";
+import type { MissingNutritionRow } from "@/varer/hooks/useMissingNutrition";
 import { DeclarationSection } from "./DeclarationSection";
 import { NutritionSection } from "./NutritionSection";
 import { GrainScaleSection } from "./GrainScaleSection";
@@ -106,7 +107,7 @@ export function LabelTab({ recipeId, recipeName, recipe, flourLines, legalEntity
         .select("name, address_line1, postal_code, city")
         .eq("id", legalEntityId!)
         .maybeSingle();
-      return data as any;
+      return (data ?? null) as LegalEntityLabelInfo | null;
     },
   });
 
@@ -136,13 +137,13 @@ export function LabelTab({ recipeId, recipeName, recipe, flourLines, legalEntity
       qc.invalidateQueries({ queryKey: ["recipe-detail", recipeId] });
       toast.success("Merkevalget er lagret");
     },
-    onError: (e: any) => toast.error(e.message ?? "Kunne ikke lagre"),
+    onError: (e: unknown) => toast.error((e as Error).message ?? "Kunne ikke lagre"),
   });
 
   const label = labelQuery.data;
   const coveragePct = label?.coverage_by_weight_pct ?? null;
   const coverageOk = (coveragePct ?? 0) >= 90;
-  const missing = (label?.missing_data?.nutrition ?? []) as any[];
+  const missing = (label?.missing_data?.nutrition ?? []) as MissingNutritionRow[];
   const keyhole = (label?.keyhole ?? null) as KeyholeResult | null;
   const grainCategory: GrainCategory | null =
     (label?.grain_category as GrainCategory | null) ??
@@ -213,8 +214,8 @@ export function LabelTab({ recipeId, recipeName, recipe, flourLines, legalEntity
       const url = URL.createObjectURL(blob);
       window.open(url, "_blank");
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
-    } catch (e: any) {
-      toast.error(e?.message ?? "Kunne ikke lage etiketten");
+    } catch (e: unknown) {
+      toast.error((e as Error)?.message ?? "Kunne ikke lage etiketten");
     } finally {
       setPrinting(false);
     }
