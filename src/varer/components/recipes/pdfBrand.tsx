@@ -39,16 +39,17 @@ const s = StyleSheet.create({
   docName: { fontSize: 11, fontWeight: 700, color: INK, marginTop: 2, textAlign: "right" },
   docMeta: { fontSize: 8, color: MUTED, marginTop: 1, textAlign: "right" },
 
+  slimWrap: { position: "absolute", top: 10 },
   slimHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     borderBottomWidth: 0.5,
     borderBottomColor: BRONZE,
-    paddingBottom: 4,
-    marginBottom: 10,
+    paddingBottom: 3,
   },
   slimName: { fontSize: 8.5, color: MUTED },
+
 
   footer: {
     position: "absolute",
