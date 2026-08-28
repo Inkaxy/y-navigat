@@ -38,6 +38,7 @@ import { SaveAsRawMaterialDialog, type CompositeRawMaterial } from "@/varer/comp
 import { RecipeImageUpload } from "@/varer/components/recipes/RecipeImageUpload";
 import { BASE_RECIPE_CATEGORY, costPerKg } from "@/varer/lib/halvfabrikat";
 import { copyRecipe } from "@/varer/lib/copyRecipe";
+import { asDepartment, RECIPE_DEPARTMENT_LABEL, RECIPE_DEPARTMENTS } from "@/varer/lib/departments";
 import { Switch } from "@/components/ui/switch";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
@@ -48,6 +49,8 @@ import {
 type HeaderState = {
   name: string;
   category: string;
+  /** '' = ingen avdeling; ellers 'bakeri' | 'konditori'. */
+  department: string;
   status: string;
   description: string;
   dough_piece_grams: number | string;
@@ -176,6 +179,7 @@ export default function RecipeDetail() {
     setHeader({
       name: recipe.name ?? "",
       category: recipe.category ?? "",
+      department: asDepartment((recipe as { department?: string | null }).department) ?? "",
       status: recipe.status ?? "draft",
       description: recipe.description ?? "",
       dough_piece_grams: (recipe as any).dough_piece_grams ?? "",
@@ -327,6 +331,7 @@ export default function RecipeDetail() {
     (includeCosts: boolean): BuildRecipePDFInput => ({
       name: header.name || recipe?.name || "Oppskrift",
       category: header.category || null,
+      department: asDepartment(header.department),
       version: recipe?.version ?? null,
       description: header.description || null,
       imageUrl: recipe?.image_url ?? null,
@@ -473,6 +478,7 @@ export default function RecipeDetail() {
         .update({
           name: header.name || null,
           category: header.category || null,
+          department: header.department || null,
           status: header.status,
           description: header.description || null,
           notes: header.notes || null,
@@ -940,6 +946,19 @@ export default function RecipeDetail() {
               <Label className="text-xs">Kategori</Label>
               <Input value={header.category ?? ""} disabled={!editable} placeholder="f.eks. Surdeigsbrød"
                 onChange={(e) => patchHeader({ category: e.target.value })} />
+            </div>
+            <div>
+              <Label className="text-xs">Avdeling</Label>
+              <select
+                value={header.department ?? ""} disabled={!editable}
+                onChange={(e) => patchHeader({ department: e.target.value })}
+                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+              >
+                <option value="">Ingen</option>
+                {RECIPE_DEPARTMENTS.map((d) => (
+                  <option key={d} value={d}>{RECIPE_DEPARTMENT_LABEL[d]}</option>
+                ))}
+              </select>
             </div>
             <div>
               <Label className="text-xs">Status</Label>

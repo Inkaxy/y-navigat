@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
+import type { RecipeDepartment } from "@/varer/lib/departments";
 import {
   calcWaterTemp,
   computePartSummary,
@@ -60,6 +61,7 @@ export interface RecipePDFStep {
 export interface RecipePDFData {
   name: string;
   category: string | null;
+  department: RecipeDepartment | null;
   version: number | null;
   description: string | null;
   imageUrl: string | null;
@@ -93,6 +95,7 @@ export interface RecipePDFData {
 export interface BuildRecipePDFInput {
   name: string;
   category?: string | null;
+  department?: RecipeDepartment | null;
   version?: number | null;
   description?: string | null;
   imageUrl?: string | null;
@@ -218,6 +221,7 @@ export function buildRecipePDFData(input: BuildRecipePDFInput): RecipePDFData {
   return {
     name: input.name || "Oppskrift",
     category: input.category ?? null,
+    department: input.department ?? null,
     version: input.version ?? null,
     description: input.description ?? null,
     imageUrl: input.imageUrl ?? null,
