@@ -110,12 +110,14 @@ function pct(n: number | null | undefined, decimals = 1): string {
   return `${fmtNum(n, decimals)} %`;
 }
 
-function IngredientRow({ line, showPercent }: { line: RecipePDFLine; showPercent: boolean }) {
+function IngredientRow({ line, index, showPercent }: { line: RecipePDFLine; index: number; showPercent: boolean }) {
   return (
-    <View style={styles.row} wrap={false}>
+    <View style={[styles.row, zebraBg(index)]} wrap={false}>
       <View style={styles.colCheck}><View style={styles.checkbox} /></View>
       <View style={styles.colName}>
-        <Text style={line.isFlour ? styles.ingNameFlour : styles.ingName}>{line.name}</Text>
+        <Text style={line.isFlour ? styles.ingNameFlour : styles.ingName}>
+          {line.name}{line.isSubRecipe ? " †" : ""}
+        </Text>
       </View>
       <View style={styles.colGrams}><Text style={styles.ingGrams}>{fmtGrams(line.grams)} g</Text></View>
       {showPercent && (
@@ -136,7 +138,7 @@ function IngredientTable({ part, showPercent }: { part: RecipePDFPart; showPerce
         <View style={styles.colGrams}><Text style={[styles.th, { textAlign: "right" }]}>Vekt</Text></View>
         {showPercent && <View style={styles.colPct}><Text style={[styles.th, { textAlign: "right" }]}>Baker-%</Text></View>}
       </View>
-      {part.lines.map((l) => <IngredientRow key={l.id} line={l} showPercent={showPercent} />)}
+      {part.lines.map((l, i) => <IngredientRow key={l.id} line={l} index={i} showPercent={showPercent} />)}
       <View style={styles.totalRow}>
         <Text style={styles.totalLabel}>Sum {part.name.toLowerCase()}</Text>
         <Text style={styles.totalValue}>{fmtGrams(rounded)} g</Text>
@@ -145,6 +147,7 @@ function IngredientTable({ part, showPercent }: { part: RecipePDFPart; showPerce
     </View>
   );
 }
+
 
 export function RecipePDFDocument({ data }: { data: RecipePDFData }) {
   const s = data.stats;
