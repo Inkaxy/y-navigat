@@ -10605,6 +10605,7 @@ export type Database = {
           declaration_updated_at: string | null
           declaration_updated_by: string | null
           decor_notes: string | null
+          department: string | null
           description: string | null
           dough_piece_grams: number | null
           dough_waste_pct: number
@@ -10665,6 +10666,7 @@ export type Database = {
           declaration_updated_at?: string | null
           declaration_updated_by?: string | null
           decor_notes?: string | null
+          department?: string | null
           description?: string | null
           dough_piece_grams?: number | null
           dough_waste_pct?: number
@@ -10725,6 +10727,7 @@ export type Database = {
           declaration_updated_at?: string | null
           declaration_updated_by?: string | null
           decor_notes?: string | null
+          department?: string | null
           description?: string | null
           dough_piece_grams?: number | null
           dough_waste_pct?: number
