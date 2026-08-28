@@ -117,7 +117,11 @@ export function RawMaterialAutocomplete({
 
   const options = query.data ?? [];
   const subOptions = subQuery.data ?? [];
+  /** Grunnoppskrifter (råvarer laget av en oppskrift) får sin egen gruppe øverst. */
+  const baseRecipeOptions = useMemo(() => options.filter((o) => !!o.produced_by_recipe_id), [options]);
+  const plainOptions = useMemo(() => options.filter((o) => !o.produced_by_recipe_id), [options]);
   const selected = useMemo(() => options.find((o) => o.id === value) ?? null, [options, value]);
+
   const selectedSub = useMemo(
     () => subOptions.find((o) => o.id === subValue) ?? null,
     [subOptions, subValue],
