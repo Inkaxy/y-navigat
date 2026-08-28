@@ -125,16 +125,22 @@ interface Props {
 export function RecipeCardPDFDocument({ data, showCosts = false }: Props) {
   const s = data.stats;
   const allParts = [...data.preferments, ...data.mainParts];
+  const hasSubRecipe = allParts.some((p) => p.lines.some((l) => l.isSubRecipe));
+  const headMeta = `v${data.version ?? 1} · ${fmtDate(data.printedAt)}`;
 
   return (
     <Document title={`Oppskrift - ${data.name}`}>
       <Page size="A4" orientation="portrait" style={styles.page}>
-        <View style={styles.runningHeader} fixed>
-          <Text>{data.name}</Text>
-          <Text>{data.category ?? ""}</Text>
-        </View>
+        <BrandRunningHeader name={data.name} meta={data.category ?? headMeta} margin={PAGE_MARGIN} />
+        <BrandHeader docType="Oppskriftskort" name={data.name} meta={headMeta} />
 
-        {data.imageUrl ? <Image style={styles.hero} src={data.imageUrl} /> : null}
+        {data.imageUrl ? (
+          <View style={styles.heroWrap}>
+            <Image style={styles.hero} src={data.imageUrl} />
+            <Image style={styles.heroSeal} src={logoRund} />
+          </View>
+        ) : null}
+
 
         <Text style={styles.kicker}>{data.category || "Oppskrift"}</Text>
         <Text style={styles.title}>{data.name}</Text>
