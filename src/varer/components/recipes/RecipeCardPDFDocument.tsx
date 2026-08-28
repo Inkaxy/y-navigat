@@ -150,15 +150,19 @@ export function RecipeCardPDFDocument({ data, showCosts = false }: Props) {
 
         <Text style={styles.sectionTitle}>Ingredienser · {fmtNum(data.scaledUnits)} stk</Text>
         {allParts.map((p) => (
-          <View key={p.id} wrap={false}>
-            {allParts.length > 1 && <Text style={styles.partName}>{p.name}</Text>}
-            {p.partType === "preferment" && (p.ripeTimeHours != null || p.targetTempCelsius != null) && (
-              <Text style={styles.partMeta}>
-                {p.ripeTimeHours != null ? `${fmtNum(p.ripeTimeHours, 1)} timer modning` : ""}
-                {p.ripeTimeHours != null && p.targetTempCelsius != null ? " · " : ""}
-                {p.targetTempCelsius != null ? `${fmtNum(p.targetTempCelsius, 1)} °C` : ""}
-              </Text>
-            )}
+          <View key={p.id}>
+            {/* Overskrift + tabellhode holdes samlet, men radene får bryte over sider. */}
+            <View minPresenceAhead={60}>
+              {allParts.length > 1 && <Text style={styles.partName}>{p.name}</Text>}
+              {p.partType === "preferment" && (p.ripeTimeHours != null || p.targetTempCelsius != null) && (
+                <Text style={styles.partMeta}>
+                  {p.ripeTimeHours != null ? `${fmtNum(p.ripeTimeHours, 1)} timer modning` : ""}
+                  {p.ripeTimeHours != null && p.targetTempCelsius != null ? " · " : ""}
+                  {p.targetTempCelsius != null ? `${fmtNum(p.targetTempCelsius, 1)} °C` : ""}
+                </Text>
+              )}
+            </View>
+
             <PartTable part={p} showCosts={showCosts} />
           </View>
         ))}
