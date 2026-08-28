@@ -12,6 +12,8 @@ import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { Sparkles, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DatasheetSection } from "./DatasheetSection";
+import { MatvaretabellenSourceCard } from "@/ravarer/components/matvaretabellen/MatvaretabellenSourceCard";
+import { useRawMaterial } from "@/ravarer/hooks/useRawMaterials";
 
 interface Props { rawMaterialId: string; }
 
@@ -29,6 +31,7 @@ const empty: NutritionRow = {
 export function NutritionTab({ rawMaterialId }: Props) {
   const { canWrite } = useRavarer();
   const { data: existing } = useNutrition(rawMaterialId);
+  const { data: rm } = useRawMaterial(rawMaterialId);
   const upsert = useUpsertNutrition();
   const { data: allergens = [] } = useAllergens(rawMaterialId);
   const setAllergen = useSetAllergen();
@@ -61,6 +64,12 @@ export function NutritionTab({ rawMaterialId }: Props) {
   return (
     <div className="space-y-5">
       <DatasheetSection rawMaterialId={rawMaterialId} />
+      <MatvaretabellenSourceCard
+        rawMaterialId={rawMaterialId}
+        rawMaterialName={rm?.name ?? ""}
+        source={existing?.source ?? null}
+        foodId={existing?.matvaretabellen_food_id ?? null}
+      />
       <Card className="p-5 space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-base font-semibold">Næringsinnhold pr 100 g</h3>

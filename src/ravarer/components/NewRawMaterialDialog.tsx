@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -33,9 +33,11 @@ interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   onCreated?: (id: string) => void;
+  /** Forhåndsutfylt navn, f.eks. fra Matvaretabellen. */
+  initialName?: string;
 }
 
-export function NewRawMaterialDialog({ open, onOpenChange, onCreated }: Props) {
+export function NewRawMaterialDialog({ open, onOpenChange, onCreated, initialName }: Props) {
   const navigate = useNavigate();
   const create = useCreateRawMaterial();
 
@@ -43,7 +45,7 @@ export function NewRawMaterialDialog({ open, onOpenChange, onCreated }: Props) {
     resolver: zodResolver(schema) as any,
     defaultValues: {
       sku: "",
-      name: "",
+      name: initialName ?? "",
       category: "",
       base_unit: "kg",
       package_unit: "",
@@ -51,6 +53,12 @@ export function NewRawMaterialDialog({ open, onOpenChange, onCreated }: Props) {
       description: "",
     },
   });
+
+  useEffect(() => {
+    if (open && initialName) form.setValue("name", initialName);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initialName]);
+
 
   const onSubmit = form.handleSubmit(async (raw) => {
     const v = schema.parse(raw);
