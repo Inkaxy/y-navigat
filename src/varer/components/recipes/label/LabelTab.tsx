@@ -22,7 +22,12 @@ import { GrainScaleSection } from "./GrainScaleSection";
 import { KeyholeSection, type KeyholeResult } from "./KeyholeSection";
 import { LABEL_SIZES, type LabelSizeKey } from "../ConsumerLabelPDFDocument";
 import { EffectiveSourceSection, buildEffectiveForRecipe, SourceBadge } from "./EffectiveSourceSection";
-import { NUTRITION_KEYS, type RecipeLabelSnapshot } from "@/varer/lib/effectiveDeclaration";
+import {
+  NUTRITION_KEYS,
+  type DeclarationMode,
+  type RecipeLabelSnapshot,
+} from "@/varer/lib/effectiveDeclaration";
+
 
 /** Feltene fra `recipes`-raden som merkefanen faktisk bruker. */
 export interface LabelRecipe {
