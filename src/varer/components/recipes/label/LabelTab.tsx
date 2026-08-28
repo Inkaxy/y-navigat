@@ -214,26 +214,42 @@ export function LabelTab({ recipeId, recipeName, recipe, flourLines, legalEntity
 
   return (
     <div className="space-y-4">
-      <CoverageSection
-        coveragePct={coveragePct}
-        missing={missing}
-        onRecalculate={recompute}
-        recalculating={compute.isPending}
+      <EffectiveSourceSection
+        recipeId={recipeId}
+        recipe={recipe}
+        calculated={(label ?? null) as RecipeLabelSnapshot | null}
         canWrite={canWrite}
+        linkedProductCount={linkedProductsQuery.data ?? 0}
       />
 
-      <DeclarationSection
-        declarationHtml={label.ingredient_declaration}
-        allergens={label.allergens}
-        unlinkedCount={label.missing_data?.lines_without_raw_material ?? 0}
-        unclassifiedNames={label.missing_data?.unclassified_grain_names ?? []}
-      />
+      <div className={cn("space-y-4", manualMode && "opacity-60")}>
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-semibold">Beregnet fra NBOS</span>
+          <SourceBadge active={!manualMode} />
+        </div>
 
-      <NutritionSection
-        per100g={label.nutrition_per_100g}
-        unitWeightGrams={recipe.unit_weight_grams ?? null}
-        coverageOk={coverageOk}
-      />
+        <CoverageSection
+          coveragePct={coveragePct}
+          missing={missing}
+          onRecalculate={recompute}
+          recalculating={compute.isPending}
+          canWrite={canWrite}
+        />
+
+        <DeclarationSection
+          declarationHtml={label.ingredient_declaration}
+          allergens={label.allergens}
+          unlinkedCount={label.missing_data?.lines_without_raw_material ?? 0}
+          unclassifiedNames={label.missing_data?.unclassified_grain_names ?? []}
+        />
+
+        <NutritionSection
+          per100g={label.nutrition_per_100g}
+          unitWeightGrams={recipe.unit_weight_grams ?? null}
+          coverageOk={coverageOk}
+        />
+      </div>
+
 
       <GrainScaleSection
         grainPct={label.grain_score_pct}
