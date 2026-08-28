@@ -2,28 +2,26 @@ import * as React from "react";
 import { Document, Page, Text, View, Image, StyleSheet } from "@react-pdf/renderer";
 import type { RecipePDFData, RecipePDFPart } from "@/varer/hooks/useRecipePDF";
 import { fmtDuration, fmtGrams, fmtNum } from "@/varer/lib/bakers";
+import {
+  BrandFooter, BrandHeader, BrandRunningHeader, SubRecipeFootnote, zebraBg,
+} from "@/varer/components/recipes/pdfBrand";
+import logoRund from "@/assets/brand/logo-rund.png";
+
+const PAGE_MARGIN = 56;
 
 // Den pene utgaven — til deling, opplæring og arkiv. Rolig typografi, god luft.
 const styles = StyleSheet.create({
-  page: { paddingTop: 44, paddingBottom: 60, paddingHorizontal: 56, fontSize: 10, fontFamily: "Helvetica", color: "#1a1a1a" },
+  page: { paddingTop: 40, paddingBottom: 64, paddingHorizontal: PAGE_MARGIN, fontSize: 10, fontFamily: "Helvetica", color: "#1a1a1a" },
 
-  runningHeader: {
-    position: "absolute",
-    top: 22,
-    left: 56,
-    right: 56,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    fontSize: 8,
-    color: "#8a8a8a",
-  },
-
-  hero: { width: "100%", height: 190, objectFit: "cover", marginBottom: 18 },
+  heroWrap: { position: "relative", marginBottom: 18 },
+  hero: { width: "100%", height: 190, objectFit: "cover" },
+  heroSeal: { position: "absolute", right: 10, bottom: 10, width: 54, height: 54, objectFit: "contain", opacity: 0.9 },
 
   kicker: { fontSize: 8, textTransform: "uppercase", letterSpacing: 1.4, color: "#8a7a63" },
   title: { fontSize: 28, fontWeight: 700, marginTop: 6, letterSpacing: -0.6 },
   rule: { borderBottomWidth: 1, borderBottomColor: "#d8d2c7", marginTop: 12, marginBottom: 14 },
   ingress: { fontSize: 11, lineHeight: 1.6, color: "#3c3c3c", marginBottom: 18 },
+
 
   sectionTitle: {
     fontSize: 9,
