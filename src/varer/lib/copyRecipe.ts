@@ -57,9 +57,11 @@ export async function copyRecipe(recipeId: string): Promise<string> {
     ...stripped(src, RECIPE_SKIP),
     name: `${(src.name as string | null) ?? "Oppskrift"} (kopi)`,
     status: "draft",
+    version: 1,
     product_id: null,
     valid_to: null,
   };
+
 
   const { data: created, error: insErr } = await supabase
     .from("recipes")
