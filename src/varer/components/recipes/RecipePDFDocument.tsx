@@ -86,20 +86,8 @@ const styles = StyleSheet.create({
   signLine: { borderBottomWidth: 1, borderBottomColor: "#111", height: 30 },
   signLabel: { fontSize: 8, color: "#555", marginTop: 3, textTransform: "uppercase", letterSpacing: 0.4 },
 
-  footer: {
-    position: "absolute",
-    bottom: 20,
-    left: 32,
-    right: 32,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    fontSize: 8,
-    color: "#777",
-    borderTopWidth: 0.5,
-    borderTopColor: "#bbb",
-    paddingTop: 4,
-  },
 });
+
 
 function fmtDate(d: Date): string {
   return new Intl.DateTimeFormat("nb-NO", { day: "2-digit", month: "2-digit", year: "numeric" }).format(d);
