@@ -3,8 +3,9 @@ import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import type { RecipePDFData, RecipePDFLine, RecipePDFPart } from "@/varer/hooks/useRecipePDF";
 import { fmtDuration, fmtGrams, fmtNum } from "@/varer/lib/bakers";
 import {
-  BRONZE, HAIRLINE, BrandFooter, BrandHeader, BrandRunningHeader, SubRecipeFootnote, zebraBg,
+  BrandFooter, BrandHeader, BrandRunningHeader, SubRecipeFootnote, zebraBg,
 } from "@/varer/components/recipes/pdfBrand";
+
 
 const PAGE_MARGIN = 32;
 
