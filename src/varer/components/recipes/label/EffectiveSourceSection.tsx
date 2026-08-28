@@ -202,10 +202,17 @@ export function EffectiveSourceSection({ recipeId, recipe, calculated, canWrite,
               <SourceBadge active={isManual} />
             </div>
             {canWrite && (
-              <Button variant="outline" size="sm" onClick={copyFromCalculation} disabled={busy}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={copyFromCalculation}
+                disabled={busy || !calculated}
+                title={calculated ? undefined : "Merkedata er ikke beregnet ennå"}
+              >
                 <ClipboardCopy className="mr-1.5 h-4 w-4" /> Kopier fra beregning
               </Button>
             )}
+
           </div>
 
           <div>
