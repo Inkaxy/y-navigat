@@ -17,6 +17,17 @@ import {
   computeTotals, fmtG, fmtPercent, RECIPE_STATUS_LABEL, type BakersLine, type BakersRawMaterial,
 } from "@/varer/lib/bakers";
 import { BASE_RECIPE_CATEGORY } from "@/varer/lib/halvfabrikat";
+import {
+  asDepartment, RECIPE_DEPARTMENT_BADGE, RECIPE_DEPARTMENT_LABEL, type RecipeDepartment,
+} from "@/varer/lib/departments";
+
+/** Valgene i segmentkontrollen for avdeling. */
+const DEPARTMENT_FILTERS: { value: "all" | RecipeDepartment | "none"; label: string }[] = [
+  { value: "all", label: "Alle" },
+  { value: "bakeri", label: "Bakeri" },
+  { value: "konditori", label: "Konditori" },
+  { value: "none", label: "Uten avdeling" },
+];
 
 /** Rå rad fra listespørringen — modulen bruker ikke de genererte Supabase-typene. */
 type RecipeLineRow = BakersLine & { id: string; raw_material_id: string | null };
