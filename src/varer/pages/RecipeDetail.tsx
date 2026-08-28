@@ -831,6 +831,44 @@ export default function RecipeDetail() {
                 </div>
               )}
             </div>
+
+            {/* Grunnoppskrift — gjør oppskriften valgbar som ingredienslinje andre steder. */}
+            <div className="col-span-full rounded-md border border-border bg-muted/20 p-3">
+              <div className="flex flex-wrap items-center gap-3">
+                <Switch
+                  id="base-recipe"
+                  checked={isBaseRecipe}
+                  disabled={!editable}
+                  onCheckedChange={toggleBaseRecipe}
+                />
+                <Label htmlFor="base-recipe" className="cursor-pointer text-sm font-medium">
+                  Grunnoppskrift — kan brukes som linje i andre oppskrifter
+                </Label>
+                {composite ? (
+                  <Badge variant="outline" className="border-app/50 text-app">Koblet råvare: {composite.name}</Badge>
+                ) : isBaseRecipe ? (
+                  <Badge variant="outline" className="border-warning/50 text-warning">Ingen råvare koblet ennå</Badge>
+                ) : null}
+              </div>
+              {composite && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {usedIn.length === 0
+                    ? "Brukes ikke i andre oppskrifter ennå."
+                    : `Brukes i ${usedIn.length} oppskrift${usedIn.length === 1 ? "" : "er"}:`}
+                  {usedIn.map((u) => (
+                    <button
+                      key={u.id}
+                      type="button"
+                      className="ml-2 underline underline-offset-2 hover:text-foreground"
+                      onClick={() => navigate(`/varer/oppskrifter/${u.id}`)}
+                    >
+                      {u.name}
+                    </button>
+                  ))}
+                </p>
+              )}
+            </div>
+
             <div className="sm:col-span-2">
               <Label className="text-xs">Navn</Label>
               <Input value={header.name ?? ""} disabled={!editable} onChange={(e) => patchHeader({ name: e.target.value })} />
