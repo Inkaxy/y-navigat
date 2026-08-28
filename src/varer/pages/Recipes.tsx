@@ -9,13 +9,34 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Search, Loader2, ChefHat, Plus, Link2, Copy, MoreHorizontal } from "lucide-react";
+import { Search, Loader2, ChefHat, Plus, Link2, Copy, MoreHorizontal, Wheat } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { copyRecipe } from "@/varer/lib/copyRecipe";
 
 import {
-  computeTotals, fmtG, fmtPercent, RECIPE_STATUS_LABEL, type BakersRawMaterial,
+  computeTotals, fmtG, fmtPercent, RECIPE_STATUS_LABEL, type BakersLine, type BakersRawMaterial,
 } from "@/varer/lib/bakers";
+import { BASE_RECIPE_CATEGORY } from "@/varer/lib/halvfabrikat";
+
+/** Rå rad fra listespørringen — modulen bruker ikke de genererte Supabase-typene. */
+type RecipeLineRow = BakersLine & { id: string; raw_material_id: string | null };
+type RecipeListRow = {
+  id: string;
+  name: string | null;
+  image_url: string | null;
+  category: string | null;
+  status: string | null;
+  version: number | null;
+  unit_weight_grams: number | null;
+  units_per_batch: number | null;
+  product_id: string | null;
+  recipe_lines: RecipeLineRow[] | null;
+  product_recipe_links: { product_id: string; products: { display_name: string | null } | null }[] | null;
+};
+type RecipeRow = RecipeListRow & {
+  totals: ReturnType<typeof computeTotals>;
+  products: string[];
+};
 
 export default function Recipes() {
   const { legalEntityId, canWrite } = useAppContext();
@@ -50,7 +71,7 @@ export default function Recipes() {
         .select("id, name, category, grain_classification, water_content_pct, current_cost_price")
         .limit(2000);
       const map: Record<string, BakersRawMaterial> = {};
-      for (const r of (data ?? []) as any[]) map[r.id] = r;
+      for (const r of (data ?? []) as unknown as BakersRawMaterial[]) map[r.id] = r;
       return map;
     },
   });
@@ -63,7 +84,7 @@ export default function Recipes() {
         .select("id, name, image_url, category, status, version, unit_weight_grams, units_per_batch, product_id, recipe_lines(id, quantity, unit, raw_material_id, is_flour_override, water_content_pct_override, ingredient_name), product_recipe_links(product_id, products(display_name))")
         .is("valid_to", null)
         .order("created_at", { ascending: false });
-      return (data ?? []) as any[];
+      return (data ?? []) as unknown as RecipeListRow[];
     },
   });
 
@@ -77,7 +98,7 @@ export default function Recipes() {
         .is("revoked_at", null);
       const counts: Record<string, number> = {};
       const now = Date.now();
-      for (const r of (data ?? []) as any[]) {
+      for (const r of (data ?? []) as { recipe_id: string; expires_at: string | null }[]) {
         if (r.expires_at && new Date(r.expires_at).getTime() < now) continue;
         counts[r.recipe_id] = (counts[r.recipe_id] ?? 0) + 1;
       }
@@ -89,20 +110,22 @@ export default function Recipes() {
   const shareCounts = shareCountsQuery.data ?? {};
 
 
-  const rows = useMemo(() => {
+  const rows = useMemo<RecipeRow[]>(() => {
     const q = search.trim().toLowerCase();
     return (recipesQuery.data ?? [])
-      .map((r: any) => {
-        const lines = (r.recipe_lines ?? []).map((l: any) => ({
+      .map((r): RecipeRow => {
+        const lines = (r.recipe_lines ?? []).map((l) => ({
           ...l,
           _rm: l.raw_material_id ? rmMap[l.raw_material_id] ?? null : null,
         }));
         const totals = computeTotals(lines, r.unit_weight_grams);
-        const products = (r.product_recipe_links ?? []).map((l: any) => l.products?.display_name).filter(Boolean);
+        const products = (r.product_recipe_links ?? [])
+          .map((l) => l.products?.display_name)
+          .filter((n): n is string => !!n);
         return { ...r, totals, products };
       })
-      .filter((r: any) => (statusFilter === "all" ? true : (r.status ?? "draft") === statusFilter))
-      .filter((r: any) =>
+      .filter((r) => (statusFilter === "all" ? true : (r.status ?? "draft") === statusFilter))
+      .filter((r) =>
         !q ? true : `${r.name ?? ""} ${r.category ?? ""} ${r.products.join(" ")}`.toLowerCase().includes(q),
       );
   }, [recipesQuery.data, rmMap, search, statusFilter]);
@@ -175,7 +198,7 @@ export default function Recipes() {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((r: any, i: number) => (
+                {rows.map((r, i) => (
                   <tr
                     key={r.id}
                     onClick={() => navigate(`/varer/oppskrifter/${r.id}`)}
@@ -203,7 +226,15 @@ export default function Recipes() {
                       <div className="text-xs text-muted-foreground">v{r.version}</div>
                     </td>
 
-                    <td className="px-4 py-2.5">{r.category ?? "—"}</td>
+                    <td className="px-4 py-2.5">
+                      {r.category === BASE_RECIPE_CATEGORY ? (
+                        <Badge variant="outline" className="gap-1 border-app/50 text-app">
+                          <Wheat className="h-3.5 w-3.5" /> Grunnoppskrift
+                        </Badge>
+                      ) : (
+                        r.category ?? "—"
+                      )}
+                    </td>
                     <td className="px-4 py-2.5 text-right tabular-nums">{fmtPercent(r.totals.hydrationPct)}</td>
                     <td className="px-4 py-2.5 text-right tabular-nums">{fmtG(r.totals.totalDoughG)} g</td>
                     <td className="px-4 py-2.5">
