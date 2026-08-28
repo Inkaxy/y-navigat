@@ -73,25 +73,35 @@ interface CalculatedRow {
 }
 
 /**
- * Synkroniserer effektiv deklarasjon for alle produkter koblet til en oppskrift
- * der effektiv modus er «auto». Manuell modus og auto_with_overrides røres ikke.
+ * Synkroniserer effektiv deklarasjon for alle produkter koblet til en oppskrift.
+ * «auto» får beregningen som snapshot, «auto_with_overrides» beregnes på nytt via
+ * compute-product-declaration, og «manual» røres aldri.
  */
 export async function syncAutoProductsForRecipe(
   service: SupabaseClient,
   recipeId: string,
   calculated: CalculatedRow,
 ): Promise<number> {
-  const { data: recipe } = await service
+  const { data: recipe, error: recipeErr } = await service
     .from("recipes")
     .select("declaration_mode")
     .eq("id", recipeId)
     .maybeSingle();
-  const recipeMode = (recipe?.declaration_mode ?? "auto") as DeclarationMode;
+  // Aldri gjett modus: uten et sikkert oppslag kan vi overskrive manuelle snapshots.
+  if (recipeErr || !recipe) {
+    console.error("syncAutoProductsForRecipe: kunne ikke lese oppskriftsmodus", recipeId, recipeErr?.message);
+    return 0;
+  }
+  const recipeMode = (recipe.declaration_mode ?? "auto") as DeclarationMode;
 
-  const { data: links } = await service
+  const { data: links, error: linksErr } = await service
     .from("product_recipe_links")
     .select("id, product_id, declaration_mode")
     .eq("recipe_id", recipeId);
+  if (linksErr) {
+    console.error("syncAutoProductsForRecipe: kunne ikke lese koblinger", recipeId, linksErr.message);
+    return 0;
+  }
   if (!links?.length) return 0;
 
   const coverage = calculated.coverage_by_weight_pct ?? 0;
@@ -108,7 +118,14 @@ export async function syncAutoProductsForRecipe(
   let n = 0;
   for (const link of links) {
     const mode = ((link.declaration_mode as DeclarationMode | null) ?? recipeMode) as DeclarationMode;
-    if (mode !== "auto") continue;
+    if (mode === "manual") continue;
+
+    if (mode === "auto_with_overrides") {
+      const ok = await syncOverrideLink(service, link.id as string, link.product_id as string);
+      if (ok) n++;
+      continue;
+    }
+
     const { error } = await service.from("products").update(payload).eq("id", link.product_id);
     if (error) {
       console.error("syncAutoProductsForRecipe", link.product_id, error.message);
@@ -118,5 +135,57 @@ export async function syncAutoProductsForRecipe(
   }
   return n;
 }
+
+/**
+ * Beregner deklarasjonen på nytt for en kobling med overstyringer og skriver
+ * snapshotet. Feiler beregningen, flagges produktet for gjennomgang i stedet for
+ * å bli stående stille utdatert.
+ */
+async function syncOverrideLink(
+  service: SupabaseClient,
+  linkId: string,
+  productId: string,
+): Promise<boolean> {
+  try {
+    const { data, error } = await service.functions.invoke("compute-product-declaration", {
+      body: { product_recipe_link_id: linkId },
+    });
+    if (error) throw error;
+    const c = (data ?? {}) as {
+      ingredient_declaration_html?: string | null;
+      allergens_contains?: string[];
+      allergens_may_contain?: string[];
+      nutrition_per_100g?: Record<string, number | null> | null;
+      data_quality?: { nutrition_coverage_pct?: number | null };
+    };
+    const coverage = c.data_quality?.nutrition_coverage_pct ?? 0;
+    const { error: upErr } = await service
+      .from("products")
+      .update({
+        manual_ingredient_declaration: stripHtml(c.ingredient_declaration_html) || null,
+        manual_allergens_contains: c.allergens_contains ?? [],
+        manual_allergens_may_contain: c.allergens_may_contain ?? [],
+        manual_nutrition_per_100g:
+          coverage >= MIN_NUTRITION_COVERAGE_PCT ? pickNutrition(c.nutrition_per_100g) : null,
+        manual_declaration_updated_at: new Date().toISOString(),
+        declaration_needs_review: false,
+        declaration_review_reason: null,
+      })
+      .eq("id", productId);
+    if (upErr) throw upErr;
+    return true;
+  } catch (e) {
+    console.error("syncOverrideLink", linkId, (e as Error).message);
+    await service
+      .from("products")
+      .update({
+        declaration_needs_review: true,
+        declaration_review_reason: "Beregningen er oppdatert — overstyringene må synkes",
+      })
+      .eq("id", productId);
+    return false;
+  }
+}
+
 
 export { parseAllergens };
