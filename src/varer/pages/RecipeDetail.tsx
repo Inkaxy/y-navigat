@@ -582,6 +582,52 @@ export default function RecipeDetail() {
     toast.success(`Pris oppdatert: ${price.toFixed(2).replace(".", ",")} kr/kg`);
   }
 
+  /** Stille prisoppdatering av den koblede grunnoppskrift-råvaren etter lagring. */
+  async function syncCompositePriceQuietly() {
+    if (!composite) return;
+    const price = costPerKg(hydratedLines);
+    if (price == null) return;
+    const { error } = await supabase
+      .from("raw_materials")
+      .update({
+        current_cost_price: price,
+        price_source: "recipe",
+        price_updated_at: new Date().toISOString(),
+      } as never)
+      .eq("id", composite.id);
+    if (error) return;
+    qc.invalidateQueries({ queryKey: ["recipe-composite", recipe?.id] });
+    qc.invalidateQueries({ queryKey: ["raw_materials_autocomplete"] });
+  }
+
+  /** Lag kopi: ny oppskrift uten produktkoblinger, åpnet i navneredigering. */
+  async function handleCopy() {
+    if (!recipe) return;
+    setCopying(true);
+    try {
+      const newId = await copyRecipe(recipe.id);
+      qc.invalidateQueries({ queryKey: ["recipes-list"] });
+      toast.success("Kopi opprettet");
+      navigate(`/varer/oppskrifter/${newId}?rename=1`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Kunne ikke kopiere oppskriften");
+    } finally {
+      setCopying(false);
+    }
+  }
+
+  /** Bryteren «Grunnoppskrift»: setter kategori og tilbyr råvare-kobling. */
+  function toggleBaseRecipe(on: boolean) {
+    if (on) {
+      patchHeader({ category: BASE_RECIPE_CATEGORY });
+      if (!composite) setRawMatOpen(true);
+    } else if ((header.category ?? "") === BASE_RECIPE_CATEGORY) {
+      patchHeader({ category: "" });
+    }
+  }
+
+
+
   if (recipeQuery.isLoading) {
     return <div className="flex h-64 items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>;
   }
