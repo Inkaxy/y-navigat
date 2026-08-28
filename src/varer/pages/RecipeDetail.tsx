@@ -36,7 +36,10 @@ import { LabelTab } from "@/varer/components/recipes/label/LabelTab";
 import { COARSE_CLASSIFICATIONS, SIFTED_CLASSIFICATIONS, type FlourLine } from "@/varer/lib/breadscale";
 import { SaveAsRawMaterialDialog, type CompositeRawMaterial } from "@/varer/components/recipes/SaveAsRawMaterialDialog";
 import { RecipeImageUpload } from "@/varer/components/recipes/RecipeImageUpload";
-import { costPerKg } from "@/varer/lib/halvfabrikat";
+import { BASE_RECIPE_CATEGORY, costPerKg } from "@/varer/lib/halvfabrikat";
+import { copyRecipe } from "@/varer/lib/copyRecipe";
+import { Switch } from "@/components/ui/switch";
+
 
 export default function RecipeDetail() {
   const { id } = useParams<{ id: string }>();
