@@ -5,6 +5,7 @@ import { fmtDuration, fmtGrams, fmtNum } from "@/varer/lib/bakers";
 import {
   BrandFooter, BrandHeader, BrandRunningHeader, SubRecipeFootnote, zebraBg,
 } from "@/varer/components/recipes/pdfBrand";
+import { RECIPE_DEPARTMENT_LABEL } from "@/varer/lib/departments";
 import logoRund from "@/assets/brand/logo-rund.png";
 
 const PAGE_MARGIN = 56;
@@ -132,7 +133,7 @@ export function RecipeCardPDFDocument({ data, showCosts = false }: Props) {
     <Document title={`Oppskrift - ${data.name}`}>
       <Page size="A4" orientation="portrait" style={styles.page}>
         <BrandRunningHeader name={data.name} meta={data.category ?? headMeta} margin={PAGE_MARGIN} />
-        <BrandHeader docType="Oppskriftskort" name={data.name} meta={headMeta} />
+        <BrandHeader docType={data.department ? `Oppskriftskort · ${RECIPE_DEPARTMENT_LABEL[data.department]}` : "Oppskriftskort"} name={data.name} meta={headMeta} />
 
         {data.imageUrl ? (
           <View style={styles.heroWrap}>

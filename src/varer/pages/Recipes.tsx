@@ -17,6 +17,17 @@ import {
   computeTotals, fmtG, fmtPercent, RECIPE_STATUS_LABEL, type BakersLine, type BakersRawMaterial,
 } from "@/varer/lib/bakers";
 import { BASE_RECIPE_CATEGORY } from "@/varer/lib/halvfabrikat";
+import {
+  asDepartment, RECIPE_DEPARTMENT_BADGE, RECIPE_DEPARTMENT_LABEL, type RecipeDepartment,
+} from "@/varer/lib/departments";
+
+/** Valgene i segmentkontrollen for avdeling. */
+const DEPARTMENT_FILTERS: { value: "all" | RecipeDepartment | "none"; label: string }[] = [
+  { value: "all", label: "Alle" },
+  { value: "bakeri", label: "Bakeri" },
+  { value: "konditori", label: "Konditori" },
+  { value: "none", label: "Uten avdeling" },
+];
 
 /** Rå rad fra listespørringen — modulen bruker ikke de genererte Supabase-typene. */
 type RecipeLineRow = BakersLine & { id: string; raw_material_id: string | null };
@@ -26,6 +37,7 @@ type RecipeListRow = {
   image_url: string | null;
   category: string | null;
   status: string | null;
+  department: string | null;
   version: number | null;
   unit_weight_grams: number | null;
   units_per_batch: number | null;
@@ -44,6 +56,7 @@ export default function Recipes() {
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [deptFilter, setDeptFilter] = useState<"all" | RecipeDepartment | "none">("all");
   const [creating, setCreating] = useState(false);
   const [copyingId, setCopyingId] = useState<string | null>(null);
 
@@ -81,7 +94,7 @@ export default function Recipes() {
     queryFn: async () => {
       const { data } = await supabase
         .from("recipes")
-        .select("id, name, image_url, category, status, version, unit_weight_grams, units_per_batch, product_id, recipe_lines(id, quantity, unit, raw_material_id, is_flour_override, water_content_pct_override, ingredient_name), product_recipe_links(product_id, products(display_name))")
+        .select("id, name, image_url, category, status, department, version, unit_weight_grams, units_per_batch, product_id, recipe_lines(id, quantity, unit, raw_material_id, is_flour_override, water_content_pct_override, ingredient_name), product_recipe_links(product_id, products(display_name))")
         .is("valid_to", null)
         .order("created_at", { ascending: false });
       return (data ?? []) as unknown as RecipeListRow[];
@@ -125,10 +138,15 @@ export default function Recipes() {
         return { ...r, totals, products };
       })
       .filter((r) => (statusFilter === "all" ? true : (r.status ?? "draft") === statusFilter))
+      .filter((r) => {
+        if (deptFilter === "all") return true;
+        const d = asDepartment(r.department);
+        return deptFilter === "none" ? d === null : d === deptFilter;
+      })
       .filter((r) =>
         !q ? true : `${r.name ?? ""} ${r.category ?? ""} ${r.products.join(" ")}`.toLowerCase().includes(q),
       );
-  }, [recipesQuery.data, rmMap, search, statusFilter]);
+  }, [recipesQuery.data, rmMap, search, statusFilter, deptFilter]);
 
   async function createRecipe() {
     setCreating(true);
@@ -176,6 +194,24 @@ export default function Recipes() {
           )}
         </div>
 
+        <div className="mb-3 inline-flex rounded-lg border border-border bg-muted/30 p-0.5">
+          {DEPARTMENT_FILTERS.map((f) => (
+            <button
+              key={f.value}
+              type="button"
+              onClick={() => setDeptFilter(f.value)}
+              aria-pressed={deptFilter === f.value}
+              className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
+                deptFilter === f.value
+                  ? "bg-background font-medium text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+
         <Card className="overflow-hidden">
           {recipesQuery.isLoading ? (
             <div className="flex h-32 items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
@@ -190,6 +226,7 @@ export default function Recipes() {
                 <tr>
                   <th className="px-4 py-2.5 text-left">Oppskrift</th>
                   <th className="px-4 py-2.5 text-left">Kategori</th>
+                  <th className="px-4 py-2.5 text-left">Avdeling</th>
                   <th className="px-4 py-2.5 text-right">Hydrering</th>
                   <th className="px-4 py-2.5 text-right">Deigvekt</th>
                   <th className="px-4 py-2.5 text-left">Produkter</th>
@@ -234,6 +271,18 @@ export default function Recipes() {
                       ) : (
                         r.category ?? "—"
                       )}
+                    </td>
+                    <td className="px-4 py-2.5">
+                      {(() => {
+                        const d = asDepartment(r.department);
+                        return d ? (
+                          <Badge variant="outline" className={`font-normal ${RECIPE_DEPARTMENT_BADGE[d]}`}>
+                            {RECIPE_DEPARTMENT_LABEL[d]}
+                          </Badge>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        );
+                      })()}
                     </td>
                     <td className="px-4 py-2.5 text-right tabular-nums">{fmtPercent(r.totals.hydrationPct)}</td>
                     <td className="px-4 py-2.5 text-right tabular-nums">{fmtG(r.totals.totalDoughG)} g</td>

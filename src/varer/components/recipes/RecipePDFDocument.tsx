@@ -5,6 +5,7 @@ import { fmtDuration, fmtGrams, fmtNum } from "@/varer/lib/bakers";
 import {
   BrandFooter, BrandHeader, BrandRunningHeader, SubRecipeFootnote, zebraBg,
 } from "@/varer/components/recipes/pdfBrand";
+import { RECIPE_DEPARTMENT_LABEL } from "@/varer/lib/departments";
 
 
 const PAGE_MARGIN = 32;
@@ -157,7 +158,7 @@ export function RecipePDFDocument({ data }: { data: RecipePDFData }) {
     <Document title={`Produksjonsark - ${data.name} - ${data.scaledUnits} stk`}>
       <Page size="A4" orientation="portrait" style={styles.page}>
         <BrandRunningHeader name={data.name} meta={headMeta} margin={PAGE_MARGIN} />
-        <BrandHeader docType="Produksjonsark" name={data.name} meta={headMeta} />
+        <BrandHeader docType={data.department ? `Produksjonsark · ${RECIPE_DEPARTMENT_LABEL[data.department]}` : "Produksjonsark"} name={data.name} meta={headMeta} />
 
         <Text style={styles.title}>{data.name}</Text>
         <Text style={styles.subTitle}>
