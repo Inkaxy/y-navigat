@@ -5,6 +5,8 @@ import { supabase } from "@/integrations/supabase/client";
  * emballasjelinjer. Kopien får navn «{navn} (kopi)», status «draft» og står helt
  * uten produktkoblinger — det er hele poenget: samme oppskrift, ny kombinasjon.
  *
+ * Avdeling (`department`) arves som resten av hodefeltene.
+ *
  * Kopieres IKKE:
  *  - `product_recipe_links` (kopien er ukoblet)
  *  - halvfabrikat-koblingen (`raw_materials.produced_by_recipe_id` peker fortsatt
