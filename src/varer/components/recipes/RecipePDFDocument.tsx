@@ -151,6 +151,7 @@ function IngredientTable({ part, showPercent }: { part: RecipePDFPart; showPerce
 
 export function RecipePDFDocument({ data }: { data: RecipePDFData }) {
   const s = data.stats;
+  const hasSubRecipe = [...data.preferments, ...data.mainParts].some((p) => p.lines.some((l) => l.isSubRecipe));
   const stats: { label: string; value: string }[] = [
     { label: "Melvekt", value: `${fmtGrams(s.flourG)} g` },
     { label: "Deigvekt", value: `${fmtGrams(s.doughG)} g` },
@@ -161,20 +162,19 @@ export function RecipePDFDocument({ data }: { data: RecipePDFData }) {
     { label: "Vanntemp", value: s.waterTempFeasible && s.waterTemp != null ? `${fmtNum(s.waterTemp, 1)} °C` : "—" },
   ];
 
+  const headMeta = `${fmtNum(data.scaledUnits)} stk · v${data.version ?? 1} · ${fmtDate(data.printedAt)}`;
+
   return (
     <Document title={`Produksjonsark - ${data.name} - ${data.scaledUnits} stk`}>
       <Page size="A4" orientation="portrait" style={styles.page}>
-        <View style={styles.runningHeader} fixed>
-          <Text style={styles.runningName}>{data.name}</Text>
-          <Text style={styles.runningMeta}>
-            Produksjonsark · {fmtNum(data.scaledUnits)} stk · {fmtDate(data.printedAt)}
-          </Text>
-        </View>
+        <BrandRunningHeader name={data.name} meta={headMeta} />
+        <BrandHeader docType="Produksjonsark" name={data.name} meta={headMeta} />
 
         <Text style={styles.title}>{data.name}</Text>
         <Text style={styles.subTitle}>
           {data.category ? `${data.category} · ` : ""}Produksjonsark
         </Text>
+
 
         <View style={styles.headMetaRow}>
           <View style={styles.headMeta}>
