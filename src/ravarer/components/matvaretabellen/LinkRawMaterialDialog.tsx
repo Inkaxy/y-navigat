@@ -19,7 +19,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useRawMaterials } from "@/ravarer/hooks/useRawMaterials";
 import { useSuppliers } from "@/ravarer/hooks/useSuppliers";
 import { useDebouncedValue } from "@/ordre/hooks/useDebouncedValue";
-import { useApplyMatvaretabellen } from "@/ravarer/hooks/useMatvaretabellen";
+import { useApplyMatvaretabellen, useMatvaretabellenLinks } from "@/ravarer/hooks/useMatvaretabellen";
 
 interface Props {
   open: boolean;
