@@ -311,7 +311,7 @@ function SortableLine({
         )}
       </div>
 
-      <div className="col-span-2">
+      <div>
         <Input
           type="number" step="any" placeholder="Gram"
           value={line.quantity}
@@ -319,7 +319,7 @@ function SortableLine({
           disabled={!canWrite} className="h-9 tabular-nums"
         />
       </div>
-      <div className="col-span-1">
+      <div>
         <select
           value={line.unit}
           onChange={(e) => onChange({ unit: e.target.value })}
@@ -330,7 +330,7 @@ function SortableLine({
         </select>
       </div>
 
-      <div className="col-span-2">
+      <div>
         <div className="relative">
           <Input
             type="number" step="0.1" placeholder="%"
@@ -344,11 +344,11 @@ function SortableLine({
         </div>
       </div>
 
-      <div className="col-span-1 flex justify-center">
+      <div className="flex justify-center">
         <FlourToggle line={line} flour={flour} canWrite={canWrite} onChange={onChange} />
       </div>
 
-      <div className="col-span-1">
+      <div>
         <Input
           type="number" step="0.1" placeholder="Svinn"
           value={line.waste_percent ?? 0}
@@ -357,18 +357,19 @@ function SortableLine({
         />
       </div>
 
-      <div className="col-span-1 flex justify-center">
+      <div className="flex justify-center">
         <DeclarationPopover line={line} canWrite={canWrite} onChange={onChange} />
       </div>
 
       {canWrite ? (
-        <Button type="button" variant="ghost" size="icon" onClick={onRemove} className="col-span-1 h-8 w-8">
+        <Button type="button" variant="ghost" size="icon" onClick={onRemove} className="h-8 w-8 justify-self-end">
           <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
         </Button>
-      ) : <div className="col-span-1" />}
+      ) : <div />}
     </div>
   );
 }
+
 
 function FlourToggle({
   line, flour, canWrite, onChange,
