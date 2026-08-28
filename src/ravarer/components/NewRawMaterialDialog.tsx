@@ -33,9 +33,11 @@ interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   onCreated?: (id: string) => void;
+  /** Forhåndsutfylt navn, f.eks. fra Matvaretabellen. */
+  initialName?: string;
 }
 
-export function NewRawMaterialDialog({ open, onOpenChange, onCreated }: Props) {
+export function NewRawMaterialDialog({ open, onOpenChange, onCreated, initialName }: Props) {
   const navigate = useNavigate();
   const create = useCreateRawMaterial();
 
