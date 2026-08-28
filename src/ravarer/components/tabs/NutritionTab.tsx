@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useNutrition, useUpsertNutrition, useAllergens, useSetAllergen, type NutritionRow } from "@/ravarer/hooks/useNutrition";
-import { ALLERGENS, ALLERGEN_PRESENCE, COUNTRY_OPTIONS, calcEnergyKj, kjToKcal } from "@/ravarer/lib/constants";
+import { ALLERGENS, ALLERGEN_PRESENCE, COUNTRY_OPTIONS, calcEnergyKj, kjToKcal, formatNumber } from "@/ravarer/lib/constants";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { Sparkles, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
