@@ -2,23 +2,17 @@ import * as React from "react";
 import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import type { RecipePDFData, RecipePDFLine, RecipePDFPart } from "@/varer/hooks/useRecipePDF";
 import { fmtDuration, fmtGrams, fmtNum } from "@/varer/lib/bakers";
+import {
+  BRONZE, HAIRLINE, BrandFooter, BrandHeader, BrandRunningHeader, SubRecipeFootnote, zebraBg,
+} from "@/varer/components/recipes/pdfBrand";
+
+const PAGE_MARGIN = 32;
 
 // NOTE: Nøytral palett — @react-pdf/renderer leser ikke CSS-tokens.
 // Arket henger i bakeriet: stor skrift, tydelige rammer, ingen kostpriser.
 const styles = StyleSheet.create({
-  page: { paddingTop: 28, paddingBottom: 56, paddingHorizontal: 32, fontSize: 11, fontFamily: "Helvetica", color: "#111111" },
+  page: { paddingTop: 28, paddingBottom: 62, paddingHorizontal: PAGE_MARGIN, fontSize: 11, fontFamily: "Helvetica", color: "#111111" },
 
-  runningHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    borderBottomWidth: 1,
-    borderBottomColor: "#111",
-    paddingBottom: 4,
-    marginBottom: 10,
-  },
-  runningName: { fontSize: 10, fontWeight: 700 },
-  runningMeta: { fontSize: 9, color: "#555" },
 
   title: { fontSize: 26, fontWeight: 700, letterSpacing: -0.4 },
   subTitle: { fontSize: 12, color: "#444", marginTop: 2 },
