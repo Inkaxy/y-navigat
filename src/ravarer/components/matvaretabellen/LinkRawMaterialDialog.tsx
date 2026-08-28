@@ -55,9 +55,13 @@ export function LinkRawMaterialDialog({ open, onOpenChange, foodId, foodName, in
   }, [rows, debounced]);
 
   const link = async (rawMaterialId: string) => {
-    await apply.mutateAsync({ rawMaterialId, foodId });
-    onLinked?.(rawMaterialId);
-    onOpenChange(false);
+    try {
+      await apply.mutateAsync({ rawMaterialId, foodId });
+      onLinked?.(rawMaterialId);
+      onOpenChange(false);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Kunne ikke hente næringsverdier");
+    }
   };
 
   const choose = async (rawMaterialId: string, name: string) => {
@@ -75,6 +79,8 @@ export function LinkRawMaterialDialog({ open, onOpenChange, foodId, foodName, in
         return;
       }
       await link(rawMaterialId);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Kunne ikke sjekke eksisterende næringsdata");
     } finally {
       setCheckingId(null);
     }
