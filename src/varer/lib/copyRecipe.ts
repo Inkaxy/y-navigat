@@ -32,10 +32,16 @@ async function fetchChildren(table: string, recipeId: string): Promise<Row[]> {
     .from(table as never)
     .select("*")
     .eq("recipe_id", recipeId);
-  // Tabellen kan mangle i eldre miljøer — da hopper vi bare over den.
-  if (error) return [];
+  if (error) {
+    // 42P01 = relation does not exist — tabellen mangler i eldre miljøer, tom liste er riktig.
+    if ((error as { code?: string }).code === "42P01") return [];
+    // Alt annet (nett, RLS, timeout) må stoppe kopieringen — ellers får brukeren
+    // en «vellykket» kopi som mangler data uten å vite det.
+    throw new Error(`${table}: ${error.message}`);
+  }
   return (data ?? []) as unknown as Row[];
 }
+
 
 export async function copyRecipe(recipeId: string): Promise<string> {
   const { data: original, error: readErr } = await supabase
@@ -51,9 +57,11 @@ export async function copyRecipe(recipeId: string): Promise<string> {
     ...stripped(src, RECIPE_SKIP),
     name: `${(src.name as string | null) ?? "Oppskrift"} (kopi)`,
     status: "draft",
+    version: 1,
     product_id: null,
     valid_to: null,
   };
+
 
   const { data: created, error: insErr } = await supabase
     .from("recipes")
