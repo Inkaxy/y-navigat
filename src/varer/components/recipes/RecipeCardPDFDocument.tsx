@@ -214,12 +214,13 @@ export function RecipeCardPDFDocument({ data, showCosts = false }: Props) {
               </Text>
             </View>
           )}
+          {!data.imageUrl && <Image style={styles.factsSeal} src={logoRund} />}
         </View>
 
-        <View style={styles.footer} fixed>
-          <Text>v{data.version ?? 1} · Skrevet ut {fmtDate(data.printedAt)}</Text>
-          <Text render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`} />
-        </View>
+        <SubRecipeFootnote show={hasSubRecipe} />
+
+        <BrandFooter margin={PAGE_MARGIN} />
+
       </Page>
     </Document>
   );
