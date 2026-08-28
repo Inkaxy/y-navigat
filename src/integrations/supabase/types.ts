@@ -3918,6 +3918,78 @@ export type Database = {
           },
         ]
       }
+      matvaretabellen_foods: {
+        Row: {
+          carbs_g: number | null
+          edible_part_pct: number | null
+          energy_kcal: number | null
+          energy_kj: number | null
+          fat_g: number | null
+          fiber_g: number | null
+          food_group_id: string | null
+          food_group_name: string | null
+          food_id: string
+          food_name: string
+          latin_name: string | null
+          portions: Json | null
+          protein_g: number | null
+          salt_g: number | null
+          saturated_fat_g: number | null
+          search_keywords: string[] | null
+          starch_g: number | null
+          sugars_g: number | null
+          synced_at: string
+          uri: string | null
+          water_g: number | null
+        }
+        Insert: {
+          carbs_g?: number | null
+          edible_part_pct?: number | null
+          energy_kcal?: number | null
+          energy_kj?: number | null
+          fat_g?: number | null
+          fiber_g?: number | null
+          food_group_id?: string | null
+          food_group_name?: string | null
+          food_id: string
+          food_name: string
+          latin_name?: string | null
+          portions?: Json | null
+          protein_g?: number | null
+          salt_g?: number | null
+          saturated_fat_g?: number | null
+          search_keywords?: string[] | null
+          starch_g?: number | null
+          sugars_g?: number | null
+          synced_at?: string
+          uri?: string | null
+          water_g?: number | null
+        }
+        Update: {
+          carbs_g?: number | null
+          edible_part_pct?: number | null
+          energy_kcal?: number | null
+          energy_kj?: number | null
+          fat_g?: number | null
+          fiber_g?: number | null
+          food_group_id?: string | null
+          food_group_name?: string | null
+          food_id?: string
+          food_name?: string
+          latin_name?: string | null
+          portions?: Json | null
+          protein_g?: number | null
+          salt_g?: number | null
+          saturated_fat_g?: number | null
+          search_keywords?: string[] | null
+          starch_g?: number | null
+          sugars_g?: number | null
+          synced_at?: string
+          uri?: string | null
+          water_g?: number | null
+        }
+        Relationships: []
+      }
       microsoft_oauth_tokens: {
         Row: {
           access_token_encrypted: string
@@ -9303,6 +9375,7 @@ export type Database = {
           fat_g: number | null
           fiber_g: number | null
           ingredient_declaration: string | null
+          matvaretabellen_food_id: string | null
           protein_g: number | null
           raw_material_id: string
           salt_g: number | null
@@ -9323,6 +9396,7 @@ export type Database = {
           fat_g?: number | null
           fiber_g?: number | null
           ingredient_declaration?: string | null
+          matvaretabellen_food_id?: string | null
           protein_g?: number | null
           raw_material_id: string
           salt_g?: number | null
@@ -9343,6 +9417,7 @@ export type Database = {
           fat_g?: number | null
           fiber_g?: number | null
           ingredient_declaration?: string | null
+          matvaretabellen_food_id?: string | null
           protein_g?: number | null
           raw_material_id?: string
           salt_g?: number | null
@@ -14746,6 +14821,10 @@ export type Database = {
           rule_value: number
         }[]
       }
+      rm_apply_matvaretabellen: {
+        Args: { p_food_id: string; p_raw_material_id: string }
+        Returns: undefined
+      }
       rm_can_read: { Args: { _rm_id: string }; Returns: boolean }
       rm_can_write: { Args: { _rm_id: string }; Returns: boolean }
       rm_line_base: {
@@ -14780,6 +14859,10 @@ export type Database = {
       rm_unit_factor: {
         Args: { p_base_unit: string; p_unit: string }
         Returns: number
+      }
+      rm_unlink_matvaretabellen: {
+        Args: { p_raw_material_id: string }
+        Returns: undefined
       }
       sales_aggregate: {
         Args: {
