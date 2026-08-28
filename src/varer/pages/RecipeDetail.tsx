@@ -127,6 +127,10 @@ export default function RecipeDetail() {
   /** Inline-redigering av tittelen øverst — samme felt som i Oppskriftsinfo. */
   const [titleEditing, setTitleEditing] = useState(false);
 
+  /** Grunnoppskrift: kategorien er markøren, råvare-koblingen gjør den valgbar. */
+  const isBaseRecipe = (header.category ?? "") === BASE_RECIPE_CATEGORY || !!composite;
+
+
 
   useEffect(() => {
     if (!recipe) return;
