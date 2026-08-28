@@ -45,7 +45,7 @@ export function NewRawMaterialDialog({ open, onOpenChange, onCreated, initialNam
     resolver: zodResolver(schema) as any,
     defaultValues: {
       sku: "",
-      name: "",
+      name: initialName ?? "",
       category: "",
       base_unit: "kg",
       package_unit: "",
@@ -53,6 +53,12 @@ export function NewRawMaterialDialog({ open, onOpenChange, onCreated, initialNam
       description: "",
     },
   });
+
+  useEffect(() => {
+    if (open && initialName) form.setValue("name", initialName);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initialName]);
+
 
   const onSubmit = form.handleSubmit(async (raw) => {
     const v = schema.parse(raw);
