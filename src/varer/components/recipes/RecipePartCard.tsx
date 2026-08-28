@@ -263,17 +263,19 @@ function SortableLine({
       ref={setNodeRef}
       style={style}
       className={cn(
-        "grid grid-cols-12 items-center gap-2 rounded-md border px-2 py-1.5",
+        // Eksplisitt kolonnemal: slett-knappen skal ALLTID ligge på linja, ytterst til høyre.
+        "grid grid-cols-[20px_minmax(0,1fr)_96px_64px_92px_36px_76px_36px_32px] items-center gap-2 rounded-md border px-2 py-1.5",
         unmatched ? "border-warning/40 bg-warning/5" : "border-transparent",
       )}
     >
       {canWrite ? (
-        <button {...attributes} {...listeners} className="col-span-1 flex cursor-grab justify-center text-muted-foreground hover:text-foreground active:cursor-grabbing">
+        <button {...attributes} {...listeners} className="flex cursor-grab justify-center text-muted-foreground hover:text-foreground active:cursor-grabbing">
           <GripVertical className="h-4 w-4" />
         </button>
-      ) : <div className="col-span-1" />}
+      ) : <div />}
 
-      <div className={cn("col-span-3", (line as any).sub_product_id && "rounded-md ring-1 ring-purple-300")}>
+      <div className={cn("min-w-0", (line as any).sub_product_id && "rounded-md ring-1 ring-purple-300")}>
+
         <RawMaterialAutocomplete
           value={line.raw_material_id}
           currentRecipeId={currentRecipeId}
@@ -309,7 +311,7 @@ function SortableLine({
         )}
       </div>
 
-      <div className="col-span-2">
+      <div>
         <Input
           type="number" step="any" placeholder="Gram"
           value={line.quantity}
@@ -317,7 +319,7 @@ function SortableLine({
           disabled={!canWrite} className="h-9 tabular-nums"
         />
       </div>
-      <div className="col-span-1">
+      <div>
         <select
           value={line.unit}
           onChange={(e) => onChange({ unit: e.target.value })}
@@ -328,7 +330,7 @@ function SortableLine({
         </select>
       </div>
 
-      <div className="col-span-2">
+      <div>
         <div className="relative">
           <Input
             type="number" step="0.1" placeholder="%"
@@ -342,11 +344,11 @@ function SortableLine({
         </div>
       </div>
 
-      <div className="col-span-1 flex justify-center">
+      <div className="flex justify-center">
         <FlourToggle line={line} flour={flour} canWrite={canWrite} onChange={onChange} />
       </div>
 
-      <div className="col-span-1">
+      <div>
         <Input
           type="number" step="0.1" placeholder="Svinn"
           value={line.waste_percent ?? 0}
@@ -355,18 +357,19 @@ function SortableLine({
         />
       </div>
 
-      <div className="col-span-1 flex justify-center">
+      <div className="flex justify-center">
         <DeclarationPopover line={line} canWrite={canWrite} onChange={onChange} />
       </div>
 
       {canWrite ? (
-        <Button type="button" variant="ghost" size="icon" onClick={onRemove} className="col-span-1 h-8 w-8">
+        <Button type="button" variant="ghost" size="icon" onClick={onRemove} className="h-8 w-8 justify-self-end">
           <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
         </Button>
-      ) : <div className="col-span-1" />}
+      ) : <div />}
     </div>
   );
 }
+
 
 function FlourToggle({
   line, flour, canWrite, onChange,

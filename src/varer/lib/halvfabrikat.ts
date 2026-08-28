@@ -1,6 +1,9 @@
 import { supabase } from "@/integrations/supabase/client";
 import { toGrams, type BakersLine } from "@/varer/lib/bakers";
 
+/** Kategorien som markerer at en oppskrift er en grunnoppskrift. */
+export const BASE_RECIPE_CATEGORY = "Grunnoppskrift";
+
 /** Enkel slug for SKU-generering. */
 export function slugify(name: string): string {
   return (name || "")

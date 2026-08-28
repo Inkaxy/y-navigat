@@ -121,7 +121,11 @@ export interface BakersRawMaterial {
   grain_classification?: string | null;
   water_content_pct?: number | null;
   current_cost_price?: number | null;
+  is_composite?: boolean | null;
+  /** Satt når råvaren er en grunnoppskrift/halvfabrikat produsert av en oppskrift. */
+  produced_by_recipe_id?: string | null;
 }
+
 
 export interface BakersLine {
   id: string;

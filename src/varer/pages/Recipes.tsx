@@ -9,7 +9,10 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Search, Loader2, ChefHat, Plus, Link2 } from "lucide-react";
+import { Search, Loader2, ChefHat, Plus, Link2, Copy, MoreHorizontal } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { copyRecipe } from "@/varer/lib/copyRecipe";
+
 import {
   computeTotals, fmtG, fmtPercent, RECIPE_STATUS_LABEL, type BakersRawMaterial,
 } from "@/varer/lib/bakers";
@@ -21,6 +24,23 @@ export default function Recipes() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [creating, setCreating] = useState(false);
+  const [copyingId, setCopyingId] = useState<string | null>(null);
+
+  /** Kopier oppskrift fra radmenyen og åpne kopien i navneredigering. */
+  async function handleCopy(id: string) {
+    setCopyingId(id);
+    try {
+      const newId = await copyRecipe(id);
+      qc.invalidateQueries({ queryKey: ["recipes-list"] });
+      toast.success("Kopi opprettet");
+      navigate(`/varer/oppskrifter/${newId}?rename=1`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Kunne ikke kopiere oppskriften");
+    } finally {
+      setCopyingId(null);
+    }
+  }
+
 
   const rmQuery = useQuery({
     queryKey: ["rm-bakers-map", legalEntityId],
@@ -151,11 +171,17 @@ export default function Recipes() {
                   <th className="px-4 py-2.5 text-right">Deigvekt</th>
                   <th className="px-4 py-2.5 text-left">Produkter</th>
                   <th className="px-4 py-2.5 text-left">Status</th>
+                  <th className="w-10 px-2 py-2.5" />
                 </tr>
               </thead>
               <tbody>
-                {rows.map((r: any) => (
-                  <tr key={r.id} onClick={() => navigate(`/varer/oppskrifter/${r.id}`)} className="cursor-pointer border-t border-border hover:bg-muted/30">
+                {rows.map((r: any, i: number) => (
+                  <tr
+                    key={r.id}
+                    onClick={() => navigate(`/varer/oppskrifter/${r.id}`)}
+                    /* Zebra: annenhver rad får svak grå bakgrunn for lesbarhet */
+                    className={`cursor-pointer border-t border-border hover:bg-muted/40 ${i % 2 === 1 ? "bg-muted/20" : ""}`}
+                  >
                     <td className="px-4 py-2.5">
                       <div className="flex items-center gap-2">
                         {r.image_url && (
@@ -190,10 +216,32 @@ export default function Recipes() {
                     <td className="px-4 py-2.5">
                       <Badge variant="outline">{RECIPE_STATUS_LABEL[r.status ?? "draft"] ?? r.status}</Badge>
                     </td>
+                    <td className="px-2 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
+                      {canWrite && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Handlinger">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem disabled={copyingId === r.id} onSelect={() => void handleCopy(r.id)}>
+                              {copyingId === r.id ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              ) : (
+                                <Copy className="mr-2 h-4 w-4" />
+                              )}
+                              Lag kopi
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+
           )}
         </Card>
       </div>

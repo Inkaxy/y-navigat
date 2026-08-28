@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { arrayMove } from "@dnd-kit/sortable";
 import { toast } from "sonner";
@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, ArrowLeft, Calculator, FileText, Loader2, Lock, Package, Plus, Printer, RefreshCw, Save, Share2 } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Calculator, Copy, FileText, Loader2, Lock, Package, Pencil, Plus, Printer, RefreshCw, Save, Share2, Wheat } from "lucide-react";
 import { logAudit } from "@/varer/lib/audit";
 import { RecipeProductLinks } from "@/varer/components/products/RecipeProductLinks";
 import { RecipeStatsBar } from "@/varer/components/recipes/RecipeStatsBar";
@@ -36,7 +36,10 @@ import { LabelTab } from "@/varer/components/recipes/label/LabelTab";
 import { COARSE_CLASSIFICATIONS, SIFTED_CLASSIFICATIONS, type FlourLine } from "@/varer/lib/breadscale";
 import { SaveAsRawMaterialDialog, type CompositeRawMaterial } from "@/varer/components/recipes/SaveAsRawMaterialDialog";
 import { RecipeImageUpload } from "@/varer/components/recipes/RecipeImageUpload";
-import { costPerKg } from "@/varer/lib/halvfabrikat";
+import { BASE_RECIPE_CATEGORY, costPerKg } from "@/varer/lib/halvfabrikat";
+import { copyRecipe } from "@/varer/lib/copyRecipe";
+import { Switch } from "@/components/ui/switch";
+
 
 export default function RecipeDetail() {
   const { id } = useParams<{ id: string }>();
@@ -66,7 +69,7 @@ export default function RecipeDetail() {
     queryFn: async () => {
       const { data } = await supabase
         .from("raw_materials")
-        .select("id, name, category, grain_classification, water_content_pct, current_cost_price")
+        .select("id, name, category, grain_classification, water_content_pct, current_cost_price, produced_by_recipe_id")
         .limit(2000);
       const map: Record<string, BakersRawMaterial> = {};
       for (const r of (data ?? []) as any[]) map[r.id] = r;
@@ -90,6 +93,25 @@ export default function RecipeDetail() {
   });
   const composite = compositeQuery.data ?? null;
 
+  /** Hvilke oppskrifter bruker denne grunnoppskriften som ingrediens? */
+  const usedInQuery = useQuery({
+    queryKey: ["recipe-used-in", composite?.id],
+    enabled: !!composite?.id,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("recipe_lines")
+        .select("recipe_id, recipes(id, name)")
+        .eq("raw_material_id", composite!.id);
+      const seen = new Map<string, string>();
+      for (const row of (data ?? []) as { recipe_id: string; recipes: { id: string; name: string | null } | null }[]) {
+        if (row.recipes?.id && row.recipes.id !== id) seen.set(row.recipes.id, row.recipes.name || "Uten navn");
+      }
+      return Array.from(seen, ([rid, name]) => ({ id: rid, name }));
+    },
+  });
+  const usedIn = usedInQuery.data ?? [];
+
+
   const recipe = recipeQuery.data;
 
   const [header, setHeader] = useState<any>({});
@@ -101,6 +123,25 @@ export default function RecipeDetail() {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [rawMatOpen, setRawMatOpen] = useState(false);
   const [repricing, setRepricing] = useState(false);
+  const [copying, setCopying] = useState(false);
+  /** Inline-redigering av tittelen øverst — samme felt som i Oppskriftsinfo. */
+  const [titleEditing, setTitleEditing] = useState(false);
+
+  /** En fersk kopi åpnes rett i navneredigering (?rename=1). */
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    if (searchParams.get("rename") !== "1") return;
+    setTitleEditing(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete("rename");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
+
+  /** Grunnoppskrift: kategorien er markøren, råvare-koblingen gjør den valgbar. */
+  const isBaseRecipe = (header.category ?? "") === BASE_RECIPE_CATEGORY || !!composite;
+
+
+
 
   useEffect(() => {
     if (!recipe) return;
@@ -525,6 +566,9 @@ export default function RecipeDetail() {
       recipeQuery.refetch();
       // Merkedata (deklarasjon, næring, grovhet, Nøkkelhull) beregnes automatisk ved lagring
       computeLabel.mutate(recipe.id);
+      // Grunnoppskrift: den koblede råvaren skal alltid ha fersk kilopris.
+      void syncCompositePriceQuietly();
+
 
     } catch (err: any) {
       toast.error(err.message ?? "Kunne ikke lagre");
@@ -559,6 +603,52 @@ export default function RecipeDetail() {
     toast.success(`Pris oppdatert: ${price.toFixed(2).replace(".", ",")} kr/kg`);
   }
 
+  /** Stille prisoppdatering av den koblede grunnoppskrift-råvaren etter lagring. */
+  async function syncCompositePriceQuietly() {
+    if (!composite) return;
+    const price = costPerKg(hydratedLines);
+    if (price == null) return;
+    const { error } = await supabase
+      .from("raw_materials")
+      .update({
+        current_cost_price: price,
+        price_source: "recipe",
+        price_updated_at: new Date().toISOString(),
+      } as never)
+      .eq("id", composite.id);
+    if (error) return;
+    qc.invalidateQueries({ queryKey: ["recipe-composite", recipe?.id] });
+    qc.invalidateQueries({ queryKey: ["raw_materials_autocomplete"] });
+  }
+
+  /** Lag kopi: ny oppskrift uten produktkoblinger, åpnet i navneredigering. */
+  async function handleCopy() {
+    if (!recipe) return;
+    setCopying(true);
+    try {
+      const newId = await copyRecipe(recipe.id);
+      qc.invalidateQueries({ queryKey: ["recipes-list"] });
+      toast.success("Kopi opprettet");
+      navigate(`/varer/oppskrifter/${newId}?rename=1`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Kunne ikke kopiere oppskriften");
+    } finally {
+      setCopying(false);
+    }
+  }
+
+  /** Bryteren «Grunnoppskrift»: setter kategori og tilbyr råvare-kobling. */
+  function toggleBaseRecipe(on: boolean) {
+    if (on) {
+      patchHeader({ category: BASE_RECIPE_CATEGORY });
+      if (!composite) setRawMatOpen(true);
+    } else if ((header.category ?? "") === BASE_RECIPE_CATEGORY) {
+      patchHeader({ category: "" });
+    }
+  }
+
+
+
   if (recipeQuery.isLoading) {
     return <div className="flex h-64 items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>;
   }
@@ -578,12 +668,52 @@ export default function RecipeDetail() {
         subtitle={`v${recipe.version ?? 1}${header.category ? ` · ${header.category}` : ""}`}
       />
       <div className="space-y-4 px-6 py-6 pb-24">
+        {/* Navnet skal være åpenbart redigerbart — klikk på tittelen eller blyanten. */}
+        <div className="flex flex-wrap items-center gap-2">
+          {titleEditing && editable ? (
+            <Input
+              autoFocus
+              value={header.name ?? ""}
+              onChange={(e) => patchHeader({ name: e.target.value })}
+              onBlur={() => setTitleEditing(false)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === "Escape") setTitleEditing(false);
+              }}
+              className="h-11 max-w-md text-xl font-semibold"
+              placeholder="Navn på oppskriften"
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => editable && setTitleEditing(true)}
+              className="group flex items-center gap-2 rounded-md px-1 text-left text-2xl font-semibold tracking-tight hover:bg-muted/50 disabled:cursor-default"
+              disabled={!editable}
+              title={editable ? "Klikk for å endre navnet" : undefined}
+            >
+              {header.name || "Uten navn"}
+              {editable && <Pencil className="h-4 w-4 text-muted-foreground opacity-0 transition group-hover:opacity-100" />}
+            </button>
+          )}
+          {isBaseRecipe && (
+            <Badge variant="outline" className="gap-1 border-app/50 text-app">
+              <Wheat className="h-3.5 w-3.5" /> Grunnoppskrift
+            </Badge>
+          )}
+        </div>
+
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="ghost" size="sm" onClick={() => navigate("/varer/oppskrifter")}>
             <ArrowLeft className="mr-1 h-4 w-4" /> Alle oppskrifter
           </Button>
           <Badge variant="outline">{RECIPE_STATUS_OPTIONS.find((s) => s.value === header.status)?.label ?? "Utkast"}</Badge>
           <div className="flex-1" />
+          {canWrite && (
+            <Button variant="outline" onClick={handleCopy} disabled={copying}>
+              {copying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Copy className="mr-2 h-4 w-4" />}
+              Lag kopi
+            </Button>
+          )}
+
           <Button
             variant="outline"
             onClick={() => printProductionSheet(buildRecipePDFData(buildPdfInput(false)))}
@@ -704,6 +834,44 @@ export default function RecipeDetail() {
                 </div>
               )}
             </div>
+
+            {/* Grunnoppskrift — gjør oppskriften valgbar som ingredienslinje andre steder. */}
+            <div className="col-span-full rounded-md border border-border bg-muted/20 p-3">
+              <div className="flex flex-wrap items-center gap-3">
+                <Switch
+                  id="base-recipe"
+                  checked={isBaseRecipe}
+                  disabled={!editable}
+                  onCheckedChange={toggleBaseRecipe}
+                />
+                <Label htmlFor="base-recipe" className="cursor-pointer text-sm font-medium">
+                  Grunnoppskrift — kan brukes som linje i andre oppskrifter
+                </Label>
+                {composite ? (
+                  <Badge variant="outline" className="border-app/50 text-app">Koblet råvare: {composite.name}</Badge>
+                ) : isBaseRecipe ? (
+                  <Badge variant="outline" className="border-warning/50 text-warning">Ingen råvare koblet ennå</Badge>
+                ) : null}
+              </div>
+              {composite && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {usedIn.length === 0
+                    ? "Brukes ikke i andre oppskrifter ennå."
+                    : `Brukes i ${usedIn.length} oppskrift${usedIn.length === 1 ? "" : "er"}:`}
+                  {usedIn.map((u) => (
+                    <button
+                      key={u.id}
+                      type="button"
+                      className="ml-2 underline underline-offset-2 hover:text-foreground"
+                      onClick={() => navigate(`/varer/oppskrifter/${u.id}`)}
+                    >
+                      {u.name}
+                    </button>
+                  ))}
+                </p>
+              )}
+            </div>
+
             <div className="sm:col-span-2">
               <Label className="text-xs">Navn</Label>
               <Input value={header.name ?? ""} disabled={!editable} onChange={(e) => patchHeader({ name: e.target.value })} />

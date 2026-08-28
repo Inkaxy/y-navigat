@@ -51,6 +51,46 @@ interface Props {
 
 const BASE_UNITS = ["kg", "g", "liter", "ml", "stk"];
 
+/** Én rad i nedtrekket — delt av gruppene «Grunnoppskrifter» og «Råvarer». */
+function RawMaterialRow({
+  option: o,
+  selected,
+  onSelect,
+}: {
+  option: RawMaterialOption;
+  selected: boolean;
+  onSelect: (o: RawMaterialOption) => void | Promise<void>;
+}) {
+  return (
+    <CommandItem
+      value={`${o.name} ${o.sku} ${o.category ?? ""}`}
+      onSelect={() => void onSelect(o)}
+    >
+      <Check className={cn("mr-2 h-4 w-4", selected ? "opacity-100" : "opacity-0")} />
+      <div className="flex flex-1 items-center justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5">
+            <span className="truncate text-sm">{o.name}</span>
+            {o.produced_by_recipe_id && (
+              <span className="shrink-0 rounded bg-app/15 px-1.5 py-0.5 text-[10px] font-medium text-app">
+                Grunnoppskrift
+              </span>
+            )}
+          </div>
+          <div className="font-mono text-xs text-muted-foreground">
+            {o.sku}
+            {o.category ? ` · ${o.category}` : ""}
+          </div>
+        </div>
+        <div className="shrink-0 text-right text-xs tabular-nums text-muted-foreground">
+          {o.current_cost_price != null ? `${o.current_cost_price.toFixed(2)} kr/${o.base_unit}` : "—"}
+        </div>
+      </div>
+    </CommandItem>
+  );
+}
+
+
 export function RawMaterialAutocomplete({
   value,
   onChange,
@@ -117,7 +157,11 @@ export function RawMaterialAutocomplete({
 
   const options = query.data ?? [];
   const subOptions = subQuery.data ?? [];
+  /** Grunnoppskrifter (råvarer laget av en oppskrift) får sin egen gruppe øverst. */
+  const baseRecipeOptions = useMemo(() => options.filter((o) => !!o.produced_by_recipe_id), [options]);
+  const plainOptions = useMemo(() => options.filter((o) => !o.produced_by_recipe_id), [options]);
   const selected = useMemo(() => options.find((o) => o.id === value) ?? null, [options, value]);
+
   const selectedSub = useMemo(
     () => subOptions.find((o) => o.id === subValue) ?? null,
     [subOptions, subValue],
@@ -169,37 +213,19 @@ export function RawMaterialAutocomplete({
                     <CommandEmpty>
                       <div className="py-3 text-center text-sm text-muted-foreground">Ingen treff</div>
                     </CommandEmpty>
-                    <CommandGroup heading={onSelectSubProduct ? "Råvarer" : undefined}>
-                      {options.map((o) => (
-                        <CommandItem
-                          key={o.id}
-                          value={`${o.name} ${o.sku} ${o.category ?? ""}`}
-                          onSelect={() => void selectRawMaterial(o)}
-                        >
-                          <Check className={cn("mr-2 h-4 w-4", value === o.id ? "opacity-100" : "opacity-0")} />
-                          <div className="flex flex-1 items-center justify-between gap-2">
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-1.5">
-                                <span className="truncate text-sm">{o.name}</span>
-                                {o.is_composite && o.produced_by_recipe_id && (
-                                  <span className="shrink-0 rounded bg-app/15 px-1.5 py-0.5 text-[10px] font-medium text-app">
-                                    Halvfabrikat
-                                  </span>
-                                )}
-                              </div>
-                              <div className="text-xs text-muted-foreground font-mono">
-                                {o.sku}
-                                {o.category ? ` · ${o.category}` : ""}
-                              </div>
-                            </div>
-
-                            <div className="shrink-0 text-right text-xs text-muted-foreground tabular-nums">
-                              {o.current_cost_price != null ? `${o.current_cost_price.toFixed(2)} kr/${o.base_unit}` : "—"}
-                            </div>
-                          </div>
-                        </CommandItem>
+                    {baseRecipeOptions.length > 0 && (
+                      <CommandGroup heading="Grunnoppskrifter">
+                        {baseRecipeOptions.map((o) => (
+                          <RawMaterialRow key={o.id} option={o} selected={value === o.id} onSelect={selectRawMaterial} />
+                        ))}
+                      </CommandGroup>
+                    )}
+                    <CommandGroup heading={onSelectSubProduct || baseRecipeOptions.length > 0 ? "Råvarer" : undefined}>
+                      {plainOptions.map((o) => (
+                        <RawMaterialRow key={o.id} option={o} selected={value === o.id} onSelect={selectRawMaterial} />
                       ))}
                     </CommandGroup>
+
                     {onSelectSubProduct && subOptions.length > 0 && (
                       <CommandGroup heading="Halvfabrikat">
                         {subOptions.map((s) => (

@@ -2,23 +2,18 @@ import * as React from "react";
 import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import type { RecipePDFData, RecipePDFLine, RecipePDFPart } from "@/varer/hooks/useRecipePDF";
 import { fmtDuration, fmtGrams, fmtNum } from "@/varer/lib/bakers";
+import {
+  BrandFooter, BrandHeader, BrandRunningHeader, SubRecipeFootnote, zebraBg,
+} from "@/varer/components/recipes/pdfBrand";
+
+
+const PAGE_MARGIN = 32;
 
 // NOTE: Nøytral palett — @react-pdf/renderer leser ikke CSS-tokens.
 // Arket henger i bakeriet: stor skrift, tydelige rammer, ingen kostpriser.
 const styles = StyleSheet.create({
-  page: { paddingTop: 28, paddingBottom: 56, paddingHorizontal: 32, fontSize: 11, fontFamily: "Helvetica", color: "#111111" },
+  page: { paddingTop: 28, paddingBottom: 62, paddingHorizontal: PAGE_MARGIN, fontSize: 11, fontFamily: "Helvetica", color: "#111111" },
 
-  runningHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    borderBottomWidth: 1,
-    borderBottomColor: "#111",
-    paddingBottom: 4,
-    marginBottom: 10,
-  },
-  runningName: { fontSize: 10, fontWeight: 700 },
-  runningMeta: { fontSize: 9, color: "#555" },
 
   title: { fontSize: 26, fontWeight: 700, letterSpacing: -0.4 },
   subTitle: { fontSize: 12, color: "#444", marginTop: 2 },
@@ -59,7 +54,7 @@ const styles = StyleSheet.create({
     marginBottom: 3,
   },
   th: { fontSize: 8, textTransform: "uppercase", color: "#555", letterSpacing: 0.4 },
-  row: { flexDirection: "row", alignItems: "center", paddingVertical: 4, borderBottomWidth: 0.5, borderBottomColor: "#ddd" },
+  row: { flexDirection: "row", alignItems: "center", paddingVertical: 4, paddingHorizontal: 3, borderBottomWidth: 0.5, borderBottomColor: "#ddd" },
   colCheck: { width: 22 },
   colName: { flex: 1, paddingRight: 8 },
   colGrams: { width: 78, textAlign: "right" },
@@ -69,6 +64,7 @@ const styles = StyleSheet.create({
   ingNameFlour: { fontSize: 12, fontWeight: 700 },
   ingGrams: { fontSize: 13, fontWeight: 700 },
   ingPct: { fontSize: 10, color: "#888" },
+
 
   totalRow: { flexDirection: "row", alignItems: "center", paddingTop: 5, marginTop: 1, borderTopWidth: 1, borderTopColor: "#111" },
   totalLabel: { flex: 1, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.4 },
@@ -91,20 +87,8 @@ const styles = StyleSheet.create({
   signLine: { borderBottomWidth: 1, borderBottomColor: "#111", height: 30 },
   signLabel: { fontSize: 8, color: "#555", marginTop: 3, textTransform: "uppercase", letterSpacing: 0.4 },
 
-  footer: {
-    position: "absolute",
-    bottom: 20,
-    left: 32,
-    right: 32,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    fontSize: 8,
-    color: "#777",
-    borderTopWidth: 0.5,
-    borderTopColor: "#bbb",
-    paddingTop: 4,
-  },
 });
+
 
 function fmtDate(d: Date): string {
   return new Intl.DateTimeFormat("nb-NO", { day: "2-digit", month: "2-digit", year: "numeric" }).format(d);
@@ -115,12 +99,14 @@ function pct(n: number | null | undefined, decimals = 1): string {
   return `${fmtNum(n, decimals)} %`;
 }
 
-function IngredientRow({ line, showPercent }: { line: RecipePDFLine; showPercent: boolean }) {
+function IngredientRow({ line, index, showPercent }: { line: RecipePDFLine; index: number; showPercent: boolean }) {
   return (
-    <View style={styles.row} wrap={false}>
+    <View style={[styles.row, zebraBg(index)]} wrap={false}>
       <View style={styles.colCheck}><View style={styles.checkbox} /></View>
       <View style={styles.colName}>
-        <Text style={line.isFlour ? styles.ingNameFlour : styles.ingName}>{line.name}</Text>
+        <Text style={line.isFlour ? styles.ingNameFlour : styles.ingName}>
+          {line.name}{line.isSubRecipe ? " †" : ""}
+        </Text>
       </View>
       <View style={styles.colGrams}><Text style={styles.ingGrams}>{fmtGrams(line.grams)} g</Text></View>
       {showPercent && (
@@ -141,7 +127,7 @@ function IngredientTable({ part, showPercent }: { part: RecipePDFPart; showPerce
         <View style={styles.colGrams}><Text style={[styles.th, { textAlign: "right" }]}>Vekt</Text></View>
         {showPercent && <View style={styles.colPct}><Text style={[styles.th, { textAlign: "right" }]}>Baker-%</Text></View>}
       </View>
-      {part.lines.map((l) => <IngredientRow key={l.id} line={l} showPercent={showPercent} />)}
+      {part.lines.map((l, i) => <IngredientRow key={l.id} line={l} index={i} showPercent={showPercent} />)}
       <View style={styles.totalRow}>
         <Text style={styles.totalLabel}>Sum {part.name.toLowerCase()}</Text>
         <Text style={styles.totalValue}>{fmtGrams(rounded)} g</Text>
@@ -151,8 +137,10 @@ function IngredientTable({ part, showPercent }: { part: RecipePDFPart; showPerce
   );
 }
 
+
 export function RecipePDFDocument({ data }: { data: RecipePDFData }) {
   const s = data.stats;
+  const hasSubRecipe = [...data.preferments, ...data.mainParts].some((p) => p.lines.some((l) => l.isSubRecipe));
   const stats: { label: string; value: string }[] = [
     { label: "Melvekt", value: `${fmtGrams(s.flourG)} g` },
     { label: "Deigvekt", value: `${fmtGrams(s.doughG)} g` },
@@ -163,20 +151,19 @@ export function RecipePDFDocument({ data }: { data: RecipePDFData }) {
     { label: "Vanntemp", value: s.waterTempFeasible && s.waterTemp != null ? `${fmtNum(s.waterTemp, 1)} °C` : "—" },
   ];
 
+  const headMeta = `${fmtNum(data.scaledUnits)} stk · v${data.version ?? 1} · ${fmtDate(data.printedAt)}`;
+
   return (
     <Document title={`Produksjonsark - ${data.name} - ${data.scaledUnits} stk`}>
       <Page size="A4" orientation="portrait" style={styles.page}>
-        <View style={styles.runningHeader} fixed>
-          <Text style={styles.runningName}>{data.name}</Text>
-          <Text style={styles.runningMeta}>
-            Produksjonsark · {fmtNum(data.scaledUnits)} stk · {fmtDate(data.printedAt)}
-          </Text>
-        </View>
+        <BrandRunningHeader name={data.name} meta={headMeta} margin={PAGE_MARGIN} />
+        <BrandHeader docType="Produksjonsark" name={data.name} meta={headMeta} />
 
         <Text style={styles.title}>{data.name}</Text>
         <Text style={styles.subTitle}>
           {data.category ? `${data.category} · ` : ""}Produksjonsark
         </Text>
+
 
         <View style={styles.headMetaRow}>
           <View style={styles.headMeta}>
@@ -282,10 +269,10 @@ export function RecipePDFDocument({ data }: { data: RecipePDFData }) {
           </View>
         </View>
 
-        <View style={styles.footer} fixed>
-          <Text>{data.name} · v{data.version ?? 1} · {fmtNum(data.scaledUnits)} stk</Text>
-          <Text render={({ pageNumber, totalPages }) => `Side ${pageNumber} av ${totalPages}`} />
-        </View>
+        <SubRecipeFootnote show={hasSubRecipe} />
+
+        <BrandFooter margin={PAGE_MARGIN} />
+
       </Page>
     </Document>
   );
