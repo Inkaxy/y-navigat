@@ -650,12 +650,52 @@ export default function RecipeDetail() {
         subtitle={`v${recipe.version ?? 1}${header.category ? ` · ${header.category}` : ""}`}
       />
       <div className="space-y-4 px-6 py-6 pb-24">
+        {/* Navnet skal være åpenbart redigerbart — klikk på tittelen eller blyanten. */}
+        <div className="flex flex-wrap items-center gap-2">
+          {titleEditing && editable ? (
+            <Input
+              autoFocus
+              value={header.name ?? ""}
+              onChange={(e) => patchHeader({ name: e.target.value })}
+              onBlur={() => setTitleEditing(false)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === "Escape") setTitleEditing(false);
+              }}
+              className="h-11 max-w-md text-xl font-semibold"
+              placeholder="Navn på oppskriften"
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => editable && setTitleEditing(true)}
+              className="group flex items-center gap-2 rounded-md px-1 text-left text-2xl font-semibold tracking-tight hover:bg-muted/50 disabled:cursor-default"
+              disabled={!editable}
+              title={editable ? "Klikk for å endre navnet" : undefined}
+            >
+              {header.name || "Uten navn"}
+              {editable && <Pencil className="h-4 w-4 text-muted-foreground opacity-0 transition group-hover:opacity-100" />}
+            </button>
+          )}
+          {isBaseRecipe && (
+            <Badge variant="outline" className="gap-1 border-app/50 text-app">
+              <Wheat className="h-3.5 w-3.5" /> Grunnoppskrift
+            </Badge>
+          )}
+        </div>
+
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="ghost" size="sm" onClick={() => navigate("/varer/oppskrifter")}>
             <ArrowLeft className="mr-1 h-4 w-4" /> Alle oppskrifter
           </Button>
           <Badge variant="outline">{RECIPE_STATUS_OPTIONS.find((s) => s.value === header.status)?.label ?? "Utkast"}</Badge>
           <div className="flex-1" />
+          {canWrite && (
+            <Button variant="outline" onClick={handleCopy} disabled={copying}>
+              {copying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Copy className="mr-2 h-4 w-4" />}
+              Lag kopi
+            </Button>
+          )}
+
           <Button
             variant="outline"
             onClick={() => printProductionSheet(buildRecipePDFData(buildPdfInput(false)))}
