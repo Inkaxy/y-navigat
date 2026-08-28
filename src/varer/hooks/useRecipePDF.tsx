@@ -26,6 +26,9 @@ export interface RecipePDFLine {
   /** Bakerprosent — uendret av skalering. */
   percent: number;
   isFlour: boolean;
+  /** Linja er en grunnoppskrift/halvfabrikat — merkes med «†» i utskriftene. */
+  isSubRecipe: boolean;
+
   /** Kostpris for linja (kun oppskriftskortet, og kun når brukeren ber om det). */
   cost: number | null;
 }
