@@ -280,10 +280,10 @@ export function RecipePDFDocument({ data }: { data: RecipePDFData }) {
           </View>
         </View>
 
-        <View style={styles.footer} fixed>
-          <Text>{data.name} · v{data.version ?? 1} · {fmtNum(data.scaledUnits)} stk</Text>
-          <Text render={({ pageNumber, totalPages }) => `Side ${pageNumber} av ${totalPages}`} />
-        </View>
+        <SubRecipeFootnote show={hasSubRecipe} />
+
+        <BrandFooter margin={PAGE_MARGIN} />
+
       </Page>
     </Document>
   );
