@@ -152,11 +152,14 @@ export function buildEffectiveDeclaration(
   const mode = effectiveMode(link.declaration_mode, link.recipes?.declaration_mode);
 
   if (mode === "manual") {
+    const linkAllergens = parseAllergenSummary(link.manual_allergen_summary);
     const useLink =
       !!link.manual_ingredient_declaration ||
       !!pickNutrition(link.manual_nutrition) ||
-      parseAllergenSummary(link.manual_allergen_summary).contains.length > 0;
+      linkAllergens.contains.length > 0 ||
+      linkAllergens.may_contain.length > 0;
     const src = useLink ? link : link.recipes;
+
     const allergens = parseAllergenSummary(src?.manual_allergen_summary);
     return {
       mode,
