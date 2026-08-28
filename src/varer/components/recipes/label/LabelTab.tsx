@@ -16,22 +16,52 @@ import {
   type GrainCategory,
 } from "@/varer/lib/breadscale";
 import { CoverageSection } from "./CoverageSection";
+import type { MissingNutritionRow } from "@/varer/hooks/useMissingNutrition";
 import { DeclarationSection } from "./DeclarationSection";
 import { NutritionSection } from "./NutritionSection";
 import { GrainScaleSection } from "./GrainScaleSection";
 import { KeyholeSection, type KeyholeResult } from "./KeyholeSection";
 import { LABEL_SIZES, type LabelSizeKey } from "../ConsumerLabelPDFDocument";
 import { EffectiveSourceSection, buildEffectiveForRecipe, SourceBadge } from "./EffectiveSourceSection";
-import { NUTRITION_KEYS, type RecipeLabelSnapshot } from "@/varer/lib/effectiveDeclaration";
+import {
+  NUTRITION_KEYS,
+  type DeclarationMode,
+  type RecipeLabelSnapshot,
+} from "@/varer/lib/effectiveDeclaration";
+
+
+/** Feltene fra `recipes`-raden som merkefanen faktisk bruker. */
+export interface LabelRecipe {
+  declaration_mode?: DeclarationMode | null;
+  manual_ingredient_declaration?: string | null;
+  manual_allergen_summary?: unknown;
+  manual_nutrition?: unknown;
+  unit_weight_grams?: number | null;
+  shelf_life_days?: number | null;
+  storage_instructions?: string | null;
+  country_of_origin?: string | null;
+  label_claim_keyhole?: boolean | null;
+  label_claim_grain?: boolean | null;
+  label_claims_approved_by?: string | null;
+  label_claims_approved_at?: string | null;
+}
+
+interface LegalEntityLabelInfo {
+  name: string | null;
+  address_line1: string | null;
+  postal_code: string | null;
+  city: string | null;
+}
 
 interface Props {
   recipeId: string;
   recipeName: string;
-  recipe: any;
+  recipe: LabelRecipe;
   flourLines: FlourLine[];
   legalEntityId: string | undefined;
   canWrite: boolean;
 }
+
 
 const NUT_ROWS: Array<{ key: string; label: string; unit: string; d: number; indent?: boolean }> = [
   { key: "energy_kj", label: "Energi", unit: "kJ", d: 0 },
@@ -77,7 +107,7 @@ export function LabelTab({ recipeId, recipeName, recipe, flourLines, legalEntity
         .select("name, address_line1, postal_code, city")
         .eq("id", legalEntityId!)
         .maybeSingle();
-      return data as any;
+      return (data ?? null) as LegalEntityLabelInfo | null;
     },
   });
 
@@ -107,13 +137,13 @@ export function LabelTab({ recipeId, recipeName, recipe, flourLines, legalEntity
       qc.invalidateQueries({ queryKey: ["recipe-detail", recipeId] });
       toast.success("Merkevalget er lagret");
     },
-    onError: (e: any) => toast.error(e.message ?? "Kunne ikke lagre"),
+    onError: (e: unknown) => toast.error((e as Error).message ?? "Kunne ikke lagre"),
   });
 
   const label = labelQuery.data;
   const coveragePct = label?.coverage_by_weight_pct ?? null;
   const coverageOk = (coveragePct ?? 0) >= 90;
-  const missing = (label?.missing_data?.nutrition ?? []) as any[];
+  const missing = (label?.missing_data?.nutrition ?? []) as MissingNutritionRow[];
   const keyhole = (label?.keyhole ?? null) as KeyholeResult | null;
   const grainCategory: GrainCategory | null =
     (label?.grain_category as GrainCategory | null) ??
@@ -184,8 +214,8 @@ export function LabelTab({ recipeId, recipeName, recipe, flourLines, legalEntity
       const url = URL.createObjectURL(blob);
       window.open(url, "_blank");
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
-    } catch (e: any) {
-      toast.error(e?.message ?? "Kunne ikke lage etiketten");
+    } catch (e: unknown) {
+      toast.error((e as Error)?.message ?? "Kunne ikke lage etiketten");
     } finally {
       setPrinting(false);
     }
