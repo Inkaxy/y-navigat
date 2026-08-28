@@ -51,6 +51,46 @@ interface Props {
 
 const BASE_UNITS = ["kg", "g", "liter", "ml", "stk"];
 
+/** Én rad i nedtrekket — delt av gruppene «Grunnoppskrifter» og «Råvarer». */
+function RawMaterialRow({
+  option: o,
+  selected,
+  onSelect,
+}: {
+  option: RawMaterialOption;
+  selected: boolean;
+  onSelect: (o: RawMaterialOption) => void | Promise<void>;
+}) {
+  return (
+    <CommandItem
+      value={`${o.name} ${o.sku} ${o.category ?? ""}`}
+      onSelect={() => void onSelect(o)}
+    >
+      <Check className={cn("mr-2 h-4 w-4", selected ? "opacity-100" : "opacity-0")} />
+      <div className="flex flex-1 items-center justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5">
+            <span className="truncate text-sm">{o.name}</span>
+            {o.produced_by_recipe_id && (
+              <span className="shrink-0 rounded bg-app/15 px-1.5 py-0.5 text-[10px] font-medium text-app">
+                Grunnoppskrift
+              </span>
+            )}
+          </div>
+          <div className="font-mono text-xs text-muted-foreground">
+            {o.sku}
+            {o.category ? ` · ${o.category}` : ""}
+          </div>
+        </div>
+        <div className="shrink-0 text-right text-xs tabular-nums text-muted-foreground">
+          {o.current_cost_price != null ? `${o.current_cost_price.toFixed(2)} kr/${o.base_unit}` : "—"}
+        </div>
+      </div>
+    </CommandItem>
+  );
+}
+
+
 export function RawMaterialAutocomplete({
   value,
   onChange,
