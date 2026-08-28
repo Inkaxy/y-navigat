@@ -127,8 +127,19 @@ export default function RecipeDetail() {
   /** Inline-redigering av tittelen øverst — samme felt som i Oppskriftsinfo. */
   const [titleEditing, setTitleEditing] = useState(false);
 
+  /** En fersk kopi åpnes rett i navneredigering (?rename=1). */
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    if (searchParams.get("rename") !== "1") return;
+    setTitleEditing(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete("rename");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
+
   /** Grunnoppskrift: kategorien er markøren, råvare-koblingen gjør den valgbar. */
   const isBaseRecipe = (header.category ?? "") === BASE_RECIPE_CATEGORY || !!composite;
+
 
 
 
