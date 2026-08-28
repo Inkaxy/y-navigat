@@ -263,17 +263,19 @@ function SortableLine({
       ref={setNodeRef}
       style={style}
       className={cn(
-        "grid grid-cols-12 items-center gap-2 rounded-md border px-2 py-1.5",
+        // Eksplisitt kolonnemal: slett-knappen skal ALLTID ligge på linja, ytterst til høyre.
+        "grid grid-cols-[20px_minmax(0,1fr)_96px_64px_92px_36px_76px_36px_32px] items-center gap-2 rounded-md border px-2 py-1.5",
         unmatched ? "border-warning/40 bg-warning/5" : "border-transparent",
       )}
     >
       {canWrite ? (
-        <button {...attributes} {...listeners} className="col-span-1 flex cursor-grab justify-center text-muted-foreground hover:text-foreground active:cursor-grabbing">
+        <button {...attributes} {...listeners} className="flex cursor-grab justify-center text-muted-foreground hover:text-foreground active:cursor-grabbing">
           <GripVertical className="h-4 w-4" />
         </button>
-      ) : <div className="col-span-1" />}
+      ) : <div />}
 
-      <div className={cn("col-span-3", (line as any).sub_product_id && "rounded-md ring-1 ring-purple-300")}>
+      <div className={cn("min-w-0", (line as any).sub_product_id && "rounded-md ring-1 ring-purple-300")}>
+
         <RawMaterialAutocomplete
           value={line.raw_material_id}
           currentRecipeId={currentRecipeId}
