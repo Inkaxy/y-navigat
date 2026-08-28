@@ -263,18 +263,20 @@ function SortableLine({
       ref={setNodeRef}
       style={style}
       className={cn(
-        // Eksplisitt kolonnemal: slett-knappen skal ALLTID ligge på linja, ytterst til høyre.
-        "grid grid-cols-[20px_minmax(0,1fr)_96px_64px_92px_36px_76px_36px_32px] items-center gap-2 rounded-md border px-2 py-1.5",
+        // Mobil: to rader (håndtak+råvare+slett, deretter tallfeltene) via flex + order.
+        // Fra md: eksplisitt kolonnemal, slett-knappen ALLTID ytterst til høyre på linja.
+        "flex flex-wrap items-center gap-2 rounded-md border px-2 py-1.5",
+        "md:grid md:grid-cols-[20px_minmax(0,1fr)_96px_64px_92px_36px_76px_36px_32px]",
         unmatched ? "border-warning/40 bg-warning/5" : "border-transparent",
       )}
     >
       {canWrite ? (
-        <button {...attributes} {...listeners} className="flex cursor-grab justify-center text-muted-foreground hover:text-foreground active:cursor-grabbing">
+        <button {...attributes} {...listeners} className="order-1 flex h-10 w-5 cursor-grab items-center justify-center text-muted-foreground hover:text-foreground active:cursor-grabbing md:order-none md:h-auto">
           <GripVertical className="h-4 w-4" />
         </button>
-      ) : <div />}
+      ) : <div className="order-1 md:order-none" />}
 
-      <div className={cn("min-w-0", (line as any).sub_product_id && "rounded-md ring-1 ring-purple-300")}>
+      <div className={cn("order-2 min-w-0 flex-1 basis-[55%] md:order-none md:flex-none md:basis-auto", (line as any).sub_product_id && "rounded-md ring-1 ring-purple-300")}>
 
         <RawMaterialAutocomplete
           value={line.raw_material_id}
@@ -311,26 +313,29 @@ function SortableLine({
         )}
       </div>
 
-      <div>
+      {/* Tvinger radbrudd under md, slik at tallfeltene får hele bredde nummer to. */}
+      <div className="order-4 basis-full md:hidden" aria-hidden />
+
+      <div className="order-5 w-24 md:order-none md:w-auto">
         <Input
           type="number" step="any" placeholder="Gram"
           value={line.quantity}
           onChange={(e) => setGrams(e.target.value)}
-          disabled={!canWrite} className="h-9 tabular-nums"
+          disabled={!canWrite} className="h-10 tabular-nums md:h-9"
         />
       </div>
-      <div>
+      <div className="order-6 w-[72px] md:order-none md:w-auto">
         <select
           value={line.unit}
           onChange={(e) => onChange({ unit: e.target.value })}
           disabled={!canWrite}
-          className="h-9 w-full rounded-md border border-input bg-background px-1 text-sm"
+          className="h-10 w-full rounded-md border border-input bg-background px-1 text-sm md:h-9"
         >
           {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
         </select>
       </div>
 
-      <div>
+      <div className="order-7 w-24 md:order-none md:w-auto">
         <div className="relative">
           <Input
             type="number" step="0.1" placeholder="%"
@@ -338,34 +343,38 @@ function SortableLine({
             onChange={(e) => setPercent(e.target.value)}
             disabled={!canWrite || flour || totalFlourG <= 0}
             title={flour ? "Melprosent er avledet — mel definerer nevneren" : "Bakerprosent av samlet melvekt"}
-            className={cn("h-9 pr-6 tabular-nums", flour && "bg-muted/60 text-muted-foreground")}
+            className={cn("h-10 pr-6 tabular-nums md:h-9", flour && "bg-muted/60 text-muted-foreground")}
           />
           <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
         </div>
       </div>
 
-      <div className="flex justify-center">
+      <div className="order-8 flex justify-center md:order-none">
         <FlourToggle line={line} flour={flour} canWrite={canWrite} onChange={onChange} />
       </div>
 
-      <div>
+      <div className="order-9 w-[76px] md:order-none md:w-auto">
         <Input
           type="number" step="0.1" placeholder="Svinn"
           value={line.waste_percent ?? 0}
           onChange={(e) => onChange({ waste_percent: e.target.value })}
-          disabled={!canWrite} className="h-9 tabular-nums"
+          disabled={!canWrite} className="h-10 tabular-nums md:h-9"
         />
       </div>
 
-      <div className="flex justify-center">
+      <div className="order-10 flex justify-center md:order-none">
         <DeclarationPopover line={line} canWrite={canWrite} onChange={onChange} />
       </div>
 
       {canWrite ? (
-        <Button type="button" variant="ghost" size="icon" onClick={onRemove} className="h-8 w-8 justify-self-end">
-          <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+        <Button
+          type="button" variant="ghost" size="icon" onClick={onRemove}
+          aria-label="Slett ingrediens"
+          className="order-3 ml-auto h-10 w-10 md:order-none md:ml-0 md:h-8 md:w-8 md:justify-self-end"
+        >
+          <Trash2 className="h-4 w-4 text-muted-foreground md:h-3.5 md:w-3.5" />
         </Button>
-      ) : <div />}
+      ) : <div className="order-3 md:order-none" />}
     </div>
   );
 }
