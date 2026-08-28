@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useNutrition, useUpsertNutrition, useAllergens, useSetAllergen, type NutritionRow } from "@/ravarer/hooks/useNutrition";
-import { ALLERGENS, ALLERGEN_PRESENCE, COUNTRY_OPTIONS, calcEnergyKj, kjToKcal } from "@/ravarer/lib/constants";
+import { ALLERGENS, ALLERGEN_PRESENCE, COUNTRY_OPTIONS, calcEnergyKj, kjToKcal, formatNumber } from "@/ravarer/lib/constants";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { Sparkles, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -95,7 +95,7 @@ export function NutritionTab({ rawMaterialId }: Props) {
         {macroSum > 100 && (
           <div className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/10 p-3 text-sm text-warning">
             <AlertTriangle className="mt-0.5 h-4 w-4" />
-            Sum makro + salt + fiber er {macroSum.toFixed(1)} g. Bør være ≤ 100 g.
+            Sum makro + salt + fiber er {formatNumber(macroSum, 1)} g. Bør være ≤ 100 g.
           </div>
         )}
       </Card>
