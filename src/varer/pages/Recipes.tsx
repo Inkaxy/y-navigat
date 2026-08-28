@@ -24,6 +24,23 @@ export default function Recipes() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [creating, setCreating] = useState(false);
+  const [copyingId, setCopyingId] = useState<string | null>(null);
+
+  /** Kopier oppskrift fra radmenyen og åpne kopien i navneredigering. */
+  async function handleCopy(id: string) {
+    setCopyingId(id);
+    try {
+      const newId = await copyRecipe(id);
+      qc.invalidateQueries({ queryKey: ["recipes-list"] });
+      toast.success("Kopi opprettet");
+      navigate(`/varer/oppskrifter/${newId}?rename=1`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Kunne ikke kopiere oppskriften");
+    } finally {
+      setCopyingId(null);
+    }
+  }
+
 
   const rmQuery = useQuery({
     queryKey: ["rm-bakers-map", legalEntityId],
