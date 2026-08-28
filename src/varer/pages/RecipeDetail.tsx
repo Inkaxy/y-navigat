@@ -120,6 +120,10 @@ export default function RecipeDetail() {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [rawMatOpen, setRawMatOpen] = useState(false);
   const [repricing, setRepricing] = useState(false);
+  const [copying, setCopying] = useState(false);
+  /** Inline-redigering av tittelen øverst — samme felt som i Oppskriftsinfo. */
+  const [titleEditing, setTitleEditing] = useState(false);
+
 
   useEffect(() => {
     if (!recipe) return;
