@@ -24,14 +24,38 @@ import { LABEL_SIZES, type LabelSizeKey } from "../ConsumerLabelPDFDocument";
 import { EffectiveSourceSection, buildEffectiveForRecipe, SourceBadge } from "./EffectiveSourceSection";
 import { NUTRITION_KEYS, type RecipeLabelSnapshot } from "@/varer/lib/effectiveDeclaration";
 
+/** Feltene fra `recipes`-raden som merkefanen faktisk bruker. */
+export interface LabelRecipe {
+  declaration_mode?: DeclarationMode | null;
+  manual_ingredient_declaration?: string | null;
+  manual_allergen_summary?: unknown;
+  manual_nutrition?: unknown;
+  unit_weight_grams?: number | null;
+  shelf_life_days?: number | null;
+  storage_instructions?: string | null;
+  country_of_origin?: string | null;
+  label_claim_keyhole?: boolean | null;
+  label_claim_grain?: boolean | null;
+  label_claims_approved_by?: string | null;
+  label_claims_approved_at?: string | null;
+}
+
+interface LegalEntityLabelInfo {
+  name: string | null;
+  address_line1: string | null;
+  postal_code: string | null;
+  city: string | null;
+}
+
 interface Props {
   recipeId: string;
   recipeName: string;
-  recipe: any;
+  recipe: LabelRecipe;
   flourLines: FlourLine[];
   legalEntityId: string | undefined;
   canWrite: boolean;
 }
+
 
 const NUT_ROWS: Array<{ key: string; label: string; unit: string; d: number; indent?: boolean }> = [
   { key: "energy_kj", label: "Energi", unit: "kJ", d: 0 },
