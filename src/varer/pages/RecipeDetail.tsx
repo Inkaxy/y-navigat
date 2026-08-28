@@ -566,6 +566,9 @@ export default function RecipeDetail() {
       recipeQuery.refetch();
       // Merkedata (deklarasjon, næring, grovhet, Nøkkelhull) beregnes automatisk ved lagring
       computeLabel.mutate(recipe.id);
+      // Grunnoppskrift: den koblede råvaren skal alltid ha fersk kilopris.
+      void syncCompositePriceQuietly();
+
 
     } catch (err: any) {
       toast.error(err.message ?? "Kunne ikke lagre");
