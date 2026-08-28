@@ -17,6 +17,7 @@ export interface NutritionRow {
   country_of_origin: string | null;
   e_numbers: string[] | null;
   source: string | null;
+  matvaretabellen_food_id?: string | null;
   source_document_url: string | null;
   verified_at: string | null;
   verified_by: string | null;
