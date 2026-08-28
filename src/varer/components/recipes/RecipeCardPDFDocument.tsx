@@ -92,9 +92,11 @@ function PartTable({ part, showCosts }: { part: RecipePDFPart; showCosts: boolea
         <View style={styles.colPct}><Text style={[styles.th, { textAlign: "right" }]}>Baker-%</Text></View>
         {showCosts && <View style={styles.colCost}><Text style={[styles.th, { textAlign: "right" }]}>Kost</Text></View>}
       </View>
-      {part.lines.map((l) => (
-        <View key={l.id} style={styles.row} wrap={false}>
-          <View style={styles.colName}><Text style={styles.cellName}>{l.name}</Text></View>
+      {part.lines.map((l, i) => (
+        <View key={l.id} style={[styles.row, zebraBg(i)]} wrap={false}>
+          <View style={styles.colName}>
+            <Text style={styles.cellName}>{l.name}{l.isSubRecipe ? " †" : ""}</Text>
+          </View>
           <View style={styles.colGrams}><Text style={styles.cellGrams}>{fmtGrams(l.grams)} g</Text></View>
           <View style={styles.colPct}><Text style={styles.cellPct}>{pct(l.percent)}</Text></View>
           {showCosts && (
@@ -104,6 +106,7 @@ function PartTable({ part, showCosts }: { part: RecipePDFPart; showCosts: boolea
           )}
         </View>
       ))}
+
       <View style={styles.sumRow}>
         <Text style={styles.sumLabel}>Sum</Text>
         <Text style={styles.sumValue}>{fmtGrams(sum)} g</Text>
