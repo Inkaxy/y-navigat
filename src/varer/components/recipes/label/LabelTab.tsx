@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -20,6 +21,8 @@ import { NutritionSection } from "./NutritionSection";
 import { GrainScaleSection } from "./GrainScaleSection";
 import { KeyholeSection, type KeyholeResult } from "./KeyholeSection";
 import { LABEL_SIZES, type LabelSizeKey } from "../ConsumerLabelPDFDocument";
+import { EffectiveSourceSection, buildEffectiveForRecipe, SourceBadge } from "./EffectiveSourceSection";
+import { NUTRITION_KEYS, type RecipeLabelSnapshot } from "@/varer/lib/effectiveDeclaration";
 
 interface Props {
   recipeId: string;
@@ -78,6 +81,17 @@ export function LabelTab({ recipeId, recipeName, recipe, flourLines, legalEntity
     },
   });
 
+  const linkedProductsQuery = useQuery({
+    queryKey: ["recipe-linked-products", recipeId],
+    queryFn: async () => {
+      const { count } = await supabase
+        .from("product_recipe_links")
+        .select("id", { count: "exact", head: true })
+        .eq("recipe_id", recipeId);
+      return count ?? 0;
+    },
+  });
+
   const saveClaim = useMutation({
     mutationFn: async (input: { field: "label_claim_keyhole" | "label_claim_grain"; value: boolean }) => {
       const { data: u } = await supabase.auth.getUser();
@@ -108,18 +122,24 @@ export function LabelTab({ recipeId, recipeName, recipe, flourLines, legalEntity
   const recompute = () =>
     compute.mutate(recipeId, { onSuccess: () => toast.success("Merkedata beregnet på nytt") });
 
-  const nutritionRows = useMemo(
-    () =>
-      NUT_ROWS.map((r) => ({
-        label: r.indent ? `— ${r.label}` : r.label,
-        value:
-          label?.nutrition_per_100g?.[r.key] == null
-            ? "—"
-            : `${fmtNum(label!.nutrition_per_100g![r.key], r.d)} ${r.unit}`,
-        indent: r.indent,
-      })),
-    [label],
+  /** Effektiv kilde: det som faktisk følger produktet (manuell eller beregnet). */
+  const effective = useMemo(
+    () => buildEffectiveForRecipe(recipe, (label ?? null) as RecipeLabelSnapshot | null),
+    [recipe, label],
   );
+  const manualMode = effective.mode === "manual";
+
+  const nutritionRows = useMemo(() => {
+    const src = manualMode ? effective.nutrition : label?.nutrition_per_100g;
+    return NUT_ROWS.map((r) => ({
+      label: r.indent ? `— ${r.label}` : r.label,
+      value:
+        src?.[r.key as (typeof NUTRITION_KEYS)[number]] == null
+          ? "—"
+          : `${fmtNum(Number(src[r.key as (typeof NUTRITION_KEYS)[number]]), r.d)} ${r.unit}`,
+      indent: r.indent,
+    }));
+  }, [label, effective, manualMode]);
 
   async function printLabel() {
     if (!label) return;
@@ -140,8 +160,8 @@ export function LabelTab({ recipeId, recipeName, recipe, flourLines, legalEntity
           size={size}
           data={{
             productName: recipeName,
-            ingredientText: (label.ingredient_declaration ?? "").replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim(),
-            allergenTerms: label.allergens?.contains ?? [],
+            ingredientText: effective.ingredientText ?? "",
+            allergenTerms: effective.contains,
             netWeightText: recipe.unit_weight_grams ? `${Math.round(recipe.unit_weight_grams)} g` : null,
             shelfLifeText: recipe.shelf_life_days
               ? `Best før: ${recipe.shelf_life_days} dager fra produksjonsdato`
@@ -149,7 +169,7 @@ export function LabelTab({ recipeId, recipeName, recipe, flourLines, legalEntity
             storageText: recipe.storage_instructions ?? null,
             originText: recipe.country_of_origin ?? null,
             nutritionRows,
-            nutritionUsable: coverageOk,
+            nutritionUsable: manualMode ? !!effective.nutrition : coverageOk,
             producerName: entity?.name ?? null,
             producerAddress: entity
               ? [entity.address_line1, [entity.postal_code, entity.city].filter(Boolean).join(" ")]
@@ -195,26 +215,42 @@ export function LabelTab({ recipeId, recipeName, recipe, flourLines, legalEntity
 
   return (
     <div className="space-y-4">
-      <CoverageSection
-        coveragePct={coveragePct}
-        missing={missing}
-        onRecalculate={recompute}
-        recalculating={compute.isPending}
+      <EffectiveSourceSection
+        recipeId={recipeId}
+        recipe={recipe}
+        calculated={(label ?? null) as RecipeLabelSnapshot | null}
         canWrite={canWrite}
+        linkedProductCount={linkedProductsQuery.data ?? 0}
       />
 
-      <DeclarationSection
-        declarationHtml={label.ingredient_declaration}
-        allergens={label.allergens}
-        unlinkedCount={label.missing_data?.lines_without_raw_material ?? 0}
-        unclassifiedNames={label.missing_data?.unclassified_grain_names ?? []}
-      />
+      <div className={cn("space-y-4", manualMode && "opacity-60")}>
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-semibold">Beregnet fra NBOS</span>
+          <SourceBadge active={!manualMode} />
+        </div>
 
-      <NutritionSection
-        per100g={label.nutrition_per_100g}
-        unitWeightGrams={recipe.unit_weight_grams ?? null}
-        coverageOk={coverageOk}
-      />
+        <CoverageSection
+          coveragePct={coveragePct}
+          missing={missing}
+          onRecalculate={recompute}
+          recalculating={compute.isPending}
+          canWrite={canWrite}
+        />
+
+        <DeclarationSection
+          declarationHtml={label.ingredient_declaration}
+          allergens={label.allergens}
+          unlinkedCount={label.missing_data?.lines_without_raw_material ?? 0}
+          unclassifiedNames={label.missing_data?.unclassified_grain_names ?? []}
+        />
+
+        <NutritionSection
+          per100g={label.nutrition_per_100g}
+          unitWeightGrams={recipe.unit_weight_grams ?? null}
+          coverageOk={coverageOk}
+        />
+      </div>
+
 
       <GrainScaleSection
         grainPct={label.grain_score_pct}
@@ -258,6 +294,14 @@ export function LabelTab({ recipeId, recipeName, recipe, flourLines, legalEntity
             {printing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Printer className="mr-2 h-4 w-4" />}
             Skriv ut etikett
           </Button>
+          <p className="w-full text-xs">
+            Kilde: <strong>{manualMode ? "manuell inntasting" : "beregnet fra NBOS"}</strong>
+            {manualMode
+              ? " — næringstabellen tas med hvis den er fylt ut."
+              : coverageOk
+                ? " — næringstabellen tas med."
+                : " — næringstabellen utelates fordi datadekningen er under 90 %."}
+          </p>
           <p className="w-full text-xs text-muted-foreground">
             Ingredienslisten settes aldri mindre enn 1,2 mm x-høyde — det er minstekravet i regelverket. Får ikke
             teksten plass på valgt størrelse, velg et større format i stedet for å krympe skriften.

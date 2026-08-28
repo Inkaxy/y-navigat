@@ -20,6 +20,7 @@ import { PdfDeclarationImportDialog } from "@/varer/components/products/PdfDecla
 import { ManualDeclarationEditor } from "@/varer/components/products/ManualDeclarationEditor";
 import { CertificationsEditor } from "@/varer/components/products/CertificationsEditor";
 import { showError } from "@/lib/userError";
+import { syncEffectiveDeclaration } from "@/varer/lib/effectiveDeclaration";
 
 type Mode = "auto" | "manual" | "auto_with_overrides";
 
@@ -50,7 +51,7 @@ export function DeclarationTab({ productId, productName, canWrite }: Props) {
     queryFn: async () => {
       const { data } = await supabase
         .from("product_recipe_links")
-        .select("id, recipe_id, extra_lines, declaration_mode, manual_ingredient_declaration, manual_nutrition, manual_allergen_summary, declaration_updated_at, recipes(name, declaration_mode, manual_ingredient_declaration, manual_nutrition, manual_allergen_summary)")
+        .select("id, product_id, recipe_id, extra_lines, declaration_mode, manual_ingredient_declaration, manual_nutrition, manual_allergen_summary, declaration_updated_at, recipes(name, declaration_mode, manual_ingredient_declaration, manual_nutrition, manual_allergen_summary)")
         .eq("product_id", productId)
         .order("is_primary", { ascending: false })
         .limit(1)
@@ -165,7 +166,14 @@ function DeclarationView({ link, productName, canWrite, qc }: { link: any; produ
     if (newMode !== "inherit") setMode(newMode);
     await logAudit({ action: "update", entity_type: "product_recipe_link", entity_id: link.id, entity_display_reference: productName, changes: { declaration_mode: newMode } });
     qc.invalidateQueries({ queryKey: ["product-recipe-link-decl", link.id] });
+    // products.manual_* er EFFEKTIV deklarasjon (snapshot) — synk etter modusbytte.
+    try {
+      await syncEffectiveDeclaration(link.id);
+    } catch (e) {
+      showError("DeclarationTab", e);
+    }
     qc.invalidateQueries({ queryKey: ["compute-product-declaration", link.id] });
+    qc.invalidateQueries({ queryKey: ["product-effective-decl", link.product_id] });
     toast.success("Modus oppdatert");
   }
 
@@ -185,6 +193,13 @@ function DeclarationView({ link, productName, canWrite, qc }: { link: any; produ
       declaration_updated_at: new Date().toISOString(),
     }).eq("id", link.id);
     if (error) { showError("DeclarationTab", error); return; }
+    // products.manual_* er EFFEKTIV deklarasjon (snapshot) — synk etter lagring.
+    try {
+      await syncEffectiveDeclaration(link.id);
+    } catch (e) {
+      showError("DeclarationTab", e);
+    }
+    qc.invalidateQueries({ queryKey: ["product-effective-decl", link.product_id] });
     toast.success("Manuell deklarasjon lagret");
     qc.invalidateQueries({ queryKey: ["product-recipe-link-decl", link.id] });
     qc.invalidateQueries({ queryKey: ["compute-product-declaration", link.id] });
@@ -192,6 +207,7 @@ function DeclarationView({ link, productName, canWrite, qc }: { link: any; produ
 
   return (
     <div className="space-y-4">
+      <EffectiveStatusCard productId={link.product_id} mode={effectiveMode} isOverridden={isOverridden} />
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <ModeSelector mode={mode} canWrite={canWrite} saving={savingMode} onChange={changeMode} />
         <div className="text-xs text-muted-foreground flex items-center gap-2">
@@ -388,6 +404,47 @@ function DeclarationView({ link, productName, canWrite, qc }: { link: any; produ
 
       {computed && (
         <PreviewDialog open={previewOpen} onClose={() => setPreviewOpen(false)} productName={productName} computed={computed} />
+      )}
+    </div>
+  );
+}
+
+const MODE_LABELS: Record<Mode, string> = {
+  auto: "Beregnet fra NBOS",
+  manual: "Manuell",
+  auto_with_overrides: "Beregnet med overstyringer",
+};
+
+/** Viser hva som faktisk følger produktet nå, og når det sist ble synket. */
+function EffectiveStatusCard({ productId, mode, isOverridden }: { productId: string; mode: Mode; isOverridden: boolean }) {
+  const snapshot = useQuery({
+    queryKey: ["product-effective-decl", productId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("products")
+        .select("manual_declaration_updated_at, manual_ingredient_declaration")
+        .eq("id", productId)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const updated = snapshot.data?.manual_declaration_updated_at;
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/30 px-3 py-2 text-xs">
+      <ShieldCheck className="h-3.5 w-3.5 text-muted-foreground" />
+      <span>
+        Følger produktet: <strong>{MODE_LABELS[mode]}</strong>{" "}
+        {isOverridden ? "(satt på denne varen)" : "(fra oppskriften)"}
+      </span>
+      <span className="text-muted-foreground">
+        {updated
+          ? `— sist synket ${new Date(updated).toLocaleDateString("nb-NO", { day: "2-digit", month: "2-digit" })}`
+          : "— ikke synket ennå"}
+      </span>
+      {!snapshot.data?.manual_ingredient_declaration && (
+        <Badge variant="outline" className="gap-1"><AlertTriangle className="h-3 w-3" /> Ingen deklarasjon lagret</Badge>
       )}
     </div>
   );
