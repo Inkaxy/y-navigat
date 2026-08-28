@@ -172,8 +172,8 @@ export function LabelTab({ recipeId, recipeName, recipe, flourLines, legalEntity
   }, [label, effective, manualMode]);
 
   async function printLabel() {
-    if (!label) return;
     setPrinting(true);
+
     try {
       // Kun det offisielle BKLF-merket trykkes. Uten merke trykkes ingen påstand.
       const grainMarkSrc =
@@ -229,20 +229,6 @@ export function LabelTab({ recipeId, recipeName, recipe, flourLines, legalEntity
     );
   }
 
-  if (!label) {
-    return (
-      <Card>
-        <CardContent className="space-y-3 py-8 text-center">
-          <p className="text-sm text-muted-foreground">Merkedata er ikke beregnet for denne oppskriften ennå.</p>
-          <Button onClick={recompute} disabled={compute.isPending}>
-            {compute.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Beregn merkedata
-          </Button>
-        </CardContent>
-      </Card>
-    );
-  }
-
   return (
     <div className="space-y-4">
       <EffectiveSourceSection
@@ -259,37 +245,56 @@ export function LabelTab({ recipeId, recipeName, recipe, flourLines, legalEntity
           <SourceBadge active={!manualMode} />
         </div>
 
-        <CoverageSection
-          coveragePct={coveragePct}
-          missing={missing}
-          onRecalculate={recompute}
-          recalculating={compute.isPending}
-          canWrite={canWrite}
-        />
+        {!label ? (
+          <Card>
+            <CardContent className="space-y-3 py-8 text-center">
+              <p className="text-sm text-muted-foreground">
+                Merkedata er ikke beregnet for denne oppskriften ennå.
+              </p>
+              {canWrite && (
+                <Button onClick={recompute} disabled={compute.isPending}>
+                  {compute.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Beregn merkedata
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        ) : (
+          <>
+            <CoverageSection
+              coveragePct={coveragePct}
+              missing={missing}
+              onRecalculate={recompute}
+              recalculating={compute.isPending}
+              canWrite={canWrite}
+            />
 
-        <DeclarationSection
-          declarationHtml={label.ingredient_declaration}
-          allergens={label.allergens}
-          unlinkedCount={label.missing_data?.lines_without_raw_material ?? 0}
-          unclassifiedNames={label.missing_data?.unclassified_grain_names ?? []}
-        />
+            <DeclarationSection
+              declarationHtml={label.ingredient_declaration}
+              allergens={label.allergens}
+              unlinkedCount={label.missing_data?.lines_without_raw_material ?? 0}
+              unclassifiedNames={label.missing_data?.unclassified_grain_names ?? []}
+            />
 
-        <NutritionSection
-          per100g={label.nutrition_per_100g}
-          unitWeightGrams={recipe.unit_weight_grams ?? null}
-          coverageOk={coverageOk}
-        />
+            <NutritionSection
+              per100g={label.nutrition_per_100g}
+              unitWeightGrams={recipe.unit_weight_grams ?? null}
+              coverageOk={coverageOk}
+            />
+          </>
+        )}
       </div>
 
-
-      <GrainScaleSection
-        grainPct={label.grain_score_pct}
-        grainCategory={label.grain_category}
-        flourGrams={label.flour_grams}
-        coarseWeightedGrams={label.whole_grain_grams}
-        flourLines={flourLines}
-        warnings={label.warnings}
-      />
+      {label && (
+        <GrainScaleSection
+          grainPct={label.grain_score_pct}
+          grainCategory={label.grain_category}
+          flourGrams={label.flour_grams}
+          coarseWeightedGrams={label.whole_grain_grams}
+          flourLines={flourLines}
+          warnings={label.warnings}
+        />
+      )}
 
       <KeyholeSection
         keyhole={keyhole}
@@ -302,6 +307,7 @@ export function LabelTab({ recipeId, recipeName, recipe, flourLines, legalEntity
         saving={saveClaim.isPending}
         onToggleClaim={(field, value) => saveClaim.mutate({ field, value })}
       />
+
 
       <Card>
         <CardHeader className="pb-3">
