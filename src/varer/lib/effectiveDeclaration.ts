@@ -197,10 +197,15 @@ async function fetchCalculated(recipeId: string): Promise<RecipeLabelSnapshot | 
   return (data ?? null) as RecipeLabelSnapshot | null;
 }
 
-/** Skriver snapshotet til produktet. */
+/**
+ * Skriver snapshotet til produktet.
+ * MERK: nettbutikkens næringstabell (`product_nutrition_calculated`) er en VIEW som
+ * regnes ut fra oppskriftslinjene — den kan ikke skrives til. Manuell næring når
+ * derfor ikke nettbutikken uten en databaseendring (view → tabell, eller at
+ * `push_products_to_nettside` leser `products.manual_nutrition_per_100g`).
+ */
 async function writeSnapshot(productId: string, eff: EffectiveDeclaration) {
-  // products.manual_* er EFFEKTIV deklarasjon (snapshot) — kilden styres av
-  // declaration_mode på oppskrift/kobling. Ikke skriv hit fra andre steder.
+
   const { error } = await supabase
     .from("products")
     .update({
