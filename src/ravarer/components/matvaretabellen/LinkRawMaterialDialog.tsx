@@ -19,7 +19,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useRawMaterials } from "@/ravarer/hooks/useRawMaterials";
 import { useSuppliers } from "@/ravarer/hooks/useSuppliers";
 import { useDebouncedValue } from "@/ordre/hooks/useDebouncedValue";
-import { useApplyMatvaretabellen } from "@/ravarer/hooks/useMatvaretabellen";
+import { useApplyMatvaretabellen, useMatvaretabellenLinks } from "@/ravarer/hooks/useMatvaretabellen";
 
 interface Props {
   open: boolean;
@@ -34,7 +34,12 @@ interface Props {
 export function LinkRawMaterialDialog({ open, onOpenChange, foodId, foodName, initialQuery, onLinked }: Props) {
   const { data: rows = [], isLoading } = useRawMaterials();
   const { data: suppliers = [] } = useSuppliers();
+  const { data: links } = useMatvaretabellenLinks();
   const apply = useApplyMatvaretabellen();
+  const alreadyLinked = useMemo(
+    () => new Set((links?.get(foodId) ?? []).map((l) => l.raw_material_id)),
+    [links, foodId],
+  );
 
   const [q, setQ] = useState(initialQuery ?? "");
   const debounced = useDebouncedValue(q, 250);
@@ -114,31 +119,42 @@ export function LinkRawMaterialDialog({ open, onOpenChange, foodId, foodName, in
             ) : visible.length === 0 ? (
               <p className="p-6 text-center text-sm text-ink-secondary">Ingen aktive råvarer matcher søket.</p>
             ) : (
-              visible.map((r, i) => (
-                <button
-                  key={r.id}
-                  onClick={() => choose(r.id, r.name)}
-                  disabled={!!checkingId || apply.isPending}
-                  className={`flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left transition hover:bg-muted ${
-                    i % 2 === 1 ? "bg-muted/30" : ""
-                  }`}
-                >
-                  <div className="min-w-0">
-                    <div className="truncate text-sm font-medium">{r.name}</div>
-                    <div className="truncate text-xs text-ink-secondary">
-                      {r.sku}
-                      {r.category ? ` · ${r.category}` : ""}
-                      {r.primary_supplier_id && supplierMap.get(r.primary_supplier_id)
-                        ? ` · ${supplierMap.get(r.primary_supplier_id)}`
-                        : ""}
+              visible.map((r, i) => {
+                const isLinked = alreadyLinked.has(r.id);
+                return (
+                  <button
+                    key={r.id}
+                    onClick={() => {
+                      if (isLinked) return;
+                      void choose(r.id, r.name);
+                    }}
+                    disabled={isLinked || !!checkingId || apply.isPending}
+                    className={`flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left transition hover:bg-muted disabled:cursor-default disabled:opacity-70 ${
+                      i % 2 === 1 ? "bg-muted/30" : ""
+                    }`}
+                  >
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-medium">{r.name}</div>
+                      <div className="truncate text-xs text-ink-secondary">
+                        {r.sku}
+                        {r.category ? ` · ${r.category}` : ""}
+                        {r.primary_supplier_id && supplierMap.get(r.primary_supplier_id)
+                          ? ` · ${supplierMap.get(r.primary_supplier_id)}`
+                          : ""}
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <Badge variant="outline">{r.base_unit}</Badge>
-                    {checkingId === r.id && <Loader2 className="h-4 w-4 animate-spin" />}
-                  </div>
-                </button>
-              ))
+                    <div className="flex shrink-0 items-center gap-2">
+                      {isLinked && (
+                        <Badge variant="outline" className="border-success/40 bg-success/10 text-success">
+                          Allerede koblet
+                        </Badge>
+                      )}
+                      <Badge variant="outline">{r.base_unit}</Badge>
+                      {checkingId === r.id && <Loader2 className="h-4 w-4 animate-spin" />}
+                    </div>
+                  </button>
+                );
+              })
             )}
           </div>
 

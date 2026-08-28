@@ -188,9 +188,17 @@ export default function Matvaretabellen() {
                           <TooltipProvider>
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <Badge className="cursor-default border-success/40 bg-success/10 text-success" variant="outline">
-                                  Koblet{linked.length > 1 ? ` (${linked.length})` : ""}
-                                </Badge>
+                                <div className="inline-block max-w-[220px] cursor-default">
+                                  <Badge
+                                    className="border-success/40 bg-success/10 text-success"
+                                    variant="outline"
+                                  >
+                                    Koblet{linked.length > 1 ? ` · ${linked.length}` : ""}
+                                  </Badge>
+                                  <div className="truncate text-xs text-ink-secondary">
+                                    {linked.map((l) => l.raw_material_name).join(", ")}
+                                  </div>
+                                </div>
                               </TooltipTrigger>
                               <TooltipContent>
                                 {linked.map((l) => (
