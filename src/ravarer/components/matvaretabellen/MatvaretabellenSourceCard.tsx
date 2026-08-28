@@ -17,7 +17,7 @@ import {
   useMatvaretabellenFood,
   useUnlinkMatvaretabellen,
 } from "@/ravarer/hooks/useMatvaretabellen";
-import { LinkRawMaterialDialog } from "./LinkRawMaterialDialog";
+import { FoodPickerDialog } from "./FoodPickerDialog";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 
 interface Props {
@@ -53,11 +53,11 @@ export function MatvaretabellenSourceCard({ rawMaterialId, rawMaterialName, sour
           )}
         </Card>
         {findOpen && (
-          <FindDialog
-            rawMaterialName={rawMaterialName}
+          <FoodPickerDialog
             open={findOpen}
             onOpenChange={setFindOpen}
             rawMaterialId={rawMaterialId}
+            initialQuery={rawMaterialName}
           />
         )}
       </>
@@ -120,33 +120,3 @@ export function MatvaretabellenSourceCard({ rawMaterialId, rawMaterialName, sour
     </>
   );
 }
-
-/**
- * Gjenbruker koble-dialogen «baklengs»: vi kjenner råvaren, men ikke matvaren.
- * Derfor viser vi matvaresøk i en enkel liste via LinkRawMaterialDialog er ikke mulig —
- * i stedet åpner vi matvarevelgeren.
- */
-function FindDialog({
-  rawMaterialId,
-  rawMaterialName,
-  open,
-  onOpenChange,
-}: {
-  rawMaterialId: string;
-  rawMaterialName: string;
-  open: boolean;
-  onOpenChange: (v: boolean) => void;
-}) {
-  return (
-    <FoodPickerDialog
-      open={open}
-      onOpenChange={onOpenChange}
-      rawMaterialId={rawMaterialId}
-      initialQuery={rawMaterialName}
-    />
-  );
-}
-
-export { LinkRawMaterialDialog };
-
-import { FoodPickerDialog } from "./FoodPickerDialog";
