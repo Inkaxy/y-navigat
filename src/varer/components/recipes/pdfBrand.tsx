@@ -87,18 +87,41 @@ export function BrandHeader({
   );
 }
 
-/** Slankere gjentakelse på side 2 og utover: bare emblem og navn. */
-export function BrandRunningHeader({ name, meta }: { name: string; meta?: string | null }) {
+/**
+ * Slankere gjentakelse på side 2 og utover: bare emblem og navn.
+ * Absolutt plassert, slik at side 1 (der den er tom) ikke får luft eller strek.
+ */
+export function BrandRunningHeader({
+  name,
+  meta,
+  margin,
+}: {
+  name: string;
+  meta?: string | null;
+  margin: number;
+}) {
   return (
-    <View style={s.slimHeader} fixed render={({ pageNumber }) => (pageNumber === 1 ? null : undefined)}>
-      <View style={{ flexDirection: "row", alignItems: "center" }}>
-        <Image src={logoEmblem} style={{ width: LOGO_EMBLEM_W * 0.7, height: LOGO_EMBLEM_H * 0.7, objectFit: "contain" }} />
-        <Text style={[s.slimName, { marginLeft: 6, fontWeight: 700, color: INK }]}>{name}</Text>
-      </View>
-      {meta ? <Text style={s.slimName}>{meta}</Text> : null}
-    </View>
+    <View
+      style={[s.slimWrap, { left: margin, right: margin }]}
+      fixed
+      render={({ pageNumber }) =>
+        pageNumber === 1 ? null : (
+          <View style={s.slimHeader}>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <Image
+                src={logoEmblem}
+                style={{ width: LOGO_EMBLEM_W * 0.7, height: LOGO_EMBLEM_H * 0.7, objectFit: "contain" }}
+              />
+              <Text style={[s.slimName, { marginLeft: 6, fontWeight: 700, color: INK }]}>{name}</Text>
+            </View>
+            {meta ? <Text style={s.slimName}>{meta}</Text> : null}
+          </View>
+        )
+      }
+    />
   );
 }
+
 
 /** Bunntekst med emblem, bakerilinje og sidetall. Sett `left`/`right` lik sidemargen. */
 export function BrandFooter({ margin }: { margin: number }) {
