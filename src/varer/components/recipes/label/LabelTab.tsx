@@ -172,8 +172,8 @@ export function LabelTab({ recipeId, recipeName, recipe, flourLines, legalEntity
   }, [label, effective, manualMode]);
 
   async function printLabel() {
-    if (!label) return;
     setPrinting(true);
+
     try {
       // Kun det offisielle BKLF-merket trykkes. Uten merke trykkes ingen påstand.
       const grainMarkSrc =
