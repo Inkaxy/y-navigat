@@ -167,6 +167,8 @@ export function buildRecipePDFData(input: BuildRecipePDFInput): RecipePDFData {
         exactGrams,
         percent: s?.percent ?? 0,
         isFlour: isFlourLine(l),
+        isSubRecipe: !!l.sub_product_id || !!l._rm?.produced_by_recipe_id,
+
         cost: input.includeCosts ? lineCost(l, exactGrams) : null,
       };
     });
