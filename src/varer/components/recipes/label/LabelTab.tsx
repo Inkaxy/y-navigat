@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -293,6 +294,14 @@ export function LabelTab({ recipeId, recipeName, recipe, flourLines, legalEntity
             {printing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Printer className="mr-2 h-4 w-4" />}
             Skriv ut etikett
           </Button>
+          <p className="w-full text-xs">
+            Kilde: <strong>{manualMode ? "manuell inntasting" : "beregnet fra NBOS"}</strong>
+            {manualMode
+              ? " — næringstabellen tas med hvis den er fylt ut."
+              : coverageOk
+                ? " — næringstabellen tas med."
+                : " — næringstabellen utelates fordi datadekningen er under 90 %."}
+          </p>
           <p className="w-full text-xs text-muted-foreground">
             Ingredienslisten settes aldri mindre enn 1,2 mm x-høyde — det er minstekravet i regelverket. Får ikke
             teksten plass på valgt størrelse, velg et større format i stedet for å krympe skriften.
