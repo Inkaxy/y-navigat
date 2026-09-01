@@ -9,7 +9,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Search, Loader2, ChefHat, Plus, Link2, Copy, MoreHorizontal, Wheat } from "lucide-react";
+import { Search, Loader2, ChefHat, Plus, Link2, Copy, MoreHorizontal, Wheat, ArrowUp, ArrowDown, ChevronsUpDown } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { copyRecipe } from "@/varer/lib/copyRecipe";
 
@@ -50,6 +50,9 @@ type RecipeRow = RecipeListRow & {
   products: string[];
 };
 
+/** Kolonner som kan sorteres i oppskriftslisten. */
+type SortKey = "name" | "category" | "department" | "hydration" | "dough" | "products" | "status";
+
 export default function Recipes() {
   const { legalEntityId, canWrite } = useAppContext();
   const navigate = useNavigate();
@@ -57,6 +60,11 @@ export default function Recipes() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [deptFilter, setDeptFilter] = useState<"all" | RecipeDepartment | "none">("all");
+  const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({ key: "name", dir: "asc" });
+
+  /** Klikk på kolonne: samme kolonne snur retning, ny kolonne starter stigende. */
+  const toggleSort = (key: SortKey) =>
+    setSort((s) => (s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" }));
   const [creating, setCreating] = useState(false);
   const [copyingId, setCopyingId] = useState<string | null>(null);
 
@@ -145,8 +153,31 @@ export default function Recipes() {
       })
       .filter((r) =>
         !q ? true : `${r.name ?? ""} ${r.category ?? ""} ${r.products.join(" ")}`.toLowerCase().includes(q),
-      );
-  }, [recipesQuery.data, rmMap, search, statusFilter, deptFilter]);
+      )
+      .sort((a, b) => {
+        const dir = sort.dir === "asc" ? 1 : -1;
+        const txt = (v: string | null | undefined) => (v ?? "").toLowerCase();
+        const num = (v: number | null | undefined) => (v == null || Number.isNaN(v) ? null : v);
+        const cmpNum = (x: number | null, y: number | null) =>
+          x == null && y == null ? 0 : x == null ? 1 : y == null ? -1 : (x - y) * dir;
+        switch (sort.key) {
+          case "category":
+            return txt(a.category).localeCompare(txt(b.category), "nb") * dir;
+          case "department":
+            return txt(asDepartment(a.department) ?? "").localeCompare(txt(asDepartment(b.department) ?? ""), "nb") * dir;
+          case "hydration":
+            return cmpNum(num(a.totals.hydrationPct), num(b.totals.hydrationPct));
+          case "dough":
+            return cmpNum(num(a.totals.totalDoughG), num(b.totals.totalDoughG));
+          case "products":
+            return (a.products.length - b.products.length) * dir;
+          case "status":
+            return txt(a.status ?? "draft").localeCompare(txt(b.status ?? "draft"), "nb") * dir;
+          default:
+            return txt(a.name).localeCompare(txt(b.name), "nb") * dir;
+        }
+      });
+  }, [recipesQuery.data, rmMap, search, statusFilter, deptFilter, sort]);
 
   async function createRecipe() {
     setCreating(true);
@@ -224,13 +255,13 @@ export default function Recipes() {
             <table className="w-full text-sm">
               <thead className="bg-muted/30 text-xs uppercase text-muted-foreground">
                 <tr>
-                  <th className="px-4 py-2.5 text-left">Oppskrift</th>
-                  <th className="px-4 py-2.5 text-left">Kategori</th>
-                  <th className="px-4 py-2.5 text-left">Avdeling</th>
-                  <th className="px-4 py-2.5 text-right">Hydrering</th>
-                  <th className="px-4 py-2.5 text-right">Deigvekt</th>
-                  <th className="px-4 py-2.5 text-left">Produkter</th>
-                  <th className="px-4 py-2.5 text-left">Status</th>
+                  <SortableTh label="Oppskrift" sortKey="name" sort={sort} onSort={toggleSort} />
+                  <SortableTh label="Kategori" sortKey="category" sort={sort} onSort={toggleSort} />
+                  <SortableTh label="Avdeling" sortKey="department" sort={sort} onSort={toggleSort} />
+                  <SortableTh label="Hydrering" sortKey="hydration" sort={sort} onSort={toggleSort} align="right" />
+                  <SortableTh label="Deigvekt" sortKey="dough" sort={sort} onSort={toggleSort} align="right" />
+                  <SortableTh label="Produkter" sortKey="products" sort={sort} onSort={toggleSort} />
+                  <SortableTh label="Status" sortKey="status" sort={sort} onSort={toggleSort} />
                   <th className="w-10 px-2 py-2.5" />
                 </tr>
               </thead>
@@ -326,5 +357,31 @@ export default function Recipes() {
         </Card>
       </div>
     </>
+  );
+}
+
+/** Klikkbar kolonneoverskrift med sorteringsindikator. */
+function SortableTh({
+  label, sortKey, sort, onSort, align = "left",
+}: {
+  label: string;
+  sortKey: SortKey;
+  sort: { key: SortKey; dir: "asc" | "desc" };
+  onSort: (key: SortKey) => void;
+  align?: "left" | "right";
+}) {
+  const active = sort.key === sortKey;
+  const Icon = !active ? ChevronsUpDown : sort.dir === "asc" ? ArrowUp : ArrowDown;
+  return (
+    <th className={`px-4 py-2.5 ${align === "right" ? "text-right" : "text-left"}`} aria-sort={active ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}>
+      <button
+        type="button"
+        onClick={() => onSort(sortKey)}
+        className={`inline-flex items-center gap-1 uppercase transition-colors hover:text-foreground ${active ? "text-foreground" : ""} ${align === "right" ? "flex-row-reverse" : ""}`}
+      >
+        {label}
+        <Icon className={`h-3 w-3 ${active ? "" : "opacity-40"}`} />
+      </button>
+    </th>
   );
 }
