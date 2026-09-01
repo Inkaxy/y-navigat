@@ -153,8 +153,31 @@ export default function Recipes() {
       })
       .filter((r) =>
         !q ? true : `${r.name ?? ""} ${r.category ?? ""} ${r.products.join(" ")}`.toLowerCase().includes(q),
-      );
-  }, [recipesQuery.data, rmMap, search, statusFilter, deptFilter]);
+      )
+      .sort((a, b) => {
+        const dir = sort.dir === "asc" ? 1 : -1;
+        const txt = (v: string | null | undefined) => (v ?? "").toLowerCase();
+        const num = (v: number | null | undefined) => (v == null || Number.isNaN(v) ? null : v);
+        const cmpNum = (x: number | null, y: number | null) =>
+          x == null && y == null ? 0 : x == null ? 1 : y == null ? -1 : (x - y) * dir;
+        switch (sort.key) {
+          case "category":
+            return txt(a.category).localeCompare(txt(b.category), "nb") * dir;
+          case "department":
+            return txt(asDepartment(a.department) ?? "").localeCompare(txt(asDepartment(b.department) ?? ""), "nb") * dir;
+          case "hydration":
+            return cmpNum(num(a.totals.hydrationPct), num(b.totals.hydrationPct));
+          case "dough":
+            return cmpNum(num(a.totals.totalDoughG), num(b.totals.totalDoughG));
+          case "products":
+            return (a.products.length - b.products.length) * dir;
+          case "status":
+            return txt(a.status ?? "draft").localeCompare(txt(b.status ?? "draft"), "nb") * dir;
+          default:
+            return txt(a.name).localeCompare(txt(b.name), "nb") * dir;
+        }
+      });
+  }, [recipesQuery.data, rmMap, search, statusFilter, deptFilter, sort]);
 
   async function createRecipe() {
     setCreating(true);
