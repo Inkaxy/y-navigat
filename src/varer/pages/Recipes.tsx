@@ -359,3 +359,29 @@ export default function Recipes() {
     </>
   );
 }
+
+/** Klikkbar kolonneoverskrift med sorteringsindikator. */
+function SortableTh({
+  label, sortKey, sort, onSort, align = "left",
+}: {
+  label: string;
+  sortKey: SortKey;
+  sort: { key: SortKey; dir: "asc" | "desc" };
+  onSort: (key: SortKey) => void;
+  align?: "left" | "right";
+}) {
+  const active = sort.key === sortKey;
+  const Icon = !active ? ChevronsUpDown : sort.dir === "asc" ? ArrowUp : ArrowDown;
+  return (
+    <th className={`px-4 py-2.5 ${align === "right" ? "text-right" : "text-left"}`} aria-sort={active ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}>
+      <button
+        type="button"
+        onClick={() => onSort(sortKey)}
+        className={`inline-flex items-center gap-1 uppercase transition-colors hover:text-foreground ${active ? "text-foreground" : ""} ${align === "right" ? "flex-row-reverse" : ""}`}
+      >
+        {label}
+        <Icon className={`h-3 w-3 ${active ? "" : "opacity-40"}`} />
+      </button>
+    </th>
+  );
+}
