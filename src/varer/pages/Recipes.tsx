@@ -50,6 +50,9 @@ type RecipeRow = RecipeListRow & {
   products: string[];
 };
 
+/** Kolonner som kan sorteres i oppskriftslisten. */
+type SortKey = "name" | "category" | "department" | "hydration" | "dough" | "products" | "status";
+
 export default function Recipes() {
   const { legalEntityId, canWrite } = useAppContext();
   const navigate = useNavigate();
@@ -57,6 +60,11 @@ export default function Recipes() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [deptFilter, setDeptFilter] = useState<"all" | RecipeDepartment | "none">("all");
+  const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({ key: "name", dir: "asc" });
+
+  /** Klikk på kolonne: samme kolonne snur retning, ny kolonne starter stigende. */
+  const toggleSort = (key: SortKey) =>
+    setSort((s) => (s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" }));
   const [creating, setCreating] = useState(false);
   const [copyingId, setCopyingId] = useState<string | null>(null);
 
