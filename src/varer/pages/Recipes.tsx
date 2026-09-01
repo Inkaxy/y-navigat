@@ -255,13 +255,13 @@ export default function Recipes() {
             <table className="w-full text-sm">
               <thead className="bg-muted/30 text-xs uppercase text-muted-foreground">
                 <tr>
-                  <th className="px-4 py-2.5 text-left">Oppskrift</th>
-                  <th className="px-4 py-2.5 text-left">Kategori</th>
-                  <th className="px-4 py-2.5 text-left">Avdeling</th>
-                  <th className="px-4 py-2.5 text-right">Hydrering</th>
-                  <th className="px-4 py-2.5 text-right">Deigvekt</th>
-                  <th className="px-4 py-2.5 text-left">Produkter</th>
-                  <th className="px-4 py-2.5 text-left">Status</th>
+                  <SortableTh label="Oppskrift" sortKey="name" sort={sort} onSort={toggleSort} />
+                  <SortableTh label="Kategori" sortKey="category" sort={sort} onSort={toggleSort} />
+                  <SortableTh label="Avdeling" sortKey="department" sort={sort} onSort={toggleSort} />
+                  <SortableTh label="Hydrering" sortKey="hydration" sort={sort} onSort={toggleSort} align="right" />
+                  <SortableTh label="Deigvekt" sortKey="dough" sort={sort} onSort={toggleSort} align="right" />
+                  <SortableTh label="Produkter" sortKey="products" sort={sort} onSort={toggleSort} />
+                  <SortableTh label="Status" sortKey="status" sort={sort} onSort={toggleSort} />
                   <th className="w-10 px-2 py-2.5" />
                 </tr>
               </thead>
