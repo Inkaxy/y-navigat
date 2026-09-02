@@ -7,19 +7,15 @@ import type { OrderEvent } from "@/ordre/hooks/useOrderDetail";
 
 function eventIcon(toStatus: string) {
   const map: Record<string, React.ReactNode> = {
-    draft: <FileEdit className="h-4 w-4" />,
     awaiting_confirmation: <AlertCircle className="h-4 w-4" />,
     confirmed: <Check className="h-4 w-4" />,
-    in_production: <Package className="h-4 w-4" />,
-    packed: <Package className="h-4 w-4" />,
-    partial_delivery: <Truck className="h-4 w-4" />,
     delivered: <Truck className="h-4 w-4" />,
-    on_hold: <Pause className="h-4 w-4" />,
     invoiced: <Receipt className="h-4 w-4" />,
     cancelled: <X className="h-4 w-4" />,
   };
   return map[toStatus] ?? <ShoppingCart className="h-4 w-4" />;
 }
+
 
 function formatTourLabel(t: { tour_number?: number; display_name?: string } | null | undefined) {
   if (!t) return "ingen tur";
@@ -41,6 +37,12 @@ function eventTitle(ev: OrderEvent) {
       </span>
     );
   }
+
+  if (eventType === "fixed_replaced_by_dated") {
+    return <span className="font-medium">Fastordre erstattet av datert ordre</span>;
+  }
+
+
 
   const toLabel = getStatusMeta(ev.to_status).label;
   if (!ev.from_status) return `Ordre opprettet (${toLabel})`;

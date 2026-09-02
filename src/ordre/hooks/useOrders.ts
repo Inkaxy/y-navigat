@@ -1,13 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
-import type { OrderStatus } from "@/ordre/lib/orderStatus";
+import type { OrderKind, OrderStatus } from "@/ordre/lib/orderStatus";
 import { osloTodayISO } from "@/lib/osloDate";
 
 export type OrderListRow = {
   id: string;
   order_number: string;
   status: OrderStatus;
+  order_kind: OrderKind;
+  approval_reason: string | null;
   source: string;
   customer_id: string;
   customer_snapshot: { display_name?: string; customer_number?: string } | null;
@@ -26,6 +28,7 @@ export type OrderListRow = {
 export type OrderListFilters = {
   search?: string;
   statuses?: OrderStatus[];
+  kinds?: OrderKind[];
   source?: string; // 'all' | source-value
   deliveryFrom?: string | null;
   deliveryTo?: string | null;
@@ -44,13 +47,16 @@ export function useOrderList(filters: OrderListFilters) {
       let q = supabase
         .from("orders")
         .select(
-          "id, order_number, status, source, customer_id, customer_snapshot, delivery_date, delivery_time, delivery_tour_id, total_incl_vat, status_changed_at, ordered_at, created_at, rule_flags, rule_override_reason, order_lines(count)",
+          "id, order_number, status, order_kind, approval_reason, source, customer_id, customer_snapshot, delivery_date, delivery_time, delivery_tour_id, total_incl_vat, status_changed_at, ordered_at, created_at, rule_flags, rule_override_reason, order_lines(count)",
           { count: "exact" },
         )
         .eq("legal_entity_id", NB_LEGAL_ENTITY_ID);
 
       if (filters.statuses && filters.statuses.length > 0) {
         q = q.in("status", filters.statuses);
+      }
+      if (filters.kinds && filters.kinds.length > 0) {
+        q = q.in("order_kind", filters.kinds);
       }
       if (filters.source && filters.source !== "all") {
         q = q.eq("source", filters.source);
@@ -148,17 +154,18 @@ export function useActionQueueCounts() {
         .from("orders")
         .select("id, status, delivery_date")
         .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
-        .in("status", ["awaiting_confirmation", "on_hold", "draft", "packed"]);
+        .in("status", ["awaiting_confirmation", "confirmed"]);
       if (error) throw error;
       const rows = data ?? [];
       const today = osloTodayISO();
       return {
         awaiting: rows.filter((r) => r.status === "awaiting_confirmation").length,
-        onHold: rows.filter((r) => r.status === "on_hold").length,
-        drafts: rows.filter((r) => r.status === "draft").length,
-        packedToday: rows.filter((r) => r.status === "packed" && r.delivery_date === today).length,
+        confirmedToday: rows.filter(
+          (r) => r.status === "confirmed" && r.delivery_date === today,
+        ).length,
       };
     },
+
     staleTime: 30_000,
   });
 }

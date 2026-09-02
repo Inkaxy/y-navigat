@@ -16,6 +16,10 @@ export type OrderDetail = {
   invoice_recipient_customer_id: string | null;
   invoice_recipient_snapshot: Record<string, unknown> | null;
   status: OrderStatus;
+  order_kind: string | null;
+  approval_reason: string | null;
+  delivery_tour_id: string | null;
+
   status_changed_at: string;
   status_changed_by: string | null;
   ordered_at: string;

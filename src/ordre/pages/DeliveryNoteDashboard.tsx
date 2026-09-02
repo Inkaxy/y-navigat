@@ -343,6 +343,16 @@ export default function DeliveryNoteDashboard() {
         navigate(`/ordre/pakksedler/liste?date=${date}&tour=${tourId}&type=datert${modeSuffix}`),
     },
     {
+      key: "ekstra",
+      label: "EKSTRAORDRE",
+      value: counts?.ekstra ?? 0,
+      classes: "bg-blue-100 text-blue-950 hover:bg-blue-200 dark:bg-blue-900/40 dark:text-blue-50",
+      span: 1,
+      onClick: () =>
+        navigate(`/ordre/pakksedler/liste?date=${date}&tour=${tourId}&type=datert${modeSuffix}`),
+    },
+
+    {
       key: "pakk",
       label: "PAKKSEDLER",
       value: counts?.pakksedler ?? 0,

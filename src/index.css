@@ -102,6 +102,28 @@
     --surface:               var(--surface-raised);
     --surface-elevated:      var(--surface-sunken);
 
+    /* ---- Ordremodell: status / livssyklus / ordretype ---- */
+    --status-awaiting:       32 80% 48%;
+    --status-confirmed:      210 50% 42%;
+    --status-delivered:      140 38% 38%;
+    --status-invoiced:       262 40% 48%;
+    --status-cancelled:      4 62% 48%;
+
+    --lifecycle-awaiting:      32 80% 48%;
+    --lifecycle-open:          28 14% 44%;
+    --lifecycle-delivery-note: 214 60% 34%;
+    --lifecycle-delivered:     140 38% 38%;
+    --lifecycle-invoiced:      262 40% 48%;
+    --lifecycle-cancelled:     4 62% 48%;
+
+    --kind-dated:            28 14% 44%;
+    --kind-fixed:            42 88% 45%;
+    --kind-repeating:        140 38% 38%;
+    --kind-extra:            210 60% 45%;
+    --kind-return:           4 62% 48%;
+    --kind-closed:           28 10% 52%;
+
+
     /* ---- Legacy aliases (peker på app-color-systemet) ---- */
     --app-primary:               var(--app-color);
     --app-primary-foreground:    var(--text-on-accent);

@@ -100,6 +100,9 @@ import { useUserAccess } from "@/ordre/hooks/useUserAccess";
 import { useCustomerWeather, type WeatherMap } from "@/ordre/hooks/useCustomerWeather";
 import { WeatherCell } from "@/ordre/components/orders/WeatherCell";
 import { useRecurringGhost, type RecurringGhostMap } from "@/ordre/hooks/useRecurringGhost";
+import { useOrdersLifecycle } from "@/ordre/hooks/useOrdersLifecycle";
+import { OrderKindBadge } from "@/ordre/components/orders/OrderKindBadge";
+import { LifecycleBadge } from "@/ordre/components/orders/LifecycleBadge";
 import { useRecurringSchedules, type RecurringScheduleWithCustomer } from "@/ordre/hooks/useRecurringOrders";
 import { RecurringScheduleDialog } from "@/ordre/components/orders/RecurringScheduleDialog";
 import {
@@ -226,7 +229,6 @@ export default function MatrixPage() {
 
   // Toolbar visning
   const [hiddenTourIds, setHiddenTourIds] = useState<Set<string>>(new Set());
-  const [showReturns, setShowReturns] = useState<boolean>(false);
   const [customerCardOpen, setCustomerCardOpen] = useState(false);
 
   const daysCount = useMemo(() => {
@@ -783,6 +785,27 @@ export default function MatrixPage() {
     [matrix],
   );
 
+  // Ordre-id per kolonne (dato|tur) → livssyklus/ordretype for kolonne-header
+  const colOrderId = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const c of matrix?.existing_cells ?? []) {
+      m.set(`${c.delivery_date}|${c.delivery_tour_id}`, c.order_id);
+    }
+    return m;
+  }, [matrix]);
+
+  const { map: colLifecycleMap } = useOrdersLifecycle(
+    useMemo(() => [...new Set(colOrderId.values())], [colOrderId]),
+  );
+
+  const colMeta = useCallback(
+    (date: string, tourId: string) => {
+      const oid = colOrderId.get(`${date}|${tourId}`);
+      return oid ? colLifecycleMap.get(oid) : undefined;
+    },
+    [colOrderId, colLifecycleMap],
+  );
+
   async function executeColumnCopy(source: { date: string; tour: MatrixTour }, input: CopyColumnInput) {
     if (!customerId || !matrix) return;
     const sourceLines = matrix.existing_cells.filter(
@@ -1292,21 +1315,6 @@ export default function MatrixPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 rounded-md border border-brand-bronze/30 bg-card/60 px-2 py-1 text-sm">
-            <span className="text-muted-foreground">vis retur</span>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="h-7 px-2 text-xs">
-                  {showReturns ? "ja" : "nei"} <ChevronDown className="ml-1 h-3 w-3" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-28">
-                <DropdownMenuItem onSelect={() => setShowReturns(false)}>nei</DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => setShowReturns(true)}>ja</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-
           <Button
             variant="brand"
             size="sm"
@@ -1532,6 +1540,7 @@ export default function MatrixPage() {
               onColDelete={(date, tour) => setDeleteColConfirm({ date, tour })}
               onColPackingNote={(date, tour) => generatePackingNoteForColumn(date, tour)}
               colHasData={colHasAnyData}
+              colMeta={colMeta}
               canEdit={canEdit}
               onOpenTourOrder={(date, tour) => setTourOrderCol({ date, tour })}
               onOpenWeekEditor={(p) => setWeekEditorProduct(p)}
@@ -1835,6 +1844,7 @@ function MatrixGrid({
   onColDelete,
   onColPackingNote,
   colHasData,
+  colMeta,
   canEdit,
   onOpenTourOrder,
   onOpenWeekEditor,
@@ -1862,6 +1872,7 @@ function MatrixGrid({
   onColDelete: (date: string, tour: MatrixTour) => void;
   onColPackingNote: (date: string, tour: MatrixTour) => void;
   colHasData: (date: string, tourId: string) => boolean;
+  colMeta: (date: string, tourId: string) => { order_kind?: string; lifecycle?: string; delivery_note_number?: string | null } | undefined;
   canEdit: boolean;
   onOpenTourOrder: (date: string, tour: MatrixTour) => void;
   onOpenWeekEditor: (product: MatrixProduct) => void;
@@ -1974,6 +1985,24 @@ function MatrixGrid({
                     {dayLabel} ({c.tour.tour_number})
                     {hasComment && <span className="ml-1 text-primary">•</span>}
                   </button>
+                  {(() => {
+                    const meta = colMeta(c.date, c.tour.id);
+                    if (!meta) return null;
+                    return (
+                      <div className="mt-0.5 flex flex-wrap items-center justify-center gap-1">
+                        {meta.order_kind ? (
+                          <OrderKindBadge kind={meta.order_kind as never} size="sm" />
+                        ) : null}
+                        {meta.lifecycle ? (
+                          <LifecycleBadge
+                            lifecycle={meta.lifecycle as never}
+                            deliveryNoteNumber={meta.delivery_note_number}
+                            size="sm"
+                          />
+                        ) : null}
+                      </div>
+                    );
+                  })()}
                   {pause && (
                     <div className="mt-0.5 inline-block rounded-sm bg-sky-200/80 px-1 text-[9px] font-semibold uppercase tracking-wide text-sky-900 dark:bg-sky-800/60 dark:text-sky-100">
                       Pause

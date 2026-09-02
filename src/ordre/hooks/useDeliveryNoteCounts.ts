@@ -8,6 +8,7 @@ import { fetchPendingRecurringOrderCounts } from "@/ordre/hooks/usePendingRecurr
 export type DeliveryNoteCounts = {
   fastordre: number;
   datert: number;
+  ekstra: number;
   retur: number;
   pakksedler: number;
 };
@@ -64,7 +65,7 @@ export function useDeliveryNoteCounts(
           .select("id", { count: "exact", head: true })
           .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
           // Speiler order_is_production_scope(status) i generate_delivery_notes.
-          .in("status", ["confirmed", "in_production", "packed"]);
+          .in("status", ["confirmed"]);
         q = isCorrection ? q.lte("delivery_date", date) : q.eq("delivery_date", date);
         if (tourId === NULL_TOUR_KEY) q = q.is("delivery_tour_id", null);
         else if (tourId !== "all") q = q.eq("delivery_tour_id", tourId);
@@ -78,12 +79,13 @@ export function useDeliveryNoteCounts(
         return q;
       };
 
-      const [fastRes, datertRes, returRes, pendingRecurring] = await Promise.all([
+      const [fastRes, datertRes, ekstraRes, returRes, pendingRecurring] = await Promise.all([
         isCorrection
           ? Promise.resolve({ count: 0, error: null as null })
-          : buildOrdersBase().eq("is_customer_order", false).eq("is_return", false),
-        buildOrdersBase().eq("is_customer_order", true).eq("is_return", false),
-        buildOrdersBase().eq("is_return", true),
+          : buildOrdersBase().eq("order_kind", "fixed"),
+        buildOrdersBase().in("order_kind", ["dated", "extra"]).eq("is_return", false),
+        buildOrdersBase().eq("order_kind", "extra"),
+        buildOrdersBase().eq("order_kind", "return"),
         isCorrection
           ? Promise.resolve({ total: 0, nullTourCount: 0, byTour: {} as Record<string, number> })
           : fetchPendingRecurringOrderCounts(date, toursQ.data ?? []),
@@ -91,6 +93,7 @@ export function useDeliveryNoteCounts(
 
       if ((fastRes as any).error) throw (fastRes as any).error;
       if (datertRes.error) throw datertRes.error;
+      if (ekstraRes.error) throw ekstraRes.error;
       if (returRes.error) throw returRes.error;
 
       const pendingFastordre = isCorrection
@@ -104,6 +107,7 @@ export function useDeliveryNoteCounts(
       return {
         fastordre: ((fastRes as any).count ?? 0) + pendingFastordre,
         datert: datertRes.count ?? 0,
+        ekstra: ekstraRes.count ?? 0,
         retur: returRes.count ?? 0,
         pakksedler: pakksedlerCount,
       };

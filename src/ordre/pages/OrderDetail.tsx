@@ -43,8 +43,12 @@ import {
   useOrderRealtime,
   useUserDisplayNames,
 } from "@/ordre/hooks/useOrderDetail";
-import { StatusBadge } from "@/ordre/components/orders/StatusBadge";
-import { StatusFlowBar } from "@/ordre/components/orders/StatusFlowBar";
+import { OrderKindBadge } from "@/ordre/components/orders/OrderKindBadge";
+import { LifecycleBadge } from "@/ordre/components/orders/LifecycleBadge";
+import { useOrdersLifecycle } from "@/ordre/hooks/useOrdersLifecycle";
+import { useGenerateDeliveryNotes } from "@/ordre/hooks/useGenerateDeliveryNotes";
+import { useCompletedMainRuns } from "@/ordre/hooks/useCompletedRuns";
+import { changeOrderStatus } from "@/ordre/lib/changeOrderStatus";
 import {
   StatusChangeDialog,
   type StatusChangeIntent,
@@ -56,17 +60,18 @@ import { OriginalEmailCard } from "@/ordre/components/orders/OriginalEmailCard";
 import { OrderAttachmentsCard } from "@/ordre/components/orders/OrderAttachmentsCard";
 import { CakeImageStatusCard } from "@/ordre/components/orders/CakeImageStatusCard";
 import { TimelineCard } from "@/ordre/components/orders/TimelineCard";
+import { canCancel, canDelete, getStatusActions } from "@/ordre/lib/statusTransitions";
 import {
-  canCancel,
-  canDelete,
-  getStatusActions,
-  flowIndex,
-} from "@/ordre/lib/statusTransitions";
-import { getStatusMeta, type OrderStatus } from "@/ordre/lib/orderStatus";
+  approvalReasonText,
+  getSourceLabel,
+  getStatusMeta,
+  type OrderStatus,
+} from "@/ordre/lib/orderStatus";
 import { formatDateLong, formatNOK } from "@/ordre/lib/format";
 import { logAudit } from "@/ordre/lib/audit";
 import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
 import { useQueryClient } from "@tanstack/react-query";
+
 
 export default function OrderDetail() {
   const { id } = useParams<{ id: string }>();
@@ -101,6 +106,16 @@ export default function OrderDetail() {
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+
+  // Utledet livssyklus (orders_lifecycle) + pakkseddel-kjøring
+  const { map: lifecycleMap } = useOrdersLifecycle([id]);
+  const lc = id ? lifecycleMap.get(id) : undefined;
+  const generateNotes = useGenerateDeliveryNotes();
+  const { data: mainRuns = [] } = useCompletedMainRuns(
+    NB_LEGAL_ENTITY_ID,
+    order?.delivery_date ?? "",
+  );
+
 
   if (isLoading) {
     return (
@@ -140,21 +155,14 @@ export default function OrderDetail() {
   const showDelete = canDelete(status, isWriter, isAdmin);
   const cancelDisabled = !canCancel(status);
 
-  const actions = getStatusActions(status, order.is_return ?? false);
-  const primaryAction = actions.find((a) => (a.variant ?? "default") !== "destructive") ?? null;
-  const secondaryActions = actions.filter((a) => a !== primaryAction);
+  const hasApprovalReason = !!order.approval_reason;
+  const actions = getStatusActions(status, order.is_return ?? false, hasApprovalReason);
+  const approveAction = actions.find((a) => a.to === "confirmed") ?? null;
+  const rejectAction = actions.find((a) => a.to === "cancelled") ?? null;
 
-  const releaseAction =
-    status === "on_hold" && order.previous_status_before_hold
-      ? {
-          label: `Frigi → ${getStatusMeta(order.previous_status_before_hold).label}`,
-          intent: {
-            to: order.previous_status_before_hold as OrderStatus,
-            label: "Frigi",
-            clearsPreviousStatus: true,
-          } as StatusChangeIntent,
-        }
-      : null;
+  const lifecycle = lc?.lifecycle ?? (status === "cancelled" ? "cancelled" : "open");
+  const orderKind = lc?.order_kind ?? (order.is_return ? "return" : "dated");
+  const canCreateDeliveryNote = lifecycle === "open" && status === "confirmed";
 
   function openStatusChange(i: StatusChangeIntent) {
     setIntent(i);
@@ -168,88 +176,30 @@ export default function OrderDetail() {
       requireComment: true,
       commentLabel: "Hvorfor avbrytes ordren?",
       confirmVariant: "destructive",
-      specialEffect: "cancel",
       warning:
-        flowIndex(status) >= flowIndex("in_production")
-          ? "Ordren er allerede i produksjon eller senere. Bekreft at produksjonsplan er informert."
+        lifecycle === "delivery_note"
+          ? "Pakkseddel er allerede kjørt for denne ordren. Bekreft at produksjon og sjåfør er informert."
           : undefined,
     });
   }
 
   async function performStatusChange(comment: string) {
     if (!intent || !order) return;
-    const userId = user?.id ?? null;
-
-    const updates: Record<string, unknown> = {
-      status: intent.to,
-      status_changed_at: new Date().toISOString(),
-      status_changed_by: userId,
-      updated_at: new Date().toISOString(),
-    };
-
-    if (intent.storesPreviousStatus) updates.previous_status_before_hold = order.status;
-    if (intent.clearsPreviousStatus) updates.previous_status_before_hold = null;
-
-    if (intent.specialEffect === "cancel" || intent.to === "cancelled") {
-      updates.cancelled_at = new Date().toISOString();
-      updates.cancelled_by = userId;
-      updates.cancelled_reason = comment;
-    }
-    if (intent.to === "confirmed" && !order.confirmed_at) {
-      updates.confirmed_at = new Date().toISOString();
-      updates.confirmed_by = userId;
-    }
-
-    // Optimistisk lås — treffer 0 rader hvis noen andre har endret ordren.
-    const { data: updRows, error: updErr } = await supabase
-      .from("orders")
-      .update(updates as never)
-      .eq("id", order.id)
-      .eq("updated_at", order.updated_at)
-      .select("id");
-    if (updErr) {
-      console.error("[OrderDetail] performStatusChange", updErr);
+    try {
+      await changeOrderStatus({
+        orderId: order.id,
+        orderNumber: order.order_number,
+        customerName,
+        fromStatus: status,
+        toStatus: intent.to,
+        comment: comment || undefined,
+        userId: user?.id ?? null,
+        isCancel: intent.to === "cancelled",
+      });
+    } catch (err) {
+      console.error("[OrderDetail] performStatusChange", err);
       toast.error("Kunne ikke lagre. Prøv igjen — kontakt support hvis det gjentar seg.");
-      throw updErr;
-    }
-    if ((updRows ?? []).length === 0) {
-      toast.error("Ordren er endret av noen andre — laster på nytt");
-      await Promise.all([
-        qc.invalidateQueries({ queryKey: ["order", order.id] }),
-        qc.invalidateQueries({ queryKey: ["order-lines", order.id] }),
-        qc.invalidateQueries({ queryKey: ["order-events", order.id] }),
-      ]);
-      throw new Error("order_conflict");
-    }
-
-
-    if (comment) {
-      const { data: latest } = await supabase
-        .from("order_status_history")
-        .select("id")
-        .eq("order_id", order.id)
-        .order("changed_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (latest?.id) {
-        await supabase
-          .from("order_status_history")
-          .update({ notes: comment })
-          .eq("id", latest.id);
-      }
-    }
-
-    await logAudit({
-      action: "status_changed",
-      entity_type: "order",
-      entity_id: order.id,
-      entity_display_reference: `${order.order_number} — ${customerName}`,
-      legal_entity_id: NB_LEGAL_ENTITY_ID,
-      changes: { from: order.status, to: intent.to, comment: comment || null },
-    });
-
-    if (intent.to === "packed" || intent.to === "delivered" || intent.to === "invoiced") {
-      console.info(`[ordre] TODO: trigger downstream app for status=${intent.to}`);
+      throw err;
     }
 
     toast.success(`Status endret til ${getStatusMeta(intent.to).label}`);
@@ -257,9 +207,35 @@ export default function OrderDetail() {
       qc.invalidateQueries({ queryKey: ["order", order.id] }),
       qc.invalidateQueries({ queryKey: ["order-events", order.id] }),
       qc.invalidateQueries({ queryKey: ["orders"] }),
+      qc.invalidateQueries({ queryKey: ["orders-lifecycle"] }),
       qc.invalidateQueries({ queryKey: ["order-status-counts"] }),
     ]);
   }
+
+  async function handleCreateDeliveryNote() {
+    if (!order) return;
+    // Samme logikk som matrisens «Lag pakkseddel»: tilleggskjøring når
+    // hovedkjøringen allerede dekker turen for denne datoen.
+    const covered = mainRuns.some(
+      (r) =>
+        !r.tour_filter ||
+        r.tour_filter.length === 0 ||
+        (order.delivery_tour_id ? r.tour_filter.includes(order.delivery_tour_id) : false),
+    );
+    try {
+      const res = await generateNotes.mutateAsync({
+        date: order.delivery_date,
+        tourFilter: order.delivery_tour_id ? [order.delivery_tour_id] : null,
+        runType: covered ? "additional" : "main",
+      });
+      toast.success(`Pakkseddel kjørt — ${res.notes_generated} pakksedler`);
+      await qc.invalidateQueries({ queryKey: ["orders-lifecycle"] });
+    } catch (err) {
+      console.error("[OrderDetail] handleCreateDeliveryNote", err);
+      toast.error("Kunne ikke lage pakkseddel");
+    }
+  }
+
 
   async function performDelete() {
     if (!order) return;
@@ -313,9 +289,20 @@ export default function OrderDetail() {
             <span className="font-mono text-title font-semibold tracking-tight">
               {order.order_number}
             </span>
-            <StatusBadge status={status} size="md" />
+            <OrderKindBadge kind={orderKind} size="md" />
+            {lc?.delivery_note_id ? (
+              <Link to={`/ordre/pakksedler?note=${lc.delivery_note_id}`}>
+                <LifecycleBadge
+                  lifecycle={lifecycle}
+                  deliveryNoteNumber={lc.delivery_note_number}
+                  size="md"
+                />
+              </Link>
+            ) : (
+              <LifecycleBadge lifecycle={lifecycle} size="md" />
+            )}
             <span className="text-caption text-muted-foreground">
-              {formatNOK(order.total_incl_vat)} · {lines.length} linjer
+              {getSourceLabel(order.source)} · {formatNOK(order.total_incl_vat)} · {lines.length} linjer
             </span>
             {order.source === "ticket" && order.source_reference && (
               <Link to={`/ordre/ticket/${order.source_reference}`} className="text-caption text-primary underline-offset-2 hover:underline">
@@ -325,62 +312,46 @@ export default function OrderDetail() {
           </div>
 
           <div className="ml-auto flex flex-wrap items-center gap-2">
-            {releaseAction && (
-              <Button size="sm" onClick={() => openStatusChange(releaseAction.intent)}>
-                {releaseAction.label}
-              </Button>
-            )}
-            {primaryAction && (
+            {approveAction && (
               <Button
                 size="sm"
-                variant={primaryAction.variant ?? "default"}
+                onClick={() =>
+                  openStatusChange({ to: "confirmed", label: approveAction.label })
+                }
+              >
+                {approveAction.label}
+              </Button>
+            )}
+            {rejectAction && (
+              <Button
+                size="sm"
+                variant="destructive"
                 onClick={() =>
                   openStatusChange({
-                    to: primaryAction.to,
-                    label: primaryAction.label,
-                    requireComment: primaryAction.requireComment,
-                    commentLabel: primaryAction.commentLabel,
-                    storesPreviousStatus: primaryAction.storesPreviousStatus,
+                    to: "cancelled",
+                    label: rejectAction.label,
+                    requireComment: true,
+                    commentLabel: rejectAction.commentLabel,
+                    confirmVariant: "destructive",
                   })
                 }
               >
-                {primaryAction.label}
+                {rejectAction.label}
               </Button>
             )}
-            {secondaryActions.length > 0 && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm">
-                    Flere handlinger
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  {secondaryActions.map((a) => (
-                    <DropdownMenuItem
-                      key={a.label}
-                      onClick={() =>
-                        openStatusChange({
-                          to: a.to,
-                          label: a.label,
-                          requireComment: a.requireComment,
-                          commentLabel: a.commentLabel,
-                          storesPreviousStatus: a.storesPreviousStatus,
-                          confirmVariant:
-                            a.variant === "destructive" ? "destructive" : "default",
-                        })
-                      }
-                      className={
-                        a.variant === "destructive" ? "text-destructive" : undefined
-                      }
-                    >
-                      {a.label}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
+            {canCreateDeliveryNote && isWriter && (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={generateNotes.isPending}
+                onClick={handleCreateDeliveryNote}
+              >
+                {generateNotes.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Lag pakkseddel
+              </Button>
             )}
 
-            {/* Overflow-meny: avbryt, slett, manuell overstyring, historikk */}
+            {/* Overflow-meny: avbryt, slett, historikk */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -406,52 +377,29 @@ export default function OrderDetail() {
                     Slett ordre
                   </DropdownMenuItem>
                 )}
-                {isAdmin && (
-                  <>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuLabel className="text-caption text-muted-foreground">
-                      Manuell overstyring
-                    </DropdownMenuLabel>
-                    {(
-                      [
-                        "draft",
-                        "awaiting_confirmation",
-                        "confirmed",
-                        "in_production",
-                        "packed",
-                        "delivered",
-                      ] as OrderStatus[]
-                    )
-                      .filter((s) => s !== status)
-                      .map((s) => (
-                        <DropdownMenuItem
-                          key={s}
-                          onClick={() =>
-                            openStatusChange({
-                              to: s,
-                              label: `Sett til ${getStatusMeta(s).label}`,
-                              requireComment: true,
-                              commentLabel: "Hvorfor brukes manuell overstyring?",
-                            })
-                          }
-                        >
-                          → {getStatusMeta(s).label}
-                        </DropdownMenuItem>
-                      ))}
-                  </>
-                )}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
         </div>
 
-        {/* Statusflyt-bar — alltid synlig under action-baren */}
-        <div className="border-t border-border bg-muted/20">
-          <div className="container mx-auto px-page py-2">
-            <StatusFlowBar current={status} events={events} userNames={userNames} source={order.source} />
+        {/* Info-striper — livssyklus og godkjenningsgrunn */}
+        {lifecycle === "delivery_note" && (
+          <div className="border-t border-warning/40 bg-warning/10">
+            <div className="container mx-auto px-page py-2 text-caption">
+              Pakkseddel {lc?.delivery_note_number ?? ""} er kjørt. Endringer lagres som korreksjon.
+            </div>
           </div>
-        </div>
+        )}
+        {status === "awaiting_confirmation" && (
+          <div className="border-t border-warning/40 bg-warning/10">
+            <div className="container mx-auto px-page py-2 text-caption">
+              Venter godkjenning fordi den kom fra {approvalReasonText(order.approval_reason)}. Alle
+              andre ordre blir ordre direkte.
+            </div>
+          </div>
+        )}
       </div>
+
 
       <div className="container mx-auto space-y-4 px-page py-4">
         {/* Realtime-banner */}
@@ -515,11 +463,12 @@ export default function OrderDetail() {
           </TabsContent>
         </Tabs>
 
-        {actions.length === 0 && !releaseAction && (
+        {actions.length === 0 && (
           <Card className="p-3 text-center text-caption italic text-muted-foreground">
             Ingen videre statushandlinger fra «{getStatusMeta(status).label}».
           </Card>
         )}
+
       </div>
 
       {/* Historikk i side-sheet */}

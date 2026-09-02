@@ -77,16 +77,16 @@ export function usePendingOrdersList(
         .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
         // Speiler order_is_production_scope(status) i generate_delivery_notes —
         // awaiting_confirmation venter på godkjenning og skal ikke pakkes.
-        .in("status", ["confirmed", "in_production", "packed"]);
+        .in("status", ["confirmed"]);
 
       q = mode === "correction" ? q.lte("delivery_date", date) : q.eq("delivery_date", date);
 
       if (tourId === NULL_TOUR_KEY) q = q.is("delivery_tour_id", null);
       else if (tourId !== "all") q = q.eq("delivery_tour_id", tourId);
 
-      if (effectiveType === "fast") q = q.eq("is_customer_order", false).eq("is_return", false);
-      else if (effectiveType === "datert") q = q.eq("is_customer_order", true).eq("is_return", false);
-      else q = q.eq("is_return", true);
+      if (effectiveType === "fast") q = q.eq("order_kind", "fixed");
+      else if (effectiveType === "datert") q = q.in("order_kind", ["dated", "extra"]).eq("is_return", false);
+      else q = q.eq("order_kind", "return");
 
       const { data, error } = await q.order("delivery_date", { ascending: true }).order("order_number", { ascending: true });
       if (error) throw error;

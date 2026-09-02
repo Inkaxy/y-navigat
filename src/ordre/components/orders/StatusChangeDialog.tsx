@@ -18,17 +18,12 @@ export type StatusChangeIntent = {
   label: string;
   requireComment?: boolean;
   commentLabel?: string;
-  /** Hvis true: lagre nåværende som previous_status_before_hold */
-  storesPreviousStatus?: boolean;
-  /** Hvis true: nullstill previous_status_before_hold */
-  clearsPreviousStatus?: boolean;
   /** Variant på bekreft-knappen */
   confirmVariant?: "default" | "destructive";
-  /** Spesielle effekter (cancelled, confirmed) */
-  specialEffect?: "cancel" | "confirm";
-  /** Ekstra advarsel-tekst (f.eks. avbryt etter produksjon) */
+  /** Ekstra advarsel-tekst */
   warning?: string;
 };
+
 
 export function StatusChangeDialog({
   open,

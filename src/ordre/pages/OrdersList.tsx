@@ -34,13 +34,20 @@ import { OrderRuleFlagsIndicator } from "@/ordre/components/orders/OrderRuleFlag
 import { useDebouncedValue } from "@/ordre/hooks/useDebouncedValue";
 import {
   DEFAULT_EXCLUDED_STATUSES,
+  ORDER_KINDS,
+  ORDER_LIFECYCLES,
   ORDER_STATUSES,
   SOURCE_LABELS,
   getSourceLabel,
   getStatusMeta,
+  type OrderKind,
+  type OrderLifecycle,
   type OrderStatus,
 } from "@/ordre/lib/orderStatus";
-import { StatusBadge } from "@/ordre/components/orders/StatusBadge";
+import { OrderKindBadge } from "@/ordre/components/orders/OrderKindBadge";
+import { LifecycleBadge } from "@/ordre/components/orders/LifecycleBadge";
+import { useOrdersLifecycle } from "@/ordre/hooks/useOrdersLifecycle";
+
 import { formatDate, formatNOK } from "@/ordre/lib/format";
 import {
   Popover,
@@ -74,6 +81,9 @@ export default function OrdersList() {
     initialStatus ? [initialStatus] : DEFAULT_STATUSES,
   );
   const [source, setSource] = useState<string>("all");
+  const [kinds, setKinds] = useState<OrderKind[]>([]);
+  const [lifecycleFilter, setLifecycleFilter] = useState<OrderLifecycle | "all">("all");
+
   const [deliveryFrom, setDeliveryFrom] = useState<string>(initialFrom);
   const [deliveryTo, setDeliveryTo] = useState<string>(initialTo);
   const [tourIds, setTourIds] = useState<string[]>([]);
@@ -103,9 +113,18 @@ export default function OrdersList() {
       ? undefined
       : statuses;
 
+  // Livssyklus «venter godkjenning»/«avbrutt» filtreres server-side på status
+  const lifecycleStatuses: OrderStatus[] | undefined =
+    lifecycleFilter === "awaiting"
+      ? ["awaiting_confirmation"]
+      : lifecycleFilter === "cancelled"
+        ? ["cancelled"]
+        : undefined;
+
   const { data, isLoading, isFetching } = useOrderList({
     search: debouncedSearch,
-    statuses: effectiveStatuses,
+    statuses: lifecycleStatuses ?? effectiveStatuses,
+    kinds: acceptanceOnly || kinds.length === 0 ? undefined : kinds,
     source: acceptanceOnly ? "all" : source,
     deliveryFrom: acceptanceOnly ? null : deliveryFrom || null,
     deliveryTo: acceptanceOnly ? null : deliveryTo || null,
@@ -115,8 +134,22 @@ export default function OrdersList() {
   });
 
   const total = data?.total ?? 0;
-  const rows = data?.rows ?? [];
+  const allRows = data?.rows ?? [];
+  const { map: lifecycleMap } = useOrdersLifecycle(allRows.map((r) => r.id));
+  const lifecycleOf = (r: OrderListRow): OrderLifecycle =>
+    (lifecycleMap.get(r.id)?.lifecycle as OrderLifecycle | undefined) ??
+    (r.status === "cancelled"
+      ? "cancelled"
+      : r.status === "awaiting_confirmation"
+        ? "awaiting"
+        : "open");
+  // Klient-side livssyklusfilter på lastet side (jf. trinn 1)
+  const rows =
+    lifecycleFilter === "all" || lifecycleStatuses
+      ? allRows
+      : allRows.filter((r) => lifecycleOf(r) === lifecycleFilter);
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
 
   // Hold URL i synk når dato-filter endres manuelt (best for deeplink-deling)
   useEffect(() => {
@@ -208,7 +241,7 @@ export default function OrdersList() {
         requireComment: true,
         commentLabel: "Hvorfor avvises bestillingen?",
         confirmVariant: "destructive",
-        specialEffect: "cancel",
+
       },
     });
   }
@@ -225,7 +258,7 @@ export default function OrdersList() {
         toStatus: intent.to,
         comment: comment || undefined,
         userId: user?.id ?? null,
-        isCancel: intent.specialEffect === "cancel",
+        isCancel: intent.to === "cancelled",
       });
       toast.success(
         intent.to === "confirmed"
@@ -317,7 +350,68 @@ export default function OrdersList() {
               />
             </div>
 
+            {/* Livssyklus-filter */}
+            <select
+              value={lifecycleFilter}
+              onChange={(e) => {
+                setPage(0);
+                setLifecycleFilter(e.target.value as OrderLifecycle | "all");
+              }}
+              className="h-8 rounded-md border border-input bg-background px-2 text-caption"
+              aria-label="Livssyklus"
+            >
+              <option value="all">Livssyklus: alle</option>
+              {ORDER_LIFECYCLES.map((l) => (
+                <option key={l.value} value={l.value}>
+                  {l.label}
+                </option>
+              ))}
+            </select>
+
+            {/* Type-filter (order_kind, server-side) */}
             <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8 gap-1.5 text-caption">
+                  Type
+                  <Badge variant="secondary" className="h-4 px-1 font-mono text-[10px]">
+                    {kinds.length === 0 ? "alle" : kinds.length}
+                  </Badge>
+                  <ChevronDown className="h-3 w-3 opacity-60" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="w-56 p-2">
+                <div className="space-y-0.5">
+                  {ORDER_KINDS.filter((k) =>
+                    ["dated", "fixed", "extra", "return"].includes(k.value),
+                  ).map((k) => (
+                    <label
+                      key={k.value}
+                      className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-body hover:bg-accent"
+                    >
+                      <Checkbox
+                        checked={kinds.includes(k.value)}
+                        onCheckedChange={() => {
+                          setPage(0);
+                          setKinds((prev) =>
+                            prev.includes(k.value)
+                              ? prev.filter((x) => x !== k.value)
+                              : [...prev, k.value],
+                          );
+                        }}
+                      />
+                      <span
+                        className="h-2 w-2 rounded-full"
+                        style={{ backgroundColor: `hsl(var(${k.tokenVar}))` }}
+                      />
+                      <span className="flex-1">{k.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
+
+            <Popover>
+
               <PopoverTrigger asChild>
                 <Button variant="outline" size="sm" className="h-8 gap-1.5 text-caption">
                   Status
@@ -576,7 +670,7 @@ export default function OrdersList() {
                     />
                   </TableHead>
                   <TableHead className="h-9 px-3 text-caption">Ordrenr</TableHead>
-                  <TableHead className="h-9 px-3 text-caption">Status</TableHead>
+                  <TableHead className="h-9 px-3 text-caption">Type / livssyklus</TableHead>
                   <TableHead className="h-9 px-3 text-caption">Kunde</TableHead>
                   <TableHead className="h-9 px-3 text-caption">Levering</TableHead>
                   <TableHead className="h-9 px-3 text-caption">Tur</TableHead>
@@ -666,8 +760,15 @@ export default function OrdersList() {
                           </span>
                         </TableCell>
                         <TableCell className="px-3 py-1.5">
-                          <StatusBadge status={r.status} />
+                          <div className="flex flex-wrap items-center gap-1">
+                            <OrderKindBadge kind={r.order_kind} />
+                            <LifecycleBadge
+                              lifecycle={lifecycleOf(r)}
+                              deliveryNoteNumber={lifecycleMap.get(r.id)?.delivery_note_number}
+                            />
+                          </div>
                         </TableCell>
+
                         <TableCell className="px-3 py-1.5">
                           <div className="flex items-baseline gap-1.5 leading-tight">
                             <span className="font-medium text-body">
@@ -839,7 +940,12 @@ export default function OrdersList() {
                         >
                           {r.order_number}
                         </span>
-                        <StatusBadge status={r.status} />
+                        <OrderKindBadge kind={r.order_kind} />
+                        <LifecycleBadge
+                          lifecycle={lifecycleOf(r)}
+                          deliveryNoteNumber={lifecycleMap.get(r.id)?.delivery_note_number}
+                        />
+
                         <OrderRuleFlagsIndicator flags={r.rule_flags} overrideReason={r.rule_override_reason} />
                       </div>
                       <div className="mt-1 truncate text-base font-medium text-foreground">

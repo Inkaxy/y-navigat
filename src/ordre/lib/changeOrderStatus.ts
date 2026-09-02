@@ -16,11 +16,13 @@ export type ChangeStatusInput = {
 };
 
 /**
- * Felles status-endring for orders.
- * Brukes både fra OrderDetail og inline aksept-kø i OrdersList.
+ * Eneste skrivepunkt for manuell statusendring på ordre.
+ * Tedebe-modellen har kun tre overganger: godkjenn, avvis og avbryt.
  */
 export async function changeOrderStatus(input: ChangeStatusInput) {
   const now = new Date().toISOString();
+  const isCancel = input.isCancel || input.toStatus === "cancelled";
+
   const updates: Record<string, unknown> = {
     status: input.toStatus,
     status_changed_at: now,
@@ -28,7 +30,7 @@ export async function changeOrderStatus(input: ChangeStatusInput) {
     updated_at: now,
   };
 
-  if (input.isCancel || input.toStatus === "cancelled") {
+  if (isCancel) {
     updates.cancelled_at = now;
     updates.cancelled_by = input.userId;
     updates.cancelled_reason = input.comment ?? null;
@@ -45,7 +47,7 @@ export async function changeOrderStatus(input: ChangeStatusInput) {
   if (error) throw error;
 
   // Kansellert ordre → flagg kakebildene så de ikke printes/telles videre.
-  if (input.isCancel || input.toStatus === "cancelled") {
+  if (isCancel) {
     try {
       const { data: imgs } = await supabase
         .from("cake_images")
@@ -65,8 +67,6 @@ export async function changeOrderStatus(input: ChangeStatusInput) {
       console.warn("[changeOrderStatus] kunne ikke flagge kakebilder", cakeErr);
     }
   }
-
-
 
   // Lagre kommentar på siste status_history-rad (best effort)
   if (input.comment) {
