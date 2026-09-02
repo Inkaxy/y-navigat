@@ -191,7 +191,12 @@ export default function Matvaretabellen() {
                       <td className="px-3 py-2 text-right tabular-nums">{g(f.salt_g)}</td>
                       <td className="px-3 py-2 text-right tabular-nums">{g(f.water_g)}</td>
                       <td className="px-3 py-2">
-                        {linked.length > 0 && (
+                        {linksLoading ? (
+                          <span className="text-xs text-ink-secondary">Laster…</span>
+                        ) : linksError ? (
+                          <span className="text-xs text-destructive">Ukjent</span>
+                        ) : linked.length > 0 && (
+
                           <TooltipProvider>
                             <Tooltip>
                               <TooltipTrigger asChild>
