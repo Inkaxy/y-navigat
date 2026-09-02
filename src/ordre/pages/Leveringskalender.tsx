@@ -824,6 +824,42 @@ export default function MatrixPage() {
     [colOrderId, colLifecycleMap],
   );
 
+  /** Kolonner (dato|tur) som har fastordre-grunnlag fra malen. */
+  const colGhostSet = useMemo(() => {
+    const s = new Set<string>();
+    for (const [gkey, qty] of ghostMap?.entries() ?? []) {
+      if (!qty || qty <= 0) continue;
+      const [date, tourId] = gkey.split("|");
+      s.add(`${date}|${tourId}`);
+    }
+    return s;
+  }, [ghostMap]);
+
+  /**
+   * Fargetone per kolonne: materialisert ordretype, ellers "fixed" når det
+   * finnes fastordre-grunnlag. `deliveryNote` gir mørkeblå stripe i header.
+   */
+  const colTone = useCallback(
+    (date: string, tourId: string): ColumnTone => {
+      const meta = colMeta(date, tourId);
+      const lifecycle = meta?.lifecycle;
+      if (meta?.order_kind) {
+        return {
+          kind: meta.order_kind as OrderKind,
+          deliveryNote: lifecycle === "delivery_note",
+          deliveryNoteNumber: meta.delivery_note_number ?? null,
+        };
+      }
+      if (colGhostSet.has(`${date}|${tourId}`)) {
+        return { kind: "fixed", deliveryNote: false, deliveryNoteNumber: null };
+      }
+      return { kind: null, deliveryNote: false, deliveryNoteNumber: null };
+    },
+    [colMeta, colGhostSet],
+  );
+
+
+
   async function executeColumnCopy(source: { date: string; tour: MatrixTour }, input: CopyColumnInput) {
     if (!customerId || !matrix) return;
     const sourceLines = matrix.existing_cells.filter(
