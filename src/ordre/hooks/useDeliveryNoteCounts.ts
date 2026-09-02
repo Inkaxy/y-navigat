@@ -64,7 +64,7 @@ export function useDeliveryNoteCounts(
           .select("id", { count: "exact", head: true })
           .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
           // Speiler order_is_production_scope(status) i generate_delivery_notes.
-          .in("status", ["confirmed", "in_production", "packed"]);
+          .in("status", ["confirmed"]);
         q = isCorrection ? q.lte("delivery_date", date) : q.eq("delivery_date", date);
         if (tourId === NULL_TOUR_KEY) q = q.is("delivery_tour_id", null);
         else if (tourId !== "all") q = q.eq("delivery_tour_id", tourId);

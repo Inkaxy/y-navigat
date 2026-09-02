@@ -77,7 +77,7 @@ export function usePendingOrdersList(
         .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
         // Speiler order_is_production_scope(status) i generate_delivery_notes —
         // awaiting_confirmation venter på godkjenning og skal ikke pakkes.
-        .in("status", ["confirmed", "in_production", "packed"]);
+        .in("status", ["confirmed"]);
 
       q = mode === "correction" ? q.lte("delivery_date", date) : q.eq("delivery_date", date);
 

@@ -6,7 +6,7 @@ import { NBE_LEGAL_ENTITY_ID } from "@/rapporter/lib/constants";
 import { logAudit } from "@/rapporter/lib/audit";
 import type { NgReportRow } from "@/rapporter/lib/ngFormat";
 
-const SALES_STATUSES = ["delivered", "partial_delivery", "invoiced"];
+const SALES_STATUSES = ["delivered", "invoiced"];
 
 export type NgCustomer = { id: string; display_name: string; gln: string | null };
 export type NgSortimentProduct = { product_id: string; display_name: string; gtin: string | null };
