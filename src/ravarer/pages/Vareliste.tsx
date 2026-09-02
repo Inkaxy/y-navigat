@@ -173,8 +173,17 @@ export default function VarelistePage() {
                     <td className="px-4 py-3 font-mono text-xs">{r.sku}</td>
                     <td className="px-4 py-3 font-medium">
                       {r.name}
-                      {r.declaration_name?.trim() && (
+                      {r.declaration_name?.trim() ? (
                         <div className="text-xs font-normal text-ink-secondary">{r.declaration_name}</div>
+                      ) : (
+                        missingDeclIds.has(r.id) && (
+                          <Badge
+                            variant="outline"
+                            className="mt-1 border-warning/40 bg-warning/10 text-[11px] font-normal text-warning"
+                          >
+                            Mangler deklarasjonsnavn
+                          </Badge>
+                        )
                       )}
                     </td>
                     <td className="px-4 py-3 text-ink-secondary">
