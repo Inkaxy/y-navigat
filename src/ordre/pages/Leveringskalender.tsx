@@ -103,6 +103,15 @@ import { useRecurringGhost, type RecurringGhostMap } from "@/ordre/hooks/useRecu
 import { useOrdersLifecycle } from "@/ordre/hooks/useOrdersLifecycle";
 import { OrderKindBadge } from "@/ordre/components/orders/OrderKindBadge";
 import { LifecycleBadge } from "@/ordre/components/orders/LifecycleBadge";
+import { getKindMeta, type OrderKind } from "@/ordre/lib/orderStatus";
+
+/** Fargetone for en matrisekolonne — styrer bakgrunn i header og celler. */
+type ColumnTone = {
+  kind: OrderKind | null;
+  deliveryNote: boolean;
+  deliveryNoteNumber: string | null;
+};
+
 import { useRecurringSchedules, type RecurringScheduleWithCustomer } from "@/ordre/hooks/useRecurringOrders";
 import { RecurringScheduleDialog } from "@/ordre/components/orders/RecurringScheduleDialog";
 import {
