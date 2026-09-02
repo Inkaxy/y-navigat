@@ -63,6 +63,7 @@ export function NutritionTab({ rawMaterialId }: Props) {
 
   return (
     <div className="space-y-5">
+      <DeclarationNameCard rawMaterialId={rawMaterialId} foodId={existing?.matvaretabellen_food_id ?? null} />
       <DatasheetSection rawMaterialId={rawMaterialId} />
       <MatvaretabellenSourceCard
         rawMaterialId={rawMaterialId}
