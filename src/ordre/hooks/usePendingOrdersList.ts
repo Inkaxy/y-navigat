@@ -8,7 +8,7 @@ import {
   type PendingRecurringOrderRow,
 } from "@/ordre/hooks/usePendingRecurringOrders";
 
-export type PendingOrderType = "fast" | "datert" | "retur";
+export type PendingOrderType = "fast" | "datert" | "ekstra" | "retur";
 export type PendingOrdersMode = "date" | "correction";
 
 export type PendingOrderRow = {
@@ -85,7 +85,8 @@ export function usePendingOrdersList(
       else if (tourId !== "all") q = q.eq("delivery_tour_id", tourId);
 
       if (effectiveType === "fast") q = q.eq("order_kind", "fixed");
-      else if (effectiveType === "datert") q = q.in("order_kind", ["dated", "extra"]).eq("is_return", false);
+      else if (effectiveType === "datert") q = q.eq("order_kind", "dated").eq("is_return", false);
+      else if (effectiveType === "ekstra") q = q.eq("order_kind", "extra");
       else q = q.eq("order_kind", "return");
 
       const { data, error } = await q.order("delivery_date", { ascending: true }).order("order_number", { ascending: true });

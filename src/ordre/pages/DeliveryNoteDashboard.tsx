@@ -216,7 +216,7 @@ export default function DeliveryNoteDashboard() {
           .select("delivery_date")
           .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
           .lte("delivery_date", date)
-          .or("is_customer_order.eq.true,is_return.eq.true");
+          .in("order_kind", ["dated", "extra", "return"]);
         if (tourId === NULL_TOUR_KEY) q = q.is("delivery_tour_id", null);
         else if (tourId !== "all") q = q.eq("delivery_tour_id", tourId);
         const { data: dateRows, error: dateErr } = await q;
@@ -349,7 +349,7 @@ export default function DeliveryNoteDashboard() {
       classes: "bg-blue-100 text-blue-950 hover:bg-blue-200 dark:bg-blue-900/40 dark:text-blue-50",
       span: 1,
       onClick: () =>
-        navigate(`/ordre/pakksedler/liste?date=${date}&tour=${tourId}&type=datert${modeSuffix}`),
+        navigate(`/ordre/pakksedler/liste?date=${date}&tour=${tourId}&type=ekstra${modeSuffix}`),
     },
 
     {

@@ -103,6 +103,15 @@ import { useRecurringGhost, type RecurringGhostMap } from "@/ordre/hooks/useRecu
 import { useOrdersLifecycle } from "@/ordre/hooks/useOrdersLifecycle";
 import { OrderKindBadge } from "@/ordre/components/orders/OrderKindBadge";
 import { LifecycleBadge } from "@/ordre/components/orders/LifecycleBadge";
+import { getKindMeta, type OrderKind } from "@/ordre/lib/orderStatus";
+
+/** Fargetone for en matrisekolonne — styrer bakgrunn i header og celler. */
+type ColumnTone = {
+  kind: OrderKind | null;
+  deliveryNote: boolean;
+  deliveryNoteNumber: string | null;
+};
+
 import { useRecurringSchedules, type RecurringScheduleWithCustomer } from "@/ordre/hooks/useRecurringOrders";
 import { RecurringScheduleDialog } from "@/ordre/components/orders/RecurringScheduleDialog";
 import {
@@ -389,11 +398,29 @@ export default function MatrixPage() {
     return map;
   }, [matrix]);
 
+  /**
+   * Fastordre ER ordren: når cellen ikke har lagret linje og kolonnen ikke har
+   * en materialisert ordre, vises spøkelsestallet fra fastordre-malen som verdi.
+   * Brukeren kan skrive over; kun faktisk endrede celler sendes til lagring.
+   */
   function getCellValue(key: CellKey): string {
     if (key in edits) return edits[key];
     const v = existingQty[key];
-    return v ? String(v) : "";
+    if (v) return String(v);
+    return isGhostCell(key) ? String(ghostMap!.get(key)) : "";
   }
+
+  /** True når cellen viser et fastordre-tall som ennå ikke er materialisert. */
+  function isGhostCell(key: CellKey): boolean {
+    if (key in edits) return false;
+    if (existingQty[key]) return false;
+    const [date, tourId] = key.split("|");
+    if (colOrderId.has(`${date}|${tourId}`)) return false;
+    if (isPaused(pauseMap, date, tourId)) return false;
+    const g = ghostMap?.get(key);
+    return !!g && g > 0;
+  }
+
 
   function getEffectiveQty(key: CellKey): number {
     if (key in edits) return Number(edits[key] || 0);
@@ -545,6 +572,14 @@ export default function MatrixPage() {
 
   async function handleSave() {
     if (!customerId || dirtyCount === 0) return;
+    // Gule (fastordre-)kolonner som berøres blir datert ordre ved lagring.
+    const fixedDates = [
+      ...new Set(
+        dirtyChanges
+          .filter((c) => colTone(c.date, c.tour_id).kind === "fixed")
+          .map((c) => c.date),
+      ),
+    ].sort();
     try {
       const result = await saveMatrix.mutateAsync({ customerId, changes: dirtyChanges });
       setEdits({});
@@ -556,13 +591,20 @@ export default function MatrixPage() {
         lines_deleted?: number;
         has_zero_fallback_lines?: string[] | null;
       } | null;
-      toast.success("Matrise lagret", {
-        description: r
-          ? `${r.orders_created ?? 0} nye ordre, ${r.lines_created ?? 0} linjer opprettet, ${r.lines_updated ?? 0} oppdatert, ${r.lines_deleted ?? 0} slettet${
-              r.orders_deleted ? `, ${r.orders_deleted} tomme ordre fjernet` : ""
-            }`
-          : undefined,
-      });
+      const description = r
+        ? `${r.orders_created ?? 0} nye ordre, ${r.lines_created ?? 0} linjer opprettet, ${r.lines_updated ?? 0} oppdatert, ${r.lines_deleted ?? 0} slettet${
+            r.orders_deleted ? `, ${r.orders_deleted} tomme ordre fjernet` : ""
+          }`
+        : undefined;
+      if (fixedDates.length > 0) {
+        toast.success(
+          `Lagret — fastordren ble datert ordre for ${fixedDates.map(formatShortDate).join(", ")}`,
+          { description },
+        );
+      } else {
+        toast.success("Lagret", { description });
+      }
+
       const fbCount = r?.has_zero_fallback_lines?.length ?? 0;
       if (fbCount > 0) {
         toast.warning(
@@ -805,6 +847,42 @@ export default function MatrixPage() {
     },
     [colOrderId, colLifecycleMap],
   );
+
+  /** Kolonner (dato|tur) som har fastordre-grunnlag fra malen. */
+  const colGhostSet = useMemo(() => {
+    const s = new Set<string>();
+    for (const [gkey, qty] of ghostMap?.entries() ?? []) {
+      if (!qty || qty <= 0) continue;
+      const [date, tourId] = gkey.split("|");
+      s.add(`${date}|${tourId}`);
+    }
+    return s;
+  }, [ghostMap]);
+
+  /**
+   * Fargetone per kolonne: materialisert ordretype, ellers "fixed" når det
+   * finnes fastordre-grunnlag. `deliveryNote` gir mørkeblå stripe i header.
+   */
+  const colTone = useCallback(
+    (date: string, tourId: string): ColumnTone => {
+      const meta = colMeta(date, tourId);
+      const lifecycle = meta?.lifecycle;
+      if (meta?.order_kind) {
+        return {
+          kind: meta.order_kind as OrderKind,
+          deliveryNote: lifecycle === "delivery_note",
+          deliveryNoteNumber: meta.delivery_note_number ?? null,
+        };
+      }
+      if (colGhostSet.has(`${date}|${tourId}`)) {
+        return { kind: "fixed", deliveryNote: false, deliveryNoteNumber: null };
+      }
+      return { kind: null, deliveryNote: false, deliveryNoteNumber: null };
+    },
+    [colMeta, colGhostSet],
+  );
+
+
 
   async function executeColumnCopy(source: { date: string; tour: MatrixTour }, input: CopyColumnInput) {
     if (!customerId || !matrix) return;
@@ -1541,8 +1619,20 @@ export default function MatrixPage() {
               onColPackingNote={(date, tour) => generatePackingNoteForColumn(date, tour)}
               colHasData={colHasAnyData}
               colMeta={colMeta}
+              colTone={colTone}
+              isGhostCell={isGhostCell}
               canEdit={canEdit}
-              onOpenTourOrder={(date, tour) => setTourOrderCol({ date, tour })}
+              onOpenTourOrder={(date, tour) => {
+                if (!colOrderId.has(`${date}|${tour.id}`)) {
+                  toast.info("Fastordre", {
+                    description:
+                      "Skriv i cellene og lagre for å lage datert ordre.",
+                  });
+                  return;
+                }
+                setTourOrderCol({ date, tour });
+              }}
+
               onOpenWeekEditor={(p) => setWeekEditorProduct(p)}
             />
             <div className="sticky left-0 flex flex-wrap items-center gap-2 border-t border-border bg-card px-4 py-3 sm:px-6">
@@ -1556,16 +1646,23 @@ export default function MatrixPage() {
               )}
               <div className="ml-auto flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
                 <span className="font-medium uppercase tracking-wide text-muted-foreground/70">Forklaring:</span>
-                <LegendSwatch className="bg-warning/10 border-warning/40" label="Ulagret endring" />
+                <KindSwatch tokenVar={getKindMeta("dated").tokenVar} label="Datert" />
+                <KindSwatch tokenVar={getKindMeta("fixed").tokenVar} label="Fastordre" />
+                <KindSwatch tokenVar={getKindMeta("extra").tokenVar} label="Ekstraordre" />
+                <KindSwatch tokenVar={getKindMeta("return").tokenVar} label="Retur" />
+                <KindSwatch tokenVar="--lifecycle-delivery-note" label="Pakkseddel kjørt" />
                 <LegendSwatch className="bg-sky-50 border-sky-300 dark:bg-sky-950/30 dark:border-sky-800" label="Leveringspause" />
-                <LegendSwatch className="bg-accent/30 border-border" label="Lagt til produkt" />
-                <LegendSwatch className="bg-muted/60 border-border" label="Helg" />
-                <LegendSwatch className="bg-muted border-border" label="Sum-rad/kolonne" />
+                <LegendSwatch className="bg-warning/10 border-warning/40" label="Ulagret" />
+                <span className="text-muted-foreground/70">
+                  Fastordre er ordren. Skriver du i en gul kolonne, blir den en datert ordre for
+                  den dagen.
+                </span>
                 <span className="text-muted-foreground/70">
                   Værvarsel fra Yr levert av Meteorologisk institutt og NRK · Historiske værdata
                   fra Open-Meteo (CC BY 4.0)
                 </span>
               </div>
+
             </div>
           </>
         )}
@@ -1845,6 +1942,9 @@ function MatrixGrid({
   onColPackingNote,
   colHasData,
   colMeta,
+  colTone,
+  isGhostCell,
+
   canEdit,
   onOpenTourOrder,
   onOpenWeekEditor,
@@ -1873,6 +1973,9 @@ function MatrixGrid({
   onColPackingNote: (date: string, tour: MatrixTour) => void;
   colHasData: (date: string, tourId: string) => boolean;
   colMeta: (date: string, tourId: string) => { order_kind?: string; lifecycle?: string; delivery_note_number?: string | null } | undefined;
+  colTone: (date: string, tourId: string) => ColumnTone;
+  isGhostCell: (key: CellKey) => boolean;
+
   canEdit: boolean;
   onOpenTourOrder: (date: string, tour: MatrixTour) => void;
   onOpenWeekEditor: (product: MatrixProduct) => void;
@@ -1963,28 +2066,44 @@ function MatrixGrid({
               const pause = isPaused(pauseMap, c.date, c.tour.id);
               const hasComment = columnComments?.has(`${c.date}|${c.tour.id}`);
               const colHas = colHasData(c.date, c.tour.id);
+              const tone = colTone(c.date, c.tour.id);
+              const toneVar = tone.kind ? getKindMeta(tone.kind).tokenVar : null;
               const d = new Date(c.date + "T00:00:00");
               const dow = (d.getDay() + 6) % 7;
               const dayLabel = DAY_LABELS[dow];
               return (
                 <th
                   key={`${c.date}-${c.tour.id}`}
+                  data-order-kind={tone.kind ?? undefined}
                   className={cn(
                     "border-b border-r border-border px-1 py-1 text-center text-[11px] font-medium text-muted-foreground",
                     pause ? "bg-sky-100 dark:bg-sky-950/40" : "bg-card/80",
                   )}
+                  style={
+                    !pause && toneVar
+                      ? { backgroundColor: `hsl(var(${toneVar}) / 0.16)` }
+                      : undefined
+                  }
                   title={`${c.tour.display_name} (${c.tour.time_from.slice(0, 5)}–${c.tour.time_to.slice(0, 5)})${pause?.reason ? ` · Pause: ${pause.reason}` : pause ? " · Pause" : ""}${hasComment ? `\nKommentar: ${columnComments?.get(`${c.date}|${c.tour.id}`)}` : ""}`}
                 >
+                  {tone.deliveryNote && (
+                    <div
+                      className="-mx-1 -mt-1 mb-1 truncate px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white"
+                      style={{ backgroundColor: "hsl(var(--lifecycle-delivery-note))" }}
+                    >
+                      Pakkseddel{tone.deliveryNoteNumber ? ` ${tone.deliveryNoteNumber}` : ""}
+                    </div>
+                  )}
                   <button
                     type="button"
-                    disabled={!colHas}
                     onClick={() => onOpenTourOrder(c.date, c.tour)}
-                    className="mx-auto block rounded px-1.5 py-0.5 text-[12px] font-semibold text-foreground hover:bg-primary/10 hover:text-primary disabled:cursor-default disabled:opacity-60 disabled:hover:bg-transparent disabled:hover:text-foreground"
-                    title={colHas ? "Åpne ordre for denne turen" : "Ingen ordre på denne turen"}
+                    className="mx-auto block rounded px-1.5 py-0.5 text-[12px] font-semibold text-foreground hover:bg-primary/10 hover:text-primary"
+                    title={colHas ? "Åpne ordre for denne turen" : "Fastordre — skriv i cellene og lagre"}
                   >
                     {dayLabel} ({c.tour.tour_number})
                     {hasComment && <span className="ml-1 text-primary">•</span>}
                   </button>
+
                   {(() => {
                     const meta = colMeta(c.date, c.tour.id);
                     if (!meta) return null;
@@ -2097,25 +2216,37 @@ function MatrixGrid({
                   const cellHasData = hasData(key);
                   const pause = isPaused(pauseMap, c.date, c.tour.id);
                   const ghost = pause ? undefined : ghostMap?.get(key);
+                  const fromFixed = isGhostCell(key);
+                  const tone = colTone(c.date, c.tour.id);
+                  const toneVar = tone.kind ? getKindMeta(tone.kind).tokenVar : null;
                   const effectiveQty = value ? Number(value.replace(",", ".") || 0) : 0;
-                  const ghostOverridden = !!ghost && !!value && effectiveQty !== ghost;
+                  const ghostOverridden = !!ghost && !fromFixed && !!value && effectiveQty !== ghost;
                   const fb = isFallback(key);
                   return (
                     <td
                       key={key}
+                      data-order-kind={tone.kind ?? undefined}
+                      data-from-fixed={fromFixed ? "true" : undefined}
                       className={cn(
                         "group relative border-b border-r border-border p-0",
-                        dirty && "bg-warning/25",
                         pause && "bg-sky-50 dark:bg-sky-950/30",
+                        dirty && "bg-warning/25",
                         fb && "outline outline-2 -outline-offset-2 outline-destructive/70",
                       )}
+                      style={
+                        !pause && !dirty && toneVar
+                          ? { backgroundColor: `hsl(var(${toneVar}) / 0.07)` }
+                          : undefined
+                      }
                       title={
                         fb
                           ? "Pris ikke funnet — mangler prisliste-rad eller spesialpris"
-                          : ghost
-                            ? ghostOverridden
-                              ? `Fastordre: ${ghost} stk — overstyrt til ${effectiveQty}`
-                              : `Fastordre: ${ghost} stk`
+                          : fromFixed
+                            ? `Fra fastordre: ${ghost} stk — skriv over for å endre`
+                            : ghost
+                              ? ghostOverridden
+                                ? `Fastordre: ${ghost} stk — overstyrt til ${effectiveQty}`
+                                : `Fastordre: ${ghost} stk`
                           : pause
                             ? pause.reason ? `Leveransepause: ${pause.reason}` : "Leveransepause"
                             : undefined
@@ -2138,13 +2269,12 @@ function MatrixGrid({
                             });
                           }
                         }}
-                        placeholder={ghost ? String(ghost) : ""}
                         className={cn(
                           "h-9 w-16 rounded-none border-0 bg-transparent px-1 text-center tabular-nums shadow-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-0",
                           value && "text-base font-semibold text-foreground",
-                          dirty && "font-bold text-warning",
+                          fromFixed && "italic text-muted-foreground",
+                          dirty && "font-bold not-italic text-warning",
                           pause && "cursor-not-allowed",
-                          ghost && !value && "placeholder:text-muted-foreground/60",
                         )}
                       />
                       {hasM && (
@@ -2254,7 +2384,31 @@ function MatrixGrid({
   );
 }
 
+/** "2026-09-02" → "02.09" */
+function formatShortDate(iso: string): string {
+  return new Intl.DateTimeFormat("nb-NO", { day: "2-digit", month: "2-digit" }).format(
+    new Date(iso + "T12:00:00"),
+  );
+}
+
+/** Fargeprøve for kolonnefarge basert på ordretype-token. */
+function KindSwatch({ tokenVar, label }: { tokenVar: string; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span
+        className="inline-block h-3 w-3 rounded-sm"
+        style={{
+          backgroundColor: `hsl(var(${tokenVar}) / 0.14)`,
+          boxShadow: `inset 0 0 0 1px hsl(var(${tokenVar}) / 0.55)`,
+        }}
+      />
+      <span>{label}</span>
+    </span>
+  );
+}
+
 function LegendSwatch({ className, label }: { className: string; label: string }) {
+
   return (
     <span className="inline-flex items-center gap-1.5">
       <span className={cn("inline-block h-3 w-3 rounded-sm border", className)} />

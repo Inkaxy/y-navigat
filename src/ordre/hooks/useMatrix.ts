@@ -131,7 +131,11 @@ export function useSaveMatrix() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["matrix"] });
       qc.invalidateQueries({ queryKey: ["orders"] });
+      // Fastordre-spøkelser og utledet livssyklus endrer seg når matrisen materialiseres.
+      qc.invalidateQueries({ queryKey: ["recurring-ghost"] });
+      qc.invalidateQueries({ queryKey: ["orders-lifecycle"] });
     },
+
   });
 }
 

@@ -143,12 +143,14 @@ export default function OrdersList() {
       : r.status === "awaiting_confirmation"
         ? "awaiting"
         : "open");
-  // Klient-side livssyklusfilter på lastet side (jf. trinn 1)
-  const rows =
-    lifecycleFilter === "all" || lifecycleStatuses
-      ? allRows
-      : allRows.filter((r) => lifecycleOf(r) === lifecycleFilter);
+  // Klient-side livssyklusfilter på lastet side (jf. trinn 1).
+  // Server-side filter kommer i trinn 3 — da blir totaltallene ærlige igjen.
+  const clientLifecycleFilter = lifecycleFilter !== "all" && !lifecycleStatuses;
+  const rows = clientLifecycleFilter
+    ? allRows.filter((r) => lifecycleOf(r) === lifecycleFilter)
+    : allRows;
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
 
 
   // Hold URL i synk når dato-filter endres manuelt (best for deeplink-deling)
@@ -851,9 +853,16 @@ export default function OrdersList() {
           {/* Paginering */}
           <div className="flex items-center justify-between border-t border-border px-3 py-2 text-caption">
             <div className="text-muted-foreground">
-              Viser {rows.length > 0 ? page * PAGE_SIZE + 1 : 0}–
-              {page * PAGE_SIZE + rows.length} av {total}
+              {clientLifecycleFilter ? (
+                <>Viser treff på denne siden — bla for flere</>
+              ) : (
+                <>
+                  Viser {rows.length > 0 ? page * PAGE_SIZE + 1 : 0}–
+                  {page * PAGE_SIZE + rows.length} av {total}
+                </>
+              )}
             </div>
+
             <div className="flex items-center gap-2">
               <Button
                 variant="outline"
