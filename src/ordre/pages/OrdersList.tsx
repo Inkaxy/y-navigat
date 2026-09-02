@@ -853,9 +853,16 @@ export default function OrdersList() {
           {/* Paginering */}
           <div className="flex items-center justify-between border-t border-border px-3 py-2 text-caption">
             <div className="text-muted-foreground">
-              Viser {rows.length > 0 ? page * PAGE_SIZE + 1 : 0}–
-              {page * PAGE_SIZE + rows.length} av {total}
+              {clientLifecycleFilter ? (
+                <>Viser treff på denne siden — bla for flere</>
+              ) : (
+                <>
+                  Viser {rows.length > 0 ? page * PAGE_SIZE + 1 : 0}–
+                  {page * PAGE_SIZE + rows.length} av {total}
+                </>
+              )}
             </div>
+
             <div className="flex items-center gap-2">
               <Button
                 variant="outline"
