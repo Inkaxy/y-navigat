@@ -65,6 +65,7 @@ export function DataQualityCard({
   const unclassified = missingData?.unclassified_grain_names ?? [];
   const compositeUnreviewed = nameList(missingData?.composite_unreviewed);
   const compositeTextOnly = nameList(missingData?.composite_text_only);
+  const missingDeclNames = missingData?.declaration_names ?? [];
   const unlinked = missingData?.lines_without_raw_material ?? 0;
   const warns = warnings ?? [];
 
@@ -75,6 +76,7 @@ export function DataQualityCard({
     unclassified.length > 0 ||
     compositeUnreviewed.length > 0 ||
     compositeTextOnly.length > 0 ||
+    missingDeclNames.length > 0 ||
     unlinked > 0 ||
     warns.length > 0;
 
