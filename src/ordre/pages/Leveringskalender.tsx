@@ -1942,6 +1942,9 @@ function MatrixGrid({
   onColPackingNote,
   colHasData,
   colMeta,
+  colTone,
+  isGhostCell,
+
   canEdit,
   onOpenTourOrder,
   onOpenWeekEditor,
