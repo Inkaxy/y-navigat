@@ -145,7 +145,8 @@ export function GrainSection({
 
   const manualParsed = parsePct(manualInput);
   const manualCategory = manualParsed != null ? grainCategoryFromPct(manualParsed) : null;
-  const manualDirty = (manualParsed ?? null) !== (manualPct ?? null);
+  const round1 = (n: number | null | undefined) => (n == null || !Number.isFinite(Number(n)) ? null : Math.round(Number(n) * 10) / 10);
+  const manualDirty = round1(manualParsed) !== round1(manualPct);
 
   const siftedLines = useMemo(
     () => flourLines.filter((l) => l.classification && SIFTED_CLASSIFICATIONS.includes(l.classification) && l.grams > 0),
