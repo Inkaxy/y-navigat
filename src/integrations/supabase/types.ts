@@ -4952,6 +4952,7 @@ export type Database = {
       }
       orders: {
         Row: {
+          approval_reason: string | null
           cake_payload: Json | null
           cancelled_at: string | null
           cancelled_by: string | null
@@ -4985,6 +4986,7 @@ export type Database = {
           is_paid: boolean
           is_return: boolean
           legal_entity_id: string
+          order_kind: string
           order_number: string
           order_sequence: number
           order_year: number
@@ -5015,6 +5017,7 @@ export type Database = {
           use_customer_default_address: boolean
         }
         Insert: {
+          approval_reason?: string | null
           cake_payload?: Json | null
           cancelled_at?: string | null
           cancelled_by?: string | null
@@ -5048,6 +5051,7 @@ export type Database = {
           is_paid?: boolean
           is_return?: boolean
           legal_entity_id: string
+          order_kind?: string
           order_number: string
           order_sequence: number
           order_year: number
@@ -5078,6 +5082,7 @@ export type Database = {
           use_customer_default_address?: boolean
         }
         Update: {
+          approval_reason?: string | null
           cake_payload?: Json | null
           cancelled_at?: string | null
           cancelled_by?: string | null
@@ -5111,6 +5116,7 @@ export type Database = {
           is_paid?: boolean
           is_return?: boolean
           legal_entity_id?: string
+          order_kind?: string
           order_number?: string
           order_sequence?: number
           order_year?: number
@@ -14347,6 +14353,7 @@ export type Database = {
       materialize_recurring_orders: {
         Args: {
           p_created_by?: string
+          p_customer_id?: string
           p_delivery_date: string
           p_legal_entity_id: string
           p_tour_filter?: string[]
@@ -14394,6 +14401,21 @@ export type Database = {
       order_is_production_scope: {
         Args: { p_status: string }
         Returns: boolean
+      }
+      order_lifecycle: { Args: { p_order_id: string }; Returns: string }
+      orders_lifecycle: {
+        Args: { p_order_ids: string[] }
+        Returns: {
+          approval_reason: string
+          delivery_note_id: string
+          delivery_note_number: string
+          delivery_note_status: string
+          invoice_basis_id: string
+          invoice_number: string
+          lifecycle: string
+          order_id: string
+          order_kind: string
+        }[]
       }
       pakkesystem_hash_key: { Args: { p_key: string }; Returns: string }
       portal_can_bake_own: { Args: never; Returns: boolean }
@@ -15329,12 +15351,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -15358,11 +15380,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -15383,11 +15405,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -15408,11 +15430,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -15425,11 +15447,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
