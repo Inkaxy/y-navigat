@@ -1646,16 +1646,23 @@ export default function MatrixPage() {
               )}
               <div className="ml-auto flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
                 <span className="font-medium uppercase tracking-wide text-muted-foreground/70">Forklaring:</span>
-                <LegendSwatch className="bg-warning/10 border-warning/40" label="Ulagret endring" />
+                <KindSwatch tokenVar={getKindMeta("dated").tokenVar} label="Datert" />
+                <KindSwatch tokenVar={getKindMeta("fixed").tokenVar} label="Fastordre" />
+                <KindSwatch tokenVar={getKindMeta("extra").tokenVar} label="Ekstraordre" />
+                <KindSwatch tokenVar={getKindMeta("return").tokenVar} label="Retur" />
+                <KindSwatch tokenVar="--lifecycle-delivery-note" label="Pakkseddel kjørt" />
                 <LegendSwatch className="bg-sky-50 border-sky-300 dark:bg-sky-950/30 dark:border-sky-800" label="Leveringspause" />
-                <LegendSwatch className="bg-accent/30 border-border" label="Lagt til produkt" />
-                <LegendSwatch className="bg-muted/60 border-border" label="Helg" />
-                <LegendSwatch className="bg-muted border-border" label="Sum-rad/kolonne" />
+                <LegendSwatch className="bg-warning/10 border-warning/40" label="Ulagret" />
+                <span className="text-muted-foreground/70">
+                  Fastordre er ordren. Skriver du i en gul kolonne, blir den en datert ordre for
+                  den dagen.
+                </span>
                 <span className="text-muted-foreground/70">
                   Værvarsel fra Yr levert av Meteorologisk institutt og NRK · Historiske værdata
                   fra Open-Meteo (CC BY 4.0)
                 </span>
               </div>
+
             </div>
           </>
         )}
