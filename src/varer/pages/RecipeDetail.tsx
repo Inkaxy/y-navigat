@@ -812,7 +812,7 @@ export default function RecipeDetail() {
           )}
         </div>
 
-        <Tabs defaultValue="oppskrift" className="space-y-4">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
           <TabsList>
             <TabsTrigger value="oppskrift">Oppskrift</TabsTrigger>
             <TabsTrigger value="merking">Merking</TabsTrigger>
@@ -825,6 +825,7 @@ export default function RecipeDetail() {
               recipe={recipe}
               flourLines={flourLines}
               legalEntityId={legalEntityId ?? undefined}
+              onGoToRecipeTab={() => setActiveTab("oppskrift")}
               canWrite={canWrite}
             />
           </TabsContent>
