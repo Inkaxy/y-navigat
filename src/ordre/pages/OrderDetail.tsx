@@ -43,8 +43,12 @@ import {
   useOrderRealtime,
   useUserDisplayNames,
 } from "@/ordre/hooks/useOrderDetail";
-import { StatusBadge } from "@/ordre/components/orders/StatusBadge";
-import { StatusFlowBar } from "@/ordre/components/orders/StatusFlowBar";
+import { OrderKindBadge } from "@/ordre/components/orders/OrderKindBadge";
+import { LifecycleBadge } from "@/ordre/components/orders/LifecycleBadge";
+import { useOrdersLifecycle } from "@/ordre/hooks/useOrdersLifecycle";
+import { useGenerateDeliveryNotes } from "@/ordre/hooks/useGenerateDeliveryNotes";
+import { useCompletedMainRuns } from "@/ordre/hooks/useCompletedRuns";
+import { changeOrderStatus } from "@/ordre/lib/changeOrderStatus";
 import {
   StatusChangeDialog,
   type StatusChangeIntent,
@@ -56,17 +60,18 @@ import { OriginalEmailCard } from "@/ordre/components/orders/OriginalEmailCard";
 import { OrderAttachmentsCard } from "@/ordre/components/orders/OrderAttachmentsCard";
 import { CakeImageStatusCard } from "@/ordre/components/orders/CakeImageStatusCard";
 import { TimelineCard } from "@/ordre/components/orders/TimelineCard";
+import { canCancel, canDelete, getStatusActions } from "@/ordre/lib/statusTransitions";
 import {
-  canCancel,
-  canDelete,
-  getStatusActions,
-  flowIndex,
-} from "@/ordre/lib/statusTransitions";
-import { getStatusMeta, type OrderStatus } from "@/ordre/lib/orderStatus";
+  approvalReasonText,
+  getSourceLabel,
+  getStatusMeta,
+  type OrderStatus,
+} from "@/ordre/lib/orderStatus";
 import { formatDateLong, formatNOK } from "@/ordre/lib/format";
 import { logAudit } from "@/ordre/lib/audit";
 import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
 import { useQueryClient } from "@tanstack/react-query";
+
 
 export default function OrderDetail() {
   const { id } = useParams<{ id: string }>();
