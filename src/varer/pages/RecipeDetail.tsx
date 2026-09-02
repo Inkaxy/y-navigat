@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, ArrowLeft, Calculator, Copy, FileText, Loader2, Lock, Package, Pencil, Plus, Printer, RefreshCw, Save, Share2, Wheat } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Copy, FileText, Loader2, Lock, Package, Pencil, Plus, Printer, RefreshCw, Save, Share2, Wheat } from "lucide-react";
 import { logAudit } from "@/varer/lib/audit";
 import { RecipeProductLinks } from "@/varer/components/products/RecipeProductLinks";
 import { RecipeStatsBar } from "@/varer/components/recipes/RecipeStatsBar";
@@ -326,6 +326,7 @@ export default function RecipeDetail() {
   const { generating, printProductionSheet, printRecipeCard } = useRecipePDF();
   const [cardDialogOpen, setCardDialogOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("oppskrift");
 
   const buildPdfInput = useCallback(
     (includeCosts: boolean): BuildRecipePDFInput => ({
@@ -794,19 +795,8 @@ export default function RecipeDetail() {
           <Button variant="outline" onClick={() => setShareOpen(true)}>
             <Share2 className="mr-2 h-4 w-4" /> Del
           </Button>
-          <Button
-            variant="outline"
-            onClick={() =>
-              recipe &&
-              computeLabel.mutate(recipe.id, {
-                onSuccess: () => toast.success("Merkedata beregnet på nytt"),
-              })
-            }
-            disabled={computeLabel.isPending}
-          >
-            {computeLabel.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Calculator className="mr-2 h-4 w-4" />}
-            Beregn på nytt
-          </Button>
+
+
 
 
 
@@ -823,7 +813,7 @@ export default function RecipeDetail() {
           )}
         </div>
 
-        <Tabs defaultValue="oppskrift" className="space-y-4">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
           <TabsList>
             <TabsTrigger value="oppskrift">Oppskrift</TabsTrigger>
             <TabsTrigger value="merking">Merking</TabsTrigger>
@@ -836,6 +826,7 @@ export default function RecipeDetail() {
               recipe={recipe}
               flourLines={flourLines}
               legalEntityId={legalEntityId ?? undefined}
+              onGoToRecipeTab={() => setActiveTab("oppskrift")}
               canWrite={canWrite}
             />
           </TabsContent>

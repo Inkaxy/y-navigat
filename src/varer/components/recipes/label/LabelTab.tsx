@@ -1,41 +1,39 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { cn } from "@/lib/utils";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Loader2, Printer } from "lucide-react";
-import { useComputeRecipeLabel, useRecipeLabelCalculated } from "@/varer/hooks/useRecipeLabel";
-import { BRODSKALAN_MARKS } from "@/varer/lib/brodskalan";
+import { Loader2 } from "lucide-react";
 import {
-  fmtNum,
-  grainCategoryFromPct,
-  type FlourLine,
-  type GrainCategory,
-} from "@/varer/lib/breadscale";
-import { CoverageSection } from "./CoverageSection";
-import type { MissingNutritionRow } from "@/varer/hooks/useMissingNutrition";
-import { DeclarationSection } from "./DeclarationSection";
-import { NutritionSection } from "./NutritionSection";
-import { GrainScaleSection } from "./GrainScaleSection";
-import { KeyholeSection, type KeyholeResult } from "./KeyholeSection";
-import { LABEL_SIZES, type LabelSizeKey } from "../ConsumerLabelPDFDocument";
-import { EffectiveSourceSection, buildEffectiveForRecipe, SourceBadge } from "./EffectiveSourceSection";
+  useComputeRecipeLabel,
+  useRecipeBreadscaleEffective,
+  useRecipeLabelCalculated,
+  useRecipeLinkedProducts,
+} from "@/varer/hooks/useRecipeLabel";
+import type { FlourLine } from "@/varer/lib/breadscale";
 import {
-  NUTRITION_KEYS,
+  buildEffectiveDeclaration,
   type DeclarationMode,
   type RecipeLabelSnapshot,
 } from "@/varer/lib/effectiveDeclaration";
+import { LabelStatusBar } from "./LabelStatusBar";
+import { DataQualityCard, type MissingData } from "./DataQualityCard";
+import { DeclarationNutritionSection } from "./DeclarationNutritionSection";
+import { GrainSection } from "./GrainSection";
+import { KeyholeSection, type KeyholeResult } from "./KeyholeSection";
+import { LabelInfoCard } from "./LabelInfoCard";
+import { ConsumerLabelSection } from "./ConsumerLabelSection";
+import { LinkedProductsCard } from "./LinkedProductsCard";
 
-
-/** Feltene fra `recipes`-raden som merkefanen faktisk bruker. */
+/** Feltene fra `recipes`-raden som merkefanen bruker. */
 export interface LabelRecipe {
   declaration_mode?: DeclarationMode | null;
   manual_ingredient_declaration?: string | null;
   manual_allergen_summary?: unknown;
   manual_nutrition?: unknown;
+  declaration_updated_at?: string | null;
+  declaration_updated_by?: string | null;
+  breadscale_mode?: string | null;
+  manual_breadscale_pct?: number | null;
   unit_weight_grams?: number | null;
   shelf_life_days?: number | null;
   storage_instructions?: string | null;
@@ -60,43 +58,25 @@ interface Props {
   flourLines: FlourLine[];
   legalEntityId: string | undefined;
   canWrite: boolean;
-}
-
-
-const NUT_ROWS: Array<{ key: string; label: string; unit: string; d: number; indent?: boolean }> = [
-  { key: "energy_kj", label: "Energi", unit: "kJ", d: 0 },
-  { key: "energy_kcal", label: "Energi", unit: "kcal", d: 0 },
-  { key: "fat_g", label: "Fett", unit: "g", d: 1 },
-  { key: "saturated_fat_g", label: "hvorav mettede fettsyrer", unit: "g", d: 1, indent: true },
-  { key: "carbs_g", label: "Karbohydrater", unit: "g", d: 1 },
-  { key: "sugars_g", label: "hvorav sukkerarter", unit: "g", d: 1, indent: true },
-  { key: "fiber_g", label: "Kostfiber", unit: "g", d: 1 },
-  { key: "protein_g", label: "Protein", unit: "g", d: 1 },
-  { key: "salt_g", label: "Salt", unit: "g", d: 2 },
-];
-
-async function toDataUrl(url: string): Promise<string | null> {
-  try {
-    const res = await fetch(url);
-    const blob = await res.blob();
-    return await new Promise((resolve) => {
-      const fr = new FileReader();
-      fr.onload = () => resolve(String(fr.result));
-      fr.onerror = () => resolve(null);
-      fr.readAsDataURL(blob);
-    });
-  } catch {
-    return null;
-  }
+  /** Bytter til Oppskrift-fanen (brukes av datakvalitet-kortet). */
+  onGoToRecipeTab?: () => void;
 }
 
 /** Merking — kan vi trykke dette på posen, og hvis ikke, hva må endres? */
-export function LabelTab({ recipeId, recipeName, recipe, flourLines, legalEntityId, canWrite }: Props) {
+export function LabelTab({
+  recipeId,
+  recipeName,
+  recipe,
+  flourLines,
+  legalEntityId,
+  canWrite,
+  onGoToRecipeTab,
+}: Props) {
   const qc = useQueryClient();
   const labelQuery = useRecipeLabelCalculated(recipeId);
   const compute = useComputeRecipeLabel();
-  const [size, setSize] = useState<LabelSizeKey>("100x70");
-  const [printing, setPrinting] = useState(false);
+  const linksQuery = useRecipeLinkedProducts(recipeId);
+  const effectiveGrain = useRecipeBreadscaleEffective(recipeId);
 
   const entityQuery = useQuery({
     queryKey: ["legal-entity-label", legalEntityId],
@@ -108,17 +88,6 @@ export function LabelTab({ recipeId, recipeName, recipe, flourLines, legalEntity
         .eq("id", legalEntityId!)
         .maybeSingle();
       return (data ?? null) as LegalEntityLabelInfo | null;
-    },
-  });
-
-  const linkedProductsQuery = useQuery({
-    queryKey: ["recipe-linked-products", recipeId],
-    queryFn: async () => {
-      const { count } = await supabase
-        .from("product_recipe_links")
-        .select("id", { count: "exact", head: true })
-        .eq("recipe_id", recipeId);
-      return count ?? 0;
     },
   });
 
@@ -140,86 +109,47 @@ export function LabelTab({ recipeId, recipeName, recipe, flourLines, legalEntity
     onError: (e: unknown) => toast.error((e as Error).message ?? "Kunne ikke lagre"),
   });
 
-  const label = labelQuery.data;
+  const label = labelQuery.data ?? null;
   const coveragePct = label?.coverage_by_weight_pct ?? null;
   const coverageOk = (coveragePct ?? 0) >= 90;
-  const missing = (label?.missing_data?.nutrition ?? []) as MissingNutritionRow[];
   const keyhole = (label?.keyhole ?? null) as KeyholeResult | null;
-  const grainCategory: GrainCategory | null =
-    (label?.grain_category as GrainCategory | null) ??
-    (label?.grain_score_pct != null ? grainCategoryFromPct(label.grain_score_pct) : null);
+  const links = linksQuery.data ?? [];
+  const primaryCount = links.filter((l) => l.is_primary).length;
+
+  const declarationManual = ((recipe.declaration_mode as DeclarationMode | null) ?? "auto") === "manual";
+  const breadscaleMode: "auto" | "manual" = recipe.breadscale_mode === "manual" ? "manual" : "auto";
 
   const recompute = () =>
-    compute.mutate(recipeId, { onSuccess: () => toast.success("Merkedata beregnet på nytt") });
+    compute.mutate(recipeId, {
+      onSuccess: () => {
+        toast.success("Merkedata beregnet på nytt");
+        qc.invalidateQueries({ queryKey: ["recipe-breadscale-effective", recipeId] });
+      },
+    });
 
-  /** Effektiv kilde: det som faktisk følger produktet (manuell eller beregnet). */
+  /** Det som faktisk følger produktet — brukes i etikett og forhåndsvisning. */
   const effective = useMemo(
-    () => buildEffectiveForRecipe(recipe, (label ?? null) as RecipeLabelSnapshot | null),
-    [recipe, label],
+    () =>
+      buildEffectiveDeclaration(
+        {
+          id: "",
+          product_id: "",
+          recipe_id: recipeId,
+          declaration_mode: null,
+          manual_ingredient_declaration: null,
+          manual_nutrition: null,
+          manual_allergen_summary: null,
+          recipes: {
+            declaration_mode: (recipe.declaration_mode as DeclarationMode | null) ?? "auto",
+            manual_ingredient_declaration: recipe.manual_ingredient_declaration ?? null,
+            manual_nutrition: recipe.manual_nutrition ?? null,
+            manual_allergen_summary: recipe.manual_allergen_summary ?? null,
+          },
+        },
+        (label ?? null) as RecipeLabelSnapshot | null,
+      ),
+    [recipe, label, recipeId],
   );
-  const manualMode = effective.mode === "manual";
-
-  const nutritionRows = useMemo(() => {
-    const src = manualMode ? effective.nutrition : label?.nutrition_per_100g;
-    return NUT_ROWS.map((r) => ({
-      label: r.indent ? `— ${r.label}` : r.label,
-      value:
-        src?.[r.key as (typeof NUTRITION_KEYS)[number]] == null
-          ? "—"
-          : `${fmtNum(Number(src[r.key as (typeof NUTRITION_KEYS)[number]]), r.d)} ${r.unit}`,
-      indent: r.indent,
-    }));
-  }, [label, effective, manualMode]);
-
-  async function printLabel() {
-    setPrinting(true);
-
-    try {
-      // Kun det offisielle BKLF-merket trykkes. Uten merke trykkes ingen påstand.
-      const grainMarkSrc =
-        recipe.label_claim_grain && grainCategory ? BRODSKALAN_MARKS[grainCategory].src : null;
-      const grainMarkImage = grainMarkSrc ? await toDataUrl(grainMarkSrc) : null;
-      const entity = entityQuery.data;
-
-      const [{ pdf }, mod] = await Promise.all([
-        import("@react-pdf/renderer"),
-        import("../ConsumerLabelPDFDocument"),
-      ]);
-      const blob = await pdf(
-        <mod.ConsumerLabelPDFDocument
-          size={size}
-          data={{
-            productName: recipeName,
-            ingredientText: effective.ingredientText ?? "",
-            allergenTerms: effective.contains,
-            netWeightText: recipe.unit_weight_grams ? `${Math.round(recipe.unit_weight_grams)} g` : null,
-            shelfLifeText: recipe.shelf_life_days
-              ? `Best før: ${recipe.shelf_life_days} dager fra produksjonsdato`
-              : null,
-            storageText: recipe.storage_instructions ?? null,
-            originText: recipe.country_of_origin ?? null,
-            nutritionRows,
-            nutritionUsable: manualMode ? !!effective.nutrition : coverageOk,
-            producerName: entity?.name ?? null,
-            producerAddress: entity
-              ? [entity.address_line1, [entity.postal_code, entity.city].filter(Boolean).join(" ")]
-                  .filter(Boolean)
-                  .join(", ")
-              : null,
-            grainMarkImage,
-            keyholeMark: !!recipe.label_claim_keyhole,
-          }}
-        />,
-      ).toBlob();
-      const url = URL.createObjectURL(blob);
-      window.open(url, "_blank");
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
-    } catch (e: unknown) {
-      toast.error((e as Error)?.message ?? "Kunne ikke lage etiketten");
-    } finally {
-      setPrinting(false);
-    }
-  }
 
   if (labelQuery.isLoading) {
     return (
@@ -231,119 +161,98 @@ export function LabelTab({ recipeId, recipeName, recipe, flourLines, legalEntity
 
   return (
     <div className="space-y-4">
-      <EffectiveSourceSection
-        recipeId={recipeId}
-        recipe={recipe}
-        calculated={(label ?? null) as RecipeLabelSnapshot | null}
+      <LabelStatusBar
+        computedAt={label?.computed_at}
+        coveragePct={coveragePct}
+        declarationManual={declarationManual}
+        breadscaleManual={breadscaleMode === "manual"}
+        linkedProducts={links}
         canWrite={canWrite}
-        linkedProductCount={linkedProductsQuery.data ?? 0}
+        computing={compute.isPending}
+        onRecompute={recompute}
       />
 
-      <div className={cn("space-y-4", manualMode && "opacity-60")}>
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold">Beregnet fra NBOS</span>
-          <SourceBadge active={!manualMode} />
-        </div>
+      <DataQualityCard
+        coveragePct={coveragePct}
+        missingData={(label?.missing_data ?? null) as MissingData | null}
+        warnings={label?.warnings ?? null}
+        onRecalculate={recompute}
+        recalculating={compute.isPending}
+        canWrite={canWrite}
+        onGoToRecipeTab={onGoToRecipeTab}
+      />
 
-        {!label ? (
-          <Card>
-            <CardContent className="space-y-3 py-8 text-center">
-              <p className="text-sm text-muted-foreground">
-                Merkedata er ikke beregnet for denne oppskriften ennå.
-              </p>
-              {canWrite && (
-                <Button onClick={recompute} disabled={compute.isPending}>
-                  {compute.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Beregn merkedata
-                </Button>
-              )}
-            </CardContent>
-          </Card>
-        ) : (
-          <>
-            <CoverageSection
-              coveragePct={coveragePct}
-              missing={missing}
-              onRecalculate={recompute}
-              recalculating={compute.isPending}
-              canWrite={canWrite}
-            />
+      <DeclarationNutritionSection
+        recipeId={recipeId}
+        recipe={recipe}
+        calculated={label}
+        canWrite={canWrite}
+        linkedProductCount={links.length}
+        computing={compute.isPending}
+        onRecompute={recompute}
+      />
 
-            <DeclarationSection
-              declarationHtml={label.ingredient_declaration}
-              allergens={label.allergens}
-              unlinkedCount={label.missing_data?.lines_without_raw_material ?? 0}
-              unclassifiedNames={label.missing_data?.unclassified_grain_names ?? []}
-            />
-
-            <NutritionSection
-              per100g={label.nutrition_per_100g}
-              unitWeightGrams={recipe.unit_weight_grams ?? null}
-              coverageOk={coverageOk}
-            />
-          </>
-        )}
-      </div>
-
-      {label && (
-        <GrainScaleSection
-          grainPct={label.grain_score_pct}
-          grainCategory={label.grain_category}
-          flourGrams={label.flour_grams}
-          coarseWeightedGrams={label.whole_grain_grams}
-          flourLines={flourLines}
-          warnings={label.warnings}
-        />
-      )}
+      <GrainSection
+        recipeId={recipeId}
+        breadscaleMode={breadscaleMode}
+        manualPct={recipe.manual_breadscale_pct ?? null}
+        claimGrain={!!recipe.label_claim_grain}
+        approvedAt={recipe.label_claims_approved_at ?? null}
+        approvedBy={recipe.label_claims_approved_by ?? null}
+        grainPct={label?.grain_score_pct ?? null}
+        grainCategory={label?.grain_category ?? null}
+        flourGrams={label?.flour_grams ?? null}
+        coarseWeightedGrams={label?.whole_grain_grams ?? null}
+        wholeGrainPctOfDry={label?.whole_grain_pct_of_dry ?? null}
+        dryMatterPct={label?.dry_matter_pct ?? null}
+        finalWeightGrams={label?.final_weight_grams ?? null}
+        warnings={label?.warnings ?? null}
+        flourLines={flourLines}
+        canWrite={canWrite}
+        savingClaim={saveClaim.isPending}
+        onToggleClaim={(value) => saveClaim.mutate({ field: "label_claim_grain", value })}
+      />
 
       <KeyholeSection
         keyhole={keyhole}
         coverageOk={coverageOk}
         claimKeyhole={!!recipe.label_claim_keyhole}
-        claimGrain={!!recipe.label_claim_grain}
         approvedBy={recipe.label_claims_approved_by ?? null}
         approvedAt={recipe.label_claims_approved_at ?? null}
         canWrite={canWrite}
         saving={saveClaim.isPending}
-        onToggleClaim={(field, value) => saveClaim.mutate({ field, value })}
+        primaryProductCount={primaryCount}
+        onToggleClaim={(value) => saveClaim.mutate({ field: "label_claim_keyhole", value })}
       />
 
+      <LabelInfoCard
+        recipeId={recipeId}
+        unitWeightGrams={recipe.unit_weight_grams ?? null}
+        shelfLifeDays={recipe.shelf_life_days ?? null}
+        storageInstructions={recipe.storage_instructions ?? null}
+        countryOfOrigin={recipe.country_of_origin ?? null}
+        canWrite={canWrite}
+      />
 
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Forbrukeretikett</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-wrap items-end gap-3">
-          <div>
-            <Label className="text-xs">Etikettstørrelse</Label>
-            <select
-              className="h-10 w-56 rounded-md border border-input bg-background px-3 text-sm"
-              value={size}
-              onChange={(e) => setSize(e.target.value as LabelSizeKey)}
-            >
-              {Object.entries(LABEL_SIZES).map(([k, v]) => (
-                <option key={k} value={k}>{v.label}</option>
-              ))}
-            </select>
-          </div>
-          <Button onClick={printLabel} disabled={printing}>
-            {printing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Printer className="mr-2 h-4 w-4" />}
-            Skriv ut etikett
-          </Button>
-          <p className="w-full text-xs">
-            Kilde: <strong>{manualMode ? "manuell inntasting" : "beregnet fra NBOS"}</strong>
-            {manualMode
-              ? " — næringstabellen tas med hvis den er fylt ut."
-              : coverageOk
-                ? " — næringstabellen tas med."
-                : " — næringstabellen utelates fordi datadekningen er under 90 %."}
-          </p>
-          <p className="w-full text-xs text-muted-foreground">
-            Ingredienslisten settes aldri mindre enn 1,2 mm x-høyde — det er minstekravet i regelverket. Får ikke
-            teksten plass på valgt størrelse, velg et større format i stedet for å krympe skriften.
-          </p>
-        </CardContent>
-      </Card>
+      <ConsumerLabelSection
+        recipeName={recipeName}
+        effective={effective}
+        effectiveGrainPct={
+          effectiveGrain.data ?? (breadscaleMode === "manual" ? recipe.manual_breadscale_pct ?? null : label?.grain_score_pct ?? null)
+        }
+        declarationManual={declarationManual}
+        breadscaleManual={breadscaleMode === "manual"}
+        claimGrain={!!recipe.label_claim_grain}
+        claimKeyhole={!!recipe.label_claim_keyhole}
+        unitWeightGrams={recipe.unit_weight_grams ?? null}
+        shelfLifeDays={recipe.shelf_life_days ?? null}
+        storageInstructions={recipe.storage_instructions ?? null}
+        countryOfOrigin={recipe.country_of_origin ?? null}
+        entity={entityQuery.data ?? null}
+        nutritionUsable={declarationManual ? !!effective.nutrition : coverageOk && !!effective.nutrition}
+      />
+
+      <LinkedProductsCard recipeId={recipeId} links={links} canWrite={canWrite} />
     </div>
   );
 }
