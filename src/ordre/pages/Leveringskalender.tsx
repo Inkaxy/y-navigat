@@ -2216,25 +2216,37 @@ function MatrixGrid({
                   const cellHasData = hasData(key);
                   const pause = isPaused(pauseMap, c.date, c.tour.id);
                   const ghost = pause ? undefined : ghostMap?.get(key);
+                  const fromFixed = isGhostCell(key);
+                  const tone = colTone(c.date, c.tour.id);
+                  const toneVar = tone.kind ? getKindMeta(tone.kind).tokenVar : null;
                   const effectiveQty = value ? Number(value.replace(",", ".") || 0) : 0;
-                  const ghostOverridden = !!ghost && !!value && effectiveQty !== ghost;
+                  const ghostOverridden = !!ghost && !fromFixed && !!value && effectiveQty !== ghost;
                   const fb = isFallback(key);
                   return (
                     <td
                       key={key}
+                      data-order-kind={tone.kind ?? undefined}
+                      data-from-fixed={fromFixed ? "true" : undefined}
                       className={cn(
                         "group relative border-b border-r border-border p-0",
-                        dirty && "bg-warning/25",
                         pause && "bg-sky-50 dark:bg-sky-950/30",
+                        dirty && "bg-warning/25",
                         fb && "outline outline-2 -outline-offset-2 outline-destructive/70",
                       )}
+                      style={
+                        !pause && !dirty && toneVar
+                          ? { backgroundColor: `hsl(var(${toneVar}) / 0.07)` }
+                          : undefined
+                      }
                       title={
                         fb
                           ? "Pris ikke funnet — mangler prisliste-rad eller spesialpris"
-                          : ghost
-                            ? ghostOverridden
-                              ? `Fastordre: ${ghost} stk — overstyrt til ${effectiveQty}`
-                              : `Fastordre: ${ghost} stk`
+                          : fromFixed
+                            ? `Fra fastordre: ${ghost} stk — skriv over for å endre`
+                            : ghost
+                              ? ghostOverridden
+                                ? `Fastordre: ${ghost} stk — overstyrt til ${effectiveQty}`
+                                : `Fastordre: ${ghost} stk`
                           : pause
                             ? pause.reason ? `Leveransepause: ${pause.reason}` : "Leveransepause"
                             : undefined
@@ -2257,14 +2269,15 @@ function MatrixGrid({
                             });
                           }
                         }}
-                        placeholder={ghost ? String(ghost) : ""}
                         className={cn(
                           "h-9 w-16 rounded-none border-0 bg-transparent px-1 text-center tabular-nums shadow-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-0",
                           value && "text-base font-semibold text-foreground",
-                          dirty && "font-bold text-warning",
+                          fromFixed && "italic text-muted-foreground",
+                          dirty && "font-bold not-italic text-warning",
                           pause && "cursor-not-allowed",
-                          ghost && !value && "placeholder:text-muted-foreground/60",
                         )}
+                      />
+
                       />
                       {hasM && (
                         <span
