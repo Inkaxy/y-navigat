@@ -609,7 +609,7 @@ export default function OrdersList() {
                     />
                   </TableHead>
                   <TableHead className="h-9 px-3 text-caption">Ordrenr</TableHead>
-                  <TableHead className="h-9 px-3 text-caption">Status</TableHead>
+                  <TableHead className="h-9 px-3 text-caption">Type / livssyklus</TableHead>
                   <TableHead className="h-9 px-3 text-caption">Kunde</TableHead>
                   <TableHead className="h-9 px-3 text-caption">Levering</TableHead>
                   <TableHead className="h-9 px-3 text-caption">Tur</TableHead>
