@@ -572,6 +572,14 @@ export default function MatrixPage() {
 
   async function handleSave() {
     if (!customerId || dirtyCount === 0) return;
+    // Gule (fastordre-)kolonner som berøres blir datert ordre ved lagring.
+    const fixedDates = [
+      ...new Set(
+        dirtyChanges
+          .filter((c) => colTone(c.date, c.tour_id).kind === "fixed")
+          .map((c) => c.date),
+      ),
+    ].sort();
     try {
       const result = await saveMatrix.mutateAsync({ customerId, changes: dirtyChanges });
       setEdits({});
@@ -583,13 +591,20 @@ export default function MatrixPage() {
         lines_deleted?: number;
         has_zero_fallback_lines?: string[] | null;
       } | null;
-      toast.success("Matrise lagret", {
-        description: r
-          ? `${r.orders_created ?? 0} nye ordre, ${r.lines_created ?? 0} linjer opprettet, ${r.lines_updated ?? 0} oppdatert, ${r.lines_deleted ?? 0} slettet${
-              r.orders_deleted ? `, ${r.orders_deleted} tomme ordre fjernet` : ""
-            }`
-          : undefined,
-      });
+      const description = r
+        ? `${r.orders_created ?? 0} nye ordre, ${r.lines_created ?? 0} linjer opprettet, ${r.lines_updated ?? 0} oppdatert, ${r.lines_deleted ?? 0} slettet${
+            r.orders_deleted ? `, ${r.orders_deleted} tomme ordre fjernet` : ""
+          }`
+        : undefined;
+      if (fixedDates.length > 0) {
+        toast.success(
+          `Lagret — fastordren ble datert ordre for ${fixedDates.map(formatShortDate).join(", ")}`,
+          { description },
+        );
+      } else {
+        toast.success("Lagret", { description });
+      }
+
       const fbCount = r?.has_zero_fallback_lines?.length ?? 0;
       if (fbCount > 0) {
         toast.warning(
