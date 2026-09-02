@@ -184,35 +184,17 @@ export function OrderBulkActionBar({ selected, onClear, onMutated, csvHeaders }:
       </Button>
 
       <div className="ml-auto flex items-center gap-2">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" disabled={running} className="h-8 gap-1.5">
-              {running ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <ChevronDown className="h-3.5 w-3.5" />
-              )}
-              Endre status
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuLabel>Manuell overstyring</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            {ORDER_STATUSES.map((s) => (
-              <DropdownMenuItem
-                key={s.value}
-                onSelect={() => applyStatus(s.value, s.label)}
-                className="gap-2"
-              >
-                <span
-                  className="h-2 w-2 rounded-full"
-                  style={{ backgroundColor: `hsl(var(${s.tokenVar}))` }}
-                />
-                <span>{s.label}</span>
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={cancelSelected}
+          disabled={running}
+          className="h-8 gap-1.5 text-destructive"
+        >
+          {running ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Ban className="h-3.5 w-3.5" />}
+          Avbryt valgte
+        </Button>
+
 
         <Button
           variant="outline"
