@@ -13,22 +13,22 @@ import { toast } from "sonner";
 import { showError } from "@/lib/userError";
 import { parseNum } from "@/varer/lib/calcFormat";
 import { formatNumber } from "@/ravarer/lib/constants";
+import { GRAIN_LEVELS, grainCategoryFromPct } from "@/varer/lib/breadscale";
 
-/** Trinnavn 1–4 — samme grenser som `breadscale_step` i databasen. */
-const STEP_LABELS: Record<number, string> = {
-  1: "Fint",
-  2: "Halvgrovt",
-  3: "Grovt",
-  4: "Ekstra grovt",
-};
+/**
+ * Trinn 1–4 utledes av de offisielle grensene i `GRAIN_LEVELS`
+ * (fint <26, halvgrovt 26–50,9, grovt 51–75,9, ekstra grovt ≥76) — samme som
+ * DB-funksjonen `breadscale_step`. Ingen egen kopi av tersklene her.
+ */
+const STEP_LABELS: Record<number, string> = Object.fromEntries(
+  GRAIN_LEVELS.map((l, i) => [i + 1, l.label]),
+) as Record<number, string>;
 
 function stepFromPct(pct: number | null | undefined): number | null {
   if (pct == null || !Number.isFinite(Number(pct))) return null;
-  const p = Number(pct);
-  if (p < 25) return 1;
-  if (p < 50) return 2;
-  if (p < 75) return 3;
-  return 4;
+  const cat = grainCategoryFromPct(Number(pct));
+  const idx = GRAIN_LEVELS.findIndex((l) => l.key === cat);
+  return idx < 0 ? null : idx + 1;
 }
 
 function describe(pct: number | null | undefined): string {
@@ -78,7 +78,7 @@ export function BreadscaleSection({ productId, canWrite }: Props) {
     queryFn: async () => {
       const { data } = await supabase
         .from("product_recipe_links")
-        .select("recipe_id, recipes(name)")
+        .select("recipe_id, recipes(name, breadscale_mode)")
         .eq("product_id", productId)
         .order("is_primary", { ascending: false })
         .limit(1)
@@ -88,6 +88,13 @@ export function BreadscaleSection({ productId, canWrite }: Props) {
   });
 
   const product = productQuery.data;
+  const recipeLink = recipeQuery.data as
+    | { recipe_id: string | null; recipes?: { name?: string | null; breadscale_mode?: string | null } | null }
+    | null
+    | undefined;
+  const recipeId = recipeLink?.recipe_id ?? null;
+  const recipeName = recipeLink?.recipes?.name ?? null;
+  const recipeMode = recipeLink?.recipes?.breadscale_mode === "manual" ? "manual" : "auto";
 
   useEffect(() => {
     if (!product) return;
@@ -161,7 +168,7 @@ export function BreadscaleSection({ productId, canWrite }: Props) {
           <CardTitle className="text-base">Grovhet (Brødskala'n)</CardTitle>
           <Badge variant={savedMode === "auto" ? "default" : "secondary"}>
             {savedMode === "auto"
-              ? `Følger varen: NBhub-beregning ${describe(effectivePct)} (oppdateres automatisk ved ny beregning)`
+              ? `Følger varen: Fra oppskriften ${describe(effectivePct)} (oppdateres automatisk)`
               : `Følger varen: Manuell ${describe(effectivePct)}`}
           </Badge>
         </div>
@@ -171,21 +178,35 @@ export function BreadscaleSection({ productId, canWrite }: Props) {
           {/* NBhub-beregning */}
           <div className="rounded-md border p-3">
             <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              NBhub-beregning
+              Fra oppskriften
             </div>
             {calcQuery.isLoading ? (
               <Loader2 className="mt-2 h-4 w-4 animate-spin text-muted-foreground" />
             ) : calcPct != null ? (
-              <div className="mt-1 text-lg font-semibold tabular-nums">{describe(calcPct)}</div>
+              <div className="mt-1 space-y-1">
+                <div className="text-sm text-muted-foreground">
+                  {recipeMode === "manual" ? "Manuell verdi i oppskriften" : "Beregnet av NBhub"}
+                </div>
+                <div className="text-lg font-semibold tabular-nums">{describe(calcPct)}</div>
+                {recipeId && (
+                  <Link
+                    to={`/varer/oppskrifter/${recipeId}`}
+                    className="inline-flex items-center gap-1 text-xs text-primary underline underline-offset-2"
+                  >
+                    Endre i oppskriften
+                    <ExternalLink className="h-3.5 w-3.5" />
+                  </Link>
+                )}
+              </div>
             ) : (
               <div className="mt-1 space-y-1 text-sm text-muted-foreground">
                 <p>Ikke beregnet ennå — beregn merkedata på primæroppskriften.</p>
-                {recipeQuery.data?.recipe_id && (
+                {recipeId && (
                   <Link
-                    to={`/varer/oppskrifter/${recipeQuery.data.recipe_id}`}
+                    to={`/varer/oppskrifter/${recipeId}`}
                     className="inline-flex items-center gap-1 text-primary underline underline-offset-2"
                   >
-                    {(recipeQuery.data as any).recipes?.name ?? "Åpne oppskriften"}
+                    Endre i oppskriften{recipeName ? ` (${recipeName})` : ""}
                     <ExternalLink className="h-3.5 w-3.5" />
                   </Link>
                 )}
@@ -208,7 +229,7 @@ export function BreadscaleSection({ productId, canWrite }: Props) {
                 placeholder="0–100"
                 className="h-9 w-28"
               />
-              <span className="text-sm text-muted-foreground">% fullkorn av tørrstoff</span>
+              <span className="text-sm text-muted-foreground">Grovhet (%) etter Brødskala'n</span>
             </div>
             <div className="mt-1 text-sm">
               {manualInvalid ? (
@@ -226,7 +247,7 @@ export function BreadscaleSection({ productId, canWrite }: Props) {
           <div className="flex items-start gap-2 rounded-md border border-amber-500/50 bg-amber-500/10 p-2 text-xs">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
             <span>
-              NBhub-beregningen gir trinn {calcStep}, manuell verdi gir trinn {manualStep}.
+              Oppskriften gir trinn {calcStep}, manuell verdi gir trinn {manualStep}.
             </span>
           </div>
         )}
@@ -243,7 +264,7 @@ export function BreadscaleSection({ productId, canWrite }: Props) {
               }}
             />
             <Label htmlFor="breadscale-mode" className="text-sm">
-              Hvilken grovhet følger varen? — {auto ? "Automatisk fra NBhub" : "Manuell"}
+              Hvilken grovhet følger varen? — {auto ? "Automatisk fra oppskriften" : "Manuell"}
             </Label>
           </div>
           {!auto && canWrite && (
