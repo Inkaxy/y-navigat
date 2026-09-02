@@ -103,18 +103,37 @@ export function useApplyMatvaretabellen() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: { rawMaterialId: string; foodId: string }) => {
+      const { data: before } = await supabase
+        .from("raw_materials")
+        .select("declaration_name")
+        .eq("id", input.rawMaterialId)
+        .maybeSingle();
       const { error } = await supabase.rpc("rm_apply_matvaretabellen", {
         p_raw_material_id: input.rawMaterialId,
         p_food_id: input.foodId,
       });
       if (error) throw error;
-      return input;
+      let declarationNameSet: string | null = null;
+      if (!before?.declaration_name?.trim()) {
+        const { data: after } = await supabase
+          .from("raw_materials")
+          .select("declaration_name")
+          .eq("id", input.rawMaterialId)
+          .maybeSingle();
+        declarationNameSet = after?.declaration_name?.trim() || null;
+      }
+      return { ...input, declarationNameSet };
     },
     onSuccess: (input) => {
       qc.invalidateQueries({ queryKey: ["matvaretabellen_links"] });
       qc.invalidateQueries({ queryKey: ["raw_material_nutrition", input.rawMaterialId] });
       qc.invalidateQueries({ queryKey: ["raw_material", input.rawMaterialId] });
-      toast.success("Næringsverdier hentet fra Matvaretabellen");
+      qc.invalidateQueries({ queryKey: ["declaration-worklist"] });
+      toast.success(
+        input.declarationNameSet
+          ? `Næringsverdier hentet fra Matvaretabellen · Deklarasjonsnavn satt til «${input.declarationNameSet}»`
+          : "Næringsverdier hentet fra Matvaretabellen",
+      );
     },
     onError: (e: any) => toast.error(`Kunne ikke koble: ${e.message ?? e}`),
   });
