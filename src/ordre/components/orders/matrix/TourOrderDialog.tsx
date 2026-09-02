@@ -44,7 +44,9 @@ import { useRecurringGhost } from "@/ordre/hooks/useRecurringGhost";
 import { useProductsByIds } from "@/ordre/hooks/useProductsByIds";
 import type { MatrixProduct, MatrixTour } from "@/ordre/hooks/useMatrix";
 import { formatNOK } from "@/ordre/lib/format";
-import { getStatusMeta } from "@/ordre/lib/orderStatus";
+import { OrderKindBadge } from "@/ordre/components/orders/OrderKindBadge";
+import { LifecycleBadge } from "@/ordre/components/orders/LifecycleBadge";
+import { useOrdersLifecycle } from "@/ordre/hooks/useOrdersLifecycle";
 import { cn } from "@/lib/utils";
 
 const LOCKED_STATUSES = new Set(["invoiced", "cancelled"]);
@@ -120,6 +122,8 @@ export function TourOrderDialog({
   }, [open]);
 
   const locked = !!order && LOCKED_STATUSES.has(order.status);
+  const { map: lifecycleMap } = useOrdersLifecycle(order ? [order.id] : []);
+  const orderLc = order ? lifecycleMap.get(order.id) : undefined;
   const readOnly = locked || !canEdit;
 
   const productMap = useMemo(() => {
@@ -385,7 +389,11 @@ export function TourOrderDialog({
                       <Badge variant="outline" className="font-mono">
                         #{order.order_number}
                       </Badge>
-                      <Badge variant="secondary">{getStatusMeta(order.status).label}</Badge>
+                      <OrderKindBadge kind={orderLc?.order_kind ?? (order.is_return ? "return" : "dated")} />
+                      <LifecycleBadge
+                        lifecycle={orderLc?.lifecycle ?? "open"}
+                        deliveryNoteNumber={orderLc?.delivery_note_number}
+                      />
                       {order.is_paid ? <Badge variant="secondary">Betalt</Badge> : null}
                     </>
                   ) : null}
