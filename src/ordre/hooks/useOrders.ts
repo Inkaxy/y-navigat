@@ -148,17 +148,18 @@ export function useActionQueueCounts() {
         .from("orders")
         .select("id, status, delivery_date")
         .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
-        .in("status", ["awaiting_confirmation", "on_hold", "draft", "packed"]);
+        .in("status", ["awaiting_confirmation", "confirmed"]);
       if (error) throw error;
       const rows = data ?? [];
       const today = osloTodayISO();
       return {
         awaiting: rows.filter((r) => r.status === "awaiting_confirmation").length,
-        onHold: rows.filter((r) => r.status === "on_hold").length,
-        drafts: rows.filter((r) => r.status === "draft").length,
-        packedToday: rows.filter((r) => r.status === "packed" && r.delivery_date === today).length,
+        confirmedToday: rows.filter(
+          (r) => r.status === "confirmed" && r.delivery_date === today,
+        ).length,
       };
     },
+
     staleTime: 30_000,
   });
 }
