@@ -530,6 +530,7 @@ export async function computeDeclarationCore(service: any, topLines: TopLine[]):
     rye_flour_grams: ryeFlour,
     composite_unreviewed,
     composite_text_only,
+    missing_declaration_names: [...missingDeclMap.values()],
     rmMap,
     nutritionByRm,
   };
