@@ -148,6 +148,15 @@ export function DataQualityCard({
                 </p>
               )}
 
+              {missingDeclNames.length > 0 && (
+                <MissingDeclarationNames
+                  rows={missingDeclNames}
+                  canWrite={canWrite}
+                  onSaved={onRecalculate}
+                />
+              )}
+
+
               {missing.length > 0 && (
                 <div id="mangler-naeringsdata" className="space-y-1 scroll-mt-24">
                   <div className="flex flex-wrap items-center gap-2">
