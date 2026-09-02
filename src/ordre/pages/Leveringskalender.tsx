@@ -389,11 +389,29 @@ export default function MatrixPage() {
     return map;
   }, [matrix]);
 
+  /**
+   * Fastordre ER ordren: når cellen ikke har lagret linje og kolonnen ikke har
+   * en materialisert ordre, vises spøkelsestallet fra fastordre-malen som verdi.
+   * Brukeren kan skrive over; kun faktisk endrede celler sendes til lagring.
+   */
   function getCellValue(key: CellKey): string {
     if (key in edits) return edits[key];
     const v = existingQty[key];
-    return v ? String(v) : "";
+    if (v) return String(v);
+    return isGhostCell(key) ? String(ghostMap!.get(key)) : "";
   }
+
+  /** True når cellen viser et fastordre-tall som ennå ikke er materialisert. */
+  function isGhostCell(key: CellKey): boolean {
+    if (key in edits) return false;
+    if (existingQty[key]) return false;
+    const [date, tourId] = key.split("|");
+    if (colOrderId.has(`${date}|${tourId}`)) return false;
+    if (isPaused(pauseMap, date, tourId)) return false;
+    const g = ghostMap?.get(key);
+    return !!g && g > 0;
+  }
+
 
   function getEffectiveQty(key: CellKey): number {
     if (key in edits) return Number(edits[key] || 0);
