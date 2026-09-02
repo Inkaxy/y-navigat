@@ -30,6 +30,7 @@ const TYPE_LABEL: Record<ListType, string> = {
   pakksedler: "pakksedler",
   fast: "fastordre",
   datert: "daterte ordre",
+  ekstra: "ekstraordre",
   retur: "returordre",
 };
 
@@ -121,7 +122,7 @@ export default function DeliveryNotesList() {
     params.get("mode") === "correction" ? "correction" : "date";
   const typeParam = (params.get("type") as ListType | null) ?? "pakksedler";
   const type: ListType =
-    typeParam === "fast" || typeParam === "datert" || typeParam === "retur"
+    typeParam === "fast" || typeParam === "datert" || typeParam === "ekstra" || typeParam === "retur"
       ? typeParam
       : "pakksedler";
 
