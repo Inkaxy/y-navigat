@@ -10679,6 +10679,7 @@ export type Database = {
           autolyse_minutes: number | null
           bake_temp_celsius: number | null
           bake_time_minutes: number | null
+          breadscale_mode: string
           bulk_proof_minutes: number | null
           category: string | null
           cooling_minutes: number | null
@@ -10704,6 +10705,7 @@ export type Database = {
           label_claims_approved_by: string | null
           legal_entity_id: string | null
           manual_allergen_summary: Json | null
+          manual_breadscale_pct: number | null
           manual_ingredient_declaration: string | null
           manual_nutrition: Json | null
           measured_per_kg: boolean
@@ -10740,6 +10742,7 @@ export type Database = {
           autolyse_minutes?: number | null
           bake_temp_celsius?: number | null
           bake_time_minutes?: number | null
+          breadscale_mode?: string
           bulk_proof_minutes?: number | null
           category?: string | null
           cooling_minutes?: number | null
@@ -10765,6 +10768,7 @@ export type Database = {
           label_claims_approved_by?: string | null
           legal_entity_id?: string | null
           manual_allergen_summary?: Json | null
+          manual_breadscale_pct?: number | null
           manual_ingredient_declaration?: string | null
           manual_nutrition?: Json | null
           measured_per_kg?: boolean
@@ -10801,6 +10805,7 @@ export type Database = {
           autolyse_minutes?: number | null
           bake_temp_celsius?: number | null
           bake_time_minutes?: number | null
+          breadscale_mode?: string
           bulk_proof_minutes?: number | null
           category?: string | null
           cooling_minutes?: number | null
@@ -10826,6 +10831,7 @@ export type Database = {
           label_claims_approved_by?: string | null
           legal_entity_id?: string | null
           manual_allergen_summary?: Json | null
+          manual_breadscale_pct?: number | null
           manual_ingredient_declaration?: string | null
           manual_nutrition?: Json | null
           measured_per_kg?: boolean
@@ -13424,6 +13430,10 @@ export type Database = {
         Returns: string
       }
       breadscale_step: { Args: { p_pct: number }; Returns: number }
+      breadscale_sync_products_for_recipe: {
+        Args: { p_recipe_id: string }
+        Returns: number
+      }
       build_cake_order_line: {
         Args: {
           p_category_id: string
@@ -14661,6 +14671,10 @@ export type Database = {
           p_reason?: string
         }
         Returns: Json
+      }
+      recipe_breadscale_effective: {
+        Args: { p_recipe_id: string }
+        Returns: number
       }
       recipe_line_base_qty: {
         Args: {

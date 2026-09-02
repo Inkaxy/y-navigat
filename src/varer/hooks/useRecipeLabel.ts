@@ -59,3 +59,85 @@ export function useComputeRecipeLabel() {
     onError: (e: any) => toast.error(e.message ?? "Kunne ikke beregne merkedata"),
   });
 }
+
+/** Koblede produkter for en oppskrift — brukes i statuslinje og koblingslista. */
+export interface RecipeLinkedProduct {
+  id: string;
+  product_id: string;
+  is_primary: boolean | null;
+  declaration_mode: string | null;
+  products: {
+    id: string;
+    display_name: string | null;
+    display_number: string | null;
+    breadscale_mode: string | null;
+    breadscale_pct: number | null;
+    breadscale_value: number | null;
+  } | null;
+}
+
+export function useRecipeLinkedProducts(recipeId: string | undefined) {
+  return useQuery({
+    queryKey: ["recipe-linked-products", recipeId],
+    enabled: !!recipeId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("product_recipe_links")
+        .select(
+          "id, product_id, is_primary, declaration_mode, products(id, display_name, display_number, breadscale_mode, breadscale_pct, breadscale_value)",
+        )
+        .eq("recipe_id", recipeId!);
+      if (error) throw error;
+      return (data ?? []) as unknown as RecipeLinkedProduct[];
+    },
+  });
+}
+
+/** Oppskriftens effektive grovhet-prosent (manuell eller beregnet, styrt av breadscale_mode). */
+export function useRecipeBreadscaleEffective(recipeId: string | undefined) {
+  return useQuery({
+    queryKey: ["recipe-breadscale-effective", recipeId],
+    enabled: !!recipeId,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("recipe_breadscale_effective", {
+        p_recipe_id: recipeId!,
+      });
+      if (error) throw error;
+      return data == null ? null : Number(data);
+    },
+  });
+}
+
+/** Synker grovhet til primærkoblede produkter. Returnerer antall oppdaterte produkter. */
+export function useSyncBreadscaleProducts() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (recipeId: string) => {
+      const { data, error } = await supabase.rpc("breadscale_sync_products_for_recipe", {
+        p_recipe_id: recipeId,
+      });
+      if (error) throw error;
+      return Number(data ?? 0);
+    },
+    onSuccess: (_n, recipeId) => {
+      qc.invalidateQueries({ queryKey: ["recipe-linked-products", recipeId] });
+      qc.invalidateQueries({ queryKey: ["recipe-breadscale-effective", recipeId] });
+    },
+  });
+}
+
+/** Slår opp visningsnavnet til en bruker (godkjenner av merker o.l.). */
+export function useUserDisplayName(userId: string | null | undefined) {
+  return useQuery({
+    queryKey: ["user-display-name", userId],
+    enabled: !!userId,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("users")
+        .select("display_name")
+        .eq("id", userId!)
+        .maybeSingle();
+      return data?.display_name ?? null;
+    },
+  });
+}

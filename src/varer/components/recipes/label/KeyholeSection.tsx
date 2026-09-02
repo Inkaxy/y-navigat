@@ -5,6 +5,8 @@ import { Label } from "@/components/ui/label";
 import { CheckCircle2, HelpCircle, Lock, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { fmtNum } from "@/varer/lib/breadscale";
+import { useUserDisplayName } from "@/varer/hooks/useRecipeLabel";
+import { formatDateTimeNb } from "./labelShared";
 
 export interface KeyholeCriterion {
   key: string;
@@ -13,6 +15,8 @@ export interface KeyholeCriterion {
   unit: string;
   value: number | null;
   met: boolean | null;
+  /** Serveren kan sende rådet direkte på kriteriet. */
+  advice?: string | null;
 }
 
 export interface KeyholeResult {
@@ -29,34 +33,39 @@ interface Props {
   keyhole: KeyholeResult | null;
   coverageOk: boolean;
   claimKeyhole: boolean;
-  claimGrain: boolean;
   approvedBy: string | null;
   approvedAt: string | null;
-  approverName?: string | null;
   canWrite: boolean;
-  onToggleClaim: (field: "label_claim_keyhole" | "label_claim_grain", value: boolean) => void;
+  onToggleClaim: (value: boolean) => void;
   saving: boolean;
+  /** Antall primærkoblede produkter merket kopieres til. */
+  primaryProductCount: number;
 }
 
-/** Nøkkelhullet som sjekkliste med konkrete råd, og låsbare merkebrytere. */
+/** Matcher råd til kriterium på nøkkel — faller tilbake til navneprefiks. */
+function adviceFor(c: KeyholeCriterion, advice: string[]): string | null {
+  if (c.advice) return c.advice;
+  const byKey = advice.find((a) => a.toLowerCase().includes(c.key.toLowerCase()));
+  if (byKey) return byKey;
+  return advice.find((a) => a.toLowerCase().startsWith(c.name.toLowerCase())) ?? null;
+}
+
+/** Nøkkelhullet som sjekkliste med konkrete råd, og låsbar merkebryter. */
 export function KeyholeSection({
   keyhole,
   coverageOk,
   claimKeyhole,
-  claimGrain,
+  approvedBy,
   approvedAt,
-  approverName,
   canWrite,
   onToggleClaim,
   saving,
+  primaryProductCount,
 }: Props) {
   const criteria = keyhole?.criteria ?? [];
-  const adviceByKey = new Map<string, string>();
-  for (const a of keyhole?.advice ?? []) {
-    const match = criteria.find((c) => a.startsWith(c.name));
-    if (match) adviceByKey.set(match.key, a);
-  }
+  const advice = keyhole?.advice ?? [];
   const locked = !coverageOk || keyhole?.status !== "oppfylt";
+  const approverName = useUserDisplayName(approvedBy).data;
 
   return (
     <Card>
@@ -98,6 +107,7 @@ export function KeyholeSection({
             <div className="grid gap-2 sm:grid-cols-2">
               {criteria.map((c) => {
                 const unknown = c.met === null;
+                const tip = c.met === false ? adviceFor(c, advice) : null;
                 return (
                   <div
                     key={c.key}
@@ -117,13 +127,10 @@ export function KeyholeSection({
                       )}
                       <div className="min-w-0 flex-1">
                         <div className="text-sm font-medium">{c.name}</div>
-                        <div className="text-xs text-muted-foreground">
-                          Krav: {c.requirement} · Målt:{" "}
-                          {unknown ? "ukjent" : `${fmtNum(c.value, 1)} ${c.unit.replace("g/100 g", "g/100 g")}`}
+                        <div className="text-xs tabular-nums text-muted-foreground">
+                          Krav: {c.requirement} · Målt: {unknown ? "ukjent" : `${fmtNum(c.value, 1)} ${c.unit}`}
                         </div>
-                        {c.met === false && adviceByKey.get(c.key) && (
-                          <p className="mt-1.5 text-xs">{adviceByKey.get(c.key)}</p>
-                        )}
+                        {tip && <p className="mt-1.5 text-xs">{tip}</p>}
                       </div>
                     </div>
                   </div>
@@ -131,13 +138,13 @@ export function KeyholeSection({
               })}
             </div>
 
-            {keyhole.advice.length > 0 && keyhole.status === "ikke_oppfylt" && (
+            {advice.length > 0 && keyhole.status === "ikke_oppfylt" && (
               <div className="rounded-md border bg-muted/30 p-3">
                 <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Hva må endres
                 </div>
                 <ul className="mt-1 list-disc space-y-1 pl-5 text-sm">
-                  {keyhole.advice.map((a, i) => (
+                  {advice.map((a, i) => (
                     <li key={i}>{a}</li>
                   ))}
                 </ul>
@@ -162,28 +169,20 @@ export function KeyholeSection({
             <Switch
               checked={claimKeyhole}
               disabled={!canWrite || saving || (locked && !claimKeyhole)}
-              onCheckedChange={(v) => onToggleClaim("label_claim_keyhole", v)}
+              onCheckedChange={onToggleClaim}
             />
           </div>
 
-          <div className="flex items-center justify-between gap-3 border-t pt-3">
-            <div className="min-w-0">
-              <Label>Merk produktet med grovhetsmerket</Label>
-              <p className="text-xs text-muted-foreground">Brødskala'n-merket for beregnet grovhetsnivå.</p>
-            </div>
-            <Switch
-              checked={claimGrain}
-              disabled={!canWrite || saving}
-              onCheckedChange={(v) => onToggleClaim("label_claim_grain", v)}
-            />
-          </div>
-
-          {(claimKeyhole || claimGrain) && approvedAt && (
+          {claimKeyhole && approvedAt && (
             <p className="text-xs text-muted-foreground">
-              Godkjent {new Date(approvedAt).toLocaleString("nb-NO")}
+              Sist godkjent {formatDateTimeNb(approvedAt)}
               {approverName ? ` av ${approverName}` : ""}.
             </p>
           )}
+
+          <p className="text-xs text-muted-foreground">
+            Merket kopieres automatisk til {primaryProductCount} primærkoblede produkter (cert_nokkelhull).
+          </p>
 
           <p className="text-xs text-muted-foreground">
             Bruk av Nøkkelhullet er frivillig og krever ingen søknad, men kravene i nøkkelhullforskriften må være
