@@ -155,21 +155,14 @@ export default function OrderDetail() {
   const showDelete = canDelete(status, isWriter, isAdmin);
   const cancelDisabled = !canCancel(status);
 
-  const actions = getStatusActions(status, order.is_return ?? false);
-  const primaryAction = actions.find((a) => (a.variant ?? "default") !== "destructive") ?? null;
-  const secondaryActions = actions.filter((a) => a !== primaryAction);
+  const hasApprovalReason = !!order.approval_reason;
+  const actions = getStatusActions(status, order.is_return ?? false, hasApprovalReason);
+  const approveAction = actions.find((a) => a.to === "confirmed") ?? null;
+  const rejectAction = actions.find((a) => a.to === "cancelled") ?? null;
 
-  const releaseAction =
-    status === "on_hold" && order.previous_status_before_hold
-      ? {
-          label: `Frigi → ${getStatusMeta(order.previous_status_before_hold).label}`,
-          intent: {
-            to: order.previous_status_before_hold as OrderStatus,
-            label: "Frigi",
-            clearsPreviousStatus: true,
-          } as StatusChangeIntent,
-        }
-      : null;
+  const lifecycle = lc?.lifecycle ?? (status === "cancelled" ? "cancelled" : "open");
+  const orderKind = lc?.order_kind ?? (order.is_return ? "return" : "dated");
+  const canCreateDeliveryNote = lifecycle === "open" && status === "confirmed";
 
   function openStatusChange(i: StatusChangeIntent) {
     setIntent(i);
@@ -183,88 +176,30 @@ export default function OrderDetail() {
       requireComment: true,
       commentLabel: "Hvorfor avbrytes ordren?",
       confirmVariant: "destructive",
-      specialEffect: "cancel",
       warning:
-        flowIndex(status) >= flowIndex("in_production")
-          ? "Ordren er allerede i produksjon eller senere. Bekreft at produksjonsplan er informert."
+        lifecycle === "delivery_note"
+          ? "Pakkseddel er allerede kjørt for denne ordren. Bekreft at produksjon og sjåfør er informert."
           : undefined,
     });
   }
 
   async function performStatusChange(comment: string) {
     if (!intent || !order) return;
-    const userId = user?.id ?? null;
-
-    const updates: Record<string, unknown> = {
-      status: intent.to,
-      status_changed_at: new Date().toISOString(),
-      status_changed_by: userId,
-      updated_at: new Date().toISOString(),
-    };
-
-    if (intent.storesPreviousStatus) updates.previous_status_before_hold = order.status;
-    if (intent.clearsPreviousStatus) updates.previous_status_before_hold = null;
-
-    if (intent.specialEffect === "cancel" || intent.to === "cancelled") {
-      updates.cancelled_at = new Date().toISOString();
-      updates.cancelled_by = userId;
-      updates.cancelled_reason = comment;
-    }
-    if (intent.to === "confirmed" && !order.confirmed_at) {
-      updates.confirmed_at = new Date().toISOString();
-      updates.confirmed_by = userId;
-    }
-
-    // Optimistisk lås — treffer 0 rader hvis noen andre har endret ordren.
-    const { data: updRows, error: updErr } = await supabase
-      .from("orders")
-      .update(updates as never)
-      .eq("id", order.id)
-      .eq("updated_at", order.updated_at)
-      .select("id");
-    if (updErr) {
-      console.error("[OrderDetail] performStatusChange", updErr);
+    try {
+      await changeOrderStatus({
+        orderId: order.id,
+        orderNumber: order.order_number,
+        customerName,
+        fromStatus: status,
+        toStatus: intent.to,
+        comment: comment || undefined,
+        userId: user?.id ?? null,
+        isCancel: intent.to === "cancelled",
+      });
+    } catch (err) {
+      console.error("[OrderDetail] performStatusChange", err);
       toast.error("Kunne ikke lagre. Prøv igjen — kontakt support hvis det gjentar seg.");
-      throw updErr;
-    }
-    if ((updRows ?? []).length === 0) {
-      toast.error("Ordren er endret av noen andre — laster på nytt");
-      await Promise.all([
-        qc.invalidateQueries({ queryKey: ["order", order.id] }),
-        qc.invalidateQueries({ queryKey: ["order-lines", order.id] }),
-        qc.invalidateQueries({ queryKey: ["order-events", order.id] }),
-      ]);
-      throw new Error("order_conflict");
-    }
-
-
-    if (comment) {
-      const { data: latest } = await supabase
-        .from("order_status_history")
-        .select("id")
-        .eq("order_id", order.id)
-        .order("changed_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (latest?.id) {
-        await supabase
-          .from("order_status_history")
-          .update({ notes: comment })
-          .eq("id", latest.id);
-      }
-    }
-
-    await logAudit({
-      action: "status_changed",
-      entity_type: "order",
-      entity_id: order.id,
-      entity_display_reference: `${order.order_number} — ${customerName}`,
-      legal_entity_id: NB_LEGAL_ENTITY_ID,
-      changes: { from: order.status, to: intent.to, comment: comment || null },
-    });
-
-    if (intent.to === "packed" || intent.to === "delivered" || intent.to === "invoiced") {
-      console.info(`[ordre] TODO: trigger downstream app for status=${intent.to}`);
+      throw err;
     }
 
     toast.success(`Status endret til ${getStatusMeta(intent.to).label}`);
@@ -272,9 +207,35 @@ export default function OrderDetail() {
       qc.invalidateQueries({ queryKey: ["order", order.id] }),
       qc.invalidateQueries({ queryKey: ["order-events", order.id] }),
       qc.invalidateQueries({ queryKey: ["orders"] }),
+      qc.invalidateQueries({ queryKey: ["orders-lifecycle"] }),
       qc.invalidateQueries({ queryKey: ["order-status-counts"] }),
     ]);
   }
+
+  async function handleCreateDeliveryNote() {
+    if (!order) return;
+    // Samme logikk som matrisens «Lag pakkseddel»: tilleggskjøring når
+    // hovedkjøringen allerede dekker turen for denne datoen.
+    const covered = mainRuns.some(
+      (r) =>
+        !r.tour_filter ||
+        r.tour_filter.length === 0 ||
+        (order.delivery_tour_id ? r.tour_filter.includes(order.delivery_tour_id) : false),
+    );
+    try {
+      const res = await generateNotes.mutateAsync({
+        date: order.delivery_date,
+        tourFilter: order.delivery_tour_id ? [order.delivery_tour_id] : null,
+        runType: covered ? "additional" : "main",
+      });
+      toast.success(`Pakkseddel kjørt — ${res.notes_generated} pakksedler`);
+      await qc.invalidateQueries({ queryKey: ["orders-lifecycle"] });
+    } catch (err) {
+      console.error("[OrderDetail] handleCreateDeliveryNote", err);
+      toast.error("Kunne ikke lage pakkseddel");
+    }
+  }
+
 
   async function performDelete() {
     if (!order) return;
