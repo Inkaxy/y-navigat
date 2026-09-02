@@ -289,9 +289,20 @@ export default function OrderDetail() {
             <span className="font-mono text-title font-semibold tracking-tight">
               {order.order_number}
             </span>
-            <StatusBadge status={status} size="md" />
+            <OrderKindBadge kind={orderKind} size="md" />
+            {lc?.delivery_note_id ? (
+              <Link to={`/ordre/pakksedler?note=${lc.delivery_note_id}`}>
+                <LifecycleBadge
+                  lifecycle={lifecycle}
+                  deliveryNoteNumber={lc.delivery_note_number}
+                  size="md"
+                />
+              </Link>
+            ) : (
+              <LifecycleBadge lifecycle={lifecycle} size="md" />
+            )}
             <span className="text-caption text-muted-foreground">
-              {formatNOK(order.total_incl_vat)} · {lines.length} linjer
+              {getSourceLabel(order.source)} · {formatNOK(order.total_incl_vat)} · {lines.length} linjer
             </span>
             {order.source === "ticket" && order.source_reference && (
               <Link to={`/ordre/ticket/${order.source_reference}`} className="text-caption text-primary underline-offset-2 hover:underline">
@@ -301,62 +312,46 @@ export default function OrderDetail() {
           </div>
 
           <div className="ml-auto flex flex-wrap items-center gap-2">
-            {releaseAction && (
-              <Button size="sm" onClick={() => openStatusChange(releaseAction.intent)}>
-                {releaseAction.label}
-              </Button>
-            )}
-            {primaryAction && (
+            {approveAction && (
               <Button
                 size="sm"
-                variant={primaryAction.variant ?? "default"}
+                onClick={() =>
+                  openStatusChange({ to: "confirmed", label: approveAction.label })
+                }
+              >
+                {approveAction.label}
+              </Button>
+            )}
+            {rejectAction && (
+              <Button
+                size="sm"
+                variant="destructive"
                 onClick={() =>
                   openStatusChange({
-                    to: primaryAction.to,
-                    label: primaryAction.label,
-                    requireComment: primaryAction.requireComment,
-                    commentLabel: primaryAction.commentLabel,
-                    storesPreviousStatus: primaryAction.storesPreviousStatus,
+                    to: "cancelled",
+                    label: rejectAction.label,
+                    requireComment: true,
+                    commentLabel: rejectAction.commentLabel,
+                    confirmVariant: "destructive",
                   })
                 }
               >
-                {primaryAction.label}
+                {rejectAction.label}
               </Button>
             )}
-            {secondaryActions.length > 0 && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm">
-                    Flere handlinger
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  {secondaryActions.map((a) => (
-                    <DropdownMenuItem
-                      key={a.label}
-                      onClick={() =>
-                        openStatusChange({
-                          to: a.to,
-                          label: a.label,
-                          requireComment: a.requireComment,
-                          commentLabel: a.commentLabel,
-                          storesPreviousStatus: a.storesPreviousStatus,
-                          confirmVariant:
-                            a.variant === "destructive" ? "destructive" : "default",
-                        })
-                      }
-                      className={
-                        a.variant === "destructive" ? "text-destructive" : undefined
-                      }
-                    >
-                      {a.label}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
+            {canCreateDeliveryNote && isWriter && (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={generateNotes.isPending}
+                onClick={handleCreateDeliveryNote}
+              >
+                {generateNotes.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Lag pakkseddel
+              </Button>
             )}
 
-            {/* Overflow-meny: avbryt, slett, manuell overstyring, historikk */}
+            {/* Overflow-meny: avbryt, slett, historikk */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -382,52 +377,29 @@ export default function OrderDetail() {
                     Slett ordre
                   </DropdownMenuItem>
                 )}
-                {isAdmin && (
-                  <>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuLabel className="text-caption text-muted-foreground">
-                      Manuell overstyring
-                    </DropdownMenuLabel>
-                    {(
-                      [
-                        "draft",
-                        "awaiting_confirmation",
-                        "confirmed",
-                        "in_production",
-                        "packed",
-                        "delivered",
-                      ] as OrderStatus[]
-                    )
-                      .filter((s) => s !== status)
-                      .map((s) => (
-                        <DropdownMenuItem
-                          key={s}
-                          onClick={() =>
-                            openStatusChange({
-                              to: s,
-                              label: `Sett til ${getStatusMeta(s).label}`,
-                              requireComment: true,
-                              commentLabel: "Hvorfor brukes manuell overstyring?",
-                            })
-                          }
-                        >
-                          → {getStatusMeta(s).label}
-                        </DropdownMenuItem>
-                      ))}
-                  </>
-                )}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
         </div>
 
-        {/* Statusflyt-bar — alltid synlig under action-baren */}
-        <div className="border-t border-border bg-muted/20">
-          <div className="container mx-auto px-page py-2">
-            <StatusFlowBar current={status} events={events} userNames={userNames} source={order.source} />
+        {/* Info-striper — livssyklus og godkjenningsgrunn */}
+        {lifecycle === "delivery_note" && (
+          <div className="border-t border-warning/40 bg-warning/10">
+            <div className="container mx-auto px-page py-2 text-caption">
+              Pakkseddel {lc?.delivery_note_number ?? ""} er kjørt. Endringer lagres som korreksjon.
+            </div>
           </div>
-        </div>
+        )}
+        {status === "awaiting_confirmation" && (
+          <div className="border-t border-warning/40 bg-warning/10">
+            <div className="container mx-auto px-page py-2 text-caption">
+              Venter godkjenning fordi den kom fra {approvalReasonText(order.approval_reason)}. Alle
+              andre ordre blir ordre direkte.
+            </div>
+          </div>
+        )}
       </div>
+
 
       <div className="container mx-auto space-y-4 px-page py-4">
         {/* Realtime-banner */}
