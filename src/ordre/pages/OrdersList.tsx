@@ -208,7 +208,7 @@ export default function OrdersList() {
         requireComment: true,
         commentLabel: "Hvorfor avvises bestillingen?",
         confirmVariant: "destructive",
-        specialEffect: "cancel",
+        },
       },
     });
   }
