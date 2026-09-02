@@ -231,22 +231,30 @@ export function ProductWeekEditor({
                             )}
                           >
                             {available ? (
-                              <Input
-                                type="text"
-                                inputMode="decimal"
-                                disabled={!canEdit}
-                                value={local[`${d}|${t.id}`] ?? ""}
-                                placeholder={ghostFor(d, t.id) ? String(ghostFor(d, t.id)) : ""}
-                                onChange={(e) => setCell(d, t.id, e.target.value)}
-                                onFocus={(e) => e.currentTarget.select()}
-                                className={cn(
-                                  "h-8 w-full rounded-none border-0 bg-transparent px-2 text-right tabular-nums shadow-none focus-visible:ring-1",
-                                  !local[`${d}|${t.id}`] &&
-                                    ghostFor(d, t.id) &&
-                                    "placeholder:text-muted-foreground/60",
-                                )}
-                              />
+                              (() => {
+                                const cur = local[`${d}|${t.id}`] ?? "";
+                                const ghost = ghostFor(d, t.id);
+                                // Fastordre er ordren: vis spøkelsestallet som verdi.
+                                const fromFixed = cur === "" && ghost > 0;
+                                return (
+                                  <Input
+                                    type="text"
+                                    inputMode="decimal"
+                                    disabled={!canEdit}
+                                    value={fromFixed ? String(ghost) : cur}
+                                    data-from-fixed={fromFixed ? "true" : undefined}
+                                    title={fromFixed ? `Fra fastordre: ${ghost}` : undefined}
+                                    onChange={(e) => setCell(d, t.id, e.target.value)}
+                                    onFocus={(e) => e.currentTarget.select()}
+                                    className={cn(
+                                      "h-8 w-full rounded-none border-0 bg-transparent px-2 text-right tabular-nums shadow-none focus-visible:ring-1",
+                                      fromFixed && "italic text-muted-foreground",
+                                    )}
+                                  />
+                                );
+                              })()
                             ) : (
+
                               <div className="h-8" />
                             )}
                           </td>
