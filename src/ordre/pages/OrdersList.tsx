@@ -225,7 +225,7 @@ export default function OrdersList() {
         toStatus: intent.to,
         comment: comment || undefined,
         userId: user?.id ?? null,
-        isCancel: intent.specialEffect === "cancel",
+        isCancel: intent.to === "cancelled",
       });
       toast.success(
         intent.to === "confirmed"
