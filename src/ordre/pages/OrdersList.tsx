@@ -350,7 +350,68 @@ export default function OrdersList() {
               />
             </div>
 
+            {/* Livssyklus-filter */}
+            <select
+              value={lifecycleFilter}
+              onChange={(e) => {
+                setPage(0);
+                setLifecycleFilter(e.target.value as OrderLifecycle | "all");
+              }}
+              className="h-8 rounded-md border border-input bg-background px-2 text-caption"
+              aria-label="Livssyklus"
+            >
+              <option value="all">Livssyklus: alle</option>
+              {ORDER_LIFECYCLES.map((l) => (
+                <option key={l.value} value={l.value}>
+                  {l.label}
+                </option>
+              ))}
+            </select>
+
+            {/* Type-filter (order_kind, server-side) */}
             <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8 gap-1.5 text-caption">
+                  Type
+                  <Badge variant="secondary" className="h-4 px-1 font-mono text-[10px]">
+                    {kinds.length === 0 ? "alle" : kinds.length}
+                  </Badge>
+                  <ChevronDown className="h-3 w-3 opacity-60" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="w-56 p-2">
+                <div className="space-y-0.5">
+                  {ORDER_KINDS.filter((k) =>
+                    ["dated", "fixed", "extra", "return"].includes(k.value),
+                  ).map((k) => (
+                    <label
+                      key={k.value}
+                      className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-body hover:bg-accent"
+                    >
+                      <Checkbox
+                        checked={kinds.includes(k.value)}
+                        onCheckedChange={() => {
+                          setPage(0);
+                          setKinds((prev) =>
+                            prev.includes(k.value)
+                              ? prev.filter((x) => x !== k.value)
+                              : [...prev, k.value],
+                          );
+                        }}
+                      />
+                      <span
+                        className="h-2 w-2 rounded-full"
+                        style={{ backgroundColor: `hsl(var(${k.tokenVar}))` }}
+                      />
+                      <span className="flex-1">{k.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
+
+            <Popover>
+
               <PopoverTrigger asChild>
                 <Button variant="outline" size="sm" className="h-8 gap-1.5 text-caption">
                   Status
