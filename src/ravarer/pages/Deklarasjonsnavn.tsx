@@ -70,7 +70,7 @@ export default function Deklarasjonsnavn() {
     <div className="space-y-5">
       <PageHeader
         title="Deklarasjonsnavn"
-        description="Råvarer i bruk som mangler lovlig ingrediensnavn. Tyngst brukt først."
+        subtitle="Råvarer i bruk som mangler lovlig ingrediensnavn. Tyngst brukt først."
       />
 
       <Card className="p-5">
