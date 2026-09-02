@@ -879,7 +879,12 @@ export default function OrdersList() {
                         >
                           {r.order_number}
                         </span>
-                        <StatusBadge status={r.status} />
+                        <OrderKindBadge kind={r.order_kind} />
+                        <LifecycleBadge
+                          lifecycle={lifecycleOf(r)}
+                          deliveryNoteNumber={lifecycleMap.get(r.id)?.delivery_note_number}
+                        />
+
                         <OrderRuleFlagsIndicator flags={r.rule_flags} overrideReason={r.rule_override_reason} />
                       </div>
                       <div className="mt-1 truncate text-base font-medium text-foreground">
