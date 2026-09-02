@@ -390,8 +390,14 @@ export function GrainSection({
                   size="sm"
                   disabled={!canWrite}
                   onClick={() => {
-                    if (manualInput.trim() === "") setManualInput(fmtNum(REPRESENTATIVE_PCT[l.key], 1));
-                    else setManualInput(fmtNum(REPRESENTATIVE_PCT[l.key], 1));
+                    const mid = fmtNum(REPRESENTATIVE_PCT[l.key], 1);
+                    if (manualInput.trim() === "") {
+                      setManualInput(mid);
+                      return;
+                    }
+                    if (manualCategory === l.key) return;
+                    setManualInput(mid);
+                    toast.info(`Verdi endret til ${fmtPct(REPRESENTATIVE_PCT[l.key])} (${l.label})`);
                   }}
                 >
                   {l.label}
