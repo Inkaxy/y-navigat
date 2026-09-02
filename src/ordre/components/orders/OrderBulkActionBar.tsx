@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { AlertTriangle, ChevronDown, Download, Loader2, Trash2, X } from "lucide-react";
+import { AlertTriangle, Ban, Download, Loader2, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -13,16 +13,8 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { supabase } from "@/integrations/supabase/client";
-import { ORDER_STATUSES, type OrderStatus } from "@/ordre/lib/orderStatus";
+import { changeOrderStatus } from "@/ordre/lib/changeOrderStatus";
 import { logAudit } from "@/ordre/lib/audit";
 import type { OrderListRow } from "@/ordre/hooks/useOrders";
 import { osloTodayISO } from "@/lib/osloDate";
