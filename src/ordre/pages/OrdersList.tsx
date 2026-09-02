@@ -74,6 +74,9 @@ export default function OrdersList() {
     initialStatus ? [initialStatus] : DEFAULT_STATUSES,
   );
   const [source, setSource] = useState<string>("all");
+  const [kinds, setKinds] = useState<OrderKind[]>([]);
+  const [lifecycleFilter, setLifecycleFilter] = useState<OrderLifecycle | "all">("all");
+
   const [deliveryFrom, setDeliveryFrom] = useState<string>(initialFrom);
   const [deliveryTo, setDeliveryTo] = useState<string>(initialTo);
   const [tourIds, setTourIds] = useState<string[]>([]);
