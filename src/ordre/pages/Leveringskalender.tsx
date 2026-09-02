@@ -1973,6 +1973,9 @@ function MatrixGrid({
   onColPackingNote: (date: string, tour: MatrixTour) => void;
   colHasData: (date: string, tourId: string) => boolean;
   colMeta: (date: string, tourId: string) => { order_kind?: string; lifecycle?: string; delivery_note_number?: string | null } | undefined;
+  colTone: (date: string, tourId: string) => ColumnTone;
+  isGhostCell: (key: CellKey) => boolean;
+
   canEdit: boolean;
   onOpenTourOrder: (date: string, tour: MatrixTour) => void;
   onOpenWeekEditor: (product: MatrixProduct) => void;
