@@ -12,6 +12,7 @@ import {
   type MissingNutritionRow,
 } from "@/varer/hooks/useMissingNutrition";
 import { ManualNutritionDialog } from "./ManualNutritionDialog";
+import { MissingDeclarationNames, type MissingDeclarationNameRow } from "./MissingDeclarationNames";
 
 export interface MissingData {
   nutrition?: MissingNutritionRow[];
@@ -19,6 +20,7 @@ export interface MissingData {
   unclassified_grain_names?: string[];
   composite_unreviewed?: Array<{ name?: string } | string>;
   composite_text_only?: Array<{ name?: string } | string>;
+  declaration_names?: MissingDeclarationNameRow[];
   lines_without_raw_material?: number;
 }
 
