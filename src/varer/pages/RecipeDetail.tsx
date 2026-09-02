@@ -326,7 +326,9 @@ export default function RecipeDetail() {
   const { generating, printProductionSheet, printRecipeCard } = useRecipePDF();
   const [cardDialogOpen, setCardDialogOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState("oppskrift");
+  const [activeTab, setActiveTab] = useState(
+    searchParams.get("tab") === "merking" ? "merking" : "oppskrift",
+  );
 
   const buildPdfInput = useCallback(
     (includeCosts: boolean): BuildRecipePDFInput => ({
@@ -987,7 +989,7 @@ export default function RecipeDetail() {
                   <Input type="number" value={header.finished_weight_grams ?? ""} disabled={!editable}
                     onChange={(e) => patchHeader({ finished_weight_grams: e.target.value })} />
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Vekten etter steking. Brukes til deklarasjon og grovhet, ikke til kostprisen.
+                    Vekt per stk etter steking — ganges med antall for deklarasjon og grovhet. Brukes ikke til kostprisen.
                   </p>
                 </div>
               </div>

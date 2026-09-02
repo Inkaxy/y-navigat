@@ -63,12 +63,41 @@ const MAX_SUB_DEPTH = 4;
 const LINE_SELECT =
   "id, raw_material_id, sub_product_id, ingredient_name, quantity, unit, waste_percent, include_in_declaration, is_quid_relevant, custom_declaration_text, water_content_pct_override, sort_order, raw_materials(id, name, unit_weight_grams, is_composite, grain_classification, cereal_type, water_content_pct, components_reviewed_at)";
 
-/** Ferdigvekt for en oppskrift: yield_grams, ellers innveid minus stektap. */
-function finalWeightOf(recipe: any, inputGrams: number): number {
+/**
+ * Ferdigvekt for en oppskrift, i prioritert rekkefølge:
+ * 1) `yield_grams` (total ferdigvekt), 2) `finished_weight_grams` × `yield_quantity`
+ * når utbyttet er i stk, 3) innveid vekt minus stektap.
+ * Returnerer også hvilken kilde som ble brukt, til warnings.
+ */
+function resolveFinalWeight(
+  recipe: any,
+  inputGrams: number,
+): { grams: number; source: string | null } {
   const y = recipe?.yield_grams != null ? Number(recipe.yield_grams) : null;
+  if (y != null && y > 0) return { grams: y, source: `Ferdigvekt: ${y} g fra feltet «Utbytte (g)»` };
+
+  const per = recipe?.finished_weight_grams != null ? Number(recipe.finished_weight_grams) : null;
+  const qty = recipe?.yield_quantity != null ? Number(recipe.yield_quantity) : null;
+  const unit = String(recipe?.yield_unit ?? "").toLowerCase();
+  if (per != null && per > 0 && qty != null && qty > 0 && (unit === "stk" || unit === "")) {
+    return {
+      grams: per * qty,
+      source: `Ferdigvekt: ${qty} stk × ${per} g fra Oppskrift-fanen`,
+    };
+  }
+
   const loss = Number(recipe?.yield_loss_pct) || 0;
-  return (y ?? inputGrams * (1 - loss / 100)) || 0;
+  return {
+    grams: inputGrams * (1 - loss / 100) || 0,
+    source: null,
+  };
 }
+
+/** Ferdigvekt for en oppskrift (kun tallet) — brukes for halvfabrikater. */
+function finalWeightOf(recipe: any, inputGrams: number): number {
+  return resolveFinalWeight(recipe, inputGrams).grams;
+}
+
 
 /**
  * Leser oppskriftslinjer og erstatter halvfabrikat-linjer (`sub_product_id`)
@@ -142,7 +171,7 @@ async function expandRecipeLines(
 
     const { data: subRecipe } = await service
       .from("recipes")
-      .select("id, name, yield_grams, yield_loss_pct")
+      .select("id, name, yield_grams, yield_loss_pct, finished_weight_grams, yield_quantity, yield_unit")
       .eq("id", subRecipeId)
       .maybeSingle();
 
@@ -208,7 +237,7 @@ Deno.serve(async (req) => {
 
     const { data: recipe } = await service
       .from("recipes")
-      .select("id, name, yield_grams, yield_loss_pct")
+      .select("id, name, yield_grams, yield_loss_pct, finished_weight_grams, yield_quantity, yield_unit")
       .eq("id", recipeId)
       .maybeSingle();
     if (!recipe) return json({ error: "Recipe not found" }, 404);
@@ -226,12 +255,13 @@ Deno.serve(async (req) => {
     const core = await computeDeclarationCore(service, topLines);
     const warnings: string[] = [...expandWarnings];
 
-    // 2) Vekter — ferdigvekt fra yield_grams, ellers innveid minus stektap
+    // 2) Vekter — yield_grams, ellers stk × ferdigvekt per stk, ellers innveid minus stektap
     const totalInputGrams = core.totalInputGrams;
-    const yieldGrams = recipe.yield_grams != null ? Number(recipe.yield_grams) : null;
-    const yieldLoss = Number(recipe.yield_loss_pct) || 0;
-    const finalWeight = (yieldGrams ?? totalInputGrams * (1 - yieldLoss / 100)) || 1;
-    if (yieldGrams == null) warnings.push("Ferdigvekt mangler — beregnet fra innveid vekt minus stektap");
+    const resolved = resolveFinalWeight(recipe, totalInputGrams);
+    const finalWeight = resolved.grams || 1;
+    if (resolved.source) warnings.push(resolved.source);
+    else warnings.push("Ferdigvekt mangler — beregnet fra innveid vekt minus stektap");
+
 
     // 3) Tørrstoff
     let dryMatterGrams = 0;

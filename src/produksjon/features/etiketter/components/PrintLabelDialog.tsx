@@ -8,7 +8,6 @@ import {
   type CombinedLabelItem,
 } from "../lib/labelPdf";
 import { useLabelData } from "../hooks/useLabelData";
-import { grainLevelLabel } from "@/varer/lib/breadscale";
 import { useLabelFieldCatalog } from "@/produksjon/features/utskriftsprofiler/hooks/useLabelFieldCatalog";
 import { useOrderLineCustomerInfo } from "../hooks/useOrderLineCustomerInfo";
 import {
@@ -153,19 +152,6 @@ export function PrintLabelDialog({
   }, [labelDataMap, selectedUnits, orderLineIds, printedFields, row?.display_name]);
 
   const blockedByMissing = missingReport.critical.size > 0;
-
-  /** Manuelt satt brødskala som ikke stemmer med beregnet grovhet. */
-  const grainMismatch = useMemo(() => {
-    if (!printedFields.has("brodskala")) return null;
-    for (const id of orderLineIds) {
-      const d = labelDataMap?.[id];
-      if (!d?.beregnetGrovhet || !d.manuellGrovhet) continue;
-      if (d.beregnetGrovhet !== d.manuellGrovhet) {
-        return { beregnet: d.beregnetGrovhet, manuell: d.manuellGrovhet };
-      }
-    }
-    return null;
-  }, [labelDataMap, orderLineIds, printedFields]);
 
   const describeMissing = (m: Map<string, Set<string>>) =>
     [...m.entries()].map(([key, who]) => ({
@@ -393,19 +379,6 @@ export function PrintLabelDialog({
             <p className="ml-6 text-xs">
               Etiketten kan ikke skrives ut før dataene er på plass. Fyll ut
               deklarasjonen på varen og prøv igjen.
-            </p>
-          </div>
-        )}
-
-        {grainMismatch && (
-          <div className="space-y-1 rounded-md border border-amber-500/50 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-400">
-            <div className="flex items-center gap-2 font-semibold">
-              <AlertCircle className="h-4 w-4 shrink-0" />
-              Brødskala'n avviker fra beregningen
-            </div>
-            <p className="ml-6 text-xs">
-              Manuelt satt brødskala ({grainLevelLabel(grainMismatch.manuell)}) stemmer ikke med beregnet
-              grovhet ({grainLevelLabel(grainMismatch.beregnet)}) — merket trykkes etter beregningen.
             </p>
           </div>
         )}

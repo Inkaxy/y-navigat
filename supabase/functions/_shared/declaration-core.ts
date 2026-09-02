@@ -389,8 +389,10 @@ export async function computeDeclarationCore(service: any, topLines: TopLine[]):
     }
     if (includeQuid && a.is_quid) {
       const pct = Math.round((a.effective_grams / totalInputGrams) * 1000) / 10;
-      display += ` ${pct}%`;
+      // QUID vises i parentes med norsk desimalkomma: «(12,5 %)».
+      display += ` (${String(pct).replace(".", ",")} %)`;
     }
+
     return display;
   }
 
