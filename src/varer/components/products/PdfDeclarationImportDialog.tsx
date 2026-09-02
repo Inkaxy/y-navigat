@@ -147,6 +147,9 @@ export function PdfDeclarationImportDialog({ open, onOpenChange, productId, prod
         .eq("id", productRecipeLinkId);
       if (error) throw error;
 
+      // Oppdater produkt-snapshotet med én gang.
+      await syncEffectiveDeclaration(productRecipeLinkId);
+
       await logAudit({
         action: "ai_declaration_imported",
         entity_type: "product_recipe_link",
