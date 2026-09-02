@@ -275,11 +275,16 @@ export async function computeDeclarationCore(service: any, topLines: TopLine[]):
       const may = rmId ? (allergensByRm.get(rmId) ?? []).filter((a) => a.presence === "may_contain").map((a) => a.allergen) : [];
       const key = rmId ? `rm:${rmId}` : `text:${normName(fallbackName)}`;
       const w = waterFor(rm, depth === 0 ? waterOverride : null);
+      const declName = declarationNameFor(rm, fallbackName);
+      const hasDeclName = typeof rm?.declaration_name === "string" && rm.declaration_name.trim() !== "";
+      if (rmId && rm && !hasDeclName && !missingDeclMap.has(rmId)) {
+        missingDeclMap.set(rmId, { raw_material_id: rmId, name: rm.name ?? fallbackName, fallback_used: declName });
+      }
       return [{
         source,
         key,
         raw_material_id: rmId,
-        name: declarationNameFor(rm, fallbackName),
+        name: declName,
         grams,
         effective_grams,
         is_quid: isQuid,
