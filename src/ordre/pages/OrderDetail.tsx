@@ -463,11 +463,12 @@ export default function OrderDetail() {
           </TabsContent>
         </Tabs>
 
-        {actions.length === 0 && !releaseAction && (
+        {actions.length === 0 && (
           <Card className="p-3 text-center text-caption italic text-muted-foreground">
             Ingen videre statushandlinger fra «{getStatusMeta(status).label}».
           </Card>
         )}
+
       </div>
 
       {/* Historikk i side-sheet */}
