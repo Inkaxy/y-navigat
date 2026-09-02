@@ -107,6 +107,16 @@ export default function OrderDetail() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
 
+  // Utledet livssyklus (orders_lifecycle) + pakkseddel-kjøring
+  const { map: lifecycleMap } = useOrdersLifecycle([id]);
+  const lc = id ? lifecycleMap.get(id) : undefined;
+  const generateNotes = useGenerateDeliveryNotes();
+  const { data: mainRuns = [] } = useCompletedMainRuns(
+    NB_LEGAL_ENTITY_ID,
+    order?.delivery_date ?? "",
+  );
+
+
   if (isLoading) {
     return (
       <>
