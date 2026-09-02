@@ -34,13 +34,20 @@ import { OrderRuleFlagsIndicator } from "@/ordre/components/orders/OrderRuleFlag
 import { useDebouncedValue } from "@/ordre/hooks/useDebouncedValue";
 import {
   DEFAULT_EXCLUDED_STATUSES,
+  ORDER_KINDS,
+  ORDER_LIFECYCLES,
   ORDER_STATUSES,
   SOURCE_LABELS,
   getSourceLabel,
   getStatusMeta,
+  type OrderKind,
+  type OrderLifecycle,
   type OrderStatus,
 } from "@/ordre/lib/orderStatus";
-import { StatusBadge } from "@/ordre/components/orders/StatusBadge";
+import { OrderKindBadge } from "@/ordre/components/orders/OrderKindBadge";
+import { LifecycleBadge } from "@/ordre/components/orders/LifecycleBadge";
+import { useOrdersLifecycle } from "@/ordre/hooks/useOrdersLifecycle";
+
 import { formatDate, formatNOK } from "@/ordre/lib/format";
 import {
   Popover,
