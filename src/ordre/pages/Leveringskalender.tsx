@@ -2332,7 +2332,31 @@ function MatrixGrid({
   );
 }
 
+/** "2026-09-02" → "02.09" */
+function formatShortDate(iso: string): string {
+  return new Intl.DateTimeFormat("nb-NO", { day: "2-digit", month: "2-digit" }).format(
+    new Date(iso + "T12:00:00"),
+  );
+}
+
+/** Fargeprøve for kolonnefarge basert på ordretype-token. */
+function KindSwatch({ tokenVar, label }: { tokenVar: string; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span
+        className="inline-block h-3 w-3 rounded-sm"
+        style={{
+          backgroundColor: `hsl(var(${tokenVar}) / 0.14)`,
+          boxShadow: `inset 0 0 0 1px hsl(var(${tokenVar}) / 0.55)`,
+        }}
+      />
+      <span>{label}</span>
+    </span>
+  );
+}
+
 function LegendSwatch({ className, label }: { className: string; label: string }) {
+
   return (
     <span className="inline-flex items-center gap-1.5">
       <span className={cn("inline-block h-3 w-3 rounded-sm border", className)} />
