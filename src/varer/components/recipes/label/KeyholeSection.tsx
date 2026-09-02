@@ -42,12 +42,31 @@ interface Props {
   primaryProductCount: number;
 }
 
-/** Matcher råd til kriterium på nøkkel — faller tilbake til navneprefiks. */
+/** Rådstekstene starter med et fast ord per kriterium — kobles eksplisitt her. */
+const ADVICE_PREFIX: Record<string, string[]> = {
+  whole_grain: ["fullkornandelen", "fullkorn"],
+  rye_share: ["rugandelen", "rug"],
+  salt: ["saltet", "salt"],
+  fiber: ["fiber", "kostfiber"],
+  fat: ["fettet", "fett"],
+  saturated_fat: ["mettet", "mettede"],
+  sugars: ["sukkeret", "sukker"],
+  sugar: ["sukkeret", "sukker"],
+  protein: ["proteinet", "protein"],
+};
+
+/** Matcher råd til kriterium via eksplisitt prefiks-map — faller tilbake til navn/nøkkel. */
 function adviceFor(c: KeyholeCriterion, advice: string[]): string | null {
   if (c.advice) return c.advice;
-  const byKey = advice.find((a) => a.toLowerCase().includes(c.key.toLowerCase()));
-  if (byKey) return byKey;
-  return advice.find((a) => a.toLowerCase().startsWith(c.name.toLowerCase())) ?? null;
+  const lower = advice.map((a) => ({ a, l: a.toLowerCase().trim() }));
+  for (const p of ADVICE_PREFIX[c.key] ?? []) {
+    const hit = lower.find((x) => x.l.startsWith(p));
+    if (hit) return hit.a;
+  }
+  const byKey = lower.find((x) => x.l.includes(c.key.toLowerCase()));
+  if (byKey) return byKey.a;
+  const firstWord = c.name.toLowerCase().split(/[\s(]/)[0];
+  return lower.find((x) => firstWord.length > 2 && x.l.startsWith(firstWord))?.a ?? null;
 }
 
 /** Nøkkelhullet som sjekkliste med konkrete råd, og låsbar merkebryter. */

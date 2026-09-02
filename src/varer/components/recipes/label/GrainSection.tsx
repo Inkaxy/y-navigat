@@ -145,7 +145,8 @@ export function GrainSection({
 
   const manualParsed = parsePct(manualInput);
   const manualCategory = manualParsed != null ? grainCategoryFromPct(manualParsed) : null;
-  const manualDirty = (manualParsed ?? null) !== (manualPct ?? null);
+  const round1 = (n: number | null | undefined) => (n == null || !Number.isFinite(Number(n)) ? null : Math.round(Number(n) * 10) / 10);
+  const manualDirty = round1(manualParsed) !== round1(manualPct);
 
   const siftedLines = useMemo(
     () => flourLines.filter((l) => l.classification && SIFTED_CLASSIFICATIONS.includes(l.classification) && l.grams > 0),
@@ -390,8 +391,14 @@ export function GrainSection({
                   size="sm"
                   disabled={!canWrite}
                   onClick={() => {
-                    if (manualInput.trim() === "") setManualInput(fmtNum(REPRESENTATIVE_PCT[l.key], 1));
-                    else setManualInput(fmtNum(REPRESENTATIVE_PCT[l.key], 1));
+                    const mid = fmtNum(REPRESENTATIVE_PCT[l.key], 1);
+                    if (manualInput.trim() === "") {
+                      setManualInput(mid);
+                      return;
+                    }
+                    if (manualCategory === l.key) return;
+                    setManualInput(mid);
+                    toast.info(`Verdi endret til ${fmtPct(REPRESENTATIVE_PCT[l.key])} (${l.label})`);
                   }}
                 >
                   {l.label}
