@@ -60,12 +60,15 @@ export function useMatvaretabellenLinks() {
     queryKey: ["matvaretabellen_links", legalEntityId],
     enabled: !!legalEntityId,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("raw_material_nutrition")
-        .select("raw_material_id, matvaretabellen_food_id, raw_material:raw_materials!inner(name, legal_entity_id)")
-        .not("matvaretabellen_food_id", "is", null)
-        .eq("raw_materials.legal_entity_id", legalEntityId);
-      if (error) throw error;
+      const data = await fetchAllRows<any>((from, to) =>
+        supabase
+          .from("raw_material_nutrition")
+          .select("raw_material_id, matvaretabellen_food_id, raw_material:raw_materials!inner(name, legal_entity_id)")
+          .not("matvaretabellen_food_id", "is", null)
+          .eq("raw_material.legal_entity_id", legalEntityId)
+          .range(from, to),
+      );
+
 
       const map = new Map<string, FoodLink[]>();
       for (const row of (data ?? []) as any[]) {
