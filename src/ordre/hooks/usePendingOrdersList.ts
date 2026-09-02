@@ -84,9 +84,9 @@ export function usePendingOrdersList(
       if (tourId === NULL_TOUR_KEY) q = q.is("delivery_tour_id", null);
       else if (tourId !== "all") q = q.eq("delivery_tour_id", tourId);
 
-      if (effectiveType === "fast") q = q.eq("is_customer_order", false).eq("is_return", false);
-      else if (effectiveType === "datert") q = q.eq("is_customer_order", true).eq("is_return", false);
-      else q = q.eq("is_return", true);
+      if (effectiveType === "fast") q = q.eq("order_kind", "fixed");
+      else if (effectiveType === "datert") q = q.in("order_kind", ["dated", "extra"]).eq("is_return", false);
+      else q = q.eq("order_kind", "return");
 
       const { data, error } = await q.order("delivery_date", { ascending: true }).order("order_number", { ascending: true });
       if (error) throw error;

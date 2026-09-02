@@ -8,6 +8,7 @@ import { fetchPendingRecurringOrderCounts } from "@/ordre/hooks/usePendingRecurr
 export type DeliveryNoteCounts = {
   fastordre: number;
   datert: number;
+  ekstra: number;
   retur: number;
   pakksedler: number;
 };
@@ -78,12 +79,13 @@ export function useDeliveryNoteCounts(
         return q;
       };
 
-      const [fastRes, datertRes, returRes, pendingRecurring] = await Promise.all([
+      const [fastRes, datertRes, ekstraRes, returRes, pendingRecurring] = await Promise.all([
         isCorrection
           ? Promise.resolve({ count: 0, error: null as null })
-          : buildOrdersBase().eq("is_customer_order", false).eq("is_return", false),
-        buildOrdersBase().eq("is_customer_order", true).eq("is_return", false),
-        buildOrdersBase().eq("is_return", true),
+          : buildOrdersBase().eq("order_kind", "fixed"),
+        buildOrdersBase().in("order_kind", ["dated", "extra"]).eq("is_return", false),
+        buildOrdersBase().eq("order_kind", "extra"),
+        buildOrdersBase().eq("order_kind", "return"),
         isCorrection
           ? Promise.resolve({ total: 0, nullTourCount: 0, byTour: {} as Record<string, number> })
           : fetchPendingRecurringOrderCounts(date, toursQ.data ?? []),
@@ -91,6 +93,7 @@ export function useDeliveryNoteCounts(
 
       if ((fastRes as any).error) throw (fastRes as any).error;
       if (datertRes.error) throw datertRes.error;
+      if (ekstraRes.error) throw ekstraRes.error;
       if (returRes.error) throw returRes.error;
 
       const pendingFastordre = isCorrection
@@ -104,6 +107,7 @@ export function useDeliveryNoteCounts(
       return {
         fastordre: ((fastRes as any).count ?? 0) + pendingFastordre,
         datert: datertRes.count ?? 0,
+        ekstra: ekstraRes.count ?? 0,
         retur: returRes.count ?? 0,
         pakksedler: pakksedlerCount,
       };
