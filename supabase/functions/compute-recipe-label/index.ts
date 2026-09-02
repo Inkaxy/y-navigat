@@ -255,12 +255,13 @@ Deno.serve(async (req) => {
     const core = await computeDeclarationCore(service, topLines);
     const warnings: string[] = [...expandWarnings];
 
-    // 2) Vekter — ferdigvekt fra yield_grams, ellers innveid minus stektap
+    // 2) Vekter — yield_grams, ellers stk × ferdigvekt per stk, ellers innveid minus stektap
     const totalInputGrams = core.totalInputGrams;
-    const yieldGrams = recipe.yield_grams != null ? Number(recipe.yield_grams) : null;
-    const yieldLoss = Number(recipe.yield_loss_pct) || 0;
-    const finalWeight = (yieldGrams ?? totalInputGrams * (1 - yieldLoss / 100)) || 1;
-    if (yieldGrams == null) warnings.push("Ferdigvekt mangler — beregnet fra innveid vekt minus stektap");
+    const resolved = resolveFinalWeight(recipe, totalInputGrams);
+    const finalWeight = resolved.grams || 1;
+    if (resolved.source) warnings.push(resolved.source);
+    else warnings.push("Ferdigvekt mangler — beregnet fra innveid vekt minus stektap");
+
 
     // 3) Tørrstoff
     let dryMatterGrams = 0;
