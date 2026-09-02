@@ -18,6 +18,7 @@ import { changeOrderStatus } from "@/ordre/lib/changeOrderStatus";
 import { logAudit } from "@/ordre/lib/audit";
 import type { OrderListRow } from "@/ordre/hooks/useOrders";
 import { osloTodayISO } from "@/lib/osloDate";
+import { useAuth } from "@/hooks/useAuth";
 
 interface Props {
   selected: OrderListRow[];
@@ -37,6 +38,7 @@ interface Props {
  *  - "Fjern alle": deselect alle
  */
 export function OrderBulkActionBar({ selected, onClear, onMutated, csvHeaders }: Props) {
+  const { user } = useAuth();
   const [running, setRunning] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteText, setDeleteText] = useState("");
@@ -111,7 +113,7 @@ export function OrderBulkActionBar({ selected, onClear, onMutated, csvHeaders }:
             fromStatus: order.status,
             toStatus: "cancelled",
             comment: reason.trim(),
-            userId: null,
+            userId: user?.id ?? null,
             isCancel: true,
           });
           ok++;
