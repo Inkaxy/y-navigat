@@ -1,5 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -45,9 +52,13 @@ export function LinkRawMaterialDialog({ open, onOpenChange, foodId, foodName, in
   const debounced = useDebouncedValue(q, 250);
   const [pending, setPending] = useState<{ id: string; name: string; source: string } | null>(null);
   const [checkingId, setCheckingId] = useState<string | null>(null);
+  const [linkedNow, setLinkedNow] = useState<string[]>([]);
 
   useEffect(() => {
-    if (open) setQ(initialQuery ?? "");
+    if (open) {
+      setQ(initialQuery ?? "");
+      setLinkedNow([]);
+    }
   }, [open, initialQuery]);
 
   const supplierMap = useMemo(() => new Map(suppliers.map((s: any) => [s.id, s.name])), [suppliers]);
@@ -63,8 +74,9 @@ export function LinkRawMaterialDialog({ open, onOpenChange, foodId, foodName, in
   const link = async (rawMaterialId: string) => {
     try {
       await apply.mutateAsync({ rawMaterialId, foodId });
+      setLinkedNow((prev) => (prev.includes(rawMaterialId) ? prev : [...prev, rawMaterialId]));
       onLinked?.(rawMaterialId);
-      onOpenChange(false);
+      // Dialogen holdes åpen slik at flere råvarer kan kobles til samme matvare.
     } catch (e: any) {
       toast.error(e?.message ?? "Kunne ikke hente næringsverdier");
     }
@@ -98,6 +110,9 @@ export function LinkRawMaterialDialog({ open, onOpenChange, foodId, foodName, in
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Koble «{foodName}» til råvare</DialogTitle>
+            <DialogDescription>
+              Velg én eller flere råvarer — vinduet blir stående åpent til du er ferdig.
+            </DialogDescription>
           </DialogHeader>
 
           <div className="relative">
@@ -120,7 +135,7 @@ export function LinkRawMaterialDialog({ open, onOpenChange, foodId, foodName, in
               <p className="p-6 text-center text-sm text-ink-secondary">Ingen aktive råvarer matcher søket.</p>
             ) : (
               visible.map((r, i) => {
-                const isLinked = alreadyLinked.has(r.id);
+                const isLinked = alreadyLinked.has(r.id) || linkedNow.includes(r.id);
                 return (
                   <button
                     key={r.id}
@@ -158,10 +173,13 @@ export function LinkRawMaterialDialog({ open, onOpenChange, foodId, foodName, in
             )}
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Lukk
-            </Button>
+          <DialogFooter className="sm:justify-between">
+            <span className="text-sm text-ink-secondary">
+              {linkedNow.length > 0
+                ? `${linkedNow.length} råvare${linkedNow.length === 1 ? "" : "r"} koblet i denne økten`
+                : "Ingen koblinger gjort ennå"}
+            </span>
+            <Button onClick={() => onOpenChange(false)}>Ferdig</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
