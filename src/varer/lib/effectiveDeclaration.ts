@@ -205,6 +205,7 @@ async function fetchCalculated(recipeId: string): Promise<RecipeLabelSnapshot | 
  * `push_products_to_nettside` leser `products.manual_nutrition_per_100g`).
  */
 async function writeSnapshot(productId: string, eff: EffectiveDeclaration) {
+  const { data: auth } = await supabase.auth.getUser();
 
   const { error } = await supabase
     .from("products")
@@ -214,6 +215,7 @@ async function writeSnapshot(productId: string, eff: EffectiveDeclaration) {
       manual_allergens_may_contain: eff.mayContain,
       manual_nutrition_per_100g: (eff.nutrition ?? null) as never,
       manual_declaration_updated_at: new Date().toISOString(),
+      manual_declaration_updated_by: auth.user?.id ?? null,
     })
     .eq("id", productId);
   if (error) throw error;

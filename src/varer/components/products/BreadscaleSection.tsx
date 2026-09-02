@@ -190,7 +190,7 @@ export function BreadscaleSection({ productId, canWrite }: Props) {
                 <div className="text-lg font-semibold tabular-nums">{describe(calcPct)}</div>
                 {recipeId && (
                   <Link
-                    to={`/varer/oppskrifter/${recipeId}`}
+                    to={`/varer/oppskrifter/${recipeId}?tab=merking`}
                     className="inline-flex items-center gap-1 text-xs text-primary underline underline-offset-2"
                   >
                     Endre i oppskriften
@@ -203,7 +203,7 @@ export function BreadscaleSection({ productId, canWrite }: Props) {
                 <p>Ikke beregnet ennå — beregn merkedata på primæroppskriften.</p>
                 {recipeId && (
                   <Link
-                    to={`/varer/oppskrifter/${recipeId}`}
+                    to={`/varer/oppskrifter/${recipeId}?tab=merking`}
                     className="inline-flex items-center gap-1 text-primary underline underline-offset-2"
                   >
                     Endre i oppskriften{recipeName ? ` (${recipeName})` : ""}
