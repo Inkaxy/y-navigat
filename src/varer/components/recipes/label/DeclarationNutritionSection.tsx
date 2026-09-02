@@ -150,9 +150,23 @@ export function DeclarationNutritionSection({
         .eq("id", recipeId);
       if (error) throw error;
       dirtyRef.current = false;
-      return afterWrite();
+      // Normaliser skjemaet til det som faktisk ble lagret, så «Ulagrede endringer» forsvinner.
+      const normalized = {
+        ingredientText: form.ingredientText.trim(),
+        contains: form.contains.split(",").map((s) => s.trim()).filter(Boolean).join(", "),
+        mayContain: form.mayContain.split(",").map((s) => s.trim()).filter(Boolean).join(", "),
+        nutrition: Object.fromEntries(
+          NUTRITION_KEYS.map((k) => [k, nut[k] != null ? String(nut[k]) : ""]),
+        ) as Record<string, string>,
+      };
+      await afterWrite();
+      return normalized;
     },
-    onSuccess: () => toast.success("Manuell deklarasjon lagret"),
+    onSuccess: (normalized) => {
+      setForm(normalized);
+      dirtyRef.current = false;
+      toast.success("Manuell deklarasjon lagret");
+    },
     onError: (e: unknown) => showError("DeclarationNutritionSection", e),
   });
 
