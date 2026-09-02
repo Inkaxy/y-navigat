@@ -113,9 +113,18 @@ export default function OrdersList() {
       ? undefined
       : statuses;
 
+  // Livssyklus «venter godkjenning»/«avbrutt» filtreres server-side på status
+  const lifecycleStatuses: OrderStatus[] | undefined =
+    lifecycleFilter === "awaiting"
+      ? ["awaiting_confirmation"]
+      : lifecycleFilter === "cancelled"
+        ? ["cancelled"]
+        : undefined;
+
   const { data, isLoading, isFetching } = useOrderList({
     search: debouncedSearch,
-    statuses: effectiveStatuses,
+    statuses: lifecycleStatuses ?? effectiveStatuses,
+    kinds: acceptanceOnly || kinds.length === 0 ? undefined : kinds,
     source: acceptanceOnly ? "all" : source,
     deliveryFrom: acceptanceOnly ? null : deliveryFrom || null,
     deliveryTo: acceptanceOnly ? null : deliveryTo || null,
@@ -125,8 +134,22 @@ export default function OrdersList() {
   });
 
   const total = data?.total ?? 0;
-  const rows = data?.rows ?? [];
+  const allRows = data?.rows ?? [];
+  const { map: lifecycleMap } = useOrdersLifecycle(allRows.map((r) => r.id));
+  const lifecycleOf = (r: OrderListRow): OrderLifecycle =>
+    (lifecycleMap.get(r.id)?.lifecycle as OrderLifecycle | undefined) ??
+    (r.status === "cancelled"
+      ? "cancelled"
+      : r.status === "awaiting_confirmation"
+        ? "awaiting"
+        : "open");
+  // Klient-side livssyklusfilter på lastet side (jf. trinn 1)
+  const rows =
+    lifecycleFilter === "all" || lifecycleStatuses
+      ? allRows
+      : allRows.filter((r) => lifecycleOf(r) === lifecycleFilter);
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
 
   // Hold URL i synk når dato-filter endres manuelt (best for deeplink-deling)
   useEffect(() => {
