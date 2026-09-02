@@ -226,7 +226,6 @@ export default function MatrixPage() {
 
   // Toolbar visning
   const [hiddenTourIds, setHiddenTourIds] = useState<Set<string>>(new Set());
-  const [showReturns, setShowReturns] = useState<boolean>(false);
   const [customerCardOpen, setCustomerCardOpen] = useState(false);
 
   const daysCount = useMemo(() => {
@@ -1290,21 +1289,6 @@ export default function MatrixPage() {
                 <span className="text-xs text-muted-foreground">—</span>
               )}
             </div>
-          </div>
-
-          <div className="flex items-center gap-2 rounded-md border border-brand-bronze/30 bg-card/60 px-2 py-1 text-sm">
-            <span className="text-muted-foreground">vis retur</span>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="h-7 px-2 text-xs">
-                  {showReturns ? "ja" : "nei"} <ChevronDown className="ml-1 h-3 w-3" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-28">
-                <DropdownMenuItem onSelect={() => setShowReturns(false)}>nei</DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => setShowReturns(true)}>ja</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
           </div>
 
           <Button
