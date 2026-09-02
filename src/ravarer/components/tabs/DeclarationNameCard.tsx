@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,17 +14,32 @@ import { suggestDeclarationName, useSaveDeclarationName } from "@/ravarer/hooks/
 
 interface Props {
   rawMaterialId: string;
-  /** Navn fra Matvaretabellen når råvaren er koblet. */
-  matvaretabellenName?: string | null;
+  /** Koblet matvare i Matvaretabellen, om noen. */
+  foodId?: string | null;
 }
 
 /** «Navn i deklarasjon» — det lovlige ingrediensnavnet for råvaren. */
-export function DeclarationNameCard({ rawMaterialId, matvaretabellenName }: Props) {
+export function DeclarationNameCard({ rawMaterialId, foodId }: Props) {
   const { canWrite } = useRavarer();
   const { data: rm } = useRawMaterial(rawMaterialId);
   const save = useSaveDeclarationName();
   const [value, setValue] = useState("");
   const [suggesting, setSuggesting] = useState(false);
+
+  const { data: food } = useQuery({
+    queryKey: ["matvaretabellen_food_name", foodId],
+    enabled: !!foodId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("matvaretabellen_foods")
+        .select("food_name")
+        .eq("food_id", foodId!)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+  const matvaretabellenName = food?.food_name ?? null;
 
   const saved = (rm as any)?.declaration_name ?? "";
   useEffect(() => setValue(saved ?? ""), [saved, rawMaterialId]);
