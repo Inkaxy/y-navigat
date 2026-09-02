@@ -1619,8 +1619,20 @@ export default function MatrixPage() {
               onColPackingNote={(date, tour) => generatePackingNoteForColumn(date, tour)}
               colHasData={colHasAnyData}
               colMeta={colMeta}
+              colTone={colTone}
+              isGhostCell={isGhostCell}
               canEdit={canEdit}
-              onOpenTourOrder={(date, tour) => setTourOrderCol({ date, tour })}
+              onOpenTourOrder={(date, tour) => {
+                if (!colOrderId.has(`${date}|${tour.id}`)) {
+                  toast.info("Fastordre", {
+                    description:
+                      "Skriv i cellene og lagre for å lage datert ordre.",
+                  });
+                  return;
+                }
+                setTourOrderCol({ date, tour });
+              }}
+
               onOpenWeekEditor={(p) => setWeekEditorProduct(p)}
             />
             <div className="sticky left-0 flex flex-wrap items-center gap-2 border-t border-border bg-card px-4 py-3 sm:px-6">
