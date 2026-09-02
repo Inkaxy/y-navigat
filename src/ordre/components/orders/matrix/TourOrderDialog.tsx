@@ -403,6 +403,13 @@ export function TourOrderDialog({
                     </Badge>
                   ) : null}
                 </div>
+                {orderLc?.lifecycle === "delivery_note" ? (
+                  <div className="mt-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-1.5 text-caption">
+                    Pakkseddel {orderLc.delivery_note_number ?? ""} er kjørt — endringer lagres som
+                    korreksjon.
+                  </div>
+                ) : null}
+
               </div>
               <div className="flex items-center gap-2">
                 <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
