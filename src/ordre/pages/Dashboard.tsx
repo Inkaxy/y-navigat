@@ -59,7 +59,7 @@ export default function Dashboard() {
             to="/ordre/ticket?status=new"
           />
           <KpiCard
-            label="Uregulert fastordre"
+            label="Fastordre i dag (ikke kjørt)"
             value={pendingRows.length}
             sub={pendingDate === tom ? "for i morgen" : `for ${formatDateLong(pendingDate)}`}
             loading={pendingLoading}
@@ -94,7 +94,7 @@ export default function Dashboard() {
             <TicketsInbox />
           </div>
 
-          {/* Uregulert fastordre */}
+          {/* Fastordre i dag (ikke kjørt) */}
           <div className="xl:col-span-2">
             <PendingRecurringCard
               date={pendingDate}
@@ -198,7 +198,7 @@ function PendingRecurringCard({
           <div>
             <CardTitle className="flex items-center gap-2 text-base">
               <AlertCircle className="h-4 w-4 text-[hsl(var(--alert-warning))]" />
-              Uregulert fastordre
+              Fastordre i dag (ikke kjørt)
             </CardTitle>
             <p className="mt-1 text-caption text-muted-foreground">
               Kunder med fastordre som ennå ikke er bekreftet eller justert for valgt dato.
