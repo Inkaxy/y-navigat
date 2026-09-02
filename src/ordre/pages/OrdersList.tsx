@@ -699,8 +699,15 @@ export default function OrdersList() {
                           </span>
                         </TableCell>
                         <TableCell className="px-3 py-1.5">
-                          <StatusBadge status={r.status} />
+                          <div className="flex flex-wrap items-center gap-1">
+                            <OrderKindBadge kind={r.order_kind} />
+                            <LifecycleBadge
+                              lifecycle={lifecycleOf(r)}
+                              deliveryNoteNumber={lifecycleMap.get(r.id)?.delivery_note_number}
+                            />
+                          </div>
                         </TableCell>
+
                         <TableCell className="px-3 py-1.5">
                           <div className="flex items-baseline gap-1.5 leading-tight">
                             <span className="font-medium text-body">
