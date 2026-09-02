@@ -445,7 +445,12 @@ export async function computeDeclarationCore(service: any, topLines: TopLine[]):
     if (a.parent_ids.size === 1) {
       const pid = [...a.parent_ids][0];
       if (wrapParents.has(pid) && parentFirstPos.get(pid) === i) {
-        const parentName = rmMap.get(pid)?.name ?? "Sammensatt";
+        const parentRm = rmMap.get(pid) ?? null;
+        const parentName = declarationNameFor(parentRm, "Sammensatt");
+        const parentHasDeclName = typeof parentRm?.declaration_name === "string" && parentRm.declaration_name.trim() !== "";
+        if (parentRm && !parentHasDeclName && !missingDeclMap.has(pid)) {
+          missingDeclMap.set(pid, { raw_material_id: pid, name: parentRm.name ?? "Sammensatt", fallback_used: parentName });
+        }
         const kids = (parentToChildren.get(pid) ?? []).slice().sort((x, y) => y.effective_grams - x.effective_grams);
         for (const k of kids) renderedKeys.add(k.key);
         ingredientParts.push(`${parentName} (${kids.map((k) => renderItem(k, false)).join(", ")})`);
