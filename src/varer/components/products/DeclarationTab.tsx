@@ -21,6 +21,7 @@ import { ManualDeclarationEditor } from "@/varer/components/products/ManualDecla
 import { CertificationsEditor } from "@/varer/components/products/CertificationsEditor";
 import { showError } from "@/lib/userError";
 import { syncEffectiveDeclaration } from "@/varer/lib/effectiveDeclaration";
+import { BreadscaleSection } from "@/varer/components/products/BreadscaleSection";
 
 type Mode = "auto" | "manual" | "auto_with_overrides";
 
@@ -67,6 +68,7 @@ export function DeclarationTab({ productId, productName, canWrite }: Props) {
     return (
       <div className="space-y-4">
         <ManualDeclarationEditor productId={productId} productName={productName} canWrite={canWrite} />
+        <BreadscaleSection productId={productId} canWrite={canWrite} />
         <CertificationsEditor productId={productId} canWrite={canWrite} />
       </div>
     );
@@ -82,6 +84,9 @@ export function DeclarationTab({ productId, productName, canWrite }: Props) {
         </div>
       )}
       <DeclarationView link={linkQuery.data} productName={productName} canWrite={canWrite} qc={qc} />
+      <div className="mt-4">
+        <BreadscaleSection productId={productId} canWrite={canWrite} />
+      </div>
       <CertificationsEditor productId={productId} canWrite={canWrite} />
       <PdfDeclarationImportDialog
         open={importOpen}
