@@ -143,12 +143,14 @@ export default function OrdersList() {
       : r.status === "awaiting_confirmation"
         ? "awaiting"
         : "open");
-  // Klient-side livssyklusfilter på lastet side (jf. trinn 1)
-  const rows =
-    lifecycleFilter === "all" || lifecycleStatuses
-      ? allRows
-      : allRows.filter((r) => lifecycleOf(r) === lifecycleFilter);
+  // Klient-side livssyklusfilter på lastet side (jf. trinn 1).
+  // Server-side filter kommer i trinn 3 — da blir totaltallene ærlige igjen.
+  const clientLifecycleFilter = lifecycleFilter !== "all" && !lifecycleStatuses;
+  const rows = clientLifecycleFilter
+    ? allRows.filter((r) => lifecycleOf(r) === lifecycleFilter)
+    : allRows;
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
 
 
   // Hold URL i synk når dato-filter endres manuelt (best for deeplink-deling)
