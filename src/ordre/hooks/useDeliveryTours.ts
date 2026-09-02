@@ -97,11 +97,8 @@ export function useDeliveryTours(opts?: { activeOnly?: boolean }) {
  * Status-whitelist som speiler order_is_production_scope(status) i databasen:
  * kun ordre som vil bli plukket opp av Hovedkjøring teller.
  */
-export const TOUR_COUNT_STATUS_WHITELIST = [
-  "confirmed",
-  "in_production",
-  "packed",
-] as const;
+export const TOUR_COUNT_STATUS_WHITELIST = ["confirmed"] as const;
+
 
 export type TourOrderCounts = {
   /** Antall ordre per delivery_tour_id (kun NOT NULL). */
