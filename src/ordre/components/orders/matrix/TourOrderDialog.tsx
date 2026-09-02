@@ -389,7 +389,7 @@ export function TourOrderDialog({
                       <Badge variant="outline" className="font-mono">
                         #{order.order_number}
                       </Badge>
-                      <OrderKindBadge kind={orderLc?.order_kind ?? (order.is_return ? "return" : "dated")} />
+                      <OrderKindBadge kind={orderLc?.order_kind ?? "dated"} />
                       <LifecycleBadge
                         lifecycle={orderLc?.lifecycle ?? "open"}
                         deliveryNoteNumber={orderLc?.delivery_note_number}
