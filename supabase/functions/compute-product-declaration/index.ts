@@ -227,6 +227,9 @@ Deno.serve(async (req) => {
         nutrition_coverage_pct: nutritionCoveragePct,
         yield_grams_set: yieldGrams != null,
       },
+      missing_data: {
+        declaration_names: core.missing_declaration_names,
+      },
       warnings,
       computed_lines: sortedAgg.map((a) => ({
         source: [...a.sources][0],
