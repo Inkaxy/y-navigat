@@ -2066,28 +2066,44 @@ function MatrixGrid({
               const pause = isPaused(pauseMap, c.date, c.tour.id);
               const hasComment = columnComments?.has(`${c.date}|${c.tour.id}`);
               const colHas = colHasData(c.date, c.tour.id);
+              const tone = colTone(c.date, c.tour.id);
+              const toneVar = tone.kind ? getKindMeta(tone.kind).tokenVar : null;
               const d = new Date(c.date + "T00:00:00");
               const dow = (d.getDay() + 6) % 7;
               const dayLabel = DAY_LABELS[dow];
               return (
                 <th
                   key={`${c.date}-${c.tour.id}`}
+                  data-order-kind={tone.kind ?? undefined}
                   className={cn(
                     "border-b border-r border-border px-1 py-1 text-center text-[11px] font-medium text-muted-foreground",
                     pause ? "bg-sky-100 dark:bg-sky-950/40" : "bg-card/80",
                   )}
+                  style={
+                    !pause && toneVar
+                      ? { backgroundColor: `hsl(var(${toneVar}) / 0.16)` }
+                      : undefined
+                  }
                   title={`${c.tour.display_name} (${c.tour.time_from.slice(0, 5)}–${c.tour.time_to.slice(0, 5)})${pause?.reason ? ` · Pause: ${pause.reason}` : pause ? " · Pause" : ""}${hasComment ? `\nKommentar: ${columnComments?.get(`${c.date}|${c.tour.id}`)}` : ""}`}
                 >
+                  {tone.deliveryNote && (
+                    <div
+                      className="-mx-1 -mt-1 mb-1 truncate px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white"
+                      style={{ backgroundColor: "hsl(var(--lifecycle-delivery-note))" }}
+                    >
+                      Pakkseddel{tone.deliveryNoteNumber ? ` ${tone.deliveryNoteNumber}` : ""}
+                    </div>
+                  )}
                   <button
                     type="button"
-                    disabled={!colHas}
                     onClick={() => onOpenTourOrder(c.date, c.tour)}
-                    className="mx-auto block rounded px-1.5 py-0.5 text-[12px] font-semibold text-foreground hover:bg-primary/10 hover:text-primary disabled:cursor-default disabled:opacity-60 disabled:hover:bg-transparent disabled:hover:text-foreground"
-                    title={colHas ? "Åpne ordre for denne turen" : "Ingen ordre på denne turen"}
+                    className="mx-auto block rounded px-1.5 py-0.5 text-[12px] font-semibold text-foreground hover:bg-primary/10 hover:text-primary"
+                    title={colHas ? "Åpne ordre for denne turen" : "Fastordre — skriv i cellene og lagre"}
                   >
                     {dayLabel} ({c.tour.tour_number})
                     {hasComment && <span className="ml-1 text-primary">•</span>}
                   </button>
+
                   {(() => {
                     const meta = colMeta(c.date, c.tour.id);
                     if (!meta) return null;
