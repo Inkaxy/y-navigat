@@ -35,7 +35,7 @@ const kcal = (v: number | null) => (v == null ? "—" : formatNumber(v, 0));
 export default function Matvaretabellen() {
   const { canWrite } = useRavarer();
   const { data: foods = [], isLoading } = useMatvaretabellenFoods();
-  const { data: links } = useMatvaretabellenLinks();
+  const { data: links, isLoading: linksLoading, isError: linksError, error: linksErrorObj } = useMatvaretabellenLinks();
   const sync = useSyncMatvaretabellen();
   const apply = useApplyMatvaretabellen();
 
