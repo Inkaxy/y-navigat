@@ -93,59 +93,51 @@ export function OrderBulkActionBar({ selected, onClear, onMutated, csvHeaders }:
   }
 
 
-  async function applyStatus(to: OrderStatus, toLabel: string) {
-    if (!confirm(`Endre status til "${toLabel}" for ${count} valgte ordre?`)) return;
+  async function cancelSelected() {
+    const reason = window.prompt(
+      `Avbryt ${count} valgte ordre. Hvorfor avbrytes de?`,
+      "",
+    );
+    if (reason === null) return;
+    if (reason.trim().length === 0) {
+      toast.error("Begrunnelse er påkrevd");
+      return;
+    }
     setRunning(true);
     let ok = 0;
     let failed = 0;
-    const toastId = toast.loading(`Oppdaterer 0 av ${count}…`);
+    const toastId = toast.loading(`Avbryter 0 av ${count}…`);
     try {
       for (let i = 0; i < selected.length; i++) {
         const order = selected[i];
-        toast.loading(`Oppdaterer ${i + 1} av ${count}…`, { id: toastId });
+        toast.loading(`Avbryter ${i + 1} av ${count}…`, { id: toastId });
         try {
-          const { error: updErr } = await supabase
-            .from("orders")
-            .update({
-              status: to,
-              status_changed_at: new Date().toISOString(),
-            })
-            .eq("id", order.id);
-          if (updErr) throw updErr;
-
-          await supabase.from("order_status_history").insert({
-            order_id: order.id,
-            from_status: order.status,
-            to_status: to,
-            notes: "Bulk-overstyring fra ordreliste",
-          });
-
-          await logAudit({
-            entity_type: "order",
-            entity_id: order.id,
-            entity_display_reference: order.order_number,
-            action: "bulk_status_change",
-            changes: { from: order.status, to },
-            reason: "Bulk fra ordreliste",
+          await changeOrderStatus({
+            orderId: order.id,
+            orderNumber: order.order_number,
+            customerName: order.customer_snapshot?.display_name ?? "Ukjent kunde",
+            fromStatus: order.status,
+            toStatus: "cancelled",
+            comment: reason.trim(),
+            userId: null,
+            isCancel: true,
           });
           ok++;
-        } catch (e: any) {
+        } catch (e) {
           failed++;
           // eslint-disable-next-line no-console
-          console.error(`Bulk-status feilet for ${order.order_number}`, e);
+          console.error(`Avbryt feilet for ${order.order_number}`, e);
         }
       }
-      if (failed === 0) {
-        toast.success(`${ok} ordre oppdatert til ${toLabel}.`, { id: toastId });
-      } else {
-        toast.error(`${ok} oppdatert, ${failed} feilet. Sjekk konsollen.`, { id: toastId });
-      }
+      if (failed === 0) toast.success(`${ok} ordre avbrutt.`, { id: toastId });
+      else toast.error(`${ok} avbrutt, ${failed} feilet.`, { id: toastId });
       onMutated();
       onClear();
     } finally {
       setRunning(false);
     }
   }
+
 
   function exportCsv() {
     // Norsk format: ; som separator, , som desimal (Excel-NB-vennlig)
