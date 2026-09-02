@@ -2277,8 +2277,6 @@ function MatrixGrid({
                           pause && "cursor-not-allowed",
                         )}
                       />
-
-                      />
                       {hasM && (
                         <span
                           className="pointer-events-none absolute right-0.5 top-0.5 text-primary"
