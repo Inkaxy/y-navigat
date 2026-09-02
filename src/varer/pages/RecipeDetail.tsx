@@ -326,7 +326,9 @@ export default function RecipeDetail() {
   const { generating, printProductionSheet, printRecipeCard } = useRecipePDF();
   const [cardDialogOpen, setCardDialogOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState("oppskrift");
+  const [activeTab, setActiveTab] = useState(
+    searchParams.get("tab") === "merking" ? "merking" : "oppskrift",
+  );
 
   const buildPdfInput = useCallback(
     (includeCosts: boolean): BuildRecipePDFInput => ({
