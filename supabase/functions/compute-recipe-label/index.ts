@@ -171,7 +171,7 @@ async function expandRecipeLines(
 
     const { data: subRecipe } = await service
       .from("recipes")
-      .select("id, name, yield_grams, yield_loss_pct")
+      .select("id, name, yield_grams, yield_loss_pct, finished_weight_grams, yield_quantity, yield_unit")
       .eq("id", subRecipeId)
       .maybeSingle();
 
@@ -237,7 +237,7 @@ Deno.serve(async (req) => {
 
     const { data: recipe } = await service
       .from("recipes")
-      .select("id, name, yield_grams, yield_loss_pct")
+      .select("id, name, yield_grams, yield_loss_pct, finished_weight_grams, yield_quantity, yield_unit")
       .eq("id", recipeId)
       .maybeSingle();
     if (!recipe) return json({ error: "Recipe not found" }, 404);
