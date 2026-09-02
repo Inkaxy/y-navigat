@@ -38,6 +38,12 @@ function eventTitle(ev: OrderEvent) {
     );
   }
 
+  if (eventType === "fixed_replaced_by_dated") {
+    return <span className="font-medium">Fastordre erstattet av datert ordre</span>;
+  }
+
+
+
   const toLabel = getStatusMeta(ev.to_status).label;
   if (!ev.from_status) return `Ordre opprettet (${toLabel})`;
   const fromLabel = getStatusMeta(ev.from_status).label;
