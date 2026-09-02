@@ -41,12 +41,14 @@ interface Props {
 export function LinkRawMaterialDialog({ open, onOpenChange, foodId, foodName, initialQuery, onLinked }: Props) {
   const { data: rows = [], isLoading } = useRawMaterials();
   const { data: suppliers = [] } = useSuppliers();
-  const { data: links } = useMatvaretabellenLinks();
+  const { data: links, isLoading: linksLoading, isError: linksError } = useMatvaretabellenLinks();
   const apply = useApplyMatvaretabellen();
+  const linksUnknown = linksLoading || linksError || !links;
   const alreadyLinked = useMemo(
     () => new Set((links?.get(foodId) ?? []).map((l) => l.raw_material_id)),
     [links, foodId],
   );
+
 
   const [q, setQ] = useState(initialQuery ?? "");
   const debounced = useDebouncedValue(q, 250);
