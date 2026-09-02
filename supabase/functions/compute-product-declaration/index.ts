@@ -149,6 +149,11 @@ Deno.serve(async (req) => {
     if (linesWithoutNut) warnings.push(`${linesWithoutNut} råvare(r) mangler næringsdata`);
     if (core.composite_unreviewed.length) warnings.push(`Sammensatt råvare uten review: ${core.composite_unreviewed.join(", ")}`);
     if (core.composite_text_only.length) warnings.push(`${core.composite_text_only.length} komponent(er) er fritekst (uten råvare-kobling)`);
+    if (core.missing_declaration_names.length) {
+      warnings.push(
+        `${core.missing_declaration_names.length} råvare(r) mangler deklarasjonsnavn — innkjøpsnavnet brukes midlertidig: ${core.missing_declaration_names.map((m) => m.name).join(", ")}`,
+      );
+    }
     if (nutritionCoveragePct < 80) warnings.push(`Kun ${nutritionCoveragePct}% av vekten har næringsdekning`);
     if (breadscaleUnclassified.length) warnings.push(`Brødskala: ${breadscaleUnclassified.length} ingredienser ikke klassifisert`);
 
