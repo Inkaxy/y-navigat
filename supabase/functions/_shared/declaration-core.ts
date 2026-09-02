@@ -207,6 +207,7 @@ export async function computeDeclarationCore(service: any, topLines: TopLine[]):
 
   const composite_unreviewed: string[] = [];
   const composite_text_only: string[] = [];
+  const missingDeclMap = new Map<string, { raw_material_id: string; name: string; fallback_used: string }>();
 
   const collectedRmIds = new Set<string>();
   function collectFromComponents(rmId: string) {
