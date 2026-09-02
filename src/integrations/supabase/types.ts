@@ -8500,6 +8500,9 @@ export type Database = {
           account_reference: string | null
           allows_return: boolean
           baked_product_id: string | null
+          breadscale_manual_value: number | null
+          breadscale_mode: string
+          breadscale_pct: number | null
           breadscale_value: number | null
           cake_role: string | null
           calc_factor: number | null
@@ -8599,6 +8602,9 @@ export type Database = {
           account_reference?: string | null
           allows_return?: boolean
           baked_product_id?: string | null
+          breadscale_manual_value?: number | null
+          breadscale_mode?: string
+          breadscale_pct?: number | null
           breadscale_value?: number | null
           cake_role?: string | null
           calc_factor?: number | null
@@ -8698,6 +8704,9 @@ export type Database = {
           account_reference?: string | null
           allows_return?: boolean
           baked_product_id?: string | null
+          breadscale_manual_value?: number | null
+          breadscale_mode?: string
+          breadscale_pct?: number | null
           breadscale_value?: number | null
           cake_role?: string | null
           calc_factor?: number | null
@@ -13414,6 +13423,7 @@ export type Database = {
         }
         Returns: string
       }
+      breadscale_step: { Args: { p_pct: number }; Returns: number }
       build_cake_order_line: {
         Args: {
           p_category_id: string
@@ -14593,6 +14603,14 @@ export type Database = {
       price_round_set_status: {
         Args: { p_action: string; p_round_id: string }
         Returns: Json
+      }
+      product_breadscale_calculated: {
+        Args: { p_product_id: string }
+        Returns: number
+      }
+      product_breadscale_set: {
+        Args: { p_manual_value?: number; p_mode: string; p_product_id: string }
+        Returns: number
       }
       product_cost: {
         Args: { p_depth?: number; p_product_id: string }
