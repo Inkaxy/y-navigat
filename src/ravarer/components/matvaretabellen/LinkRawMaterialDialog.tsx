@@ -41,12 +41,14 @@ interface Props {
 export function LinkRawMaterialDialog({ open, onOpenChange, foodId, foodName, initialQuery, onLinked }: Props) {
   const { data: rows = [], isLoading } = useRawMaterials();
   const { data: suppliers = [] } = useSuppliers();
-  const { data: links } = useMatvaretabellenLinks();
+  const { data: links, isLoading: linksLoading, isError: linksError } = useMatvaretabellenLinks();
   const apply = useApplyMatvaretabellen();
+  const linksUnknown = linksLoading || linksError || !links;
   const alreadyLinked = useMemo(
     () => new Set((links?.get(foodId) ?? []).map((l) => l.raw_material_id)),
     [links, foodId],
   );
+
 
   const [q, setQ] = useState(initialQuery ?? "");
   const debounced = useDebouncedValue(q, 250);
@@ -115,6 +117,12 @@ export function LinkRawMaterialDialog({ open, onOpenChange, foodId, foodName, in
             </DialogDescription>
           </DialogHeader>
 
+          {linksUnknown && !linksLoading && (
+            <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+              Kunne ikke hente eksisterende koblinger — «Allerede koblet» vises ikke.
+            </div>
+          )}
+
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-secondary" />
             <Input
@@ -125,6 +133,7 @@ export function LinkRawMaterialDialog({ open, onOpenChange, foodId, foodName, in
               className="h-11 pl-9"
             />
           </div>
+
 
           <div className="max-h-[45vh] overflow-y-auto rounded-lg border border-line-subtle">
             {isLoading ? (

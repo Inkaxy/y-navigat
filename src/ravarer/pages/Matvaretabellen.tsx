@@ -35,7 +35,7 @@ const kcal = (v: number | null) => (v == null ? "—" : formatNumber(v, 0));
 export default function Matvaretabellen() {
   const { canWrite } = useRavarer();
   const { data: foods = [], isLoading } = useMatvaretabellenFoods();
-  const { data: links } = useMatvaretabellenLinks();
+  const { data: links, isLoading: linksLoading, isError: linksError, error: linksErrorObj } = useMatvaretabellenLinks();
   const sync = useSyncMatvaretabellen();
   const apply = useApplyMatvaretabellen();
 
@@ -133,7 +133,14 @@ export default function Matvaretabellen() {
         </div>
       </Card>
 
+      {linksError && (
+        <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          Kunne ikke hente koblinger: {(linksErrorObj as any)?.message ?? "ukjent feil"} — statuskolonnen kan vise feil.
+        </div>
+      )}
+
       <Card className="overflow-hidden">
+
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -184,7 +191,12 @@ export default function Matvaretabellen() {
                       <td className="px-3 py-2 text-right tabular-nums">{g(f.salt_g)}</td>
                       <td className="px-3 py-2 text-right tabular-nums">{g(f.water_g)}</td>
                       <td className="px-3 py-2">
-                        {linked.length > 0 && (
+                        {linksLoading ? (
+                          <span className="text-xs text-ink-secondary">Laster…</span>
+                        ) : linksError ? (
+                          <span className="text-xs text-destructive">Ukjent</span>
+                        ) : linked.length > 0 && (
+
                           <TooltipProvider>
                             <Tooltip>
                               <TooltipTrigger asChild>
