@@ -111,6 +111,7 @@ export function DeclarationNutritionSection({
   const afterWrite = async () => {
     const n = await syncEffectiveDeclarationForRecipe(recipeId);
     qc.invalidateQueries({ queryKey: ["recipe-detail", recipeId] });
+    qc.invalidateQueries({ queryKey: ["recipe-linked-products"] });
     return n;
   };
 
