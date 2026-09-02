@@ -128,17 +128,44 @@ export type CoreResult = {
   rye_flour_grams: number;
   composite_unreviewed: string[];
   composite_text_only: string[];
+  /** Råvarer uten declaration_name — innkjøpsnavnet er renset og brukt midlertidig. */
+  missing_declaration_names: Array<{ raw_material_id: string; name: string; fallback_used: string }>;
   rmMap: Map<string, any>;
   nutritionByRm: Map<string, any>;
 };
 
 const RM_SELECT = "id, name, declaration_name, is_composite, grain_classification, cereal_type, water_content_pct, components_reviewed_at, unit_weight_grams";
 
-/** Navnet som skal stå i deklarasjonen for en råvare: declaration_name > name > fallback. */
+const PACKAGING_RE =
+  /(,\s*)?\b(sekk|kartong|container|pose|spann|eske|bøtte|kasse|dunk|flaske|boks|pk|pakke|krt|ctn|bulk|palleboks|kanne|bib|slim|brett|beger|glass|hylse|rull)\b[^,]*/g;
+const QUANTITY_RE =
+  /(,\s*)?\d+([.,]\d+)?\s*(x\s*\d+([.,]\d+)?\s*)?(kg|g|gr|l|ltr|liter|ml|dl|cl|stk|pk)\b[^,]*/g;
+const BRAND_RE =
+  /\b(idun|tine|regal|dansk|pals|jæder|jaeder|credin|odense|mills|norgesmøllene|lantmännen|lantmannen|bakers|select|pf|kavli|q-meieriene|synnøve|freia|nidar|callebaut|barry|dreidoppel|zeelandia|puratos|tegral|meny|asko)\b\.?/g;
+
+/**
+ * Renser et innkjøpsnavn til et brukbart ingrediensnavn.
+ * Speiler SQL-funksjonen public.declaration_name_suggest.
+ */
+export function suggestDeclarationName(rawName: string): string {
+  let t = String(rawName ?? "").toLowerCase();
+  t = t.replace(PACKAGING_RE, "");
+  t = t.replace(QUANTITY_RE, "");
+  t = t.replace(BRAND_RE, "");
+  t = t.replace(/\s{2,}/g, " ").replace(/\s*,\s*,/g, ",");
+  t = t.replace(/^[\s,\-/]+/, "").replace(/[\s,\-/]+$/, "");
+  return t;
+}
+
+/**
+ * Navnet som skal stå i deklarasjonen for en råvare.
+ * declaration_name > renset innkjøpsnavn > fallback. Aldri rått merke-/innkjøpsnavn.
+ */
 export function declarationNameFor(rm: any, fallbackName: string): string {
   const dn = typeof rm?.declaration_name === "string" ? rm.declaration_name.trim() : "";
   if (dn) return dn;
-  return rm?.name ?? fallbackName;
+  const src = rm?.name ?? fallbackName ?? "";
+  return suggestDeclarationName(src) || String(src).toLowerCase().trim() || fallbackName;
 }
 
 /**
@@ -180,6 +207,7 @@ export async function computeDeclarationCore(service: any, topLines: TopLine[]):
 
   const composite_unreviewed: string[] = [];
   const composite_text_only: string[] = [];
+  const missingDeclMap = new Map<string, { raw_material_id: string; name: string; fallback_used: string }>();
 
   const collectedRmIds = new Set<string>();
   function collectFromComponents(rmId: string) {
@@ -247,11 +275,16 @@ export async function computeDeclarationCore(service: any, topLines: TopLine[]):
       const may = rmId ? (allergensByRm.get(rmId) ?? []).filter((a) => a.presence === "may_contain").map((a) => a.allergen) : [];
       const key = rmId ? `rm:${rmId}` : `text:${normName(fallbackName)}`;
       const w = waterFor(rm, depth === 0 ? waterOverride : null);
+      const declName = declarationNameFor(rm, fallbackName);
+      const hasDeclName = typeof rm?.declaration_name === "string" && rm.declaration_name.trim() !== "";
+      if (rmId && rm && !hasDeclName && !missingDeclMap.has(rmId)) {
+        missingDeclMap.set(rmId, { raw_material_id: rmId, name: rm.name ?? fallbackName, fallback_used: declName });
+      }
       return [{
         source,
         key,
         raw_material_id: rmId,
-        name: declarationNameFor(rm, fallbackName),
+        name: declName,
         grams,
         effective_grams,
         is_quid: isQuid,
@@ -497,6 +530,7 @@ export async function computeDeclarationCore(service: any, topLines: TopLine[]):
     rye_flour_grams: ryeFlour,
     composite_unreviewed,
     composite_text_only,
+    missing_declaration_names: [...missingDeclMap.values()],
     rmMap,
     nutritionByRm,
   };

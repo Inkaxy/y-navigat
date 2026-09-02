@@ -12,6 +12,7 @@ import {
   type MissingNutritionRow,
 } from "@/varer/hooks/useMissingNutrition";
 import { ManualNutritionDialog } from "./ManualNutritionDialog";
+import { MissingDeclarationNames, type MissingDeclarationNameRow } from "./MissingDeclarationNames";
 
 export interface MissingData {
   nutrition?: MissingNutritionRow[];
@@ -19,6 +20,7 @@ export interface MissingData {
   unclassified_grain_names?: string[];
   composite_unreviewed?: Array<{ name?: string } | string>;
   composite_text_only?: Array<{ name?: string } | string>;
+  declaration_names?: MissingDeclarationNameRow[];
   lines_without_raw_material?: number;
 }
 
@@ -63,6 +65,7 @@ export function DataQualityCard({
   const unclassified = missingData?.unclassified_grain_names ?? [];
   const compositeUnreviewed = nameList(missingData?.composite_unreviewed);
   const compositeTextOnly = nameList(missingData?.composite_text_only);
+  const missingDeclNames = missingData?.declaration_names ?? [];
   const unlinked = missingData?.lines_without_raw_material ?? 0;
   const warns = warnings ?? [];
 
@@ -73,6 +76,7 @@ export function DataQualityCard({
     unclassified.length > 0 ||
     compositeUnreviewed.length > 0 ||
     compositeTextOnly.length > 0 ||
+    missingDeclNames.length > 0 ||
     unlinked > 0 ||
     warns.length > 0;
 
@@ -143,6 +147,15 @@ export function DataQualityCard({
                   Ingen mangler funnet — beregningsgrunnlaget er komplett.
                 </p>
               )}
+
+              {missingDeclNames.length > 0 && (
+                <MissingDeclarationNames
+                  rows={missingDeclNames}
+                  canWrite={canWrite}
+                  onSaved={onRecalculate}
+                />
+              )}
+
 
               {missing.length > 0 && (
                 <div id="mangler-naeringsdata" className="space-y-1 scroll-mt-24">

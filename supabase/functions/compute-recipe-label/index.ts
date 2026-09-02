@@ -419,8 +419,15 @@ Deno.serve(async (req) => {
       unclassified_grain_names: core.breadscale.unclassified,
       composite_unreviewed: core.composite_unreviewed,
       composite_text_only: core.composite_text_only,
+      declaration_names: core.missing_declaration_names,
       lines_without_raw_material: core.sortedAgg.filter((a) => !a.raw_material_id).length,
     };
+
+    if (core.missing_declaration_names.length) {
+      warnings.push(
+        `${core.missing_declaration_names.length} råvare(r) mangler deklarasjonsnavn — innkjøpsnavnet brukes midlertidig: ${core.missing_declaration_names.map((m) => m.name).join(", ")}`,
+      );
+    }
 
     const allergens = { contains: core.containsList, may_contain: core.mayContainList };
 

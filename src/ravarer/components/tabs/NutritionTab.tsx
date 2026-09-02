@@ -1,3 +1,4 @@
+import { DeclarationNameCard } from "./DeclarationNameCard";
 import { useState, useEffect, useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -63,6 +64,7 @@ export function NutritionTab({ rawMaterialId }: Props) {
 
   return (
     <div className="space-y-5">
+      <DeclarationNameCard rawMaterialId={rawMaterialId} foodId={existing?.matvaretabellen_food_id ?? null} />
       <DatasheetSection rawMaterialId={rawMaterialId} />
       <MatvaretabellenSourceCard
         rawMaterialId={rawMaterialId}

@@ -12,6 +12,7 @@ import { useSuppliers } from "@/ravarer/hooks/useSuppliers";
 import { useAllRawMaterialPurchaseStats } from "@/ravarer/hooks/usePurchaseStats";
 import { formatNok, formatNumber, formatDate } from "@/ravarer/lib/constants";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
+import { useDeclarationWorklist } from "@/ravarer/hooks/useDeclarationNames";
 import { ItemTypeBadge } from "@/ravarer/components/ItemTypeBadge";
 import { CategorySelectItems } from "@/ravarer/components/CategorySelectItems";
 
@@ -19,7 +20,12 @@ type SortKey = "name" | "volume_12m";
 
 export default function VarelistePage() {
   const navigate = useNavigate();
-  const { canWrite } = useRavarer();
+  const { canWrite, legalEntityId } = useRavarer();
+  const { data: declWorklist } = useDeclarationWorklist(legalEntityId);
+  const missingDeclIds = useMemo(
+    () => new Set((declWorklist ?? []).map((d) => d.raw_material_id)),
+    [declWorklist],
+  );
   const { data: rows = [], isLoading } = useRawMaterials();
   const { data: suppliers = [] } = useSuppliers();
   const { data: statsMap } = useAllRawMaterialPurchaseStats();
@@ -173,8 +179,17 @@ export default function VarelistePage() {
                     <td className="px-4 py-3 font-mono text-xs">{r.sku}</td>
                     <td className="px-4 py-3 font-medium">
                       {r.name}
-                      {r.declaration_name?.trim() && (
+                      {r.declaration_name?.trim() ? (
                         <div className="text-xs font-normal text-ink-secondary">{r.declaration_name}</div>
+                      ) : (
+                        missingDeclIds.has(r.id) && (
+                          <Badge
+                            variant="outline"
+                            className="mt-1 border-warning/40 bg-warning/10 text-[11px] font-normal text-warning"
+                          >
+                            Mangler deklarasjonsnavn
+                          </Badge>
+                        )
                       )}
                     </td>
                     <td className="px-4 py-3 text-ink-secondary">

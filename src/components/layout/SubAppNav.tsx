@@ -248,6 +248,7 @@ function RavarerNav() {
     { kind: "link", to: "/ravarer/varemottak", label: "Varemottak", icon: Package },
     { kind: "link", to: "/ravarer/varetelling", label: "Varetelling", icon: ClipboardCheck },
     { kind: "link", to: "/ravarer/matvaretabellen", label: "Matvaretabellen", icon: Database },
+    { kind: "link", to: "/ravarer/deklarasjonsnavn", label: "Deklarasjonsnavn", icon: Database },
 
     { kind: "link", to: "/ravarer/leverandorer", label: "Leverandører", icon: Building2 },
     { kind: "link", to: "/ravarer/avtaler", label: "Avtaler", icon: FileText },
