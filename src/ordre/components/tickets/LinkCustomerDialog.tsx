@@ -85,8 +85,6 @@ export default function LinkCustomerDialog({
           customer_id: c.id,
           name: (senderName ?? senderEmail).trim(),
           email: senderEmail,
-          role: "E-post",
-          is_active: true,
         });
         if (error) throw error;
       }
