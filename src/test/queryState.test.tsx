@@ -1,6 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { QueryState } from "@/components/common/QueryState";
 
 /**
@@ -43,6 +42,7 @@ describe("QueryState", () => {
       </QueryState>,
     );
     expect(screen.getByText("Ingen treff")).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("lar feil vinne over både lasting og tom", () => {
@@ -53,11 +53,12 @@ describe("QueryState", () => {
     );
     const alert = screen.getByRole("alert");
     expect(alert).toHaveTextContent("Kunne ikke hente dataene");
+    // Rå backend-tekst skal aldri vises til bruker.
     expect(alert).not.toHaveTextContent("boom");
     expect(screen.queryByText("Innhold")).not.toBeInTheDocument();
   });
 
-  it("viser feil-ID for support og kaller onRetry", async () => {
+  it("viser feil-ID for support og kaller onRetry", () => {
     const onRetry = vi.fn();
     render(
       <QueryState scope="test" isError error={new Error("boom")} onRetry={onRetry}>
@@ -65,23 +66,24 @@ describe("QueryState", () => {
       </QueryState>,
     );
     expect(screen.getByRole("alert")).toHaveTextContent(/feil-ID \S+ til support/);
-    await userEvent.click(screen.getByRole("button", { name: /prøv igjen/i }));
+    fireEvent.click(screen.getByRole("button", { name: /prøv igjen/i }));
     expect(onRetry).toHaveBeenCalledTimes(1);
   });
 
-  it("logger feilen strukturert én gang med scope", () => {
+  it("logger samme feil bare én gang, med scope", () => {
     const spy = vi.spyOn(console, "error");
+    const error = new Error("boom");
     const { rerender } = render(
-      <QueryState scope="ordre:test" isError error={new Error("boom")}>
+      <QueryState scope="ordre:test" isError error={error}>
         <p>Innhold</p>
       </QueryState>,
     );
     rerender(
-      <QueryState scope="ordre:test" isError error={new Error("boom")}>
+      <QueryState scope="ordre:test" isError error={error}>
         <p>Innhold</p>
       </QueryState>,
     );
     const scoped = spy.mock.calls.filter((call) => JSON.stringify(call).includes("ordre:test"));
-    expect(scoped.length).toBeGreaterThanOrEqual(1);
+    expect(scoped).toHaveLength(1);
   });
 });
