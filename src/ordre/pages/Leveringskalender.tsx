@@ -29,6 +29,7 @@ import { nb } from "date-fns/locale";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AppBanner } from "@/ordre/components/shell/AppBanner";
+import { QueryEmptyState, QueryErrorState } from "@/components/common/QueryState";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
@@ -178,7 +179,13 @@ export default function MatrixPage() {
   );
   const existingSchedule: RecurringScheduleWithCustomer | null =
     customerId && customerSchedules.length > 0 ? customerSchedules[0] : null;
-  const { data: matrix, isLoading } = useMatrixData(customerId, dateFrom, dateTo);
+  const {
+    data: matrix,
+    isLoading,
+    isError: isMatrixError,
+    error: matrixError,
+    refetch: refetchMatrix,
+  } = useMatrixData(customerId, dateFrom, dateTo);
   const { data: addableProducts } = useAddableProducts(customerId, !!customerId);
   // MVA-sats per produkt for varer som legges til lokalt (RPC-en returnerer ikke mva_rate)
   const addableIds = useMemo(() => (addableProducts ?? []).map((p) => p.id).sort(), [addableProducts]);
@@ -1523,14 +1530,37 @@ export default function MatrixPage() {
               </p>
             </div>
           </div>
+        ) : isMatrixError ? (
+          <div className="mx-auto max-w-xl p-6">
+            <QueryErrorState
+              error={matrixError}
+              scope="ordre:leveringskalender:matrise"
+              onRetry={() => void refetchMatrix()}
+              title="Kunne ikke hente matrisen"
+            />
+          </div>
         ) : isLoading ? (
           <div className="grid h-64 place-items-center text-muted-foreground">
             <Loader2 className="animate-spin" />
+            <span className="sr-only">Laster matrisen</span>
           </div>
-        ) : !matrix ? null : columns.length === 0 ? (
+        ) : !matrix ? (
+          <div className="mx-auto max-w-xl p-6">
+            <QueryEmptyState
+              title="Fant ingen matrisedata"
+              description="Prøv en annen uke, eller last inn på nytt."
+              action={
+                <Button variant="outline" size="sm" onClick={() => void refetchMatrix()}>
+                  Last inn på nytt
+                </Button>
+              }
+            />
+          </div>
+        ) : columns.length === 0 ? (
           <div className="grid h-64 place-items-center p-6 text-center text-muted-foreground">
             <p>Ingen aktive turer denne uken.</p>
           </div>
+
         ) : isEmptyMatrix ? (
           <div className="grid h-full place-items-center p-10 text-center">
             <div className="max-w-md">
