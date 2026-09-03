@@ -21,33 +21,87 @@ import {
 import { useAssignableUsers } from "@/ordre/hooks/useAssignableUsers";
 import { useRecentOrdersLite } from "@/ordre/hooks/useRecentOrdersLite";
 import { TicketReplyDialog } from "./TicketReplyDialog";
-
-const STATUS_LABEL: Record<TicketStatus, string> = {
-  new: "Ny", in_progress: "Pågår", resolved: "Løst", closed: "Lukket", spam: "Spam",
-};
-const PRIO_LABEL: Record<TicketPriority, string> = {
-  low: "Lav", normal: "Normal", high: "Høy", urgent: "Haster",
-};
+import {
+  TICKET_PRIORITY_LABEL as PRIO_LABEL,
+  TICKET_STATUS_LABEL as STATUS_LABEL,
+  TICKET_STATUSES,
+  TICKET_PRIORITIES,
+} from "@/ordre/lib/ticketFormat";
+import { getStatusMeta } from "@/ordre/lib/orderStatus";
+import { logTicketEvent, type TicketEventType } from "@/ordre/lib/ticketEvents";
+import {
+  linkTicketToOrder,
+  unlinkTicketFromOrder,
+  useInvalidateTicketLinks,
+} from "@/ordre/hooks/useTicketOrderLink";
 
 export function TicketQuickActions({ ticket }: { ticket: Ticket }) {
   const { toast } = useToast();
   const update = useUpdateTicket();
+  const invalidateLinks = useInvalidateTicketLinks();
   const [replyOpen, setReplyOpen] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
 
-  const patch = (p: Partial<Ticket>, msg: string) =>
+  /** Lagrer endringen og skriver samme hendelse i tidslinjen som TicketActionBar. */
+  const patch = (p: Partial<Ticket>, msg: string, eventType?: TicketEventType) =>
     update.mutate({ id: ticket.id, patch: p }, {
-      onSuccess: () => toast({ title: msg }),
+      onSuccess: () => {
+        if (eventType) {
+          void logTicketEvent({
+            ticket_id: ticket.id,
+            order_id: ticket.related_order_id ?? null,
+            event_type: eventType,
+            actor_type: "staff",
+            summary: msg,
+          });
+        }
+        toast({ title: msg });
+      },
       onError: (e) => toast({
         title: "Feilet", description: e instanceof Error ? e.message : String(e),
         variant: "destructive",
       }),
     });
 
+  const statusEvent = (next: TicketStatus): TicketEventType =>
+    next === "resolved"
+      ? "ticket.resolved"
+      : ticket.status === "resolved" || ticket.status === "closed"
+        ? "ticket.reopened"
+        : "ticket.status_changed";
+
+  const onLinkOrder = async (orderId: string, orderNumber: string | null) => {
+    try {
+      await linkTicketToOrder(ticket.id, orderId, orderNumber);
+      invalidateLinks(ticket.id);
+      toast({ title: "Koblet til ordre" });
+    } catch (e) {
+      toast({
+        title: "Feilet", description: e instanceof Error ? e.message : String(e),
+        variant: "destructive",
+      });
+    }
+  };
+
+  const onUnlinkOrder = async () => {
+    if (!ticket.related_order_id) return;
+    try {
+      await unlinkTicketFromOrder(ticket.id, ticket.related_order_id);
+      invalidateLinks(ticket.id);
+      toast({ title: "Ordrekobling fjernet" });
+    } catch (e) {
+      toast({
+        title: "Feilet", description: e instanceof Error ? e.message : String(e),
+        variant: "destructive",
+      });
+    }
+  };
+
   const stop = (e: React.MouseEvent | React.KeyboardEvent) => {
     e.preventDefault(); e.stopPropagation();
   };
+
 
   return (
     <div onClick={stop} onKeyDown={stop as never} className="flex items-center gap-1">
