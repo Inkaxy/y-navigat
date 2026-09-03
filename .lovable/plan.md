@@ -1,160 +1,135 @@
-# Revisjon av NBHub — kun-lesende gjennomgang
-
-Alle tall under er målt i dag mot `main` (856 TS/TSX-filer, 190 113 linjer, 76 edge functions, 245 migrasjoner). Jeg skiller **[bekreftet]** (målt/kjørt) fra **[antakelse]** (rimelig slutning, ikke verifisert).
-
----
-
-## 1) Produkt- og informasjonsarkitektur
-
-**[bekreftet]** `src/App.tsx` er 526 linjer med **189 `<Route>`** og **120 forekomster av `AppAccessGuard`** som er skrevet ut manuelt per rute, ofte kombinert med `<Shell>` + app-provider i samme JSX-linje (se f.eks. linje 334–353 for Varer). Én glemt guard = en åpen rute, og ingenting fanger det opp.
-
-**[bekreftet]** 13 app-moduler under `src/` med svært ujevn vekt: `ordre` 46 141 linjer, `varer` 35 041, `ravarer` 16 924, `produksjon` 15 370, `pos_styring` 14 549 — mot `lib` 643 og `hooks` 542. Delt logikk er altså nesten fraværende i forhold til modulmassen; hver app har sin egen versjon av entitetsvalg, tilgang og formattering.
-
-**[bekreftet]** Minst fire konkurrerende mekanismer for «hvilket selskap ser jeg nå»: `src/providers/SelectionProvider.tsx`, `src/kunder/state/SelectedEntityContext.tsx`, `src/pos_styring/contexts/LegalEntityContext.tsx` og `src/ravarer/context/RavarerContext.tsx` (som leser `useSelection` og eksponerer sin egen `legalEntityId`). 137 filer refererer `legalEntityId`.
-
-**[bekreftet]** 17 separate context-providere. `src/fakturaer`, `src/fakturering`, `src/varer`, `src/ravarer` har hver sin app-context med overlappende ansvar (session + entitet + tilgangsnivå).
-
-**[antakelse]** Navigasjonen speiler intern organisering (Ordre/Varer/Råvarer/Produksjon/Fakturering) mer enn arbeidsoppgaver. Det er trolig grunnen til at samme begrep (deklarasjon, grovhet, lager) finnes i tre apper med hver sin inngang.
-
----
-
-## 2) UX/UI og mobil
-
-**[bekreftet]** Designsystemet brytes systematisk i Kiosk: 166 hardkodede fargeklasser totalt utenfor `components/ui`, hvorav `text-[#F4ECDC]` alene 16 ganger i `src/kiosk/components/CloseSessionModal.tsx`, 9 i `ReceiptView.tsx`, 7 i `PaymentModal.tsx`, samt `bg-[#0F0E0E]` hardkodet i `src/kiosk/components/KioskShell.tsx` (linje 27–28, satt direkte på `document.documentElement.style`). Kiosk kan dermed ikke temes, og fargene kan drifte fra `--brand-*`-tokens uten at noe brekker synlig.
-
-**[bekreftet]** Hardkodede farger lekker også inn i vanlige app-flater: `src/ordre/pages/Leveringskalender.tsx`, `src/ordre/pages/TicketDetail.tsx`, `src/fakturering/components/GroupCard.tsx`, `src/components/layout/CompanySelector.tsx` m.fl.
-
-**[bekreftet]** 78 filer rendrer `<table>`, men bare 46 filer bruker `overflow-x-auto`. Tabeller uten horisontal scroll på mobil er en reell risiko i minst noen av de 32 differansefilene.
-
-**[bekreftet]** `src/components/layout/AppShell.tsx` har mobil bunnavigasjon **kun** for `/ordre` (`isOrdre`-sjekken, linje 12 og 30). De øvrige 12 modulene har ingen tilsvarende mobilnavigasjon.
-
-**[bekreftet]** 2 429 linjer i `src/ordre/pages/Leveringskalender.tsx` — matrisen, som er den mest brukte skjermen — i én fil. Det gjør UX-endringer der uforholdsmessig risikable.
-
----
-
-## 3) Tilgjengelighet
-
-**[bekreftet]** 165 `aria-label` fordelt på 856 filer. Til sammenligning: 189 ruter og 78 tabellfiler. Dekningen er tynn.
-
-**[bekreftet]** 16 tilfeller av klikkbare ikke-interaktive elementer (`<div|span|td|tr onClick>`), bl.a. 3 i `src/ordre/pages/DeliveryNotesList.tsx`, 2 i `src/varer/pages/Profitability.tsx`, 2 i `src/fakturering/pages/KjoringDetalj.tsx`. Disse er ikke tastaturnåbare og har ingen rolle.
-
-**[bekreftet]** Positivt: `index.html` har `lang="nb"`, ekte `<title>` og `<meta name="description">`. Ingen `<img>` mangler `alt` (0 treff).
-
-**[bekreftet]** `AppShell` har ingen «hopp til innhold»-lenke og ingen `<h1>`-garanti per side; `PageHeader` finnes, men brukes ikke overalt.
-
-**[antakelse]** Kontrast i Kiosk (`#F4ECDC` på `#1B1410`) er sannsynligvis OK, men de hardkodede verdiene er aldri kontrastsjekket mot tokens.
-
----
-
-## 4) React/TypeScript-arkitektur og vedlikeholdbarhet
-
-**[bekreftet]** `npx eslint .` gir **1 142 feil og 117 advarsler**. Fordeling:
-- `@typescript-eslint/no-explicit-any`: **1 113**
-- `react-hooks/exhaustive-deps`: **59**
-- `react-refresh/only-export-components`: 48
-- `no-useless-escape`: 12, parse-/øvrige: ~10
-
-Med andre ord: `npm run lint` er i praksis ubrukelig som port — den er alltid rød.
-
-**[bekreftet]** Motstridende TypeScript-konfig: rot-`tsconfig.json` setter `"strictNullChecks": false` og `"noImplicitAny": false`, mens `tsconfig.app.json` setter `"strict": true` og `"noImplicitAny": true`. Bygget bruker app-konfigen, men editor/verktøy som plukker rotfila får en løsere kontrakt. **[antakelse]** Dette er sannsynligvis årsaken til at `any` har fått spre seg.
-
-**[bekreftet]** Vite kjører ingen typesjekk i bygget (`vite.config.ts` har ingen checker-plugin), og `package.json` har ikke noe `typecheck`-script. Typefeil kan altså nå produksjon.
-
-**[bekreftet]** 20+ filer over 800 linjer, topp: `Leveringskalender.tsx` 2 429, `CakeBuilderDetail.tsx` 1 689, `DeliveryRuleFormDialog.tsx` 1 661, `CustomerOrderModal.tsx` 1 645, `TastaturEditor.tsx` 1 574, `NewOrder.tsx` 1 421.
-
-**[bekreftet]** Datalag er ikke konsekvent: 59 filer under `pages/`/`components/` kaller `supabase.from(...)` direkte, mot 36 filer under `hooks/`. 518 `useQuery`-kall og 1 130 `queryKey`-literaler — nøkler bygges ad hoc, ikke via delte key-factories (unntak finnes, f.eks. `labelProductsQueryKey` i `src/produksjon/features/etiketter/hooks/useLabelProducts.ts`).
-
-**[bekreftet]** To Supabase-klienter med hver sin `storageKey`: `src/integrations/supabase/client.ts` (`nbos-auth-token`, cookie-storage) og `src/kiosk/integrations/supabase/client.ts`. Bevisst for Kiosk, men det dobler auth-overflaten.
-
----
-
-## 5) Ytelse og bundle-størrelse
-
-**[bekreftet]** Produksjonsbygg (1 m 8 s): `dist/assets` = **9,5 MB** ufordelt over 337 JS-chunks. Største:
-
-```text
-1.4M  react-pdf.browser-*.js
-1.4M  index-*.js            <- entry-chunk
-415K  Leveringskalender-*.js
-404K  xlsx-*.js
-399K  useCakeCalibration-*.js
-375K  RichTextEditor-*.js
-357K  LineChart-*.js
-321K  CakeImageEditor-*.js
-195K  html2canvas.esm-*.js
-```
-
-**[bekreftet]** Rollup advarer eksplisitt om manglende `manualChunks`; `vite.config.ts` setter kun `chunkSizeWarningLimit: 1200` — altså er advarselen skrudd opp, ikke løst.
-
-**[bekreftet]** Entry-chunken på 1,4 MB er problemet: `src/App.tsx` lazy-laster 160 sider, men importerer `AppShell`, `Topbar`, alle 17 providere, `Index`, `Login`, `Hjem` og samtlige app-contexts statisk. Alt dette lastes før innlogging.
-
-**[bekreftet]** Tunge biblioteker i `package.json` som trolig ikke trengs samtidig: `@react-pdf/renderer` + `jspdf` + `html2canvas` (tre PDF/render-veier), `xlsx`, `fabric` v6, `recharts`, `tiptap`.
-
-**[bekreftet]** Positivt: `QueryClient` er fornuftig satt (`staleTime: 5 min`, `refetchOnWindowFocus: false`, `retry: 1`) i `src/App.tsx`.
-
-**[bekreftet]** 117 `select("*")`-kall. Mot brede tabeller (`products` har 100 kolonner, `orders` 63, `customer_profiles` 53) er dette både ytelse og unødig dataeksponering.
-
-**[bekreftet]** `terserOptions.drop_console: false` — 83 `console.*`-kall følger med til produksjon.
-
----
-
-## 6) Autentisering, tilgangskontroll og RLS-risiko
-
-**[bekreftet — sikkerhetsskann]** Tre funn på **error**-nivå, alle «sensitive kolonner lesbare for feil rolle»:
-- `negotiation_recipients.access_token` / `password_hash` lesbare for enhver innlogget bruker med Råvarer-lesetilgang → intern bruker kan opptre som leverandør i portalen.
-- `pos_operators.pin_hash` lesbar for kiosk-brukere og butikkbrukere.
-- `user_invitations.code_hash` lesbar for plattformeiere.
-
-Fellesnevneren er den samme: RLS gir rad-tilgang, men ingen kolonne-restriksjon. Fikses med view/kolonne-grants, ikke med nye policyer.
-
-**[bekreftet — aktivt funn]** `pickup_locations_select_pos_active` gir `anon` SELECT på adresser og beskrivelser.
-
-**[bekreftet — supabase linter]** 232 issues: **7 tabeller med RLS på og null policyer** (INFO, men i praksis enten død tabell eller utilsiktet lukket), 201 SECURITY DEFINER-funksjoner kjørbare for innloggede, 14 kjørbare anonymt, 5 extensions i `public`, 3 funksjoner uten `search_path`, 2 materialiserte views i API-et. Flere av disse er tidligere merket «ignorert» av dere.
-
-**[bekreftet]** Klientsidens tilgangskontroll er kosmetikk med to nivåer: `ProtectedRoute` (er du logget inn + har en `users`-rad) og `AppAccessGuard` (finnes app-koden i `useAccessibleApps`). Begge er rene UI-gjerder. `src/ravarer/context/RavarerContext.tsx` henter riktignok ekte nivå via RPC `app_access_level`, men det mønsteret er ikke gjennomført i de andre appene — de fleste steder er `canWrite` ikke sjekket i det hele tatt før mutasjon.
-
-**[antakelse]** Den reelle sikkerheten hviler derfor nesten utelukkende på RLS. Det er i og for seg riktig arkitektur, men det betyr at hver av de 232 linter-funnene teller mer enn de ville gjort i en app med server-lag.
-
----
-
-## 7) Tester, observability og feiltilstander
-
-**[bekreftet]** **Ingen ErrorBoundary finnes i hele `src/`** (0 treff på `ErrorBoundary`, `componentDidCatch`, `errorElement`). En enkelt render-exception i f.eks. `Leveringskalender` gir hvit skjerm for hele appen, uten logging.
-
-**[bekreftet]** 8 testfiler for 856 kildefiler: `src/test/{cart,lineCost,osloDate,payment,pricing,recalcRegal,rls}.test.ts` og `src/rapporter/pages/__tests__/kunder.click.test.tsx`, pluss én edge-function-test. Kritiske forretningsregler uten test: leveringsregelmotoren, ordre-livssyklus/statusoverganger, fakturakjøringen, deklarasjons-/allergenmotoren, POS-journalens hash-kjede.
-
-**[bekreftet]** Ingen frontend-feilrapportering (ingen Sentry e.l. i `package.json`). Eneste observability er 83 `console.*` som havner i brukerens konsoll.
-
-**[bekreftet]** Ingen CI-konfig funnet; `npm run lint` er rød og `npm test` dekker ~1 % av flatene, så det finnes ingen automatisk port mot regresjon.
-
-**[bekreftet]** Positivt: alle filer som bruker Supabase-realtime rydder opp — 0 filer med `channel(` uten `removeChannel`.
-
-**[antakelse]** Lastetilstander finnes stedvis (`Skeleton` i `ProtectedRoute`/`AppAccessGuard`), men feiltilstander håndteres i hovedsak som `toast.error` uten mulighet til å prøve igjen.
-
----
-
-## 8) De ti viktigste forbedringene, rangert etter effekt/innsats
-
-| # | Tiltak | Effekt | Innsats |
-|---|---|---|---|
-| 1 | **ErrorBoundary** rundt `AppShell` + per rute-segment, med fallback og logging | Fjerner hvit-skjerm-klassen av feil helt | Lav |
-| 2 | **Lukk de tre error-funnene** (`negotiation_recipients`, `pos_operators.pin_hash`, `user_invitations.code_hash`) via views uten hemmelige kolonner + `REVOKE` på grunntabell | Fjerner reell privilegie-eskalering | Lav–middels |
-| 3 | **Rutetabell i stedet for 189 håndskrevne `<Route>`** — deklarativ `{path, appCode, element}`-liste som genererer `Shell`+`AppAccessGuard`+provider | Umulig å glemme en guard; App.tsx fra 526 → ~120 linjer | Middels |
-| 4 | **`manualChunks` + rens av PDF-stacken** (velg én av `@react-pdf`/`jspdf`+`html2canvas`), lat-last `xlsx`, `fabric`, `recharts` | Entry-chunk 1,4 MB → forventet under 400 KB | Middels |
-| 5 | **Gjør lint og typecheck grønn og blokkerende**: fjern motstridende flagg i rot-`tsconfig.json`, legg til `npm run typecheck`, sett `no-explicit-any` til `warn` med et tak som synker | Gjør de 1 142 feilene til et styrbart tall i stedet for støy | Middels |
-| 6 | **Én kilde for valgt selskap** — behold `SelectionProvider`, la `kunder`/`pos_styring`/`ravarer` lese derfra i stedet for egne contexts | Fjerner klassen «feil selskap i én fane» | Middels |
-| 7 | **Tester på forretningsreglene**: leveringsregler, statusoverganger, fakturagrunnlag, deklarasjonsmotor, POS-hashkjede | De fem stedene der en feil koster penger eller mattrygghet | Middels–høy |
-| 8 | **Feilrapportering** (Sentry e.l.) + `drop_console: true` i produksjon | Dere ser feil før brukeren ringer | Lav |
-| 9 | **A11y-basis**: erstatt de 16 `div onClick` med `<button>`, «hopp til innhold», `overflow-x-auto` på de 32 tabellfilene som mangler det, `aria-label` på ikon-knapper | Tastatur- og mobilbrukbarhet | Lav–middels |
-| 10 | **Del opp `Leveringskalender.tsx` (2 429 linjer)** i matrise-grid, celleeditor, filterlinje og datalag | Senker risiko på appens mest kritiske skjerm | Høy |
-
-Rekkefølgen er bevisst: 1, 2 og 8 er dagsverk med stor effekt; 3–6 er strukturelle og bør tas før modulmassen vokser videre; 7 og 10 er de dyre, men uunngåelige.
-
----
-
-## Hva jeg ikke rakk å verifisere
-
-- Faktisk mobilbruk: jeg målte klasser statisk, ikke rendret sideoppførsel på små skjermer.
-- Om de 7 «RLS enabled, no policy»-tabellene er døde eller aktivt i bruk.
-- Om de 201 SECURITY DEFINER-funksjonene kjørbare for innloggede er bevisst (mange ser ut som RPC-er appen faktisk kaller).
-- Kontrastmåling av Kiosk-fargene.
+# Ordre-modulen: analyse og ombyggingsplan
+
+Basert på lesing av NBOSv2/HEAD (`src/ordre`, `src/App.tsx`, `supabase/functions/*`) og read-only spørringer mot Supabase. Ingen kode eller database er endret.
+
+## A. Bekreftede funn (verifisert) vs. antakelser
+
+### A1. Omfang (bekreftet)
+- `src/ordre`: 203 filer, 46 141 linjer. 29 ruter under `/ordre` (`src/App.tsx:445-475`).
+- 62 hooks i `src/ordre/hooks`, 29 sider i `src/ordre/pages`.
+- Største filer: `Leveringskalender.tsx` 2429, `DeliveryRuleFormDialog.tsx` 1661, `CustomerOrderModal.tsx` 1645, `NewOrder.tsx` 1421, `CakeImageEditor.tsx` 1287, `TicketDetail.tsx` 1173, `OrdersList.tsx` 1060, `DeliveryNoteDashboard.tsx` 897, `matrix/TourOrderDialog.tsx` 874, `useCustomerOrders.ts` 614.
+- 35 `select('*')` i 20 filer; 27 `.tsx`-komponenter med direkte Supabase-kall; 175 `any`.
+- **0 filer i `src/ordre` håndterer `isError`** mot 53 som bruker `isLoading`. Feiltilstander vises praktisk talt ikke.
+
+### A2. Ordrekontorets dashbord (bekreftet)
+`src/ordre/pages/Dashboard.tsx` (301 linjer) har bare fire KPI-er, alle ekte data:
+- «Nye e-poster» — `useTicketCounts` (`useTickets.ts:193`, fire separate spørringer + `auth.getUser()`).
+- «Fastordre i dag (ikke kjørt)» — `usePendingRecurringOrderRows`.
+- «Levering i dag/i morgen» — `useDeliveryDayStats` (`useOrders.ts:123`, henter alle ordrerader og aggregerer i klienten).
+- Under: `components/shell/TicketsInbox.tsx`-widget (373 linjer) + fastordre-liste med hardkodet `VISIBLE = 12`.
+
+Data som allerede finnes, men **ikke** er på dashbordet:
+| Arbeidsliste | Kilde som allerede finnes |
+| --- | --- |
+| Til godkjenning / avvik | `orders.status='awaiting_confirmation'`, `orders.rule_flags`, `approval_reason`; `useAcceptanceQueueCount`, `useOrdersLifecycle` |
+| Frister som nærmer seg | RPC `check_order_deadline_violations`, `evaluate_delivery_rules`, `usePreviewDeliveryRules` |
+| Pakkseddel-status/avvik | RPC `get_delivery_day_status` via `useDeliveryDayStatus.ts` (returnerer allerede `hovedkjoring`, `tilleggskjoringer`, `pauser`, og tellere for fastordre, daterte, retur, pakksedler, venter_godkjenning, **uten_tur**) — hooken finnes, men brukes ikke på dashbordet |
+| Nettbutikkordre som venter | `website_orders` (11 rader), `website_order_rejects`, `WebsiteOrders.tsx` |
+| Retur/tilbakebetaling | `refunds` (1 rad), `useRefunds`, `useReturnDeliveryNotes` |
+| Nylige endringer | `order_status_history`, `audit_log`, `ticket_events` |
+| Manglende tur/pris/kundeinfo | `orders.delivery_tour_id is null`, `order_lines.unit_price`, `pickup_locations` |
+
+**Mangler:** ingen samlet «arbeidsbord»-RPC, ingen «mine oppgaver», ingen kobling mellom ticket-kø og ordrekø, ingen aggregering på server (dashbordet henter rader og teller i browseren).
+
+### A3. Tickets / e-post / M365 / AI (bekreftet)
+Datagrunnlag (faktiske radtall): `tickets` 73, `ticket_inbound_messages` **1**, `ticket_replies` 10, `ticket_events` 27, `ticket_attachments` 2, `email_outbox` 10, `microsoft_oauth_tokens` 2. Status: 72 av 73 tickets er `resolved`; kun 11 har `ai_status='success'`.
+
+Flyten som finnes:
+- `microsoft-graph-webhook` (355 l): validation-handshake, `clientState`-sjekk, idempotens på `microsoft_message_id` mot både `tickets` og `ticket_inbound_messages`, tråding via `conversation_id`, fallback via `[T-xxxxxxxx]` i emnet + RPC `find_ticket_by_short_id`, `awaiting_external`-håndtering, `ticket_events`-logging, vedleggsopplasting.
+- OAuth: `microsoft-oauth-init/callback/disconnect`, `microsoft-token-refresh`, abonnement: `microsoft-graph-subscription-create/renew/delete`.
+- Utsending: `microsoft-graph-send`, `microsoft-graph-reply`, `microsoft-graph-reply-ticket`, `process-email-outbox`, `send-order-confirmation`.
+- AI: `analyze-email-with-ai` (581 l), `generate-ticket-reply` (398 l), `apply-ticket-change` (365 l), `check-ai-secrets`; UI `AiForslag.tsx`, `ChangeIntentCard.tsx`.
+- `tickets.related_order_id` finnes, med RPC `sync_ticket_order_link` og tabell `ticket_order_links` (mange-til-mange) — **to parallelle koblingsmodeller**.
+
+Konkrete feil/risikoer, alle bekreftet i kode:
+1. **Postboks-inkonsistens `/me` vs `/users/{mailbox}`**: `microsoft-graph-webhook:104` og `:286` og `ticket-refetch-attachments:79` og `microsoft-graph-reply-ticket:81` bruker `/me/...`, mens `microsoft-graph-send:132`, `microsoft-graph-reply:115`, `send-order-confirmation:91` og `_shared/graph-mail.ts:51` bruker `/users/{mailbox}/...`. Med to rader i `microsoft_oauth_tokens` og delt postboks `ordre@notterobakeri.no` vil `/me` treffe kontoen som eier tokenet, ikke nødvendigvis den delte postkassen. Dette er den mest sannsynlige årsaken til at `ticket_inbound_messages` bare har 1 rad.
+2. **Token-valg**: `microsoft-graph-send:98-103` tar «nyeste rad» i `microsoft_oauth_tokens` uten å filtrere på postboks. Med to rader er hvilken konto som sender ikke-deterministisk.
+3. **Idempotens uten unik nøkkel**: webhooken sjekker eksistens og setter inn i to steg (les-så-skriv). Ved parallelle notifikasjoner for samme melding kan duplikater oppstå. Bør sikres med unik indeks + `on conflict`.
+4. **Tråd-identitet**: kun `conversation_id` + emne-tag. `In-Reply-To`/`References`/`microsoft_internet_message_id` lagres, men brukes ikke til matching. Reply-all og videresending utenfra gir nye conversation-id-er.
+5. **Sanitization**: `body_html` lagres rått og rendres i tråden. Må verifiseres at all rendering går gjennom sanitizer; quoted text trimmes ikke, så tråder blir uleselige.
+6. **Status/SLA/ansvar**: `tickets.status` er fritekst `text`, ikke enum. `assigned_team` er enum `ticket_team`, `assigned_to` uuid, `followers` array — men det finnes ingen `sla_due_at`/`first_response_at`-kolonne; SLA beregnes i klienten (`lib/sla.ts`, `useSlaSettings`).
+7. **Ingen låsing/concurrency**: `useUpdateTicket` skriver hele felt uten `updated_at`-sjekk; to saksbehandlere overskriver hverandre. `useTicketPresence` finnes, men er bare visning.
+8. `useTickets` bruker `select('*')` med `limit(500)` og filtrerer klientsidig på tilordning — henter `body_html` for 500 tickets til listevisningen.
+
+**«AI foreslår, menneske godkjenner» — det som mangler:** ingen felles forslagstabell med livssyklus (foreslått → godkjent/avvist → anvendt), ingen sporing av hvem som godkjente, ingen diff-visning som er lik på tvers av ordreutkast/svarutkast, ingen re-kjøring/versjonering av forslag. `ai_suggestion` er en løs jsonb uten skjema, og `apply-ticket-change` er eneste anvend-vei.
+
+### A4. Leveringskalender / matrise (bekreftet)
+- `Leveringskalender.tsx` 2429 linjer med all state, tabellrendering, dialoger og PDF-trigger i én fil. Matrisekomponentene er dialoger (`matrix/TourOrderDialog.tsx` 874, `CorrectionsDialog.tsx` 471, `ProductWeekEditor.tsx` 347 …), ikke et gjenbrukbart grid.
+- Layout: `mx-auto w-[95%] max-w-[1800px] px-2` på linje 1105 og 1514 — dobbel container inne i sidens shell, med fast tak på 1800px og 5 % marg som spiser skjermbredde. Første kolonne er låst til `w-[320px] min-w-[320px]` (linje 2025, 2154, 2329, 2352). Sticky topprad `top-0 z-20` (2022) og sticky venstrekolonne `left-0` med tre ulike z-indekser (10/20/30).
+- Ingen virtualisering: alle produktrader × dager rendres. Med full varekatalog blir dette tungt.
+- **Dato/tidssone: tre ulike strategier i samme fil** — `new Date(dato + "T12:00:00")` (linje 244, 1292, 1565, 1892, 2031, 2071, 2154, 2390), `T00:00:00` (2071) og `Date.UTC(...)` (1913, 1916). `src/lib/osloDate.ts` finnes, men brukes bare delvis.
+- Lagring går via `save_matrix_changes` (`useMatrix.ts:124`) som sender kun endrede celler — bra — men det finnes ingen optimistisk lås: `get_customer_matrix_data` leses med `staleTime: 15_000` og skrivinger sjekker ikke om raden er endret av andre.
+
+### A5. Kundeordre (bekreftet)
+- `CustomerOrders.tsx` (118 l) er kun kundevelger + `CustomerOrdersTab`. Ingen oversikt over kommende/tidligere ordre før kunde er valgt, ingen kalender/tidslinje, ingen hurtighandlinger.
+- `CustomerOrdersTab.tsx` 273 l, `CustomerOrderModal.tsx` 1645 l (skjema, kakebilder, vedlegg, AI-forslag i én komponent).
+- `useCustomerOrders.ts` 614 l gjør fler-stegs skriving i klienten: `next_order_number` → insert `orders` → insert `order_lines` → ved feil **manuell rollback via `delete`** (linje 341) og `orders.update(prevOrder)` (linje 522). Dette er ikke transaksjonelt; en avbrutt fane kan etterlate halve ordre.
+- `(supabase as any).rpc("replace_child_rows", …)` (linje 511) — utypet RPC-kall.
+
+### A6. Antakelser (ikke verifisert)
+- At `/me` er hovedårsaken til lav inbound-volum er en sterk, men ikke bevist hypotese; må bekreftes mot Graph-logg og edge-function-logg.
+- RLS-status per ticket-tabell er ikke gjennomgått policy for policy i denne runden.
+- Lint/typecheck ble ikke kjørt i denne meldingen (kun statiske søk), for å unngå tilstandsendringer.
+
+## B. Rangert feil-/mangelliste
+
+### P0 — blokkerer daglig drift eller gir datafeil
+1. Graph-postboks `/me` vs `/users/{mailbox}` og ikke-deterministisk tokenvalg → e-post kan hentes/sendes fra feil konto.
+2. Ingen unik indeks som håndhever idempotens på `microsoft_message_id` → duplikate tickets/meldinger ved samtidige webhooks.
+3. Ikke-transaksjonell ordreoppretting/-oppdatering i `useCustomerOrders.ts` med manuell rollback.
+4. Ingen feiltilstander i UI (0 `isError`) → stille feil ser ut som «tomt».
+5. Ingen samtidighetskontroll på ticket-status og matrise-celler → overskriving mellom saksbehandlere.
+
+### P1 — reduserer effektivitet betydelig
+6. Dashbordet er ikke et arbeidsbord: fire KPI-er, klientaggregering, ingen køer for godkjenning/frister/nettbutikk/retur/uten tur — selv om `get_delivery_day_status` allerede gir tallene.
+7. Tråd-identitet kun via `conversation_id` + emnetag; quoted text og reply-all ikke håndtert.
+8. Ingen strukturert AI-forslagslivssyklus (godkjent av / avvist / anvendt).
+9. `Leveringskalender.tsx` 2429 linjer, dobbel container, fast 1800px, ingen virtualisering, tre dato-strategier.
+10. `select('*')` på `tickets` med `limit(500)` inkl. `body_html` i listevisning.
+11. To parallelle ordre↔ticket-koblingsmodeller (`related_order_id` og `ticket_order_links`).
+
+### P2 — teknisk gjeld
+12. 14 filer over 600 linjer; `CustomerOrderModal.tsx` og `DeliveryRuleFormDialog.tsx` bør splittes.
+13. 175 `any`, verst i pakkseddel-hooks; utypede RPC-kall.
+14. 27 komponenter med direkte Supabase-kall utenfor hooks.
+15. Navnekollisjon `pages/TicketsInbox.tsx` vs `components/shell/TicketsInbox.tsx`.
+16. Død rute `/ordre/avvik` (Placeholder) og foreldreløs `src/ordre/pages/Pakkesystem.tsx` (ruten redirigerer til produksjon).
+17. A11y: sticky tabell uten `scope`/`aria-sort` gjennomgått, fokusfeller i store dialoger.
+
+## C. Implementeringsplan i tre leveranser
+
+**Leveranse 1 — Arbeidsbord + feiltilstander (ingen DB-endringer).**
+Nytt operativt dashbord bygget på eksisterende hooks/RPC-er (`get_delivery_day_status`, `useOrdersLifecycle`, `useAcceptanceQueueCount`, `website_orders`, `useRefunds`, `order_status_history`). Felles `QueryState`-komponent for laster/feil/tomt som tas i bruk på ordre-, ticket- og kalendersidene. Rydding: fjern død `/ordre/avvik`-rute, omdøp widget til `TicketsInboxWidget`, stram `useTickets` til eksplisitt kolonneliste uten `body_html`. Drift påvirkes ikke — eksisterende sider består.
+
+**Leveranse 2 — E-post- og ticket-hardening.**
+Standardiser alle Graph-kall til `/users/{mailbox}`, velg token deterministisk per postboks, legg unik indeks + `on conflict` for idempotens, utvid trådmatching med `internet_message_id`/`In-Reply-To`, sanitize og kollaps quoted text i tråden, innfør optimistisk lås på ticket-oppdatering. Samle AI-forslag i én livssyklus med godkjenn/avvis/anvend og sporing av bruker.
+
+**Leveranse 3 — Kalender og kundeordre.**
+Del `Leveringskalender.tsx` i grid-, toolbar- og dialoglag, fjern dobbel container og 1800px-taket, én dato-hjelper (`osloDate`), virtualiser rader. Bygg ny kundeordre-arbeidsflate: kundesøk med nylige kunder, kommende/tidligere ordre, ukes-tidslinje, kopier forrige ordre, hurtigoppretting, avviks- og ticketkoblinger. Flytt ordreskriving til én transaksjonell RPC.
+
+## D. Filer i leveranse 1
+
+Nye:
+- `src/ordre/hooks/useOrderDeskBoard.ts` — samler eksisterende hooks til ett arbeidsbord-datasett.
+- `src/ordre/components/dashboard/WorkQueueCard.tsx` — generisk kø-kort (tittel, antall, tone, lenke, topp-5 rader).
+- `src/ordre/components/dashboard/KpiTile.tsx` — uttrekk av dagens `KpiCard` for gjenbruk.
+- `src/components/common/QueryState.tsx` — felles laster/feil/tomt-tilstand.
+
+Endres:
+- `src/ordre/pages/Dashboard.tsx` — bygges om til arbeidsbord med køer: til godkjenning, frister som nærmer seg, uten tur/hentested, nettbutikk venter, fastordre ikke kjørt, pakkseddelstatus, retur/tilbakebetaling, nye tickets, nylige endringer.
+- `src/ordre/hooks/useTickets.ts` — eksplisitte kolonner i `useTickets`, `useTicketCounts` slås sammen til færre spørringer.
+- `src/ordre/hooks/useOrders.ts` — `useDeliveryDayStats` teller med `head/count` i stedet for å hente alle rader.
+- `src/ordre/pages/OrdersList.tsx`, `TicketsInbox.tsx`, `Leveringskalender.tsx` — ta i bruk `QueryState`.
+- `src/App.tsx` — fjern `/ordre/avvik`-placeholder-ruten.
+- Omdøping: `src/ordre/components/shell/TicketsInbox.tsx` → `TicketsInboxWidget.tsx`.
+
+## E. Databaseendringer (først i leveranse 2, bakoverkompatibelt)
+
+Ingen nye tabeller foreslås; eksisterende modell utvides.
+1. `create unique index concurrently` på `tickets(microsoft_message_id)` og `ticket_inbound_messages(microsoft_message_id)` — krever dedupe-sjekk først (dagens volum: 73 / 1 rader, lav risiko).
+2. `alter table tickets add column if not exists sla_due_at timestamptz, first_response_at timestamptz` — nullable, backfill valgfritt; klientberegning består til feltene er fylt.
+3. `alter table ticket_inbound_messages add column if not exists in_reply_to text, references_header text` — nullable, kun brukt av ny trådmatching.
+4. Konsolidering av ordre↔ticket: behold `related_order_id` som «primær ordre», la `ticket_order_links` være kanonisk for flere koblinger; `sync_ticket_order_link` utvides slik at begge holdes i synk. Ingen kolonne slettes.
+5. Én transaksjonell RPC for ordreoppretting/-oppdatering (leveranse 3), `security definer` med `search_path=public`, som erstatter klient-rollbacken.
+
+RLS-krav for alt av det ovennevnte: nye kolonner arver eksisterende policyer; nye/endrede funksjoner må være `security definer` med eksplisitt entitetssjekk (`current_user_entity_ids()`), og `GRANT EXECUTE` gis kun til `authenticated`. Ingen `anon`-tilgang til ticket- eller ordredata.
