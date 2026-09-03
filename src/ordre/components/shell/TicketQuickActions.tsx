@@ -277,7 +277,10 @@ function LinkOrderDialog({
                         {o.customer_name ?? "—"}{o.delivery_date ? ` · ${o.delivery_date}` : ""}
                       </div>
                     </div>
-                    <span className="text-caption text-muted-foreground">{o.status}</span>
+                    <span className="text-caption text-muted-foreground">
+                      {getStatusMeta(o.status).label}
+                    </span>
+
                   </div>
                 </CommandItem>
               ))}
