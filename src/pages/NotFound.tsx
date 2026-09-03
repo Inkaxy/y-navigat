@@ -18,8 +18,13 @@ export default function NotFound() {
     <main className="flex min-h-screen items-center justify-center bg-surface-canvas px-4 py-10 safe-px">
       <section className="w-full max-w-md animate-fade-in rounded-[14px] border border-border bg-card p-6 text-center shadow-md sm:p-8">
         <div className="flex justify-center">
-          <Logo variant="monogram" className="h-16 w-auto text-brand-ink" title="Nøtterø Bakeri" />
+          <BrandMark
+            role="img"
+            aria-label="Nøtterø Bakeri"
+            className="h-24 w-auto text-brand-ink sm:h-28"
+          />
         </div>
+
 
         <p className="mt-6 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
           404
