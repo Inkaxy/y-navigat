@@ -37,7 +37,7 @@ import {
   type TicketAttachment,
 } from "@/ordre/hooks/useTickets";
 import { useUserAccess } from "@/ordre/hooks/useUserAccess";
-import { useTicketReplies, useSendTicketReply } from "@/ordre/hooks/useTicketReplies";
+import { useTicketReplies, useSendTicketReply, safeUuid } from "@/ordre/hooks/useTicketReplies";
 import {
   useInternalComments,
   useAddInternalComment,
@@ -331,6 +331,15 @@ export default function TicketDetail() {
   const [showEvents, setShowEvents] = useState(true);
   const [refundOpen, setRefundOpen] = useState(false);
   const [lightbox, setLightbox] = useState<{ url: string; name: string } | null>(null);
+  /**
+   * Idempotens-nøkkel for gjeldende svarutkast. Genereres én gang når brukeren
+   * begynner å skrive, og nullstilles først etter vellykket sending — slik at
+   * unik-indeksen i basen faktisk stopper dobbeltsending.
+   */
+  const [draftKey, setDraftKey] = useState<string | null>(null);
+  useEffect(() => {
+    if (text.trim() && !draftKey) setDraftKey(safeUuid());
+  }, [text, draftKey]);
 
   // Navn på aktører i hendelser + følgere + ansvarlig
   const nameIds = useMemo(
@@ -398,11 +407,16 @@ export default function TicketDetail() {
     const map = new Map<string, TicketAttachment[]>();
     const claimed = new Set<string>();
     for (const m of inboundMessages) {
+      // 1) Eksplisitt kobling fra webhooken — gjelder alle vedleggstyper.
+      const explicit = attachments.filter((a) => a.ticket_inbound_message_id === m.id);
+      // 2) Eldre rader uten kolonnen: fall tilbake til cid-referanser i HTML-en.
       const cids = extractCidRefs(m.body_html).map((c) => c.replace(/^<|>$/g, ""));
-      const mine = attachments.filter((a) => {
+      const byCid = attachments.filter((a) => {
+        if (a.ticket_inbound_message_id) return false;
         const cid = (a.content_id ?? "").replace(/^<|>$/g, "");
         return cid && cids.includes(cid);
       });
+      const mine = [...explicit, ...byCid];
       for (const a of mine) claimed.add(a.id);
       map.set(m.id, mine);
     }
@@ -411,7 +425,7 @@ export default function TicketDetail() {
   }, [attachments, inboundMessages]);
 
   const deadline = useMemo(
-    () => (sla && intent && ticket ? computeDeadline(ticket.received_at, intent, sla.sla, sla.bh) : null),
+    () => (sla && ticket ? computeDeadline(ticket.received_at, intent, sla.sla, sla.bh) : null),
     [sla, intent, ticket],
   );
   const countdown = deadline ? formatCountdown(deadline, new Date()) : null;
@@ -616,8 +630,13 @@ export default function TicketDetail() {
   const onSend = async () => {
     if (!text.trim() || !id) return;
     try {
-      await sendReply.mutateAsync({ ticket_id: id, body_text: text.trim() });
+      await sendReply.mutateAsync({
+        ticket_id: id,
+        body_text: text.trim(),
+        idempotency_key: draftKey ?? undefined,
+      });
       setText("");
+      setDraftKey(null);
       toast.success(`Svar sendt til ${ticket.sender_email}`);
     } catch (e) {
       toast.error(`Kunne ikke sende: ${e instanceof Error ? e.message : String(e)}`);
