@@ -22,6 +22,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useCompany } from "@/hooks/useCompany";
 import { toast } from "sonner";
 import { useState } from "react";
 import { useIsPlatformOwner } from "@/hooks/useIsPlatformOwner";
@@ -218,7 +219,7 @@ function AddPositionDialog({ userId, assignedBy }: { userId: string; assignedBy:
   const today = osloTodayISO();
   const [open, setOpen] = useState(false);
   const [positionId, setPositionId] = useState<string>("");
-  const [legalEntityId, setLegalEntityId] = useState<string>("");
+  const { data: company } = useCompany();
   const [validFrom, setValidFrom] = useState<string>(today);
   const [validTo, setValidTo] = useState<string>("");
   const [isPrimary, setIsPrimary] = useState(false);
@@ -237,16 +238,17 @@ function AddPositionDialog({ userId, assignedBy }: { userId: string; assignedBy:
 
 
   const reset = () => {
-    setPositionId(""); setLegalEntityId(""); setValidFrom(today); setValidTo(""); setIsPrimary(false);
+    setPositionId(""); setValidFrom(today); setValidTo(""); setIsPrimary(false);
   };
 
   const create = useMutation({
     mutationFn: async () => {
-      if (!positionId || !legalEntityId) throw new Error("Velg stilling og selskap");
+      if (!positionId) throw new Error("Velg stilling");
+      if (!company) throw new Error("Fant ikke firmaet");
       const { error } = await supabase.from("user_positions").insert({
         user_id: userId,
         position_id: positionId,
-        legal_entity_id: legalEntityId,
+        legal_entity_id: company.id,
         valid_from: validFrom,
         valid_to: validTo || null,
         is_primary: isPrimary,
