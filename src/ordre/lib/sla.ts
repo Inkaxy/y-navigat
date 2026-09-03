@@ -75,17 +75,23 @@ export function addBusinessHours(from: Date, hours: number, bh: BusinessHours): 
   return cur;
 }
 
+/**
+ * Frist for en ticket. Ukategoriserte henvendelser (AI har ikke kjørt, feilet
+ * eller ga «uklar») får standardfristen for «spørsmål» — 4 timer — slik at de
+ * aldri blir usynlige i køene.
+ */
 export function computeDeadline(
   receivedAt: string | Date,
   intent: RequestType | null | undefined,
   sla: SlaDeadlines,
   bh: BusinessHours,
 ): Date | null {
-  if (!intent) return null;
-  const hours = sla[intent] ?? DEFAULT_SLA[intent];
+  const hours =
+    (intent ? sla[intent] ?? DEFAULT_SLA[intent] : undefined) ?? sla.question ?? DEFAULT_SLA.question!;
   if (!hours) return null;
   return addBusinessHours(new Date(receivedAt), hours, bh);
 }
+
 
 export function formatCountdown(deadline: Date, now: Date = new Date()): { text: string; overdue: boolean } {
   const diff = deadline.getTime() - now.getTime();
