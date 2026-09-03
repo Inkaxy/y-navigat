@@ -7,8 +7,16 @@ export type TicketEventType =
   | "ticket.assigned"
   | "ticket.unassigned"
   | "ticket.status_changed"
+  | "ticket.priority_changed"
+  | "ticket.team_changed"
   | "ticket.resolved"
   | "ticket.reopened"
+  | "ticket.internal_ask"
+  | "ticket.transferred"
+  | "ticket.forwarded"
+  | "ticket.forwarded_external"
+  | "ticket.change_applied"
+  | "ticket.change_rejected"
   // AI
   | "ai.analysis_started"
   | "ai.analysis_completed"
@@ -20,16 +28,24 @@ export type TicketEventType =
   | "order.created_from_ticket"
   // Endringer
   | "order.fields_changed"
+  | "order.lines_changed"
   | "order.cancelled"
   | "order.status_changed"
   // Kommunikasjon
   | "reply.sent"
   | "confirmation.sent"
   | "customer.replied"
+  | "external.replied"
+  // Refusjon
+  | "refund.created"
+  | "refund.approved"
+  | "refund.rejected"
+  | "refund.paid"
   // Notater
   | "note.added"
   // Kakebilder
-  | "cake_image.printed";
+  | "cake_image.printed"
+  | "cake_image.attached";
 
 export type ActorType = "customer" | "staff" | "ai" | "system";
 
@@ -38,24 +54,44 @@ export const EVENT_LABEL: Record<TicketEventType, string> = {
   "ticket.assigned": "Tildelt ansvarlig",
   "ticket.unassigned": "Fjernet ansvarlig",
   "ticket.status_changed": "Status endret",
-  "ticket.resolved": "Markert ferdig",
+  "ticket.priority_changed": "Prioritet endret",
+  "ticket.team_changed": "Team endret",
+  "ticket.resolved": "Markert som løst",
   "ticket.reopened": "Gjenåpnet",
+  "ticket.internal_ask": "Spurt internt",
+  "ticket.transferred": "Eierskap overført",
+  "ticket.forwarded": "Videresendt",
+  "ticket.forwarded_external": "Videresendt til ekstern",
+  "ticket.change_applied": "Endringsforslag anvendt",
+  "ticket.change_rejected": "Endringsforslag avvist",
   "ai.analysis_started": "AI-analyse startet",
   "ai.analysis_completed": "AI-analyse fullført",
   "ai.analysis_failed": "AI-analyse feilet",
   "ai.suggestion_edited": "AI-forslag endret",
   "ticket.linked_to_order": "Koblet til ordre",
   "ticket.unlinked_from_order": "Frakoblet ordre",
-  "order.created_from_ticket": "Ordre opprettet fra ticket",
+  "order.created_from_ticket": "Ordre opprettet fra samtalen",
   "order.fields_changed": "Ordre endret",
+  "order.lines_changed": "Ordrelinjer endret",
   "order.cancelled": "Ordre kansellert",
   "order.status_changed": "Ordrestatus endret",
   "reply.sent": "Svar sendt til kunde",
   "confirmation.sent": "Bekreftelse sendt",
   "customer.replied": "Kunde svarte",
+  "external.replied": "Ekstern part svarte",
+  "refund.created": "Tilbakebetaling opprettet",
+  "refund.approved": "Tilbakebetaling godkjent",
+  "refund.rejected": "Tilbakebetaling avvist",
+  "refund.paid": "Tilbakebetaling utbetalt",
   "note.added": "Notat lagt til",
   "cake_image.printed": "Kakebilde skrevet ut",
+  "cake_image.attached": "Kakebilde lagt til",
 };
+
+/** Norsk etikett for en hendelseskode — ukjente koder vises som «Hendelse». */
+export function eventLabel(type: string): string {
+  return EVENT_LABEL[type as TicketEventType] ?? "Hendelse";
+}
 
 export type LogTicketEventInput = {
   ticket_id?: string | null;

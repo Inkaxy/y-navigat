@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { formatDistanceToNow } from "date-fns";
-import { nb } from "date-fns/locale";
-import { Paperclip, Package, AlertTriangle, Inbox } from "lucide-react";
+import { Paperclip, Package, AlertTriangle, Inbox, Search } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
@@ -23,6 +22,17 @@ import {
 } from "@/ordre/hooks/useTickets";
 
 import { computeDeadline, formatCountdown } from "@/ordre/lib/sla";
+import { useUserNames } from "@/ordre/hooks/useUserNames";
+import {
+  formatTicketTimeShort,
+  formatTicketTime,
+  formatTicketRelative,
+  ticketInitials,
+  TICKET_PRIORITY_LABEL,
+  TICKET_PRIORITY_DOT,
+  TICKET_PRIORITIES,
+} from "@/ordre/lib/ticketFormat";
+import type { TicketPriority } from "@/ordre/hooks/useTickets";
 
 type TicketRow = {
   id: string;
@@ -34,6 +44,8 @@ type TicketRow = {
   status: "new" | "in_progress" | "resolved" | "closed" | "spam";
   assigned_to: string | null;
   assigned_team: TicketTeam | null;
+  priority: TicketPriority;
+  updated_at: string;
   awaiting_internal: boolean;
   has_attachments: boolean;
   related_order_id: string | null;
@@ -58,6 +70,8 @@ type QueueKey =
   | "mine"
   | "awaiting_customer"
   | "resolved"
+  | "closed"
+  | "spam"
   | `team:${TicketTeam}`;
 
 /**
@@ -66,7 +80,16 @@ type QueueKey =
  */
 function parseQueueParam(raw: string | null): QueueKey {
   if (!raw) return "all";
-  const fixed: QueueKey[] = ["all", "new", "unassigned", "mine", "awaiting_customer", "resolved"];
+  const fixed: QueueKey[] = [
+    "all",
+    "new",
+    "unassigned",
+    "mine",
+    "awaiting_customer",
+    "resolved",
+    "closed",
+    "spam",
+  ];
   if ((fixed as string[]).includes(raw)) return raw as QueueKey;
   if (
     raw.startsWith("intent:") &&
@@ -82,13 +105,6 @@ function parseQueueParam(raw: string | null): QueueKey {
 
 
 
-
-function initials(name: string | null, email: string): string {
-  const src = (name ?? email).trim();
-  const parts = src.split(/\s+/).filter(Boolean);
-  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
-  return src.slice(0, 2).toUpperCase();
-}
 
 function ConfidenceChip({ score }: { score: number | null }) {
   if (score == null) return null;
@@ -119,7 +135,7 @@ function useInboxTickets() {
       const { data, error } = await supabase
         .from("tickets")
         .select(
-          "id, subject, body_preview, sender_name, sender_email, received_at, status, assigned_to, assigned_team, awaiting_internal, has_attachments, related_order_id, ai_confidence_score, ai_suggestion, orders:related_order_id(order_number)",
+          "id, subject, body_preview, sender_name, sender_email, received_at, updated_at, status, priority, assigned_to, assigned_team, awaiting_internal, has_attachments, related_order_id, ai_confidence_score, ai_suggestion, orders:related_order_id(order_number)",
         )
         .order("received_at", { ascending: false })
         .limit(500);
@@ -293,10 +309,14 @@ export default function TicketsInbox() {
 
 
   const { data: sla } = useSlaSettings();
+  const [search, setSearch] = useState("");
+  const [priority, setPriority] = useState<TicketPriority | "all">("all");
 
   const ticketIds = useMemo(() => tickets.map((t) => t.id), [tickets]);
   const { data: latestReply = new Map<string, string>() } = useLatestReplyByTicket(ticketIds);
   const { data: latestInbound = new Map<string, string>() } = useLatestInboundByTicket(ticketIds);
+  const assigneeIds = useMemo(() => tickets.map((t) => t.assigned_to), [tickets]);
+  const { data: assigneeNames = {} } = useUserNames(assigneeIds);
 
 
   const rows: Row[] = useMemo(
@@ -336,6 +356,8 @@ export default function TicketsInbox() {
       unassigned: open.filter((r) => r.assigned_to == null).length,
       awaiting_customer: rows.filter((r) => r.awaitingCustomer && isOpen(r)).length,
       resolved: rows.filter((r) => r.status === "resolved").length,
+      closed: rows.filter((r) => r.status === "closed").length,
+      spam: rows.filter((r) => r.status === "spam").length,
       mine: rows.filter((r) => r.assigned_to === user?.id && isOpen(r)).length,
       intent: {} as Record<RequestType, number>,
       team: {} as Record<TicketTeam, number>,
@@ -376,6 +398,8 @@ export default function TicketsInbox() {
     else if (queue === "awaiting_customer")
       out = rows.filter((r) => r.awaitingCustomer && isOpen(r));
     else if (queue === "resolved") out = rows.filter((r) => r.status === "resolved");
+    else if (queue === "closed") out = rows.filter((r) => r.status === "closed");
+    else if (queue === "spam") out = rows.filter((r) => r.status === "spam");
     else if (queue.startsWith("intent:")) {
       const k = queue.slice("intent:".length) as RequestType;
       out = rows.filter((r) => r.intent === k && isOpen(r));
@@ -383,8 +407,31 @@ export default function TicketsInbox() {
       const k = queue.slice("team:".length) as TicketTeam;
       out = rows.filter((r) => r.assigned_team === k && isOpen(r));
     } else out = rows;
-    return queue === "resolved" ? out : [...out].sort(sortByDeadline);
-  }, [rows, queue, user?.id]);
+
+    if (priority !== "all") out = out.filter((r) => r.priority === priority);
+
+    const term = search.trim().toLowerCase();
+    if (term.length >= 2) {
+      out = out.filter((r) =>
+        [
+          r.subject,
+          r.sender_name,
+          r.sender_email,
+          r.body_preview,
+          r.orders?.order_number,
+        ]
+          .filter(Boolean)
+          .some((v) => String(v).toLowerCase().includes(term)),
+      );
+    }
+
+    const closedish = queue === "resolved" || queue === "closed" || queue === "spam";
+    return closedish
+      ? [...out].sort(
+          (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
+        )
+      : [...out].sort(sortByDeadline);
+  }, [rows, queue, user?.id, search, priority]);
 
 
   return (
@@ -490,6 +537,18 @@ export default function TicketsInbox() {
             label="Løste"
             count={counts.resolved}
           />
+          <QueueButton
+            active={queue === "closed"}
+            onClick={() => setQueue("closed")}
+            label="Lukket"
+            count={counts.closed}
+          />
+          <QueueButton
+            active={queue === "spam"}
+            onClick={() => setQueue("spam")}
+            label="Søppel"
+            count={counts.spam}
+          />
 
           <SectionLabel>Team-køer</SectionLabel>
           {TEAMS.map((team) => (
@@ -516,6 +575,39 @@ export default function TicketsInbox() {
 
         {/* Liste */}
         <div className="min-w-0">
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <div className="relative min-w-0 flex-1">
+              <Search
+                className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"
+                aria-hidden="true"
+              />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Søk i emne, avsender, ordrenummer …"
+                aria-label="Søk i henvendelser"
+                className="h-9 bg-background pl-8"
+              />
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {(["all", ...TICKET_PRIORITIES] as const).map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => setPriority(p)}
+                  className={cn(
+                    "rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors",
+                    priority === p
+                      ? "border-[hsl(var(--brand-bronze))] bg-[hsl(var(--brand-bronze)/0.14)] text-foreground"
+                      : "border-border bg-background text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {p === "all" ? "Alle prioriteter" : TICKET_PRIORITY_LABEL[p]}
+                </button>
+              ))}
+            </div>
+          </div>
+
         <QueryState
           isLoading={isLoading}
           isError={isError}
@@ -575,6 +667,15 @@ export default function TicketsInbox() {
                         <span className="truncate text-sm font-semibold text-foreground">
                           {t.subject || "(uten emne)"}
                         </span>
+                        {t.priority !== "normal" && (
+                          <span
+                            className={cn(
+                              "h-2 w-2 shrink-0 rounded-full",
+                              TICKET_PRIORITY_DOT[t.priority],
+                            )}
+                            title={`Prioritet: ${TICKET_PRIORITY_LABEL[t.priority]}`}
+                          />
+                        )}
                         {t.has_attachments && (
                           <Paperclip
                             className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
@@ -592,11 +693,8 @@ export default function TicketsInbox() {
                           {t.sender_name || t.sender_email}
                         </span>
                         <span aria-hidden="true">·</span>
-                        <span className="shrink-0">
-                          {formatDistanceToNow(new Date(t.received_at), {
-                            locale: nb,
-                            addSuffix: true,
-                          })}
+                        <span className="shrink-0" title={formatTicketRelative(t.received_at)}>
+                          {formatTicketTimeShort(t.received_at)}
                         </span>
                       </div>
                     </div>
@@ -635,17 +733,23 @@ export default function TicketsInbox() {
                           {t.countdown}
                         </span>
                       )}
-                      <span className="hidden w-24 text-right text-xs text-muted-foreground md:inline">
-                        {formatDistanceToNow(new Date(t.received_at), {
-                          locale: nb,
-                          addSuffix: true,
-                        })}
+                      <span
+                        className="hidden w-36 text-right text-xs text-muted-foreground md:inline"
+                        title={`Mottatt ${formatTicketTime(t.received_at)} · sist aktivitet ${formatTicketTime(t.updated_at)}`}
+                      >
+                        {formatTicketTimeShort(t.received_at)}
                       </span>
                       <span
                         className="hidden h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-semibold text-muted-foreground sm:flex"
-                        title={t.assigned_to ? "Tildelt" : "Ikke tildelt"}
+                        title={
+                          t.assigned_to
+                            ? `Ansvarlig: ${assigneeNames[t.assigned_to] ?? "Ukjent bruker"}`
+                            : "Uten ansvarlig"
+                        }
                       >
-                        {t.assigned_to ? initials(t.sender_name, t.sender_email) : "—"}
+                        {t.assigned_to
+                          ? ticketInitials(assigneeNames[t.assigned_to] ?? null, "?")
+                          : "—"}
                       </span>
                     </div>
                   </div>

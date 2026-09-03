@@ -25,6 +25,8 @@ interface Props {
   replyText: string;
   onConsumeReplyText: () => void;
   linkedOrderNumber?: string | null;
+  /** Hvilke handlinger som vises. Standard: alle tre. */
+  show?: Array<"ask" | "transfer" | "forward">;
 }
 
 export default function TicketComposerActions({
@@ -32,7 +34,9 @@ export default function TicketComposerActions({
   replyText,
   onConsumeReplyText,
   linkedOrderNumber,
+  show = ["ask", "transfer", "forward"],
 }: Props) {
+  const visible = (k: "ask" | "transfer" | "forward") => show.includes(k);
   const { data: users = [] } = useActiveUsers();
   const addComment = useAddInternalComment();
   const updateTicket = useUpdateTicket();
@@ -227,8 +231,9 @@ export default function TicketComposerActions({
   };
 
   return (
-    <div className="mt-3 space-y-3 border-t pt-3">
+    <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
+        {visible("ask") && (
         <div className="flex items-center gap-1.5">
           <Select value={mention} onValueChange={setMention}>
             <SelectTrigger className="h-9 w-[220px] bg-background">
@@ -263,7 +268,9 @@ export default function TicketComposerActions({
             <AtSign className="h-3.5 w-3.5" /> Spør internt (@tagg)
           </Button>
         </div>
+        )}
 
+        {visible("transfer") && (
         <Button
           variant="outline"
           size="sm"
@@ -275,7 +282,9 @@ export default function TicketComposerActions({
         >
           <Users2 className="h-3.5 w-3.5" /> → Overfør eierskap
         </Button>
+        )}
 
+        {visible("forward") && (
         <Button
           variant="outline"
           size="sm"
@@ -287,6 +296,7 @@ export default function TicketComposerActions({
         >
           <Forward className="h-3.5 w-3.5" /> ✉️ Videresend til e-post
         </Button>
+        )}
       </div>
 
       {transferOpen && (
@@ -379,11 +389,13 @@ export default function TicketComposerActions({
         </div>
       )}
 
+      {show.length === 3 && (
       <p className="text-[11px] text-muted-foreground">
         <b>@tagg</b> = du beholder samtalen, de varsles og svarer internt. <b>Overfør</b> ={" "}
         samtalen flyttes til deres kø. <b>Videresend</b> = e-post ut av huset — svaret rutes
         tilbake hit.
       </p>
+      )}
     </div>
   );
 }

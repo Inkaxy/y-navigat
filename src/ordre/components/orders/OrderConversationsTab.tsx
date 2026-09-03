@@ -1,13 +1,18 @@
 import { Link } from "react-router-dom";
-import { formatDistanceToNow } from "date-fns";
-import { nb } from "date-fns/locale";
 import { MessageSquare, ArrowUpRight, Paperclip, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
-import { initialsOf } from "@/ordre/lib/format";
+import {
+  formatTicketTime,
+  formatTicketTimeShort,
+  formatTicketRelative,
+  ticketInitials,
+  TICKET_STATUS_LABEL,
+  TICKET_STATUS_STYLE,
+} from "@/ordre/lib/ticketFormat";
 import {
   normalizeAiSuggestion,
   REQUEST_TYPE_LABEL,
@@ -20,30 +25,12 @@ import {
 import { TimelineCard } from "@/ordre/components/orders/TimelineCard";
 import type { TicketStatus } from "@/ordre/hooks/useTickets";
 
-const STATUS_LABEL: Record<TicketStatus, string> = {
-  new: "Åpen",
-  in_progress: "Åpen",
-  resolved: "Løst",
-  closed: "Løst",
-  spam: "Spam",
-};
-
-const STATUS_STYLE: Record<TicketStatus, string> = {
-  new: "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30",
-  in_progress:
-    "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30",
-  resolved:
-    "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30",
-  closed:
-    "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30",
-  spam: "bg-muted text-muted-foreground border-border",
-};
 
 function ConversationRow({ t }: { t: OrderConversation }) {
   const status: TicketStatus = t.awaiting_internal ? "in_progress" : t.status;
   const displayStatus: string = t.awaiting_internal
-    ? "Venter"
-    : STATUS_LABEL[t.status];
+    ? "Venter internt"
+    : TICKET_STATUS_LABEL[t.status];
   const ai = normalizeAiSuggestion(t.ai_suggestion);
   const intent = ai?.request_type ?? null;
   const senderLabel = t.sender_name || t.sender_email;
@@ -52,7 +39,7 @@ function ConversationRow({ t }: { t: OrderConversation }) {
     <div className="flex flex-wrap items-center gap-3 border-t border-border px-3 py-3 first:border-t-0 hover:bg-accent/40">
       <Avatar className="h-8 w-8 shrink-0">
         <AvatarFallback className="text-[11px]">
-          {initialsOf(senderLabel)}
+          {ticketInitials(senderLabel, t.sender_email)}
         </AvatarFallback>
       </Avatar>
       <div className="min-w-0 flex-1">
@@ -78,18 +65,15 @@ function ConversationRow({ t }: { t: OrderConversation }) {
             <MessageSquare className="h-3 w-3" />
             {t.message_count}
           </span>
-          <span>
-            Sist aktivitet{" "}
-            {formatDistanceToNow(new Date(t.last_activity_at), {
-              locale: nb,
-              addSuffix: true,
-            })}
+          <span title={formatTicketRelative(t.last_activity_at)}>
+            Sist aktivitet {formatTicketTimeShort(t.last_activity_at)}
           </span>
+          <span title="Mottatt">{formatTicketTime(t.received_at)}</span>
         </div>
       </div>
       <Badge
         variant="outline"
-        className={cn("text-[10px] shrink-0", STATUS_STYLE[status])}
+        className={cn("text-[10px] shrink-0", TICKET_STATUS_STYLE[status])}
       >
         {displayStatus}
       </Badge>

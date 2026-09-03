@@ -1,6 +1,4 @@
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
@@ -9,6 +7,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
+import { useSendTicketReply } from "@/ordre/hooks/useTicketReplies";
+import { useUpdateTicket } from "@/ordre/hooks/useTickets";
 import type { Ticket } from "@/ordre/hooks/useTickets";
 
 export function TicketReplyDialog({
@@ -21,36 +21,31 @@ export function TicketReplyDialog({
   onOpenChange: (v: boolean) => void;
 }) {
   const { toast } = useToast();
-  const qc = useQueryClient();
   const [body, setBody] = useState("");
   const [markResolved, setMarkResolved] = useState(false);
+  const sendReply = useSendTicketReply();
+  const update = useUpdateTicket();
 
-  const send = useMutation({
-    mutationFn: async () => {
-      const html = body
-        .split(/\n{2,}/)
-        .map((p) => `<p>${escapeHtml(p).replace(/\n/g, "<br/>")}</p>`)
-        .join("");
-      const { data, error } = await supabase.functions.invoke("microsoft-graph-reply-ticket", {
-        body: { ticket_id: ticket.id, body_html: html, mark_resolved: markResolved },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      return data;
-    },
-    onSuccess: () => {
+  const onSend = async () => {
+    try {
+      await sendReply.mutateAsync({ ticket_id: ticket.id, body_text: body });
+      if (markResolved) {
+        await update.mutateAsync({ id: ticket.id, patch: { status: "resolved" } });
+      }
       toast({ title: "Svar sendt", description: `Til ${ticket.sender_email}` });
-      qc.invalidateQueries({ queryKey: ["tickets"] });
-      qc.invalidateQueries({ queryKey: ["ticket", ticket.id] });
-      qc.invalidateQueries({ queryKey: ["tickets-counts"] });
-      setBody(""); setMarkResolved(false); onOpenChange(false);
-    },
-    onError: (e) => toast({
-      title: "Kunne ikke sende svar",
-      description: e instanceof Error ? e.message : String(e),
-      variant: "destructive",
-    }),
-  });
+      setBody("");
+      setMarkResolved(false);
+      onOpenChange(false);
+    } catch (e) {
+      toast({
+        title: "Kunne ikke sende svar",
+        description: e instanceof Error ? e.message : String(e),
+        variant: "destructive",
+      });
+    }
+  };
+
+  const pending = sendReply.isPending || update.isPending;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -85,18 +80,14 @@ export function TicketReplyDialog({
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={send.isPending}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={pending}>
             Avbryt
           </Button>
-          <Button onClick={() => send.mutate()} disabled={!body.trim() || send.isPending}>
-            {send.isPending ? "Sender …" : "Send svar"}
+          <Button onClick={() => void onSend()} disabled={!body.trim() || pending}>
+            {pending ? "Sender …" : "Send svar"}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
-}
-
-function escapeHtml(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
