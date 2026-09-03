@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useCompany } from "@/hooks/useCompany";
 
 export interface PresenceUser {
   user_id: string;
@@ -14,17 +15,18 @@ export interface PresenceUser {
  */
 export function useTicketPresence(ticketId: string | undefined) {
   const { user } = useAuth();
+  const { data: company } = useCompany();
+  const companyId = company?.id;
   const [others, setOthers] = useState<PresenceUser[]>([]);
 
   useEffect(() => {
-    if (!ticketId || !user?.id) return;
+    if (!ticketId || !user?.id || !companyId) return;
 
     let cancelled = false;
     let channel: ReturnType<typeof supabase.channel> | null = null;
 
     (async () => {
-      // Hent display_name (best-effort). Tickets er foreløpig kun NB (single-LE).
-      const NB_LEGAL_ENTITY_ID = "751709bc-04b3-4449-867d-b97faa9ab373";
+      // Hent display_name (best-effort). NBhub er ett firma — id fra useCompany().
       const { data: profile } = await supabase
         .from("users_public")
         .select("display_name, first_name")
@@ -35,7 +37,7 @@ export function useTicketPresence(ticketId: string | undefined) {
         profile?.first_name ??
         user.email ??
         "Ukjent bruker";
-      const legalEntityId = NB_LEGAL_ENTITY_ID;
+      const legalEntityId = companyId;
 
       if (cancelled || !legalEntityId) return;
 
@@ -78,7 +80,7 @@ export function useTicketPresence(ticketId: string | undefined) {
       }
       setOthers([]);
     };
-  }, [ticketId, user?.id, user?.email]);
+  }, [ticketId, user?.id, user?.email, companyId]);
 
   return others;
 }

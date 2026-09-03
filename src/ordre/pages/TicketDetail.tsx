@@ -1,244 +1,95 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import DOMPurify from "dompurify";
-import { format, formatDistanceToNow } from "date-fns";
-import { nb } from "date-fns/locale";
+import { Link, useParams } from "react-router-dom";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  AlertTriangle,
   ArrowLeft,
-  ArrowRight,
-  Package,
-  CheckCircle2,
+  AtSign,
   Loader2,
+  Lock,
   Paperclip,
   Send,
   Sparkles,
-  StickyNote,
-  Wallet,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
 import { TicketPresenceBanner } from "@/ordre/components/shell/TicketPresenceBanner";
 
 import {
   useTicket,
-  useUpdateTicket,
   getTicketAttachmentSignedUrl,
+  type TicketAttachment,
 } from "@/ordre/hooks/useTickets";
-import {
-  useTicketReplies,
-  useSendTicketReply,
-} from "@/ordre/hooks/useTicketReplies";
+import { useUserAccess } from "@/ordre/hooks/useUserAccess";
+import { useTicketReplies, useSendTicketReply } from "@/ordre/hooks/useTicketReplies";
 import {
   useInternalComments,
   useAddInternalComment,
 } from "@/ordre/hooks/useInternalComments";
+import { useInboundMessages, type InboundMessage } from "@/ordre/hooks/useInboundMessages";
+import { useUserNames } from "@/ordre/hooks/useUserNames";
+import { useActiveUsers } from "@/ordre/hooks/useActiveUsers";
+import { useSlaSettings } from "@/ordre/hooks/useSlaSettings";
+import { computeDeadline, formatCountdown } from "@/ordre/lib/sla";
 import {
   normalizeAiSuggestion,
   REQUEST_TYPE_LABEL,
   REQUEST_TYPE_BADGE,
 } from "@/ordre/lib/aiSuggestion";
-import type { TicketAttachment } from "@/ordre/hooks/useTickets";
+import {
+  formatTicketTime,
+  sendStatusLabel,
+  ticketShortId,
+  TICKET_PRIORITY_LABEL,
+  TICKET_STATUS_LABEL,
+  TICKET_STATUS_STYLE,
+} from "@/ordre/lib/ticketFormat";
+import { logTicketEvent } from "@/ordre/lib/ticketEvents";
+import { TEAM_LABEL, TEAMS, type TicketTeam } from "@/ordre/lib/teams";
+import { createNotifications } from "@/ordre/hooks/useNotifications";
+import ConversationItem from "@/ordre/components/tickets/ConversationItem";
+import TimelineEvent, {
+  type TimelineEventRow,
+} from "@/ordre/components/tickets/TimelineEvent";
+import TicketActionBar from "@/ordre/components/tickets/TicketActionBar";
+import OrderLinkCard from "@/ordre/components/tickets/OrderLinkCard";
+import EmailBody, { sanitizeEmailHtml, extractCidRefs } from "@/ordre/components/tickets/EmailBody";
 import ChangeIntentCard from "@/ordre/components/tickets/ChangeIntentCard";
-import LinkOrderSearch from "@/ordre/components/tickets/LinkOrderSearch";
-import CreateOrderFromTicketButton from "@/ordre/components/tickets/CreateOrderFromTicketButton";
 import AttachmentCakePrintButton from "@/ordre/components/tickets/AttachmentCakePrintButton";
-import EditLinkedOrderButton from "@/ordre/components/tickets/EditLinkedOrderButton";
-import TicketComposerActions from "@/ordre/components/tickets/TicketComposerActions";
 import { CakeImageStatusCard } from "@/ordre/components/orders/CakeImageStatusCard";
-import { useInboundMessages, type InboundMessage } from "@/ordre/hooks/useInboundMessages";
 import CreateRefundDialog from "@/ordre/components/tickets/CreateRefundDialog";
 import RefundStatusCard from "@/ordre/components/tickets/RefundStatusCard";
 
-// ────────────────────────── helpers
-
-function fmtTime(iso: string): string {
-  const d = new Date(iso);
-  const now = new Date();
-  const sameDay = d.toDateString() === now.toDateString();
-  if (sameDay) return `i dag ${format(d, "HH:mm")}`;
-  return format(d, "d. MMM HH:mm", { locale: nb });
-}
-
-function sanitize(html: string): string {
-  return DOMPurify.sanitize(html, {
-    USE_PROFILES: { html: true },
-    FORBID_ATTR: ["style", "onerror", "onclick"],
-  });
-}
-
-// Extract cid: content-ids referenced from HTML (img src="cid:xxx").
-function extractCidRefs(html: string | null): string[] {
-  if (!html) return [];
-  const out = new Set<string>();
-  const re = /(?:src|href)\s*=\s*["']cid:([^"'>]+)["']/gi;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(html))) out.add(m[1].trim());
-  return [...out];
-}
-
-// Rewrites cid:XYZ img src to a signed URL when an attachment matches by
-// content_id. Async — call inside a useEffect that awaits signed URLs.
-function rewriteCidImages(html: string, urlMap: Record<string, string>): string {
-  return html.replace(
-    /(<(?:img|source)[^>]+?)(src|srcset)\s*=\s*["']cid:([^"'>]+)["']/gi,
-    (full, prefix, attr, cid) => {
-      const key = cid.trim().replace(/^<|>$/g, "");
-      const url = urlMap[key] ?? urlMap[`<${key}>`] ?? urlMap[key.replace(/@.*$/, "")];
-      return url ? `${prefix}${attr}="${url}"` : full;
-    },
-  );
-}
-
-// Hook: resolve signed URLs for cid-referenced inline attachments.
-function useCidUrls(attachments: TicketAttachment[], cidRefs: string[]) {
-  const [map, setMap] = useState<Record<string, string>>({});
-  const key = cidRefs.slice().sort().join(",") + "|" + attachments.map((a) => a.id).join(",");
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const next: Record<string, string> = {};
-      for (const ref of cidRefs) {
-        const bare = ref.replace(/^<|>$/g, "");
-        const match = attachments.find((a) => {
-          const cid = (a.content_id ?? "").replace(/^<|>$/g, "");
-          return cid && (cid === bare || cid === ref);
-        });
-        if (!match) continue;
-        try {
-          const url = await getTicketAttachmentSignedUrl(match.id, { inline: true });
-          next[bare] = url;
-        } catch {
-          /* ignore */
-        }
-      }
-      if (!cancelled) setMap(next);
-    })();
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key]);
-  return map;
-}
-
-// Render sanitized HTML email body with inline cid: images resolved to signed URLs.
-// Shows a "Hent vedlegg fra Outlook" button when there are cid: refs without a matching attachment.
-function EmailBody({
-  html,
-  fallbackText,
-  attachments,
-  ticketId,
-}: {
-  html: string | null;
-  fallbackText: string;
-  attachments: TicketAttachment[];
-  ticketId: string;
-}) {
-  const cidRefs = useMemo(() => extractCidRefs(html), [html]);
-  const cidUrls = useCidUrls(attachments, cidRefs);
-  const missing = cidRefs.filter((r) => {
-    const bare = r.replace(/^<|>$/g, "");
-    return !cidUrls[bare];
-  });
-  const [refetching, setRefetching] = useState(false);
-  const qc = useQueryClient();
-
-  const rewritten = useMemo(() => {
-    if (!html) return null;
-    return rewriteCidImages(html, cidUrls);
-  }, [html, cidUrls]);
-
-  const onRefetch = async () => {
-    setRefetching(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("ticket-refetch-attachments", {
-        body: { ticket_id: ticketId },
-      });
-      if (error) throw error;
-      const inserted = (data as { inserted?: number } | null)?.inserted ?? 0;
-      toast.success(
-        inserted > 0 ? `Hentet ${inserted} vedlegg fra Outlook` : "Ingen nye vedlegg funnet",
-      );
-      qc.invalidateQueries({ queryKey: ["ticket", ticketId] });
-    } catch (e) {
-      toast.error("Klarte ikke å hente vedlegg", {
-        description: (e as Error).message,
-      });
-    } finally {
-      setRefetching(false);
-    }
-  };
-
-  return (
-    <>
-      {rewritten ? (
-        <div
-          className="prose prose-sm max-w-none text-sm text-foreground [&_a]:text-primary [&_img]:max-w-full [&_img]:rounded [&_img]:border"
-          dangerouslySetInnerHTML={{ __html: rewritten }}
-        />
-      ) : (
-        <p className="whitespace-pre-wrap text-sm text-foreground">{fallbackText}</p>
-      )}
-      {missing.length > 0 && (
-        <div className="mt-3 flex items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-amber-800 dark:text-amber-200">
-          <Paperclip className="h-3.5 w-3.5" />
-          <span>
-            {missing.length} innebygde bilder ble ikke lastet ned fra e-posten.
-          </span>
-          <Button
-            size="sm"
-            variant="outline"
-            className="ml-auto h-7 text-xs"
-            onClick={onRefetch}
-            disabled={refetching}
-          >
-            {refetching ? (
-              <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-            ) : null}
-            Hent fra Outlook
-          </Button>
-        </div>
-      )}
-    </>
-  );
-}
-
-
-
-function initials(name: string | null, email?: string | null): string {
-  const src = (name ?? email ?? "?").trim();
-  const parts = src.split(/[\s@.]+/).filter(Boolean);
-  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
-  return src.slice(0, 2).toUpperCase();
-}
-
 // ────────────────────────── data hooks
-
-interface TicketEvent {
-  id: string;
-  event_type: string;
-  summary: string | null;
-  actor_label: string | null;
-  occurred_at: string;
-}
 
 function useTicketEvents(ticketId: string | undefined) {
   return useQuery({
     enabled: !!ticketId,
     queryKey: ["ticket-events", ticketId],
-    queryFn: async (): Promise<TicketEvent[]> => {
+    queryFn: async (): Promise<TimelineEventRow[]> => {
       const { data, error } = await supabase
         .from("ticket_events")
-        .select("id, event_type, summary, actor_label, occurred_at")
+        .select("id, event_type, summary, actor_label, actor_user_id, occurred_at")
         .eq("ticket_id", ticketId!)
         .order("occurred_at", { ascending: true });
       if (error) throw error;
-      return (data ?? []) as TicketEvent[];
+      return (data ?? []) as unknown as TimelineEventRow[];
     },
   });
 }
@@ -251,9 +102,7 @@ function useCustomerCard(senderEmail: string | undefined) {
       const email = senderEmail!.toLowerCase();
       const { data: byPrimary } = await supabase
         .from("customers")
-        .select(
-          "id, customer_number, display_name, primary_contact_email, primary_contact_phone",
-        )
+        .select("id, customer_number, display_name, primary_contact_email, primary_contact_phone")
         .ilike("primary_contact_email", email)
         .limit(1);
       let customer = (byPrimary ?? [])[0] ?? null;
@@ -290,7 +139,6 @@ function useCustomerCard(senderEmail: string | undefined) {
         }
       }
       if (!customer) return { customer: null, orderCount: 0 };
-
       const since = new Date();
       since.setMonth(since.getMonth() - 12);
       const { count } = await supabase
@@ -316,13 +164,29 @@ function useLinkedOrder(orderId: string | null) {
         .eq("id", orderId!)
         .maybeSingle();
       if (error) throw error;
-      // Also count lines
       const { data: lines } = await supabase
         .from("order_lines")
         .select("quantity, product_snapshot, notes")
         .eq("order_id", orderId!)
         .limit(6);
-      return { order: data, lines: (lines ?? []) as Array<{ quantity: number; product_snapshot: { name?: string } | null; notes: string | null }> };
+      let customerName: string | null = null;
+      if (data?.customer_id) {
+        const { data: c } = await supabase
+          .from("customers")
+          .select("display_name")
+          .eq("id", data.customer_id)
+          .maybeSingle();
+        customerName = c?.display_name ?? null;
+      }
+      return {
+        order: data,
+        customerName,
+        lines: (lines ?? []) as Array<{
+          quantity: number;
+          product_snapshot: { name?: string } | null;
+          notes: string | null;
+        }>,
+      };
     },
   });
 }
@@ -363,12 +227,8 @@ function AttachmentThumb({
 
   const handleClick = () => {
     if (!url) return;
-    if (isImage) {
-      onOpen(url, att.file_name);
-    } else {
-      // PDF and other files: open in new tab for native viewer / download
-      window.open(url, "_blank", "noopener,noreferrer");
-    }
+    if (isImage) onOpen(url, att.file_name);
+    else window.open(url, "_blank", "noopener,noreferrer");
   };
 
   return (
@@ -380,18 +240,15 @@ function AttachmentThumb({
         title={isPdf ? "Åpne PDF i ny fane" : isImage ? "Åpne bilde" : "Åpne vedlegg"}
       >
         {isImage && url ? (
-          <img
-            src={url}
-            alt={att.file_name}
-            className="h-10 w-10 rounded object-cover"
-          />
+          <img src={url} alt={att.file_name} className="h-10 w-10 rounded object-cover" />
         ) : (
-          <div className={`flex h-10 w-10 items-center justify-center rounded ${isPdf ? "bg-red-100 text-red-700" : "bg-muted text-muted-foreground"}`}>
-            {isPdf ? (
-              <span className="text-[10px] font-bold">PDF</span>
-            ) : (
-              <Paperclip className="h-4 w-4" />
+          <div
+            className={cn(
+              "flex h-10 w-10 items-center justify-center rounded",
+              isPdf ? "bg-red-100 text-red-700" : "bg-muted text-muted-foreground",
             )}
+          >
+            {isPdf ? <span className="text-[10px] font-bold">PDF</span> : <Paperclip className="h-4 w-4" />}
           </div>
         )}
         <div className="min-w-0">
@@ -416,8 +273,6 @@ function AttachmentThumb({
   );
 }
 
-// ────────────────────────── side cards
-
 function SideCard({
   label,
   right,
@@ -440,41 +295,53 @@ function SideCard({
   );
 }
 
-// ────────────────────────── main page
+type ComposerTab = "reply" | "note" | "ask";
 
-type ThreadItem =
-  | { kind: "email"; at: string; node: React.ReactNode }
-  | { kind: "reply"; at: string; node: React.ReactNode }
-  | { kind: "note"; at: string; node: React.ReactNode }
-  | { kind: "event"; at: string; node: React.ReactNode };
+// ────────────────────────── main page
 
 export default function TicketDetail() {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
   const qc = useQueryClient();
+  const { user } = useAuth();
+  const { data: access } = useUserAccess(user);
+  const canWrite = access?.hasOrdreWrite ?? false;
 
   const { data: ticketData, isLoading } = useTicket(id);
   const ticket = ticketData?.ticket ?? null;
-  const attachments = ticketData?.attachments ?? [];
+  const attachments = useMemo(() => ticketData?.attachments ?? [], [ticketData]);
   const { data: replies = [] } = useTicketReplies(id);
   const { data: comments = [] } = useInternalComments(id);
   const { data: events = [] } = useTicketEvents(id);
   const { data: inboundMessages = [] } = useInboundMessages(id);
   const { data: customerCard } = useCustomerCard(ticket?.sender_email);
   const { data: linked } = useLinkedOrder(ticket?.related_order_id ?? null);
+  const { data: sla } = useSlaSettings();
+  const { data: activeUsers = [] } = useActiveUsers();
 
-  const updateTicket = useUpdateTicket();
   const sendReply = useSendTicketReply();
   const addComment = useAddInternalComment();
 
-  const [replyText, setReplyText] = useState("");
+  const [tab, setTab] = useState<ComposerTab>("reply");
+  const [text, setText] = useState("");
+  const [mention, setMention] = useState("");
   const [draftLoading, setDraftLoading] = useState(false);
+  const [reanalyzing, setReanalyzing] = useState(false);
+  const [showEvents, setShowEvents] = useState(true);
   const [refundOpen, setRefundOpen] = useState(false);
-  const [lightbox, setLightbox] = useState<{ url: string; name: string } | null>(
-    null,
-  );
+  const [lightbox, setLightbox] = useState<{ url: string; name: string } | null>(null);
 
-  // Realtime updates for thread
+  // Navn på aktører i hendelser + følgere + ansvarlig
+  const nameIds = useMemo(
+    () => [
+      ...events.map((e) => e.actor_user_id ?? null),
+      ...(ticket?.followers ?? []),
+      ticket?.assigned_to ?? null,
+    ],
+    [events, ticket?.followers, ticket?.assigned_to],
+  );
+  const { data: names = {} } = useUserNames(nameIds);
+
+  // Realtime
   useEffect(() => {
     if (!id) return;
     const ch = supabase
@@ -501,7 +368,12 @@ export default function TicketDetail() {
       )
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "ticket_inbound_messages", filter: `ticket_id=eq.${id}` },
+        {
+          event: "*",
+          schema: "public",
+          table: "ticket_inbound_messages",
+          filter: `ticket_id=eq.${id}`,
+        },
         () => {
           qc.invalidateQueries({ queryKey: ["ticket-inbound-messages", id] });
           qc.invalidateQueries({ queryKey: ["ticket", id] });
@@ -514,76 +386,314 @@ export default function TicketDetail() {
   }, [id, qc]);
 
   const ai = useMemo(() => normalizeAiSuggestion(ticket?.ai_suggestion), [ticket]);
+  const intent = ai?.request_type ?? null;
 
-  const attachmentsByCreated = useMemo(() => {
-    // We just show all attachments under the incoming email.
-    return attachments;
-  }, [attachments]);
+  /**
+   * Vedlegg plasseres under den meldingen de hører til: cid-referanser i
+   * meldingens HTML avgjør eierskap; resten faller tilbake til første e-post.
+   */
+  const attachmentsByMessage = useMemo(() => {
+    const map = new Map<string, TicketAttachment[]>();
+    const claimed = new Set<string>();
+    for (const m of inboundMessages) {
+      const cids = extractCidRefs(m.body_html).map((c) => c.replace(/^<|>$/g, ""));
+      const mine = attachments.filter((a) => {
+        const cid = (a.content_id ?? "").replace(/^<|>$/g, "");
+        return cid && cids.includes(cid);
+      });
+      for (const a of mine) claimed.add(a.id);
+      map.set(m.id, mine);
+    }
+    map.set("__root__", attachments.filter((a) => !claimed.has(a.id)));
+    return map;
+  }, [attachments, inboundMessages]);
 
-  const threadItems: ThreadItem[] = useMemo(() => {
-    const items: ThreadItem[] = [];
-    if (ticket) {
-      items.push({
-        kind: "email",
-        at: ticket.received_at,
+  const deadline = useMemo(
+    () => (sla && intent && ticket ? computeDeadline(ticket.received_at, intent, sla.sla, sla.bh) : null),
+    [sla, intent, ticket],
+  );
+  const countdown = deadline ? formatCountdown(deadline, new Date()) : null;
+
+  const awaitingCustomer = useMemo(() => {
+    const lastOut = replies
+      .filter((r) => r.send_status === "sent")
+      .map((r) => r.sent_at ?? r.created_at)
+      .sort()
+      .pop();
+    if (!lastOut || !ticket) return false;
+    const lastIn = [ticket.received_at, ...inboundMessages.map((m) => m.received_at)]
+      .sort()
+      .pop()!;
+    return new Date(lastOut).getTime() > new Date(lastIn).getTime();
+  }, [replies, inboundMessages, ticket]);
+
+  type Item = { at: string; key: string; node: React.ReactNode; isEvent: boolean };
+
+  const items: Item[] = useMemo(() => {
+    if (!ticket) return [];
+    const out: Item[] = [];
+
+    out.push({
+      at: ticket.received_at,
+      key: `root-${ticket.id}`,
+      isEvent: false,
+      node: (
+        <ConversationItem
+          variant="incoming"
+          authorName={ticket.sender_name || ticket.sender_email}
+          roleLabel="Kunde"
+          subLabel={ticket.sender_email}
+          at={ticket.received_at}
+          footer={
+            (attachmentsByMessage.get("__root__")?.filter((a) => !a.is_inline || !a.content_id)
+              .length ?? 0) > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {attachmentsByMessage
+                  .get("__root__")!
+                  .filter((a) => !a.is_inline || !a.content_id)
+                  .map((a) => (
+                    <AttachmentThumb
+                      key={a.id}
+                      att={a}
+                      onOpen={(url, name) => setLightbox({ url, name })}
+                      ticketId={ticket.id}
+                      ticketSubject={ticket.subject}
+                      order={linked?.order ?? null}
+                      customerName={ticket.sender_name ?? ticket.sender_email}
+                    />
+                  ))}
+              </div>
+            ) : undefined
+          }
+        >
+          <EmailBody
+            html={ticket.body_html ? sanitizeEmailHtml(ticket.body_html) : null}
+            fallbackText={ticket.body_text ?? ticket.body_preview ?? ""}
+            attachments={attachments}
+            ticketId={ticket.id}
+          />
+        </ConversationItem>
+      ),
+    });
+
+    for (const m of inboundMessages) {
+      const own = attachmentsByMessage.get(m.id) ?? [];
+      out.push({
+        at: m.received_at,
+        key: `in-${m.id}`,
+        isEvent: false,
         node: (
-          <IncomingEmail
-            ticket={ticket}
-            attachments={attachmentsByCreated}
-            onOpen={setLightbox}
-            order={linked?.order ?? null}
+          <ConversationItem
+            variant={m.is_from_external_forward ? "external" : "incoming"}
+            authorName={m.sender_name || m.sender_email}
+            roleLabel={m.is_from_external_forward ? "Ekstern" : "Kunde"}
+            subLabel={m.sender_email}
+            at={m.received_at}
+            footer={
+              own.filter((a) => !a.is_inline || !a.content_id).length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {own
+                    .filter((a) => !a.is_inline || !a.content_id)
+                    .map((a) => (
+                      <AttachmentThumb
+                        key={a.id}
+                        att={a}
+                        onOpen={(url, name) => setLightbox({ url, name })}
+                        ticketId={ticket.id}
+                        ticketSubject={ticket.subject}
+                        order={linked?.order ?? null}
+                        customerName={m.sender_name ?? m.sender_email}
+                      />
+                    ))}
+                </div>
+              ) : undefined
+            }
+          >
+            <EmailBody
+              html={m.body_html ? sanitizeEmailHtml(m.body_html) : null}
+              fallbackText={m.body_text ?? m.body_preview ?? ""}
+              attachments={attachments}
+              ticketId={m.ticket_id}
+            />
+          </ConversationItem>
+        ),
+      });
+    }
+
+    for (const r of replies) {
+      out.push({
+        at: r.sent_at ?? r.created_at,
+        key: `re-${r.id}`,
+        isEvent: false,
+        node: (
+          <ConversationItem
+            variant="outgoing"
+            authorName={r.sent_by_name ?? "Ukjent bruker"}
+            roleLabel="Nøtterø Bakeri"
+            subLabel="Sendt til kunde"
+            at={r.sent_at ?? r.created_at}
+            statusChip={
+              <span
+                className={cn(
+                  "rounded-full border px-2 py-0.5 text-[10px] font-semibold",
+                  r.send_status === "sent"
+                    ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                    : r.send_status === "pending"
+                      ? "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+                      : "border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-300",
+                )}
+              >
+                {sendStatusLabel(r.send_status, r.error_message)}
+              </span>
+            }
+          >
+            <p className="whitespace-pre-wrap text-sm text-foreground">{r.body_text}</p>
+          </ConversationItem>
+        ),
+      });
+    }
+
+    for (const c of comments) {
+      out.push({
+        at: c.created_at,
+        key: `no-${c.id}`,
+        isEvent: false,
+        node: (
+          <ConversationItem
+            variant="note"
+            authorName={c.author_name ?? "Ukjent bruker"}
+            roleLabel="Internt notat"
+            at={c.created_at}
+          >
+            <p className="whitespace-pre-wrap text-sm text-foreground">{c.body}</p>
+          </ConversationItem>
+        ),
+      });
+    }
+
+    for (const e of events) {
+      out.push({
+        at: e.occurred_at,
+        key: `ev-${e.id}`,
+        isEvent: true,
+        node: (
+          <TimelineEvent
+            event={e}
+            actorName={e.actor_user_id ? names[e.actor_user_id] : null}
           />
         ),
       });
     }
-    for (const r of replies) {
-      items.push({
-        kind: "reply",
-        at: r.created_at,
-        node: <ReplyBubble r={r} />,
-      });
-    }
-    for (const c of comments) {
-      items.push({
-        kind: "note",
-        at: c.created_at,
-        node: <InternalNoteBubble c={c} />,
-      });
-    }
-    for (const m of inboundMessages) {
-      items.push({
-        kind: "email",
-        at: m.received_at,
-        node: <InboundMessageBubble m={m} attachments={attachments} />,
-      });
-    }
-    for (const e of events) {
-      items.push({
-        kind: "event",
-        at: e.occurred_at,
-        node: <EventBubble e={e} />,
-      });
-    }
-    items.sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
-    return items;
-  }, [ticket, attachmentsByCreated, replies, comments, events, inboundMessages]);
+
+    out.sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
+    return out;
+  }, [
+    ticket,
+    attachments,
+    attachmentsByMessage,
+    inboundMessages,
+    replies,
+    comments,
+    events,
+    names,
+    linked?.order,
+  ]);
 
   if (isLoading || !ticket) {
     return (
       <div className="flex h-64 items-center justify-center text-muted-foreground">
-        <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Laster ticket…
+        <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Laster henvendelse …
       </div>
     );
   }
 
+  const visibleItems = showEvents ? items : items.filter((i) => !i.isEvent);
+
   // ─── handlers
 
-  const onSendReply = async () => {
-    if (!replyText.trim() || !id || sendReply.isPending) return;
+  const onSend = async () => {
+    if (!text.trim() || !id) return;
     try {
-      await sendReply.mutateAsync({ ticket_id: id, body_text: replyText.trim() });
-      setReplyText("");
-      toast.success("Svar sendt til kunde");
+      await sendReply.mutateAsync({ ticket_id: id, body_text: text.trim() });
+      setText("");
+      toast.success(`Svar sendt til ${ticket.sender_email}`);
+    } catch (e) {
+      toast.error(`Kunne ikke sende: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  };
+
+  const onSaveNote = async () => {
+    if (!text.trim() || !id) return;
+    try {
+      await addComment.mutateAsync({ ticket_id: id, body: text.trim(), mentioned_teams: [] });
+      await logTicketEvent({
+        ticket_id: id,
+        event_type: "note.added",
+        summary: "Internt notat lagt til",
+      });
+      setText("");
+      qc.invalidateQueries({ queryKey: ["ticket-events", id] });
+      toast.success("Internt notat lagret");
+    } catch (e) {
+      toast.error(`Kunne ikke lagre: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  };
+
+  const mentionLabel = mention.startsWith("team:")
+    ? `@${TEAM_LABEL[mention.slice(5) as TicketTeam]}`
+    : mention.startsWith("user:")
+      ? `@${activeUsers.find((u) => u.id === mention.slice(5))?.display_name ?? "bruker"}`
+      : "";
+
+  const onAsk = async () => {
+    if (!id || !mention || !text.trim()) return;
+    try {
+      const mentionedTeams: TicketTeam[] = mention.startsWith("team:")
+        ? [mention.slice(5) as TicketTeam]
+        : [];
+      await addComment.mutateAsync({
+        ticket_id: id,
+        body: `${mentionLabel}\n\n${text.trim()}`,
+        mentioned_teams: mentionedTeams,
+      });
+      await supabase
+        .from("tickets")
+        .update({ awaiting_internal: true } as never)
+        .eq("id", id);
+      await logTicketEvent({
+        ticket_id: id,
+        event_type: "ticket.internal_ask",
+        summary: `Spurt internt ${mentionLabel}`,
+        payload: { mention },
+      });
+      const recipients = new Set<string>();
+      if (mention.startsWith("team:")) {
+        const { data: members } = await supabase
+          .from("user_team_memberships")
+          .select("user_id")
+          .eq("team", mention.slice(5) as TicketTeam);
+        for (const m of members ?? []) if (m.user_id) recipients.add(m.user_id as string);
+      } else {
+        recipients.add(mention.slice(5));
+      }
+      if (user?.id) recipients.delete(user.id);
+      await createNotifications(
+        Array.from(recipients).map((user_id) => ({
+          user_id,
+          type: "ticket.team_mention",
+          title: `${mentionLabel} spurte om saken`,
+          body: ticket.subject ?? null,
+          link: `/ordre/ticket/${id}`,
+          ticket_id: id,
+          refund_id: null,
+          order_id: ticket.related_order_id ?? null,
+        })),
+      );
+      setText("");
+      setMention("");
+      qc.invalidateQueries({ queryKey: ["ticket", id] });
+      qc.invalidateQueries({ queryKey: ["ticket-events", id] });
+      toast.success(`Spørsmål sendt til ${mentionLabel}`);
     } catch (e) {
       toast.error(`Kunne ikke sende: ${e instanceof Error ? e.message : String(e)}`);
     }
@@ -593,16 +703,13 @@ export default function TicketDetail() {
     if (!id) return;
     setDraftLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke(
-        "generate-ticket-reply",
-        {
-          body: { ticket_id: id, reply_type: "reply" },
-        },
-      );
+      const { data, error } = await supabase.functions.invoke("generate-ticket-reply", {
+        body: { ticket_id: id, reply_type: "reply" },
+      });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       const draft = (data?.draft ?? {}) as { body_text?: string };
-      if (draft.body_text) setReplyText(draft.body_text);
+      if (draft.body_text) setText(draft.body_text);
       toast.success("AI-utkast satt inn — rediger før sending");
     } catch (e) {
       toast.error(`AI-utkast feilet: ${e instanceof Error ? e.message : String(e)}`);
@@ -611,285 +718,289 @@ export default function TicketDetail() {
     }
   };
 
-  const onSaveInternalNote = async () => {
-    if (!replyText.trim() || !id) return;
+  const onReanalyze = async () => {
+    if (!id) return;
+    setReanalyzing(true);
     try {
-      await addComment.mutateAsync({
-        ticket_id: id,
-        body: replyText.trim(),
-        mentioned_teams: [],
+      const { data, error } = await supabase.functions.invoke("analyze-email-with-ai", {
+        body: { ticket_id: id },
       });
-      if (ticket?.awaiting_internal) {
-        await updateTicket.mutateAsync({
-          id,
-          patch: { awaiting_internal: false } as never,
-        });
-      }
-      setReplyText("");
-      toast.success("Internt notat lagret");
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      qc.invalidateQueries({ queryKey: ["ticket", id] });
+      toast.success("AI-analysen er oppdatert");
     } catch (e) {
-      toast.error(`Feil: ${e instanceof Error ? e.message : String(e)}`);
+      toast.error(`Analysen feilet: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setReanalyzing(false);
     }
   };
 
-  const onMarkResolved = async () => {
-    if (!id) return;
-    await updateTicket.mutateAsync({ id, patch: { status: "resolved" } as never });
-    toast.success("Ticket markert som løst");
-  };
+  const sendDisabled =
+    !canWrite ||
+    !text.trim() ||
+    sendReply.isPending ||
+    addComment.isPending ||
+    (tab === "ask" && !mention);
 
-  const statusLabel: Record<string, string> = {
-    new: "ÅPEN",
-    in_progress: "PÅGÅR",
-    resolved: "LØST",
-    closed: "LUKKET",
-    spam: "SPAM",
+  const TAB_META: Record<ComposerTab, { label: string; cls: string }> = {
+    reply: { label: "Svar til kunde", cls: "bg-primary text-primary-foreground" },
+    note: {
+      label: "Internt notat",
+      cls: "bg-amber-500/20 text-amber-900 dark:text-amber-100",
+    },
+    ask: { label: "Spør internt / @tagg", cls: "bg-amber-500/20 text-amber-900 dark:text-amber-100" },
   };
-  const intent = ai?.request_type ?? null;
 
   return (
     <div className="mx-auto max-w-[1400px] px-4 py-6 md:px-6">
       {id && <TicketPresenceBanner ticketId={id} />}
-      {/* Header */}
-
-      <div className="mb-4 flex items-start gap-3">
-        <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-[hsl(var(--brand-cream))] text-xl">
-          ✏️
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="truncate text-2xl font-semibold tracking-tight">
-              {ticket.subject || "(uten emne)"}
-            </h1>
-            {intent && (
-              <span
-                className={cn(
-                  "inline-flex items-center rounded border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide",
-                  REQUEST_TYPE_BADGE[intent],
-                )}
-              >
-                {REQUEST_TYPE_LABEL[intent]}
-              </span>
-            )}
-            <span className="inline-flex items-center rounded border border-border bg-muted px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
-              {statusLabel[ticket.status] ?? ticket.status}
-            </span>
-            {linked?.order && (
-              <Link
-                to={`/ordre/ordrer/${linked.order.id}`}
-                title={`Åpne ordre #${linked.order.order_number}`}
-                className="group inline-flex items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-1 text-xs font-semibold text-emerald-800 shadow-sm transition-colors hover:bg-emerald-500/20 dark:text-emerald-200"
-              >
-                <Package className="h-3.5 w-3.5" />
-                <span>Ordre #{linked.order.order_number}</span>
-                <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" />
-              </Link>
-            )}
-            {ticket.awaiting_internal && (
-              <span className="inline-flex items-center rounded border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">
-                ⏳ venter på @intern
-              </span>
-            )}
-            {ticket.awaiting_external && (
-              <span className="inline-flex items-center rounded border border-purple-500/40 bg-purple-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-purple-700 dark:text-purple-300">
-                ⏳ venter på ekstern{ticket.awaiting_external_email ? ` · ${ticket.awaiting_external_email}` : ""}
-              </span>
-            )}
-          </div>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {ticket.sender_name ?? ticket.sender_email} · {fmtTime(ticket.received_at)}
-          </p>
-        </div>
-        <Button
-          variant="default"
-          className="gap-2"
-          onClick={onMarkResolved}
-          disabled={updateTicket.isPending || ticket.status === "resolved"}
-        >
-          <CheckCircle2 className="h-4 w-4" />
-          Marker som løst
-        </Button>
-      </div>
 
       <Link
         to="/ordre/ticket"
-        className="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+        className="mb-3 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="h-3.5 w-3.5" /> Tilbake til innboksen
       </Link>
 
-      <div className="grid gap-5 lg:grid-cols-[1fr_360px]">
-        {/* Thread */}
-        <div className="space-y-3">
-          {threadItems.map((it, i) => (
-            <div key={i}>{it.node}</div>
-          ))}
-
-          {/* Reply composer */}
-          <div className="rounded-lg border bg-[hsl(var(--brand-cream))] p-4 shadow-sm">
-            <Textarea
-              value={replyText}
-              onChange={(e) => setReplyText(e.target.value)}
-              placeholder="Skriv svar til kunden … (eller trykk ✨ for AI-utkast basert på mal + ordredata)"
-              className="min-h-[130px] resize-y bg-background"
-            />
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <Button onClick={onSendReply} disabled={!replyText.trim() || sendReply.isPending} className="gap-2">
-                <Send className="h-4 w-4" /> Send svar
-              </Button>
-              <Button variant="outline" onClick={onAiDraft} disabled={draftLoading} className="gap-2">
-                {draftLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Sparkles className="h-4 w-4" />
+      {/* A) Topplinje */}
+      <div className="sticky top-0 z-20 -mx-4 mb-4 border-b bg-[hsl(var(--background))]/95 px-4 py-3 backdrop-blur md:-mx-6 md:px-6">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <h1 className="truncate text-xl font-semibold tracking-tight md:text-2xl">
+              {ticket.subject || "(uten emne)"}
+            </h1>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              Fra {ticket.sender_name ?? ticket.sender_email} &lt;{ticket.sender_email}&gt; · mottatt{" "}
+              {formatTicketTime(ticket.received_at)} · {ticketShortId(ticket.id)}
+            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              <span
+                className={cn(
+                  "inline-flex items-center rounded border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide",
+                  TICKET_STATUS_STYLE[ticket.status],
                 )}
-                Sett inn AI-utkast
-              </Button>
-              <Button
-                variant="outline"
-                onClick={onSaveInternalNote}
-                disabled={!replyText.trim() || addComment.isPending}
-                className="gap-2"
               >
-                <StickyNote className="h-4 w-4" /> Lagre som internt notat
-              </Button>
+                {TICKET_STATUS_LABEL[ticket.status]}
+              </span>
+              {intent && (
+                <span
+                  className={cn(
+                    "inline-flex items-center rounded border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide",
+                    REQUEST_TYPE_BADGE[intent],
+                  )}
+                >
+                  {REQUEST_TYPE_LABEL[intent]}
+                </span>
+              )}
+              {awaitingCustomer && (
+                <span className="inline-flex items-center rounded border border-sky-500/40 bg-sky-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">
+                  Venter på kunde
+                </span>
+              )}
+              {ticket.awaiting_internal && (
+                <span className="inline-flex items-center rounded border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">
+                  Venter på @
+                  {ticket.assigned_team
+                    ? TEAM_LABEL[ticket.assigned_team]
+                    : names[ticket.assigned_to ?? ""] ?? "intern"}
+                </span>
+              )}
+              {ticket.awaiting_external && (
+                <span className="inline-flex items-center rounded border border-purple-500/40 bg-purple-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-purple-700 dark:text-purple-300">
+                  Venter på ekstern: {ticket.awaiting_external_email ?? "ukjent"}
+                </span>
+              )}
+              {countdown?.overdue && (
+                <span
+                  className="inline-flex items-center gap-1 rounded border border-red-500/40 bg-red-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-700 dark:text-red-300"
+                  title={deadline ? `Frist: ${formatTicketTime(deadline)}` : undefined}
+                >
+                  <AlertTriangle className="h-3 w-3" aria-hidden="true" /> Over frist ·{" "}
+                  {deadline ? formatTicketTime(deadline) : ""}
+                </span>
+              )}
             </div>
-            <TicketComposerActions
+          </div>
+
+          {/* Handlingsrad — kollapser til knapp på mobil */}
+          <details className="w-full md:hidden">
+            <summary className="cursor-pointer rounded-md border bg-background px-3 py-2 text-sm font-medium">
+              Handlinger
+            </summary>
+            <div className="mt-2">
+              <TicketActionBar
+                ticket={ticket}
+                canWrite={canWrite}
+                linkedOrderNumber={linked?.order?.order_number ?? null}
+              />
+            </div>
+          </details>
+          <div className="hidden md:block">
+            <TicketActionBar
               ticket={ticket}
-              replyText={replyText}
-              onConsumeReplyText={() => setReplyText("")}
+              canWrite={canWrite}
               linkedOrderNumber={linked?.order?.order_number ?? null}
             />
           </div>
         </div>
+        {!canWrite && (
+          <p className="mt-2 text-xs text-muted-foreground">
+            Du har lesetilgang til ordre-appen. Handlinger og svar er deaktivert.
+          </p>
+        )}
+      </div>
 
-        {/* Sidebar */}
-        <div className="space-y-3">
-          <SideCard label="Kunde">
-            {customerCard?.customer ? (
-              <div className="space-y-1 text-sm">
-                <div className="font-semibold text-foreground">
-                  {customerCard.customer.display_name}
-                  <span className="ml-2 text-xs font-normal text-muted-foreground">
-                    · {customerCard.customer.customer_number}
-                  </span>
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  {customerCard.customer.primary_contact_email}
-                  {customerCard.customer.primary_contact_phone
-                    ? ` · ${customerCard.customer.primary_contact_phone}`
-                    : ""}
-                </div>
-                <div className="pt-1 text-xs text-muted-foreground">
-                  {customerCard.orderCount} ordrer siste 12 mnd
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-1">
-                <div className="inline-flex items-center rounded border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">
-                  Ikke i registeret
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  {ticket.sender_name ?? ticket.sender_email}
-                </div>
-                <div className="text-xs text-muted-foreground">{ticket.sender_email}</div>
-              </div>
-            )}
-          </SideCard>
+      <div className="grid gap-5 lg:grid-cols-[1fr_360px]">
+        {/* B) Samtalen */}
+        <div className="min-w-0 space-y-3">
+          <div className="flex items-center gap-2 rounded-md border bg-[hsl(var(--brand-cream))] px-3 py-2">
+            <Switch
+              id="show-events"
+              checked={showEvents}
+              onCheckedChange={setShowEvents}
+            />
+            <Label htmlFor="show-events" className="cursor-pointer text-sm">
+              {showEvents ? "Vis systemhendelser" : "Kun samtale"}
+            </Label>
+          </div>
 
-          {ai && (
-            <SideCard
-              label="AI-analyse"
-              right={
-                ticket.ai_confidence_score != null ? (
-                  <span className="inline-flex items-center rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
-                    Konfidens {Math.round(Number(ticket.ai_confidence_score) * (Number(ticket.ai_confidence_score) > 1 ? 1 : 100))}%
-                  </span>
-                ) : null
-              }
-            >
-              <div className="space-y-2 text-sm">
-                {intent && (
-                  <span
-                    className={cn(
-                      "inline-flex items-center rounded border px-2 py-0.5 text-[10px] font-bold uppercase",
-                      REQUEST_TYPE_BADGE[intent],
-                    )}
-                  >
-                    {REQUEST_TYPE_LABEL[intent]}
-                  </span>
-                )}
-                {ai.summary && <p className="text-foreground">{ai.summary}</p>}
-                {ai.risks?.length > 0 && (
-                  <div className="space-y-1">
-                    {ai.risks.map((r, i) => (
-                      <div
-                        key={i}
-                        className={cn(
-                          "rounded border px-2 py-1.5 text-xs",
-                          r.severity === "red"
-                            ? "border-destructive/40 bg-destructive/10 text-destructive"
-                            : "border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-200",
-                        )}
-                      >
-                        ⚠️ {r.message}
-                      </div>
+          {visibleItems.map((it) => (
+            <div key={it.key}>{it.node}</div>
+          ))}
+
+          {/* C) Skrivefelt */}
+          <div className="rounded-lg border bg-[hsl(var(--brand-cream))] p-4 shadow-sm">
+            <div className="mb-3 flex flex-wrap gap-1.5">
+              {(["reply", "note", "ask"] as ComposerTab[]).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setTab(t)}
+                  className={cn(
+                    "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                    tab === t
+                      ? TAB_META[t].cls
+                      : "bg-background text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {TAB_META[t].label}
+                </button>
+              ))}
+            </div>
+
+            {tab === "ask" && (
+              <Select value={mention} onValueChange={setMention}>
+                <SelectTrigger className="mb-2 h-9 w-full bg-background md:w-[280px]">
+                  <SelectValue placeholder="Velg team eller person …" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectLabel>Team</SelectLabel>
+                    {TEAMS.map((t) => (
+                      <SelectItem key={`t-${t}`} value={`team:${t}`}>
+                        @{TEAM_LABEL[t]}
+                      </SelectItem>
                     ))}
-                  </div>
-                )}
-                {/* Opprett ordre ligger i «Ordre»-kortet under — alltid tilgjengelig */}
-              </div>
-            </SideCard>
-          )}
+                  </SelectGroup>
+                  <SelectGroup>
+                    <SelectLabel>Personer</SelectLabel>
+                    {activeUsers.map((u) => (
+                      <SelectItem key={`u-${u.id}`} value={`user:${u.id}`}>
+                        @{u.display_name}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            )}
 
-          {linked?.order ? (
-            <SideCard label="Koblet ordre">
-              <div className="space-y-2 text-sm">
-                <div className="font-semibold text-foreground">
-                  #{linked.order.order_number}
-                  <span className="ml-2 text-xs font-normal text-muted-foreground">
-                    · {linked.order.status}
-                  </span>
-                </div>
-                {linked.order.delivery_date && (
-                  <div className="text-xs text-muted-foreground">
-                    {format(new Date(linked.order.delivery_date), "eeee d. MMM", {
-                      locale: nb,
-                    })}
-                    {linked.order.delivery_time ? ` kl. ${linked.order.delivery_time.slice(0, 5)}` : ""}
-                  </div>
-                )}
-                {linked.lines.length > 0 && (
-                  <div className="text-xs text-muted-foreground">
-                    {linked.lines
-                      .map((l) => `${l.quantity} × ${l.product_snapshot?.name ?? l.notes ?? "linje"}`)
-                      .join(" · ")}
-                  </div>
-                )}
+            <Textarea
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              disabled={!canWrite}
+              className={cn(
+                "min-h-[130px] resize-y bg-background",
+                tab !== "reply" && "border-amber-400/60",
+              )}
+              placeholder={
+                tab === "reply"
+                  ? `Skriv svar til ${ticket.sender_email} …`
+                  : tab === "note"
+                    ? "Skriv et internt notat — kunden ser ikke dette."
+                    : "Hva lurer du på? Notatet er kun synlig internt."
+              }
+            />
+
+            {tab !== "reply" && (
+              <p className="mt-1 flex items-center gap-1 text-xs text-amber-700 dark:text-amber-300">
+                <Lock className="h-3 w-3" /> Kun synlig internt — sendes ikke til kunden.
+              </p>
+            )}
+
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              {tab === "reply" && (
+                <>
+                  <Button onClick={onSend} disabled={sendDisabled} className="gap-2">
+                    <Send className="h-4 w-4" /> Send svar til {ticket.sender_email}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={onAiDraft}
+                    disabled={!canWrite || draftLoading}
+                    className="gap-2"
+                  >
+                    {draftLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-4 w-4" />
+                    )}
+                    Sett inn AI-utkast
+                  </Button>
+                </>
+              )}
+              {tab === "note" && (
                 <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-2 w-full"
-                  onClick={() => navigate(`/ordre/ordrer/${linked.order!.id}`)}
+                  onClick={onSaveNote}
+                  disabled={sendDisabled}
+                  className="gap-2 bg-amber-500 text-amber-950 hover:bg-amber-500/90"
                 >
-                  Åpne ordren →
+                  <Lock className="h-4 w-4" /> Lagre internt notat
                 </Button>
-                <EditLinkedOrderButton
-                  orderId={linked.order.id}
-                  customerId={
-                    (linked.order as unknown as { customer_id: string | null }).customer_id ?? null
-                  }
-                  onSaved={() => {
-                    qc.invalidateQueries({ queryKey: ["ticket-linked-order", linked.order!.id] });
-                    qc.invalidateQueries({ queryKey: ["ticket", id] });
-                  }}
-                />
+              )}
+              {tab === "ask" && (
+                <Button
+                  onClick={onAsk}
+                  disabled={sendDisabled}
+                  className="gap-2 bg-amber-500 text-amber-950 hover:bg-amber-500/90"
+                >
+                  <AtSign className="h-4 w-4" />
+                  Send spørsmål til {mentionLabel || "…"}
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* D) Høyre kolonne */}
+        <div className="space-y-3">
+          <OrderLinkCard
+            ticket={ticket}
+            linked={linked}
+            ai={ai}
+            attachments={attachments}
+            canWrite={canWrite}
+          >
+            {linked?.order && (
+              <>
                 <Button
                   size="sm"
-                  className="mt-2 w-full gap-2 bg-emerald-600 text-white hover:bg-emerald-700"
+                  variant="outline"
+                  className="mt-2 w-full gap-2"
                   onClick={() => setRefundOpen(true)}
+                  disabled={!canWrite}
                 >
-                  💸 Opprett tilbakebetaling
+                  Opprett tilbakebetaling
                 </Button>
                 {ai?.change_intent && id && (
                   <ChangeIntentCard
@@ -904,36 +1015,141 @@ export default function TicketDetail() {
                     }}
                   />
                 )}
-              </div>
-            </SideCard>
-          ) : (
-            id && (
-              <SideCard label="Ordre">
-                <div className="space-y-3">
-                  <LinkOrderSearch
-                    ticketId={id}
-                    onLinked={() => {
-                      qc.invalidateQueries({ queryKey: ["ticket", id] });
-                      qc.invalidateQueries({ queryKey: ["ticket-events", id] });
-                      qc.invalidateQueries({ queryKey: ["cake-images-for", id] });
-                    }}
-                  />
-                  <div className="border-t pt-2">
-                    <CreateOrderFromTicketButton
-                      ticket={ticket}
-                      ai={ai ?? null}
-                      attachments={attachments}
-                      onCreated={() => {
-                        qc.invalidateQueries({ queryKey: ["ticket", id] });
-                        qc.invalidateQueries({ queryKey: ["ticket-events", id] });
-                        qc.invalidateQueries({ queryKey: ["cake-images-for", id] });
-                      }}
-                    />
-                  </div>
+              </>
+            )}
+          </OrderLinkCard>
+
+          <SideCard label="Kunde">
+            {customerCard?.customer ? (
+              <div className="space-y-1 text-sm">
+                <Link
+                  to={`/kunder/kunder/${customerCard.customer.id}`}
+                  className="font-semibold text-foreground underline-offset-2 hover:underline"
+                >
+                  {customerCard.customer.display_name}
+                </Link>
+                <div className="text-xs text-muted-foreground">
+                  Kundenr. {customerCard.customer.customer_number}
                 </div>
-              </SideCard>
-            )
-          )}
+                <div className="text-xs text-muted-foreground">
+                  {customerCard.customer.primary_contact_email}
+                  {customerCard.customer.primary_contact_phone
+                    ? ` · ${customerCard.customer.primary_contact_phone}`
+                    : ""}
+                </div>
+                <div className="pt-1 text-xs text-muted-foreground">
+                  {customerCard.orderCount} ordrer siste 12 mnd
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-1">
+                <div className="inline-flex items-center rounded border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">
+                  Ikke i kunderegisteret
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {ticket.sender_name ?? ticket.sender_email}
+                </div>
+                <div className="text-xs text-muted-foreground">{ticket.sender_email}</div>
+              </div>
+            )}
+          </SideCard>
+
+          <SideCard
+            label="AI-analyse"
+            right={
+              ticket.ai_confidence_score != null ? (
+                <span className="inline-flex items-center rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
+                  Konfidens{" "}
+                  {Math.round(
+                    Number(ticket.ai_confidence_score) *
+                      (Number(ticket.ai_confidence_score) > 1 ? 1 : 100),
+                  )}
+                  %
+                </span>
+              ) : null
+            }
+          >
+            <div className="space-y-2 text-sm">
+              {intent ? (
+                <span
+                  className={cn(
+                    "inline-flex items-center rounded border px-2 py-0.5 text-[10px] font-bold uppercase",
+                    REQUEST_TYPE_BADGE[intent],
+                  )}
+                >
+                  {REQUEST_TYPE_LABEL[intent]}
+                </span>
+              ) : (
+                <p className="text-xs text-muted-foreground">Ingen analyse er kjørt ennå.</p>
+              )}
+              {ai?.summary && <p className="text-foreground">{ai.summary}</p>}
+              {(ai?.missing_info?.length ?? 0) > 0 && (
+                <div>
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Mangler info
+                  </div>
+                  <ul className="list-inside list-disc text-xs text-muted-foreground">
+                    {ai!.missing_info.map((m) => (
+                      <li key={m.code}>{m.label}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {(ai?.risks?.length ?? 0) > 0 && (
+                <div className="space-y-1">
+                  {ai!.risks.map((r, i) => (
+                    <div
+                      key={i}
+                      className={cn(
+                        "rounded border px-2 py-1.5 text-xs",
+                        r.severity === "red"
+                          ? "border-destructive/40 bg-destructive/10 text-destructive"
+                          : "border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-200",
+                      )}
+                    >
+                      {r.message}
+                    </div>
+                  ))}
+                </div>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full gap-2"
+                onClick={onReanalyze}
+                disabled={!canWrite || reanalyzing}
+              >
+                {reanalyzing ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Sparkles className="h-3.5 w-3.5" />
+                )}
+                Kjør analyse på nytt
+              </Button>
+            </div>
+          </SideCard>
+
+          <SideCard label="Detaljer">
+            <dl className="space-y-1 text-xs">
+              <Detail label="Ansvarlig" value={names[ticket.assigned_to ?? ""] ?? "Uten ansvarlig"} />
+              <Detail
+                label="Team"
+                value={ticket.assigned_team ? TEAM_LABEL[ticket.assigned_team] : "Uten team"}
+              />
+              <Detail label="Prioritet" value={TICKET_PRIORITY_LABEL[ticket.priority]} />
+              <Detail
+                label="Følgere"
+                value={
+                  (ticket.followers ?? []).length
+                    ? ticket.followers.map((f) => names[f] ?? "Ukjent bruker").join(", ")
+                    : "Ingen"
+                }
+              />
+              <Detail label="Opprettet" value={formatTicketTime(ticket.created_at)} />
+              <Detail label="Sist oppdatert" value={formatTicketTime(ticket.updated_at)} />
+              <Detail label="Postboks" value={ticket.source_mailbox} />
+            </dl>
+          </SideCard>
 
           {id && <CakeImageStatusCard ticketId={id} />}
           {id && <RefundStatusCard ticketId={id} />}
@@ -960,7 +1176,6 @@ export default function TicketDetail() {
         />
       )}
 
-      {/* Lightbox */}
       {lightbox && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-8"
@@ -985,189 +1200,11 @@ export default function TicketDetail() {
   );
 }
 
-// ────────────────────────── thread items
-
-function IncomingEmail({
-  ticket,
-  attachments,
-  onOpen,
-  order,
-}: {
-  ticket: NonNullable<ReturnType<typeof useTicket>["data"]>["ticket"];
-  attachments: TicketAttachment[];
-  onOpen: (x: { url: string; name: string }) => void;
-  order?: { id: string; order_number: string; delivery_date: string | null } | null;
-}) {
-  if (!ticket) return null;
-  const html = ticket.body_html ? sanitize(ticket.body_html) : null;
+function Detail({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-l-4 border-l-blue-500 bg-[hsl(var(--brand-cream))] p-4 shadow-sm">
-      <div className="mb-2 flex items-center gap-2 text-sm">
-        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-500/10 text-xs font-semibold text-blue-700 dark:text-blue-300">
-          {initials(ticket.sender_name, ticket.sender_email)}
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="truncate font-semibold text-foreground">
-            {ticket.sender_name ?? ticket.sender_email}
-            <span className="ml-1 font-normal text-muted-foreground">
-              · {ticket.sender_email}
-            </span>
-          </div>
-        </div>
-        <div className="text-xs text-muted-foreground">
-          {fmtTime(ticket.received_at)}
-        </div>
-      </div>
-      <EmailBody
-        html={html}
-        fallbackText={ticket.body_text ?? ticket.body_preview ?? ""}
-        attachments={attachments}
-        ticketId={ticket.id}
-      />
-      {attachments.filter((a) => !a.is_inline || !a.content_id).length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-2 border-t pt-3">
-          {attachments
-            .filter((a) => !a.is_inline || !a.content_id)
-            .map((a) => (
-              <AttachmentThumb
-                key={a.id}
-                att={a}
-                onOpen={(url, name) => onOpen({ url, name })}
-                ticketId={ticket.id}
-                ticketSubject={ticket.subject}
-                order={order}
-                customerName={ticket.sender_name ?? ticket.sender_email}
-              />
-            ))}
-        </div>
-      )}
+    <div className="flex gap-2">
+      <dt className="w-24 shrink-0 text-muted-foreground">{label}</dt>
+      <dd className="min-w-0 flex-1 break-words text-foreground">{value}</dd>
     </div>
   );
 }
-
-function ReplyBubble({
-  r,
-}: {
-  r: {
-    id: string;
-    body_text: string;
-    sent_by_name: string | null;
-    send_status: "pending" | "sent" | "failed";
-    created_at: string;
-    sent_at: string | null;
-  };
-}) {
-  return (
-    <div className="rounded-lg border border-l-4 border-l-emerald-500 bg-[hsl(var(--brand-cream))] p-4 shadow-sm">
-      <div className="mb-1 flex items-center gap-2 text-sm">
-        <span className="font-semibold text-foreground">
-          Svar sendt · {r.sent_by_name ?? "Bruker"}
-        </span>
-        <span
-          className={cn(
-            "rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase",
-            r.send_status === "sent"
-              ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-              : r.send_status === "pending"
-                ? "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300"
-                : "border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-300",
-          )}
-        >
-          {r.send_status}
-        </span>
-        <span className="ml-auto text-xs text-muted-foreground">
-          {fmtTime(r.sent_at ?? r.created_at)}
-        </span>
-      </div>
-      <p className="whitespace-pre-wrap text-sm text-foreground">{r.body_text}</p>
-    </div>
-  );
-}
-
-function InternalNoteBubble({
-  c,
-}: {
-  c: { id: string; body: string; author_name: string | null; created_at: string };
-}) {
-  return (
-    <div className="rounded-lg border border-l-4 border-l-amber-400 bg-amber-50/60 p-4 shadow-sm dark:bg-amber-950/20">
-      <div className="mb-1 flex items-center gap-2 text-sm">
-        <span className="inline-flex items-center rounded border border-amber-500/40 bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-800 dark:text-amber-200">
-          Internt notat
-        </span>
-        <span className="font-semibold text-foreground">{c.author_name ?? "Bruker"}</span>
-        <span className="ml-auto text-xs text-muted-foreground">
-          {fmtTime(c.created_at)}
-        </span>
-      </div>
-      <p className="whitespace-pre-wrap text-sm text-foreground">{c.body}</p>
-    </div>
-  );
-}
-
-function EventBubble({ e }: { e: TicketEvent }) {
-  const isForward = e.event_type === "ticket.forwarded_external";
-  if (isForward) {
-    return (
-      <div className="rounded-lg border border-l-4 border-l-purple-500 bg-purple-50/60 p-3 text-sm shadow-sm dark:bg-purple-950/20">
-        <div className="flex items-center gap-2 font-semibold text-purple-900 dark:text-purple-200">
-          ✉️ Videresendt til {e.actor_label ?? "ekstern"}
-          <span className="ml-auto text-xs font-normal text-muted-foreground">
-            {formatDistanceToNow(new Date(e.occurred_at), { locale: nb, addSuffix: true })}
-          </span>
-        </div>
-        {e.summary && (
-          <div className="mt-1 text-xs text-muted-foreground">{e.summary}</div>
-        )}
-      </div>
-    );
-  }
-  return (
-    <div className="flex items-center gap-2 rounded-md border-l-2 border-l-muted-foreground/30 bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground">
-      <span className="font-medium text-foreground">{e.event_type}</span>
-      {e.summary && <span>· {e.summary}</span>}
-      {e.actor_label && <span>· {e.actor_label}</span>}
-      <span className="ml-auto">
-        {formatDistanceToNow(new Date(e.occurred_at), { locale: nb, addSuffix: true })}
-      </span>
-    </div>
-  );
-}
-
-function InboundMessageBubble({
-  m,
-  attachments,
-}: {
-  m: InboundMessage;
-  attachments: TicketAttachment[];
-}) {
-  const html = m.body_html ? sanitize(m.body_html) : null;
-  return (
-    <div className="rounded-lg border border-l-4 border-l-blue-500 bg-[hsl(var(--brand-cream))] p-4 shadow-sm">
-      <div className="mb-2 flex items-center gap-2 text-sm">
-        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-500/10 text-xs font-semibold text-blue-700 dark:text-blue-300">
-          {initials(m.sender_name, m.sender_email)}
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="truncate font-semibold text-foreground">
-            {m.sender_name ?? m.sender_email}
-            <span className="ml-1 font-normal text-muted-foreground">· {m.sender_email}</span>
-            {m.is_from_external_forward && (
-              <span className="ml-2 inline-flex items-center rounded border border-purple-500/40 bg-purple-500/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-purple-700 dark:text-purple-300">
-                svar fra ekstern
-              </span>
-            )}
-          </div>
-        </div>
-        <div className="text-xs text-muted-foreground">{fmtTime(m.received_at)}</div>
-      </div>
-      <EmailBody
-        html={html}
-        fallbackText={m.body_text ?? m.body_preview ?? ""}
-        attachments={attachments}
-        ticketId={m.ticket_id}
-      />
-    </div>
-  );
-}
-

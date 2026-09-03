@@ -32,6 +32,8 @@ Deno.serve(async (req) => {
       ticket_id?: string;
       body_html?: string;
       mark_resolved?: boolean;
+      /** Klient-generert nøkkel — logges for sporbarhet ved dobbeltsending. */
+      idempotency_key?: string;
     };
     if (!body.ticket_id || !body.body_html?.trim()) {
       return json({ error: "ticket_id og body_html kreves" }, 400);
@@ -44,7 +46,7 @@ Deno.serve(async (req) => {
 
     const { data: ticket, error: tErr } = await userClient
       .from("tickets")
-      .select("id, microsoft_message_id, source_mailbox, subject, sender_email")
+      .select("id, microsoft_message_id, source_mailbox, subject, sender_email, assigned_to")
       .eq("id", body.ticket_id)
       .maybeSingle();
     if (tErr) throw tErr;
@@ -97,11 +99,16 @@ Deno.serve(async (req) => {
 
     const patch: Record<string, unknown> = {
       status: body.mark_resolved ? "resolved" : "in_progress",
-      assigned_to: user.id,
     };
+    // Eierskap skal ALDRI overstyres av at noen svarer på vegne av andre.
+    if (!ticket.assigned_to) patch.assigned_to = user.id;
     await admin.from("tickets").update(patch).eq("id", ticket.id);
 
-    return json({ success: true, sent_to: ticket.sender_email });
+    return json({
+      success: true,
+      sent_to: ticket.sender_email,
+      idempotency_key: body.idempotency_key ?? null,
+    });
   } catch (e) {
     console.error("microsoft-graph-reply-ticket error", e);
     return json({ error: e instanceof Error ? e.message : String(e) }, 500);
