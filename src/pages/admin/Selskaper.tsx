@@ -150,7 +150,7 @@ export default function Selskaper() {
       <AppHeaderBanner
         icon={Building2}
         title="Selskaper"
-        subtitle="Juridiske enheter i konsernet."
+        subtitle="Juridisk enhet for bakeriet."
         actions={
           <Button size="sm" onClick={() => setEditing({ ...empty })}>
             <Plus className="h-4 w-4" /> Nytt selskap
