@@ -336,6 +336,8 @@ export default function TicketDetail() {
    * begynner å skrive, og nullstilles først etter vellykket sending — slik at
    * unik-indeksen i basen faktisk stopper dobbeltsending.
    */
+  const [createCustomerOpen, setCreateCustomerOpen] = useState(false);
+  const [linkCustomerOpen, setLinkCustomerOpen] = useState(false);
   const [draftKey, setDraftKey] = useState<string | null>(null);
   useEffect(() => {
     if (text.trim() && !draftKey) setDraftKey(safeUuid());

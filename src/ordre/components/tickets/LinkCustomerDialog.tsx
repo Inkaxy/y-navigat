@@ -22,6 +22,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { supabase } from "@/integrations/supabase/client";
+import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
 import { useDebouncedValue } from "@/kunder/hooks/useDebouncedValue";
 
 type CustomerHit = {
@@ -83,6 +84,7 @@ export default function LinkCustomerDialog({
       if (!existing?.length) {
         const { error } = await supabase.from("customer_contacts").insert({
           customer_id: c.id,
+          legal_entity_id: NB_LEGAL_ENTITY_ID,
           name: (senderName ?? senderEmail).trim(),
           email: senderEmail,
         });
