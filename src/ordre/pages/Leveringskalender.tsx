@@ -1280,8 +1280,8 @@ export default function MatrixPage() {
           </div>
 
 
-          <div className="relative flex flex-col gap-0.5 self-start">
-            <div className="flex items-center gap-1 rounded-md border border-brand-bronze/30 bg-card/60 px-2 py-1 text-sm">
+          <div className="relative flex w-full max-w-full flex-col gap-0.5 self-start sm:w-auto">
+            <div className="flex flex-wrap items-center gap-1 rounded-md border border-brand-bronze/30 bg-card/60 px-2 py-1 text-sm">
               <Popover open={fromDateOpen} onOpenChange={setFromDateOpen}>
                 <PopoverTrigger asChild>
                   <Button
