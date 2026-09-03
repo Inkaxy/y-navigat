@@ -64,7 +64,7 @@ export default function Hjem() {
             {firstName ? <>, <span className="text-brand-bronze">{firstName}</span></> : ""}.
           </h1>
           <p className="mt-3 max-w-xl text-sm text-muted-foreground md:text-base">
-            Velkommen tilbake til driftshjernen for Nøtterø Bakeri-konsernet — siden 1898.
+            Velkommen tilbake til driftshjernen for bakeriet — siden 1898.
           </p>
         </div>
       </section>

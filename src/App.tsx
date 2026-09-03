@@ -62,7 +62,6 @@ const IntegrasjonDetalj = lazy(() => import("./pages/admin/IntegrasjonDetalj"));
 const TripletexIntegrasjon = lazy(() => import("./pages/admin/TripletexIntegrasjon"));
 const Helsesenter = lazy(() => import("./pages/admin/Helsesenter"));
 const Audit = lazy(() => import("./pages/admin/Audit"));
-const Selskaper = lazy(() => import("./pages/admin/Selskaper"));
 const Brukere = lazy(() => import("./pages/admin/Brukere"));
 const BrukerDetalj = lazy(() => import("./pages/admin/BrukerDetalj"));
 const Tilganger = lazy(() => import("./pages/admin/Tilganger"));
@@ -326,8 +325,7 @@ const App = () => (
               <Route path="/min-profil" element={<Shell><MinProfil /></Shell>} />
               <Route path="/varsler" element={<Shell><Varsler /></Shell>} />
               <Route path="/hjelp" element={<Shell><Hjelp /></Shell>} />
-              <Route path="/admin" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><AdminIndex /></AppAccessGuard></Shell>} />
-              <Route path="/admin/selskaper" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><PlatformAdminGuard title="Selskaper"><Selskaper /></PlatformAdminGuard></AppAccessGuard></Shell>} />
+              <Route path="/admin" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><AdminIndex /></AppAccessGuard></Shell>} /></PlatformAdminGuard></AppAccessGuard></Shell>} />
               <Route path="/admin/brukere" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><Brukere /></AppAccessGuard></Shell>} />
               <Route path="/admin/brukere/:id" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><PlatformAdminGuard title="Brukerdetaljer"><BrukerDetalj /></PlatformAdminGuard></AppAccessGuard></Shell>} />
               <Route path="/admin/tilganger" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><PlatformAdminGuard title="Tilganger"><Tilganger /></PlatformAdminGuard></AppAccessGuard></Shell>} />

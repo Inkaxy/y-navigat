@@ -8,7 +8,6 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { CompanyBlock } from "./CompanyBlock";
 import { AppTabs } from "./AppTabs";
 import { OutletSelector } from "./OutletSelector";
 import { UserMenu } from "./UserMenu";
@@ -37,13 +36,6 @@ export function MobileMenu({ onOpenPalette }: Props) {
           </SheetHeader>
 
           <div className="flex flex-col gap-5 p-4">
-            <section className="space-y-2">
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-ink-tertiary">
-                Selskap
-              </div>
-              <CompanyBlock />
-            </section>
-
             <section className="space-y-2">
               <div className="text-[10px] font-semibold uppercase tracking-wider text-ink-tertiary">
                 App
