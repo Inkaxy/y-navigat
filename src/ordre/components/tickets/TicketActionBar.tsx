@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { toast } from "sonner";
-import { CheckCircle2, MoreHorizontal, UserCheck } from "lucide-react";
+import { CheckCircle2, MoreHorizontal, RotateCcw, UserCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -190,13 +190,25 @@ export default function TicketActionBar({
         </SelectContent>
       </Select>
 
-      <Button
-        className="h-9 gap-1.5"
-        onClick={() => onStatus("resolved")}
-        disabled={!canWrite || updateTicket.isPending || ticket.status === "resolved"}
-      >
-        <CheckCircle2 className="h-4 w-4" /> Marker som løst
-      </Button>
+      {ticket.status === "resolved" || ticket.status === "closed" ? (
+        <Button
+          variant="outline"
+          className="h-9 gap-1.5"
+          onClick={() => onStatus("in_progress")}
+          disabled={!canWrite || updateTicket.isPending}
+        >
+          <RotateCcw className="h-4 w-4" /> Gjenåpne
+        </Button>
+      ) : (
+        <Button
+          className="h-9 gap-1.5"
+          onClick={() => onStatus("resolved")}
+          disabled={!canWrite || updateTicket.isPending}
+        >
+          <CheckCircle2 className="h-4 w-4" /> Marker som løst
+        </Button>
+      )}
+
 
       <Popover open={moreOpen} onOpenChange={setMoreOpen}>
         <PopoverTrigger asChild>

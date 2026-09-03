@@ -5,11 +5,13 @@ import {
   AlertTriangle,
   ArrowLeft,
   AtSign,
+  Link2,
   Loader2,
   Lock,
   Paperclip,
   Send,
   Sparkles,
+  UserPlus,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -37,7 +39,7 @@ import {
   type TicketAttachment,
 } from "@/ordre/hooks/useTickets";
 import { useUserAccess } from "@/ordre/hooks/useUserAccess";
-import { useTicketReplies, useSendTicketReply } from "@/ordre/hooks/useTicketReplies";
+import { useTicketReplies, useSendTicketReply, safeUuid } from "@/ordre/hooks/useTicketReplies";
 import {
   useInternalComments,
   useAddInternalComment,
@@ -75,6 +77,8 @@ import ChangeIntentCard from "@/ordre/components/tickets/ChangeIntentCard";
 import AttachmentCakePrintButton from "@/ordre/components/tickets/AttachmentCakePrintButton";
 import { CakeImageStatusCard } from "@/ordre/components/orders/CakeImageStatusCard";
 import CreateRefundDialog from "@/ordre/components/tickets/CreateRefundDialog";
+import QuickCreateCustomerDialog from "@/ordre/components/tickets/QuickCreateCustomerDialog";
+import LinkCustomerDialog from "@/ordre/components/tickets/LinkCustomerDialog";
 import RefundStatusCard from "@/ordre/components/tickets/RefundStatusCard";
 
 // ────────────────────────── data hooks
@@ -331,6 +335,17 @@ export default function TicketDetail() {
   const [showEvents, setShowEvents] = useState(true);
   const [refundOpen, setRefundOpen] = useState(false);
   const [lightbox, setLightbox] = useState<{ url: string; name: string } | null>(null);
+  /**
+   * Idempotens-nøkkel for gjeldende svarutkast. Genereres én gang når brukeren
+   * begynner å skrive, og nullstilles først etter vellykket sending — slik at
+   * unik-indeksen i basen faktisk stopper dobbeltsending.
+   */
+  const [createCustomerOpen, setCreateCustomerOpen] = useState(false);
+  const [linkCustomerOpen, setLinkCustomerOpen] = useState(false);
+  const [draftKey, setDraftKey] = useState<string | null>(null);
+  useEffect(() => {
+    if (text.trim() && !draftKey) setDraftKey(safeUuid());
+  }, [text, draftKey]);
 
   // Navn på aktører i hendelser + følgere + ansvarlig
   const nameIds = useMemo(
@@ -398,11 +413,16 @@ export default function TicketDetail() {
     const map = new Map<string, TicketAttachment[]>();
     const claimed = new Set<string>();
     for (const m of inboundMessages) {
+      // 1) Eksplisitt kobling fra webhooken — gjelder alle vedleggstyper.
+      const explicit = attachments.filter((a) => a.ticket_inbound_message_id === m.id);
+      // 2) Eldre rader uten kolonnen: fall tilbake til cid-referanser i HTML-en.
       const cids = extractCidRefs(m.body_html).map((c) => c.replace(/^<|>$/g, ""));
-      const mine = attachments.filter((a) => {
+      const byCid = attachments.filter((a) => {
+        if (a.ticket_inbound_message_id) return false;
         const cid = (a.content_id ?? "").replace(/^<|>$/g, "");
         return cid && cids.includes(cid);
       });
+      const mine = [...explicit, ...byCid];
       for (const a of mine) claimed.add(a.id);
       map.set(m.id, mine);
     }
@@ -411,7 +431,7 @@ export default function TicketDetail() {
   }, [attachments, inboundMessages]);
 
   const deadline = useMemo(
-    () => (sla && intent && ticket ? computeDeadline(ticket.received_at, intent, sla.sla, sla.bh) : null),
+    () => (sla && ticket ? computeDeadline(ticket.received_at, intent, sla.sla, sla.bh) : null),
     [sla, intent, ticket],
   );
   const countdown = deadline ? formatCountdown(deadline, new Date()) : null;
@@ -616,8 +636,13 @@ export default function TicketDetail() {
   const onSend = async () => {
     if (!text.trim() || !id) return;
     try {
-      await sendReply.mutateAsync({ ticket_id: id, body_text: text.trim() });
+      await sendReply.mutateAsync({
+        ticket_id: id,
+        body_text: text.trim(),
+        idempotency_key: draftKey ?? undefined,
+      });
       setText("");
+      setDraftKey(null);
       toast.success(`Svar sendt til ${ticket.sender_email}`);
     } catch (e) {
       toast.error(`Kunne ikke sende: ${e instanceof Error ? e.message : String(e)}`);
@@ -830,6 +855,16 @@ export default function TicketDetail() {
                   {deadline ? formatTicketTime(deadline) : ""}
                 </span>
               )}
+              {/* Uten AI-intensjon brukes standardfristen — vis hvorfor fristen finnes. */}
+              {deadline && !intent && (
+                <span
+                  className="inline-flex items-center rounded border border-dashed border-border px-2 py-0.5 text-[10px] font-medium text-muted-foreground"
+                  title={`Frist: ${formatTicketTime(deadline)}`}
+                >
+                  (standardfrist)
+                </span>
+              )}
+
             </div>
           </div>
 
@@ -1043,7 +1078,7 @@ export default function TicketDetail() {
                 </div>
               </div>
             ) : (
-              <div className="space-y-1">
+              <div className="space-y-2">
                 <div className="inline-flex items-center rounded border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">
                   Ikke i kunderegisteret
                 </div>
@@ -1051,8 +1086,17 @@ export default function TicketDetail() {
                   {ticket.sender_name ?? ticket.sender_email}
                 </div>
                 <div className="text-xs text-muted-foreground">{ticket.sender_email}</div>
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <Button size="sm" variant="outline" onClick={() => setCreateCustomerOpen(true)}>
+                    <UserPlus className="mr-1.5 h-3.5 w-3.5" /> Opprett kunde
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setLinkCustomerOpen(true)}>
+                    <Link2 className="mr-1.5 h-3.5 w-3.5" /> Koble til eksisterende
+                  </Button>
+                </div>
               </div>
             )}
+
           </SideCard>
 
           <SideCard
@@ -1156,6 +1200,25 @@ export default function TicketDetail() {
           {id && <RefundStatusCard ticketId={id} />}
         </div>
       </div>
+
+      <QuickCreateCustomerDialog
+        open={createCustomerOpen}
+        onOpenChange={setCreateCustomerOpen}
+        defaultName={ticket.sender_name}
+        defaultEmail={ticket.sender_email}
+        onCreated={() =>
+          qc.invalidateQueries({ queryKey: ["ticket-customer-card", ticket.sender_email] })
+        }
+      />
+      <LinkCustomerDialog
+        open={linkCustomerOpen}
+        onOpenChange={setLinkCustomerOpen}
+        senderEmail={ticket.sender_email}
+        senderName={ticket.sender_name}
+        onLinked={() =>
+          qc.invalidateQueries({ queryKey: ["ticket-customer-card", ticket.sender_email] })
+        }
+      />
 
       {id && linked?.order && (
         <CreateRefundDialog

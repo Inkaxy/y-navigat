@@ -377,7 +377,8 @@ Regler:
 - customer_match.customer_id skal være en av id-ene fra KUNDE-KANDIDATER, eller null.
 - candidate_orders / referenced_order / change_intent: bruk EKSAKTE order_id fra KANDIDAT-ORDRE.
 - Norsk datoformat DD-MM-YYYY inn; delivery_date ut skal være ISO YYYY-MM-DD.
-- Kort summary/reasoning på norsk.
+- ALL tekst som vises til saksbehandler skal være på norsk bokmål: summary, suggested_action, reasoning, why_match, missing_info[].label, risks[].message og alle notat-felt. Kun de tekniske kodene (request_type, missing_info[].code, risks[].code, risks[].severity) beholdes på engelsk.
+- summary skal være 1–2 korte setninger på norsk uten engelske ord som "Order", "Change", "Customer" eller "Delivery".
 
 PRODUCTION_NOTES: kort tekst til bakeriet med Felt: verdi per linje. STORE_NOTES: kort tekst til utleveringsstedet. Sett null hvis intet relevant.`;
 

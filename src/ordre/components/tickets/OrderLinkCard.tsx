@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import { getStatusMeta } from "@/ordre/lib/orderStatus";
 import { StatusPill } from "@/ordre/components/ui/status-pill";
 import { formatNOK, formatDateLong } from "@/ordre/lib/format";
-import { logTicketEvent } from "@/ordre/lib/ticketEvents";
+import { linkTicketToOrder, unlinkTicketFromOrder } from "@/ordre/hooks/useTicketOrderLink";
 import LinkOrderSearch from "@/ordre/components/tickets/LinkOrderSearch";
 import CreateOrderFromTicketButton from "@/ordre/components/tickets/CreateOrderFromTicketButton";
 import EditLinkedOrderButton from "@/ordre/components/tickets/EditLinkedOrderButton";
@@ -92,22 +92,7 @@ export default function OrderLinkCard({
   const onUnlink = async () => {
     if (!order) return;
     try {
-      const { error } = await supabase
-        .from("tickets")
-        .update({ related_order_id: null } as never)
-        .eq("id", ticket.id);
-      if (error) throw error;
-      await supabase
-        .from("ticket_order_links")
-        .delete()
-        .eq("ticket_id", ticket.id)
-        .eq("order_id", order.id);
-      await logTicketEvent({
-        ticket_id: ticket.id,
-        order_id: order.id,
-        event_type: "ticket.unlinked_from_order",
-        summary: `Fjernet kobling til ordre #${order.order_number}`,
-      });
+      await unlinkTicketFromOrder(ticket.id, order.id, order.order_number);
       invalidate();
       toast.success("Ordrekoblingen er fjernet");
     } catch (e) {
@@ -117,28 +102,14 @@ export default function OrderLinkCard({
 
   const linkCandidate = async (orderId: string, orderNumber: string | null) => {
     try {
-      const { error } = await supabase
-        .from("tickets")
-        .update({ related_order_id: orderId } as never)
-        .eq("id", ticket.id);
-      if (error) throw error;
-      await supabase
-        .from("ticket_order_links")
-        .upsert({ ticket_id: ticket.id, order_id: orderId } as never, {
-          onConflict: "ticket_id,order_id",
-        });
-      await logTicketEvent({
-        ticket_id: ticket.id,
-        order_id: orderId,
-        event_type: "ticket.linked_to_order",
-        summary: `Koblet til ordre #${orderNumber ?? orderId.slice(0, 8)}`,
-      });
+      await linkTicketToOrder(ticket.id, orderId, orderNumber);
       invalidate();
       toast.success("Ordren er koblet til samtalen");
     } catch (e) {
       toast.error(`Kunne ikke koble: ${e instanceof Error ? e.message : String(e)}`);
     }
   };
+
 
   const candidates = (ai?.candidate_orders ?? []).filter(
     (c) => c.order_id && c.order_id !== ticket.related_order_id,

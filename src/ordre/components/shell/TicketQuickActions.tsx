@@ -1,7 +1,8 @@
 import { useState } from "react";
 import {
-  CheckCircle2, Clock, Flag, Link2, MoreHorizontal, Reply, UserPlus, X,
+  CheckCircle2, Clock, Flag, Link2, MoreHorizontal, Reply, RotateCcw, UserPlus, X,
 } from "lucide-react";
+
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
   DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent,
@@ -21,33 +22,87 @@ import {
 import { useAssignableUsers } from "@/ordre/hooks/useAssignableUsers";
 import { useRecentOrdersLite } from "@/ordre/hooks/useRecentOrdersLite";
 import { TicketReplyDialog } from "./TicketReplyDialog";
-
-const STATUS_LABEL: Record<TicketStatus, string> = {
-  new: "Ny", in_progress: "Pågår", resolved: "Løst", closed: "Lukket", spam: "Spam",
-};
-const PRIO_LABEL: Record<TicketPriority, string> = {
-  low: "Lav", normal: "Normal", high: "Høy", urgent: "Haster",
-};
+import {
+  TICKET_PRIORITY_LABEL as PRIO_LABEL,
+  TICKET_STATUS_LABEL as STATUS_LABEL,
+  TICKET_STATUSES,
+  TICKET_PRIORITIES,
+} from "@/ordre/lib/ticketFormat";
+import { getStatusMeta } from "@/ordre/lib/orderStatus";
+import { logTicketEvent, type TicketEventType } from "@/ordre/lib/ticketEvents";
+import {
+  linkTicketToOrder,
+  unlinkTicketFromOrder,
+  useInvalidateTicketLinks,
+} from "@/ordre/hooks/useTicketOrderLink";
 
 export function TicketQuickActions({ ticket }: { ticket: Ticket }) {
   const { toast } = useToast();
   const update = useUpdateTicket();
+  const invalidateLinks = useInvalidateTicketLinks();
   const [replyOpen, setReplyOpen] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
 
-  const patch = (p: Partial<Ticket>, msg: string) =>
+  /** Lagrer endringen og skriver samme hendelse i tidslinjen som TicketActionBar. */
+  const patch = (p: Partial<Ticket>, msg: string, eventType?: TicketEventType) =>
     update.mutate({ id: ticket.id, patch: p }, {
-      onSuccess: () => toast({ title: msg }),
+      onSuccess: () => {
+        if (eventType) {
+          void logTicketEvent({
+            ticket_id: ticket.id,
+            order_id: ticket.related_order_id ?? null,
+            event_type: eventType,
+            actor_type: "staff",
+            summary: msg,
+          });
+        }
+        toast({ title: msg });
+      },
       onError: (e) => toast({
         title: "Feilet", description: e instanceof Error ? e.message : String(e),
         variant: "destructive",
       }),
     });
 
+  const statusEvent = (next: TicketStatus): TicketEventType =>
+    next === "resolved"
+      ? "ticket.resolved"
+      : ticket.status === "resolved" || ticket.status === "closed"
+        ? "ticket.reopened"
+        : "ticket.status_changed";
+
+  const onLinkOrder = async (orderId: string, orderNumber: string | null) => {
+    try {
+      await linkTicketToOrder(ticket.id, orderId, orderNumber);
+      invalidateLinks(ticket.id);
+      toast({ title: "Koblet til ordre" });
+    } catch (e) {
+      toast({
+        title: "Feilet", description: e instanceof Error ? e.message : String(e),
+        variant: "destructive",
+      });
+    }
+  };
+
+  const onUnlinkOrder = async () => {
+    if (!ticket.related_order_id) return;
+    try {
+      await unlinkTicketFromOrder(ticket.id, ticket.related_order_id);
+      invalidateLinks(ticket.id);
+      toast({ title: "Ordrekobling fjernet" });
+    } catch (e) {
+      toast({
+        title: "Feilet", description: e instanceof Error ? e.message : String(e),
+        variant: "destructive",
+      });
+    }
+  };
+
   const stop = (e: React.MouseEvent | React.KeyboardEvent) => {
     e.preventDefault(); e.stopPropagation();
   };
+
 
   return (
     <div onClick={stop} onKeyDown={stop as never} className="flex items-center gap-1">
@@ -76,9 +131,9 @@ export function TicketQuickActions({ ticket }: { ticket: Ticket }) {
               <Clock className="mr-2 h-3.5 w-3.5" /> Status: {STATUS_LABEL[ticket.status]}
             </DropdownMenuSubTrigger>
             <DropdownMenuSubContent>
-              {(Object.keys(STATUS_LABEL) as TicketStatus[]).map((s) => (
+              {TICKET_STATUSES.map((s) => (
                 <DropdownMenuItem key={s}
-                  onSelect={() => patch({ status: s }, `Status: ${STATUS_LABEL[s]}`)}>
+                  onSelect={() => patch({ status: s }, `Status: ${STATUS_LABEL[s]}`, statusEvent(s))}>
                   {STATUS_LABEL[s]}
                 </DropdownMenuItem>
               ))}
@@ -91,9 +146,9 @@ export function TicketQuickActions({ ticket }: { ticket: Ticket }) {
               <Flag className="mr-2 h-3.5 w-3.5" /> Prioritet: {PRIO_LABEL[ticket.priority]}
             </DropdownMenuSubTrigger>
             <DropdownMenuSubContent>
-              {(Object.keys(PRIO_LABEL) as TicketPriority[]).map((p) => (
+              {TICKET_PRIORITIES.map((p) => (
                 <DropdownMenuItem key={p}
-                  onSelect={() => patch({ priority: p }, `Prioritet: ${PRIO_LABEL[p]}`)}>
+                  onSelect={() => patch({ priority: p }, `Prioritet: ${PRIO_LABEL[p]}`, "ticket.priority_changed")}>
                   {PRIO_LABEL[p]}
                 </DropdownMenuItem>
               ))}
@@ -106,7 +161,8 @@ export function TicketQuickActions({ ticket }: { ticket: Ticket }) {
             {ticket.assigned_to ? "Endre ansvarlig" : "Tildel ansvarlig"}
           </DropdownMenuItem>
           {ticket.assigned_to && (
-            <DropdownMenuItem onSelect={() => patch({ assigned_to: null }, "Tildeling fjernet")}>
+            <DropdownMenuItem
+              onSelect={() => patch({ assigned_to: null }, "Ansvarlig fjernet", "ticket.unassigned")}>
               <X className="mr-2 h-3.5 w-3.5" /> Fjern tildeling
             </DropdownMenuItem>
           )}
@@ -115,14 +171,22 @@ export function TicketQuickActions({ ticket }: { ticket: Ticket }) {
             {ticket.related_order_id ? "Endre koblet ordre" : "Koble til ordre"}
           </DropdownMenuItem>
           {ticket.related_order_id && (
-            <DropdownMenuItem onSelect={() => patch({ related_order_id: null }, "Ordrekobling fjernet")}>
+            <DropdownMenuItem onSelect={() => void onUnlinkOrder()}>
               <X className="mr-2 h-3.5 w-3.5" /> Fjern ordrekobling
             </DropdownMenuItem>
           )}
           <DropdownMenuSeparator />
-          <DropdownMenuItem onSelect={() => patch({ status: "resolved" }, "Markert som løst")}>
-            <CheckCircle2 className="mr-2 h-3.5 w-3.5" /> Marker som løst
-          </DropdownMenuItem>
+          {ticket.status === "resolved" || ticket.status === "closed" ? (
+            <DropdownMenuItem
+              onSelect={() => patch({ status: "in_progress" }, "Gjenåpnet", "ticket.reopened")}>
+              <RotateCcw className="mr-2 h-3.5 w-3.5" /> Gjenåpne
+            </DropdownMenuItem>
+          ) : (
+            <DropdownMenuItem
+              onSelect={() => patch({ status: "resolved" }, "Markert som løst", "ticket.resolved")}>
+              <CheckCircle2 className="mr-2 h-3.5 w-3.5" /> Marker som løst
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
 
@@ -130,12 +194,13 @@ export function TicketQuickActions({ ticket }: { ticket: Ticket }) {
       <AssignDialog
         open={assignOpen} onOpenChange={setAssignOpen}
         currentId={ticket.assigned_to}
-        onPick={(uid) => patch({ assigned_to: uid }, "Ansvarlig oppdatert")}
+        onPick={(uid) => patch({ assigned_to: uid }, "Ansvarlig oppdatert", "ticket.assigned")}
       />
       <LinkOrderDialog
         open={linkOpen} onOpenChange={setLinkOpen}
-        onPick={(orderId) => patch({ related_order_id: orderId }, "Koblet til ordre")}
+        onPick={(orderId, orderNumber) => void onLinkOrder(orderId, orderNumber)}
       />
+
     </div>
   );
 }
@@ -180,7 +245,7 @@ function LinkOrderDialog({
   open, onOpenChange, onPick,
 }: {
   open: boolean; onOpenChange: (v: boolean) => void;
-  onPick: (orderId: string) => void;
+  onPick: (orderId: string, orderNumber: string | null) => void;
 }) {
   const [search, setSearch] = useState("");
   const { data: orders = [], isLoading } = useRecentOrdersLite(search);
@@ -203,7 +268,7 @@ function LinkOrderDialog({
               {orders.map((o) => (
                 <CommandItem
                   key={o.id} value={o.id}
-                  onSelect={() => { onPick(o.id); onOpenChange(false); }}
+                  onSelect={() => { onPick(o.id, o.order_number ?? null); onOpenChange(false); }}
                 >
                   <div className="flex w-full items-center justify-between gap-2">
                     <div>
@@ -212,7 +277,10 @@ function LinkOrderDialog({
                         {o.customer_name ?? "—"}{o.delivery_date ? ` · ${o.delivery_date}` : ""}
                       </div>
                     </div>
-                    <span className="text-caption text-muted-foreground">{o.status}</span>
+                    <span className="text-caption text-muted-foreground">
+                      {getStatusMeta(o.status).label}
+                    </span>
+
                   </div>
                 </CommandItem>
               ))}

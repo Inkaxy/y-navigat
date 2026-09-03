@@ -12026,6 +12026,7 @@ export type Database = {
           size_bytes: number | null
           storage_path: string | null
           ticket_id: string
+          ticket_inbound_message_id: string | null
         }
         Insert: {
           ai_summarized_at?: string | null
@@ -12044,6 +12045,7 @@ export type Database = {
           size_bytes?: number | null
           storage_path?: string | null
           ticket_id: string
+          ticket_inbound_message_id?: string | null
         }
         Update: {
           ai_summarized_at?: string | null
@@ -12062,6 +12064,7 @@ export type Database = {
           size_bytes?: number | null
           storage_path?: string | null
           ticket_id?: string
+          ticket_inbound_message_id?: string | null
         }
         Relationships: [
           {
@@ -12076,6 +12079,13 @@ export type Database = {
             columns: ["ticket_id"]
             isOneToOne: false
             referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ticket_attachments_ticket_inbound_message_id_fkey"
+            columns: ["ticket_inbound_message_id"]
+            isOneToOne: false
+            referencedRelation: "ticket_inbound_messages"
             referencedColumns: ["id"]
           },
         ]

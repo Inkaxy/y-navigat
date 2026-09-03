@@ -161,7 +161,7 @@ async function processMessage(
       parentTicket.awaiting_external_email != null &&
       senderEmail.toLowerCase() === parentTicket.awaiting_external_email.toLowerCase();
 
-    const { error: insErr } = await admin.from("ticket_inbound_messages").insert({
+    const { data: inboundRow, error: insErr } = await admin.from("ticket_inbound_messages").insert({
       ticket_id: parentTicket.id,
       microsoft_message_id: msg.id,
       microsoft_internet_message_id: msg.internetMessageId ?? null,
@@ -175,7 +175,7 @@ async function processMessage(
       has_attachments: !!msg.hasAttachments,
       received_at: msg.receivedDateTime,
       is_from_external_forward: isFromExternalForward,
-    });
+    }).select("id").single();
     if (insErr) {
       console.error("Insert inbound message failed", insErr);
       return;
@@ -215,7 +215,13 @@ async function processMessage(
     }
 
     // Attachments (inline images inkludert) på svaret lagres også på parent-ticket
-    await fetchAndStoreAttachments(admin, accessToken, messageId, parentTicket.id);
+    await fetchAndStoreAttachments(
+      admin,
+      accessToken,
+      messageId,
+      parentTicket.id,
+      inboundRow?.id ?? null,
+    );
     return;
   }
 
@@ -280,6 +286,8 @@ async function fetchAndStoreAttachments(
   accessToken: string,
   messageId: string,
   ticketId: string,
+  /** Settes for vedlegg som kom med en senere melding i tråden. */
+  inboundMessageId: string | null = null,
 ) {
   try {
     const attRes = await fetch(
@@ -324,6 +332,7 @@ async function fetchAndStoreAttachments(
         storage_path: storagePath,
         is_inline: !!a.isInline,
         content_id: a.contentId ?? null,
+        ticket_inbound_message_id: inboundMessageId,
       });
     }
   } catch (err) {

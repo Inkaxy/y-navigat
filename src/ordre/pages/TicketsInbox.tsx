@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Paperclip, Package, AlertTriangle, Inbox, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllRows } from "@/lib/supabasePaging";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 import { QueryErrorState, QueryState } from "@/components/common/QueryState";
@@ -127,20 +128,35 @@ function ConfidenceChip({ score }: { score: number | null }) {
   );
 }
 
+const TICKET_SELECT =
+  "id, subject, body_preview, sender_name, sender_email, received_at, updated_at, status, priority, assigned_to, assigned_team, awaiting_internal, has_attachments, related_order_id, ai_confidence_score, ai_suggestion, orders:related_order_id(order_number)";
+
+/** Antall lukkede/søppel-saker vi laster ned — resten telles med head-count. */
+const ARCHIVE_PAGE = 200;
+
 function useInboxTickets() {
   const qc = useQueryClient();
   const query = useQuery({
     queryKey: ["tickets", "inbox"],
     queryFn: async (): Promise<TicketRow[]> => {
-      const { data, error } = await supabase
+      // Åpne saker hentes KOMPLETT (paginert) slik at køtellerne aldri lyver.
+      const open = await fetchAllRows<TicketRow>((from, to) =>
+        supabase
+          .from("tickets")
+          .select(TICKET_SELECT)
+          .not("status", "in", "(closed,spam)")
+          .order("received_at", { ascending: false })
+          .range(from, to) as never,
+      );
+      // Arkivet er ubegrenset stort — vis kun de nyeste, tell resten separat.
+      const { data: archive, error } = await supabase
         .from("tickets")
-        .select(
-          "id, subject, body_preview, sender_name, sender_email, received_at, updated_at, status, priority, assigned_to, assigned_team, awaiting_internal, has_attachments, related_order_id, ai_confidence_score, ai_suggestion, orders:related_order_id(order_number)",
-        )
+        .select(TICKET_SELECT)
+        .in("status", ["closed", "spam"])
         .order("received_at", { ascending: false })
-        .limit(500);
+        .limit(ARCHIVE_PAGE);
       if (error) throw error;
-      return (data ?? []) as unknown as TicketRow[];
+      return [...open, ...((archive ?? []) as unknown as TicketRow[])];
     },
   });
 
@@ -150,7 +166,10 @@ function useInboxTickets() {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "tickets" },
-        () => qc.invalidateQueries({ queryKey: ["tickets", "inbox"] }),
+        () => {
+          qc.invalidateQueries({ queryKey: ["tickets", "inbox"] });
+          qc.invalidateQueries({ queryKey: ["tickets", "archive-counts"] });
+        },
       )
       .subscribe();
     return () => {
@@ -348,6 +367,20 @@ export default function TicketsInbox() {
 
 
 
+  // Lukket/søppel lastes bare delvis ned — hent eksakt antall fra serveren.
+  const { data: archiveCounts } = useQuery({
+    queryKey: ["tickets", "archive-counts"],
+    queryFn: async () => {
+      const [closed, spam] = await Promise.all([
+        supabase.from("tickets").select("id", { count: "exact", head: true }).eq("status", "closed"),
+        supabase.from("tickets").select("id", { count: "exact", head: true }).eq("status", "spam"),
+      ]);
+      if (closed.error) throw closed.error;
+      if (spam.error) throw spam.error;
+      return { closed: closed.count ?? 0, spam: spam.count ?? 0 };
+    },
+  });
+
   const counts = useMemo(() => {
     const open = rows.filter(isOpen);
     const c = {
@@ -356,8 +389,8 @@ export default function TicketsInbox() {
       unassigned: open.filter((r) => r.assigned_to == null).length,
       awaiting_customer: rows.filter((r) => r.awaitingCustomer && isOpen(r)).length,
       resolved: rows.filter((r) => r.status === "resolved").length,
-      closed: rows.filter((r) => r.status === "closed").length,
-      spam: rows.filter((r) => r.status === "spam").length,
+      closed: archiveCounts?.closed ?? rows.filter((r) => r.status === "closed").length,
+      spam: archiveCounts?.spam ?? rows.filter((r) => r.status === "spam").length,
       mine: rows.filter((r) => r.assigned_to === user?.id && isOpen(r)).length,
       intent: {} as Record<RequestType, number>,
       team: {} as Record<TicketTeam, number>,
@@ -369,7 +402,7 @@ export default function TicketsInbox() {
       c.team[team] = open.filter((r) => r.assigned_team === team).length;
     }
     return c;
-  }, [rows, user?.id]);
+  }, [rows, user?.id, archiveCounts]);
 
   const kpis = useMemo(() => {
     const open = rows.filter(isOpen);
