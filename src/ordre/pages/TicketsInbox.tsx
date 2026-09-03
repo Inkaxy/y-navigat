@@ -231,13 +231,6 @@ export default function TicketsInbox() {
   const { data: latestReply = new Map<string, string>() } = useLatestReplyByTicket(ticketIds);
   const { data: latestInbound = new Map<string, string>() } = useLatestInboundByTicket(ticketIds);
 
-  type Row = TicketRow & {
-    intent: RequestType | null;
-    deadline: Date | null;
-    overdue: boolean;
-    countdown: string | null;
-    awaitingCustomer: boolean;
-  };
 
   const rows: Row[] = useMemo(
     () => {
