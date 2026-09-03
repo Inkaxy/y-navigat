@@ -19,12 +19,13 @@ import { formatRelative, initialsOf } from "@/ordre/lib/format";
 import { cn } from "@/lib/utils";
 import { TicketQuickActions } from "./TicketQuickActions";
 import { DeskSectionState } from "@/ordre/components/dashboard/DeskSectionState";
+import {
+  TICKET_PRIORITIES,
+  TICKET_PRIORITY_LABEL as PRIO_LABEL,
+  TICKET_STATUS_LABEL as STATUS_LABEL,
+} from "@/ordre/lib/ticketFormat";
 
 type Tab = "open" | "new" | "mine" | "unassigned";
-
-const STATUS_LABEL: Record<TicketStatus, string> = {
-  new: "Ny", in_progress: "Pågår", resolved: "Løst", closed: "Lukket", spam: "Spam",
-};
 
 const STATUS_TONE: Record<TicketStatus, string> = {
   new: "bg-[hsl(var(--alert-info))]/12 text-[hsl(var(--alert-info))] border-[hsl(var(--alert-info))]/30",
@@ -32,10 +33,6 @@ const STATUS_TONE: Record<TicketStatus, string> = {
   resolved: "bg-[hsl(var(--alert-success))]/12 text-[hsl(var(--alert-success))] border-[hsl(var(--alert-success))]/30",
   closed: "bg-muted text-muted-foreground border-border",
   spam: "bg-destructive/10 text-destructive border-destructive/30",
-};
-
-const PRIO_LABEL: Record<TicketPriority, string> = {
-  low: "Lav", normal: "Normal", high: "Høy", urgent: "Haster",
 };
 
 const VISIBLE_LIMIT = 8;
@@ -180,7 +177,7 @@ export function TicketsInboxWidget() {
           <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground">
             <Filter className="h-3 w-3" /> Prioritet
           </span>
-          {(Object.keys(PRIO_LABEL) as TicketPriority[]).map((p) => {
+          {TICKET_PRIORITIES.map((p) => {
             const active = priorities.includes(p);
             return (
               <button
