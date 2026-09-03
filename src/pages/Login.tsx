@@ -75,7 +75,7 @@ export default function Login() {
         </p>
       }
     >
-      <form onSubmit={handleSubmit} className="space-y-4" noValidate={false}>
+      <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="email">E-post</Label>
           <Input
