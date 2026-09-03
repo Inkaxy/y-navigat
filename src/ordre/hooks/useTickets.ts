@@ -83,7 +83,10 @@ export interface TicketAttachment {
   attached_by: string | null;
   attached_at: string | null;
   content_id: string | null;
+  /** Hvilken senere melding i tråden vedlegget kom med. Null = første e-post. */
+  ticket_inbound_message_id?: string | null;
   microsoft_attachment_id?: string | null;
+
 }
 
 export interface TicketsFilter {
