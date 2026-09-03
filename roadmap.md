@@ -5,9 +5,10 @@
 - [x] `useOrderDeskBoard` + `OrderDeskKpi`, `WorkQueueCard`, `DeskSectionState`
 - [x] Omdøp dashbord-widget til `TicketsInboxWidget`, semantiske lenkerader, trygge feilmeldinger
 - [x] Lettere ticket-queries (eksplisitte kolonner, færre nettverkskall i `useTicketCounts`)
-- [x] Feiltilstander med «Prøv igjen»: dashbord, innboks, ordreliste, kundeordre, leveringskalender
-- [x] Leveringskalender: full bredde, responsiv førstekolonne, sticky kompakt toppbar
-- [x] Navigasjon: «Innboks», bakoverkompatibel `/ordre/avvik`
+- [x] Feiltilstander med «Prøv igjen»: dashbord og innboks-widget
+- [ ] Feiltilstander: ordreliste, kundeordre, leveringskalender (Leveranse 2)
+- [x] Leveringskalender: full bredde (full-bleed shell) + responsiv førstekolonne
+- [x] Navigasjon: «Innboks» i submeny, fjernet død `/ordre/avvik`-placeholder
 
 ## Leveranse 2 (ikke startet)
 - E-post/ticket-hardening: `/users/{mailbox}` overalt, deterministisk tokenvalg, idempotens-indeks,
