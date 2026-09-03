@@ -19,6 +19,8 @@ import { useAddInternalComment } from "@/ordre/hooks/useInternalComments";
 import { useUpdateTicket, type Ticket } from "@/ordre/hooks/useTickets";
 import { useActiveUsers } from "@/ordre/hooks/useActiveUsers";
 import { createNotifications } from "@/ordre/hooks/useNotifications";
+import { useInboundMessages, type InboundMessage } from "@/ordre/hooks/useInboundMessages";
+import { useTicketReplies, type TicketReply } from "@/ordre/hooks/useTicketReplies";
 
 interface Props {
   ticket: Ticket;
@@ -51,7 +53,14 @@ export default function TicketComposerActions({
   );
   const [sending, setSending] = useState(false);
 
-  const originalHtml = useMemo(() => buildQuotedOriginal(ticket), [ticket]);
+  const { data: inbound = [] } = useInboundMessages(ticket.id);
+  const { data: replies = [] } = useTicketReplies(ticket.id);
+  // Hele samtalen legges ved — interne notater er bevisst utelatt.
+  const quoted = useMemo(
+    () => buildQuotedOriginal(ticket, inbound, replies),
+    [ticket, inbound, replies],
+  );
+  const originalHtml = quoted.html;
 
   // ─── @tagg
   const onAsk = async () => {
@@ -370,7 +379,8 @@ export default function TicketComposerActions({
             className="min-h-[110px] bg-background"
           />
           <p className="mt-2 text-xs text-muted-foreground">
-            Original-e-posten legges ved automatisk. Svaret havner rett tilbake i denne samtalen
+            Hele samtalen ({quoted.count} {quoted.count === 1 ? "melding" : "meldinger"}) legges
+            ved. Interne notater sendes aldri med. Svaret havner rett tilbake i denne samtalen
             (samme e-posttråd) — ikke i en privat innboks.
           </p>
           <div className="mt-2 flex items-center gap-2">
@@ -412,17 +422,71 @@ function shortId(uuid: string): string {
   return uuid.slice(0, 8);
 }
 
-function buildQuotedOriginal(ticket: Ticket): string {
-  const header =
-    `<p style="color:#666;font-size:12px;margin:0 0 8px 0">` +
-    `Fra: ${escapeHtml(ticket.sender_name ?? "")} &lt;${escapeHtml(ticket.sender_email)}&gt;<br/>` +
-    `Sendt: ${escapeHtml(new Date(ticket.received_at).toLocaleString("nb-NO"))}<br/>` +
-    `Emne: ${escapeHtml(ticket.subject ?? "")}` +
-    `</p>`;
-  const body = ticket.body_html
-    ? ticket.body_html
-    : `<pre style="white-space:pre-wrap;font-family:inherit">${escapeHtml(
-        ticket.body_text ?? ticket.body_preview ?? "",
-      )}</pre>`;
-  return `<blockquote style="border-left:3px solid #ccc;padding-left:12px;margin:0">${header}${body}</blockquote>`;
+type QuotedItem = { at: string; from: string; label: string; subject: string | null; html: string };
+
+/**
+ * Bygger sitatet som følger med en videresending: kundens e-poster og våre
+ * svar, nyeste først. Interne notater tas ALDRI med.
+ */
+function buildQuotedOriginal(
+  ticket: Ticket,
+  inbound: InboundMessage[],
+  replies: TicketReply[],
+): { html: string; count: number } {
+  const items: QuotedItem[] = [];
+
+  items.push({
+    at: ticket.received_at,
+    from: `${ticket.sender_name ?? ""} <${ticket.sender_email}>`.trim(),
+    label: "Fra kunde",
+    subject: ticket.subject ?? null,
+    html: ticket.body_html
+      ? ticket.body_html
+      : `<pre style="white-space:pre-wrap;font-family:inherit">${escapeHtml(
+          ticket.body_text ?? ticket.body_preview ?? "",
+        )}</pre>`,
+  });
+
+  for (const m of inbound) {
+    items.push({
+      at: m.received_at,
+      from: `${m.sender_name ?? ""} <${m.sender_email}>`.trim(),
+      label: m.is_from_external_forward ? "Fra ekstern part" : "Fra kunde",
+      subject: m.subject ?? null,
+      html: m.body_html
+        ? m.body_html
+        : `<pre style="white-space:pre-wrap;font-family:inherit">${escapeHtml(
+            m.body_text ?? m.body_preview ?? "",
+          )}</pre>`,
+    });
+  }
+
+  for (const r of replies) {
+    if (r.send_status !== "sent") continue;
+    items.push({
+      at: r.sent_at ?? r.created_at,
+      from: r.sent_by_name ?? "Ordrekontoret",
+      label: "Vårt svar",
+      subject: ticket.subject ?? null,
+      html:
+        r.body_rendered ??
+        `<pre style="white-space:pre-wrap;font-family:inherit">${escapeHtml(r.body_text)}</pre>`,
+    });
+  }
+
+  items.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+
+  const html = items
+    .map((it) => {
+      const header =
+        `<p style="color:#666;font-size:12px;margin:0 0 8px 0">` +
+        `<b>${escapeHtml(it.label)}</b><br/>` +
+        `Fra: ${escapeHtml(it.from)} · ${escapeHtml(new Date(it.at).toLocaleString("nb-NO"))}<br/>` +
+        `Emne: ${escapeHtml(it.subject ?? "")}` +
+        `</p>`;
+      return `<blockquote style="border-left:3px solid #ccc;padding-left:12px;margin:0 0 16px 0">${header}${it.html}</blockquote>`;
+    })
+    .join("");
+
+  return { html, count: items.length };
 }
