@@ -5,11 +5,13 @@ import {
   AlertTriangle,
   ArrowLeft,
   AtSign,
+  Link2,
   Loader2,
   Lock,
   Paperclip,
   Send,
   Sparkles,
+  UserPlus,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -75,6 +77,8 @@ import ChangeIntentCard from "@/ordre/components/tickets/ChangeIntentCard";
 import AttachmentCakePrintButton from "@/ordre/components/tickets/AttachmentCakePrintButton";
 import { CakeImageStatusCard } from "@/ordre/components/orders/CakeImageStatusCard";
 import CreateRefundDialog from "@/ordre/components/tickets/CreateRefundDialog";
+import QuickCreateCustomerDialog from "@/ordre/components/tickets/QuickCreateCustomerDialog";
+import LinkCustomerDialog from "@/ordre/components/tickets/LinkCustomerDialog";
 import RefundStatusCard from "@/ordre/components/tickets/RefundStatusCard";
 
 // ────────────────────────── data hooks
@@ -1196,6 +1200,25 @@ export default function TicketDetail() {
           {id && <RefundStatusCard ticketId={id} />}
         </div>
       </div>
+
+      <QuickCreateCustomerDialog
+        open={createCustomerOpen}
+        onOpenChange={setCreateCustomerOpen}
+        defaultName={ticket.sender_name}
+        defaultEmail={ticket.sender_email}
+        onCreated={() =>
+          qc.invalidateQueries({ queryKey: ["ticket-customer-card", ticket.sender_email] })
+        }
+      />
+      <LinkCustomerDialog
+        open={linkCustomerOpen}
+        onOpenChange={setLinkCustomerOpen}
+        senderEmail={ticket.sender_email}
+        senderName={ticket.sender_name}
+        onLinked={() =>
+          qc.invalidateQueries({ queryKey: ["ticket-customer-card", ticket.sender_email] })
+        }
+      />
 
       {id && linked?.order && (
         <CreateRefundDialog
