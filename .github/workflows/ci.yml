@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Test, typecheck og build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Installer avhengigheter
+        run: npm ci
+
+      - name: Test
+        run: npm run test
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        env:
+          # Vite trenger variablene ved build; ekte verdier settes som
+          # repository secrets. Placeholder gjør at bygget kjører i forks.
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://placeholder.supabase.co' }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY || 'placeholder-anon-key' }}
+          VITE_SUPABASE_PROJECT_ID: ${{ secrets.VITE_SUPABASE_PROJECT_ID || 'placeholder' }}
+        run: npm run build
+
+  lint:
+    # MIDLERTIDIG RAPPORTERENDE JOBB.
+    # Kodebasen har i dag ~1 100 eksisterende ESLint-feil (hovedsakelig
+    # @typescript-eslint/no-explicit-any). Lint kjøres derfor som en
+    # ikke-blokkerende rapport inntil gjelden er nedbetalt — da fjernes
+    # `continue-on-error` og jobben gjøres obligatorisk.
+    name: Lint (rapporterende, ikke-blokkerende)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Installer avhengigheter
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint

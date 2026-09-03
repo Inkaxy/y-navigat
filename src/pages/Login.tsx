@@ -1,19 +1,13 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
-import { UserCircle2 } from "lucide-react";
-import LoginLogo from "@/assets/brand/logo-login.svg?react";
-
-// Demo-panel er kun synlig i utvikling og bare hvis VITE_DEMO_PASSWORD er satt
-// som build-secret. Passordet bundles ikke i prod-byggene.
-const DEMO_PASSWORD = (import.meta.env.VITE_DEMO_PASSWORD as string | undefined) ?? "";
-const DEMO_ENABLED = import.meta.env.DEV && DEMO_PASSWORD.length > 0;
+import { AuthShell } from "@/components/auth/AuthShell";
+import { logAppError } from "@/lib/errorLog";
 
 const ALLOWED_RETURN_HOSTS = /^https:\/\/([a-z0-9-]+\.)?nbhub\.no(\/|$)/;
 
@@ -21,24 +15,6 @@ const resolveReturnTarget = (raw: string | null): string | null => {
   if (!raw) return null;
   return ALLOWED_RETURN_HOSTS.test(raw) ? raw : null;
 };
-
-const DEMO_USERS: Array<{
-  email: string;
-  name: string;
-  role: string;
-  entity: string;
-}> = DEMO_ENABLED
-  ? [
-      { email: "kari.berg@demo.no",     name: "Kari Berg",     role: "Daglig leder",   entity: "Nøtterø Bakeri (NB)" },
-      { email: "lars.solheim@demo.no",  name: "Lars Solheim",  role: "Ordrekontor",    entity: "Nøtterø Bakeri (NB)" },
-      { email: "maja.lund@demo.no",     name: "Maja Lund",     role: "HR-ansvarlig",   entity: "Nøtterø Bakeri (NB)" },
-      { email: "anne.hansen@demo.no",   name: "Anne Hansen",   role: "Butikkleder",    entity: "Is & Bakevarer (IB)" },
-      { email: "ole.nilsen@demo.no",    name: "Ole Nilsen",    role: "Butikkleder",    entity: "Nøtterø Kafeer (NK)" },
-      { email: "per.olsen@demo.no",     name: "Per Olsen",     role: "Baker",          entity: "Nøtterø Bakeri (NB)" },
-      { email: "ida.strand@demo.no",    name: "Ida Strand",    role: "Konditor",       entity: "Mellom Kafé (MK)" },
-      { email: "tom.eriksen@demo.no",   name: "Tom Eriksen",   role: "Sjåfør",         entity: "Nøtterø Bakeri (NB)" },
-    ]
-  : [];
 
 export default function Login() {
   const navigate = useNavigate();
@@ -48,13 +24,22 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  const goAfterLogin = () => {
+    const target = resolveReturnTarget(params.get("return"));
+    if (target) {
+      window.location.href = target;
+    } else {
+      navigate("/", { replace: true });
+    }
+  };
+
   useEffect(() => {
     if (!user) return;
     const target = resolveReturnTarget(params.get("return"));
     if (target) {
       window.location.href = target;
     } else {
-      navigate("/hjem", { replace: true });
+      navigate("/", { replace: true });
     }
   }, [user, navigate, params]);
 
@@ -62,131 +47,77 @@ export default function Login() {
     document.title = "Logg inn — NBHub";
   }, []);
 
-  const signIn = async (loginEmail: string, loginPassword: string) => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setSubmitting(true);
-    const { error } = await supabase.auth.signInWithPassword({
-      email: loginEmail,
-      password: loginPassword,
-    });
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
     setSubmitting(false);
+
     if (error) {
-      if (import.meta.env.DEV) {
-        // eslint-disable-next-line no-console
-        console.warn("[auth] sign-in failed:", error.message);
-      }
+      // Rå Supabase-meldinger skal aldri vises til sluttbruker.
+      logAppError(error, { scope: "auth:sign-in" });
       toast.error("Innlogging mislyktes", {
-        description: "E-postadresse eller passord er feil.",
+        description: "Kontrollér e-postadresse og passord, og prøv igjen.",
       });
       return;
     }
-    const target = resolveReturnTarget(params.get("return"));
-    if (target) {
-      window.location.href = target;
-    } else {
-      navigate("/hjem", { replace: true });
-    }
-  };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    await signIn(email, password);
-  };
-
-  const handleDemoLogin = async (demoEmail: string) => {
-    setEmail(demoEmail);
-    setPassword(DEMO_PASSWORD);
-    await signIn(demoEmail, DEMO_PASSWORD);
+    goAfterLogin();
   };
 
   return (
-    <div
-      className="flex min-h-screen items-start justify-center bg-surface-canvas px-4 pt-4 pb-4"
-      style={{
-        background:
-          "radial-gradient(ellipse at top, hsl(var(--surface-raised)) 0%, hsl(var(--surface-canvas)) 70%)",
-      }}
+    <AuthShell
+      title="Logg inn"
+      description="Bruk arbeidsadressen din og passordet ditt."
+      footer={
+        <p>
+          Problemer med innlogging? Ta kontakt med plattform-ansvarlig.
+        </p>
+      }
     >
-      <div className="w-full max-w-3xl space-y-2 animate-fade-in">
-        <div className="flex flex-col items-center text-center">
-          <LoginLogo
-            role="img"
-            aria-label="Nøtterø Bakeri"
-            className="h-[24rem] w-auto sm:h-[28rem] md:h-[34rem] lg:h-[40rem] text-brand-ink drop-shadow-[0_8px_30px_hsl(var(--brand-bronze)/0.18)]"
+      <form onSubmit={handleSubmit} className="space-y-4" noValidate={false}>
+        <div className="space-y-2">
+          <Label htmlFor="email">E-post</Label>
+          <Input
+            id="email"
+            name="email"
+            type="email"
+            inputMode="email"
+            autoComplete="email"
+            autoCapitalize="none"
+            spellCheck={false}
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="navn@notterobakeri.no"
           />
         </div>
 
-        <Card className="shadow-elevated">
-          <CardHeader>
-            <CardTitle>Logg inn</CardTitle>
-            <CardDescription>Bruk din arbeidsadresse og passord.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">E-post</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  autoComplete="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="navn@notterobakeri.no"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Passord</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  autoComplete="current-password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-              </div>
-              <Button type="submit" variant="brand" className="w-full" disabled={submitting}>
-                {submitting ? "Logger inn…" : "Logg inn"}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
+        <div className="space-y-2">
+          <div className="flex items-baseline justify-between gap-2">
+            <Label htmlFor="password">Passord</Label>
+            <Link
+              to="/glemt-passord"
+              className="rounded-sm text-xs font-medium text-brand-bronze underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            >
+              Glemt passord?
+            </Link>
+          </div>
+          <Input
+            id="password"
+            name="password"
+            type="password"
+            autoComplete="current-password"
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+        </div>
 
-        {DEMO_ENABLED && (
-          <Card className="border-dashed">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold">Demo-brukere</CardTitle>
-              <CardDescription className="text-xs">
-                Klikk for å logge inn som testbruker. Kun for demonstrasjon.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {DEMO_USERS.map((u) => (
-                <button
-                  key={u.email}
-                  type="button"
-                  onClick={() => handleDemoLogin(u.email)}
-                  disabled={submitting}
-                  className="flex w-full items-center gap-3 rounded-md border border-border bg-background px-3 py-2 text-left transition-colors hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <UserCircle2 className="h-8 w-8 shrink-0 text-muted-foreground" aria-hidden="true" />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="truncate text-sm font-medium">{u.name}</span>
-                      <span className="shrink-0 text-xs text-muted-foreground">{u.role}</span>
-                    </div>
-                    <div className="truncate text-xs text-muted-foreground">{u.entity}</div>
-                  </div>
-                </button>
-              ))}
-            </CardContent>
-          </Card>
-        )}
-
-        <p className="text-center text-xs text-muted-foreground">
-          Glemt passord? Ta kontakt med plattform-ansvarlig.
-        </p>
-      </div>
-    </div>
+        <Button type="submit" variant="brand" className="w-full" disabled={submitting}>
+          {submitting ? "Logger inn…" : "Logg inn"}
+        </Button>
+      </form>
+    </AuthShell>
   );
 }
