@@ -266,7 +266,7 @@ export default function TicketsInbox() {
   );
 
 
-  const isOpen = (t: Row) => t.status === "new" || t.status === "in_progress";
+
 
   const counts = useMemo(() => {
     const open = rows.filter(isOpen);
