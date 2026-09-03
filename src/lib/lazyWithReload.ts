@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { lazy, type ComponentType } from "react";
 
 const FLAG = "nbh_chunk_reloaded";
@@ -29,7 +30,7 @@ const clearFlag = () => {
  * fordi brukeren står på en utdatert kodepakke. Flagget i sessionStorage
  * hindrer reload-løkke; det nullstilles ved neste vellykkede lasting.
  */
-export function lazyWithReload<T extends ComponentType<never>>(
+export function lazyWithReload<T extends ComponentType<any>>(
   factory: () => Promise<{ default: T }>,
 ) {
   return lazy(() =>
