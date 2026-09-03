@@ -563,9 +563,10 @@ export default function TicketsInbox() {
                   <div className="pointer-events-none flex w-full items-center gap-3">
                     <div
                       className={cn(
-                        "inline-flex shrink-0 items-center rounded border px-2 py-1 text-[10px] font-bold tracking-wide",
+                        "inline-flex max-w-[6.5rem] shrink-0 items-center truncate rounded border px-2 py-1 text-[10px] font-bold tracking-wide sm:max-w-none",
                         badgeCls,
                       )}
+                      title={badgeLabel}
                     >
                       {badgeLabel}
                     </div>
@@ -585,7 +586,22 @@ export default function TicketsInbox() {
                       <div className="mt-0.5 truncate text-xs text-muted-foreground">
                         {t.body_preview || t.sender_email}
                       </div>
+                      {/* Mobil: avsender og tidspunkt får egen linje fordi
+                          metadata-kolonnen til høyre skjules på små skjermer. */}
+                      <div className="mt-1 flex items-center gap-1.5 text-[11px] text-muted-foreground sm:hidden">
+                        <span className="truncate font-medium">
+                          {t.sender_name || t.sender_email}
+                        </span>
+                        <span aria-hidden="true">·</span>
+                        <span className="shrink-0">
+                          {formatDistanceToNow(new Date(t.received_at), {
+                            locale: nb,
+                            addSuffix: true,
+                          })}
+                        </span>
+                      </div>
                     </div>
+
 
                     {/* Metadata: krymper trinnvis bort på små skjermer slik at
                         emnet beholder plassen sin i stedet for å presse raden bredere. */}
