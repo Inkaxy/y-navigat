@@ -32,8 +32,6 @@ export type TicketEventType =
   | "order.cancelled"
   | "order.status_changed"
   // Kommunikasjon
-  | "reply.sent"
-  | "confirmation.sent"
   | "customer.replied"
   | "external.replied"
   // Refusjon
@@ -75,8 +73,6 @@ export const EVENT_LABEL: Record<TicketEventType, string> = {
   "order.lines_changed": "Ordrelinjer endret",
   "order.cancelled": "Ordre kansellert",
   "order.status_changed": "Ordrestatus endret",
-  "reply.sent": "Svar sendt til kunde",
-  "confirmation.sent": "Bekreftelse sendt",
   "customer.replied": "Kunde svarte",
   "external.replied": "Ekstern part svarte",
   "refund.created": "Tilbakebetaling opprettet",

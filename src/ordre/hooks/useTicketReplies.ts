@@ -13,7 +13,7 @@ function escapeHtml(s: string): string {
 
 
 /** `crypto.randomUUID` finnes ikke i usikre/eldre kontekster — trygg fallback. */
-function safeUuid(): string {
+export function safeUuid(): string {
   const c = typeof crypto !== "undefined" ? crypto : undefined;
   if (c && typeof c.randomUUID === "function") return c.randomUUID();
   if (c && typeof c.getRandomValues === "function") {
@@ -83,9 +83,15 @@ export function useSendTicketReply() {
     mutationFn: async ({
       ticket_id,
       body_text,
+      idempotency_key,
     }: {
       ticket_id: string;
       body_text: string;
+      /**
+       * Stabil nøkkel per utkast. Sendes den samme ved gjentatte forsøk, gjør
+       * unik-indeksen i basen at samme svar aldri logges to ganger.
+       */
+      idempotency_key?: string;
     }) => {
       const text = body_text.trim();
       if (!text) throw new Error("Tomt svar");
@@ -96,7 +102,7 @@ export function useSendTicketReply() {
         .join("");
 
       // Idempotens-nøkkel: hindrer duplikate rader dersom to kall slipper gjennom.
-      const idempotencyKey = safeUuid();
+      const idempotencyKey = idempotency_key ?? safeUuid();
 
       const { data, error } = await supabase.functions.invoke(
         "microsoft-graph-reply-ticket",
