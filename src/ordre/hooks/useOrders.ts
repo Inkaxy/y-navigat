@@ -3,6 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
 import type { OrderKind, OrderStatus } from "@/ordre/lib/orderStatus";
 import { osloTodayISO } from "@/lib/osloDate";
+import { fetchAllRows } from "@/lib/supabasePaging";
+
 
 export type OrderListRow = {
   id: string;
@@ -85,10 +87,14 @@ export function useOrderList(filters: OrderListFilters) {
       const { data, error, count } = await q;
       if (error) throw error;
 
-      const rows = (data ?? []).map((r: any) => ({
+      type QueryRow = Omit<OrderListRow, "line_count"> & {
+        order_lines?: { count: number }[] | null;
+      };
+      const rows: OrderListRow[] = ((data ?? []) as unknown as QueryRow[]).map((r) => ({
         ...r,
         line_count: Array.isArray(r.order_lines) && r.order_lines[0] ? r.order_lines[0].count : 0,
-      })) as OrderListRow[];
+      }));
+
 
       return { rows, total: count ?? 0 };
     },
@@ -102,13 +108,18 @@ export function useStatusCounts() {
   return useQuery({
     queryKey: ["order-status-counts"],
     queryFn: async (): Promise<StatusCount[]> => {
-      const { data, error } = await supabase
-        .from("orders")
-        .select("status")
-        .eq("legal_entity_id", NB_LEGAL_ENTITY_ID);
-      if (error) throw error;
+      // Paginerer: én `select` uten range stopper på PostgREST-taket (1000 rader)
+      // og ga tidligere for lave tellere så snart basen vokste.
+      const rows = await fetchAllRows<{ status: string }>((from, to) =>
+        supabase
+          .from("orders")
+          .select("status")
+          .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
+          .order("id", { ascending: true })
+          .range(from, to),
+      );
       const counts = new Map<string, number>();
-      for (const row of data ?? []) {
+      for (const row of rows) {
         counts.set(row.status, (counts.get(row.status) ?? 0) + 1);
       }
       return Array.from(counts.entries()).map(([status, count]) => ({
@@ -123,15 +134,21 @@ export function useStatusCounts() {
 export function useDeliveryDayStats(date: string) {
   return useQuery({
     queryKey: ["delivery-day-stats", date],
+    enabled: !!date,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("orders")
-        .select("id, total_incl_vat, status")
-        .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
-        .eq("delivery_date", date)
-        .not("status", "in", "(cancelled)");
-      if (error) throw error;
-      const rows = data ?? [];
+      // Kun kolonnene aggregatet trenger, og paginert slik at både antall og
+      // sum er riktige også på dager med mer enn 1000 ordre.
+      const rows = await fetchAllRows<{ total_incl_vat: number | null; status: string }>(
+        (from, to) =>
+          supabase
+            .from("orders")
+            .select("total_incl_vat, status")
+            .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
+            .eq("delivery_date", date)
+            .not("status", "in", "(cancelled)")
+            .order("id", { ascending: true })
+            .range(from, to),
+      );
       const total = rows.reduce((sum, r) => sum + Number(r.total_incl_vat ?? 0), 0);
       const byStatus = new Map<string, number>();
       for (const r of rows) byStatus.set(r.status, (byStatus.get(r.status) ?? 0) + 1);
@@ -150,22 +167,30 @@ export function useActionQueueCounts() {
   return useQuery({
     queryKey: ["action-queue-counts"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("orders")
-        .select("id, status, delivery_date")
-        .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
-        .in("status", ["awaiting_confirmation", "confirmed"]);
-      if (error) throw error;
-      const rows = data ?? [];
       const today = osloTodayISO();
+      // To rene tellinger på serveren i stedet for å laste hele radsettet.
+      const [awaitingRes, confirmedRes] = await Promise.all([
+        supabase
+          .from("orders")
+          .select("id", { count: "exact", head: true })
+          .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
+          .eq("status", "awaiting_confirmation"),
+        supabase
+          .from("orders")
+          .select("id", { count: "exact", head: true })
+          .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
+          .eq("status", "confirmed")
+          .eq("delivery_date", today),
+      ]);
+      if (awaitingRes.error) throw awaitingRes.error;
+      if (confirmedRes.error) throw confirmedRes.error;
       return {
-        awaiting: rows.filter((r) => r.status === "awaiting_confirmation").length,
-        confirmedToday: rows.filter(
-          (r) => r.status === "confirmed" && r.delivery_date === today,
-        ).length,
+        awaiting: awaitingRes.count ?? 0,
+        confirmedToday: confirmedRes.count ?? 0,
       };
     },
 
     staleTime: 30_000,
   });
 }
+

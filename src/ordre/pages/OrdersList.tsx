@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/table";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { QueryErrorState } from "@/components/common/QueryState";
 import { useOrderList, type OrderListRow } from "@/ordre/hooks/useOrders";
 import { OrderRuleFlagsIndicator } from "@/ordre/components/orders/OrderRuleFlagsIndicator";
 import { useDebouncedValue } from "@/ordre/hooks/useDebouncedValue";
@@ -104,7 +105,6 @@ export default function OrdersList() {
   // B.3 — Deselect ved filter-endring (unngår skjulte valg som overrasker bulk-ops)
   useEffect(() => {
     setSelectedIds(new Set());
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearch, statuses, source, deliveryFrom, deliveryTo, tourIds, page]);
 
   const effectiveStatuses: OrderStatus[] | undefined = acceptanceOnly
@@ -121,7 +121,7 @@ export default function OrdersList() {
         ? ["cancelled"]
         : undefined;
 
-  const { data, isLoading, isFetching } = useOrderList({
+  const { data, isLoading, isFetching, isError, error, refetch } = useOrderList({
     search: debouncedSearch,
     statuses: lifecycleStatuses ?? effectiveStatuses,
     kinds: acceptanceOnly || kinds.length === 0 ? undefined : kinds,
@@ -686,10 +686,21 @@ export default function OrdersList() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {isLoading ? (
+                {isError ? (
+                  <TableRow>
+                    <TableCell colSpan={acceptanceOnly ? 11 : 10} className="p-3">
+                      <QueryErrorState
+                        error={error}
+                        scope="ordre:ordreliste"
+                        onRetry={() => void refetch()}
+                        compact
+                      />
+                    </TableCell>
+                  </TableRow>
+                ) : isLoading ? (
                   Array.from({ length: 12 }).map((_, i) => (
                     <TableRow key={i}>
-                      <TableCell colSpan={10} className="px-3 py-2">
+                      <TableCell colSpan={acceptanceOnly ? 11 : 10} className="px-3 py-2">
                         <Skeleton className="h-5" />
                       </TableCell>
                     </TableRow>
@@ -697,7 +708,7 @@ export default function OrdersList() {
                 ) : rows.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={10}
+                      colSpan={acceptanceOnly ? 11 : 10}
                       className="py-12 text-center text-body text-muted-foreground"
                     >
                       Ingen ordrer matcher filtrene.
@@ -853,7 +864,9 @@ export default function OrdersList() {
           {/* Paginering */}
           <div className="flex items-center justify-between border-t border-border px-3 py-2 text-caption">
             <div className="text-muted-foreground">
-              {clientLifecycleFilter ? (
+              {isError ? (
+                <>Antall ukjent — dataene kunne ikke hentes</>
+              ) : clientLifecycleFilter ? (
                 <>Viser treff på denne siden — bla for flere</>
               ) : (
                 <>
@@ -862,6 +875,7 @@ export default function OrdersList() {
                 </>
               )}
             </div>
+
 
             <div className="flex items-center gap-2">
               <Button
@@ -891,7 +905,13 @@ export default function OrdersList() {
 
         {/* Mobil — kort-liste i stedet for tabell */}
         <div className="space-y-2 md:hidden">
-          {isLoading ? (
+          {isError ? (
+            <QueryErrorState
+              error={error}
+              scope="ordre:ordreliste:mobil"
+              onRetry={() => void refetch()}
+            />
+          ) : isLoading ? (
             Array.from({ length: 6 }).map((_, i) => (
               <Skeleton key={i} className="h-24 w-full rounded-lg" />
             ))

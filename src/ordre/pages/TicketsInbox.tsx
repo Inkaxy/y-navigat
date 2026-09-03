@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import { nb } from "date-fns/locale";
-import { Paperclip, Package, AlertTriangle } from "lucide-react";
+import { Paperclip, Package, AlertTriangle, Inbox } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
+import { QueryState } from "@/components/common/QueryState";
 import {
   normalizeAiSuggestion,
   REQUEST_TYPE_LABEL,
@@ -123,13 +124,17 @@ function KpiCard({
   value,
   label,
   tone,
+  failed,
 }: {
   value: number | string;
   label: string;
   tone?: "default" | "danger" | "warn" | "success";
+  /** Datasettet feilet — vis strek i stedet for et misvisende null-tall. */
+  failed?: boolean;
 }) {
-  const valueTone =
-    tone === "danger"
+  const valueTone = failed
+    ? "text-muted-foreground"
+    : tone === "danger"
       ? "text-red-600 dark:text-red-400"
       : tone === "warn"
         ? "text-amber-600 dark:text-amber-400"
@@ -139,10 +144,10 @@ function KpiCard({
   return (
     <div className="rounded-lg border bg-[hsl(var(--brand-cream))] px-5 py-4 shadow-sm">
       <div className={cn("text-3xl font-semibold tracking-tight", valueTone)}>
-        {value}
+        {failed ? "–" : value}
       </div>
       <div className="mt-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-        {label}
+        {failed ? `${label} · ikke tilgjengelig` : label}
       </div>
     </div>
   );
@@ -199,9 +204,14 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 }
 
 export default function TicketsInbox() {
-  const navigate = useNavigate();
   const { user } = useAuth();
-  const { data: tickets = [], isLoading } = useInboxTickets();
+  const {
+    data: tickets = [],
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useInboxTickets();
   const [queue, setQueue] = useState<QueueKey>("all");
   const { data: openRefundsCount = 0 } = useQuery({
     queryKey: ["refunds", "open-count"],
@@ -292,15 +302,6 @@ export default function TicketsInbox() {
     };
   }, [rows, counts.awaiting_customer, openRefundsCount]);
 
-  const sortByDeadline = (a: Row, b: Row) => {
-    // Overdue først, deretter tidligste deadline, deretter received_at
-    if (a.overdue && !b.overdue) return -1;
-    if (!a.overdue && b.overdue) return 1;
-    const ad = a.deadline?.getTime() ?? Infinity;
-    const bd = b.deadline?.getTime() ?? Infinity;
-    if (ad !== bd) return ad - bd;
-    return new Date(a.received_at).getTime() - new Date(b.received_at).getTime();
-  };
 
   const filtered = useMemo(() => {
     let out: Row[];
@@ -339,12 +340,13 @@ export default function TicketsInbox() {
 
       {/* KPI-rad */}
       <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
-        <KpiCard value={kpis.open} label="Åpne" />
-        <KpiCard value={kpis.awaitingCustomer} label="Venter på kunde" />
-        <KpiCard value={kpis.overFrist} label="Over frist" tone="danger" />
-        <KpiCard value={kpis.withoutOrder} label="Uten ordre-kobling" />
+        <KpiCard value={kpis.open} label="Åpne" failed={isError} />
+        <KpiCard value={kpis.awaitingCustomer} label="Venter på kunde" failed={isError} />
+        <KpiCard value={kpis.overFrist} label="Over frist" tone="danger" failed={isError} />
+        <KpiCard value={kpis.withoutOrder} label="Uten ordre-kobling" failed={isError} />
         <KpiCard value={kpis.toPayout} label="Til utbetaling" tone="success" />
       </div>
+
 
       <div className="grid gap-4 lg:grid-cols-[240px_1fr]">
         {/* Køer */}
@@ -411,114 +413,124 @@ export default function TicketsInbox() {
         </aside>
 
         {/* Liste */}
-        <div className="space-y-2">
-          {isLoading && (
-            <div className="rounded-lg border bg-[hsl(var(--brand-cream))] p-8 text-center text-sm text-muted-foreground">
-              Laster tickets…
-            </div>
-          )}
-          {!isLoading && filtered.length === 0 && (
-            <div className="rounded-lg border bg-[hsl(var(--brand-cream))] p-8 text-center text-sm text-muted-foreground">
-              Ingen tickets i denne køen.
-            </div>
-          )}
-          {filtered.map((t) => {
-            const unread = t.status === "new";
-            const badgeCls = t.intent
-              ? REQUEST_TYPE_BADGE[t.intent]
-              : "bg-muted text-muted-foreground border-border";
-            const badgeLabel = t.intent
-              ? REQUEST_TYPE_LABEL[t.intent].toUpperCase()
-              : "UKATEGORISERT";
-            return (
-              <div
-                key={t.id}
-                role="button"
-                tabIndex={0}
-                onClick={() => navigate(`/ordre/ticket/${t.id}`)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    navigate(`/ordre/ticket/${t.id}`);
-                  }
-                }}
-                className={cn(
-                  "group relative flex cursor-pointer items-center gap-3 rounded-lg border bg-[hsl(var(--brand-cream))] px-4 py-3 shadow-sm transition-colors hover:bg-[hsl(var(--brand-cream-deep))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--brand-bronze))]",
-                  unread && "border-l-4 border-l-orange-500",
-                )}
-              >
-                <div
+        <QueryState
+          isLoading={isLoading}
+          isError={isError}
+          error={error}
+          scope="ordre:innboks"
+          onRetry={() => void refetch()}
+          errorTitle="Kunne ikke hente e-postene"
+          isEmpty={filtered.length === 0}
+          emptyTitle="Ingen tickets i denne køen."
+          emptyDescription="Velg en annen kø i menyen til venstre."
+          emptyIcon={Inbox}
+          skeletonRows={6}
+          skeletonRowClassName="h-16 rounded-lg"
+        >
+          <ul className="space-y-2">
+            {filtered.map((t) => {
+              const unread = t.status === "new";
+              const badgeCls = t.intent
+                ? REQUEST_TYPE_BADGE[t.intent]
+                : "bg-muted text-muted-foreground border-border";
+              const badgeLabel = t.intent
+                ? REQUEST_TYPE_LABEL[t.intent].toUpperCase()
+                : "UKATEGORISERT";
+              return (
+                <li
+                  key={t.id}
                   className={cn(
-                    "inline-flex shrink-0 items-center rounded border px-2 py-1 text-[10px] font-bold tracking-wide",
-                    badgeCls,
+                    "group relative flex items-center gap-3 rounded-lg border bg-[hsl(var(--brand-cream))] px-4 py-3 shadow-sm transition-colors hover:bg-[hsl(var(--brand-cream-deep))]",
+                    unread && "border-l-4 border-l-orange-500",
                   )}
                 >
-                  {badgeLabel}
-                </div>
-
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="truncate text-sm font-semibold text-foreground">
-                      {t.subject || "(uten emne)"}
-                    </span>
-                    {t.has_attachments && (
-                      <Paperclip className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                    )}
-                  </div>
-                  <div className="mt-0.5 truncate text-xs text-muted-foreground">
-                    {t.body_preview || t.sender_email}
-                  </div>
-                </div>
-
-                <div className="flex shrink-0 items-center gap-2">
-                  {t.related_order_id && t.orders?.order_number ? (
-                    <Link
-                      to={`/ordre/ordrer/${t.related_order_id}`}
-                      onClick={(e) => e.stopPropagation()}
-                      className="inline-flex items-center gap-1 rounded-md border bg-background px-2 py-1 text-xs font-medium text-foreground hover:bg-muted"
-                    >
-                      <Package className="h-3 w-3" />
-                      #{t.orders.order_number}
-                    </Link>
-                  ) : (
-                    <span className="rounded-md border border-dashed px-2 py-1 text-xs text-muted-foreground">
-                      Ingen ordre ennå
-                    </span>
-                  )}
-                  <ConfidenceChip score={t.ai_confidence_score} />
-                  {t.countdown && (
-                    <span
-                      className={cn(
-                        "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium",
-                        t.overdue
-                          ? "border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-300"
-                          : "border-border bg-muted text-muted-foreground",
-                      )}
-                      title={t.deadline ? `Frist: ${t.deadline.toLocaleString("nb-NO")}` : ""}
-                    >
-                      {t.overdue && <AlertTriangle className="h-3 w-3" />}
-                      {t.countdown}
-                    </span>
-                  )}
-                  <span className="w-24 text-right text-xs text-muted-foreground">
-                    {formatDistanceToNow(new Date(t.received_at), {
-                      locale: nb,
-                      addSuffix: true,
-                    })}
-                  </span>
-                  <span
-                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-semibold text-muted-foreground"
-                    title={t.assigned_to ? "Tildelt" : "Ikke tildelt"}
+                  {/* Ekte lenke som dekker hele raden — gir tastatur, midtklikk og «åpne i ny fane». */}
+                  <Link
+                    to={`/ordre/ticket/${t.id}`}
+                    className="absolute inset-0 z-0 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[hsl(var(--brand-bronze))]"
                   >
-                    {t.assigned_to
-                      ? initials(t.sender_name, t.sender_email)
-                      : "—"}
-                  </span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+                    <span className="sr-only">
+                      Åpne e-post: {t.subject || "(uten emne)"} fra{" "}
+                      {t.sender_name || t.sender_email}
+                    </span>
+                  </Link>
+
+                  <div className="pointer-events-none flex w-full items-center gap-3">
+                    <div
+                      className={cn(
+                        "inline-flex shrink-0 items-center rounded border px-2 py-1 text-[10px] font-bold tracking-wide",
+                        badgeCls,
+                      )}
+                    >
+                      {badgeLabel}
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="truncate text-sm font-semibold text-foreground">
+                          {t.subject || "(uten emne)"}
+                        </span>
+                        {t.has_attachments && (
+                          <Paperclip
+                            className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
+                            aria-label="Har vedlegg"
+                          />
+                        )}
+                      </div>
+                      <div className="mt-0.5 truncate text-xs text-muted-foreground">
+                        {t.body_preview || t.sender_email}
+                      </div>
+                    </div>
+
+                    <div className="flex shrink-0 items-center gap-2">
+                      {t.related_order_id && t.orders?.order_number ? (
+                        <Link
+                          to={`/ordre/ordrer/${t.related_order_id}`}
+                          className="pointer-events-auto relative z-10 inline-flex items-center gap-1 rounded-md border bg-background px-2 py-1 text-xs font-medium text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                          <Package className="h-3 w-3" aria-hidden="true" />
+                          #{t.orders.order_number}
+                        </Link>
+                      ) : (
+                        <span className="rounded-md border border-dashed px-2 py-1 text-xs text-muted-foreground">
+                          Ingen ordre ennå
+                        </span>
+                      )}
+                      <ConfidenceChip score={t.ai_confidence_score} />
+                      {t.countdown && (
+                        <span
+                          className={cn(
+                            "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium",
+                            t.overdue
+                              ? "border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-300"
+                              : "border-border bg-muted text-muted-foreground",
+                          )}
+                          title={t.deadline ? `Frist: ${t.deadline.toLocaleString("nb-NO")}` : ""}
+                        >
+                          {t.overdue && <AlertTriangle className="h-3 w-3" aria-hidden="true" />}
+                          {t.countdown}
+                        </span>
+                      )}
+                      <span className="w-24 text-right text-xs text-muted-foreground">
+                        {formatDistanceToNow(new Date(t.received_at), {
+                          locale: nb,
+                          addSuffix: true,
+                        })}
+                      </span>
+                      <span
+                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-semibold text-muted-foreground"
+                        title={t.assigned_to ? "Tildelt" : "Ikke tildelt"}
+                      >
+                        {t.assigned_to ? initials(t.sender_name, t.sender_email) : "—"}
+                      </span>
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </QueryState>
+
       </div>
     </div>
   );
