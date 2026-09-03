@@ -130,7 +130,7 @@ export function useTickets(filter: TicketsFilter = {}) {
       }
       const { data, error } = await q;
       if (error) throw error;
-      return (data ?? []) as Ticket[];
+      return (data ?? []) as unknown as Ticket[];
     },
   });
 }
