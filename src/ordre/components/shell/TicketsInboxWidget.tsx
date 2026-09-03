@@ -306,10 +306,7 @@ export function TicketsInboxWidget() {
                         )}
                       </div>
                     </div>
-                    <div
-                      className="ml-2 flex flex-shrink-0 items-center gap-1"
-                      onClick={(e) => e.stopPropagation()}
-                    >
+                    <div className="pointer-events-auto relative z-10 ml-2 flex flex-shrink-0 items-center gap-1">
                       {!isMine && user?.id && (
                         <Button
                           size="sm"
