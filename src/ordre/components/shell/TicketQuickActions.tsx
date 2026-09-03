@@ -268,7 +268,7 @@ function LinkOrderDialog({
               {orders.map((o) => (
                 <CommandItem
                   key={o.id} value={o.id}
-                  onSelect={() => { onPick(o.id); onOpenChange(false); }}
+                  onSelect={() => { onPick(o.id, o.order_number ?? null); onOpenChange(false); }}
                 >
                   <div className="flex w-full items-center justify-between gap-2">
                     <div>
