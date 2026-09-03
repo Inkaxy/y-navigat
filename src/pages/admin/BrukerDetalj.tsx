@@ -170,7 +170,6 @@ export default function BrukerDetalj() {
             <TableHeader>
               <TableRow>
                 <TableHead>Stilling</TableHead>
-                <TableHead>Selskap</TableHead>
                 <TableHead>Fra</TableHead>
                 <TableHead>Til</TableHead>
                 <TableHead>Aktiv</TableHead>
@@ -178,13 +177,12 @@ export default function BrukerDetalj() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {positions.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">Ingen stillinger</TableCell></TableRow>}
+              {positions.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">Ingen stillinger</TableCell></TableRow>}
               {positions.map((p: any) => {
                 const active = p.valid_from <= today && (!p.valid_to || p.valid_to > today);
                 return (
                   <TableRow key={p.id}>
                     <TableCell>{p.position?.display_name} {p.is_primary && <Badge variant="outline">Primær</Badge>}</TableCell>
-                    <TableCell>{p.legal_entity?.short_code}</TableCell>
                     <TableCell>{p.valid_from}</TableCell>
                     <TableCell>{p.valid_to ?? "—"}</TableCell>
                     <TableCell><Badge variant={active ? "default" : "secondary"}>{active ? "Aktiv" : "Avsluttet"}</Badge></TableCell>
@@ -237,17 +235,6 @@ function AddPositionDialog({ userId, assignedBy }: { userId: string; assignedBy:
     },
   });
 
-  const { data: entities = [] } = useQuery({
-    queryKey: ["legal-entities-list"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("legal_entities")
-        .select("id, short_code, legal_name")
-        .order("short_code");
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
 
   const reset = () => {
     setPositionId(""); setLegalEntityId(""); setValidFrom(today); setValidTo(""); setIsPrimary(false);
@@ -295,17 +282,6 @@ function AddPositionDialog({ userId, assignedBy }: { userId: string; assignedBy:
               <SelectContent>
                 {positions.map((p: any) => (
                   <SelectItem key={p.id} value={p.id}>{p.display_name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label>Selskap</Label>
-            <Select value={legalEntityId} onValueChange={setLegalEntityId}>
-              <SelectTrigger><SelectValue placeholder="Velg selskap" /></SelectTrigger>
-              <SelectContent>
-                {entities.map((e: any) => (
-                  <SelectItem key={e.id} value={e.id}>{e.short_code} – {e.legal_name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
