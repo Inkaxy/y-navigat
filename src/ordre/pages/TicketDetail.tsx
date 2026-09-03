@@ -849,6 +849,16 @@ export default function TicketDetail() {
                   {deadline ? formatTicketTime(deadline) : ""}
                 </span>
               )}
+              {/* Uten AI-intensjon brukes standardfristen — vis hvorfor fristen finnes. */}
+              {deadline && !intent && (
+                <span
+                  className="inline-flex items-center rounded border border-dashed border-border px-2 py-0.5 text-[10px] font-medium text-muted-foreground"
+                  title={`Frist: ${formatTicketTime(deadline)}`}
+                >
+                  (standardfrist)
+                </span>
+              )}
+
             </div>
           </div>
 
