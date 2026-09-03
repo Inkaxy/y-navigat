@@ -2,6 +2,8 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+
 
 vi.mock("@/rapporter/hooks/useSalesAggregate", async () => {
   const actual = await vi.importActual<any>("@/rapporter/hooks/useSalesAggregate");
@@ -27,12 +29,21 @@ vi.mock("@/rapporter/hooks/useSalesAggregate", async () => {
 
 import Kunder from "../Kunder";
 
-const renderPage = () =>
-  render(
-    <MemoryRouter>
-      <Kunder />
-    </MemoryRouter>,
+const renderPage = () => {
+  // ReportFilterBar → SaveReportDialog bruker useQueryClient, så siden må
+  // rendres inne i en QueryClientProvider.
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: 0 } },
+  });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter>
+        <Kunder />
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
+};
+
 
 describe("Kunder", () => {
   it("åpner handlekurven med korrekt sum ved klikk på kunderad", async () => {

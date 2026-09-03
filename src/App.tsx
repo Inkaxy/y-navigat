@@ -8,11 +8,13 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { ThemeProvider } from "@/providers/ThemeProvider";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { AppShell } from "@/components/layout/AppShell";
+import { ErrorBoundary } from "@/components/errors/ErrorBoundary";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Hjem from "./pages/Hjem";
 
 import NotFound from "./pages/NotFound";
+
 import { AppAccessGuard } from "./components/auth/AppAccessGuard";
 import { PlatformAdminGuard } from "./components/auth/PlatformAdminGuard";
 import { Navigate } from "react-router-dom";
@@ -74,6 +76,9 @@ const Hjelp = lazy(() => import("./pages/Hjelp"));
 const AppPlaceholder = lazy(() => import("./pages/apps/AppPlaceholder"));
 const AcceptInvite = lazy(() => import("./pages/auth/AcceptInvite"));
 const SetPortalPassword = lazy(() => import("./pages/auth/SetPortalPassword"));
+const ForgotPassword = lazy(() => import("./pages/auth/ForgotPassword"));
+const ResetPassword = lazy(() => import("./pages/auth/ResetPassword"));
+
 const KioskOperatorRoute = lazy(() => import("@/kiosk/routes").then((m) => ({ default: m.KioskOperatorRoute })));
 const KioskCustomerRoute = lazy(() => import("@/kiosk/routes").then((m) => ({ default: m.KioskCustomerRoute })));
 const KioskSelfServiceRoute = lazy(() => import("@/kiosk/routes").then((m) => ({ default: m.KioskSelfServiceRoute })));
@@ -233,6 +238,19 @@ const RedirectFakturaer = () => {
   return <Navigate to={`/ravarer/fakturaer/${id}`} replace />;
 };
 
+/**
+ * `/tilbakestill-passord` deles av to flyter:
+ * - Kundeportalen (kundeportal.nbhub.no) → eksisterende SetPortalPassword.
+ * - Ansatte i NBHub → ResetPassword fra «Glemt passord».
+ */
+const TilbakestillPassordRoute = () => {
+  const isPortalHost =
+    typeof window !== "undefined" && window.location.hostname.startsWith("kundeportal.");
+  return isPortalHost ? <SetPortalPassword /> : <ResetPassword />;
+};
+
+
+
 const Shell = ({ children }: { children: React.ReactNode }) => (
   <ProtectedRoute>
     <AppShell>{children}</AppShell>
@@ -284,20 +302,23 @@ const AppRoute = ({
 );
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <ThemeProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <AuthProvider>
+  <ErrorBoundary variant="app" scope="root">
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <AuthProvider>
             <Suspense fallback={<div className="p-8 text-sm text-muted-foreground">Laster …</div>}>
               <Routes>
               <Route path="/login" element={<Login />} />
+              <Route path="/glemt-passord" element={<ForgotPassword />} />
               <Route path="/velg-passord" element={<SetPortalPassword />} />
-              <Route path="/tilbakestill-passord" element={<SetPortalPassword />} />
+              <Route path="/tilbakestill-passord" element={<TilbakestillPassordRoute />} />
               <Route path="/login/velg-passord" element={<SetPortalPassword />} />
               <Route path="/login/tilbakestill-passord" element={<SetPortalPassword />} />
+
               <Route path="/auth/accept-invite" element={<AcceptInvite />} />
               <Route path="/aktiver" element={<AcceptInvite />} />
               <Route path="/" element={<Index />} />
@@ -516,11 +537,13 @@ const App = () => (
               <Route path="*" element={<NotFound />} />
             </Routes>
             </Suspense>
-          </AuthProvider>
-        </BrowserRouter>
-      </TooltipProvider>
-    </ThemeProvider>
-  </QueryClientProvider>
+            </AuthProvider>
+          </BrowserRouter>
+        </TooltipProvider>
+      </ThemeProvider>
+    </QueryClientProvider>
+  </ErrorBoundary>
 );
+
 
 export default App;
