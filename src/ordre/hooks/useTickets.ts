@@ -95,11 +95,23 @@ export interface TicketsFilter {
   toDate?: string;
 }
 
+/**
+ * Kolonner som innboks-lister trenger. Tunge/sensitive felt (`body_html`,
+ * `body_text`, `internal_notes`, `ai_suggestion`) hentes bevisst ikke her —
+ * de lastes først i detaljvisningen via `useTicket`.
+ */
+export const TICKET_LIST_COLUMNS =
+  "id, microsoft_message_id, source_mailbox, subject, body_preview, sender_email, sender_name, to_recipients, cc_recipients, has_attachments, received_at, importance, conversation_id, status, priority, assigned_to, assigned_team, related_order_id, ai_status, ai_confidence_score, awaiting_internal, awaiting_external, awaiting_external_email, followers, created_at, updated_at";
+
 export function useTickets(filter: TicketsFilter = {}) {
   return useQuery({
     queryKey: ["tickets", filter],
     queryFn: async () => {
-      let q = supabase.from("tickets").select("*").order("received_at", { ascending: false }).limit(500);
+      let q = supabase
+        .from("tickets")
+        .select(TICKET_LIST_COLUMNS)
+        .order("received_at", { ascending: false })
+        .limit(500);
       if (filter.search) {
         const s = `%${filter.search}%`;
         q = q.or(`subject.ilike.${s},sender_email.ilike.${s},sender_name.ilike.${s},body_text.ilike.${s},body_preview.ilike.${s}`);
