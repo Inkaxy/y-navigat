@@ -1102,7 +1102,7 @@ export default function MatrixPage() {
   return (
     <div className="-mt-8 -mb-12 flex h-full flex-col bg-background">
 
-      <div className="mx-auto w-[95%] max-w-[1800px] px-2 py-5">
+      <div className="w-full px-1 py-5 sm:px-2">
         <div className="rounded-[16px] border-2 border-brand-bronze/40 bg-gradient-to-br from-card to-brand-cream/20 p-5 shadow-lg ring-1 ring-inset ring-brand-bronze/10 px-[10px] py-[20px]">
         <div className="flex flex-wrap items-center gap-3">
           <Button
@@ -1511,7 +1511,7 @@ export default function MatrixPage() {
         </div>
       </div>
 
-      <div className="mx-auto w-[95%] max-w-[1800px] flex-1 overflow-auto px-2">
+      <div className="w-full flex-1 overflow-auto px-1 sm:px-2">
         {!customerId ? (
           <div className="grid h-full place-items-center p-10 text-center text-muted-foreground">
             <div className="max-w-2xl">

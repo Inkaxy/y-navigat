@@ -469,7 +469,6 @@ const App = () => (
               <Route path="/ordre/tilbakebetalinger" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreRefundsQueue /></AppAccessGuard></Shell>} />
               <Route path="/ordre/ai-forslag" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreAiForslag /></AppAccessGuard></Shell>} />
               <Route path="/ordre/ticket-rapporter" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreTicketReports /></AppAccessGuard></Shell>} />
-              <Route path="/ordre/avvik" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdrePlaceholder title="Avvik" subtitle="Avviksregistrering" body="Avviksregistrering er ikke tilgjengelig i ordremodulen." /></AppAccessGuard></Shell>} />
               <Route path="/ordre/pakkesystem" element={<Navigate to="/produksjon/pakkesystem" replace />} />
               <Route path="/ordre/innstillinger" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreInnstillinger /></AppAccessGuard></Shell>} />
               <Route path="/ordre/innstillinger/m365-callback" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><M365Callback /></AppAccessGuard></Shell>} />
