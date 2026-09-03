@@ -166,7 +166,10 @@ function useInboxTickets() {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "tickets" },
-        () => qc.invalidateQueries({ queryKey: ["tickets", "inbox"] }),
+        () => {
+          qc.invalidateQueries({ queryKey: ["tickets", "inbox"] });
+          qc.invalidateQueries({ queryKey: ["tickets", "archive-counts"] });
+        },
       )
       .subscribe();
     return () => {
