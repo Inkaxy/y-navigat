@@ -15,12 +15,31 @@
       `fetchAllRows`; `useActionQueueCounts` bruker eksakte count-spørringer
 - [x] Leveringskalender: full bredde (full-bleed shell) + responsiv førstekolonne
 - [x] Navigasjon: «Innboks» i submeny, fjernet død `/ordre/avvik`-placeholder
-- [x] Tester: `src/test/queryState.test.tsx` + `orderDesk.test.ts` (94 tester grønne)
+
+## Leveranse 1 — kvalitetssikring (ferdig)
+- [x] `/ordre/avvik` gjenopprettet som redirect til `/ordre/ordrer?bucket=avvik`
+- [x] `OrderDeskHeader`: norsk dato + «sist oppdatert» fra `dataUpdatedAt` (deterministisk,
+      formattere isolert i `src/ordre/lib/deskHeaderFormat.ts`)
+- [x] Feillogging flyttet ut av render (`QueryState`/`DeskSectionState` logger i `useEffect`,
+      stabil feil-ID per unik feil)
+- [x] Eksplisitte feilflater i `TicketsInbox` (inkl. refusjoner), `OrdersList`, `CustomerOrders`,
+      `CustomerOrdersTab` og `Leveringskalender`
+- [x] Arbeidskøer delt i navngitte grupper («Ordre til godkjenning» / «E-post som krever handling»)
+      med egne lenker; `AutomationRunsCard` med ekte fastordre-, nettbutikk- og pakkseddeldata
+- [x] Leveringskalender: sticky verktøylinje + felles `FIRST_COL_WIDTH` (240–320px)
+- [x] Manglende designtokens lagt til i `tailwind.config.ts` (`text-caption/body/title`, `px-page`)
+      — var brukt ~110 steder uten definisjon
+- [x] Responsivt: `min-w-0` på kortene (ingen horisontal overflow på 390px), KPI-rad 4 kolonner
+      fra `lg` og 8 fra `2xl`, dato i kølistene skjules på smale skjermer
+- [x] Kvalitet: ubrukte typer fjernet, `any`-cast ryddet, lint rent på berørte filer,
+      105 tester grønne, typecheck + build OK
 
 ## Leveranse 2 (klar til start)
 - E-post/ticket-hardening: `/users/{mailbox}` overalt, deterministisk tokenvalg, idempotens-indeks,
   trådmatching på `internet_message_id`, sanitization/quoted text, optimistisk lås, AI-forslagslivssyklus
 - Ta i bruk `QueryState` på resten av Ordre-flatene (kundeordre, turer, pakksedler, kakebilder)
+- Fjern gjenstående `text-*`-hardkoding som nå kan bruke de nye typografitokenene
+
 
 ## Leveranse 3 (ikke startet)
 - Del opp `Leveringskalender.tsx`, virtualisering, én dato-hjelper

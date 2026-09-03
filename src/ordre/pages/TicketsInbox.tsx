@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import { nb } from "date-fns/locale";
@@ -7,7 +7,7 @@ import { Paperclip, Package, AlertTriangle, Inbox } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
-import { QueryState } from "@/components/common/QueryState";
+import { QueryErrorState, QueryState } from "@/components/common/QueryState";
 import {
   normalizeAiSuggestion,
   REQUEST_TYPE_LABEL,
@@ -42,14 +42,6 @@ type TicketRow = {
   orders?: { order_number: string | null } | null;
 };
 
-type QueueKey =
-  | "all"
-  | `intent:${RequestType}`
-  | "mine"
-  | "awaiting_customer"
-  | "resolved"
-  | `team:${TicketTeam}`;
-
 const INTENT_QUEUES: { key: RequestType; label: string; icon: string }[] = [
   { key: "new_order", label: "Nye bestillinger", icon: "🛒" },
   { key: "change", label: "Endringer", icon: "✏️" },
@@ -57,6 +49,39 @@ const INTENT_QUEUES: { key: RequestType; label: string; icon: string }[] = [
   { key: "complaint", label: "Klager", icon: "⚠️" },
   { key: "question", label: "Spørsmål", icon: "❓" },
 ];
+
+type QueueKey =
+  | "all"
+  | "new"
+  | "unassigned"
+  | `intent:${RequestType}`
+  | "mine"
+  | "awaiting_customer"
+  | "resolved"
+  | `team:${TicketTeam}`;
+
+/**
+ * Køene kan åpnes direkte fra dashbordet via `?queue=`. Ukjente verdier faller
+ * tilbake til «Alle åpne» slik at gamle lenker aldri gir en tom skjerm.
+ */
+function parseQueueParam(raw: string | null): QueueKey {
+  if (!raw) return "all";
+  const fixed: QueueKey[] = ["all", "new", "unassigned", "mine", "awaiting_customer", "resolved"];
+  if ((fixed as string[]).includes(raw)) return raw as QueueKey;
+  if (
+    raw.startsWith("intent:") &&
+    INTENT_QUEUES.some((q) => q.key === raw.slice("intent:".length))
+  ) {
+    return raw as QueueKey;
+  }
+  if (raw.startsWith("team:") && (TEAMS as readonly string[]).includes(raw.slice("team:".length))) {
+    return raw as QueueKey;
+  }
+  return "all";
+}
+
+
+
 
 function initials(name: string | null, email: string): string {
   const src = (name ?? email).trim();
@@ -236,18 +261,36 @@ export default function TicketsInbox() {
     error,
     refetch,
   } = useInboxTickets();
-  const [queue, setQueue] = useState<QueueKey>("all");
-  const { data: openRefundsCount = 0 } = useQuery({
+  // Køvalget ligger i URL-en slik at dashbordets KPI-lenker treffer riktig kø
+  // og køen overlever refresh / deling av lenke.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const queue = parseQueueParam(searchParams.get("queue"));
+  const setQueue = (next: QueueKey) => {
+    const params = new URLSearchParams(searchParams);
+    if (next === "all") params.delete("queue");
+    else params.set("queue", next);
+    setSearchParams(params, { replace: true });
+  };
+  // Sekundær kilde: en feil her skal kun slå ut på sin egen KPI, ikke skjule innboksen.
+  const {
+    data: openRefundsCount = 0,
+    isError: isRefundsError,
+    error: refundsQueryError,
+    refetch: refetchRefunds,
+  } = useQuery({
     queryKey: ["refunds", "open-count"],
     queryFn: async () => {
-      const { count } = await supabase
+      const { count, error: refundsError } = await supabase
         .from("refunds")
         .select("id", { count: "exact", head: true })
         .in("status", ["pending", "approved"]);
+      if (refundsError) throw refundsError;
       return count ?? 0;
     },
     staleTime: 30_000,
   });
+
+
 
   const { data: sla } = useSlaSettings();
 
@@ -289,6 +332,8 @@ export default function TicketsInbox() {
     const open = rows.filter(isOpen);
     const c = {
       all: open.length,
+      new: open.filter((r) => r.status === "new").length,
+      unassigned: open.filter((r) => r.assigned_to == null).length,
       awaiting_customer: rows.filter((r) => r.awaitingCustomer && isOpen(r)).length,
       resolved: rows.filter((r) => r.status === "resolved").length,
       mine: rows.filter((r) => r.assigned_to === user?.id && isOpen(r)).length,
@@ -323,6 +368,9 @@ export default function TicketsInbox() {
   const filtered = useMemo(() => {
     let out: Row[];
     if (queue === "all") out = rows.filter(isOpen);
+    else if (queue === "new") out = rows.filter((r) => r.status === "new");
+    else if (queue === "unassigned")
+      out = rows.filter((r) => r.assigned_to == null && isOpen(r));
     else if (queue === "mine")
       out = rows.filter((r) => r.assigned_to === user?.id && isOpen(r));
     else if (queue === "awaiting_customer")
@@ -337,6 +385,7 @@ export default function TicketsInbox() {
     } else out = rows;
     return queue === "resolved" ? out : [...out].sort(sortByDeadline);
   }, [rows, queue, user?.id]);
+
 
   return (
     <div className="mx-auto max-w-[1400px] px-4 py-6 md:px-6">
@@ -361,8 +410,27 @@ export default function TicketsInbox() {
         <KpiCard value={kpis.awaitingCustomer} label="Venter på kunde" failed={isError} />
         <KpiCard value={kpis.overFrist} label="Over frist" tone="danger" failed={isError} />
         <KpiCard value={kpis.withoutOrder} label="Uten ordre-kobling" failed={isError} />
-        <KpiCard value={kpis.toPayout} label="Til utbetaling" tone="success" />
+        <KpiCard
+          value={kpis.toPayout}
+          label="Til utbetaling"
+          tone="success"
+          failed={isRefundsError}
+        />
       </div>
+
+      {/* Avgrenset feilflate: kun refusjonstellingen feilet — innboksen står. */}
+      {isRefundsError && (
+        <QueryErrorState
+          error={refundsQueryError}
+          scope="ordre:innboks:refusjoner"
+          onRetry={() => void refetchRefunds()}
+          title="Kunne ikke hente «Til utbetaling»"
+          description="Resten av innboksen er oppdatert."
+          compact
+          className="mb-5"
+        />
+      )}
+
 
 
       <div className="grid gap-4 lg:grid-cols-[240px_1fr]">
@@ -375,6 +443,21 @@ export default function TicketsInbox() {
             label="Alle åpne"
             count={counts.all}
           />
+          <QueueButton
+            active={queue === "new"}
+            onClick={() => setQueue("new")}
+            icon="🆕"
+            label="Nye"
+            count={counts.new}
+          />
+          <QueueButton
+            active={queue === "unassigned"}
+            onClick={() => setQueue("unassigned")}
+            icon="🙋"
+            label="Uten ansvarlig"
+            count={counts.unassigned}
+          />
+
           {INTENT_QUEUES.map((q) => (
             <QueueButton
               key={q.key}
@@ -457,10 +540,11 @@ export default function TicketsInbox() {
                 <li
                   key={t.id}
                   className={cn(
-                    "group relative flex items-center gap-3 rounded-lg border bg-[hsl(var(--brand-cream))] px-4 py-3 shadow-sm transition-colors hover:bg-[hsl(var(--brand-cream-deep))]",
+                    "relative flex items-center gap-3 rounded-lg border bg-[hsl(var(--brand-cream))] px-4 py-3 shadow-sm transition-colors hover:bg-[hsl(var(--brand-cream-deep))] focus-within:bg-[hsl(var(--brand-cream-deep))]",
                     unread && "border-l-4 border-l-orange-500",
                   )}
                 >
+
                   {/* Ekte lenke som dekker hele raden — gir tastatur, midtklikk og «åpne i ny fane». */}
                   <Link
                     to={`/ordre/ticket/${t.id}`}

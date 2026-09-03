@@ -1109,9 +1109,12 @@ export default function MatrixPage() {
   return (
     <div className="-mt-8 -mb-12 flex h-full flex-col bg-background">
 
-      <div className="w-full px-1 py-5 sm:px-2">
-        <div className="rounded-[16px] border-2 border-brand-bronze/40 bg-gradient-to-br from-card to-brand-cream/20 p-5 shadow-lg ring-1 ring-inset ring-brand-bronze/10 px-[10px] py-[20px]">
-        <div className="flex flex-wrap items-center gap-3">
+      {/* Kompakt, sticky hovedverktøylinje. Legger seg rett under topbaren (72px)
+          slik at filtrene alltid er tilgjengelige mens matrisen scrolles. */}
+      <div className="sticky top-[72px] z-30 w-full bg-background/95 px-1 py-2 backdrop-blur supports-[backdrop-filter]:bg-background/85 sm:px-2">
+        <div className="rounded-[14px] border border-brand-bronze/40 bg-gradient-to-br from-card to-brand-cream/20 px-3 py-2.5 shadow-sm ring-1 ring-inset ring-brand-bronze/10">
+        <div className="flex flex-wrap items-center gap-2">
+
           <Button
             variant="outline"
             size="icon"
@@ -1231,7 +1234,7 @@ export default function MatrixPage() {
           <div className="flex flex-col items-start gap-1.5">
             <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
               <PopoverTrigger asChild>
-                <Button variant="outline" size="lg" className="min-w-[320px] justify-start text-base font-semibold border-2 border-brand-bronze/30 hover:border-brand-bronze/60 shadow-sm">
+                <Button variant="outline" className="min-w-[240px] justify-start border-2 border-brand-bronze/30 text-sm font-semibold shadow-sm hover:border-brand-bronze/60 lg:min-w-[300px]">
                   {selectedCustomer
                     ? `${selectedCustomer.customer_number} — ${selectedCustomer.display_name}`
                     : "Velg kunde …"}
@@ -1518,7 +1521,9 @@ export default function MatrixPage() {
         </div>
       </div>
 
-      <div className="w-full flex-1 overflow-auto px-1 sm:px-2">
+      {/* Innholdsområdet scroller ikke selv — matrisen har sin egen scroll-container. */}
+      <div className="w-full flex-1 px-1 pt-3 sm:px-2">
+
         {!customerId ? (
           <div className="grid h-full place-items-center p-10 text-center text-muted-foreground">
             <div className="max-w-2xl">
@@ -1623,8 +1628,10 @@ export default function MatrixPage() {
             />
           </div>
         ) : (
-          <>
+          /* Én tydelig horisontal scroll-container rundt hele matrisen (inkl. summer og legende). */
+          <div className="w-full overflow-x-auto">
             <MatrixGrid
+
               columns={columns}
               products={allProducts}
               addedIds={new Set(addedProducts.map((p) => p.id))}
@@ -1694,7 +1701,8 @@ export default function MatrixPage() {
               </div>
 
             </div>
-          </>
+          </div>
+
         )}
       </div>
 
@@ -1947,6 +1955,14 @@ function getISOWeek(d: Date): number {
   return Math.ceil(((date.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
 }
 
+/**
+ * Bredde på den låste produktkolonnen i matrisen.
+ * 240px er minimum for at produktnavn + hurtigknapper skal få plass uten klipping;
+ * laptop får 280px og store skjermer 320px.
+ */
+const FIRST_COL_WIDTH =
+  "w-[240px] min-w-[240px] lg:w-[280px] lg:min-w-[280px] xl:w-[320px] xl:min-w-[320px]";
+
 function MatrixGrid({
   columns,
   products,
@@ -2052,7 +2068,10 @@ function MatrixGrid({
         <thead className="sticky top-0 z-20 bg-card">
           <tr>
             <th
-              className="sticky left-0 z-30 w-[190px] min-w-[190px] sm:w-[240px] sm:min-w-[240px] xl:w-[320px] xl:min-w-[320px] border-b border-r border-border bg-card px-3 py-2 text-left"
+              className={cn(
+                "sticky left-0 z-30 border-b border-r border-border bg-card px-3 py-2 text-left",
+                FIRST_COL_WIDTH,
+              )}
               rowSpan={2}
             >
               Produkt
@@ -2181,7 +2200,8 @@ function MatrixGrid({
                 <th
                   scope="row"
                   className={cn(
-                    "sticky left-0 z-10 w-[190px] min-w-[190px] sm:w-[240px] sm:min-w-[240px] xl:w-[320px] xl:min-w-[320px] border-b border-r border-border px-3 py-1.5 text-left font-normal",
+                    "sticky left-0 z-10 border-b border-r border-border px-3 py-1.5 text-left font-normal",
+                    FIRST_COL_WIDTH,
                     isAdded ? "bg-accent/30" : "bg-card",
                   )}
                 >
@@ -2356,7 +2376,10 @@ function MatrixGrid({
           <tr className="bg-muted/40">
             <th
               scope="row"
-              className="sticky left-0 z-10 w-[190px] min-w-[190px] sm:w-[240px] sm:min-w-[240px] xl:w-[320px] xl:min-w-[320px] border-b border-r border-border bg-muted/40 px-3 py-1.5 text-left text-xs font-medium text-muted-foreground"
+              className={cn(
+                "sticky left-0 z-10 border-b border-r border-border bg-muted/40 px-3 py-1.5 text-left text-xs font-medium text-muted-foreground",
+                FIRST_COL_WIDTH,
+              )}
             >
               Dagsum (antall)
             </th>
@@ -2379,7 +2402,10 @@ function MatrixGrid({
           <tr className="bg-muted">
             <th
               scope="row"
-              className="sticky left-0 z-10 w-[190px] min-w-[190px] sm:w-[240px] sm:min-w-[240px] xl:w-[320px] xl:min-w-[320px] border-b border-r border-border bg-muted px-3 py-2 text-left font-bold"
+              className={cn(
+                "sticky left-0 z-10 border-b border-r border-border bg-muted px-3 py-2 text-left font-bold",
+                FIRST_COL_WIDTH,
+              )}
             >
               Sum kr
             </th>
