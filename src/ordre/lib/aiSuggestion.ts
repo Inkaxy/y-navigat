@@ -220,6 +220,9 @@ export function normalizeAiSuggestion(raw: unknown): AiSuggestion | null {
     const s = raw as AiSuggestion;
     return {
       ...s,
+      request_type: (s.request_type in REQUEST_TYPE_LABEL
+        ? s.request_type
+        : "unclear") as RequestType,
       candidate_orders: Array.isArray(s.candidate_orders) ? s.candidate_orders : [],
       referenced_order: s.referenced_order ?? null,
       change_intent: s.change_intent ?? null,

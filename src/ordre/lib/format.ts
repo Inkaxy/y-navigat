@@ -58,6 +58,9 @@ export function formatRelative(value: string | Date | null | undefined): string 
   if (!value) return "—";
   const d = typeof value === "string" ? new Date(value) : value;
   if (Number.isNaN(d.getTime())) return "—";
+  if (typeof Intl === "undefined" || typeof Intl.RelativeTimeFormat !== "function") {
+    return formatDateTime(d);
+  }
   const diffMs = Date.now() - d.getTime();
   const sec = Math.round(diffMs / 1000);
   const rtf = new Intl.RelativeTimeFormat("nb-NO", { numeric: "auto" });

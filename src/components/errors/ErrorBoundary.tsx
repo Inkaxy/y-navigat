@@ -2,6 +2,7 @@ import { Component, type ErrorInfo, type ReactNode } from "react";
 import { AlertTriangle, Home, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { createErrorId, logAppError } from "@/lib/errorLog";
+import { isChunkLoadError } from "@/lib/lazyWithReload";
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -59,6 +60,34 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     if (!error) return this.props.children;
 
     const isApp = (this.props.variant ?? "app") === "app";
+
+    if (isChunkLoadError(error)) {
+      return (
+        <div className="flex min-h-[60vh] items-center justify-center px-4 py-10">
+          <section
+            role="alert"
+            className="mx-auto w-full max-w-lg rounded-[14px] border border-border bg-card p-6 text-center shadow-md sm:p-8"
+          >
+            <h1 className="text-lg font-semibold tracking-tight text-foreground">
+              Ny versjon av NBHub er tilgjengelig
+            </h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Siden må lastes inn på nytt for å hente den nyeste versjonen.
+            </p>
+            <Button
+              type="button"
+              variant="brand"
+              className="mt-5"
+              onClick={() => window.location.reload()}
+            >
+              <RotateCcw aria-hidden="true" />
+              <span>Last inn på nytt</span>
+            </Button>
+          </section>
+        </div>
+      );
+    }
+
 
     const card = (
       <section
