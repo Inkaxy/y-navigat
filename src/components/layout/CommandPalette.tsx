@@ -1,11 +1,8 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
 import { Command } from "cmdk";
 import { Sun, Moon, Monitor, ExternalLink } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { supabase } from "@/integrations/supabase/client";
-import { useSelection } from "@/providers/SelectionProvider";
 import { useTheme, type ThemeMode } from "@/providers/ThemeProvider";
 import { useAccessibleApps } from "@/hooks/useAccessibleApps";
 import { getAppInternalRoute } from "@/lib/appRoutes";
@@ -29,21 +26,8 @@ const CURRENT_APP_SLUG = "nbhub";
 export function CommandPalette({ open, onOpenChange }: Props) {
   const navigate = useNavigate();
   const { setMode } = useTheme();
-  const { legalEntityId, setLegalEntityId } = useSelection();
   const { data: apps } = useAccessibleApps();
 
-  const { data: entities } = useQuery({
-    queryKey: ["legal_entities", "command_palette"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("legal_entities")
-        .select("id, legal_name, short_code")
-        .eq("status", "active")
-        .order("legal_name");
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
 
   // Global ⌘K / Ctrl+K toggle
   useEffect(() => {
@@ -71,10 +55,6 @@ export function CommandPalette({ open, onOpenChange }: Props) {
     close();
   };
 
-  const handleCompany = (id: string) => {
-    setLegalEntityId(id);
-    close();
-  };
 
   const handleTheme = (m: ThemeMode) => {
     setMode(m);
@@ -129,22 +109,6 @@ export function CommandPalette({ open, onOpenChange }: Props) {
               ))}
             </Command.Group>
 
-            {entities && entities.length > 0 && (
-              <Command.Group
-                heading="Selskap"
-                className="[&_[cmdk-group-heading]]:eyebrow [&_[cmdk-group-heading]]:px-[18px] [&_[cmdk-group-heading]]:pb-1 [&_[cmdk-group-heading]]:pt-2.5"
-              >
-                {entities.map((e) => (
-                  <PaletteItem
-                    key={e.id}
-                    onSelect={() => handleCompany(e.id)}
-                    value={`selskap ${e.legal_name} ${e.short_code}`}
-                  >
-                    <span
-                      className={cn(
-                        "h-2 w-2 rounded-full",
-                        legalEntityId === e.id ? "bg-app" : "bg-line-strong",
-                      )}
                     />
                     <span>Bytt til {e.legal_name}</span>
                   </PaletteItem>
