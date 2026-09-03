@@ -563,10 +563,9 @@ export default function TicketsInbox() {
                   <div className="pointer-events-none flex w-full items-center gap-3">
                     <div
                       className={cn(
-                        "inline-flex max-w-[6.5rem] shrink-0 items-center truncate rounded border px-2 py-1 text-[10px] font-bold tracking-wide sm:max-w-none",
+                        "inline-flex shrink-0 items-center rounded border px-2 py-1 text-[10px] font-bold tracking-wide",
                         badgeCls,
                       )}
-                      title={badgeLabel}
                     >
                       {badgeLabel}
                     </div>
