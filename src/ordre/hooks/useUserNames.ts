@@ -12,11 +12,20 @@ export function useUserNames(userIds: (string | null | undefined)[]) {
     queryKey: ["ticket-user-names", ids.join(",")],
     staleTime: 5 * 60_000,
     queryFn: async (): Promise<Record<string, string>> => {
-      const { data, error } = await supabase
-        .from("users_public")
-        .select("id, display_name, first_name, last_name")
-        .in("id", ids);
-      if (error) throw error;
+      // Del opp i bolker slik at URL-en ikke blir for lang ved mange id-er.
+      const chunks: string[][] = [];
+      for (let i = 0; i < ids.length; i += 100) chunks.push(ids.slice(i, i + 100));
+      const results = await Promise.all(
+        chunks.map((chunk) =>
+          supabase
+            .from("users_public")
+            .select("id, display_name, first_name, last_name")
+            .in("id", chunk),
+        ),
+      );
+      const failed = results.find((r) => r.error);
+      if (failed?.error) throw failed.error;
+      const data = results.flatMap((r) => r.data ?? []);
       const map: Record<string, string> = {};
       for (const u of (data ?? []) as Array<{
         id: string;

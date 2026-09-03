@@ -626,12 +626,13 @@ export default function TicketsInbox() {
 
             {filtered.map((t) => {
               const unread = t.status === "new";
-              const badgeCls = t.intent
-                ? REQUEST_TYPE_BADGE[t.intent]
-                : "bg-muted text-muted-foreground border-border";
-              const badgeLabel = t.intent
-                ? REQUEST_TYPE_LABEL[t.intent].toUpperCase()
-                : "UKATEGORISERT";
+              const fallbackBadge = "bg-muted text-muted-foreground border-border";
+              const badgeCls =
+                (t.intent ? REQUEST_TYPE_BADGE[t.intent] : null) ?? fallbackBadge;
+              const badgeLabel = (
+                (t.intent ? REQUEST_TYPE_LABEL[t.intent] : null) ?? "Ukategorisert"
+              ).toUpperCase();
+              const prio = t.priority ?? "normal";
               return (
                 <li
                   key={t.id}
@@ -667,13 +668,13 @@ export default function TicketsInbox() {
                         <span className="truncate text-sm font-semibold text-foreground">
                           {t.subject || "(uten emne)"}
                         </span>
-                        {t.priority !== "normal" && (
+                        {prio !== "normal" && (
                           <span
                             className={cn(
                               "h-2 w-2 shrink-0 rounded-full",
-                              TICKET_PRIORITY_DOT[t.priority],
+                              TICKET_PRIORITY_DOT[prio],
                             )}
-                            title={`Prioritet: ${TICKET_PRIORITY_LABEL[t.priority]}`}
+                            title={`Prioritet: ${TICKET_PRIORITY_LABEL[prio]}`}
                           />
                         )}
                         {t.has_attachments && (

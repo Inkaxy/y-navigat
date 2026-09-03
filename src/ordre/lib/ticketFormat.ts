@@ -25,6 +25,9 @@ export function formatTicketRelative(value: string | Date | null | undefined): s
   if (!value) return "—";
   const d = typeof value === "string" ? new Date(value) : value;
   if (Number.isNaN(d.getTime())) return "—";
+  if (typeof Intl === "undefined" || typeof Intl.RelativeTimeFormat !== "function") {
+    return formatTicketTimeShort(d);
+  }
   const sec = Math.round((Date.now() - d.getTime()) / 1000);
   const rtf = new Intl.RelativeTimeFormat("nb-NO", { numeric: "auto" });
   const abs = Math.abs(sec);

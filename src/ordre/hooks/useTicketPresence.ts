@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useCompany } from "@/hooks/useCompany";
+import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
 
 export interface PresenceUser {
   user_id: string;
@@ -16,11 +17,11 @@ export interface PresenceUser {
 export function useTicketPresence(ticketId: string | undefined) {
   const { user } = useAuth();
   const { data: company } = useCompany();
-  const companyId = company?.id;
+  const companyId = company?.id ?? NB_LEGAL_ENTITY_ID;
   const [others, setOthers] = useState<PresenceUser[]>([]);
 
   useEffect(() => {
-    if (!ticketId || !user?.id || !companyId) return;
+    if (!ticketId || !user?.id) return;
 
     let cancelled = false;
     let channel: ReturnType<typeof supabase.channel> | null = null;
