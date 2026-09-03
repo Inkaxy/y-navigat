@@ -38,10 +38,10 @@ export function AppShell({ children }: { children: ReactNode }) {
           <SubAppNav />
           <main id="main-content" tabIndex={-1} className="flex-1 focus:outline-none">
             <div
-              className={`page-canvas mx-auto w-full animate-fade-in px-4 pt-5 sm:px-6 sm:pt-6 md:px-8 md:pt-8 safe-px ${
-                isOrdre ? "pb-mobile-nav md:pb-12" : "pb-10 md:pb-12"
-              }`}
-              style={{ maxWidth: "1280px" }}
+              className={`page-canvas mx-auto w-full animate-fade-in pt-5 sm:pt-6 md:pt-8 safe-px ${
+                isFullBleed ? "px-2 sm:px-3 md:px-4" : "px-4 sm:px-6 md:px-8"
+              } ${isOrdre ? "pb-mobile-nav md:pb-12" : "pb-10 md:pb-12"}`}
+              style={isFullBleed ? undefined : { maxWidth: "1280px" }}
             >
               {/* Lokal feilgrense: én app-modul skal ikke ta ned hele NBHub-skallet.
                   `key` på pathname nullstiller feilen når brukeren navigerer videre. */}
