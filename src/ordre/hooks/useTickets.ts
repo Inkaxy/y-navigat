@@ -9,8 +9,9 @@ export interface Ticket {
   microsoft_message_id: string;
   source_mailbox: string;
   subject: string | null;
-  body_html: string | null;
-  body_text: string | null;
+  /** Tunge felt hentes kun i detaljvisning (`useTicket`), ikke i lister. */
+  body_html?: string | null;
+  body_text?: string | null;
   body_preview: string | null;
   sender_email: string;
   sender_name: string | null;
