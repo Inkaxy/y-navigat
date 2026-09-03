@@ -2,7 +2,8 @@ import { useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Compass, Home } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Logo } from "@/components/brand/Logo";
+import BrandMark from "@/assets/brand/logo-login.svg?react";
+
 
 export default function NotFound() {
   const location = useLocation();
