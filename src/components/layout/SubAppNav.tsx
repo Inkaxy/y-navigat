@@ -101,7 +101,7 @@ const STATIC_SUBMENUS: Record<string, { prefix: string; appSlug: string; items: 
     appSlug: "ordre",
     items: [
       { kind: "link", to: "/ordre/dashbord", label: "Dashbord", icon: LayoutDashboard },
-      { kind: "link", to: "/ordre/ticket", label: "Ticket", icon: Ticket },
+      { kind: "link", to: "/ordre/ticket", label: "Innboks", icon: Ticket },
       { kind: "link", to: "/ordre/leveringskalender", label: "Ordre", icon: CalendarRange },
       { kind: "link", to: "/ordre/kundeordrer", label: "Kundeordrer", icon: ShoppingBag },
       { kind: "link", to: "/ordre/ordrer", label: "Bestillinger", icon: ClipboardList },

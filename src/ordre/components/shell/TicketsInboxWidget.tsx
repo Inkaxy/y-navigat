@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import {
   Inbox, Paperclip, ArrowRight, AlertCircle, User as UserIcon,
   Search, X, CheckCircle2, UserCheck, Filter,
@@ -18,6 +18,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { formatRelative, initialsOf } from "@/ordre/lib/format";
 import { cn } from "@/lib/utils";
 import { TicketQuickActions } from "./TicketQuickActions";
+import { DeskSectionState } from "@/ordre/components/dashboard/DeskSectionState";
 
 type Tab = "open" | "new" | "mine" | "unassigned";
 
@@ -39,13 +40,18 @@ const PRIO_LABEL: Record<TicketPriority, string> = {
 
 const VISIBLE_LIMIT = 8;
 
-export function TicketsInbox() {
+/**
+ * Innboks-widget for ordrekontorets arbeidsbord.
+ *
+ * Dette er et sammendrag av `/ordre/ticket` — ikke hele innboksen. Widgeten
+ * viser åpne e-poster med hurtighandlinger; full liste ligger på egen side.
+ */
+export function TicketsInboxWidget() {
   const [tab, setTab] = useState<Tab>("open");
   const [search, setSearch] = useState("");
   const [priorities, setPriorities] = useState<TicketPriority[]>([]);
   const [showAll, setShowAll] = useState(false);
   const { data: counts } = useTicketCounts();
-  const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
   const update = useUpdateTicket();
@@ -59,7 +65,7 @@ export function TicketsInbox() {
           ? { assigned: "unassigned" as const, status: ["new", "in_progress"] as TicketStatus[] }
           : { status: ["new", "in_progress"] as TicketStatus[] };
 
-  const { data: tickets = [], isLoading } = useTickets({
+  const { data: tickets = [], isLoading, isError, error, refetch } = useTickets({
     ...baseFilter,
     search: search.trim() || undefined,
     priority: priorities.length ? priorities : undefined,
@@ -145,6 +151,7 @@ export function TicketsInbox() {
             <button
               key={t.key}
               type="button"
+              aria-pressed={tab === t.key}
               onClick={() => setTab(t.key)}
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-caption font-medium transition-colors",
@@ -179,6 +186,7 @@ export function TicketsInbox() {
               <button
                 key={p}
                 type="button"
+                aria-pressed={active}
                 onClick={() => togglePrio(p)}
                 className={cn(
                   "rounded-full border px-2 py-0.5 text-[10px] font-medium transition-colors",
@@ -203,7 +211,16 @@ export function TicketsInbox() {
         </div>
 
         {/* List */}
-        {isLoading ? (
+        {isError ? (
+          <DeskSectionState
+            isError
+            error={error}
+            onRetry={() => void refetch()}
+            scope="ordre-desk/inbox-widget"
+          >
+            {null}
+          </DeskSectionState>
+        ) : isLoading ? (
           <div className="space-y-2">
             {Array.from({ length: 5 }).map((_, i) => (
               <Skeleton key={i} className="h-14" />
@@ -227,16 +244,18 @@ export function TicketsInbox() {
               const isUrgent = t.priority === "urgent" || t.priority === "high";
               const isMine = !!user?.id && t.assigned_to === user.id;
               return (
-                <li key={t.id}>
-                  <div
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => navigate(`/ordre/ticket/${t.id}`)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") navigate(`/ordre/ticket/${t.id}`);
-                    }}
-                    className="group flex cursor-pointer items-start gap-3 px-3 py-2.5 transition-colors hover:bg-muted/60 focus:outline-none focus-visible:bg-muted/60"
+                <li key={t.id} className="relative">
+                  {/* Ekte lenke som dekker hele raden — gir tastatur, midtklikk og «åpne i ny fane». */}
+                  <Link
+                    to={`/ordre/ticket/${t.id}`}
+                    className="absolute inset-0 z-0 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                   >
+                    <span className="sr-only">
+                      Åpne e-post: {t.subject ?? "(uten emne)"} fra{" "}
+                      {t.sender_name ?? t.sender_email}
+                    </span>
+                  </Link>
+                  <div className="group pointer-events-none flex items-start gap-3 px-3 py-2.5 transition-colors hover:bg-muted/60">
                     <span
                       className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-muted text-caption font-semibold text-muted-foreground"
                       title={t.sender_name ?? t.sender_email}
@@ -292,18 +311,14 @@ export function TicketsInbox() {
                         {t.related_order_id && (
                           <Link
                             to={`/ordre/ordrer/${t.related_order_id}`}
-                            onClick={(e) => e.stopPropagation()}
-                            className="text-[10px] font-semibold text-primary hover:underline"
+                            className="pointer-events-auto relative z-10 text-[10px] font-semibold text-primary hover:underline"
                           >
                             · Ordre #{orderNumbers?.[t.related_order_id] ?? "…"}
                           </Link>
                         )}
                       </div>
                     </div>
-                    <div
-                      className="ml-2 flex flex-shrink-0 items-center gap-1"
-                      onClick={(e) => e.stopPropagation()}
-                    >
+                    <div className="pointer-events-auto relative z-10 ml-2 flex flex-shrink-0 items-center gap-1">
                       {!isMine && user?.id && (
                         <Button
                           size="sm"

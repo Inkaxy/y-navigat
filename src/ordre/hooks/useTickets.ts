@@ -9,8 +9,9 @@ export interface Ticket {
   microsoft_message_id: string;
   source_mailbox: string;
   subject: string | null;
-  body_html: string | null;
-  body_text: string | null;
+  /** Tunge felt hentes kun i detaljvisning (`useTicket`), ikke i lister. */
+  body_html?: string | null;
+  body_text?: string | null;
   body_preview: string | null;
   sender_email: string;
   sender_name: string | null;
@@ -94,11 +95,23 @@ export interface TicketsFilter {
   toDate?: string;
 }
 
+/**
+ * Kolonner som innboks-lister trenger. Tunge/sensitive felt (`body_html`,
+ * `body_text`, `internal_notes`, `ai_suggestion`) hentes bevisst ikke her —
+ * de lastes først i detaljvisningen via `useTicket`.
+ */
+export const TICKET_LIST_COLUMNS =
+  "id, microsoft_message_id, source_mailbox, subject, body_preview, sender_email, sender_name, to_recipients, cc_recipients, has_attachments, received_at, importance, conversation_id, status, priority, assigned_to, assigned_team, related_order_id, ai_status, ai_confidence_score, awaiting_internal, awaiting_external, awaiting_external_email, followers, created_at, updated_at";
+
 export function useTickets(filter: TicketsFilter = {}) {
   return useQuery({
     queryKey: ["tickets", filter],
     queryFn: async () => {
-      let q = supabase.from("tickets").select("*").order("received_at", { ascending: false }).limit(500);
+      let q = supabase
+        .from("tickets")
+        .select(TICKET_LIST_COLUMNS)
+        .order("received_at", { ascending: false })
+        .limit(500);
       if (filter.search) {
         const s = `%${filter.search}%`;
         q = q.or(`subject.ilike.${s},sender_email.ilike.${s},sender_name.ilike.${s},body_text.ilike.${s},body_preview.ilike.${s}`);
@@ -117,7 +130,7 @@ export function useTickets(filter: TicketsFilter = {}) {
       }
       const { data, error } = await q;
       if (error) throw error;
-      return (data ?? []) as Ticket[];
+      return (data ?? []) as unknown as Ticket[];
     },
   });
 }
@@ -190,25 +203,54 @@ export function isAwaitingCustomer(args: {
 }
 
 
+/** Lettvektsrad brukt av tellere og arbeidskøer på ordredashbordet. */
+export type TicketQueueRow = Pick<
+  Ticket,
+  | "id"
+  | "subject"
+  | "sender_email"
+  | "sender_name"
+  | "received_at"
+  | "status"
+  | "priority"
+  | "assigned_to"
+  | "related_order_id"
+>;
+
+/**
+ * Åpne tickets i én spørring. Tellerne utledes i klienten i stedet for fire
+ * separate `count`-kall, og selve radene gjenbrukes av arbeidskøene.
+ */
 export function useTicketCounts() {
   return useQuery({
     queryKey: ["tickets-counts"],
     queryFn: async () => {
       const { data: u } = await supabase.auth.getUser();
-      const myId = u.user?.id;
-      const [newRes, ipRes, mineRes, latest] = await Promise.all([
-        supabase.from("tickets").select("id", { count: "exact", head: true }).eq("status", "new"),
-        supabase.from("tickets").select("id", { count: "exact", head: true }).eq("status", "in_progress"),
-        myId
-          ? supabase.from("tickets").select("id", { count: "exact", head: true }).eq("assigned_to", myId).in("status", ["new", "in_progress"])
-          : Promise.resolve({ count: 0 } as any),
-        supabase.from("tickets").select("id, subject, sender_email, sender_name, received_at").eq("status", "new").order("received_at", { ascending: false }).limit(5),
-      ]);
+      const myId = u.user?.id ?? null;
+
+      const { data, error } = await supabase
+        .from("tickets")
+        .select(
+          "id, subject, sender_email, sender_name, received_at, status, priority, assigned_to, related_order_id",
+        )
+        .in("status", ["new", "in_progress"])
+        .order("received_at", { ascending: false })
+        .limit(500);
+      if (error) throw error;
+
+      const openTickets = (data ?? []) as unknown as TicketQueueRow[];
+      const newTickets = openTickets.filter((t) => t.status === "new");
+
       return {
-        newCount: newRes.count ?? 0,
-        inProgressCount: ipRes.count ?? 0,
-        mineCount: mineRes.count ?? 0,
-        latestNew: (latest.data ?? []) as Pick<Ticket, "id" | "subject" | "sender_email" | "sender_name" | "received_at">[],
+        openTickets,
+        newCount: newTickets.length,
+        inProgressCount: openTickets.filter((t) => t.status === "in_progress").length,
+        mineCount: myId ? openTickets.filter((t) => t.assigned_to === myId).length : 0,
+        unassignedCount: openTickets.filter((t) => t.assigned_to == null).length,
+        latestNew: newTickets.slice(0, 5) as Pick<
+          Ticket,
+          "id" | "subject" | "sender_email" | "sender_name" | "received_at"
+        >[],
       };
     },
   });
