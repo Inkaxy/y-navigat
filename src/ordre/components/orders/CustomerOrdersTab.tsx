@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Loader2, Truck, ShoppingBag, Check, ArrowDownRight, MessageSquare } from "lucide-react";
+import { Plus, Truck, ShoppingBag, Check, ArrowDownRight, MessageSquare } from "lucide-react";
+import { QueryState } from "@/components/common/QueryState";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -52,7 +54,7 @@ export function CustomerOrdersTab({ customer }: { customer: CustomerOption }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
 
-  const { data: orders, isLoading } = useCustomerOrders({
+  const { data: orders, isLoading, isError, error, refetch } = useCustomerOrders({
     customerId: customer.id,
     fromDate,
     toDate,
@@ -152,22 +154,27 @@ export function CustomerOrdersTab({ customer }: { customer: CustomerOption }) {
 
       {/* List */}
       <div className="rounded-lg border border-border bg-card">
-        {isLoading ? (
-          <div className="grid place-items-center py-12">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          </div>
-        ) : !orders || orders.length === 0 ? (
-          <div className="flex flex-col items-center gap-3 py-12 text-center">
-            <p className="text-sm text-muted-foreground">
-              Ingen kundeordrer for valgt periode.
-            </p>
+        <QueryState
+          isLoading={isLoading}
+          isError={isError}
+          error={error}
+          scope="ordre:kundeordrer:liste"
+          onRetry={() => void refetch()}
+          errorTitle="Kunne ikke hente kundeordrene"
+          isEmpty={!orders || orders.length === 0}
+          emptyTitle="Ingen kundeordrer for valgt periode."
+          emptyAction={
             <Button variant="outline" onClick={openNew}>
               <Plus className="h-4 w-4" />
               Ny kundeordre
             </Button>
-          </div>
-        ) : (
+          }
+          className="m-3"
+          skeletonRows={5}
+          skeletonRowClassName="h-10"
+        >
           <div className="overflow-x-auto">
+
             <table className="w-full text-sm">
               <thead className="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
                 <tr>
@@ -182,7 +189,7 @@ export function CustomerOrdersTab({ customer }: { customer: CustomerOption }) {
                 </tr>
               </thead>
               <tbody>
-                {orders.map((o) => (
+                {(orders ?? []).map((o) => (
                   <tr
                     key={o.id}
                     className="cursor-pointer border-t border-border hover:bg-accent/50"
@@ -222,8 +229,11 @@ export function CustomerOrdersTab({ customer }: { customer: CustomerOption }) {
                         <span className="inline-flex items-center gap-1.5">
                           <StatusBadge status={o.status} />
                           <OrderRuleFlagsIndicator
-                            flags={(o as any).rule_flags}
-                            overrideReason={(o as any).rule_override_reason ?? null}
+                            flags={(o as { rule_flags?: unknown }).rule_flags}
+                            overrideReason={
+                              (o as { rule_override_reason?: string | null })
+                                .rule_override_reason ?? null
+                            }
                           />
                         </span>
                       )}
@@ -257,8 +267,9 @@ export function CustomerOrdersTab({ customer }: { customer: CustomerOption }) {
               </tbody>
             </table>
           </div>
-        )}
+        </QueryState>
       </div>
+
 
       {modalOpen && (
         <CustomerOrderModal

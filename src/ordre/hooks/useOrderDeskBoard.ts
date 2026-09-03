@@ -20,6 +20,24 @@ export type DeskRow = {
   tone?: "critical" | "warning" | "info" | "default";
 };
 
+/**
+ * En navngitt gruppe rader inne i ett kø-kort.
+ *
+ * Bakgrunn: «Må håndteres nå» blander to ulike kilder (ordre til godkjenning og
+ * e-post). Da må hver kilde ha sin egen overskrift og sin egen «vis alle»-lenke,
+ * slik at ingen lenke lover å vise alt og deretter utelater halvparten.
+ */
+export type DeskGroup = {
+  key: string;
+  label: string;
+  rows: DeskRow[];
+  /** Totalt antall i gruppen — kan være større enn `rows.length`. */
+  total: number;
+  to: string;
+  toLabel: string;
+  emptyText: string;
+};
+
 type PendingRecurringRow = {
   schedule_id: string;
   customer_id: string;
@@ -108,6 +126,54 @@ export function recurringToDeskRows(rows: PendingRecurringRow[], date: string): 
   }));
 }
 
+/** Maks antall faktiske arbeidsrader per gruppe i «Må håndteres nå». */
+export const MUST_HANDLE_ROWS_PER_GROUP = 4;
+
+/**
+ * Bygger de to gruppene i «Må håndteres nå».
+ *
+ * Hver gruppe beholder sin egen destinasjon slik at «Godkjenningskø» og
+ * «Åpne innboks» peker der radene faktisk finnes.
+ */
+export function buildMustHandleGroups(input: {
+  approvalRows: OrderListRow[];
+  approvalTotal: number;
+  tickets: TicketQueueRow[];
+  maxPerGroup?: number;
+}): DeskGroup[] {
+  const maxPerGroup = input.maxPerGroup ?? MUST_HANDLE_ROWS_PER_GROUP;
+  const approvals = ordersToDeskRows(input.approvalRows, {
+    badge: () => "Venter godkjenning",
+  }).map((r) => ({ ...r, tone: "critical" as const }));
+  const ticketRows = ticketsToDeskRows(input.tickets);
+
+  return [
+    {
+      key: "approvals",
+      label: "Ordre til godkjenning",
+      rows: approvals.slice(0, maxPerGroup),
+      total: Math.max(input.approvalTotal, approvals.length),
+      to: "/ordre/ordrer?status=awaiting_confirmation",
+      toLabel: "Godkjenningskø",
+      emptyText: "Ingen ordre venter på godkjenning.",
+    },
+    {
+      key: "tickets",
+      label: "E-post som krever handling",
+      rows: ticketRows.slice(0, maxPerGroup),
+      total: ticketRows.length,
+      to: "/ordre/ticket",
+      toLabel: "Åpne innboks",
+      emptyText: "Ingen e-post krever handling nå.",
+    },
+  ];
+}
+
+/** Summen av faktiske oppgaver på tvers av gruppene. */
+export function totalOfGroups(groups: DeskGroup[]): number {
+  return groups.reduce((sum, g) => sum + g.total, 0);
+}
+
 /* ------------------------------------------------------------------ */
 /* Datakilder                                                          */
 /* ------------------------------------------------------------------ */
@@ -129,14 +195,6 @@ export function usePendingWebsiteOrdersCount() {
     },
   });
 }
-
-export type DeskSection<T> = {
-  data: T;
-  isLoading: boolean;
-  isError: boolean;
-  error: unknown;
-  refetch: () => void;
-};
 
 /**
  * Komponerer eksisterende Ordre-queries til ett arbeidsbord.
@@ -167,26 +225,60 @@ export function useOrderDeskBoard(options: { pendingDate?: string } = {}) {
   const recurringQ = usePendingRecurringOrderRows(pendingDate, "all");
   const websiteQ = usePendingWebsiteOrdersCount();
 
+  // Kun refetch-funksjonene (stabile referanser fra React Query) er avhengigheter,
+  // ikke hele query-resultatene — de bytter identitet ved hver render.
+  const refetchTickets = ticketsQ.refetch;
+  const refetchApprovalCount = approvalCountQ.refetch;
+  const refetchApprovalRows = approvalRowsQ.refetch;
+  const refetchTodayStats = todayStatsQ.refetch;
+  const refetchTomorrowStats = tomorrowStatsQ.refetch;
+  const refetchDayStatus = dayStatusQ.refetch;
+  const refetchUpcoming = upcomingQ.refetch;
+  const refetchRecurring = recurringQ.refetch;
+  const refetchWebsite = websiteQ.refetch;
+
+  const refetchMustHandle = useCallback(() => {
+    void refetchTickets();
+    void refetchApprovalRows();
+    void refetchApprovalCount();
+  }, [refetchTickets, refetchApprovalRows, refetchApprovalCount]);
+
+  const refetchNextDeliveries = useCallback(() => {
+    void refetchUpcoming();
+  }, [refetchUpcoming]);
+
+  const refetchRecurringRows = useCallback(() => {
+    void refetchRecurring();
+  }, [refetchRecurring]);
+
+  const refetchWebsiteCount = useCallback(() => {
+    void refetchWebsite();
+  }, [refetchWebsite]);
+
+  const refetchDeliveryNotes = useCallback(() => {
+    void refetchDayStatus();
+  }, [refetchDayStatus]);
+
   const refetchAll = useCallback(() => {
-    void ticketsQ.refetch();
-    void approvalCountQ.refetch();
-    void approvalRowsQ.refetch();
-    void todayStatsQ.refetch();
-    void tomorrowStatsQ.refetch();
-    void dayStatusQ.refetch();
-    void upcomingQ.refetch();
-    void recurringQ.refetch();
-    void websiteQ.refetch();
+    void refetchTickets();
+    void refetchApprovalCount();
+    void refetchApprovalRows();
+    void refetchTodayStats();
+    void refetchTomorrowStats();
+    void refetchDayStatus();
+    void refetchUpcoming();
+    void refetchRecurring();
+    void refetchWebsite();
   }, [
-    ticketsQ,
-    approvalCountQ,
-    approvalRowsQ,
-    todayStatsQ,
-    tomorrowStatsQ,
-    dayStatusQ,
-    upcomingQ,
-    recurringQ,
-    websiteQ,
+    refetchTickets,
+    refetchApprovalCount,
+    refetchApprovalRows,
+    refetchTodayStats,
+    refetchTomorrowStats,
+    refetchDayStatus,
+    refetchUpcoming,
+    refetchRecurring,
+    refetchWebsite,
   ]);
 
   const openTickets = ticketsQ.data?.openTickets ?? [];
@@ -195,13 +287,11 @@ export function useOrderDeskBoard(options: { pendingDate?: string } = {}) {
   const upcomingRows = upcomingQ.data?.rows ?? [];
   const recurringRows = (recurringQ.data ?? []) as PendingRecurringRow[];
 
-  const mustHandleRows: DeskRow[] = [
-    ...ordersToDeskRows(approvalRows, { badge: () => "Venter godkjenning" }).map((r) => ({
-      ...r,
-      tone: "critical" as const,
-    })),
-    ...ticketsToDeskRows(actionTickets),
-  ];
+  const mustHandleGroups = buildMustHandleGroups({
+    approvalRows,
+    approvalTotal: approvalCountQ.data ?? approvalRows.length,
+    tickets: actionTickets,
+  });
 
   return {
     dates: { today, tomorrow: tom, pendingDate },
@@ -214,60 +304,56 @@ export function useOrderDeskBoard(options: { pendingDate?: string } = {}) {
         unassignedCount: ticketsQ.data?.unassignedCount ?? 0,
         isLoading: ticketsQ.isLoading,
         isError: ticketsQ.isError,
+        error: ticketsQ.error,
       },
       approvals: {
         count: approvalCountQ.data ?? 0,
         isLoading: approvalCountQ.isLoading,
         isError: approvalCountQ.isError,
+        error: approvalCountQ.error,
       },
       today: {
         count: todayStatsQ.data?.count ?? 0,
         total: todayStatsQ.data?.total ?? 0,
         isLoading: todayStatsQ.isLoading,
         isError: todayStatsQ.isError,
+        error: todayStatsQ.error,
       },
       tomorrow: {
         count: tomorrowStatsQ.data?.count ?? 0,
         total: tomorrowStatsQ.data?.total ?? 0,
         isLoading: tomorrowStatsQ.isLoading,
         isError: tomorrowStatsQ.isError,
+        error: tomorrowStatsQ.error,
       },
       recurring: {
         count: recurringRows.length,
         isLoading: recurringQ.isLoading,
         isError: recurringQ.isError,
+        error: recurringQ.error,
       },
       withoutTour: {
         count: dayStatusQ.data?.tellere.uten_tur ?? 0,
         isLoading: dayStatusQ.isLoading,
         isError: dayStatusQ.isError,
+        error: dayStatusQ.error,
       },
       website: {
         count: websiteQ.data ?? 0,
         isLoading: websiteQ.isLoading,
         isError: websiteQ.isError,
-      },
-      deliveryNotes: {
-        count: dayStatusQ.data?.tellere.pakksedler ?? 0,
-        mainRunDone: dayStatusQ.data?.hovedkjoring?.kjort ?? false,
-        extraRuns: dayStatusQ.data?.tilleggskjoringer ?? 0,
-        isLoading: dayStatusQ.isLoading,
-        isError: dayStatusQ.isError,
+        error: websiteQ.error,
       },
     },
 
     queues: {
       mustHandle: {
-        rows: mustHandleRows,
-        total: (approvalCountQ.data ?? approvalRows.length) + actionTickets.length,
+        groups: mustHandleGroups,
+        total: totalOfGroups(mustHandleGroups),
         isLoading: ticketsQ.isLoading || approvalRowsQ.isLoading,
         isError: ticketsQ.isError || approvalRowsQ.isError,
         error: ticketsQ.error ?? approvalRowsQ.error,
-        refetch: () => {
-          void ticketsQ.refetch();
-          void approvalRowsQ.refetch();
-          void approvalCountQ.refetch();
-        },
+        refetch: refetchMustHandle,
       },
       nextDeliveries: {
         rows: ordersToDeskRows(upcomingRows, {
@@ -277,15 +363,40 @@ export function useOrderDeskBoard(options: { pendingDate?: string } = {}) {
         isLoading: upcomingQ.isLoading,
         isError: upcomingQ.isError,
         error: upcomingQ.error,
-        refetch: () => void upcomingQ.refetch(),
+        refetch: refetchNextDeliveries,
       },
+      /**
+       * «Automatiske løp» dekker alle tre maskinelle kildene ordrekontoret må
+       * følge opp hver dag: fastordre, nettbutikkordre og pakkseddelkjøringen.
+       */
       automation: {
-        rows: recurringToDeskRows(recurringRows, pendingDate),
-        total: recurringRows.length,
-        isLoading: recurringQ.isLoading,
-        isError: recurringQ.isError,
-        error: recurringQ.error,
-        refetch: () => void recurringQ.refetch(),
+        recurring: {
+          rows: recurringToDeskRows(recurringRows, pendingDate),
+          total: recurringRows.length,
+          to: `/ordre/faste-rutiner?date=${pendingDate}`,
+          isLoading: recurringQ.isLoading,
+          isError: recurringQ.isError,
+          error: recurringQ.error,
+          refetch: refetchRecurringRows,
+        },
+        website: {
+          count: websiteQ.data ?? 0,
+          to: "/ordre/nettbutikk",
+          isLoading: websiteQ.isLoading,
+          isError: websiteQ.isError,
+          error: websiteQ.error,
+          refetch: refetchWebsiteCount,
+        },
+        deliveryNotes: {
+          count: dayStatusQ.data?.tellere.pakksedler ?? 0,
+          mainRunDone: dayStatusQ.data?.hovedkjoring?.kjort ?? false,
+          extraRuns: dayStatusQ.data?.tilleggskjoringer ?? 0,
+          to: `/ordre/pakksedler?date=${today}`,
+          isLoading: dayStatusQ.isLoading,
+          isError: dayStatusQ.isError,
+          error: dayStatusQ.error,
+          refetch: refetchDeliveryNotes,
+        },
       },
     },
 
@@ -293,12 +404,16 @@ export function useOrderDeskBoard(options: { pendingDate?: string } = {}) {
       ticketsQ.isFetching ||
       upcomingQ.isFetching ||
       approvalRowsQ.isFetching ||
-      recurringQ.isFetching,
+      recurringQ.isFetching ||
+      websiteQ.isFetching ||
+      dayStatusQ.isFetching,
     dataUpdatedAt: Math.max(
       ticketsQ.dataUpdatedAt ?? 0,
       upcomingQ.dataUpdatedAt ?? 0,
       approvalRowsQ.dataUpdatedAt ?? 0,
       recurringQ.dataUpdatedAt ?? 0,
+      websiteQ.dataUpdatedAt ?? 0,
+      dayStatusQ.dataUpdatedAt ?? 0,
     ),
     refetchAll,
   };

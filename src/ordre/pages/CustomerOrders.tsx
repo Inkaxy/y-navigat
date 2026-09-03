@@ -1,13 +1,15 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Loader2, Search, Check, Users } from "lucide-react";
+import { Search, Check, Users } from "lucide-react";
 import { AppBanner } from "@/ordre/components/shell/AppBanner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { QueryErrorState, QueryState } from "@/components/common/QueryState";
 import { useNBCustomers, useCustomerById, type CustomerOption } from "@/ordre/hooks/useNBCustomers";
 import { useDebouncedValue } from "@/ordre/hooks/useDebouncedValue";
 import { CustomerOrdersTab } from "@/ordre/components/orders/CustomerOrdersTab";
+
 
 function CustomerCombobox({
   value,
@@ -19,7 +21,7 @@ function CustomerCombobox({
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const debouncedQ = useDebouncedValue(q, 250);
-  const { data: customers, isLoading } = useNBCustomers(debouncedQ);
+  const { data: customers, isLoading, isError, error, refetch } = useNBCustomers(debouncedQ);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -39,14 +41,21 @@ function CustomerCombobox({
           />
         </div>
         <div className="max-h-[320px] overflow-y-auto">
-          {isLoading ? (
-            <div className="p-4 text-center text-sm text-muted-foreground">
-              <Loader2 className="mx-auto h-4 w-4 animate-spin" />
-            </div>
-          ) : !customers || customers.length === 0 ? (
-            <div className="p-4 text-center text-sm text-muted-foreground">Ingen treff</div>
-          ) : (
-            customers.map((c) => (
+          <QueryState
+            isLoading={isLoading}
+            isError={isError}
+            error={error}
+            scope="ordre:kundeordrer:kundesok"
+            onRetry={() => void refetch()}
+            errorTitle="Kunne ikke søke etter kunder"
+            isEmpty={!customers || customers.length === 0}
+            emptyTitle="Ingen treff"
+            compact
+            className="m-2"
+            skeletonRows={4}
+            skeletonRowClassName="h-9"
+          >
+            {(customers ?? []).map((c) => (
               <button
                 key={c.id}
                 type="button"
@@ -65,9 +74,10 @@ function CustomerCombobox({
                 </div>
                 {value?.id === c.id && <Check className="h-4 w-4 text-primary" />}
               </button>
-            ))
-          )}
+            ))}
+          </QueryState>
         </div>
+
       </PopoverContent>
     </Popover>
   );
@@ -77,9 +87,12 @@ export default function CustomerOrdersPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialCustomerId = searchParams.get("customerId");
   const [customer, setCustomer] = useState<CustomerOption | null>(null);
-  const { data: preselected } = useCustomerById(
-    initialCustomerId && !customer ? initialCustomerId : null,
-  );
+  const {
+    data: preselected,
+    isError: isPreselectError,
+    error: preselectError,
+    refetch: refetchPreselect,
+  } = useCustomerById(initialCustomerId && !customer ? initialCustomerId : null);
 
   useEffect(() => {
     if (preselected && !customer) {
@@ -98,10 +111,23 @@ export default function CustomerOrdersPage() {
         icon={Users}
       />
       <div className="container mx-auto max-w-6xl space-y-4 px-4 py-6 sm:px-6">
+        {/* Feil i forhåndsvalget skal ikke blokkere siden — man kan alltid velge kunde manuelt. */}
+        {isPreselectError && (
+          <QueryErrorState
+            error={preselectError}
+            scope="ordre:kundeordrer:forhandsvalgt-kunde"
+            onRetry={() => void refetchPreselect()}
+            title="Kunne ikke hente den forhåndsvalgte kunden"
+            description="Velg kunden manuelt i listen, eller prøv igjen."
+            compact
+          />
+        )}
+
         <div className="flex flex-wrap items-center gap-3">
           <span className="text-sm font-medium">Kunde:</span>
           <CustomerCombobox value={customer} onSelect={setCustomer} />
         </div>
+
 
         {!customer ? (
           <div className="rounded-lg border border-dashed border-border bg-card/50 p-12 text-center">

@@ -469,6 +469,9 @@ const App = () => (
               <Route path="/ordre/ai-forslag" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreAiForslag /></AppAccessGuard></Shell>} />
               <Route path="/ordre/ticket-rapporter" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreTicketReports /></AppAccessGuard></Shell>} />
               <Route path="/ordre/pakkesystem" element={<Navigate to="/produksjon/pakkesystem" replace />} />
+              {/* Bakoverkompatibilitet: den gamle avviks-siden er borte, men bokmerker skal ikke gi 404. */}
+              <Route path="/ordre/avvik" element={<Navigate to="/ordre/dashbord?focus=avvik" replace />} />
+
               <Route path="/ordre/innstillinger" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreInnstillinger /></AppAccessGuard></Shell>} />
               <Route path="/ordre/innstillinger/m365-callback" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><M365Callback /></AppAccessGuard></Shell>} />
               <Route path="/produksjon" element={<Shell><AppAccessGuard appCode="produksjon" appName="Produksjon"><Navigate to="/produksjon/oversikt" replace /></AppAccessGuard></Shell>} />

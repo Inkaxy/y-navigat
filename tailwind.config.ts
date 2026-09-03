@@ -17,6 +17,21 @@ export default {
         sans: ["Inter", "system-ui", "sans-serif"],
         serif: ["Fraunces", "Georgia", "serif"],
       },
+      /**
+       * Semantiske tekststørrelser. Markup i Ordre/Varer har lenge brukt
+       * `text-title`/`text-body`/`text-caption`; uten disse definisjonene var
+       * klassene no-ops og all tekst falt tilbake til arvet størrelse.
+       */
+      fontSize: {
+        caption: ["0.75rem", { lineHeight: "1rem" }],
+        body: ["0.875rem", { lineHeight: "1.25rem" }],
+        title: ["1.125rem", { lineHeight: "1.5rem" }],
+      },
+      /** Horisontal sidemarg for innholdscontainere (`px-page`). */
+      spacing: {
+        page: "1.5rem",
+      },
+
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
