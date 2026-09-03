@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import {
   Inbox, Paperclip, ArrowRight, AlertCircle, User as UserIcon,
   Search, X, CheckCircle2, UserCheck, Filter,
@@ -18,6 +18,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { formatRelative, initialsOf } from "@/ordre/lib/format";
 import { cn } from "@/lib/utils";
 import { TicketQuickActions } from "./TicketQuickActions";
+import { DeskSectionState } from "@/ordre/components/dashboard/DeskSectionState";
 
 type Tab = "open" | "new" | "mine" | "unassigned";
 
@@ -64,7 +65,7 @@ export function TicketsInboxWidget() {
           ? { assigned: "unassigned" as const, status: ["new", "in_progress"] as TicketStatus[] }
           : { status: ["new", "in_progress"] as TicketStatus[] };
 
-  const { data: tickets = [], isLoading } = useTickets({
+  const { data: tickets = [], isLoading, isError, error, refetch } = useTickets({
     ...baseFilter,
     search: search.trim() || undefined,
     priority: priorities.length ? priorities : undefined,
@@ -150,6 +151,7 @@ export function TicketsInboxWidget() {
             <button
               key={t.key}
               type="button"
+              aria-pressed={tab === t.key}
               onClick={() => setTab(t.key)}
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-caption font-medium transition-colors",
@@ -184,6 +186,7 @@ export function TicketsInboxWidget() {
               <button
                 key={p}
                 type="button"
+                aria-pressed={active}
                 onClick={() => togglePrio(p)}
                 className={cn(
                   "rounded-full border px-2 py-0.5 text-[10px] font-medium transition-colors",
@@ -208,7 +211,16 @@ export function TicketsInboxWidget() {
         </div>
 
         {/* List */}
-        {isLoading ? (
+        {isError ? (
+          <DeskSectionState
+            isError
+            error={error}
+            onRetry={() => void refetch()}
+            scope="ordre-desk/inbox-widget"
+          >
+            {null}
+          </DeskSectionState>
+        ) : isLoading ? (
           <div className="space-y-2">
             {Array.from({ length: 5 }).map((_, i) => (
               <Skeleton key={i} className="h-14" />
