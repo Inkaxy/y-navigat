@@ -109,12 +109,6 @@ export function CommandPalette({ open, onOpenChange }: Props) {
               ))}
             </Command.Group>
 
-                    />
-                    <span>Bytt til {e.legal_name}</span>
-                  </PaletteItem>
-                ))}
-              </Command.Group>
-            )}
 
             <Command.Group
               heading="Tema"

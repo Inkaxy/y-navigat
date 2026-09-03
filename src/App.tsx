@@ -325,7 +325,7 @@ const App = () => (
               <Route path="/min-profil" element={<Shell><MinProfil /></Shell>} />
               <Route path="/varsler" element={<Shell><Varsler /></Shell>} />
               <Route path="/hjelp" element={<Shell><Hjelp /></Shell>} />
-              <Route path="/admin" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><AdminIndex /></AppAccessGuard></Shell>} /></PlatformAdminGuard></AppAccessGuard></Shell>} />
+              <Route path="/admin" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><AdminIndex /></AppAccessGuard></Shell>} />
               <Route path="/admin/brukere" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><Brukere /></AppAccessGuard></Shell>} />
               <Route path="/admin/brukere/:id" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><PlatformAdminGuard title="Brukerdetaljer"><BrukerDetalj /></PlatformAdminGuard></AppAccessGuard></Shell>} />
               <Route path="/admin/tilganger" element={<Shell><AppAccessGuard appCode="nbos" appName="NBOS Admin"><PlatformAdminGuard title="Tilganger"><Tilganger /></PlatformAdminGuard></AppAccessGuard></Shell>} />
