@@ -232,16 +232,18 @@ export function TicketsInboxWidget() {
               const isUrgent = t.priority === "urgent" || t.priority === "high";
               const isMine = !!user?.id && t.assigned_to === user.id;
               return (
-                <li key={t.id}>
-                  <div
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => navigate(`/ordre/ticket/${t.id}`)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") navigate(`/ordre/ticket/${t.id}`);
-                    }}
-                    className="group flex cursor-pointer items-start gap-3 px-3 py-2.5 transition-colors hover:bg-muted/60 focus:outline-none focus-visible:bg-muted/60"
+                <li key={t.id} className="relative">
+                  {/* Ekte lenke som dekker hele raden — gir tastatur, midtklikk og «åpne i ny fane». */}
+                  <Link
+                    to={`/ordre/ticket/${t.id}`}
+                    className="absolute inset-0 z-0 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                   >
+                    <span className="sr-only">
+                      Åpne e-post: {t.subject ?? "(uten emne)"} fra{" "}
+                      {t.sender_name ?? t.sender_email}
+                    </span>
+                  </Link>
+                  <div className="group pointer-events-none flex items-start gap-3 px-3 py-2.5 transition-colors hover:bg-muted/60">
                     <span
                       className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-muted text-caption font-semibold text-muted-foreground"
                       title={t.sender_name ?? t.sender_email}
