@@ -203,6 +203,30 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
+/** Ticket beriket med SLA-frist og «venter på kunde»-status. */
+type Row = TicketRow & {
+  intent: RequestType | null;
+  deadline: Date | null;
+  overdue: boolean;
+  countdown: string | null;
+  awaitingCustomer: boolean;
+};
+
+/** Åpen = ubehandlet eller under arbeid (ikke løst/lukket). */
+const isOpen = (t: Row) => t.status === "new" || t.status === "in_progress";
+
+/** Over frist først, deretter tidligste frist, til slutt eldste e-post. */
+function sortByDeadline(a: Row, b: Row) {
+  if (a.overdue && !b.overdue) return -1;
+  if (!a.overdue && b.overdue) return 1;
+  const ad = a.deadline?.getTime() ?? Infinity;
+  const bd = b.deadline?.getTime() ?? Infinity;
+  if (ad !== bd) return ad - bd;
+  return new Date(a.received_at).getTime() - new Date(b.received_at).getTime();
+}
+
+
+
 export default function TicketsInbox() {
   const { user } = useAuth();
   const {
