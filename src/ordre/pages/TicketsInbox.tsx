@@ -222,7 +222,7 @@ function QueueButton({
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="mt-4 mb-1 px-3 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+    <div className="col-span-full mt-4 mb-1 px-3 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
       {children}
     </div>
   );
@@ -435,7 +435,9 @@ export default function TicketsInbox() {
 
       <div className="grid gap-4 lg:grid-cols-[240px_1fr]">
         {/* Køer */}
-        <aside className="rounded-lg border bg-[hsl(var(--brand-cream))] p-2">
+        {/* Køene ligger i to kolonner på små skjermer slik at lista ikke skyves langt ned. */}
+        <aside className="grid min-w-0 grid-cols-2 gap-x-2 gap-y-0.5 rounded-lg border bg-[hsl(var(--brand-cream))] p-2 lg:block">
+
           <SectionLabel>Køer</SectionLabel>
           <QueueButton
             active={queue === "all"}
@@ -513,6 +515,7 @@ export default function TicketsInbox() {
         </aside>
 
         {/* Liste */}
+        <div className="min-w-0">
         <QueryState
           isLoading={isLoading}
           isError={isError}
@@ -528,6 +531,7 @@ export default function TicketsInbox() {
           skeletonRowClassName="h-16 rounded-lg"
         >
           <ul className="space-y-2">
+
             {filtered.map((t) => {
               const unread = t.status === "new";
               const badgeCls = t.intent
@@ -581,8 +585,25 @@ export default function TicketsInbox() {
                       <div className="mt-0.5 truncate text-xs text-muted-foreground">
                         {t.body_preview || t.sender_email}
                       </div>
+                      {/* Mobil: avsender og tidspunkt får egen linje fordi
+                          metadata-kolonnen til høyre skjules på små skjermer. */}
+                      <div className="mt-1 flex items-center gap-1.5 text-[11px] text-muted-foreground sm:hidden">
+                        <span className="truncate font-medium">
+                          {t.sender_name || t.sender_email}
+                        </span>
+                        <span aria-hidden="true">·</span>
+                        <span className="shrink-0">
+                          {formatDistanceToNow(new Date(t.received_at), {
+                            locale: nb,
+                            addSuffix: true,
+                          })}
+                        </span>
+                      </div>
                     </div>
 
+
+                    {/* Metadata: krymper trinnvis bort på små skjermer slik at
+                        emnet beholder plassen sin i stedet for å presse raden bredere. */}
                     <div className="flex shrink-0 items-center gap-2">
                       {t.related_order_id && t.orders?.order_number ? (
                         <Link
@@ -593,11 +614,13 @@ export default function TicketsInbox() {
                           #{t.orders.order_number}
                         </Link>
                       ) : (
-                        <span className="rounded-md border border-dashed px-2 py-1 text-xs text-muted-foreground">
+                        <span className="hidden rounded-md border border-dashed px-2 py-1 text-xs text-muted-foreground sm:inline">
                           Ingen ordre ennå
                         </span>
                       )}
-                      <ConfidenceChip score={t.ai_confidence_score} />
+                      <span className="hidden lg:inline">
+                        <ConfidenceChip score={t.ai_confidence_score} />
+                      </span>
                       {t.countdown && (
                         <span
                           className={cn(
@@ -612,14 +635,14 @@ export default function TicketsInbox() {
                           {t.countdown}
                         </span>
                       )}
-                      <span className="w-24 text-right text-xs text-muted-foreground">
+                      <span className="hidden w-24 text-right text-xs text-muted-foreground md:inline">
                         {formatDistanceToNow(new Date(t.received_at), {
                           locale: nb,
                           addSuffix: true,
                         })}
                       </span>
                       <span
-                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-semibold text-muted-foreground"
+                        className="hidden h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-semibold text-muted-foreground sm:flex"
                         title={t.assigned_to ? "Tildelt" : "Ikke tildelt"}
                       >
                         {t.assigned_to ? initials(t.sender_name, t.sender_email) : "—"}
@@ -631,8 +654,10 @@ export default function TicketsInbox() {
             })}
           </ul>
         </QueryState>
+        </div>
 
       </div>
+
     </div>
   );
 }

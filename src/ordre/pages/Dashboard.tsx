@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useCallback, useMemo, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   Plus,
   TruckIcon,
@@ -17,6 +17,7 @@ import { AppBanner } from "@/ordre/components/shell/AppBanner";
 import { Button } from "@/components/ui/button";
 import { OrderDeskKpi, OrderDeskSplitKpi } from "@/ordre/components/dashboard/OrderDeskKpi";
 import { OrderDeskHeader } from "@/ordre/components/dashboard/OrderDeskHeader";
+import { DeskFocusNotice } from "@/ordre/components/dashboard/DeskFocusNotice";
 import { WorkQueueCard } from "@/ordre/components/dashboard/WorkQueueCard";
 import { AutomationRunsCard } from "@/ordre/components/dashboard/AutomationRunsCard";
 import { useOrderDeskBoard, type DeskGroup } from "@/ordre/hooks/useOrderDeskBoard";
@@ -30,9 +31,18 @@ export default function Dashboard() {
   const today = todayISO();
   const tom = tomorrow();
   const [pendingDate, setPendingDate] = useState<string>(tom);
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const board = useOrderDeskBoard({ pendingDate });
   const { kpi, queues } = board;
+
+  /** Bokmerker til den nedlagte `/ordre/avvik` lander her med `?focus=avvik`. */
+  const showFocusNotice = searchParams.get("focus") === "avvik";
+  const dismissFocusNotice = useCallback(() => {
+    const next = new URLSearchParams(searchParams);
+    next.delete("focus");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const dayAfter = useMemo(() => {
     const d = new Date(`${today}T12:00:00`);
@@ -74,6 +84,10 @@ export default function Dashboard() {
           isFetching={board.isFetching}
           onRefresh={board.refetchAll}
         />
+
+        {showFocusNotice && <DeskFocusNotice onDismiss={dismissFocusNotice} />}
+
+
 
         {/* KPI-strip: hele driftsbildet på én linje */}
         <section
