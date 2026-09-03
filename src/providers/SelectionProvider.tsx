@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { useCompany } from "@/hooks/useCompany";
 
 interface Selection {
   legalEntityId: string | null;
@@ -29,6 +30,24 @@ function readInitial(): Selection {
   }
 }
 
+/**
+ * NBhub er ett firma: sørger for at lagret `legalEntityId` alltid peker på den
+ * ene aktive raden i `legal_entities` (også når lagret id er slettet).
+ */
+function CompanySync({
+  legalEntityId,
+  setLegalEntityId,
+}: {
+  legalEntityId: string | null;
+  setLegalEntityId: (id: string | null) => void;
+}) {
+  const { data: company } = useCompany();
+  useEffect(() => {
+    if (company && company.id !== legalEntityId) setLegalEntityId(company.id);
+  }, [company, legalEntityId, setLegalEntityId]);
+  return null;
+}
+
 export function SelectionProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<Selection>(readInitial);
 
@@ -42,11 +61,17 @@ export function SelectionProvider({ children }: { children: ReactNode }) {
 
   const value: SelectionContextValue = {
     ...state,
-    setLegalEntityId: (id) => setState((s) => ({ ...s, legalEntityId: id, outletId: null })),
+    setLegalEntityId: (id) =>
+      setState((s) => (s.legalEntityId === id ? s : { ...s, legalEntityId: id, outletId: null })),
     setOutletId: (id) => setState((s) => ({ ...s, outletId: id })),
   };
 
-  return <SelectionContext.Provider value={value}>{children}</SelectionContext.Provider>;
+  return (
+    <SelectionContext.Provider value={value}>
+      <CompanySync legalEntityId={state.legalEntityId} setLegalEntityId={value.setLegalEntityId} />
+      {children}
+    </SelectionContext.Provider>
+  );
 }
 
 export function useSelection() {
