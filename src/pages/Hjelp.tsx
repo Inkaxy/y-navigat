@@ -22,7 +22,7 @@ export default function Hjelp() {
         </CardHeader>
         <CardContent className="space-y-2 text-sm text-muted-foreground">
           <p>
-            NBHub er hovedshellet alle ansatte i Nøtterø Bakeri-konsernet logger inn i.
+            NBHub er hovedshellet alle ansatte i bakeriet logger inn i.
             Herfra ser du et dashbord tilpasset stillingen din og navigerer videre til
             de fagappene du har tilgang til.
           </p>

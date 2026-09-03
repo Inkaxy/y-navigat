@@ -10,6 +10,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { useCompany } from "@/hooks/useCompany";
 import { toast } from "sonner";
 import { Plus, Trash2 } from "lucide-react";
 
@@ -19,37 +20,24 @@ interface Props {
   onInvited?: () => void;
 }
 
-type Assignment = { legal_entity_id: string; position_id: string };
+type Assignment = { position_id: string };
 
 export function InviteUserDialog({ open, onOpenChange, onInvited }: Props) {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
-  const [assignments, setAssignments] = useState<Assignment[]>([
-    { legal_entity_id: "", position_id: "" },
-  ]);
+  const { data: company } = useCompany();
+  const [assignments, setAssignments] = useState<Assignment[]>([{ position_id: "" }]);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (!open) {
       setFirstName(""); setLastName(""); setEmail("");
-      setAssignments([{ legal_entity_id: "", position_id: "" }]);
+      setAssignments([{ position_id: "" }]);
       setSubmitting(false);
     }
   }, [open]);
 
-  const { data: companies = [] } = useQuery({
-    queryKey: ["invite-le-options"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("legal_entities")
-        .select("id, short_code, legal_name")
-        .order("short_code");
-      if (error) throw error;
-      return data;
-    },
-    enabled: open,
-  });
 
   const { data: positions = [] } = useQuery({
     queryKey: ["invite-position-options"],
@@ -69,7 +57,7 @@ export function InviteUserDialog({ open, onOpenChange, onInvited }: Props) {
     setAssignments((prev) => prev.map((a, i) => (i === idx ? { ...a, ...patch } : a)));
   };
   const addRow = () =>
-    setAssignments((prev) => [...prev, { legal_entity_id: "", position_id: "" }]);
+    setAssignments((prev) => [...prev, { position_id: "" }]);
   const removeRow = (idx: number) =>
     setAssignments((prev) => prev.filter((_, i) => i !== idx));
 
@@ -78,7 +66,13 @@ export function InviteUserDialog({ open, onOpenChange, onInvited }: Props) {
       toast.error("Navn og e-post er påkrevd");
       return;
     }
-    const cleaned = assignments.filter((a) => a.legal_entity_id && a.position_id);
+    if (!company) {
+      toast.error("Fant ikke firmaet");
+      return;
+    }
+    const cleaned = assignments
+      .filter((a) => a.position_id)
+      .map((a) => ({ legal_entity_id: company.id, position_id: a.position_id }));
     if (cleaned.length === 0) {
       toast.error("Minst én stilling må fylles ut");
       return;
@@ -86,12 +80,11 @@ export function InviteUserDialog({ open, onOpenChange, onInvited }: Props) {
     // Dedup på (selskap, stilling)
     const seen = new Set<string>();
     for (const a of cleaned) {
-      const key = `${a.legal_entity_id}:${a.position_id}`;
-      if (seen.has(key)) {
-        toast.error("Samme stilling i samme selskap er lagt til to ganger");
+      if (seen.has(a.position_id)) {
+        toast.error("Samme stilling er lagt til to ganger");
         return;
       }
-      seen.add(key);
+      seen.add(a.position_id);
     }
 
     setSubmitting(true);
@@ -143,7 +136,7 @@ export function InviteUserDialog({ open, onOpenChange, onInvited }: Props) {
         <DialogHeader>
           <DialogTitle>Inviter ny bruker</DialogTitle>
           <DialogDescription>
-            Brukeren mottar en e-post med en 6-sifret aktiveringskode. Koden er gyldig i 7 dager. Du kan tilordne flere selskap og stillinger.
+            Brukeren mottar en e-post med en 6-sifret aktiveringskode. Koden er gyldig i 7 dager. Du kan tilordne flere stillinger.
           </DialogDescription>
         </DialogHeader>
 
@@ -171,18 +164,7 @@ export function InviteUserDialog({ open, onOpenChange, onInvited }: Props) {
               </Button>
             </div>
             {assignments.map((a, idx) => (
-              <div key={idx} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-center">
-                <Select
-                  value={a.legal_entity_id}
-                  onValueChange={(v) => updateAssignment(idx, { legal_entity_id: v })}
-                >
-                  <SelectTrigger><SelectValue placeholder="Selskap" /></SelectTrigger>
-                  <SelectContent>
-                    {companies.map((c: any) => (
-                      <SelectItem key={c.id} value={c.id}>{c.short_code}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div key={idx} className="grid grid-cols-[1fr_auto] gap-2 items-center">
                 <Select
                   value={a.position_id}
                   onValueChange={(v) => updateAssignment(idx, { position_id: v })}

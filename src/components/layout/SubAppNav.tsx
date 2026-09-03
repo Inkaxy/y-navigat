@@ -182,7 +182,6 @@ const STATIC_SUBMENUS: Record<string, { prefix: string; appSlug: string; items: 
     prefix: "/admin",
     appSlug: "nbos",
     items: [
-      { kind: "link", to: "/admin/selskaper", label: "Selskaper", icon: Building2 },
       { kind: "link", to: "/admin/brukere", label: "Brukere", icon: Users },
       { kind: "link", to: "/admin/tilganger", label: "Tilganger", icon: UserCog },
       { kind: "link", to: "/admin/outlets", label: "Utsalg", icon: ShoppingBag },

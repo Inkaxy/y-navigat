@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import {
-  Building2, Users, KeyRound, Store, Briefcase, AppWindow,
+  Users, KeyRound, Store, Briefcase, AppWindow,
   Plug, HeartPulse, ScrollText, ShieldCheck, type LucideIcon,
 } from "lucide-react";
 import AdminLayout from "./AdminLayout";
@@ -17,7 +17,6 @@ type Area = {
 };
 
 const AREAS: Area[] = [
-  { to: "/admin/selskaper",    title: "Selskaper",    desc: "Juridiske enheter (AS) i konsernet.",        icon: Building2, active: true },
   { to: "/admin/brukere",      title: "Brukere",      desc: "Ansatte og deres stillinger.",                icon: Users, active: true },
   { to: "/admin/tilganger",    title: "Tilganger",    desc: "Stilling × app tilgangsmatrise.",             icon: KeyRound, active: true },
   { to: "/admin/outlets",      title: "Butikker",     desc: "Butikker, bakerier og produksjonssteder.",    icon: Store, active: true },
@@ -34,7 +33,7 @@ export default function AdminIndex() {
       <AppHeaderBanner
         icon={ShieldCheck}
         title="NBOS Admin"
-        subtitle="Konfigurer selskaper, brukere, tilganger og system."
+        subtitle="Konfigurer brukere, tilganger og system."
       />
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {AREAS.map((a) => {

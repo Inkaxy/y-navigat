@@ -22,6 +22,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useCompany } from "@/hooks/useCompany";
 import { toast } from "sonner";
 import { useState } from "react";
 import { useIsPlatformOwner } from "@/hooks/useIsPlatformOwner";
@@ -170,7 +171,6 @@ export default function BrukerDetalj() {
             <TableHeader>
               <TableRow>
                 <TableHead>Stilling</TableHead>
-                <TableHead>Selskap</TableHead>
                 <TableHead>Fra</TableHead>
                 <TableHead>Til</TableHead>
                 <TableHead>Aktiv</TableHead>
@@ -178,13 +178,12 @@ export default function BrukerDetalj() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {positions.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">Ingen stillinger</TableCell></TableRow>}
+              {positions.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">Ingen stillinger</TableCell></TableRow>}
               {positions.map((p: any) => {
                 const active = p.valid_from <= today && (!p.valid_to || p.valid_to > today);
                 return (
                   <TableRow key={p.id}>
                     <TableCell>{p.position?.display_name} {p.is_primary && <Badge variant="outline">Primær</Badge>}</TableCell>
-                    <TableCell>{p.legal_entity?.short_code}</TableCell>
                     <TableCell>{p.valid_from}</TableCell>
                     <TableCell>{p.valid_to ?? "—"}</TableCell>
                     <TableCell><Badge variant={active ? "default" : "secondary"}>{active ? "Aktiv" : "Avsluttet"}</Badge></TableCell>
@@ -220,7 +219,7 @@ function AddPositionDialog({ userId, assignedBy }: { userId: string; assignedBy:
   const today = osloTodayISO();
   const [open, setOpen] = useState(false);
   const [positionId, setPositionId] = useState<string>("");
-  const [legalEntityId, setLegalEntityId] = useState<string>("");
+  const { data: company } = useCompany();
   const [validFrom, setValidFrom] = useState<string>(today);
   const [validTo, setValidTo] = useState<string>("");
   const [isPrimary, setIsPrimary] = useState(false);
@@ -237,29 +236,19 @@ function AddPositionDialog({ userId, assignedBy }: { userId: string; assignedBy:
     },
   });
 
-  const { data: entities = [] } = useQuery({
-    queryKey: ["legal-entities-list"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("legal_entities")
-        .select("id, short_code, legal_name")
-        .order("short_code");
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
 
   const reset = () => {
-    setPositionId(""); setLegalEntityId(""); setValidFrom(today); setValidTo(""); setIsPrimary(false);
+    setPositionId(""); setValidFrom(today); setValidTo(""); setIsPrimary(false);
   };
 
   const create = useMutation({
     mutationFn: async () => {
-      if (!positionId || !legalEntityId) throw new Error("Velg stilling og selskap");
+      if (!positionId) throw new Error("Velg stilling");
+      if (!company) throw new Error("Fant ikke firmaet");
       const { error } = await supabase.from("user_positions").insert({
         user_id: userId,
         position_id: positionId,
-        legal_entity_id: legalEntityId,
+        legal_entity_id: company.id,
         valid_from: validFrom,
         valid_to: validTo || null,
         is_primary: isPrimary,
@@ -295,17 +284,6 @@ function AddPositionDialog({ userId, assignedBy }: { userId: string; assignedBy:
               <SelectContent>
                 {positions.map((p: any) => (
                   <SelectItem key={p.id} value={p.id}>{p.display_name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label>Selskap</Label>
-            <Select value={legalEntityId} onValueChange={setLegalEntityId}>
-              <SelectTrigger><SelectValue placeholder="Velg selskap" /></SelectTrigger>
-              <SelectContent>
-                {entities.map((e: any) => (
-                  <SelectItem key={e.id} value={e.id}>{e.short_code} – {e.legal_name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>

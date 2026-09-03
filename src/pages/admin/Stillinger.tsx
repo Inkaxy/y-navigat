@@ -124,7 +124,7 @@ export default function Stillinger() {
       <AppHeaderBanner
         icon={Briefcase}
         title="Stillinger"
-        subtitle="Stillingsmaler — globale på tvers av selskap."
+        subtitle="Stillingsmaler for bakeriet."
         actions={
           <Button size="sm" onClick={() => setEditing({ ...empty })}>
             <Plus className="h-4 w-4" /> Ny stilling

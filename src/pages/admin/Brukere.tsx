@@ -11,9 +11,6 @@ import { Badge } from "@/components/ui/badge";
 import {
   Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
 } from "@/components/ui/table";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
 import { useQueryClient } from "@tanstack/react-query";
 import { useIsPlatformOwner } from "@/hooks/useIsPlatformOwner";
 import { InviteUserDialog } from "./components/InviteUserDialog";
@@ -33,7 +30,6 @@ type Row = {
 
 export default function Brukere() {
   const [search, setSearch] = useState("");
-  const [companyId, setCompanyId] = useState<string>("all");
   const [inviteOpen, setInviteOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [resendingId, setResendingId] = useState<string | null>(null);
@@ -67,17 +63,6 @@ export default function Brukere() {
     }
   };
 
-  const { data: companies = [] } = useQuery({
-    queryKey: ["admin-le-options"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("legal_entities")
-        .select("id, short_code, legal_name")
-        .order("short_code");
-      if (error) throw error;
-      return data;
-    },
-  });
 
   const { data = [], isLoading } = useQuery({
     queryKey: ["admin-users"],
@@ -112,11 +97,10 @@ export default function Brukere() {
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
     return data.filter((r) => {
-      if (companyId !== "all" && !r.legal_entity_ids.includes(companyId)) return false;
       if (!q) return true;
       return r.display_name.toLowerCase().includes(q) || r.email.toLowerCase().includes(q);
     });
-  }, [data, search, companyId]);
+  }, [data, search]);
 
   return (
     <AdminLayout title="Brukere">
@@ -140,15 +124,6 @@ export default function Brukere() {
 
       <div className="flex flex-wrap items-center gap-2">
         <Input placeholder="Søk navn eller e-post…" value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-sm" />
-        <Select value={companyId} onValueChange={setCompanyId}>
-          <SelectTrigger className="w-[220px]"><SelectValue placeholder="Alle selskap" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Alle selskap</SelectItem>
-            {companies.map((c: any) => (
-              <SelectItem key={c.id} value={c.id}>{c.short_code} — {c.legal_name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
       </div>
 
       <div className="rounded-md border border-line bg-surface-canvas">
