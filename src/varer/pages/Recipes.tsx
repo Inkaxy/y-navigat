@@ -9,8 +9,17 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Search, Loader2, ChefHat, Plus, Link2, Copy, MoreHorizontal, Wheat, ArrowUp, ArrowDown, ChevronsUpDown } from "lucide-react";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Search, Loader2, ChefHat, Plus, Link2, Copy, MoreHorizontal, Wheat, ArrowUp, ArrowDown, ChevronsUpDown, Trash2 } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Label } from "@/components/ui/label";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { copyRecipe } from "@/varer/lib/copyRecipe";
 
 import {
@@ -67,6 +76,27 @@ export default function Recipes() {
     setSort((s) => (s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" }));
   const [creating, setCreating] = useState(false);
   const [copyingId, setCopyingId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<{ id: string; name: string } | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState("");
+  const [deleteBusy, setDeleteBusy] = useState(false);
+
+  /** Slett oppskrift etter at brukeren har skrevet «slett». */
+  async function handleDelete() {
+    if (!deleting || deleteConfirm.trim().toLowerCase() !== "slett") return;
+    setDeleteBusy(true);
+    try {
+      const { error } = await supabase.from("recipes").delete().eq("id", deleting.id);
+      if (error) throw error;
+      qc.invalidateQueries({ queryKey: ["recipes-list"] });
+      toast.success("Oppskriften er slettet");
+      setDeleting(null);
+      setDeleteConfirm("");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Kunne ikke slette oppskriften");
+    } finally {
+      setDeleteBusy(false);
+    }
+  }
 
   /** Kopier oppskrift fra radmenyen og åpne kopien i navneredigering. */
   async function handleCopy(id: string) {
@@ -344,6 +374,17 @@ export default function Recipes() {
                               )}
                               Lag kopi
                             </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              className="text-destructive focus:text-destructive"
+                              onSelect={() => {
+                                setDeleteConfirm("");
+                                setDeleting({ id: r.id, name: r.name?.trim() || "Uten navn" });
+                              }}
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Slett
+                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       )}
@@ -356,6 +397,55 @@ export default function Recipes() {
           )}
         </Card>
       </div>
+
+      <AlertDialog
+        open={!!deleting}
+        onOpenChange={(o) => {
+          if (!o && !deleteBusy) {
+            setDeleting(null);
+            setDeleteConfirm("");
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Slett «{deleting?.name}»?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Oppskriften og linjene slettes permanent. Dette kan ikke angres. Skriv «slett» for å bekrefte.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="delete-confirm">Bekreftelse</Label>
+            <Input
+              id="delete-confirm"
+              value={deleteConfirm}
+              onChange={(e) => setDeleteConfirm(e.target.value)}
+              placeholder="slett"
+              autoComplete="off"
+            />
+          </div>
+          <AlertDialogFooter>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setDeleting(null);
+                setDeleteConfirm("");
+              }}
+              disabled={deleteBusy}
+            >
+              Avbryt
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => void handleDelete()}
+              disabled={deleteBusy || deleteConfirm.trim().toLowerCase() !== "slett"}
+            >
+              {deleteBusy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Slett
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
