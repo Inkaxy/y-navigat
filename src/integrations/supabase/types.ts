@@ -14,6 +14,135 @@ export type Database = {
   }
   public: {
     Tables: {
+      _backup_legal_entities_20260903: {
+        Row: {
+          backed_up_at: string | null
+          bank_account: string | null
+          bank_name: string | null
+          breadscale_default_enabled: boolean | null
+          contact_email: string | null
+          contact_person: string | null
+          contact_phone: string | null
+          created_at: string | null
+          display_name: string | null
+          founded_year: number | null
+          gln: string | null
+          gs1_prefix: string | null
+          iban: string | null
+          id: string | null
+          invoice_address_line1: string | null
+          invoice_address_line2: string | null
+          invoice_city: string | null
+          invoice_country: string | null
+          invoice_postal_code: string | null
+          legal_name: string | null
+          logo_url: string | null
+          mva_registered: boolean | null
+          ng_supplier_name: string | null
+          notes: string | null
+          org_number: string | null
+          settings: Json | null
+          short_code: string | null
+          signature_color: string | null
+          status: string | null
+          support_email: string | null
+          support_phone: string | null
+          swift: string | null
+          updated_at: string | null
+          vat_number: string | null
+        }
+        Insert: {
+          backed_up_at?: string | null
+          bank_account?: string | null
+          bank_name?: string | null
+          breadscale_default_enabled?: boolean | null
+          contact_email?: string | null
+          contact_person?: string | null
+          contact_phone?: string | null
+          created_at?: string | null
+          display_name?: string | null
+          founded_year?: number | null
+          gln?: string | null
+          gs1_prefix?: string | null
+          iban?: string | null
+          id?: string | null
+          invoice_address_line1?: string | null
+          invoice_address_line2?: string | null
+          invoice_city?: string | null
+          invoice_country?: string | null
+          invoice_postal_code?: string | null
+          legal_name?: string | null
+          logo_url?: string | null
+          mva_registered?: boolean | null
+          ng_supplier_name?: string | null
+          notes?: string | null
+          org_number?: string | null
+          settings?: Json | null
+          short_code?: string | null
+          signature_color?: string | null
+          status?: string | null
+          support_email?: string | null
+          support_phone?: string | null
+          swift?: string | null
+          updated_at?: string | null
+          vat_number?: string | null
+        }
+        Update: {
+          backed_up_at?: string | null
+          bank_account?: string | null
+          bank_name?: string | null
+          breadscale_default_enabled?: boolean | null
+          contact_email?: string | null
+          contact_person?: string | null
+          contact_phone?: string | null
+          created_at?: string | null
+          display_name?: string | null
+          founded_year?: number | null
+          gln?: string | null
+          gs1_prefix?: string | null
+          iban?: string | null
+          id?: string | null
+          invoice_address_line1?: string | null
+          invoice_address_line2?: string | null
+          invoice_city?: string | null
+          invoice_country?: string | null
+          invoice_postal_code?: string | null
+          legal_name?: string | null
+          logo_url?: string | null
+          mva_registered?: boolean | null
+          ng_supplier_name?: string | null
+          notes?: string | null
+          org_number?: string | null
+          settings?: Json | null
+          short_code?: string | null
+          signature_color?: string | null
+          status?: string | null
+          support_email?: string | null
+          support_phone?: string | null
+          swift?: string | null
+          updated_at?: string | null
+          vat_number?: string | null
+        }
+        Relationships: []
+      }
+      _backup_legal_entity_rows_20260903: {
+        Row: {
+          backed_up_at: string | null
+          row: Json | null
+          tb: string | null
+        }
+        Insert: {
+          backed_up_at?: string | null
+          row?: Json | null
+          tb?: string | null
+        }
+        Update: {
+          backed_up_at?: string | null
+          row?: Json | null
+          tb?: string | null
+        }
+        Relationships: []
+      }
       _pos_smoke_results: {
         Row: {
           msg: string | null
