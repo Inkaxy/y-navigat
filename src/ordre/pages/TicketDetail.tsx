@@ -306,6 +306,7 @@ export default function TicketDetail() {
   const { user } = useAuth();
   const { data: access } = useUserAccess(user);
   const canWrite = access?.hasOrdreWrite ?? false;
+  const isMobile = useIsMobile();
 
   const { data: ticketData, isLoading } = useTicket(id);
   const ticket = ticketData?.ticket ?? null;
@@ -752,6 +753,14 @@ export default function TicketDetail() {
     },
     ask: { label: "Spør internt / @tagg", cls: "bg-amber-500/20 text-amber-900 dark:text-amber-100" },
   };
+
+  const actionBar = (
+    <TicketActionBar
+      ticket={ticket}
+      canWrite={canWrite}
+      linkedOrderNumber={linked?.order?.order_number ?? null}
+    />
+  );
 
   return (
     <div className="mx-auto max-w-[1400px] px-4 py-6 md:px-6">
