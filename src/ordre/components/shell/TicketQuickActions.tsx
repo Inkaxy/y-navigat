@@ -245,7 +245,7 @@ function LinkOrderDialog({
   open, onOpenChange, onPick,
 }: {
   open: boolean; onOpenChange: (v: boolean) => void;
-  onPick: (orderId: string) => void;
+  onPick: (orderId: string, orderNumber: string | null) => void;
 }) {
   const [search, setSearch] = useState("");
   const { data: orders = [], isLoading } = useRecentOrdersLite(search);
