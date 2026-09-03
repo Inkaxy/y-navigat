@@ -2022,7 +2022,7 @@ function MatrixGrid({
         <thead className="sticky top-0 z-20 bg-card">
           <tr>
             <th
-              className="sticky left-0 z-30 w-[320px] min-w-[320px] border-b border-r border-border bg-card px-3 py-2 text-left"
+              className="sticky left-0 z-30 w-[190px] min-w-[190px] sm:w-[240px] sm:min-w-[240px] xl:w-[320px] xl:min-w-[320px] border-b border-r border-border bg-card px-3 py-2 text-left"
               rowSpan={2}
             >
               Produkt
@@ -2151,7 +2151,7 @@ function MatrixGrid({
                 <th
                   scope="row"
                   className={cn(
-                    "sticky left-0 z-10 w-[320px] min-w-[320px] border-b border-r border-border px-3 py-1.5 text-left font-normal",
+                    "sticky left-0 z-10 w-[190px] min-w-[190px] sm:w-[240px] sm:min-w-[240px] xl:w-[320px] xl:min-w-[320px] border-b border-r border-border px-3 py-1.5 text-left font-normal",
                     isAdded ? "bg-accent/30" : "bg-card",
                   )}
                 >
@@ -2326,7 +2326,7 @@ function MatrixGrid({
           <tr className="bg-muted/40">
             <th
               scope="row"
-              className="sticky left-0 z-10 w-[320px] min-w-[320px] border-b border-r border-border bg-muted/40 px-3 py-1.5 text-left text-xs font-medium text-muted-foreground"
+              className="sticky left-0 z-10 w-[190px] min-w-[190px] sm:w-[240px] sm:min-w-[240px] xl:w-[320px] xl:min-w-[320px] border-b border-r border-border bg-muted/40 px-3 py-1.5 text-left text-xs font-medium text-muted-foreground"
             >
               Dagsum (antall)
             </th>
@@ -2349,7 +2349,7 @@ function MatrixGrid({
           <tr className="bg-muted">
             <th
               scope="row"
-              className="sticky left-0 z-10 w-[320px] min-w-[320px] border-b border-r border-border bg-muted px-3 py-2 text-left font-bold"
+              className="sticky left-0 z-10 w-[190px] min-w-[190px] sm:w-[240px] sm:min-w-[240px] xl:w-[320px] xl:min-w-[320px] border-b border-r border-border bg-muted px-3 py-2 text-left font-bold"
             >
               Sum kr
             </th>
