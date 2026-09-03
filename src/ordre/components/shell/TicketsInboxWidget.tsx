@@ -39,13 +39,18 @@ const PRIO_LABEL: Record<TicketPriority, string> = {
 
 const VISIBLE_LIMIT = 8;
 
-export function TicketsInbox() {
+/**
+ * Innboks-widget for ordrekontorets arbeidsbord.
+ *
+ * Dette er et sammendrag av `/ordre/ticket` — ikke hele innboksen. Widgeten
+ * viser åpne e-poster med hurtighandlinger; full liste ligger på egen side.
+ */
+export function TicketsInboxWidget() {
   const [tab, setTab] = useState<Tab>("open");
   const [search, setSearch] = useState("");
   const [priorities, setPriorities] = useState<TicketPriority[]>([]);
   const [showAll, setShowAll] = useState(false);
   const { data: counts } = useTicketCounts();
-  const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
   const update = useUpdateTicket();
