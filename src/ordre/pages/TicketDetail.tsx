@@ -1072,7 +1072,7 @@ export default function TicketDetail() {
                 </div>
               </div>
             ) : (
-              <div className="space-y-1">
+              <div className="space-y-2">
                 <div className="inline-flex items-center rounded border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">
                   Ikke i kunderegisteret
                 </div>
@@ -1080,8 +1080,17 @@ export default function TicketDetail() {
                   {ticket.sender_name ?? ticket.sender_email}
                 </div>
                 <div className="text-xs text-muted-foreground">{ticket.sender_email}</div>
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <Button size="sm" variant="outline" onClick={() => setCreateCustomerOpen(true)}>
+                    <UserPlus className="mr-1.5 h-3.5 w-3.5" /> Opprett kunde
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setLinkCustomerOpen(true)}>
+                    <Link2 className="mr-1.5 h-3.5 w-3.5" /> Koble til eksisterende
+                  </Button>
+                </div>
               </div>
             )}
+
           </SideCard>
 
           <SideCard
