@@ -9,9 +9,18 @@ import { SubAppNav } from "./SubAppNav";
 import { BugReportButton } from "./BugReportButton";
 import { MobileBottomNav } from "@/ordre/components/shell/MobileBottomNav";
 
+/**
+ * Ruter som skal bruke hele skjermbredden (full-bleed) fordi innholdet er en
+ * bred matrise/tabell der hver ekstra piksel er nyttig kolonneplass.
+ */
+const FULL_BLEED_PREFIXES = ["/ordre/leveringskalender"];
+
 export function AppShell({ children }: { children: ReactNode }) {
   const { pathname } = useLocation();
   const isOrdre = pathname === "/ordre" || pathname.startsWith("/ordre/");
+  const isFullBleed = FULL_BLEED_PREFIXES.some(
+    (p) => pathname === p || pathname.startsWith(`${p}/`),
+  );
   const appCode = resolveAppCodeFromPath(pathname);
 
   return (
