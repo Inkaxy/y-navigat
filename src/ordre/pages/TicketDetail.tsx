@@ -68,6 +68,7 @@ import TimelineEvent, {
   type TimelineEventRow,
 } from "@/ordre/components/tickets/TimelineEvent";
 import TicketActionBar from "@/ordre/components/tickets/TicketActionBar";
+import { useIsMobile } from "@/hooks/use-mobile";
 import OrderLinkCard from "@/ordre/components/tickets/OrderLinkCard";
 import EmailBody, { sanitizeEmailHtml, extractCidRefs } from "@/ordre/components/tickets/EmailBody";
 import ChangeIntentCard from "@/ordre/components/tickets/ChangeIntentCard";
@@ -823,26 +824,17 @@ export default function TicketDetail() {
             </div>
           </div>
 
-          {/* Handlingsrad — kollapser til knapp på mobil */}
-          <details className="w-full md:hidden">
-            <summary className="cursor-pointer rounded-md border bg-background px-3 py-2 text-sm font-medium">
-              Handlinger
-            </summary>
-            <div className="mt-2">
-              <TicketActionBar
-                ticket={ticket}
-                canWrite={canWrite}
-                linkedOrderNumber={linked?.order?.order_number ?? null}
-              />
-            </div>
-          </details>
-          <div className="hidden md:block">
-            <TicketActionBar
-              ticket={ticket}
-              canWrite={canWrite}
-              linkedOrderNumber={linked?.order?.order_number ?? null}
-            />
-          </div>
+          {/* Handlingsrad — kollapser til knapp på mobil. Kun ÉN instans rendres. */}
+          {isMobile ? (
+            <details className="w-full">
+              <summary className="cursor-pointer rounded-md border bg-background px-3 py-2 text-sm font-medium">
+                Handlinger
+              </summary>
+              <div className="mt-2">{actionBar}</div>
+            </details>
+          ) : (
+            <div>{actionBar}</div>
+          )}
         </div>
         {!canWrite && (
           <p className="mt-2 text-xs text-muted-foreground">
