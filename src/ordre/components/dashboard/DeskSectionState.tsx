@@ -39,7 +39,7 @@ export function DeskSectionState({
   children,
 }: DeskSectionStateProps) {
   if (isError) {
-    const { errorId } = logAppError(error, { scope });
+    const errorId = logAppError(error, { scope });
     return (
       <div
         role="alert"
