@@ -161,7 +161,6 @@ const OrdreCakeImagesDashboard = lazy(() => import("@/ordre/pages/CakeImagesDash
 const OrdreCakeImagesList = lazy(() => import("@/ordre/pages/CakeImagesList"));
 const OrdreCakeImageEditor = lazy(() => import("@/ordre/pages/CakeImageEditor"));
 const OrdreCakeImagesPrint = lazy(() => import("@/ordre/pages/CakeImagesPrint"));
-const OrdrePlaceholder = lazy(() => import("@/ordre/pages/Placeholder"));
 const OrdreInnstillinger = lazy(() => import("@/ordre/pages/Innstillinger"));
 const M365Callback = lazy(() => import("@/ordre/pages/M365Callback"));
 const OrdreTicketsList = lazy(() => import("@/ordre/pages/TicketsInbox"));
