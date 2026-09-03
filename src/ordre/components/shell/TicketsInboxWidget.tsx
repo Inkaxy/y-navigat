@@ -299,8 +299,7 @@ export function TicketsInboxWidget() {
                         {t.related_order_id && (
                           <Link
                             to={`/ordre/ordrer/${t.related_order_id}`}
-                            onClick={(e) => e.stopPropagation()}
-                            className="text-[10px] font-semibold text-primary hover:underline"
+                            className="pointer-events-auto relative z-10 text-[10px] font-semibold text-primary hover:underline"
                           >
                             · Ordre #{orderNumbers?.[t.related_order_id] ?? "…"}
                           </Link>
