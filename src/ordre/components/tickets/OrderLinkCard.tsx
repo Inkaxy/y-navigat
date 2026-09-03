@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import { getStatusMeta } from "@/ordre/lib/orderStatus";
 import { StatusPill } from "@/ordre/components/ui/status-pill";
 import { formatNOK, formatDateLong } from "@/ordre/lib/format";
-import { logTicketEvent } from "@/ordre/lib/ticketEvents";
+import { linkTicketToOrder, unlinkTicketFromOrder } from "@/ordre/hooks/useTicketOrderLink";
 import LinkOrderSearch from "@/ordre/components/tickets/LinkOrderSearch";
 import CreateOrderFromTicketButton from "@/ordre/components/tickets/CreateOrderFromTicketButton";
 import EditLinkedOrderButton from "@/ordre/components/tickets/EditLinkedOrderButton";
