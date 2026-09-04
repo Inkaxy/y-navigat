@@ -15,6 +15,12 @@ import CreateOrderFromTicketButton from "@/ordre/components/tickets/CreateOrderF
 import EditLinkedOrderButton from "@/ordre/components/tickets/EditLinkedOrderButton";
 import type { Ticket, TicketAttachment } from "@/ordre/hooks/useTickets";
 import type { AiSuggestion } from "@/ordre/lib/aiSuggestion";
+import {
+  CONFIDENCE_LABEL,
+  CONFIDENCE_SHORT,
+  CONFIDENCE_TOKEN,
+  confidenceLevel,
+} from "@/ordre/lib/aiConfidence";
 
 export interface LinkedOrderData {
   order: {
