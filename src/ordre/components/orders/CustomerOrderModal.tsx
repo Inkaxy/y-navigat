@@ -875,7 +875,14 @@ export function CustomerOrderModal({
           else onOpenChange(true);
         }}
       >
-        <DialogContent className="max-w-4xl max-h-[92vh] overflow-y-auto max-sm:!left-0 max-sm:!top-0 max-sm:!h-[100dvh] max-sm:!max-h-[100dvh] max-sm:!w-screen max-sm:!max-w-none max-sm:!translate-x-0 max-sm:!translate-y-0 max-sm:!rounded-none max-sm:!border-0 max-sm:p-4">
+        <DialogContent
+          overlayClassName={sidePanel ? "bg-foreground/20" : undefined}
+          className={
+            sidePanel
+              ? "left-auto right-0 top-0 h-[100dvh] max-h-[100dvh] w-full max-w-[min(46rem,60vw)] translate-x-0 translate-y-0 overflow-y-auto rounded-none border-l data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right max-sm:!max-w-none max-sm:p-4"
+              : "max-w-4xl max-h-[92vh] overflow-y-auto max-sm:!left-0 max-sm:!top-0 max-sm:!h-[100dvh] max-sm:!max-h-[100dvh] max-sm:!w-screen max-sm:!max-w-none max-sm:!translate-x-0 max-sm:!translate-y-0 max-sm:!rounded-none max-sm:!border-0 max-sm:p-4"
+          }
+        >
           <DialogHeader>
             <DialogTitle>
               {isEdit ? `Rediger kundeordre ${existing?.order_number ?? ""}` : "Ny kundeordre"}
