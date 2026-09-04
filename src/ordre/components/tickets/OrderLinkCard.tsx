@@ -111,9 +111,11 @@ export default function OrderLinkCard({
   };
 
 
-  const candidates = (ai?.candidate_orders ?? []).filter(
-    (c) => c.order_id && c.order_id !== ticket.related_order_id,
-  );
+  const candidates = [...(ai?.candidate_orders ?? [])]
+    .filter((c) => c.order_id && c.order_id !== ticket.related_order_id)
+    .sort((a, b) => (b.match_confidence ?? 0) - (a.match_confidence ?? 0));
+  const best = candidates[0] ?? null;
+  const otherCandidates = candidates.slice(1);
 
   return (
     <div className="rounded-[10px] border border-border bg-card p-4 shadow-xs">
