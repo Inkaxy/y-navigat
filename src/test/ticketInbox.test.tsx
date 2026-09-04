@@ -94,7 +94,7 @@ describe("neste handling i listen", () => {
   };
 
   it("ber om at saken tas når ingen eier den", () => {
-    expect(nextActionLabel(row)).toBe("Ta saken");
+    expect(nextActionLabel(row)).toBe("Trenger ansvarlig");
   });
 
   it("viser venting når kunden er neste", () => {
