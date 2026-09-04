@@ -229,29 +229,85 @@ export default function OrderLinkCard({
         </div>
       ) : (
         <div className="space-y-3">
-          <p className="text-xs text-muted-foreground">
-            Ingen ordre er koblet til denne henvendelsen ennå.
-          </p>
-          {canWrite && <LinkOrderSearch ticketId={ticket.id} onLinked={invalidate} />}
-
-          {candidates.length > 0 && (
-            <div className="space-y-1.5">
-              <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                AI-forslag
+          {/* Beslutningsflyt: er dette en eksisterende ordre, en annen ordre, eller en ny? */}
+          {best ? (
+            <div className="space-y-2 rounded-[10px] border border-primary/30 bg-primary/5 p-2.5">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-caption font-semibold uppercase tracking-wide text-primary">
+                  Foreslått ordre
+                </span>
+                <StatusPill
+                  label={CONFIDENCE_LABEL[confidenceLevel(best.match_confidence)]}
+                  tokenVar={CONFIDENCE_TOKEN[confidenceLevel(best.match_confidence)]}
+                  size="sm"
+                />
               </div>
-              {candidates.slice(0, 5).map((c) => (
+              <div className="text-sm font-semibold text-foreground">
+                #{best.order_number ?? best.order_id.slice(0, 8)}
+                {best.snapshot?.customer_name ? ` · ${best.snapshot.customer_name}` : ""}
+              </div>
+              {best.snapshot?.delivery_date && (
+                <div className="text-caption text-muted-foreground">
+                  Levering {formatDateLong(best.snapshot.delivery_date)}
+                </div>
+              )}
+              {best.why_match && (
+                <p className="text-caption text-muted-foreground">
+                  <span className="font-semibold text-foreground">Belegg:</span> {best.why_match}
+                </p>
+              )}
+              <div className="flex flex-wrap gap-2 pt-0.5">
+                <Button
+                  size="sm"
+                  disabled={!canWrite}
+                  onClick={() => void linkCandidate(best.order_id, best.order_number)}
+                >
+                  Dette er riktig
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setSwitching((v) => !v)}
+                  disabled={!canWrite}
+                >
+                  Finn en annen ordre
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <p className="text-caption text-muted-foreground">
+              Ingen ordre er koblet til denne henvendelsen ennå.
+            </p>
+          )}
+
+          {(switching || !best) && canWrite && (
+            <LinkOrderSearch ticketId={ticket.id} onLinked={invalidate} />
+          )}
+
+          {otherCandidates.length > 0 && (
+            <div className="space-y-1.5">
+              <div className="text-caption font-semibold uppercase tracking-wide text-muted-foreground">
+                Andre mulige ordrer
+              </div>
+              {otherCandidates.slice(0, 4).map((c) => (
                 <button
                   key={c.order_id}
                   type="button"
                   disabled={!canWrite}
                   onClick={() => void linkCandidate(c.order_id, c.order_number)}
                   className={cn(
-                    "w-full rounded-md border bg-background px-2 py-1.5 text-left text-xs transition-colors hover:bg-muted disabled:opacity-60",
+                    "w-full rounded-[8px] border border-border bg-background px-2 py-1.5 text-left text-caption transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60",
                   )}
                 >
-                  <div className="font-medium text-foreground">
+                  <div className="flex items-center gap-1.5 font-medium text-foreground">
                     #{c.order_number ?? c.order_id.slice(0, 8)}
                     {c.snapshot?.customer_name ? ` · ${c.snapshot.customer_name}` : ""}
+                    <StatusPill
+                      label={CONFIDENCE_SHORT[confidenceLevel(c.match_confidence)]}
+                      tokenVar={CONFIDENCE_TOKEN[confidenceLevel(c.match_confidence)]}
+                      size="sm"
+                      hideDot
+                    />
                   </div>
                   <div className="text-muted-foreground">{c.why_match}</div>
                 </button>
@@ -260,12 +316,13 @@ export default function OrderLinkCard({
           )}
 
           {canWrite && (
-            <div className="border-t pt-2">
+            <div className="border-t border-border pt-2">
               <CreateOrderFromTicketButton
                 ticket={ticket}
                 ai={ai}
                 attachments={attachments}
                 onCreated={invalidate}
+                label="Dette er en ny ordre"
               />
             </div>
           )}
