@@ -78,3 +78,45 @@ Kø, filtre, søk og sortering flyttes til Supabase (paginert + `count`) med deb
 4. Split-view / peek-panel.
 5. Kø-forenkling og ordre-beslutningsflyt.
 6. Serverside-liste og virtualisering.
+
+---
+
+# Del 2: Designregler — hva en ny Ticket/Innboks må følge for å føles som NBHub
+
+Grunnlag: `src/index.css`, `tailwind.config.ts`, `PageHeader`, `AppShell`/`AppTabs`, `OrderDeskHeader`, `OrderDeskKpi`, `WorkQueueCard`, `DeskSectionState`, `StatusPill`, `OrdersList` (tabellmønsteret), `CustomerOrders`, `QueryState`.
+
+## 12 regler
+
+1. **Sidehode = `PageHeader`, ikke egenbygd.** Dagens innboks har et hjemmelaget hode med emoji i en cream-boks. Resten av NBHub bruker `PageHeader` med bronze-eyebrow, Fraunces-display-tittel, valgfri brødsmulesti, `actions`-slot og monogram-watermark. Ticket skal ha eyebrow «Ordre», tittel «Innboks», og handlinger til høyre.
+2. **Kortflater er `bg-card` + `border-border` + `rounded-lg`.** Direkte `bg-[hsl(var(--brand-cream))]` (brukt på KPI-kort, køpanel, listerader, sidefelt-kort og composeren i dag) er feil: `--brand-cream` er en shell-farge og følger ikke mørk modus riktig. `--card` peker allerede på `--surface-raised`, som er den korrekte «etikett-papir»-flaten.
+3. **Aldri hardkodede farger.** `text-white` i køtellerbadgen, `bg-red-100 text-red-700` på PDF-ikonet, `bg-amber-500 text-amber-950` på notat-knappen, og `emerald/amber/red`-skalaene i konfidens-chippen skal erstattes av `--state-*`/`--alert-*`-tokens, `destructive`, `warning`, `success` og shadcn-varianter.
+4. **Status vises med `StatusPill`, ikke ad-hoc spans.** `StatusPill` er stempel-looken i hele Ordre (`tokenVar` + ring + prikk + 10px uppercase med 0.14em spor). Ticket-status, intensjon og ventetilstander bør få egne tokens i samme familie som `--status-*`/`--lifecycle-*` og rendres gjennom samme komponent.
+5. **Typografiskalaen er `text-caption` / `text-body` / `text-title` + `font-display` på overskrifter.** Ticket-sidene bruker i dag rå `text-[10px]`, `text-[11px]`, `text-xs`, `text-3xl` om hverandre. Tallverdier og datoer skal ha `tabular-nums` som i `OrdersList`.
+6. **Lucide-ikoner, aldri emoji.** 🛒 ✏️ 🚫 ⚠️ ❓ ✉️ 💸 🆕 🙋 i køene og hodet finnes ikke andre steder i NBHub. Bruk `ShoppingCart`, `Pencil`, `Ban`, `AlertTriangle`, `HelpCircle`, `Mail`, `Banknote` i 3.5–4 px-klassen (`h-4 w-4`), plassert i en 8×8 tonet ikonflate slik `OrderDeskKpi` gjør.
+7. **KPI-rader gjenbruker `OrderDeskKpi` / `OrderDeskSplitKpi`.** Dashbordets KPI er klikkbare, har ikon, `sub`-tekst, `loading`-skjelett og `failed`-strek. Innboksens egne `KpiCard` duplikerer dette dårligere (ikke klikkbar, ingen ikon, ingen skjelett) og bør fjernes til fordel for de eksisterende.
+8. **Lister følger Ordre-mønsteret: tabell med sticky `bg-card`-header, `h-9`-rader, `text-caption`-celler og `divide-y`** — slik `OrdersList` og `WorkQueueCard.DeskRowList` gjør. Kort-i-liste med `space-y-2` (dagens tickets) gir lavere tetthet enn resten av modulen og passer dårlig for 60+ rader.
+9. **Alle tilstander gjennom `QueryState` / `QueryErrorState` / `DeskSectionState`** med `scope`-streng, norsk `emptyTitle`, `skeletonRows` og `onRetry`. Detaljsidens full-side spinner og de stille sidefelt-kortene bryter dette.
+10. **Fokus og interaksjon:** `focus-visible:ring-2 focus-visible:ring-ring` (ikke hardkodet bronze), hover `hover:bg-muted/60`, `hover:border-primary/40` på klikkbare kort, radius `rounded-lg` (10px) — nøyaktig som `OrderDeskKpi` og `DeskRowList`.
+11. **Aksentfargen er `--primary` (app-farge fra `AppColorProvider`), ikke `--brand-bronze` direkte.** Bronze hører til eyebrow, watermark og selection. Aktive køer/tabs skal bruke `bg-primary/10` + `text-primary` slik `AppTabs` gjør, ellers vil Ticket se ut som en annen app enn resten av Ordre.
+12. **Layout: `container mx-auto px-page py-6` og `space-y-6`,** ikke `max-w-[1400px] px-4 md:px-6` som ticket-sidene bruker i dag — da havner innboksen i annen bredde og annen rytme enn dashbordet den lenkes fra. Mobil skal følge `touch-target` (44 px) og `pb-mobile-nav`.
+
+## Konkret gjenbrukskart
+
+| Behov | Bruk denne | I stedet for |
+| --- | --- | --- |
+| Sidehode | `PageHeader` (eyebrow/title/subtitle/actions/crumbs) | egenbygd cream-hode med emoji |
+| Statuslinje «sist oppdatert» | `OrderDeskHeader`-mønsteret | ingenting |
+| KPI-felt | `OrderDeskKpi`, `OrderDeskSplitKpi` | lokal `KpiCard` |
+| Kø-/arbeidslister | `WorkQueueCard` + `DeskRowList`, eller shadcn `Table` som i `OrdersList` | `<ul className="space-y-2">` med cream-kort |
+| Status/intensjon/prioritet | `StatusPill` + nye `--ticket-*`-tokens ved siden av `--status-*` | inline `border-…/40 bg-…/10 text-…` |
+| Laster/feil/tom | `QueryState`, `QueryErrorState`, `DeskSectionState` | `Loader2`-spinner, stille kort |
+| Kortflate | `Card`/`CardHeader`/`CardContent` eller `bg-card border-border rounded-lg` | `bg-[hsl(var(--brand-cream))]` |
+| Knapper | shadcn `Button` med `default`/`outline`/`ghost`/`destructive`/`brand` | `bg-amber-500 text-amber-950` |
+| Filtre/segmenter | `AppTabs`-stilen og `OrdersList`-filterlinjen (`h-8`, `text-caption`, popover-multivalg) | egne bronze-rammede pill-knapper |
+| Søk | samme `Input`+`Search`-mønster som `OrdersList`, med debounce | udebounced lokalt søk |
+| Dialoger/popovers | shadcn `Dialog`/`Popover`/`Command` (som `LinkCustomerDialog` allerede gjør) | egenbygd lightbox uten fokusfelle |
+| Tall/beløp/dato | `formatNOK`, `formatDateLong` fra `@/ordre/lib/format`, `tabular-nums` | ad-hoc `toLocaleString` |
+
+## Tokens som mangler og bør legges til (ikke gjort nå)
+`--ticket-new`, `--ticket-in-progress`, `--ticket-awaiting-customer`, `--ticket-awaiting-internal`, `--ticket-resolved`, `--ticket-spam` samt `--ai-confidence-high/med/low` — slik at Ticket kan bruke `StatusPill` og ett felles konfidens-språk uten inline-farger.
+
