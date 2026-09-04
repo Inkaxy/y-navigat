@@ -125,6 +125,11 @@ type Props = {
   sourceTicketNumber?: string | null;
   /** Emne fra ticket-e-posten — brukes som fallback-tittel på kakebilder. */
   sourceTicketSubject?: string | null;
+  /**
+   * «side-panel» legger skjemaet i høyre halvdel uten mørkt bakteppe, slik at
+   * originalmeldingen i ticketen fortsatt er synlig mens ordren fylles ut.
+   */
+  presentation?: "modal" | "side-panel";
 };
 
 type LineDraft = {
