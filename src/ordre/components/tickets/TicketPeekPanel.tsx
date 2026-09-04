@@ -186,7 +186,9 @@ const TicketPeekPanel = forwardRef<
               <LinkCustomerDialog
                 open={linkCustomer}
                 onOpenChange={setLinkCustomer}
-                ticket={ticket}
+                senderEmail={ticket.sender_email}
+                senderName={ticket.sender_name}
+                onLinked={() => setLinkCustomer(false)}
               />
             )}
           </div>
