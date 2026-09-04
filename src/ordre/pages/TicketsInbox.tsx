@@ -10,7 +10,7 @@ import { fetchAllRows } from "@/lib/supabasePaging";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 import { QueryErrorState, QueryState } from "@/components/common/QueryState";
-import PageHeader from "@/ordre/components/shell/PageHeader";
+import { PageHeader } from "@/ordre/components/shell/PageHeader";
 import { normalizeAiSuggestion, REQUEST_TYPE_LABEL, type RequestType } from "@/ordre/lib/aiSuggestion";
 import { TEAMS, TEAM_LABEL, type TicketTeam } from "@/ordre/lib/teams";
 import { useSlaSettings } from "@/ordre/hooks/useSlaSettings";
