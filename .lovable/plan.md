@@ -1,135 +1,80 @@
-# Ordre-modulen: analyse og ombyggingsplan
+# UX-audit: Ticket / Innboks i Ordre-modulen
 
-Basert på lesing av NBOSv2/HEAD (`src/ordre`, `src/App.tsx`, `supabase/functions/*`) og read-only spørringer mot Supabase. Ingen kode eller database er endret.
+Kun analyse — ingen kodeendringer foreslått implementert her.
 
-## A. Bekreftede funn (verifisert) vs. antakelser
+Grunnlag: gjennomgang av faktisk kode i `TicketsInbox.tsx` (801 linjer), `TicketDetail.tsx` (1274 linjer), `TicketActionBar`, `OrderLinkCard`, `LinkOrderSearch`, `CreateOrderFromTicketButton`, `LinkCustomerDialog`, `TicketComposerActions`, `ChangeIntentCard`. Preview-innlogging var ikke tilgjengelig i dette miljøet (prosjektet bruker ekstern Supabase-auth), så vurderingen er gjort på den rendrede strukturen i koden, ikke på levende skjermbilder.
 
-### A1. Omfang (bekreftet)
-- `src/ordre`: 203 filer, 46 141 linjer. 29 ruter under `/ordre` (`src/App.tsx:445-475`).
-- 62 hooks i `src/ordre/hooks`, 29 sider i `src/ordre/pages`.
-- Største filer: `Leveringskalender.tsx` 2429, `DeliveryRuleFormDialog.tsx` 1661, `CustomerOrderModal.tsx` 1645, `NewOrder.tsx` 1421, `CakeImageEditor.tsx` 1287, `TicketDetail.tsx` 1173, `OrdersList.tsx` 1060, `DeliveryNoteDashboard.tsx` 897, `matrix/TourOrderDialog.tsx` 874, `useCustomerOrders.ts` 614.
-- 35 `select('*')` i 20 filer; 27 `.tsx`-komponenter med direkte Supabase-kall; 175 `any`.
-- **0 filer i `src/ordre` håndterer `isError`** mot 53 som bruker `isLoading`. Feiltilstander vises praktisk talt ikke.
+## De 15 viktigste UX-problemene (rangert)
 
-### A2. Ordrekontorets dashbord (bekreftet)
-`src/ordre/pages/Dashboard.tsx` (301 linjer) har bare fire KPI-er, alle ekte data:
-- «Nye e-poster» — `useTicketCounts` (`useTickets.ts:193`, fire separate spørringer + `auth.getUser()`).
-- «Fastordre i dag (ikke kjørt)» — `usePendingRecurringOrderRows`.
-- «Levering i dag/i morgen» — `useDeliveryDayStats` (`useOrders.ts:123`, henter alle ordrerader og aggregerer i klienten).
-- Under: `components/shell/TicketsInbox.tsx`-widget (373 linjer) + fastordre-liste med hardkodet `VISIBLE = 12`.
+1. **Ingen split-view — hver sak koster full sidenavigasjon.** Innboksen er en ren liste; å lese en sak betyr rutebytte til `/ordre/ticket/:id`, og tilbake via «Tilbake til innboksen». Køposisjon, scroll, søk og filtre må gjenoppbygges mentalt hver gang. For et ordrekontor som skal gjennom 30–80 e-poster om morgenen er dette den største enkeltkostnaden.
+2. **Ingen tastaturnavigasjon i arbeidsflyten.** Ingen j/k-navigasjon, ingen `e` (løs), `a` (tildel), `r` (svar), ingen Cmd+Enter-send i composeren, ingen «neste sak» etter løsning. Alt krever mus. `Send`-knappen har heller ingen hurtigtast.
+3. **Venstremenyen har 16+ køer uten prioritering.** Køer, intensjonskøer, «Mine», arkivstatuser og team-køer ligger visuelt likestilt i én smal kolonne. En saksbehandler trenger reelt 3–4 innganger (Mine, Uten ansvarlig, Over frist, Alle åpne); resten er filtre, ikke køer.
+4. **Ingen bulk-handlinger og ingen avkryssing.** Tildeling, statusendring, søppelmerking og team-flytting må gjøres én og én, og kun inne på detaljsiden. Rutinemessig opprydding (spam, kvitteringer, autosvar) blir uforholdsmessig dyrt.
+5. **Handlinger mangler helt i listen.** Hver rad er kun en lenke; det finnes ingen hover-handlinger («Ta selv», «Løs», «Søppel», «Utsett»). Selv en triviell sak krever minimum 3 klikk + 2 sidelastinger.
+6. **AI-tillit kommuniseres inkonsekvent.** Konfidens vises som prosentchip i listen (grønn/gul/rød terskel), men i sidefeltet er samme tall alltid grønn ramme uansett verdi. Intensjonsbadgen vises like «hardt» ved 45 % som ved 95 %, uten at det står hva analysen faktisk bygger på. Det gir enten overtillit eller vilkårlig mistillit.
+7. **AI-utkast erstatter innholdet i skrivefeltet uten forvarsel eller angremulighet.** `onAiDraft` setter `setText(...)` direkte over et eventuelt påbegynt svar. Ingen diff, ingen «behold mitt utkast», ingen angre.
+8. **Kundeidentifisering er skjult nederst i høyre kolonne.** «Ikke i kunderegisteret» — den viktigste risikoopplysningen på siden — ligger under ordrekortet, i liten tekst. Toppen viser bare rå avsenderadresse. Ved ukjent avsender bør identiteten være det første, ikke det tredje.
+9. **To parallelle veier til ordre skaper forvirring.** «Koble til ordre» (søk), «AI-forslag», «Opprett kundeordre fra e-posten» og «Bytt ordre» ligger i samme kort med lik visuell vekt, uten et tydelig «gjelder dette en eksisterende ordre eller en ny?»-veivalg. `related_order_id` og `ticket_order_links` gir dessuten et «Primær»-begrep som aldri forklares i UI-et.
+10. **Ordreopprettelse fra ticket taper kontekst.** Flyten er popover → kundesøk → stor `CustomerOrderModal` som dekker e-posten. Saksbehandleren kan ikke lese kundens ønske mens hun fyller ut ordren, og må huske dato, klokkeslett og kaketekst.
+11. **Statusmodellen er overbelastet.** Status (5 verdier), prioritet, `awaiting_internal`, `awaiting_external`, «venter på kunde» (utledet), SLA-nedtelling og «(standardfrist)» kan vises som opptil 7 badges samtidig i topplinjen. Det er ingen visuell rangering mellom «hva er sant» og «hva må jeg gjøre».
+12. **Tidslinjen blander samtale og revisjonslogg.** Alle `ticket_events` er flettet kronologisk inn i tråden bak én av/på-bryter. På en sak med mange statusendringer drukner den faktiske e-postutvekslingen. Systemhendelser hører hjemme som kollapset gruppering eller egen fane, ikke som likestilte innslag.
+13. **Detaljsiden har praktisk talt ingen feilhåndtering.** Kun `isLoading || !ticket` → spinner. En feilet `useTicket` gir evig «Laster henvendelse …». Sidefeltets spørringer (kunde, ordre, hendelser, vedlegg) har verken feil- eller tomtilstand — de forsvinner bare stille. Dette bryter med `QueryState`-mønsteret som innboksen faktisk bruker.
+14. **Handlingsraden er en vegg av selects.** Fire nedtrekk (status, prioritet, ansvarlig, team) + «Ta selv» + primærknapp + «Flere handlinger» ligger i toppen med samme vekt. Videresending og eierskapsoverføring er samtidig gjemt bak et popover — de brukes oftere enn team-nedtrekket de konkurrerer med.
+15. **Innboksens skala og ytelse er ikke løst i UI-et.** Alle åpne saker hentes komplett og filtreres/sorteres i klienten; arkivet kuttes ved 200 rader uten at brukeren får vite det, og søket treffer kun nedlastede rader. Søket er dessuten ikke debounced og har ingen indikasjon på at det bare dekker gjeldende kø. På sikt gir dette både treg liste og «saken finnes ikke»-opplevelser.
 
-Data som allerede finnes, men **ikke** er på dashbordet:
-| Arbeidsliste | Kilde som allerede finnes |
-| --- | --- |
-| Til godkjenning / avvik | `orders.status='awaiting_confirmation'`, `orders.rule_flags`, `approval_reason`; `useAcceptanceQueueCount`, `useOrdersLifecycle` |
-| Frister som nærmer seg | RPC `check_order_deadline_violations`, `evaluate_delivery_rules`, `usePreviewDeliveryRules` |
-| Pakkseddel-status/avvik | RPC `get_delivery_day_status` via `useDeliveryDayStatus.ts` (returnerer allerede `hovedkjoring`, `tilleggskjoringer`, `pauser`, og tellere for fastordre, daterte, retur, pakksedler, venter_godkjenning, **uten_tur**) — hooken finnes, men brukes ikke på dashbordet |
-| Nettbutikkordre som venter | `website_orders` (11 rader), `website_order_rejects`, `WebsiteOrders.tsx` |
-| Retur/tilbakebetaling | `refunds` (1 rad), `useRefunds`, `useReturnDeliveryNotes` |
-| Nylige endringer | `order_status_history`, `audit_log`, `ticket_events` |
-| Manglende tur/pris/kundeinfo | `orders.delivery_tour_id is null`, `order_lines.unit_price`, `pickup_locations` |
+### Mindre funn (verdt å ta i samme runde)
+- Ikoner er emoji (🛒 ✏️ 🚫 ⚠️ ❓ ✉️ 💸) i et ellers Lucide-basert designsystem — bryter NBHub-stilen og skalerer dårlig i mørk modus.
+- Køene bruker `bg-[hsl(var(--brand-bronze))] text-white` med hardkodet `text-white` i tellerbadge, mot prosjektets token-regel.
+- Lightbox mangler Escape-lukking, fokusfelle og `role="dialog"`.
+- `AttachmentThumb` henter signert URL per vedlegg uten feil-visning; feiler den, vises en tom ramme.
+- Tallet på tellerbadgen for «Uten ordre-kobling» ekskluderer `question`, men etiketten sier ikke det.
+- Ulest markeres kun med oransje venstrekant på cream-bakgrunn — svak kontrast og ingen fet skrift.
 
-**Mangler:** ingen samlet «arbeidsbord»-RPC, ingen «mine oppgaver», ingen kobling mellom ticket-kø og ordrekø, ingen aggregering på server (dashbordet henter rader og teller i browseren).
+## Forslag til målarkitektur
 
-### A3. Tickets / e-post / M365 / AI (bekreftet)
-Datagrunnlag (faktiske radtall): `tickets` 73, `ticket_inbound_messages` **1**, `ticket_replies` 10, `ticket_events` 27, `ticket_attachments` 2, `email_outbox` 10, `microsoft_oauth_tokens` 2. Status: 72 av 73 tickets er `resolved`; kun 11 har `ai_status='success'`.
+### 1. Trepanels arbeidsflate (erstatter liste → side-navigasjon)
+```text
+┌────────────┬──────────────────────────┬───────────────┐
+│ Køer       │ Saksliste (virtuell)     │ Sak (peek)    │
+│ Mine 12    │ [ ] Kiwi Teie   over frist│ Tråd          │
+│ Uten ansv. │ [ ] Rema 1000   2t igjen  │ Composer      │
+│ Over frist │ ...                       │ Kontekst      │
+│ Alle åpne  │                           │               │
+│ ─ filtre ─ │                           │               │
+└────────────┴──────────────────────────┴───────────────┘
+```
+- Venstre reduseres til 4 faste køer + «Filtre»-panel (intensjon, team, prioritet, arkiv) som chips over listen.
+- Midten får avkryssing, hover-handlinger og virtualisert liste; `?queue=` beholdes, `?ticket=` legges til så peek er delbar.
+- Høyre er samme komponent som dagens detaljside — full side (`/ordre/ticket/:id`) beholdes for dyplenking og mobil.
 
-Flyten som finnes:
-- `microsoft-graph-webhook` (355 l): validation-handshake, `clientState`-sjekk, idempotens på `microsoft_message_id` mot både `tickets` og `ticket_inbound_messages`, tråding via `conversation_id`, fallback via `[T-xxxxxxxx]` i emnet + RPC `find_ticket_by_short_id`, `awaiting_external`-håndtering, `ticket_events`-logging, vedleggsopplasting.
-- OAuth: `microsoft-oauth-init/callback/disconnect`, `microsoft-token-refresh`, abonnement: `microsoft-graph-subscription-create/renew/delete`.
-- Utsending: `microsoft-graph-send`, `microsoft-graph-reply`, `microsoft-graph-reply-ticket`, `process-email-outbox`, `send-order-confirmation`.
-- AI: `analyze-email-with-ai` (581 l), `generate-ticket-reply` (398 l), `apply-ticket-change` (365 l), `check-ai-secrets`; UI `AiForslag.tsx`, `ChangeIntentCard.tsx`.
-- `tickets.related_order_id` finnes, med RPC `sync_ticket_order_link` og tabell `ticket_order_links` (mange-til-mange) — **to parallelle koblingsmodeller**.
+### 2. Sakens indre struktur: én kolonne samtale, én kolonne beslutning
+- Toppen: kundeidentitet først (navn + kundenr. eller tydelig «Ukjent avsender» med to knapper), deretter emne, deretter maks tre statusbadges (status, ventetilstand, frist).
+- Beslutningskolonnen får fast rekkefølge: **Ordre → AI → Kunde-historikk → Detaljer**, der AI-kortet alltid oppgir grunnlag og usikkerhet.
+- Systemhendelser flyttes ut av tråden til et kollapset «Historikk»-panel med antall.
 
-Konkrete feil/risikoer, alle bekreftet i kode:
-1. **Postboks-inkonsistens `/me` vs `/users/{mailbox}`**: `microsoft-graph-webhook:104` og `:286` og `ticket-refetch-attachments:79` og `microsoft-graph-reply-ticket:81` bruker `/me/...`, mens `microsoft-graph-send:132`, `microsoft-graph-reply:115`, `send-order-confirmation:91` og `_shared/graph-mail.ts:51` bruker `/users/{mailbox}/...`. Med to rader i `microsoft_oauth_tokens` og delt postboks `ordre@notterobakeri.no` vil `/me` treffe kontoen som eier tokenet, ikke nødvendigvis den delte postkassen. Dette er den mest sannsynlige årsaken til at `ticket_inbound_messages` bare har 1 rad.
-2. **Token-valg**: `microsoft-graph-send:98-103` tar «nyeste rad» i `microsoft_oauth_tokens` uten å filtrere på postboks. Med to rader er hvilken konto som sender ikke-deterministisk.
-3. **Idempotens uten unik nøkkel**: webhooken sjekker eksistens og setter inn i to steg (les-så-skriv). Ved parallelle notifikasjoner for samme melding kan duplikater oppstå. Bør sikres med unik indeks + `on conflict`.
-4. **Tråd-identitet**: kun `conversation_id` + emne-tag. `In-Reply-To`/`References`/`microsoft_internet_message_id` lagres, men brukes ikke til matching. Reply-all og videresending utenfra gir nye conversation-id-er.
-5. **Sanitization**: `body_html` lagres rått og rendres i tråden. Må verifiseres at all rendering går gjennom sanitizer; quoted text trimmes ikke, så tråder blir uleselige.
-6. **Status/SLA/ansvar**: `tickets.status` er fritekst `text`, ikke enum. `assigned_team` er enum `ticket_team`, `assigned_to` uuid, `followers` array — men det finnes ingen `sla_due_at`/`first_response_at`-kolonne; SLA beregnes i klienten (`lib/sla.ts`, `useSlaSettings`).
-7. **Ingen låsing/concurrency**: `useUpdateTicket` skriver hele felt uten `updated_at`-sjekk; to saksbehandlere overskriver hverandre. `useTicketPresence` finnes, men er bare visning.
-8. `useTickets` bruker `select('*')` med `limit(500)` og filtrerer klientsidig på tilordning — henter `body_html` for 500 tickets til listevisningen.
+### 3. Én ordre-beslutning, ikke fire knapper
+Ordre-kortet stiller ett spørsmål når ingen ordre er koblet: *Gjelder dette en eksisterende ordre?*
+- Ja → AI-kandidater øverst (med begrunnelse og konfidens), deretter søk.
+- Nei → «Opprett ordre fra e-posten», som åpner en **sidepanel-ordre** (ikke fullskjerm-modal) slik at e-posten forblir synlig, med AI-forhåndsutfylte felt merket per felt.
 
-**«AI foreslår, menneske godkjenner» — det som mangler:** ingen felles forslagstabell med livssyklus (foreslått → godkjent/avvist → anvendt), ingen sporing av hvem som godkjente, ingen diff-visning som er lik på tvers av ordreutkast/svarutkast, ingen re-kjøring/versjonering av forslag. `ai_suggestion` er en løs jsonb uten skjema, og `apply-ticket-change` er eneste anvend-vei.
+### 4. AI som forslag, aldri som fakta
+- Ett felles konfidens-språk: Høy / Middels / Lav med samme farge overalt, prosent kun som tooltip.
+- Under lav konfidens vises intensjon som «AI foreslår: Endring (lav sikkerhet)» med «Bekreft / Endre».
+- AI-utkast settes inn i et **eget forslagsfelt** over composeren med «Bruk», «Bruk og rediger», «Forkast» — aldri overskrive brukerens tekst.
 
-### A4. Leveringskalender / matrise (bekreftet)
-- `Leveringskalender.tsx` 2429 linjer med all state, tabellrendering, dialoger og PDF-trigger i én fil. Matrisekomponentene er dialoger (`matrix/TourOrderDialog.tsx` 874, `CorrectionsDialog.tsx` 471, `ProductWeekEditor.tsx` 347 …), ikke et gjenbrukbart grid.
-- Layout: `mx-auto w-[95%] max-w-[1800px] px-2` på linje 1105 og 1514 — dobbel container inne i sidens shell, med fast tak på 1800px og 5 % marg som spiser skjermbredde. Første kolonne er låst til `w-[320px] min-w-[320px]` (linje 2025, 2154, 2329, 2352). Sticky topprad `top-0 z-20` (2022) og sticky venstrekolonne `left-0` med tre ulike z-indekser (10/20/30).
-- Ingen virtualisering: alle produktrader × dager rendres. Med full varekatalog blir dette tungt.
-- **Dato/tidssone: tre ulike strategier i samme fil** — `new Date(dato + "T12:00:00")` (linje 244, 1292, 1565, 1892, 2031, 2071, 2154, 2390), `T00:00:00` (2071) og `Date.UTC(...)` (1913, 1916). `src/lib/osloDate.ts` finnes, men brukes bare delvis.
-- Lagring går via `save_matrix_changes` (`useMatrix.ts:124`) som sender kun endrede celler — bra — men det finnes ingen optimistisk lås: `get_customer_matrix_data` leses med `staleTime: 15_000` og skrivinger sjekker ikke om raden er endret av andre.
+### 5. Tastatur- og hastighetslag
+`j/k` navigasjon, `Enter` åpne, `e` løs + hopp til neste, `a` tildel meg, `r` svar, `n` notat, `l` koble ordre, `Cmd/Ctrl+Enter` send, `?` hurtigtast-oversikt. Bulk: `x` velg, deretter samme handlinger på utvalget.
 
-### A5. Kundeordre (bekreftet)
-- `CustomerOrders.tsx` (118 l) er kun kundevelger + `CustomerOrdersTab`. Ingen oversikt over kommende/tidligere ordre før kunde er valgt, ingen kalender/tidslinje, ingen hurtighandlinger.
-- `CustomerOrdersTab.tsx` 273 l, `CustomerOrderModal.tsx` 1645 l (skjema, kakebilder, vedlegg, AI-forslag i én komponent).
-- `useCustomerOrders.ts` 614 l gjør fler-stegs skriving i klienten: `next_order_number` → insert `orders` → insert `order_lines` → ved feil **manuell rollback via `delete`** (linje 341) og `orders.update(prevOrder)` (linje 522). Dette er ikke transaksjonelt; en avbrutt fane kan etterlate halve ordre.
-- `(supabase as any).rpc("replace_child_rows", …)` (linje 511) — utypet RPC-kall.
+### 6. Tilstands-disiplin
+Alle spørringer i detaljvisningen gjennom `QueryState`/`QueryErrorState` med avgrenset feilflate per kort (samme mønster som innboksens refusjons-KPI), tomtekster på norsk, skjelett i stedet for full-side spinner, og eksplisitt «Viser 200 nyeste — søk for eldre» der arkivet er kuttet.
 
-### A6. Antakelser (ikke verifisert)
-- At `/me` er hovedårsaken til lav inbound-volum er en sterk, men ikke bevist hypotese; må bekreftes mot Graph-logg og edge-function-logg.
-- RLS-status per ticket-tabell er ikke gjennomgått policy for policy i denne runden.
-- Lint/typecheck ble ikke kjørt i denne meldingen (kun statiske søk), for å unngå tilstandsendringer.
+### 7. Serverside-liste
+Kø, filtre, søk og sortering flyttes til Supabase (paginert + `count`) med debounced søk, slik at innboksen skalerer og søket dekker hele arkivet, ikke bare det som er lastet ned.
 
-## B. Rangert feil-/mangelliste
-
-### P0 — blokkerer daglig drift eller gir datafeil
-1. Graph-postboks `/me` vs `/users/{mailbox}` og ikke-deterministisk tokenvalg → e-post kan hentes/sendes fra feil konto.
-2. Ingen unik indeks som håndhever idempotens på `microsoft_message_id` → duplikate tickets/meldinger ved samtidige webhooks.
-3. Ikke-transaksjonell ordreoppretting/-oppdatering i `useCustomerOrders.ts` med manuell rollback.
-4. Ingen feiltilstander i UI (0 `isError`) → stille feil ser ut som «tomt».
-5. Ingen samtidighetskontroll på ticket-status og matrise-celler → overskriving mellom saksbehandlere.
-
-### P1 — reduserer effektivitet betydelig
-6. Dashbordet er ikke et arbeidsbord: fire KPI-er, klientaggregering, ingen køer for godkjenning/frister/nettbutikk/retur/uten tur — selv om `get_delivery_day_status` allerede gir tallene.
-7. Tråd-identitet kun via `conversation_id` + emnetag; quoted text og reply-all ikke håndtert.
-8. Ingen strukturert AI-forslagslivssyklus (godkjent av / avvist / anvendt).
-9. `Leveringskalender.tsx` 2429 linjer, dobbel container, fast 1800px, ingen virtualisering, tre dato-strategier.
-10. `select('*')` på `tickets` med `limit(500)` inkl. `body_html` i listevisning.
-11. To parallelle ordre↔ticket-koblingsmodeller (`related_order_id` og `ticket_order_links`).
-
-### P2 — teknisk gjeld
-12. 14 filer over 600 linjer; `CustomerOrderModal.tsx` og `DeliveryRuleFormDialog.tsx` bør splittes.
-13. 175 `any`, verst i pakkseddel-hooks; utypede RPC-kall.
-14. 27 komponenter med direkte Supabase-kall utenfor hooks.
-15. Navnekollisjon `pages/TicketsInbox.tsx` vs `components/shell/TicketsInbox.tsx`.
-16. Død rute `/ordre/avvik` (Placeholder) og foreldreløs `src/ordre/pages/Pakkesystem.tsx` (ruten redirigerer til produksjon).
-17. A11y: sticky tabell uten `scope`/`aria-sort` gjennomgått, fokusfeller i store dialoger.
-
-## C. Implementeringsplan i tre leveranser
-
-**Leveranse 1 — Arbeidsbord + feiltilstander (ingen DB-endringer).**
-Nytt operativt dashbord bygget på eksisterende hooks/RPC-er (`get_delivery_day_status`, `useOrdersLifecycle`, `useAcceptanceQueueCount`, `website_orders`, `useRefunds`, `order_status_history`). Felles `QueryState`-komponent for laster/feil/tomt som tas i bruk på ordre-, ticket- og kalendersidene. Rydding: fjern død `/ordre/avvik`-rute, omdøp widget til `TicketsInboxWidget`, stram `useTickets` til eksplisitt kolonneliste uten `body_html`. Drift påvirkes ikke — eksisterende sider består.
-
-**Leveranse 2 — E-post- og ticket-hardening.**
-Standardiser alle Graph-kall til `/users/{mailbox}`, velg token deterministisk per postboks, legg unik indeks + `on conflict` for idempotens, utvid trådmatching med `internet_message_id`/`In-Reply-To`, sanitize og kollaps quoted text i tråden, innfør optimistisk lås på ticket-oppdatering. Samle AI-forslag i én livssyklus med godkjenn/avvis/anvend og sporing av bruker.
-
-**Leveranse 3 — Kalender og kundeordre.**
-Del `Leveringskalender.tsx` i grid-, toolbar- og dialoglag, fjern dobbel container og 1800px-taket, én dato-hjelper (`osloDate`), virtualiser rader. Bygg ny kundeordre-arbeidsflate: kundesøk med nylige kunder, kommende/tidligere ordre, ukes-tidslinje, kopier forrige ordre, hurtigoppretting, avviks- og ticketkoblinger. Flytt ordreskriving til én transaksjonell RPC.
-
-## D. Filer i leveranse 1
-
-Nye:
-- `src/ordre/hooks/useOrderDeskBoard.ts` — samler eksisterende hooks til ett arbeidsbord-datasett.
-- `src/ordre/components/dashboard/WorkQueueCard.tsx` — generisk kø-kort (tittel, antall, tone, lenke, topp-5 rader).
-- `src/ordre/components/dashboard/KpiTile.tsx` — uttrekk av dagens `KpiCard` for gjenbruk.
-- `src/components/common/QueryState.tsx` — felles laster/feil/tomt-tilstand.
-
-Endres:
-- `src/ordre/pages/Dashboard.tsx` — bygges om til arbeidsbord med køer: til godkjenning, frister som nærmer seg, uten tur/hentested, nettbutikk venter, fastordre ikke kjørt, pakkseddelstatus, retur/tilbakebetaling, nye tickets, nylige endringer.
-- `src/ordre/hooks/useTickets.ts` — eksplisitte kolonner i `useTickets`, `useTicketCounts` slås sammen til færre spørringer.
-- `src/ordre/hooks/useOrders.ts` — `useDeliveryDayStats` teller med `head/count` i stedet for å hente alle rader.
-- `src/ordre/pages/OrdersList.tsx`, `TicketsInbox.tsx`, `Leveringskalender.tsx` — ta i bruk `QueryState`.
-- `src/App.tsx` — fjern `/ordre/avvik`-placeholder-ruten.
-- Omdøping: `src/ordre/components/shell/TicketsInbox.tsx` → `TicketsInboxWidget.tsx`.
-
-## E. Databaseendringer (først i leveranse 2, bakoverkompatibelt)
-
-Ingen nye tabeller foreslås; eksisterende modell utvides.
-1. `create unique index concurrently` på `tickets(microsoft_message_id)` og `ticket_inbound_messages(microsoft_message_id)` — krever dedupe-sjekk først (dagens volum: 73 / 1 rader, lav risiko).
-2. `alter table tickets add column if not exists sla_due_at timestamptz, first_response_at timestamptz` — nullable, backfill valgfritt; klientberegning består til feltene er fylt.
-3. `alter table ticket_inbound_messages add column if not exists in_reply_to text, references_header text` — nullable, kun brukt av ny trådmatching.
-4. Konsolidering av ordre↔ticket: behold `related_order_id` som «primær ordre», la `ticket_order_links` være kanonisk for flere koblinger; `sync_ticket_order_link` utvides slik at begge holdes i synk. Ingen kolonne slettes.
-5. Én transaksjonell RPC for ordreoppretting/-oppdatering (leveranse 3), `security definer` med `search_path=public`, som erstatter klient-rollbacken.
-
-RLS-krav for alt av det ovennevnte: nye kolonner arver eksisterende policyer; nye/endrede funksjoner må være `security definer` med eksplisitt entitetssjekk (`current_user_entity_ids()`), og `GRANT EXECUTE` gis kun til `authenticated`. Ingen `anon`-tilgang til ticket- eller ordredata.
+## Foreslått rekkefølge om dette skal bygges
+1. Tastatur + hover-handlinger + bulk i eksisterende liste (høy effekt, lav risiko).
+2. Feil-/tom-tilstander i detaljvisningen.
+3. AI-tillit og AI-utkast som ikke overskriver.
+4. Split-view / peek-panel.
+5. Kø-forenkling og ordre-beslutningsflyt.
+6. Serverside-liste og virtualisering.
