@@ -154,6 +154,9 @@ export default function LinkOrderSearch({ ticketId, onLinked }: Props) {
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Søk på ordrenummer eller kunde…"
+          aria-label="Søk etter ordre å koble til"
+          /* Tastatursnarveien «l» fokuserer dette feltet. */
+          data-order-link-search
           className="h-9 pl-8 text-sm"
         />
       </div>
