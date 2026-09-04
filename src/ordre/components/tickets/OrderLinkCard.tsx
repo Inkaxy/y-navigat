@@ -245,8 +245,8 @@ export default function OrderLinkCard({
                   Foreslått ordre
                 </span>
                 <StatusPill
-                  label={CONFIDENCE_LABEL[confidenceLevel(best.match_confidence)]}
-                  tokenVar={CONFIDENCE_TOKEN[confidenceLevel(best.match_confidence)]}
+                  label={CONFIDENCE_LABEL[(confidenceLevel(best.match_confidence) ?? "low")]}
+                  tokenVar={CONFIDENCE_TOKEN[(confidenceLevel(best.match_confidence) ?? "low")]}
                   size="sm"
                 />
               </div>
@@ -311,8 +311,8 @@ export default function OrderLinkCard({
                     #{c.order_number ?? c.order_id.slice(0, 8)}
                     {c.snapshot?.customer_name ? ` · ${c.snapshot.customer_name}` : ""}
                     <StatusPill
-                      label={CONFIDENCE_SHORT[confidenceLevel(c.match_confidence)]}
-                      tokenVar={CONFIDENCE_TOKEN[confidenceLevel(c.match_confidence)]}
+                      label={CONFIDENCE_SHORT[(confidenceLevel(c.match_confidence) ?? "low")]}
+                      tokenVar={CONFIDENCE_TOKEN[(confidenceLevel(c.match_confidence) ?? "low")]}
                       size="sm"
                       hideDot
                     />
