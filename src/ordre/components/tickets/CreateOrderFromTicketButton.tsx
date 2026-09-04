@@ -223,6 +223,7 @@ export default function CreateOrderFromTicketButton({
 
       {modalOpen && chosen && (
         <CustomerOrderModal
+          presentation="side-panel"
           open={modalOpen}
           onOpenChange={(v) => {
             setModalOpen(v);
