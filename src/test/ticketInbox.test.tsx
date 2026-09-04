@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 import { describe, expect, it, vi } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import {
@@ -109,7 +110,7 @@ describe("AI-forslag", () => {
       request_type: "change",
       order_fields: { delivery_date: "2026-05-01" },
       field_confidence: { delivery_date: 0.92 },
-      evidence: { delivery_date: "flyttes til 1. mai" },
+      reasoning_per_field: { delivery_date: "flyttes til 1. mai" },
     } as never);
     const dato = suggestions.find((s) => s.field === "delivery_date");
     expect(dato?.level).toBe("high");
