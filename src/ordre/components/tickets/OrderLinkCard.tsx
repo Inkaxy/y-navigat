@@ -116,7 +116,7 @@ export default function OrderLinkCard({
   );
 
   return (
-    <div className="rounded-lg border bg-[hsl(var(--brand-cream))] p-4 shadow-sm">
+    <div className="rounded-[10px] border border-border bg-card p-4 shadow-xs">
       <div className="mb-2 flex items-center gap-2">
         <Package className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
         <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
