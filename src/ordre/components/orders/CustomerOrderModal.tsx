@@ -292,7 +292,9 @@ export function CustomerOrderModal({
   sourceTicketId,
   sourceTicketNumber,
   sourceTicketSubject,
+  presentation = "modal",
 }: Props) {
+  const sidePanel = presentation === "side-panel";
   const isEdit = !!orderId;
   const { data: existing, isLoading: loadingExisting } = useCustomerOrderDetail(orderId ?? null);
   const createMut = useCreateCustomerOrder();
