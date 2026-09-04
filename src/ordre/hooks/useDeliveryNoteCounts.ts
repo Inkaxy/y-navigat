@@ -83,7 +83,7 @@ export function useDeliveryNoteCounts(
         isCorrection
           ? Promise.resolve({ count: 0, error: null as null })
           : buildOrdersBase().eq("order_kind", "fixed"),
-        buildOrdersBase().in("order_kind", ["dated", "extra"]).eq("is_return", false),
+        buildOrdersBase().eq("order_kind", "dated").eq("is_return", false),
         buildOrdersBase().eq("order_kind", "extra"),
         buildOrdersBase().eq("order_kind", "return"),
         isCorrection

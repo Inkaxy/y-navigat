@@ -126,7 +126,7 @@ export default function DeliveryNoteDashboard() {
 
   const buttonState = useMemo(() => {
     if (mode === "correction") {
-      const pending = (counts?.datert ?? 0) + (counts?.retur ?? 0);
+      const pending = (counts?.datert ?? 0) + (counts?.ekstra ?? 0) + (counts?.retur ?? 0);
       if (pending === 0) {
         return {
           mode: "all_done" as const,
