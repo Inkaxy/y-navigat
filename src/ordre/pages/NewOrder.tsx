@@ -654,6 +654,21 @@ export default function NewOrder() {
     { subtotal: 0, vat: 0, total: 0, discount: 0 },
   );
 
+  // Hentestedet fra AI-forslaget regnes som kjent bare når det matcher et
+  // registrert hentested.
+  const { data: pickupLocations } = usePickupLocations(NB_LEGAL_ENTITY_ID, { onlyActive: true });
+  const pickupHint = ticketAi?.order_fields?.pickup_location_hint ?? null;
+  const matchedPickupLocationId = useMemo(() => {
+    if (!pickupHint) return null;
+    const needle = pickupHint.trim().toLowerCase();
+    if (!needle) return null;
+    const hit = (pickupLocations ?? []).find((loc) => {
+      const name = loc.display_name.toLowerCase();
+      return name === needle || name.includes(needle) || needle.includes(name);
+    });
+    return hit?.id ?? null;
+  }, [pickupHint, pickupLocations]);
+
   // QA-sjekkliste før ordre lagres
   const qaChecks = useMemo(() => {
     return evaluateOrderDraftChecks({
@@ -661,7 +676,7 @@ export default function NewOrder() {
       delivery_time: deliveryTime || null,
       has_pickup_concept: !!ticketAi?.order_fields?.pickup_location_hint,
       pickup_location_hint: ticketAi?.order_fields?.pickup_location_hint ?? null,
-      pickup_location_known: true,
+      pickup_location_known: !!matchedPickupLocationId,
       lines: lines.map((l) => ({
         product_id: l.product?.id ?? null,
         product_name: l.product?.display_name ?? null,
@@ -671,7 +686,7 @@ export default function NewOrder() {
       ai: ticketAi,
       source_text: ticketBodyText,
     });
-  }, [deliveryDate, deliveryTime, lines, customer?.id, ticketAi, ticketBodyText]);
+  }, [deliveryDate, deliveryTime, lines, customer?.id, ticketAi, ticketBodyText, matchedPickupLocationId]);
   const qaSummary = summarizeQa(qaChecks);
 
   /** Linjer uten reell pris — må bekreftes før ordren opprettes. */
