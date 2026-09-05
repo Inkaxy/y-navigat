@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
-import { Info, Printer, RotateCcw, Download, AlertTriangle } from "lucide-react";
+import { Info, Printer, RotateCcw, Download, AlertTriangle, RefreshCw } from "lucide-react";
+import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import {
   CombinedLabelPdfDocument,
@@ -66,13 +67,15 @@ import {
 } from "@/produksjon/features/etiketter/hooks/useLabelUnits";
 import { useLabelPrintProfiles } from "@/produksjon/features/utskriftsprofiler/hooks/useLabelPrintProfiles";
 import type { LabelProductRow, LabelScreenFilter } from "@/produksjon/features/etiketter/types";
+import { useLabelUnitCakeImages } from "@/produksjon/features/etiketter/hooks/useLabelUnitCakeImages";
+import { osloTodayISO } from "@/lib/osloDate";
 
 const ALL = "all" as const;
 /** Pseudo-verdi for ordre uten tur (henteordre, delivery_tour_id IS NULL). */
 const NO_TOUR = "__no_tour__" as const;
 
 export default function EtiketterPage() {
-  const today = useMemo(() => format(new Date(), "yyyy-MM-dd"), []);
+  const today = useMemo(() => osloTodayISO(), []);
   const [date, setDate] = useState<string>(today);
 
   const { legalEntityId: selectedLegalEntityId } = useSelection();
@@ -119,9 +122,13 @@ export default function EtiketterPage() {
   // og hver gang realtime melder om endringer i grunnlaget.
   const syncNumbers = useSyncLabelNumbers();
   const syncMutate = syncNumbers.mutate;
+  const [lastNumberSyncAt, setLastNumberSyncAt] = useState<Date | null>(null);
   useEffect(() => {
     if (!legalEntityId || !date) return;
-    syncMutate({ legalEntityId, date });
+    syncMutate(
+      { legalEntityId, date },
+      { onSuccess: () => setLastNumberSyncAt(new Date()) },
+    );
   }, [legalEntityId, date, lastUpdateAt, syncMutate]);
 
   const { data: labelUnits } = useLabelUnits(legalEntityId || undefined, date);
@@ -138,6 +145,11 @@ export default function EtiketterPage() {
     () => (labelUnits ?? []).reduce((m, u) => Math.max(m, u.number), 0),
     [labelUnits],
   );
+  const labelUnitIds = useMemo(
+    () => (labelUnits ?? []).map((unit) => unit.id),
+    [labelUnits],
+  );
+  const { data: cakeImagesByUnit } = useLabelUnitCakeImages(labelUnitIds);
 
   const [, forceTick] = useState(0);
   useEffect(() => {
@@ -167,6 +179,14 @@ export default function EtiketterPage() {
   const activeProfilesCount = useMemo(
     () => (profiles ?? []).filter((p) => p.status === "active").length,
     [profiles],
+  );
+  const setupWarnings = useMemo(
+    () =>
+      (filteredRows ?? []).filter(
+        (row) =>
+          row.department_ids.length === 0 || !productProfiles?.[row.product_id],
+      ),
+    [filteredRows, productProfiles],
   );
 
   const { data: printedCount = 0 } = usePrintedLabelCount(filter, productIds);
@@ -421,6 +441,27 @@ export default function EtiketterPage() {
         </div>
         <div className="flex items-center gap-3">
           <RealtimeIndicator status={realtimeStatus} lastUpdateAt={lastUpdateAt} />
+          <Button
+            variant="outline"
+            onClick={() =>
+              syncNumbers.mutate(
+                { legalEntityId, date },
+                {
+                  onSuccess: () => {
+                    setLastNumberSyncAt(new Date());
+                    toast.success("Etikettnumrene er synkronisert");
+                  },
+                  onError: () => toast.error("Kunne ikke synkronisere etikettnumrene"),
+                },
+              )
+            }
+            disabled={!legalEntityId || syncNumbers.isPending}
+            className="gap-2"
+            title={lastNumberSyncAt ? `Sist synkronisert ${format(lastNumberSyncAt, "HH:mm:ss")}` : undefined}
+          >
+            <RefreshCw className={cn("h-4 w-4", syncNumbers.isPending && "animate-spin")} />
+            Synkroniser nummer
+          </Button>
           {bulkDisabledReason ? (
             <Tooltip>
               <TooltipTrigger asChild>
@@ -461,6 +502,24 @@ export default function EtiketterPage() {
           </Button>
         </div>
       </div>
+
+      {setupWarnings.length > 0 && (
+        <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-400">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <div>
+            <p className="font-semibold">
+              {setupWarnings.length} etikettvare mangler produksjonsavdeling eller utskriftsprofil
+            </p>
+            <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
+              {setupWarnings.map((row) => (
+                <Link key={row.product_id} to={`/varer/vareliste/${row.product_id}`} className="underline underline-offset-2">
+                  {row.display_number} — {row.display_name}
+                </Link>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Filtre */}
       <div className="flex flex-wrap items-end gap-4">
@@ -578,6 +637,7 @@ export default function EtiketterPage() {
         productProfiles={productProfiles}
         profiles={profiles}
         unitsByProduct={unitsByProduct}
+        cakeImagesByUnit={cakeImagesByUnit}
         missingFieldsByProduct={missingFieldsByProduct}
         onPrint={(row) => {
           setPrintRow(row);
