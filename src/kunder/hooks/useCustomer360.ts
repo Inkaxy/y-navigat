@@ -139,7 +139,7 @@ export function useCustomer360Logistics(customerId: string | null | undefined) {
     staleTime: 30_000,
     queryFn: async (): Promise<Customer360Logistics> => {
       const today = osloTodayISO();
-      const [pauseRes, notesRes, toursRes] = await Promise.all([
+      const [pauseRes, notesRes] = await Promise.all([
         supabase
           .from("delivery_pauses")
           .select("id, pause_from, pause_to, tour_filter, reason, notes")
@@ -155,18 +155,27 @@ export function useCustomer360Logistics(customerId: string | null | undefined) {
           .eq("customer_id", customerId!)
           .order("delivery_date", { ascending: false })
           .limit(10),
-        supabase
-          .from("delivery_tours")
-          .select("id, display_name")
-          .eq("legal_entity_id", NB_LEGAL_ENTITY_ID),
       ]);
       if (pauseRes.error) throw pauseRes.error;
       if (notesRes.error) throw notesRes.error;
-      if (toursRes.error) throw toursRes.error;
 
-      const tourName = new Map<string, string>(
-        (toursRes.data ?? []).map((t) => [t.id, t.display_name ?? ""]),
+      // Turnavn hentes bare når en pause faktisk er begrenset til turer.
+      const neededTourIds = Array.from(
+        new Set(
+          (pauseRes.data ?? []).flatMap((p) => ((p.tour_filter as string[] | null) ?? [])),
+        ),
       );
+      const tourName = new Map<string, string>();
+      if (neededTourIds.length > 0) {
+        const toursRes = await supabase
+          .from("delivery_tours")
+          .select("id, display_name")
+          .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
+          .in("id", neededTourIds);
+        if (toursRes.error) throw toursRes.error;
+        for (const t of toursRes.data ?? []) tourName.set(t.id, t.display_name ?? "");
+      }
+
 
       const pauses: Customer360Pause[] = (pauseRes.data ?? []).map((p) => ({
         id: p.id,
