@@ -329,6 +329,12 @@ export function CustomerOrderModal({
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const [dirty, setDirty] = useState(false);
+  /**
+   * Skjemaet fylles programmatisk når panelet åpnes. Et urørt skjema skal
+   * ikke gi «ulagrede endringer»-dialog, så første oppsett hoppes over.
+   */
+  const initializedRef = useRef(false);
+  const skipNextDirtyRef = useRef(false);
   const [merknadFor, setMerknadFor] = useState<string | null>(null);
   /** 0-pris må bekreftes aktivt før lagring. */
   const [zeroPriceOpen, setZeroPriceOpen] = useState(false);
@@ -519,6 +525,7 @@ export function CustomerOrderModal({
         });
       }
       if (cancelled || drafts.length === 0) return;
+      skipNextDirtyRef.current = true;
       setLines(drafts);
     })();
     return () => {
@@ -528,7 +535,19 @@ export function CustomerOrderModal({
 
   // Mark dirty on any field change after init
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      initializedRef.current = false;
+      skipNextDirtyRef.current = false;
+      return;
+    }
+    if (!initializedRef.current) {
+      initializedRef.current = true;
+      return;
+    }
+    if (skipNextDirtyRef.current) {
+      skipNextDirtyRef.current = false;
+      return;
+    }
     setDirty(true);
     // intentional shallow listing of dependencies for "dirty" detection
     // eslint-disable-next-line react-hooks/exhaustive-deps
