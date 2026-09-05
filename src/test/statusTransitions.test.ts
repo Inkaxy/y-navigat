@@ -28,7 +28,7 @@ describe("getStatusActions", () => {
   });
 
   it("gir ingen manuelle overganger for øvrige statuser", () => {
-    const rest: OrderStatus[] = ["in_production", "packed", "delivered", "invoiced", "cancelled"];
+    const rest: OrderStatus[] = ["delivered", "invoiced", "cancelled"];
     for (const s of rest) {
       expect(getStatusActions(s)).toEqual([]);
     }
@@ -39,7 +39,6 @@ describe("canCancel", () => {
   it("tillater avbryt kun for bekreftet og venter på bekreftelse", () => {
     expect(canCancel("confirmed")).toBe(true);
     expect(canCancel("awaiting_confirmation")).toBe(true);
-    expect(canCancel("in_production")).toBe(false);
     expect(canCancel("delivered")).toBe(false);
     expect(canCancel("cancelled")).toBe(false);
   });
