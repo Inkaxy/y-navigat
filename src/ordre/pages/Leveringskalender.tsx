@@ -331,11 +331,13 @@ export default function MatrixPage() {
 
   function applyQuickFilter(kind: QuickRange) {
     if (!customerId) return;
-    const r = rangeFor(kind);
-    setQuickFilter(kind);
-    setDateFrom(r.from);
-    setDateTo(r.to);
-    saveStoredRange(customerId, kind);
+    guardAction(() => {
+      const r = rangeFor(kind);
+      setQuickFilter(kind);
+      setDateFrom(r.from);
+      setDateTo(r.to);
+      saveStoredRange(customerId, kind);
+    });
   }
 
   // Drop locally-added products that have arrived in the server response (after save+refresh)
