@@ -14,9 +14,15 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
+import { usePickupLocations } from "@/kunder/hooks/usePickupLocations";
 import { tomorrow, todayISO, formatNOK } from "@/ordre/lib/format";
 import { type CustomerOption } from "@/ordre/hooks/useNBCustomers";
-import { fetchEffectivePrice, type ProductOption } from "@/ordre/hooks/useNBProducts";
+import {
+  fetchEffectivePrice,
+  fetchEffectivePricesBatch,
+  type EffectivePrice,
+  type ProductOption,
+} from "@/ordre/hooks/useNBProducts";
 import { CustomerCombobox } from "@/ordre/components/orders/CustomerCombobox";
 import { CustomerContextPanel } from "@/ordre/components/orders/CustomerContextPanel";
 import {
@@ -66,6 +72,8 @@ type LineDraft = {
   discount_percent: string;
   vat_rate: number;
   notes: string;
+  /** Prismotoren fant ingen reell pris — linjen må bekreftes før lagring. */
+  is_fallback: boolean;
 };
 
 function newLine(): LineDraft {
@@ -80,6 +88,7 @@ function newLine(): LineDraft {
     discount_percent: "0",
     vat_rate: 15,
     notes: "",
+    is_fallback: false,
   };
 }
 
@@ -380,63 +389,53 @@ export default function NewOrder() {
     if (!customer) return;
     const cust = customer;
     const date = deliveryDate;
-    setLines((prev) => prev.map((l) => (l.product ? { ...l, _refetch: Date.now() } as LineDraft : l)));
-    // For hver linje med produkt: hent ny pris, og flett KUN prisfeltene inn
-    // med funksjonell oppdatering (brukerens mengde/rabatt/notat bevares).
+    // For hver linje med produkt: hent nye priser i ÉN batch, og flett KUN
+    // prisfeltene inn (brukerens mengde/rabatt/notat bevares).
     void (async () => {
       const snapshot = linesRef.current;
-      const failed: string[] = [];
-      const results = await Promise.all(
-        snapshot.map(async (l) => {
-          if (!l.product || isManualOverride(l.unit_price_source)) return null;
-          try {
-            const ep = await fetchEffectivePrice({
-              productId: l.product.id,
-              customerId: cust.id,
-              date,
-              caller: "new_order_form",
-            });
-            if (!ep) return null;
-            return {
-              uid: l.uid,
-              productId: l.product.id,
-              unit_price: String(ep.price ?? 0),
-              unit_price_source: ep.source,
-              unit_price_source_id: ep.special_price_id ?? ep.price_list_id ?? null,
-              effective_price: ep.price,
-            };
-          } catch (err) {
-            // Feil skjules ikke: operatøren må vite at prisen ikke ble oppdatert.
-            logAppError(err, { scope: "ordre:ny-ordre:reprising" });
-            failed.push(l.product.display_name);
-            return null;
-          }
-        }),
+      const repriceable = snapshot.filter(
+        (l) => l.product && !isManualOverride(l.unit_price_source),
       );
-      type PriceUpdate = NonNullable<(typeof results)[number]>;
-      const byUid = new Map<string, PriceUpdate>(
-        results.filter((r): r is PriceUpdate => r !== null).map((r) => [r.uid, r]),
+      if (repriceable.length === 0) return;
+      const productIds = Array.from(
+        new Set(repriceable.map((l) => l.product!.id)),
       );
-      if (failed.length > 0) {
+      let prices: Map<string, EffectivePrice>;
+      try {
+        prices = await fetchEffectivePricesBatch({
+          productIds,
+          customerId: cust.id,
+          date,
+          caller: "new_order_form",
+        });
+      } catch (err) {
+        // Feil skjules ikke: operatøren må vite at prisene ikke ble oppdatert.
+        logAppError(err, { scope: "ordre:ny-ordre:reprising" });
+        toast.error("Fant ikke nye priser. Kontroller prisene før du lagrer.");
+        return;
+      }
+      const missing = repriceable
+        .filter((l) => !prices.has(l.product!.id))
+        .map((l) => l.product!.display_name);
+      if (missing.length > 0) {
         toast.error(
-          failed.length === 1
-            ? `Fant ikke ny pris for ${failed[0]}. Kontroller prisen før du lagrer.`
-            : `Fant ikke ny pris for ${failed.length} varer. Kontroller prisene før du lagrer.`,
+          missing.length === 1
+            ? `Fant ikke ny pris for ${missing[0]}. Kontroller prisen før du lagrer.`
+            : `Fant ikke ny pris for ${missing.length} varer. Kontroller prisene før du lagrer.`,
         );
       }
-      if (byUid.size === 0) return;
       setLines((prev) =>
         prev.map((l) => {
-          const upd = byUid.get(l.uid);
-          // Ikke overskriv hvis brukeren har byttet produkt eller låst prisen i mellomtiden
-          if (!upd || !l.product || l.product.id !== upd.productId) return l;
-          if (isManualOverride(l.unit_price_source)) return l;
+          if (!l.product || isManualOverride(l.unit_price_source)) return l;
+          const ep = prices.get(l.product.id);
+          if (!ep) return l;
           return {
             ...l,
-            unit_price: upd.unit_price,
-            unit_price_source: upd.unit_price_source,
-            unit_price_source_id: upd.unit_price_source_id,
-            effective_price: upd.effective_price,
+            unit_price: String(ep.price ?? 0),
+            unit_price_source: ep.source,
+            unit_price_source_id: ep.special_price_id ?? ep.price_list_id ?? null,
+            effective_price: ep.price,
+            is_fallback: ep.is_fallback,
           };
         }),
       );
@@ -488,6 +487,7 @@ export default function NewOrder() {
               unit_price_source: ep?.source ?? null,
               unit_price_source_id: ep?.special_price_id ?? ep?.price_list_id ?? null,
               effective_price: ep?.price ?? null,
+              is_fallback: !ep || ep.is_fallback,
             }
           : l,
       ),
@@ -532,7 +532,7 @@ export default function NewOrder() {
     if (idx === -1) return;
     const next = current[idx + 1];
     if (next) {
-      focusOrderLineField(next.product ? next.uid : next.uid, next.product ? "qty" : "search");
+      focusOrderLineField(next.uid, next.product ? "qty" : "search");
       return;
     }
     const added = newLine();
@@ -588,6 +588,7 @@ export default function NewOrder() {
         discount_percent: String(cl.discount_percent),
         vat_rate: cl.vat_rate,
         notes: cl.notes ?? "",
+        is_fallback: false,
       };
     });
 
@@ -600,31 +601,34 @@ export default function NewOrder() {
     // Re-trekk priser for ny kunde/dato (samme logikk som i useEffect)
     if (customer) {
       void (async () => {
-        const refreshed = await Promise.all(
-          newLines.map(async (l) => {
-            // Forhandlet pris fra forrige ordre skal ikke overskrives.
-            if (!l.product || !shouldRepriceCopiedLine(l)) return l;
-            try {
-              const ep = await fetchEffectivePrice({
-                productId: l.product.id,
-                customerId: customer.id,
-                date: deliveryDate,
-                caller: "new_order_form",
-              });
-              if (!ep) return l;
-              return {
-                ...l,
-                unit_price: String(ep.price ?? 0),
-                unit_price_source: ep.source,
-                unit_price_source_id: ep.special_price_id ?? ep.price_list_id ?? null,
-                effective_price: ep.price,
-              };
-            } catch (err) {
-              logAppError(err, { scope: "ordre:ny-ordre:kopier-priser" });
-              return l;
-            }
-          }),
-        );
+        const repriceable = newLines.filter((l) => l.product && shouldRepriceCopiedLine(l));
+        if (repriceable.length === 0) return;
+        let prices: Map<string, EffectivePrice>;
+        try {
+          prices = await fetchEffectivePricesBatch({
+            productIds: Array.from(new Set(repriceable.map((l) => l.product!.id))),
+            customerId: customer.id,
+            date: deliveryDate,
+            caller: "new_order_form",
+          });
+        } catch (err) {
+          logAppError(err, { scope: "ordre:ny-ordre:kopier-priser" });
+          return;
+        }
+        const refreshed = newLines.map((l) => {
+          // Forhandlet pris fra forrige ordre skal ikke overskrives.
+          if (!l.product || !shouldRepriceCopiedLine(l)) return l;
+          const ep = prices.get(l.product.id);
+          if (!ep) return l;
+          return {
+            ...l,
+            unit_price: String(ep.price ?? 0),
+            unit_price_source: ep.source,
+            unit_price_source_id: ep.special_price_id ?? ep.price_list_id ?? null,
+            effective_price: ep.price,
+            is_fallback: ep.is_fallback,
+          };
+        });
         setLines((prev) => {
           // Bare oppdater de nye linjene
           const newUids = new Set(newLines.map((l) => l.uid));
@@ -651,6 +655,21 @@ export default function NewOrder() {
     { subtotal: 0, vat: 0, total: 0, discount: 0 },
   );
 
+  // Hentestedet fra AI-forslaget regnes som kjent bare når det matcher et
+  // registrert hentested.
+  const { data: pickupLocations } = usePickupLocations(NB_LEGAL_ENTITY_ID, { onlyActive: true });
+  const pickupHint = ticketAi?.order_fields?.pickup_location_hint ?? null;
+  const matchedPickupLocationId = useMemo(() => {
+    if (!pickupHint) return null;
+    const needle = pickupHint.trim().toLowerCase();
+    if (!needle) return null;
+    const hit = (pickupLocations ?? []).find((loc) => {
+      const name = loc.display_name.toLowerCase();
+      return name === needle || name.includes(needle) || needle.includes(name);
+    });
+    return hit?.id ?? null;
+  }, [pickupHint, pickupLocations]);
+
   // QA-sjekkliste før ordre lagres
   const qaChecks = useMemo(() => {
     return evaluateOrderDraftChecks({
@@ -658,7 +677,7 @@ export default function NewOrder() {
       delivery_time: deliveryTime || null,
       has_pickup_concept: !!ticketAi?.order_fields?.pickup_location_hint,
       pickup_location_hint: ticketAi?.order_fields?.pickup_location_hint ?? null,
-      pickup_location_known: true,
+      pickup_location_known: !!matchedPickupLocationId,
       lines: lines.map((l) => ({
         product_id: l.product?.id ?? null,
         product_name: l.product?.display_name ?? null,
@@ -668,14 +687,18 @@ export default function NewOrder() {
       ai: ticketAi,
       source_text: ticketBodyText,
     });
-  }, [deliveryDate, deliveryTime, lines, customer?.id, ticketAi, ticketBodyText]);
+  }, [deliveryDate, deliveryTime, lines, customer?.id, ticketAi, ticketBodyText, matchedPickupLocationId]);
   const qaSummary = summarizeQa(qaChecks);
 
   /** Linjer uten reell pris — må bekreftes før ordren opprettes. */
   const riskyPriceCount = useMemo(
     () =>
       countRiskyPriceLines(
-        lines.map((l) => ({ hasProduct: !!l.product, unit_price: l.unit_price })),
+        lines.map((l) => ({
+          hasProduct: !!l.product,
+          unit_price: l.unit_price,
+          is_fallback: l.is_fallback,
+        })),
       ),
     [lines],
   );

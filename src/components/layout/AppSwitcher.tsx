@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { useLocation, useNavigate, Link } from "react-router-dom";
+import { useLocation, Link } from "react-router-dom";
+import { useGuardedNavigate } from "@/providers/UnsavedGuardProvider";
 import { ChevronDown, Search, LayoutDashboard, X, ExternalLink } from "lucide-react";
 import { getAppIcon } from "@/lib/appIcons";
 import {
@@ -78,7 +79,7 @@ function isNew(app: AccessibleApp): boolean {
 export function AppSwitcher() {
   const { data: apps = [] } = useAccessibleApps();
   const { pathname } = useLocation();
-  const navigate = useNavigate();
+  const navigate = useGuardedNavigate();
 
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");

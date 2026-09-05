@@ -34,9 +34,22 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { fetchEffectivePrice, type ProductOption } from "@/ordre/hooks/useNBProducts";
+import {
+  fetchEffectivePrice,
+  fetchEffectivePricesBatch,
+  type EffectivePrice,
+  type ProductOption,
+} from "@/ordre/hooks/useNBProducts";
+import { logAppError } from "@/lib/errorLog";
 import { ProductSearchInput } from "@/ordre/components/orders/ProductSearchInput";
-import { countRiskyPriceLines, focusOrderLineField } from "@/ordre/lib/orderLines";
+import {
+  countRiskyPriceLines,
+  focusOrderLineField,
+  isManualOverride,
+  MANUAL_PRICE_SOURCE,
+  PRICE_OVERRIDE_NOTE_PREFIX,
+} from "@/ordre/lib/orderLines";
+import { PriceOverrideReasonDialog } from "@/ordre/components/orders/PriceOverrideReasonDialog";
 import { ZeroPriceConfirmDialog } from "@/ordre/components/orders/ZeroPriceConfirmDialog";
 import { useDeliveryTours, tourMatches, trimSec } from "@/ordre/hooks/useDeliveryTours";
 import { CustomerContextPanel } from "@/ordre/components/orders/CustomerContextPanel";
@@ -64,7 +77,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { logAudit } from "@/ordre/lib/audit";
 import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
 import { MerknadDialog } from "@/ordre/components/orders/MerknadDialog";
-import { type Merknad, isMerknadEmpty } from "@/ordre/lib/merknad";
+import { type Merknad, isMerknadEmpty, emptyMerknad } from "@/ordre/lib/merknad";
 import {
   PENDING_CAKE_IMAGE_KEY,
   flushPendingCakeImages,
@@ -153,6 +166,11 @@ type LineDraft = {
   unit_price: string;
   /** true når sentralisert prisoppslag faller tilbake til 0 — vises som rød advarsel */
   is_fallback?: boolean;
+  /** Prisen fra prismotoren, til sammenligning ved manuell overstyring. */
+  effective_price?: number | null;
+  /** Settes til 'manual_override' når operatøren skriver inn prisen selv. */
+  unit_price_source?: string | null;
+  unit_price_source_id?: string | null;
   merknad: Merknad | null;
 };
 
@@ -329,6 +347,13 @@ export function CustomerOrderModal({
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const [dirty, setDirty] = useState(false);
+  /**
+   * Skjemaet fylles programmatisk når panelet åpnes. Et urørt skjema skal
+   * ikke gi «ulagrede endringer»-dialog, så første oppsett hoppes over.
+   */
+  const linesRef = useRef<LineDraft[]>([]);
+  const initializedRef = useRef(false);
+  const skipNextDirtyRef = useRef(false);
   const [merknadFor, setMerknadFor] = useState<string | null>(null);
   /** 0-pris må bekreftes aktivt før lagring. */
   const [zeroPriceOpen, setZeroPriceOpen] = useState(false);
@@ -515,10 +540,12 @@ export function CustomerOrderModal({
           quantity: String(spec.quantity),
           unit_price: ep ? String(ep.price) : "0",
           is_fallback: !ep || ep.is_fallback,
+          effective_price: ep?.price ?? null,
           merknad: null,
         });
       }
       if (cancelled || drafts.length === 0) return;
+      skipNextDirtyRef.current = true;
       setLines(drafts);
     })();
     return () => {
@@ -528,11 +555,71 @@ export function CustomerOrderModal({
 
   // Mark dirty on any field change after init
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      initializedRef.current = false;
+      skipNextDirtyRef.current = false;
+      return;
+    }
+    if (!initializedRef.current) {
+      initializedRef.current = true;
+      return;
+    }
+    if (skipNextDirtyRef.current) {
+      skipNextDirtyRef.current = false;
+      return;
+    }
     setDirty(true);
     // intentional shallow listing of dependencies for "dirty" detection
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [name, email, phone, deliveryDate, hour, minute, tourId, distribution, source, sendSms, sendEmail, isPaid, lines]);
+
+  linesRef.current = lines;
+
+  // Ny dato kan gi ny pris: hent alle linjeprisene i én runde. Manuelt
+  // overstyrte priser røres ikke.
+  useEffect(() => {
+    if (!open || !deliveryDate) return;
+    const customerId = customer.id;
+    const date = deliveryDate;
+    let cancelled = false;
+    void (async () => {
+      const repriceable = linesRef.current.filter(
+        (l) => l.product && !isManualOverride(l.unit_price_source),
+      );
+      if (repriceable.length === 0) return;
+      let prices: Map<string, EffectivePrice>;
+      try {
+        prices = await fetchEffectivePricesBatch({
+          productIds: Array.from(new Set(repriceable.map((l) => l.product!.id))),
+          customerId,
+          date,
+          caller: "customer_order_create",
+        });
+      } catch (err) {
+        logAppError(err, { scope: "ordre:kundeordre:reprising" });
+        toast.error("Fant ikke nye priser for datoen. Kontroller prisene før du lagrer.");
+        return;
+      }
+      if (cancelled) return;
+      setLines((prev) =>
+        prev.map((l) => {
+          if (!l.product || isManualOverride(l.unit_price_source)) return l;
+          const ep = prices.get(l.product.id);
+          if (!ep) return l;
+          return {
+            ...l,
+            unit_price: String(ep.price ?? 0),
+            is_fallback: ep.is_fallback,
+            effective_price: ep.price,
+          };
+        }),
+      );
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // Kun ved datoendring — linjeendringer prises der de oppstår.
+  }, [deliveryDate, open, customer.id]);
 
   // Ny prisrisiko må bekreftes på nytt.
   useEffect(() => {
@@ -588,6 +675,8 @@ export function CustomerOrderModal({
     existingOrderId: orderId ?? null,
   });
   const [overrideOpen, setOverrideOpen] = useState(false);
+  /** Linjen som venter på begrunnelse for manuelt overstyrt pris. */
+  const [priceOverrideUid, setPriceOverrideUid] = useState<string | null>(null);
   const [pendingOverrideReason, setPendingOverrideReason] = useState<string | null>(null);
 
 
@@ -639,7 +728,28 @@ export function CustomerOrderModal({
   function setLinePrice(uid: string, value: string) {
     const cleaned = value.replace(",", ".");
     if (cleaned !== "" && !/^\d*\.?\d*$/.test(cleaned)) return;
-    setLines((prev) => prev.map((l) => (l.uid === uid ? { ...l, unit_price: cleaned } : l)));
+    setLines((prev) =>
+      prev.map((l) => {
+        if (l.uid !== uid) return l;
+        const isOverride =
+          l.effective_price != null && Number(cleaned) !== Number(l.effective_price);
+        return {
+          ...l,
+          unit_price: cleaned,
+          unit_price_source: isOverride ? MANUAL_PRICE_SOURCE : l.unit_price_source,
+        };
+      }),
+    );
+  }
+
+  /** Ber om begrunnelse når operatøren forlater et prisfelt hun har overstyrt. */
+  function handlePriceBlur(uid: string) {
+    const line = lines.find((l) => l.uid === uid);
+    if (!line || !isManualOverride(line.unit_price_source)) return;
+    const existing = (line.merknad as { price_override_reason?: string } | null)
+      ?.price_override_reason;
+    if (existing) return;
+    setPriceOverrideUid(uid);
   }
 
   const totals = useMemo(() => {
@@ -717,6 +827,8 @@ export function CustomerOrderModal({
       product_mva_rate: l.product!.mva_rate ?? 15,
       quantity: Number(l.quantity),
       unit_price: Number(l.unit_price) || 0,
+      unit_price_source: l.unit_price_source ?? null,
+      unit_price_source_id: l.unit_price_source_id ?? null,
       merknad: l.merknad && !isMerknadEmpty(l.merknad) ? l.merknad : null,
 
     }));
@@ -1215,6 +1327,7 @@ export function CustomerOrderModal({
                             inputMode="decimal"
                             value={l.unit_price}
                             onChange={(e) => setLinePrice(l.uid, e.target.value)}
+                            onBlur={() => handlePriceBlur(l.uid)}
                             className="h-9 text-right tabular-nums"
                           />
                           <div className="text-right text-sm font-medium tabular-nums">
@@ -1443,6 +1556,56 @@ export function CustomerOrderModal({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <PriceOverrideReasonDialog
+        open={priceOverrideUid !== null}
+        onOpenChange={(v) => {
+          if (!v) setPriceOverrideUid(null);
+        }}
+        productName={
+          lines.find((l) => l.uid === priceOverrideUid)?.product?.display_name ?? null
+        }
+        originalPrice={(() => {
+          const line = lines.find((l) => l.uid === priceOverrideUid);
+          return line?.effective_price != null ? String(line.effective_price) : null;
+        })()}
+        newPrice={lines.find((l) => l.uid === priceOverrideUid)?.unit_price ?? null}
+        onConfirm={(reason) => {
+          const uid = priceOverrideUid;
+          setPriceOverrideUid(null);
+          if (!uid) return;
+          setLines((prev) =>
+            prev.map((l) =>
+              l.uid === uid
+                ? {
+                    ...l,
+                    merknad: {
+                      ...(l.merknad ?? emptyMerknad),
+                      price_override_reason: `${PRICE_OVERRIDE_NOTE_PREFIX} ${reason.trim()}`,
+                    },
+                  }
+                : l,
+            ),
+          );
+        }}
+        onCancel={() => {
+          const uid = priceOverrideUid;
+          setPriceOverrideUid(null);
+          if (!uid) return;
+          // Uten begrunnelse settes prisen tilbake til prismotorens pris.
+          setLines((prev) =>
+            prev.map((l) =>
+              l.uid === uid && l.effective_price != null
+                ? {
+                    ...l,
+                    unit_price: String(l.effective_price),
+                    unit_price_source: null,
+                  }
+                : l,
+            ),
+          );
+        }}
+      />
 
       <ZeroPriceConfirmDialog
         open={zeroPriceOpen}

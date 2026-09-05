@@ -28,7 +28,9 @@ export function ZeroPriceConfirmDialog({
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Lagre med 0 kr på {count} linjer?</AlertDialogTitle>
+          <AlertDialogTitle>
+            Lagre med 0 kr på {count === 1 ? "1 linje" : `${count} linjer`}?
+          </AlertDialogTitle>
           <AlertDialogDescription>
             {count === 1
               ? "Én linje mangler pris eller står til 0 kr."

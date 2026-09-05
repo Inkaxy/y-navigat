@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
+import { useGuardedNavigate } from "@/providers/UnsavedGuardProvider";
 import { LayoutDashboard, MoreHorizontal } from "lucide-react";
 import { getAppIcon } from "@/lib/appIcons";
 import {
@@ -25,7 +26,7 @@ interface Entry {
 export function AppTabs() {
   const { data: apps } = useAccessibleApps();
   const { pathname } = useLocation();
-  const navigate = useNavigate();
+  const navigate = useGuardedNavigate();
 
   const entries: Entry[] = useMemo(() => {
     const list = (apps ?? [])

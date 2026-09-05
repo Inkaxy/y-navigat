@@ -29,7 +29,8 @@ import {
 import {
   buildRecipePDFData, useRecipePDF, type BuildRecipePDFInput, type RecipeCardOptions,
 } from "@/varer/hooks/useRecipePDF";
-import { useUnsavedChangesWarning } from "@/varer/hooks/useUnsavedChangesWarning";
+import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
+import { UnsavedChangesDialog } from "@/varer/components/products/detail/UnsavedChangesDialog";
 import { useComputeRecipeLabel } from "@/varer/hooks/useRecipeLabel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LabelTab } from "@/varer/components/recipes/label/LabelTab";
@@ -366,7 +367,7 @@ export default function RecipeDetail() {
     [header, recipe, parts, hydratedLines, steps, factor, scaleSummary.unitCount, desiredUnits, baseUnits],
   );
 
-  useUnsavedChangesWarning(dirty && canWrite);
+  const unsavedGuard = useUnsavedChangesGuard(dirty && canWrite);
 
 
   function patchHeader(patch: Partial<HeaderState>) {
@@ -1185,6 +1186,11 @@ export default function RecipeDetail() {
         canWrite={canWrite}
       />
 
+      <UnsavedChangesDialog
+        open={unsavedGuard.isBlocked}
+        onConfirm={unsavedGuard.discard}
+        onCancel={unsavedGuard.stay}
+      />
     </>
 
 

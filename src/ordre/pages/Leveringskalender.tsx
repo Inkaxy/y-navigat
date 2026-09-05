@@ -1,7 +1,8 @@
 import { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import type { MatrixCell as MatrixCellRow } from "@/ordre/hooks/useMatrix";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
+import { useGuardedNavigate } from "@/providers/UnsavedGuardProvider";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 import { UnsavedChangesDialog } from "@/components/common/UnsavedChangesDialog";
 import {
@@ -245,7 +246,7 @@ export default function MatrixPage() {
   const upsertColumnComment = useUpsertColumnComment();
   const deleteMatrixColumn = useDeleteMatrixColumn();
   const generateNotes = useGenerateDeliveryNotes();
-  const navigate = useNavigate();
+  const navigate = useGuardedNavigate();
   const { data: weatherMap } = useCustomerWeather(customerId, dateFrom, dateTo);
   const { data: ghostMap } = useRecurringGhost(customerId, dateFrom, dateTo);
   const { data: pauseMap } = useDeliveryPausesForCustomer(customerId, dateFrom, dateTo);
@@ -254,7 +255,6 @@ export default function MatrixPage() {
   const [edits, setEdits] = useState<Record<CellKey, string>>({});
   const [addedProducts, setAddedProducts] = useState<MatrixProduct[]>([]);
   const [addOpen, setAddOpen] = useState(false);
-  const [discardOpen, setDiscardOpen] = useState(false);
 
   // Column action dialog state
   const [copyColCol, setCopyColCol] = useState<{ date: string; tour: MatrixTour } | null>(null);
@@ -311,11 +311,21 @@ export default function MatrixPage() {
     | null
   >(null);
 
+  /**
+   * Kommer brukeren fra en dyplenke med ?date=, skal den datoen vinne over
+   * kundens lagrede hurtigfilter ved første kundevalg.
+   */
+  const honorDateParamRef = useRef(!!initialDate);
+
   // When customer changes: load stored quick-filter (default this_week), apply.
   useEffect(() => {
     setEdits({});
     setAddedProducts([]);
     if (!customerId) return;
+    if (honorDateParamRef.current) {
+      honorDateParamRef.current = false;
+      return;
+    }
     const stored = loadStoredRange(customerId) ?? "this_week";
     const r = rangeFor(stored);
     setQuickFilter(stored);
@@ -486,6 +496,26 @@ export default function MatrixPage() {
     void handleSaveRef.current();
   }, []);
 
+  /** Ctrl/Cmd+S lagrer matrisen fra hele siden, ikke bare fra en celle. */
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== "s") return;
+      if (e.defaultPrevented) return;
+      const el = e.target as HTMLElement | null;
+      const inDialog = !!el?.closest?.("[role='dialog']");
+      const inOtherInput =
+        !!el &&
+        (el.tagName === "TEXTAREA" ||
+          el.isContentEditable ||
+          (el.tagName === "INPUT" && !el.hasAttribute("data-cell")));
+      if (inDialog || inOtherInput) return;
+      e.preventDefault();
+      stableSave();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [stableSave]);
+
   const setCellValue = useCallback((key: CellKey, value: string) => {
     const cleaned = value.replace(",", ".");
     if (cleaned !== "" && !/^\d*\.?\d*$/.test(cleaned)) return;
@@ -537,13 +567,43 @@ export default function MatrixPage() {
     [cellOrderIds],
   );
 
+  /** Stabile kolonnehandlinger — nye funksjoner per render ville re-rendret hele matrisen. */
+  const packingNoteRef = useRef<(date: string, tour: MatrixTour) => void>(() => {});
+  const colOrderIdRef = useRef(colOrderId);
+  colOrderIdRef.current = colOrderId;
+  const handleColCopy = useCallback(
+    (date: string, tour: MatrixTour) => setCopyColCol({ date, tour }),
+    [],
+  );
+  const handleColDelete = useCallback(
+    (date: string, tour: MatrixTour) => setDeleteColConfirm({ date, tour }),
+    [],
+  );
+  const handleColPackingNote = useCallback((date: string, tour: MatrixTour) => {
+    packingNoteRef.current(date, tour);
+  }, []);
+  const handleOpenTourOrder = useCallback((date: string, tour: MatrixTour) => {
+    if (!colOrderIdRef.current.has(`${date}|${tour.id}`)) {
+      toast.info("Fastordre", {
+        description: "Skriv i cellene og lagre for å lage datert ordre.",
+      });
+      return;
+    }
+    setTourOrderCol({ date, tour });
+  }, []);
+
   const notifyPaused = useCallback(() => {
     toast.info("Leveransepause", {
       description: "Fjern pausen først om kunden likevel skal få leveranse.",
     });
   }, []);
 
-  /** Ulagrede endringer gruppert per produkt — gir stabile props per rad. */
+  /**
+   * Ulagrede endringer gruppert per produkt — gir stabile props per rad.
+   * Uendrede produkter beholder NØYAKTIG samme objekt, slik at bare den
+   * berørte raden (og sumraden) rendres på nytt ved et tastetrykk.
+   */
+  const editsByProductRef = useRef<Map<string, Record<CellKey, string>>>(new Map());
   const editsByProduct = useMemo(() => {
     const m = new Map<string, Record<CellKey, string>>();
     for (const [key, value] of Object.entries(edits)) {
@@ -553,6 +613,15 @@ export default function MatrixPage() {
       if (bucket) bucket[key] = value;
       else m.set(productId, { [key]: value });
     }
+    const prev = editsByProductRef.current;
+    for (const [productId, bucket] of m) {
+      const before = prev.get(productId);
+      if (!before) continue;
+      const keys = Object.keys(bucket);
+      const sameKeys = Object.keys(before).length === keys.length;
+      if (sameKeys && keys.every((k) => before[k] === bucket[k])) m.set(productId, before);
+    }
+    editsByProductRef.current = m;
     return m;
   }, [edits]);
 
@@ -738,19 +807,15 @@ export default function MatrixPage() {
   }
 
   handleSaveRef.current = handleSave;
+  packingNoteRef.current = (date, tour) => {
+    void generatePackingNoteForColumn(date, tour);
+  };
 
 
 
+  /** «Forkast» bruker den felles ulagret-dialogen. */
   function handleDiscardClick() {
-    if (addedProducts.length > 0 || dirtyCount > 0) {
-      setDiscardOpen(true);
-    }
-  }
-
-  function confirmDiscard() {
-    setEdits({});
-    setAddedProducts([]);
-    setDiscardOpen(false);
+    if (addedProducts.length > 0 || dirtyCount > 0) guardAction(() => {});
   }
 
   function handleAddProduct(p: AddableProduct) {
@@ -1897,25 +1962,16 @@ export default function MatrixPage() {
               weatherMap={weatherMap}
               pauseMap={pauseMap}
               columnComments={columnComments}
-              onColCopy={(date, tour) => setCopyColCol({ date, tour })}
-              onColDelete={(date, tour) => setDeleteColConfirm({ date, tour })}
-              onColPackingNote={(date, tour) => generatePackingNoteForColumn(date, tour)}
+              onColCopy={handleColCopy}
+              onColDelete={handleColDelete}
+              onColPackingNote={handleColPackingNote}
               colHasData={colHasAnyData}
               colMeta={colMeta}
               colTone={colTone}
               noTourByDate={noTourByDate}
               onMoveToTour={moveNoTourToTour}
               canEdit={canEdit}
-              onOpenTourOrder={(date, tour) => {
-                if (!colOrderId.has(`${date}|${tour.id}`)) {
-                  toast.info("Fastordre", {
-                    description:
-                      "Skriv i cellene og lagre for å lage datert ordre.",
-                  });
-                  return;
-                }
-                setTourOrderCol({ date, tour });
-              }}
+              onOpenTourOrder={handleOpenTourOrder}
               onOpenWeekEditor={openWeekEditor}
             />
             <div className="sticky left-0 flex flex-wrap items-center gap-2 border-t border-border bg-card px-4 py-3 sm:px-6">
@@ -2039,28 +2095,6 @@ export default function MatrixPage() {
         {...unsavedGuard.dialogProps}
         description="Celleendringene i matrisen er ikke lagret ennå. Forkaster du dem, forsvinner de."
       />
-
-      <AlertDialog open={discardOpen} onOpenChange={setDiscardOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Kast endringer?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {addedProducts.length > 0 && unsavedAddedCount > 0 ? (
-                <>
-                  {unsavedAddedCount} produkt{unsavedAddedCount === 1 ? "" : "er"} uten lagrede mengder vil bli fjernet fra matrisen.
-                  {dirtyCount > 0 && <> {dirtyCount} celle-endring{dirtyCount === 1 ? "" : "er"} vil også gå tapt.</>}
-                </>
-              ) : (
-                <>{dirtyCount} celle-endring{dirtyCount === 1 ? "" : "er"} vil gå tapt.</>
-              )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Avbryt</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDiscard}>Kast endringer</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       <AlertDialog open={!!copyConfirm} onOpenChange={(v) => !v && setCopyConfirm(null)}>
         <AlertDialogContent>
@@ -2373,6 +2407,7 @@ function MatrixGrid({
   /** Antall-summer: per rad (uke) og per kolonne (dag × tur) — dempet, sekundær info. */
   const qtySums = useMemo(() => {
     const rows: Record<string, number> = {};
+    const rowsNoTour: Record<string, number> = {};
     const cols: Record<string, number> = {};
     for (const p of products) {
       const rowEdits = editsByProduct.get(p.id) ?? EMPTY_EDITS;
@@ -2387,13 +2422,15 @@ function MatrixGrid({
           n = noTourByDate.get(c.date)?.get(p.id)?.quantity ?? 0;
         }
         if (!n) continue;
-        rowSum += n;
+        // «Uten tur» holdes utenfor ukesummen — akkurat som «Sum kr» gjør.
+        if (c.kind === "tour") rowSum += n;
+        else rowsNoTour[p.id] = (rowsNoTour[p.id] ?? 0) + n;
         const k = c.kind === "tour" ? colKeyOf(c.date, c.tour.id) : `${c.date}|`;
         cols[k] = (cols[k] ?? 0) + n;
       }
       rows[p.id] = rowSum;
     }
-    return { rows, cols };
+    return { rows, rowsNoTour, cols };
   }, [renderCols, products, editsByProduct, getBaseValue, noTourByDate]);
 
   return (
@@ -2496,6 +2533,7 @@ function MatrixGrid({
               colInfo={colInfo}
               noTourByDate={noTourByDate}
               rowQtySum={qtySums.rows[p.id] ?? 0}
+              rowNoTourQty={qtySums.rowsNoTour[p.id] ?? 0}
               rowTotal={rowTotals[p.id] ?? 0}
               canEdit={canEdit}
               onChange={onChange}
