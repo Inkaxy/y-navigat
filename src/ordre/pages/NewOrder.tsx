@@ -34,6 +34,7 @@ import {
   withPriceOverrideNote,
 } from "@/ordre/lib/orderLines";
 import { logAudit } from "@/ordre/lib/audit";
+import { persistAppError } from "@/lib/errorLog";
 import { logTicketEvent } from "@/ordre/lib/ticketEvents";
 import { TourPicker } from "@/ordre/components/orders/TourPicker";
 import { CopyFromPreviousOrderDialog } from "@/ordre/components/orders/CopyFromPreviousOrderDialog";
@@ -324,6 +325,11 @@ export default function NewOrder() {
     productIds: productIdsForCheck,
   });
   const [overrideOpen, setOverrideOpen] = useState(false);
+  /** Linjen som venter på begrunnelse for manuell prisoverstyring. */
+  const [overrideReasonUid, setOverrideReasonUid] = useState<string | null>(null);
+  /** 0-pris må bekreftes eksplisitt før ordren kan opprettes. */
+  const [zeroPriceOpen, setZeroPriceOpen] = useState(false);
+  const [zeroPriceConfirmed, setZeroPriceConfirmed] = useState(false);
   const [pendingOverrideReason, setPendingOverrideReason] = useState<string | null>(null);
 
   // Når kunde endres: pre-fyll adresse + håndter kunde-referanse
@@ -629,6 +635,19 @@ export default function NewOrder() {
   }, [deliveryDate, deliveryTime, lines, customer?.id, ticketAi, ticketBodyText]);
   const qaSummary = summarizeQa(qaChecks);
 
+  /** Linjer uten reell pris — må bekreftes før ordren opprettes. */
+  const riskyPriceCount = useMemo(
+    () =>
+      countRiskyPriceLines(
+        lines.map((l) => ({ hasProduct: !!l.product, unit_price: l.unit_price })),
+      ),
+    [lines],
+  );
+
+  useEffect(() => {
+    setZeroPriceConfirmed(false);
+  }, [riskyPriceCount]);
+
   async function save(overrideReason: string | null = pendingOverrideReason) {
     if (!customer) {
       toast.error("Velg en kunde");
@@ -651,6 +670,18 @@ export default function NewOrder() {
     // QA: blokkér på røde sjekker med mindre brukeren har bekreftet override
     if (qaSummary.severity === "red" && !qaOverride) {
       toast.error("Kvalitetssikring: røde punkter må løses (eller bekreft override)");
+      return;
+    }
+    const missingReason = validLines.find(
+      (l) => isManualOverride(l.unit_price_source) && !l.notes.includes(PRICE_OVERRIDE_NOTE_PREFIX),
+    );
+    if (missingReason) {
+      toast.error(`Begrunn den manuelle prisen på "${missingReason.product?.display_name}"`);
+      setOverrideReasonUid(missingReason.uid);
+      return;
+    }
+    if (!zeroPriceConfirmed && riskyPriceCount > 0) {
+      setZeroPriceOpen(true);
       return;
     }
     if (rulesPreview.blocks.length > 0 && !overrideReason) {
