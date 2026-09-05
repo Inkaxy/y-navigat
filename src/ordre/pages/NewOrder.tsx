@@ -502,6 +502,24 @@ export default function NewOrder() {
     setOverrideReasonUid(uid);
   }
 
+  /**
+   * Enter i Mengde bekrefter linjen: siste linje får en ny tom linje under,
+   * ellers hopper fokus til produktsøket på neste linje.
+   */
+  function confirmLineAndContinue(uid: string) {
+    const current = linesRef.current;
+    const idx = current.findIndex((l) => l.uid === uid);
+    if (idx === -1) return;
+    const next = current[idx + 1];
+    if (next) {
+      focusOrderLineField(next.product ? next.uid : next.uid, next.product ? "qty" : "search");
+      return;
+    }
+    const added = newLine();
+    setLines((prev) => [...prev, added]);
+    focusOrderLineField(added.uid, "search");
+  }
+
   function removeLine(uid: string) {
     setLines((prev) => prev.filter((l) => l.uid !== uid));
   }
@@ -836,6 +854,53 @@ export default function NewOrder() {
 
   return (
     <>
+      <ZeroPriceConfirmDialog
+        open={zeroPriceOpen}
+        onOpenChange={setZeroPriceOpen}
+        count={riskyPriceCount}
+        onConfirm={() => {
+          setZeroPriceOpen(false);
+          setZeroPriceConfirmed(true);
+          void save(pendingOverrideReason, true);
+        }}
+      />
+
+      <PriceOverrideReasonDialog
+        open={overrideReasonUid !== null}
+        onOpenChange={(open) => {
+          if (!open) setOverrideReasonUid(null);
+        }}
+        productName={
+          lines.find((l) => l.uid === overrideReasonUid)?.product?.display_name ?? null
+        }
+        originalPrice={(() => {
+          const line = lines.find((l) => l.uid === overrideReasonUid);
+          return line?.effective_price != null ? formatNOK(line.effective_price) : null;
+        })()}
+        newPrice={lines.find((l) => l.uid === overrideReasonUid)?.unit_price ?? null}
+        onConfirm={(reason) => {
+          const uid = overrideReasonUid;
+          if (!uid) return;
+          setLines((prev) =>
+            prev.map((l) => (l.uid === uid ? { ...l, notes: withPriceOverrideNote(l.notes, reason) } : l)),
+          );
+          setOverrideReasonUid(null);
+        }}
+        onCancel={() => {
+          const uid = overrideReasonUid;
+          if (!uid) return;
+          // Uten begrunnelse settes prisen tilbake til prismotorens pris.
+          setLines((prev) =>
+            prev.map((l) =>
+              l.uid === uid && l.effective_price != null
+                ? { ...l, unit_price: String(l.effective_price), unit_price_source: l.unit_price_source === MANUAL_PRICE_SOURCE ? null : l.unit_price_source }
+                : l,
+            ),
+          );
+          setOverrideReasonUid(null);
+        }}
+      />
+
       <UnsavedChangesDialog
         {...unsavedGuard.dialogProps}
         description="Ordreutkastet er ikke lagret ennå. Forkaster du det, forsvinner linjene du har lagt inn."
@@ -1124,7 +1189,9 @@ export default function NewOrder() {
                             disabled={!l.product}
                             aria-label={`Pris per enhet for ${l.product?.display_name ?? "ny linje"}`}
                             aria-invalid={priceRisky}
-                            className="h-9 pr-8 text-right text-sm tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                            className={`h-9 pr-8 text-right text-sm tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${
+                              priceRisky ? "border-destructive text-destructive focus-visible:ring-destructive" : ""
+                            }`}
                           />
                           <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
                             kr
