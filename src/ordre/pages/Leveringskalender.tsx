@@ -547,6 +547,31 @@ export default function MatrixPage() {
     [cellOrderIds],
   );
 
+  /** Stabile kolonnehandlinger — nye funksjoner per render ville re-rendret hele matrisen. */
+  const packingNoteRef = useRef<(date: string, tour: MatrixTour) => void>(() => {});
+  const colOrderIdRef = useRef(colOrderId);
+  colOrderIdRef.current = colOrderId;
+  const handleColCopy = useCallback(
+    (date: string, tour: MatrixTour) => setCopyColCol({ date, tour }),
+    [],
+  );
+  const handleColDelete = useCallback(
+    (date: string, tour: MatrixTour) => setDeleteColConfirm({ date, tour }),
+    [],
+  );
+  const handleColPackingNote = useCallback((date: string, tour: MatrixTour) => {
+    packingNoteRef.current(date, tour);
+  }, []);
+  const handleOpenTourOrder = useCallback((date: string, tour: MatrixTour) => {
+    if (!colOrderIdRef.current.has(`${date}|${tour.id}`)) {
+      toast.info("Fastordre", {
+        description: "Skriv i cellene og lagre for å lage datert ordre.",
+      });
+      return;
+    }
+    setTourOrderCol({ date, tour });
+  }, []);
+
   const notifyPaused = useCallback(() => {
     toast.info("Leveransepause", {
       description: "Fjern pausen først om kunden likevel skal få leveranse.",
@@ -762,6 +787,9 @@ export default function MatrixPage() {
   }
 
   handleSaveRef.current = handleSave;
+  packingNoteRef.current = (date, tour) => {
+    void generatePackingNoteForColumn(date, tour);
+  };
 
 
 
@@ -1914,25 +1942,16 @@ export default function MatrixPage() {
               weatherMap={weatherMap}
               pauseMap={pauseMap}
               columnComments={columnComments}
-              onColCopy={(date, tour) => setCopyColCol({ date, tour })}
-              onColDelete={(date, tour) => setDeleteColConfirm({ date, tour })}
-              onColPackingNote={(date, tour) => generatePackingNoteForColumn(date, tour)}
+              onColCopy={handleColCopy}
+              onColDelete={handleColDelete}
+              onColPackingNote={handleColPackingNote}
               colHasData={colHasAnyData}
               colMeta={colMeta}
               colTone={colTone}
               noTourByDate={noTourByDate}
               onMoveToTour={moveNoTourToTour}
               canEdit={canEdit}
-              onOpenTourOrder={(date, tour) => {
-                if (!colOrderId.has(`${date}|${tour.id}`)) {
-                  toast.info("Fastordre", {
-                    description:
-                      "Skriv i cellene og lagre for å lage datert ordre.",
-                  });
-                  return;
-                }
-                setTourOrderCol({ date, tour });
-              }}
+              onOpenTourOrder={handleOpenTourOrder}
               onOpenWeekEditor={openWeekEditor}
             />
             <div className="sticky left-0 flex flex-wrap items-center gap-2 border-t border-border bg-card px-4 py-3 sm:px-6">
