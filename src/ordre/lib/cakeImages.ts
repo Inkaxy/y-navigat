@@ -356,9 +356,9 @@ export async function attachTicketCakeImagesToOrder(input: {
     .select("id")
     .eq("ticket_id", input.ticket_id)
     .is("order_id", null);
-  if (error) return 0;
+  if (error) return { updated: 0, skipped: 0 };
   const rows = (data ?? []) as { id: string }[];
-  if (rows.length === 0) return 0;
+  if (rows.length === 0) return { updated: 0, skipped: 0 };
 
   const cakeLine = await findCakeLineForOrder(input.order_id).catch(() => null);
   let availableUnits: LabelUnitCandidate[] = [];
