@@ -323,7 +323,7 @@ export default function TicketDetail() {
   const { data: sla } = useSlaSettings();
   const { data: activeUsers = [] } = useActiveUsers();
 
-, setReanalyzing] = useState(false);
+  const [reanalyzing, setReanalyzing] = useState(false);
   const [showEvents, setShowEvents] = useState(true);
   const [refundOpen, setRefundOpen] = useState(false);
   const [lightbox, setLightbox] = useState<{ url: string; name: string } | null>(null);
