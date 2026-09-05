@@ -2160,7 +2160,22 @@ function MatrixGrid({
             </th>
           </tr>
           <tr>
-            {columns.map((c) => {
+            {renderCols.map((rc) => {
+              if (rc.kind === "notour") {
+                return (
+                  <th
+                    key={`${rc.date}-notour`}
+                    className="border-b border-r border-border bg-muted/50 px-1 py-1 text-center text-[11px] font-medium text-muted-foreground"
+                    title="Bestilte linjer uten tur — flytt til en tur for å redigere"
+                  >
+                    <div className="px-1.5 py-0.5 text-[12px] font-semibold text-foreground">
+                      Uten tur
+                    </div>
+                    <div className="mt-0.5 text-[9px] uppercase tracking-wide">Kun visning</div>
+                  </th>
+                );
+              }
+              const c = rc;
               const pause = isPaused(pauseMap, c.date, c.tour.id);
               const hasComment = columnComments?.has(`${c.date}|${c.tour.id}`);
               const colHas = colHasData(c.date, c.tour.id);
