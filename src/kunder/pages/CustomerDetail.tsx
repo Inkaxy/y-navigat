@@ -65,6 +65,12 @@ import { OverrideField } from "@/kunder/components/customers/OverrideField";
 import { ChangeProfileDialog } from "@/kunder/components/customers/ChangeProfileDialog";
 import { ActivityTimeline } from "@/kunder/components/activity/ActivityTimeline";
 import { useCustomerActivityFeed } from "@/kunder/hooks/useCustomerActivityFeed";
+import { QueryState } from "@/components/common/QueryState";
+import { CustomerOrdersDeliveryTab } from "@/kunder/components/customers/CustomerOrdersDeliveryTab";
+import {
+  effectivePriceListSourceLabel,
+  useEffectivePriceList,
+} from "@/kunder/hooks/useEffectivePriceList";
 import {
   ALL_OVERRIDABLE_FIELDS,
   DELIVERY_FIELDS,
@@ -167,6 +173,11 @@ export default function CustomerDetail() {
   const canWrite = !!access?.hasKunderWrite;
 
   const [tab, setTab] = useState("info");
+  const effectivePriceList = useEffectivePriceList(
+    id,
+    customer?.default_price_list_id ?? null,
+    (profile as { default_price_list_id?: string | null } | undefined)?.default_price_list_id ?? null,
+  );
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [changeProfileOpen, setChangeProfileOpen] = useState(false);
   const [confirmAction, setConfirmAction] = useState<"deactivate" | "delete" | null>(null);
@@ -716,6 +727,7 @@ export default function CustomerDetail() {
               <TabsTrigger value="addresses">Adresser</TabsTrigger>
               <TabsTrigger value="invoice">Faktura- og betalingsinfo</TabsTrigger>
               <TabsTrigger value="pricing">Prising</TabsTrigger>
+              <TabsTrigger value="orders">Ordre og levering</TabsTrigger>
               <TabsTrigger value="delivery">Utkjøring / utskrifter</TabsTrigger>
               <TabsTrigger value="notes">Notater</TabsTrigger>
               <TabsTrigger value="history">
@@ -1109,6 +1121,38 @@ export default function CustomerDetail() {
           <TabsContent value="pricing" className="mt-4 space-y-4">
             <Card>
               <CardHeader>
+                <CardTitle>Gjeldende prisliste</CardTitle>
+                <CardDescription>
+                  Prislista som faktisk brukes ved prising av kundens ordrer
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <QueryState
+                  scope="kunder:effektiv-prisliste"
+                  isLoading={effectivePriceList.isLoading}
+                  isError={effectivePriceList.isError}
+                  error={effectivePriceList.error}
+                  onRetry={() => void effectivePriceList.refetch()}
+                  skeletonRows={1}
+                  skeletonRowClassName="h-9"
+                  compact
+                >
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-body font-medium">
+                      {effectivePriceList.data?.display_name ?? "Ingen prisliste funnet"}
+                    </span>
+                    {effectivePriceList.data && (
+                      <Badge variant="outline">
+                        {effectivePriceListSourceLabel(effectivePriceList.data.source)}
+                      </Badge>
+                    )}
+                  </div>
+                </QueryState>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
                 <CardTitle>Standard prisliste</CardTitle>
                 <CardDescription>Kunde-spesifikt valg (ingen profil-arv)</CardDescription>
               </CardHeader>
@@ -1156,6 +1200,11 @@ export default function CustomerDetail() {
                 ))}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* TAB 3b: ORDRE OG LEVERING (read-only 360) */}
+          <TabsContent value="orders" className="mt-4">
+            {id ? <CustomerOrdersDeliveryTab customerId={id} /> : null}
           </TabsContent>
 
           {/* TAB 4: UTKJØRING */}
