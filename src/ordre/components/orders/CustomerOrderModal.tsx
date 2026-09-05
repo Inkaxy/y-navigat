@@ -153,6 +153,11 @@ type LineDraft = {
   unit_price: string;
   /** true når sentralisert prisoppslag faller tilbake til 0 — vises som rød advarsel */
   is_fallback?: boolean;
+  /** Prisen fra prismotoren, til sammenligning ved manuell overstyring. */
+  effective_price?: number | null;
+  /** Settes til 'manual_override' når operatøren skriver inn prisen selv. */
+  unit_price_source?: string | null;
+  unit_price_source_id?: string | null;
   merknad: Merknad | null;
 };
 
@@ -607,6 +612,8 @@ export function CustomerOrderModal({
     existingOrderId: orderId ?? null,
   });
   const [overrideOpen, setOverrideOpen] = useState(false);
+  /** Linjen som venter på begrunnelse for manuelt overstyrt pris. */
+  const [priceOverrideUid, setPriceOverrideUid] = useState<string | null>(null);
   const [pendingOverrideReason, setPendingOverrideReason] = useState<string | null>(null);
 
 
@@ -658,7 +665,28 @@ export function CustomerOrderModal({
   function setLinePrice(uid: string, value: string) {
     const cleaned = value.replace(",", ".");
     if (cleaned !== "" && !/^\d*\.?\d*$/.test(cleaned)) return;
-    setLines((prev) => prev.map((l) => (l.uid === uid ? { ...l, unit_price: cleaned } : l)));
+    setLines((prev) =>
+      prev.map((l) => {
+        if (l.uid !== uid) return l;
+        const isOverride =
+          l.effective_price != null && Number(cleaned) !== Number(l.effective_price);
+        return {
+          ...l,
+          unit_price: cleaned,
+          unit_price_source: isOverride ? MANUAL_PRICE_SOURCE : l.unit_price_source,
+        };
+      }),
+    );
+  }
+
+  /** Ber om begrunnelse når operatøren forlater et prisfelt hun har overstyrt. */
+  function handlePriceBlur(uid: string) {
+    const line = lines.find((l) => l.uid === uid);
+    if (!line || !isManualOverride(line.unit_price_source)) return;
+    const existing = (line.merknad as { price_override_reason?: string } | null)
+      ?.price_override_reason;
+    if (existing) return;
+    setPriceOverrideUid(uid);
   }
 
   const totals = useMemo(() => {
@@ -736,6 +764,8 @@ export function CustomerOrderModal({
       product_mva_rate: l.product!.mva_rate ?? 15,
       quantity: Number(l.quantity),
       unit_price: Number(l.unit_price) || 0,
+      unit_price_source: l.unit_price_source ?? null,
+      unit_price_source_id: l.unit_price_source_id ?? null,
       merknad: l.merknad && !isMerknadEmpty(l.merknad) ? l.merknad : null,
 
     }));
@@ -1234,6 +1264,7 @@ export function CustomerOrderModal({
                             inputMode="decimal"
                             value={l.unit_price}
                             onChange={(e) => setLinePrice(l.uid, e.target.value)}
+                            onBlur={() => handlePriceBlur(l.uid)}
                             className="h-9 text-right tabular-nums"
                           />
                           <div className="text-right text-sm font-medium tabular-nums">
