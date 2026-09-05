@@ -2005,6 +2005,9 @@ function MatrixGrid({
   colMeta,
   colTone,
   isGhostCell,
+  orderCount,
+  noTourByDate,
+  onMoveToTour,
 
   canEdit,
   onOpenTourOrder,
