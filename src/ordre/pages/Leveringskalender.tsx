@@ -1016,6 +1016,11 @@ export default function MatrixPage() {
 
   const openWeekEditor = useCallback((p: MatrixProduct) => setWeekEditorProduct(p), []);
 
+  const addedIdSet = useMemo(
+    () => new Set(addedProducts.map((p) => p.id)),
+    [addedProducts],
+  );
+
   const moveNoTourToTour = useCallback(
     (entry: NoTourEntry) =>
       setMoveTourOrder({
