@@ -71,6 +71,8 @@ type LineDraft = {
   discount_percent: string;
   vat_rate: number;
   notes: string;
+  /** Prismotoren fant ingen reell pris — linjen må bekreftes før lagring. */
+  is_fallback: boolean;
 };
 
 function newLine(): LineDraft {
@@ -85,6 +87,7 @@ function newLine(): LineDraft {
     discount_percent: "0",
     vat_rate: 15,
     notes: "",
+    is_fallback: false,
   };
 }
 
@@ -483,6 +486,7 @@ export default function NewOrder() {
               unit_price_source: ep?.source ?? null,
               unit_price_source_id: ep?.special_price_id ?? ep?.price_list_id ?? null,
               effective_price: ep?.price ?? null,
+              is_fallback: !ep || ep.is_fallback,
             }
           : l,
       ),
@@ -527,7 +531,7 @@ export default function NewOrder() {
     if (idx === -1) return;
     const next = current[idx + 1];
     if (next) {
-      focusOrderLineField(next.product ? next.uid : next.uid, next.product ? "qty" : "search");
+      focusOrderLineField(next.uid, next.product ? "qty" : "search");
       return;
     }
     const added = newLine();
@@ -583,6 +587,7 @@ export default function NewOrder() {
         discount_percent: String(cl.discount_percent),
         vat_rate: cl.vat_rate,
         notes: cl.notes ?? "",
+        is_fallback: false,
       };
     });
 
@@ -595,31 +600,34 @@ export default function NewOrder() {
     // Re-trekk priser for ny kunde/dato (samme logikk som i useEffect)
     if (customer) {
       void (async () => {
-        const refreshed = await Promise.all(
-          newLines.map(async (l) => {
-            // Forhandlet pris fra forrige ordre skal ikke overskrives.
-            if (!l.product || !shouldRepriceCopiedLine(l)) return l;
-            try {
-              const ep = await fetchEffectivePrice({
-                productId: l.product.id,
-                customerId: customer.id,
-                date: deliveryDate,
-                caller: "new_order_form",
-              });
-              if (!ep) return l;
-              return {
-                ...l,
-                unit_price: String(ep.price ?? 0),
-                unit_price_source: ep.source,
-                unit_price_source_id: ep.special_price_id ?? ep.price_list_id ?? null,
-                effective_price: ep.price,
-              };
-            } catch (err) {
-              logAppError(err, { scope: "ordre:ny-ordre:kopier-priser" });
-              return l;
-            }
-          }),
-        );
+        const repriceable = newLines.filter((l) => l.product && shouldRepriceCopiedLine(l));
+        if (repriceable.length === 0) return;
+        let prices: Map<string, EffectivePrice>;
+        try {
+          prices = await fetchEffectivePricesBatch({
+            productIds: Array.from(new Set(repriceable.map((l) => l.product!.id))),
+            customerId: customer.id,
+            date: deliveryDate,
+            caller: "new_order_form",
+          });
+        } catch (err) {
+          logAppError(err, { scope: "ordre:ny-ordre:kopier-priser" });
+          return;
+        }
+        const refreshed = newLines.map((l) => {
+          // Forhandlet pris fra forrige ordre skal ikke overskrives.
+          if (!l.product || !shouldRepriceCopiedLine(l)) return l;
+          const ep = prices.get(l.product.id);
+          if (!ep) return l;
+          return {
+            ...l,
+            unit_price: String(ep.price ?? 0),
+            unit_price_source: ep.source,
+            unit_price_source_id: ep.special_price_id ?? ep.price_list_id ?? null,
+            effective_price: ep.price,
+            is_fallback: ep.is_fallback,
+          };
+        });
         setLines((prev) => {
           // Bare oppdater de nye linjene
           const newUids = new Set(newLines.map((l) => l.uid));
@@ -670,7 +678,11 @@ export default function NewOrder() {
   const riskyPriceCount = useMemo(
     () =>
       countRiskyPriceLines(
-        lines.map((l) => ({ hasProduct: !!l.product, unit_price: l.unit_price })),
+        lines.map((l) => ({
+          hasProduct: !!l.product,
+          unit_price: l.unit_price,
+          is_fallback: l.is_fallback,
+        })),
       ),
     [lines],
   );
