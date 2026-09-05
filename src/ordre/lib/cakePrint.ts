@@ -179,7 +179,27 @@ const FOOT_BAND_MM = 22;
 const PAGE_MARGIN_MM = 10;
 /** Etikettstripe under hvert bilde: QR + nummer + kunde. */
 const CAPTION_MM = 12;
-const QR_MM = 10;
+export const QR_MM = 10;
+
+/**
+ * Y-intervaller i den roterte etikettstripa, målt fra toppen av stripa.
+ * jsPDF tegner rotert tekst oppover fra ankeret, så nummeret forankres med
+ * sin egen lengde under QR-en, og linjeteksten får aldri lov til å starte
+ * høyere enn nummeret slutter.
+ */
+export function rotatedCaptionSpans(labelLenMm: number, hMm: number) {
+  const qr = { startMm: 0, endMm: QR_MM };
+  const number = { startMm: QR_MM + 2, endMm: QR_MM + 2 + labelLenMm };
+  const textStartMm = number.endMm + 2;
+  const textEndMm = hMm - 2;
+  return {
+    qr,
+    number,
+    textStartMm,
+    textEndMm,
+    textLenMm: Math.max(0, textEndMm - textStartMm),
+  };
+}
 
 /**
  * Hvor bildet faktisk skal tegnes for en plassering, og hvor etikettstripa
