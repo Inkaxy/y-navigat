@@ -1713,10 +1713,13 @@ export default function CakeImageEditor() {
             <Button
               variant="brand"
               className="h-10"
-              disabled={printFlow.busy || saving}
+              disabled={printFlow.busy || saving || !format}
+              title={!format ? "Velg format før utskrift" : undefined}
               onClick={async () => {
+                if (!checkPrintGate()) return;
                 if (await doSave(false)) void printNow();
               }}
+
             >
               {printFlow.busy ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
