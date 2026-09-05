@@ -590,48 +590,69 @@ export default function DeliveryNoteDashboard() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-64">
+                <TooltipProvider delayDuration={200}>
                 <DropdownMenuItem
                   disabled={!canRunMain}
                   onSelect={() => setConfirmOpen(true)}
                 >
                   Hovedkjøring
                 </DropdownMenuItem>
-                <DropdownMenuItem
-                  disabled={!mainCompletedInScope || generate.isPending}
-                  title={
-                    !mainCompletedInScope
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="block">
+                      <DropdownMenuItem
+                        disabled={!mainCompletedInScope || generate.isPending}
+                        onSelect={() => runTilleggkjoring()}
+                      >
+                        Tilleggkjøring
+                      </DropdownMenuItem>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="left" className="max-w-xs">
+                    {!mainCompletedInScope
                       ? "Krever at hovedkjøring er kjørt for valgt dato/tur"
-                      : undefined
-                  }
-                  onSelect={() => runTilleggkjoring()}
-                >
-                  Tilleggkjøring
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  disabled={!mainCompletedInScope || generate.isPending || isPastDate}
-                  title={
-                    !mainCompletedInScope
+                      : "Generer pakksedler for ordre som har kommet til etter hovedkjøringen"}
+                  </TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="block">
+                      <DropdownMenuItem
+                        disabled={!mainCompletedInScope || generate.isPending || isPastDate}
+                        onSelect={() => setConfirmCorrectionOpen(true)}
+                      >
+                        Korreksjonskjøring
+                      </DropdownMenuItem>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="left" className="max-w-xs">
+                    {!mainCompletedInScope
                       ? "Krever at hovedkjøring er kjørt for valgt dato/tur"
                       : isPastDate
                         ? "Korreksjonskjøring er ikke tillatt for passerte leveringsdatoer — bruk korreksjonsmodus eller tilleggkjøring"
-                        : undefined
-                  }
-                  onSelect={() => setConfirmCorrectionOpen(true)}
-                >
-                  Korreksjonskjøring
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  disabled={!mainCompletedInScope || undoRuns.isPending || generate.isPending}
-                  title={
-                    !mainCompletedInScope
+                        : "Bygg pakksedlene på nytt for valgt dato/tur"}
+                  </TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="block">
+                      <DropdownMenuItem
+                        disabled={!mainCompletedInScope || undoRuns.isPending || generate.isPending}
+                        onSelect={() => setConfirmUndoOpen(true)}
+                        className="text-destructive focus:text-destructive"
+                      >
+                        Angre kjøring
+                      </DropdownMenuItem>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="left" className="max-w-xs">
+                    {!mainCompletedInScope
                       ? "Ingen kjøring å angre for valgt dato/tur"
-                      : "Slett pakksedler og angre kjøringen for valgt dato/tur"
-                  }
-                  onSelect={() => setConfirmUndoOpen(true)}
-                  className="text-destructive focus:text-destructive"
-                >
-                  Angre kjøring
-                </DropdownMenuItem>
+                      : "Slett pakksedler og angre kjøringen for valgt dato/tur"}
+                  </TooltipContent>
+                </Tooltip>
+                </TooltipProvider>
+
 
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
