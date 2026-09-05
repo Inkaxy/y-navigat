@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { MatrixProduct, MatrixTour } from "@/ordre/hooks/useMatrix";
 import { formatNOK } from "@/ordre/lib/format";
+import { Button } from "@/components/ui/button";
 
 export type FlatLineRow = {
   key: string;
