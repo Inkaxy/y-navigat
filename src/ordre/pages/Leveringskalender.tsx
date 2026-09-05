@@ -1524,9 +1524,11 @@ export default function MatrixPage() {
                     onSelect={(d) => {
                       if (!d) return;
                       const iso = fmtDate(d, "yyyy-MM-dd");
-                      setDateFrom(iso);
-                      setDateTo(addDays(iso, Math.max(daysCount, 1) - 1));
-                      setQuickFilter(null);
+                      guardAction(() => {
+                        setDateFrom(iso);
+                        setDateTo(addDays(iso, Math.max(daysCount, 1) - 1));
+                        setQuickFilter(null);
+                      });
                       setFromDateOpen(false);
                     }}
                     initialFocus
