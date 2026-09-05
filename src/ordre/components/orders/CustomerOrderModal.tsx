@@ -842,6 +842,7 @@ export function CustomerOrderModal({
                   order_id: row.id,
                   order_line_id: cakeLineInfo?.order_line_id ?? null,
                   production_department_id: cakeLineInfo?.production_department_id ?? null,
+                  require_label_unit: cakeLineInfo?.has_label_product ?? false,
                   delivery_date: input.deliveryDate,
                   title: cakeTitle,
                   customer_name: input.finalCustomerName,

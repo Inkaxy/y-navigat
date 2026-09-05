@@ -77,6 +77,7 @@ export default function AttachmentCakePrintButton({
         order_id: order?.id ?? null,
         order_line_id: cakeLine?.order_line_id ?? null,
         production_department_id: cakeLine?.production_department_id ?? null,
+        require_label_unit: cakeLine?.has_label_product ?? false,
         delivery_date: deliveryDate,
         title:
           (ticketSubject ?? "").trim() ||

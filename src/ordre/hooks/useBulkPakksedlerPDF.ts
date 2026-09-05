@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
 import type { PakkseddelPDFData, PakkseddelPDFLine } from "@/ordre/hooks/usePakkseddelPDF";
+import { fetchLabelNumbersByUnit, resolveLabelNumber } from "@/ordre/lib/labelNumber";
 
 export type BulkTourGroup = {
   /** delivery_tour_id, eller null for "Uten tur" */
@@ -172,10 +173,11 @@ export function useBulkPakksedlerPDF(scope: BulkScope | null) {
       if (orderLineIds.length > 0) {
         const { data: cakeRows, error: cakeErr } = await supabase
           .from("cake_images")
-          .select("order_line_id, label_number, edited_path, original_path")
+          .select("order_line_id, label_unit_id, label_number, edited_path, original_path")
           .in("order_line_id", orderLineIds);
         if (cakeErr) throw cakeErr;
         const rows = (cakeRows ?? []) as any[];
+        const numberByUnit = await fetchLabelNumbersByUnit(rows);
         const paths = rows.map((r) => r.edited_path || r.original_path).filter(Boolean);
         const { data: signed } = paths.length
           ? await supabase.storage.from("cake-images").createSignedUrls(paths, 60 * 30)
@@ -183,7 +185,7 @@ export function useBulkPakksedlerPDF(scope: BulkScope | null) {
         const urlMap = Object.fromEntries((signed ?? []).map((sg: any) => [sg.path, sg.signedUrl]));
         for (const r of rows) {
           cakeByLine[r.order_line_id as string] = {
-            label_number: r.label_number ?? null,
+            label_number: resolveLabelNumber(r, numberByUnit),
             url: urlMap[r.edited_path || r.original_path] ?? null,
           };
         }
