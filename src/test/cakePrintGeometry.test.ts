@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { placementGeometry, rotatedImageDraw } from "@/ordre/lib/cakePrint";
+import {
+  placementGeometry,
+  rotatedImageDraw,
+  scaledPlacementSize,
+} from "@/ordre/lib/cakePrint";
 import { packSheets } from "@/ordre/lib/cakeSheetLayout";
 import type { Placement } from "@/ordre/lib/cakeSheetLayout";
 
@@ -48,5 +52,20 @@ describe("rotatedImageDraw", () => {
     expect(draw.heightMm).toBe(100); // bredden på papiret
     expect(draw.widthMm).toBe(200); // høyden på papiret
     expect(draw.rotation).toBe(90);
+  });
+});
+
+describe("scaledPlacementSize", () => {
+  it("bruker X-korreksjon på bredden når bildet står rett", () => {
+    expect(
+      scaledPlacementSize({ widthMm: 100, heightMm: 200 }, 1.02, 0.98, false),
+    ).toEqual({ widthMm: 102, heightMm: 196 });
+  });
+
+  it("bytter korreksjonsakser når plasseringen er rotert", () => {
+    // Bildet er 100 × 200 mm, men ligger på tvers: 200 mm langs arkets X-akse.
+    expect(
+      scaledPlacementSize({ widthMm: 100, heightMm: 200 }, 1.02, 0.98, true),
+    ).toEqual({ widthMm: 204, heightMm: 98 });
   });
 });

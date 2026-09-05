@@ -518,10 +518,16 @@ export async function buildCakePdf(
         }
       }
       if (item.labelNumber) {
-        pdf.setFontSize(12);
-        if (geo.rotated) pdf.text(`#${item.labelNumber}`, capX + 4, capY + QR_MM + 4);
-        else pdf.text(`#${item.labelNumber}`, textX, capY + 4);
+        if (geo.rotated) {
+          // Stripen er bare 10 mm bred — nummeret settes på høykant i 9 pt.
+          pdf.setFontSize(9);
+          pdf.text(`#${item.labelNumber}`, capX + 3.5, capY + QR_MM + 4, { angle: 90 });
+        } else {
+          pdf.setFontSize(12);
+          pdf.text(`#${item.labelNumber}`, textX, capY + 4);
+        }
       }
+
 
       pdf.setFontSize(7);
       const line1 = [item.customerName, item.orderRef ? `Ordre ${item.orderRef}` : null]
