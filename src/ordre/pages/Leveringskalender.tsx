@@ -455,9 +455,19 @@ export default function MatrixPage() {
     const productById = new Map(allProducts.map((p) => [p.id, p]));
     const rowMap = new Map<string, Row>();
 
-    // 1) Lagrede celler (ta med ALLE bestilte linjer, også uten tur)
+    // 1) Lagrede celler (ta med ALLE bestilte linjer, også uten tur).
+    //    Flere ordre på samme dato|tur|produkt summeres til én rad.
     for (const c of matrix.existing_cells) {
       const key = `${c.delivery_date}|${c.delivery_tour_id ?? ""}|${c.product_id}`;
+      const prev = rowMap.get(key);
+      if (prev) {
+        prev.quantity += Number(c.quantity);
+        prev.line_total_incl_vat += Number(c.line_total_incl_vat);
+        if (c.order_id && !prev.order_ids?.includes(c.order_id)) {
+          prev.order_ids = [...(prev.order_ids ?? []), c.order_id];
+        }
+        continue;
+      }
       rowMap.set(key, {
         key,
         delivery_date: c.delivery_date,
@@ -466,10 +476,13 @@ export default function MatrixPage() {
         quantity: Number(c.quantity),
         unit_price: Number(c.unit_price),
         line_total_incl_vat: Number(c.line_total_incl_vat),
+        order_ids: c.order_id ? [c.order_id] : [],
+        order_number: c.order_number ?? null,
+        readOnly: !c.delivery_tour_id,
       });
     }
 
-    // 2) Fastordre (faktiske faste bestillinger fra recurring schedules)
+    // 2) Fastordre — samme ghost-regel som i rutenettet
     if (ghostMap) {
       for (const [gkey, qty] of ghostMap.entries()) {
         if (!qty || qty <= 0) continue;
@@ -477,6 +490,7 @@ export default function MatrixPage() {
         if (!visibleDates.has(date)) continue;
         const key = `${date}|${tour_id}|${product_id}`;
         if (rowMap.has(key)) continue;
+        if (visibleGhostQty({ key, ...ghostRuleBase }) <= 0) continue;
         const p = productById.get(product_id);
         const unitPrice = Number(p?.unit_price ?? 0);
         const mvaRate = Number(p?.mva_rate ?? 0);
