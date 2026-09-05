@@ -2035,6 +2035,11 @@ export default function MatrixPage() {
         />
       )}
 
+      <UnsavedChangesDialog
+        {...unsavedGuard.dialogProps}
+        description="Celleendringene i matrisen er ikke lagret ennå. Forkaster du dem, forsvinner de."
+      />
+
       <AlertDialog open={discardOpen} onOpenChange={setDiscardOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
