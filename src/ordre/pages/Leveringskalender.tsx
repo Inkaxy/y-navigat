@@ -2322,8 +2322,40 @@ function MatrixGrid({
                     </div>
                   </div>
                 </th>
-                {columns.map((c) => {
+                {renderCols.map((rc) => {
+                  if (rc.kind === "notour") {
+                    const entry = noTourByDate.get(rc.date)?.get(p.id);
+                    return (
+                      <td
+                        key={`${rc.date}-notour-${p.id}`}
+                        className="border-b border-r border-border bg-muted/30 px-1 py-1.5 text-center"
+                        title={
+                          entry
+                            ? `Uten tur${entry.orderNumbers.length ? ` · ${entry.orderNumbers.join(", ")}` : ""}`
+                            : undefined
+                        }
+                      >
+                        {entry ? (
+                          <div className="flex flex-col items-center gap-0.5">
+                            <span className="text-base font-semibold tabular-nums">
+                              {entry.quantity}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => onMoveToTour(entry)}
+                              disabled={!canEdit}
+                              className="rounded px-1 text-[10px] font-medium text-primary hover:bg-primary/10 disabled:opacity-40"
+                            >
+                              Flytt til tur
+                            </button>
+                          </div>
+                        ) : null}
+                      </td>
+                    );
+                  }
+                  const c = rc;
                   const key = ckey(c.date, c.tour.id, p.id);
+                  const dupOrders = orderCount(key);
                   const value = getValue(key);
                   const dirty = isDirty(key);
                   const hasM = hasMerknad(key);
