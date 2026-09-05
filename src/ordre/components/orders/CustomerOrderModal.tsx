@@ -50,6 +50,8 @@ import type { CustomerOption } from "@/ordre/hooks/useNBCustomers";
 import { tomorrow } from "@/ordre/lib/format";
 import { usePreviewDeliveryRules } from "@/ordre/hooks/usePreviewDeliveryRules";
 import { DeliveryRulesFeedback } from "@/ordre/components/rules/DeliveryRulesFeedback";
+import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
+import { UnsavedChangesDialog } from "@/components/common/UnsavedChangesDialog";
 import { OverrideRuleDialog } from "@/ordre/components/rules/OverrideRuleDialog";
 import { useUserAccess } from "@/ordre/hooks/useUserAccess";
 import { useAuth } from "@/hooks/useAuth";
@@ -318,7 +320,7 @@ export function CustomerOrderModal({
   const [lines, setLines] = useState<LineDraft[]>([newLine()]);
   const [submitting, setSubmitting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [confirmCancel, setConfirmCancel] = useState(false);
+
   const [dirty, setDirty] = useState(false);
   const [merknadFor, setMerknadFor] = useState<string | null>(null);
 
@@ -854,12 +856,11 @@ export function CustomerOrderModal({
   }
 
   function handleClose() {
-    if (dirty) {
-      setConfirmCancel(true);
-    } else {
-      onOpenChange(false);
-    }
+    unsavedGuard.requestAction(() => onOpenChange(false));
   }
+
+  /** Ulagret-vakt: samme dialog som resten av ordre-modulen. */
+  const unsavedGuard = useUnsavedChangesGuard(dirty && open);
 
   const canDelete = isEdit && !existing?.picked_up_at;
   const deleteTooltip = existing?.picked_up_at
@@ -1355,31 +1356,10 @@ export function CustomerOrderModal({
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={confirmCancel} onOpenChange={setConfirmCancel}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              <span className="inline-flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-warning" /> Forkast endringer?
-              </span>
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              Det er ulagrede endringer. Vil du forkaste dem?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Bli</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                setConfirmCancel(false);
-                onOpenChange(false);
-              }}
-            >
-              Forkast
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <UnsavedChangesDialog
+        {...unsavedGuard.dialogProps}
+        description="Ordren har endringer som ikke er lagret. Forkaster du dem, forsvinner de."
+      />
 
       <OverrideRuleDialog
         open={overrideOpen}
