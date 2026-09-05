@@ -34,7 +34,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { fetchEffectivePrice, type ProductOption } from "@/ordre/hooks/useNBProducts";
+import {
+  fetchEffectivePrice,
+  fetchEffectivePricesBatch,
+  type EffectivePrice,
+  type ProductOption,
+} from "@/ordre/hooks/useNBProducts";
+import { logAppError } from "@/lib/errorLog";
 import { ProductSearchInput } from "@/ordre/components/orders/ProductSearchInput";
 import {
   countRiskyPriceLines,
@@ -345,6 +351,7 @@ export function CustomerOrderModal({
    * Skjemaet fylles programmatisk når panelet åpnes. Et urørt skjema skal
    * ikke gi «ulagrede endringer»-dialog, så første oppsett hoppes over.
    */
+  const linesRef = useRef<LineDraft[]>([]);
   const initializedRef = useRef(false);
   const skipNextDirtyRef = useRef(false);
   const [merknadFor, setMerknadFor] = useState<string | null>(null);
@@ -565,6 +572,8 @@ export function CustomerOrderModal({
     // intentional shallow listing of dependencies for "dirty" detection
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [name, email, phone, deliveryDate, hour, minute, tourId, distribution, source, sendSms, sendEmail, isPaid, lines]);
+
+  linesRef.current = lines;
 
   // Ny dato kan gi ny pris: hent alle linjeprisene i én runde. Manuelt
   // overstyrte priser røres ikke.
