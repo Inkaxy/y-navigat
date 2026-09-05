@@ -49,7 +49,7 @@ export function useSlaBreachNotifications(
         qc.invalidateQueries({ queryKey: ["notifications"] });
       })
       .catch((e: unknown) => {
-        logAppError(e, { source: "useSlaBreachNotifications" });
+        logAppError(e, { scope: "ordre:sla-breach-varsel" });
       })
       .finally(() => {
         running.current = false;
