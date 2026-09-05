@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   buildIlikeOr,
+  isNumericTerm,
+  parseTicketRef,
   entityRoute,
   groupEntityHits,
   sanitizeSearchTerm,
@@ -18,6 +20,29 @@ describe("sanitizeSearchTerm", () => {
 
   it("beholder rene tall", () => {
     expect(sanitizeSearchTerm("1042")).toBe("1042");
+  });
+});
+
+describe("parseTicketRef", () => {
+  const uuid = "3f1a2b3c-4d5e-6f70-8192-a3b4c5d6e7f8";
+
+  it("godtar ren uuid og «T-»/«#»-prefiks", () => {
+    expect(parseTicketRef(uuid)).toBe(uuid);
+    expect(parseTicketRef(`T-${uuid}`)).toBe(uuid);
+    expect(parseTicketRef(`#${uuid}`)).toBe(uuid);
+  });
+
+  it("returnerer null for vanlig fritekst", () => {
+    expect(parseTicketRef("kringle")).toBeNull();
+    expect(parseTicketRef("1042")).toBeNull();
+  });
+});
+
+describe("isNumericTerm", () => {
+  it("kjenner igjen rene tall", () => {
+    expect(isNumericTerm(" 1042 ")).toBe(true);
+    expect(isNumericTerm("10 42")).toBe(false);
+    expect(isNumericTerm("A1042")).toBe(false);
   });
 });
 

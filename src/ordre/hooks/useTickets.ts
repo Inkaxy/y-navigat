@@ -1,3 +1,8 @@
+import {
+  DEFAULT_BUSINESS_HOURS,
+  DEFAULT_SLA,
+  computeDeadline,
+} from "@/ordre/lib/sla";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -224,6 +229,15 @@ export type TicketQueueRow = Pick<
  * Åpne tickets i én spørring. Tellerne utledes i klienten i stedet for fire
  * separate `count`-kall, og selve radene gjenbrukes av arbeidskøene.
  */
+/**
+ * Telleren «Må tas nå» bruker standardfristen (uten AI-intensjon), slik at
+ * dashbordet slipper et ekstra oppslag. Innboksen regner fristen mer presist.
+ */
+function isOverdueByDefaultSla(receivedAt: string, now: number): boolean {
+  const deadline = computeDeadline(receivedAt, null, DEFAULT_SLA, DEFAULT_BUSINESS_HOURS);
+  return !!deadline && deadline.getTime() < now;
+}
+
 export function useTicketCounts() {
   return useQuery({
     queryKey: ["tickets-counts"],
@@ -241,6 +255,7 @@ export function useTicketCounts() {
         .limit(500);
       if (error) throw error;
 
+      const now = Date.now();
       const openTickets = (data ?? []) as unknown as TicketQueueRow[];
       const newTickets = openTickets.filter((t) => t.status === "new");
 
@@ -250,6 +265,9 @@ export function useTicketCounts() {
         inProgressCount: openTickets.filter((t) => t.status === "in_progress").length,
         mineCount: myId ? openTickets.filter((t) => t.assigned_to === myId).length : 0,
         unassignedCount: openTickets.filter((t) => t.assigned_to == null).length,
+        nowCount: openTickets.filter(
+          (t) => t.priority === "urgent" || isOverdueByDefaultSla(t.received_at, now),
+        ).length,
         latestNew: newTickets.slice(0, 5) as Pick<
           Ticket,
           "id" | "subject" | "sender_email" | "sender_name" | "received_at"

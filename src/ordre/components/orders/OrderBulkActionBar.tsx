@@ -74,6 +74,9 @@ export function OrderBulkActionBar({
         const order = selected[i];
         toast.loading(`Sletter ${i + 1} av ${count}…`, { id: toastId });
         try {
+          const { error: delErr } = await supabase.from("orders").delete().eq("id", order.id);
+          if (delErr) throw delErr;
+          // Audit skrives først når slettingen faktisk gikk gjennom.
           await logAudit({
             entity_type: "order",
             entity_id: order.id,
@@ -82,8 +85,6 @@ export function OrderBulkActionBar({
             changes: { order_snapshot: order as unknown as Record<string, unknown> },
             reason: "Bulk-sletting fra ordreliste",
           });
-          const { error: delErr } = await supabase.from("orders").delete().eq("id", order.id);
-          if (delErr) throw delErr;
           ok++;
         } catch (e) {
           failed++;

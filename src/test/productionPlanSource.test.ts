@@ -34,6 +34,27 @@ describe("productionStatusesForDate", () => {
   });
 });
 
+describe("excludePausedLines på virtuelle fastordrelinjer", () => {
+  const recurring = [
+    { customer_id: "c1", tour_id: null, product_id: "p1", quantity: 3 },
+    { customer_id: "c2", tour_id: "t1", product_id: "p1", quantity: 2 },
+  ];
+
+  it("fjerner fastordrelinjer for kunder i pause uten turfilter", () => {
+    const kept = excludePausedLines(recurring, [pause()], "2026-09-10");
+    expect(kept.map((l) => l.customer_id)).toEqual(["c2"]);
+  });
+
+  it("beholder linjen når pausen gjelder en annen tur", () => {
+    const kept = excludePausedLines(
+      recurring,
+      [pause({ customer_id: "c2", tour_filter: ["t9"] })],
+      "2026-09-10",
+    );
+    expect(kept).toHaveLength(2);
+  });
+});
+
 describe("excludePausedLines", () => {
   const lines = [
     { customer_id: "c1", tour_id: "t1", n: 1 },

@@ -1,6 +1,8 @@
 import { supabase } from "@/integrations/supabase/client";
 import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
 import { fetchAllRows } from "@/lib/supabasePaging";
+import { osloDateISO } from "@/lib/osloDate";
+import { osloDateISO } from "@/lib/osloDate";
 
 /**
  * ÉN felles definisjon av hvilke ordre som er «gjenstående» (ventende) for
@@ -78,11 +80,9 @@ export function isPendingOrder(
 /** Antall dager bakover korreksjonsmodus ser. */
 export const CORRECTION_WINDOW_DAYS = 60;
 
-/** ISO-dato forskjøvet et antall dager (UTC-trygt). */
+/** ISO-dato forskjøvet et antall dager (Oslo-trygt). */
 export function shiftIso(date: string, days: number): string {
-  const d = new Date(`${date}T12:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
+  return osloDateISO(new Date(`${date}T12:00:00Z`).getTime() + days * 86_400_000);
 }
 
 /** Nedre grense for korreksjonsmodus (siste 60 dager). */

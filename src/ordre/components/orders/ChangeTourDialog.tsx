@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { invalidateOrderQueries } from "@/ordre/lib/orderConflict";
 import {
   Dialog,
   DialogContent,
@@ -74,8 +75,7 @@ export function ChangeTourDialog({
     },
     onSuccess: () => {
       toast.success("Tur oppdatert");
-      void qc.invalidateQueries({ queryKey: ["order", orderId] });
-      void qc.invalidateQueries({ queryKey: ["order-events", orderId] });
+      void invalidateOrderQueries(qc, orderId);
       void qc.invalidateQueries({ queryKey: ["matrix"] });
       onOpenChange(false);
     },

@@ -26,7 +26,8 @@ export function CakeLayerList({ layers, active, onSelect, onAction }: Props) {
     return <p className="text-xs text-muted-foreground">Ingen lag enda.</p>;
   }
   return (
-    <div className="space-y-1">
+    // Under 1024 px skal alle knappene være minst 40 px høye (touch-mål).
+    <div className="space-y-1 [&_button]:h-10 lg:[&_button]:h-7">
       {[...layers].reverse().map((o, i) => {
         const locked = o.selectable === false;
         return (

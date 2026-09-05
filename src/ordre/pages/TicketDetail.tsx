@@ -793,7 +793,7 @@ export default function TicketDetail() {
             {customerCard?.customer ? (
               <div className="space-y-1 text-sm">
                 <Link
-                  to={`/kunder/kunder/${customerCard.customer.id}`}
+                  to={`/kunder/kundeliste/${customerCard.customer.id}`}
                   className="font-semibold text-foreground underline-offset-2 hover:underline"
                 >
                   {customerCard.customer.display_name}

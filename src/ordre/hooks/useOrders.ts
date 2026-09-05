@@ -74,20 +74,60 @@ export type OrderListFilters = {
   pageSize?: number;
 };
 
+const ORDER_LIST_COLUMNS =
+  "id, order_number, status, order_kind, approval_reason, source, customer_id, customer_snapshot, delivery_date, delivery_time, delivery_tour_id, total_incl_vat, status_changed_at, ordered_at, created_at, rule_flags, rule_override_reason, order_lines(count)";
+
+/**
+ * Minimal strukturell type for PostgREST-filtrene vi bruker — lar oss dele
+ * filteroppsettet mellom id-oppslaget og radoppslaget uten `any`.
+ */
+type OrderFilterBuilder = {
+  in(column: string, values: readonly string[]): OrderFilterBuilder;
+  eq(column: string, value: string): OrderFilterBuilder;
+  gte(column: string, value: string): OrderFilterBuilder;
+  lte(column: string, value: string): OrderFilterBuilder;
+  or(filter: string): OrderFilterBuilder;
+};
+
+type QueryRow = Omit<OrderListRow, "line_count"> & {
+  order_lines?: { count: number }[] | null;
+};
+
+function mapRows(data: unknown): OrderListRow[] {
+  return ((data ?? []) as QueryRow[]).map((r) => ({
+    ...r,
+    line_count: Array.isArray(r.order_lines) && r.order_lines[0] ? r.order_lines[0].count : 0,
+  }));
+}
+
+/**
+ * Slår opp hvilke av ordrene som faktisk har den ønskede livssyklusen.
+ * Bruker samme kilde som `useOrdersLifecycle` (RPC-en `orders_lifecycle`),
+ * slik at total og paginering stemmer med det brukeren ser.
+ */
+async function filterIdsByLifecycle(
+  ids: string[],
+  lifecycle: OrderLifecycle,
+): Promise<Set<string>> {
+  const keep = new Set<string>();
+  const CHUNK = 400;
+  for (let i = 0; i < ids.length; i += CHUNK) {
+    const chunk = ids.slice(i, i + CHUNK);
+    const { data, error } = await supabase.rpc("orders_lifecycle", { p_order_ids: chunk });
+    if (error) throw error;
+    for (const row of (data ?? []) as unknown as { order_id: string; lifecycle: string }[]) {
+      if (row.lifecycle === lifecycle) keep.add(row.order_id);
+    }
+  }
+  return keep;
+}
+
 export function useOrderList(filters: OrderListFilters) {
   const pageSize = filters.pageSize ?? 50;
   const page = filters.page ?? 0;
   return useQuery({
     queryKey: ["orders", filters],
     queryFn: async () => {
-      let q = supabase
-        .from("orders")
-        .select(
-          "id, order_number, status, order_kind, approval_reason, source, customer_id, customer_snapshot, delivery_date, delivery_time, delivery_tour_id, total_incl_vat, status_changed_at, ordered_at, created_at, rule_flags, rule_override_reason, order_lines(count)",
-          { count: "exact" },
-        )
-        .eq("legal_entity_id", NB_LEGAL_ENTITY_ID);
-
       const lcStatuses = lifecycleStatuses(filters.lifecycle);
       const statusFilter = lcStatuses
         ? filters.statuses && filters.statuses.length > 0
@@ -95,55 +135,89 @@ export function useOrderList(filters: OrderListFilters) {
           : lcStatuses
         : filters.statuses;
 
-      if (statusFilter && statusFilter.length > 0) {
-        q = q.in("status", statusFilter);
-      } else if (statusFilter && statusFilter.length === 0) {
+      if (statusFilter && statusFilter.length === 0) {
         return { rows: [] as OrderListRow[], total: 0 };
       }
-      if (filters.kinds && filters.kinds.length > 0) {
-        q = q.in("order_kind", filters.kinds);
-      }
-      if (filters.source && filters.source !== "all") {
-        q = q.eq("source", filters.source);
-      }
-      if (filters.tourIds && filters.tourIds.length > 0) {
-        q = q.in("delivery_tour_id", filters.tourIds);
-      }
-      if (filters.deliveryFrom) q = q.gte("delivery_date", filters.deliveryFrom);
-      if (filters.deliveryTo) q = q.lte("delivery_date", filters.deliveryTo);
-      if (filters.customerId) q = q.eq("customer_id", filters.customerId);
 
-      if (filters.search && filters.search.trim().length > 0) {
-        const s = filters.search.trim().replace(/[%,]/g, " ");
-        q = q.or(
-          [
-            `order_number.ilike.%${s}%`,
-            `internal_notes.ilike.%${s}%`,
-            `customer_snapshot->>display_name.ilike.%${s}%`,
-            `customer_snapshot->>customer_number.ilike.%${s}%`,
-          ].join(","),
+      /** Legger alle brukerfiltrene på en spørring (samme sett for id- og radoppslag). */
+      const applyFilters = <T extends OrderFilterBuilder>(query: T): T => {
+        let q = query;
+        if (statusFilter && statusFilter.length > 0) q = q.in("status", statusFilter);
+        if (filters.kinds && filters.kinds.length > 0) q = q.in("order_kind", filters.kinds);
+        if (filters.source && filters.source !== "all") q = q.eq("source", filters.source);
+        if (filters.tourIds && filters.tourIds.length > 0) {
+          q = q.in("delivery_tour_id", filters.tourIds);
+        }
+        if (filters.deliveryFrom) q = q.gte("delivery_date", filters.deliveryFrom);
+        if (filters.deliveryTo) q = q.lte("delivery_date", filters.deliveryTo);
+        if (filters.customerId) q = q.eq("customer_id", filters.customerId);
+        if (filters.search && filters.search.trim().length > 0) {
+          const s = filters.search.trim().replace(/[%,]/g, " ");
+          q = q.or(
+            [
+              `order_number.ilike.%${s}%`,
+              `internal_notes.ilike.%${s}%`,
+              `customer_snapshot->>display_name.ilike.%${s}%`,
+              `customer_snapshot->>customer_number.ilike.%${s}%`,
+            ].join(","),
+          );
+        }
+        return q;
+      };
+
+      // «Uten pakkseddel» og «pakkseddel» kan ikke skilles på status alene.
+      // Da avgjøres settet først, slik at både total og sider blir riktige.
+      if (needsClientLifecycleRefinement(filters.lifecycle)) {
+        const candidates = await fetchAllRows<{ id: string; delivery_date: string }>((from, to) =>
+          applyFilters(
+            supabase
+              .from("orders")
+              .select("id, delivery_date")
+              .eq("legal_entity_id", NB_LEGAL_ENTITY_ID),
+          )
+            .order("delivery_date", { ascending: true })
+            .order("id", { ascending: true })
+            .range(from, to),
         );
+        const keep = await filterIdsByLifecycle(
+          candidates.map((c) => c.id),
+          filters.lifecycle as OrderLifecycle,
+        );
+        const matching = candidates.filter((c) => keep.has(c.id));
+        const pageIds = matching.slice(page * pageSize, page * pageSize + pageSize).map((c) => c.id);
+        if (pageIds.length === 0) {
+          return { rows: [] as OrderListRow[], total: matching.length };
+        }
+        const { data, error } = await supabase
+          .from("orders")
+          .select(ORDER_LIST_COLUMNS)
+          .in("id", pageIds);
+        if (error) throw error;
+        const byId = new Map(mapRows(data).map((r) => [r.id, r]));
+        const rows = pageIds
+          .map((id) => byId.get(id))
+          .filter((r): r is OrderListRow => Boolean(r));
+        return { rows, total: matching.length };
       }
 
-      q = q.order("delivery_date", { ascending: true }).range(page * pageSize, page * pageSize + pageSize - 1);
+      const q = applyFilters(
+        supabase
+          .from("orders")
+          .select(ORDER_LIST_COLUMNS, { count: "exact" })
+          .eq("legal_entity_id", NB_LEGAL_ENTITY_ID),
+      )
+        .order("delivery_date", { ascending: true })
+        .range(page * pageSize, page * pageSize + pageSize - 1);
 
       const { data, error, count } = await q;
       if (error) throw error;
 
-      type QueryRow = Omit<OrderListRow, "line_count"> & {
-        order_lines?: { count: number }[] | null;
-      };
-      const rows: OrderListRow[] = ((data ?? []) as unknown as QueryRow[]).map((r) => ({
-        ...r,
-        line_count: Array.isArray(r.order_lines) && r.order_lines[0] ? r.order_lines[0].count : 0,
-      }));
-
-
-      return { rows, total: count ?? 0 };
+      return { rows: mapRows(data), total: count ?? 0 };
     },
     placeholderData: (prev) => prev,
   });
 }
+
 
 export type StatusCount = { status: OrderStatus; count: number };
 

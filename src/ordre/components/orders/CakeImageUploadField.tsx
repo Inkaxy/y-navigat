@@ -86,7 +86,12 @@ export function CakeImageUploadField({
     try {
       const { path } = await uploadCakeImageFile(file, deliveryDate);
       if (orderLineId) {
-        await attachCakeImageToOrderLine(orderLineId, path, productName);
+        const { labelWarning } = await attachCakeImageToOrderLine(
+          orderLineId,
+          path,
+          productName,
+        );
+        if (labelWarning) toast.warning(labelWarning);
         await loadExisting();
         onPendingPathChange(null);
         toast.success(`Kakebildet er lagt i utskriftskøen`, {

@@ -172,7 +172,7 @@ export function useCustomerActivityFeed(filters: ActivityFilters) {
             customer_name: o.customers?.display_name ?? null,
             changes: { status: o.status, source: o.source, delivery_date: o.delivery_date },
             reason: null,
-            href: o.id ? `/ordre/bestillinger/${o.id}` : null,
+            href: o.id ? `/ordre/ordrer/${o.id}` : null,
             source_app: "ordre",
           });
         }
@@ -191,7 +191,7 @@ export function useCustomerActivityFeed(filters: ActivityFilters) {
             customer_name: o.customers?.display_name ?? null,
             changes: { delivery_date: o.delivery_date },
             reason: null,
-            href: o.id ? `/ordre/bestillinger/${o.id}` : null,
+            href: o.id ? `/ordre/ordrer/${o.id}` : null,
             source_app: "ordre",
           });
         }

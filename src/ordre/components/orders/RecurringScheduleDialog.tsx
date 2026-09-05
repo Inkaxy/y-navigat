@@ -674,7 +674,10 @@ export function RecurringScheduleDialog({
         </div>
 
         <DialogFooter className="gap-2 sm:justify-between px-6 py-3 border-t bg-background">
-          <div>
+          <div className="flex items-center gap-2">
+            <span className="hidden text-xs text-muted-foreground sm:block">
+              Endringer gjelder leveringer som ennå ikke er kjørt på pakkseddel.
+            </span>
             {isEdit && (
               <Button
                 variant="outline"

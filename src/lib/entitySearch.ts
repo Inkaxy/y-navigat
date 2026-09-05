@@ -24,6 +24,22 @@ export function buildIlikeOr(columns: string[], term: string): string {
   return columns.map((c) => `${c}.ilike.%${safe}%`).join(",");
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Tar imot en direkte referanse til en sak: en ren UUID, eller UUID-en med
+ * «T-»/«#»-prefiks slik den vises i saksoverskrifter og lenker.
+ */
+export function parseTicketRef(raw: string): string | null {
+  const t = raw.trim().replace(/^[#tT]-?/, "").trim();
+  return UUID_RE.test(t) ? t.toLowerCase() : null;
+}
+
+/** Er søket bare siffer? Da er det trolig et ordre-, kunde- eller varenummer. */
+export function isNumericTerm(raw: string): boolean {
+  return /^\d+$/.test(raw.trim());
+}
+
 export type EntityKind = "customer" | "order" | "product" | "ticket";
 
 export type EntityHit = {

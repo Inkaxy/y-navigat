@@ -2,7 +2,39 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Printer, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { useBulkPakksedlerPDF, type BulkScope } from "@/ordre/hooks/useBulkPakksedlerPDF";
+import {
+  useBulkPakksedlerPDF,
+  type BulkPakksedlerPDFData,
+  type BulkScope,
+} from "@/ordre/hooks/useBulkPakksedlerPDF";
+
+/** Maks antall pakksedler per PDF-fil — større filer henger nettleseren. */
+const CHUNK_SIZE = 25;
+
+/** Deler datasettet i biter à 25 pakksedler, uten å blande turgruppene. */
+export function chunkBulkData(
+  data: BulkPakksedlerPDFData,
+  chunkSize = CHUNK_SIZE,
+): BulkPakksedlerPDFData[] {
+  const chunks: BulkPakksedlerPDFData[] = [];
+  let current: BulkPakksedlerPDFData | null = null;
+  let count = 0;
+  for (const group of data.groups) {
+    for (const note of group.notes) {
+      if (!current || count === chunkSize) {
+        current = { ...data, groups: [], total_notes: 0 };
+        chunks.push(current);
+        count = 0;
+      }
+      const last = current.groups[current.groups.length - 1];
+      if (last && last.tour_id === group.tour_id) last.notes.push(note);
+      else current.groups.push({ ...group, notes: [note] });
+      current.total_notes += 1;
+      count += 1;
+    }
+  }
+  return chunks;
+}
 
 interface Props {
   scope: BulkScope;
@@ -14,6 +46,10 @@ interface Props {
   /** Custom ikon (default: Printer) */
   icon?: React.ReactNode;
   ariaLabel?: string;
+}
+
+function errMsg(e: unknown): string {
+  return e instanceof Error ? e.message : "ukjent feil";
 }
 
 function slugify(s: string): string {
@@ -40,6 +76,7 @@ export function BulkPakkseddelPDFButton({
 
   const { data, isLoading, isFetching, error: queryError } = useBulkPakksedlerPDF(scope);
   const [generating, setGenerating] = useState(false);
+  const [progress, setProgress] = useState<string | null>(null);
 
   const empty = !!data && data.total_notes === 0;
 
@@ -60,62 +97,68 @@ export function BulkPakkseddelPDFButton({
           import("@react-pdf/renderer"),
           import("./BulkPakksedlerPDFDocument"),
         ]);
-      } catch (importErr: any) {
+      } catch (importErr) {
         console.error("[BulkPDF] Lazy import feilet:", importErr);
-        toast.error(`Kunne ikke laste PDF-modul: ${importErr?.message ?? "ukjent feil"}`);
+        toast.error(`Kunne ikke laste PDF-modul: ${errMsg(importErr)}`);
         return;
       }
 
       const { pdf } = pdfModule;
       const { BulkPakksedlerPDFDocument } = docModule;
 
-      // 2) Bygg PDF-instans (kan kaste i React-PDF rendering)
-      let instance;
-      try {
-        instance = pdf(<BulkPakksedlerPDFDocument data={data} />);
-      } catch (renderErr: any) {
-        console.error("[BulkPDF] pdf() krasjet under bygging:", renderErr);
-        toast.error(`Kunne ikke generere PDF: ${renderErr?.message ?? "rendering-feil"}`);
-        return;
-      }
-
-      // 3) Konverter til Blob
-      let blob: Blob;
-      try {
-        blob = await instance.toBlob();
-      } catch (blobErr: any) {
-        console.error("[BulkPDF] toBlob() feilet:", blobErr);
-        toast.error(`Kunne ikke generere PDF: ${blobErr?.message ?? "blob-feil"}`);
-        return;
-      }
-
-      if (!blob || blob.size === 0) {
-        console.error("[BulkPDF] Tom blob returnert", blob);
-        toast.error("Kunne ikke generere PDF: tomt resultat");
-        return;
-      }
-
-      // 4) Trigger nedlasting
-      const url = URL.createObjectURL(blob);
+      const chunks = chunkBulkData(data);
+      const total = data.total_notes;
       const tourSlug =
         scope.kind === "ids"
           ? "valgte"
           : scope.tourId === "all"
             ? "alle"
             : slugify(data.scope_label);
-      const fileName = `Pakksedler_${data.delivery_date}_${tourSlug}.pdf`;
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-      toast.success(`PDF lastet ned: ${fileName} (${data.total_notes} pakksedler)`);
-    } catch (err: any) {
+
+      let done = 0;
+      for (let i = 0; i < chunks.length; i += 1) {
+        const chunk = chunks[i];
+        const fromNo = done + 1;
+        const toNo = done + chunk.total_notes;
+        setProgress(chunks.length > 1 ? `Genererer ${fromNo}–${toNo} av ${total}…` : null);
+
+        let blob: Blob;
+        try {
+          blob = await pdf(<BulkPakksedlerPDFDocument data={chunk} />).toBlob();
+        } catch (renderErr) {
+          console.error("[BulkPDF] PDF-bygging feilet:", renderErr);
+          toast.error(`Kunne ikke generere PDF (${fromNo}–${toNo}): ${errMsg(renderErr)}`);
+          return;
+        }
+        if (!blob || blob.size === 0) {
+          console.error("[BulkPDF] Tom blob returnert");
+          toast.error("Kunne ikke generere PDF: tomt resultat");
+          return;
+        }
+
+        const part = chunks.length > 1 ? `_del${i + 1}av${chunks.length}` : "";
+        const fileName = `Pakksedler_${data.delivery_date}_${tourSlug}${part}.pdf`;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        done = toNo;
+      }
+
+      toast.success(
+        chunks.length > 1
+          ? `${total} pakksedler lastet ned i ${chunks.length} filer`
+          : `PDF lastet ned (${total} pakksedler)`,
+      );
+    } catch (err) {
       console.error("[BulkPDF] Uventet feil:", err);
-      toast.error(`Kunne ikke generere PDF: ${err?.message ?? "uventet feil"}`);
+      toast.error(`Kunne ikke generere PDF: ${errMsg(err)}`);
     } finally {
+      setProgress(null);
       setGenerating(false);
     }
   }
@@ -137,7 +180,7 @@ export function BulkPakkseddelPDFButton({
       aria-label={ariaLabel ?? (label || "Skriv ut")}
       title={
         queryError
-          ? `Datafeil: ${(queryError as any)?.message ?? "ukjent"}`
+          ? `Datafeil: ${errMsg(queryError)}`
           : empty
             ? "Ingen pakksedler i valgt omfang"
             : undefined
@@ -146,7 +189,7 @@ export function BulkPakkseddelPDFButton({
       {generating ? (
         <>
           <Loader2 className="h-4 w-4 animate-spin" />
-          {label && "Genererer PDF…"}
+          {label && (progress ?? "Genererer PDF…")}
         </>
       ) : (
         <>

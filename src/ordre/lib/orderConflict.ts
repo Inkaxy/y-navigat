@@ -19,6 +19,7 @@ export function invalidateOrderQueries(qc: QueryClient, orderId?: string | null)
     ["orders"],
     ["orders-lifecycle"],
     ["order-status-counts"],
+    ["delivery-day-status"],
     ["action-queue-counts"],
   ];
   if (orderId) {

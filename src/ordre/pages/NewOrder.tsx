@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { invalidateOrderQueries } from "@/ordre/lib/orderConflict";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 import { UnsavedChangesDialog } from "@/components/common/UnsavedChangesDialog";
@@ -94,6 +95,7 @@ function newLine(): LineDraft {
 
 export default function NewOrder() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
   const prefilledCustomerId = searchParams.get("customer_id");
   const ticketId = searchParams.get("ticket_id");
@@ -894,6 +896,7 @@ export default function NewOrder() {
         });
       }
 
+      await invalidateOrderQueries(queryClient, orderRow.id);
       toast.success(`Ordre ${numRow.order_number} opprettet`);
       setSavedOrder(true);
       navigate("/ordre/ordrer");

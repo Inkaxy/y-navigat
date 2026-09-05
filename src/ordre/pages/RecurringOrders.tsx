@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { CalendarRange, Copy, Loader2, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { CalendarRange, Copy, Info, Loader2, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { AppBanner } from "@/ordre/components/shell/AppBanner";
 import { Button } from "@/components/ui/button";
@@ -104,6 +105,17 @@ export default function RecurringOrders() {
       />
 
       <div className="container mx-auto space-y-4 px-4 py-6 sm:px-6">
+        <Card className="flex flex-wrap items-start gap-2 border-l-4 border-l-primary/50 p-3 text-sm">
+          <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+          <p className="flex-1 text-muted-foreground">
+            Fastordre er maler. De blir til faktiske ordre først når pakksedler kjøres for
+            en dato — endringer her påvirker bare leveringer som ennå ikke er kjørt.{" "}
+            <Link to="/ordre/pakksedler" className="font-medium text-primary underline-offset-2 hover:underline">
+              Gå til pakksedler
+            </Link>
+          </p>
+        </Card>
+
         <Card className="flex flex-wrap items-center gap-2 p-3">
           <div className="relative flex-1 min-w-[200px]">
             <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />

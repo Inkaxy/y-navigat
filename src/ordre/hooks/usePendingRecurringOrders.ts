@@ -4,7 +4,11 @@ import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
 import { useDeliveryTours } from "@/ordre/hooks/useDeliveryTours";
 import { NULL_TOUR_KEY } from "@/ordre/hooks/useTourRunStatus";
 import { pickEffectiveSchedulesForDate } from "@/ordre/lib/recurringOverrides";
-import { fetchDeliveryPauses, isPausedForDate } from "@/ordre/lib/pendingOrders";
+import {
+  fetchDeliveryPauses,
+  isPausedForDate,
+  type DeliveryPauseLike,
+} from "@/ordre/lib/pendingOrders";
 
 type DeliveryTourLike = {
   id: string;
@@ -60,6 +64,8 @@ function resolveFallbackTourId(tours: DeliveryTourLike[], isoDow: number) {
 export async function fetchPendingRecurringOrderCounts(
   date: string,
   tours: DeliveryTourLike[],
+  /** Allerede hentede leveransepauser — spar et rundturs-oppslag. */
+  knownPauses?: readonly DeliveryPauseLike[],
 ): Promise<PendingRecurringOrderCounts> {
   const weekday = isoDayOfWeek(date);
   const fallbackTourId = resolveFallbackTourId(tours, weekday);
@@ -81,7 +87,7 @@ export async function fetchPendingRecurringOrderCounts(
         .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
         .eq("delivery_date", date)
         .not("recurring_schedule_id", "is", null),
-      fetchDeliveryPauses(date, date),
+      knownPauses ?? fetchDeliveryPauses(date, date),
     ]);
 
   if (schedulesError) throw schedulesError;
@@ -133,6 +139,8 @@ export async function fetchPendingRecurringOrderRows(
   date: string,
   tours: DeliveryTourLike[],
   tourFilter: string,
+  /** Allerede hentede leveransepauser — spar et rundturs-oppslag. */
+  knownPauses?: readonly DeliveryPauseLike[],
 ): Promise<PendingRecurringOrderRow[]> {
   const weekday = isoDayOfWeek(date);
   const fallbackTourId = resolveFallbackTourId(tours, weekday);
@@ -154,7 +162,7 @@ export async function fetchPendingRecurringOrderRows(
         .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
         .eq("delivery_date", date)
         .not("recurring_schedule_id", "is", null),
-      fetchDeliveryPauses(date, date),
+      knownPauses ?? fetchDeliveryPauses(date, date),
     ]);
 
   if (schedulesError) throw schedulesError;
