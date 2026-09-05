@@ -98,6 +98,25 @@ export function applyScale(mm: number | null | undefined, scale = 1) {
   return Math.round(mm * scale * 100) / 100;
 }
 
+/**
+ * Kalibreringen korrigerer skriverens akser, ikke bildets. Når pakkeren legger
+ * bildet på tvers, bytter bildets bredde og høyde plass på arket — da må
+ * X-korreksjonen følge arkets bredde og Y-korreksjonen arkets høyde.
+ */
+export function scaledPlacementSize(
+  item: { widthMm?: number | null; heightMm?: number | null },
+  scale: number,
+  scaleY: number,
+  rotated: boolean,
+): { widthMm: number; heightMm: number } {
+  const w = item.widthMm ?? 0;
+  const h = item.heightMm ?? 0;
+  return rotated
+    ? { widthMm: (applyScale(h, scale) ?? 0), heightMm: (applyScale(w, scaleY) ?? 0) }
+    : { widthMm: (applyScale(w, scale) ?? 0), heightMm: (applyScale(h, scaleY) ?? 0) };
+}
+
+
 async function urlToDataUrl(url: string): Promise<string> {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
