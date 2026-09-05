@@ -2432,6 +2432,15 @@ function MatrixGrid({
                           <StickyNote className="h-2.5 w-2.5" />
                         </span>
                       )}
+                      {dupOrders > 1 && (
+                        <span
+                          className="pointer-events-none absolute left-0.5 top-0.5 text-muted-foreground"
+                          aria-label={`${dupOrders} ordre`}
+                          title={`${dupOrders} ordre — antallet er summert`}
+                        >
+                          <Layers className="h-2.5 w-2.5" />
+                        </span>
+                      )}
                       {cellHasData && !pause && (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
