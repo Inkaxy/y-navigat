@@ -329,6 +329,19 @@ export function CustomerOrderModal({
   /** 0-pris må bekreftes aktivt før lagring. */
   const [zeroPriceOpen, setZeroPriceOpen] = useState(false);
   const [zeroPriceConfirmed, setZeroPriceConfirmed] = useState(false);
+  /** Linjer uten reell pris (0 kr eller fallback) — må bekreftes før lagring. */
+  const riskyPriceLines = useMemo(
+    () =>
+      countRiskyPriceLines(
+        lines.map((l) => ({
+          hasProduct: !!l.product,
+          unit_price: l.unit_price,
+          is_fallback: l.is_fallback,
+        })),
+      ),
+    [lines],
+  );
+  const [pendingSaveReason, setPendingSaveReason] = useState<string | null>(null);
 
   // Vedlegg fra e-posten (ticket) — brukerens valg per vedlegg
   const [attachmentChoice, setAttachmentChoice] = useState<
@@ -628,20 +641,6 @@ export function CustomerOrderModal({
     return { qty, sum, count: lines.filter((l) => l.product).length };
   }, [lines]);
 
-  /** Linjer uten reell pris (0 kr eller fallback) — må bekreftes før lagring. */
-  const riskyPriceLines = useMemo(
-    () =>
-      countRiskyPriceLines(
-        lines.map((l) => ({
-          hasProduct: !!l.product,
-          unit_price: l.unit_price,
-          is_fallback: l.is_fallback,
-        })),
-      ),
-    [lines],
-  );
-  const [pendingSaveReason, setPendingSaveReason] = useState<string | null>(null);
-
   const fmtKr = (n: number) =>
     n.toLocaleString("nb-NO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -720,10 +719,10 @@ export function CustomerOrderModal({
 
   }
 
-  async function handleSave(overrideReason: string | null = null) {
+  async function handleSave(overrideReason: string | null = null, forceZeroPrice = false) {
     const input = buildInput(overrideReason);
     if (!input) return;
-    if (!zeroPriceConfirmed && riskyPriceLines > 0) {
+    if (!forceZeroPrice && !zeroPriceConfirmed && riskyPriceLines > 0) {
       setPendingSaveReason(overrideReason);
       setZeroPriceOpen(true);
       return;
@@ -1408,7 +1407,7 @@ export function CustomerOrderModal({
         onConfirm={() => {
           setZeroPriceOpen(false);
           setZeroPriceConfirmed(true);
-          void handleSave(pendingSaveReason);
+          void handleSave(pendingSaveReason, true);
         }}
       />
 
