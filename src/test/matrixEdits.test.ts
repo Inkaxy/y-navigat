@@ -62,7 +62,12 @@ describe("aggregateExistingCells", () => {
 
   it("legger linjer uten tur i egen bøtte, ikke i rutenettet", () => {
     const idx = aggregateExistingCells([
-      cell({ delivery_tour_id: null, quantity: 4, order_id: "o9", order_number: "1009" }),
+      cell({
+        delivery_tour_id: null as unknown as string,
+        quantity: 4,
+        order_id: "o9",
+        order_number: "1009",
+      }),
     ]);
     expect(Object.keys(idx.qty)).toHaveLength(0);
     const entry = idx.noTour.get(`${DATE}|${P1}`);
