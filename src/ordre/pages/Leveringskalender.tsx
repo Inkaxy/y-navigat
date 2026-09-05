@@ -543,40 +543,24 @@ export default function MatrixPage() {
   // ----- Totals (net kr) -----
   // Per-cell value = qty * (product.unit_price ?? 0). Per-row sum, per-col sum, grand total.
   const totals = useMemo(() => {
-    const rowTotals: Record<string, number> = {};
-    const colTotals: Record<string, number> = {}; // key: `${date}|${tour_id}`
-    let grand = 0;
-    for (const p of allProducts) {
-      const price = p.unit_price ?? 0;
-      let rowSum = 0;
-      for (const c of columns) {
-        const key = ckey(c.date, c.tour.id, p.id);
-        const ghostQty = ghostMap?.get(`${c.date}|${c.tour.id}|${p.id}`) ?? 0;
-        const qty =
-          key in edits
-            ? Number(edits[key] || 0)
-            : existingQty[key] ?? ghostQty;
-        if (!qty || !price) continue;
-        const amount = qty * price;
-        rowSum += amount;
-        const colKey = `${c.date}|${c.tour.id}`;
-        colTotals[colKey] = (colTotals[colKey] ?? 0) + amount;
-      }
-      rowTotals[p.id] = rowSum;
-      grand += rowSum;
-    }
+    const result = computeTotals({
+      products: allProducts,
+      columns: columns.map((c) => ({ date: c.date, tourId: c.tour.id })),
+      ...ghostRuleBase,
+    });
     // Dev-mode sanity check: row-sum total === col-sum total === grand
     if (import.meta.env.DEV) {
-      const rowSumGrand = Object.values(rowTotals).reduce((a, b) => a + b, 0);
-      const colSumGrand = Object.values(colTotals).reduce((a, b) => a + b, 0);
+      const rowSumGrand = Object.values(result.rowTotals).reduce((a, b) => a + b, 0);
+      const colSumGrand = Object.values(result.colTotals).reduce((a, b) => a + b, 0);
       console.assert(
-        Math.abs(rowSumGrand - grand) < 0.005 && Math.abs(colSumGrand - grand) < 0.005,
+        Math.abs(rowSumGrand - result.grand) < 0.005 &&
+          Math.abs(colSumGrand - result.grand) < 0.005,
         "[Matrix totals] row/col/grand mismatch",
-        { rowSumGrand, colSumGrand, grand },
+        { rowSumGrand, colSumGrand, grand: result.grand },
       );
     }
-    return { rowTotals, colTotals, grand };
-  }, [allProducts, columns, edits, existingQty, ghostMap]);
+    return result;
+  }, [allProducts, columns, ghostRuleBase]);
 
   async function handleSave() {
     if (!customerId || dirtyCount === 0) return;
