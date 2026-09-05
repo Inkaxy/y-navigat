@@ -565,18 +565,65 @@ export type CakeImagePrint = {
   kind: "print" | "reprint" | "pdf" | "test";
   sheet: string | null;
   note: string | null;
+  printer_label: string | null;
+  scale_applied_pct: number | null;
+  /** Navnet på den som skrev ut — slått opp fra `users`, aldri e-post. */
+  printed_by_name?: string | null;
 };
 
-/** Utskriftshistorikken for ett bilde — hvem, når og hva slags utskrift. */
+/** Utskriftshistorikken for ett bilde — hvem, når, hvilken skriver og skala. */
 export async function fetchPrintHistory(cakeImageId: string) {
   const { data, error } = await supabase
     .from("cake_image_prints")
-    .select("*")
+    .select(
+      "id, cake_image_id, printed_by, printed_at, kind, sheet, note, printer_label, scale_applied_pct",
+    )
     .eq("cake_image_id", cakeImageId)
     .order("printed_at", { ascending: false })
     .limit(25);
   if (error) throw error;
-  return (data ?? []) as unknown as CakeImagePrint[];
+  const rows = (data ?? []) as unknown as CakeImagePrint[];
+  const userIds = Array.from(
+    new Set(rows.map((r) => r.printed_by).filter(Boolean) as string[]),
+  );
+  if (userIds.length === 0) return rows;
+  const { data: users, error: userError } = await supabase
+    .from("users")
+    .select("id, display_name")
+    .in("id", userIds);
+  if (userError) {
+    console.warn("[cakeImages] kunne ikke hente navn på utskriver", userError);
+    return rows;
+  }
+  const names = new Map(
+    ((users ?? []) as Array<{ id: string; display_name: string | null }>).map((u) => [
+      u.id,
+      u.display_name,
+    ]),
+  );
+  return rows.map((r) => ({
+    ...r,
+    printed_by_name: r.printed_by ? (names.get(r.printed_by) ?? null) : null,
+  }));
+}
+
+/** Logger et feiltrykk på et bilde uten å flytte status. */
+export async function logMisprint(
+  cakeImageId: string,
+  reason: string,
+  printer?: { printerLabel?: string | null; scaleAppliedPct?: number | null },
+) {
+  const { data: u } = await supabase.auth.getUser();
+  const { error } = await supabase.from("cake_image_prints").insert({
+    cake_image_id: cakeImageId,
+    kind: "test",
+    sheet: null,
+    note: reason.trim() ? `feiltrykk: ${reason.trim()}` : "feiltrykk",
+    printer_label: printer?.printerLabel ?? null,
+    scale_applied_pct: printer?.scaleAppliedPct ?? null,
+    printed_by: u.user?.id ?? null,
+  } as never);
+  if (error) throw error;
 }
 
 /**
@@ -661,68 +708,6 @@ export async function markPrinted(
 }
 
 
-const DEMO_SOURCES = [
-  {
-    title: "Bursdagskake — Emma 5 år",
-    customer_name: "Familien Hansen",
-    color: "#f9c5d1",
-    label: "EMMA 5 ÅR",
-  },
-  {
-    title: "Brudekake — Sundby/Lie",
-    customer_name: "Anne Sundby",
-    color: "#cbe7d1",
-    label: "♥ Anne & Per ♥",
-  },
-  {
-    title: "Konfirmasjon — Marius",
-    customer_name: "Familien Olsen",
-    color: "#d6e4ff",
-    label: "GRATULERER MARIUS",
-  },
-];
-
-async function svgToPng(svg: string): Promise<Blob> {
-  const url = "data:image/svg+xml;utf8," + encodeURIComponent(svg);
-  const img = new Image();
-  img.crossOrigin = "anonymous";
-  await new Promise<void>((res, rej) => {
-    img.onload = () => res();
-    img.onerror = () => rej(new Error("img load"));
-    img.src = url;
-  });
-  const canvas = document.createElement("canvas");
-  canvas.width = 1000;
-  canvas.height = 750;
-  const ctx = canvas.getContext("2d")!;
-  ctx.drawImage(img, 0, 0, 1000, 750);
-  return await new Promise<Blob>((res) =>
-    canvas.toBlob((b) => res(b!), "image/png"),
-  );
-}
-
-export async function seedDemoImages(date: string) {
-  for (const d of DEMO_SOURCES) {
-    const svg = `
-<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1000 750'>
-  <rect width='1000' height='750' fill='${d.color}'/>
-  <circle cx='500' cy='340' r='200' fill='#fff' stroke='#1f1b16' stroke-width='6'/>
-  <text x='500' y='360' text-anchor='middle' font-family='Inter,Arial' font-size='62' font-weight='800' fill='#1f1b16'>${d.label}</text>
-  <text x='500' y='660' text-anchor='middle' font-family='Inter,Arial' font-size='28' fill='#4a3f33'>Demo kakebilde</text>
-</svg>`.trim();
-    const blob = await svgToPng(svg);
-    const file = new File([blob], `${d.title}.png`, { type: "image/png" });
-    const up = await uploadOriginal(file, date);
-    await createCakeImage({
-      delivery_date: date,
-      title: d.title,
-      original_path: up.path,
-      source: "demo",
-      customer_name: d.customer_name,
-    });
-  }
-}
-
 export function statusLabel(s: CakeImageStatus) {
   switch (s) {
     case "venter":
@@ -798,32 +783,6 @@ export async function linkCakeImageToOrder(
       ? "Ingen etikettvare i ordren — bildet får ikke etikettnummer"
       : null,
   };
-}
-
-/**
- * Testarket fra kalibreringen logges som en utskrift med kind 'test'.
- * `cake_image_prints` krever et bilde, så testarket henges på det sist
- * oppdaterte kakebildet — det flytter ingen status, men gir sporbarhet.
- */
-export async function logCalibrationTestPrint(printerLabel: string) {
-  const { data } = await supabase
-    .from("cake_images")
-    .select("id")
-    .order("updated_at", { ascending: false })
-    .limit(1);
-  const anchorId = (data ?? [])[0]?.id as string | undefined;
-  if (!anchorId) return;
-  const { data: u } = await supabase.auth.getUser();
-  const { error } = await supabase.from("cake_image_prints").insert({
-    cake_image_id: anchorId,
-    kind: "test",
-    sheet: "A4",
-    note: `Kalibreringsark 100 × 100 mm — ${printerLabel}`,
-    printer_label: printerLabel,
-    scale_applied_pct: 100,
-    printed_by: u.user?.id ?? null,
-  } as never);
-  if (error) console.error("[cakeImages] kunne ikke logge kalibreringsark", error);
 }
 
 export type CakeLineDetails = {

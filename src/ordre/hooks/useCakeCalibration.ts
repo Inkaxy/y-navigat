@@ -57,6 +57,20 @@ const clampPct = (v: unknown) => {
 };
 
 /**
+ * Hvilken skriver maskinen skal bruke: det maskinen sist valgte, ellers den
+ * som er merket som standard. Aldri en tilfeldig kalibrering — er ingenting
+ * valgt og ingen standard satt, må brukeren velge skriver selv.
+ */
+export function pickPrinterLabel(
+  stored: string | null,
+  calibrations: Pick<CakePrintCalibration, "printer_label" | "is_default">[],
+): string | null {
+  if (stored && calibrations.some((c) => c.printer_label === stored)) return stored;
+  if (stored && calibrations.length === 0) return stored;
+  return calibrations.find((c) => c.is_default)?.printer_label ?? null;
+}
+
+/**
  * Valgt skriver + korreksjonen som skal brukes. Maskinen husker sist brukte
  * skriver; er ingenting valgt, styrer `is_default`. Uten kalibrering brukes
  * 100 % — det er en opplysning, ikke en advarsel.
@@ -71,16 +85,10 @@ export function useCakePrinterSelection() {
     }
   });
 
-  const printerLabel = useMemo(() => {
-    if (stored && calibrations.some((c) => c.printer_label === stored)) return stored;
-    if (stored && calibrations.length === 0) return stored;
-    return (
-      calibrations.find((c) => c.is_default)?.printer_label ??
-      calibrations[0]?.printer_label ??
-      stored ??
-      null
-    );
-  }, [stored, calibrations]);
+  const printerLabel = useMemo(
+    () => pickPrinterLabel(stored, calibrations),
+    [stored, calibrations],
+  );
 
   const selectPrinter = useCallback((label: string | null) => {
     setStored(label);
