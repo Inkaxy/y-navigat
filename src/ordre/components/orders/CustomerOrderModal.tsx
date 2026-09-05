@@ -619,7 +619,6 @@ export function CustomerOrderModal({
       cancelled = true;
     };
     // Kun ved datoendring — linjeendringer prises der de oppstår.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deliveryDate, open, customer.id]);
 
   // Ny prisrisiko må bekreftes på nytt.
