@@ -65,6 +65,7 @@ import { OverrideField } from "@/kunder/components/customers/OverrideField";
 import { ChangeProfileDialog } from "@/kunder/components/customers/ChangeProfileDialog";
 import { ActivityTimeline } from "@/kunder/components/activity/ActivityTimeline";
 import { useCustomerActivityFeed } from "@/kunder/hooks/useCustomerActivityFeed";
+import { QueryState } from "@/components/common/QueryState";
 import { CustomerOrdersDeliveryTab } from "@/kunder/components/customers/CustomerOrdersDeliveryTab";
 import {
   effectivePriceListSourceLabel,
@@ -172,6 +173,11 @@ export default function CustomerDetail() {
   const canWrite = !!access?.hasKunderWrite;
 
   const [tab, setTab] = useState("info");
+  const effectivePriceList = useEffectivePriceList(
+    id,
+    customer?.default_price_list_id ?? null,
+    (profile as { default_price_list_id?: string | null } | undefined)?.default_price_list_id ?? null,
+  );
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [changeProfileOpen, setChangeProfileOpen] = useState(false);
   const [confirmAction, setConfirmAction] = useState<"deactivate" | "delete" | null>(null);
