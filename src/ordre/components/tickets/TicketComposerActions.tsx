@@ -388,7 +388,10 @@ export default function TicketComposerActions({
           />
           <Textarea
             value={forwardMessage}
-            onChange={(e) => setForwardMessage(e.target.value)}
+            onChange={(e) => {
+              setForwardTouched(true);
+              setForwardMessage(e.target.value);
+            }}
             className="min-h-[110px] bg-background"
           />
           <p className="mt-2 text-xs text-muted-foreground">
