@@ -23,6 +23,9 @@ export default defineConfig(({ mode }) => ({
       visualizer({ filename: "dist/stats.html", template: "raw-data", gzipSize: true }),
   ].filter(Boolean),
   build: {
+    // "hidden": sourcemaps genereres, men refereres ikke fra bundlene.
+    // Gir lesbare stack traces i bug_reports uten å eksponere kilden i devtools.
+    sourcemap: "hidden",
     chunkSizeWarningLimit: 1200,
     minify: "terser",
     terserOptions: {
