@@ -994,6 +994,38 @@ export default function MatrixPage() {
     [pauseMap, colTone],
   );
 
+  /** Stabile celle-/radhandlere: identiteten endres aldri, innholdet er alltid ferskt. */
+  const cellActionsRef = useRef({
+    openMerknad,
+    handleCopyToNextDay,
+    tourById,
+  });
+  cellActionsRef.current = { openMerknad, handleCopyToNextDay, tourById };
+
+  const openMerknadByIds = useCallback((date: string, tourId: string, productId: string) => {
+    const tour = cellActionsRef.current.tourById.get(tourId);
+    if (!tour) return;
+    cellActionsRef.current.openMerknad(date, tour, productId);
+  }, []);
+
+  const copyNextDayByIds = useCallback((date: string, tourId: string, productId: string) => {
+    const tour = cellActionsRef.current.tourById.get(tourId);
+    if (!tour) return;
+    cellActionsRef.current.handleCopyToNextDay(date, tour, productId);
+  }, []);
+
+  const openWeekEditor = useCallback((p: MatrixProduct) => setWeekEditorProduct(p), []);
+
+  const moveNoTourToTour = useCallback(
+    (entry: NoTourEntry) =>
+      setMoveTourOrder({
+        orderId: entry.orderIds[0],
+        orderNumber: entry.orderNumbers[0] ?? "",
+      }),
+    [],
+  );
+
+
 
   /**
    * «Kopier forrige uke»: fyller tomme celler i perioden med mengdene fra
