@@ -104,7 +104,15 @@ export function usePendingOrdersList(
       });
 
       const rows: PendingOrderRow[] = data
-        .filter((o) => isPendingOrder(o, scoped.packedOrderIds, pauses))
+        .filter((o) =>
+          // Returordre er per definisjon is_return = true; for RETUR-lista
+          // gjelder samme regler, men uten is_return-filteret.
+          isPendingOrder(
+            effectiveType === "retur" ? { ...o, is_return: false } : o,
+            scoped.packedOrderIds,
+            pauses,
+          ),
+        )
         .map((o) => {
           const tour = o.delivery_tour_id ? tourById.get(o.delivery_tour_id) : null;
           const snap = (o.customer_snapshot ?? {}) as Record<string, string | undefined>;
