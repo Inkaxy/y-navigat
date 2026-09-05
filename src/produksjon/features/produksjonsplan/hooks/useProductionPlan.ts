@@ -15,6 +15,7 @@ import {
   type RunLike,
 } from "../lib/planSource";
 import { productionRowKey } from "./useProductionPlanSnapshots";
+import { aggregateProductionLines } from "../lib/aggregate";
 
 import type { ProductionPlanRow, ProductionPlanRowDetail, ProduksjonsplanCriteria } from "../types";
 
