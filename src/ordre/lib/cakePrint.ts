@@ -16,11 +16,11 @@ import {
   packSheets,
   sheetSize,
   type PackItem,
+  type Placement,
   type SheetOrientation,
 } from "@/ordre/lib/cakeSheetLayout";
 import { resolveLabelNumber } from "@/ordre/lib/labelNumber";
 
-export const A4 = { widthMm: 210, heightMm: 297 };
 /** Linjal langs kanten — måler du 50 mm med linjal, har skriveren ikke skalert. */
 export const RULER_MM = 50;
 
@@ -98,256 +98,6 @@ export function applyScale(mm: number | null | undefined, scale = 1) {
   return Math.round(mm * scale * 100) / 100;
 }
 
-export const CAKE_PRINT_CSS = `
-  @page { size: A4 portrait; margin: 0; }
-  html, body { margin: 0; padding: 0; background: #fff; }
-  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .cake-sheet {
-    position: relative;
-    width: 210mm;
-    height: 297mm;
-    margin: 0 auto;
-    background: #fff;
-    overflow: hidden;
-    page-break-after: always;
-    break-after: page;
-    box-sizing: border-box;
-    font-family: Inter, Arial, sans-serif;
-    color: #000;
-  }
-  .cake-sheet:last-child { page-break-after: auto; break-after: auto; }
-  .cake-artwork {
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
-    display: block;
-  }
-  .cake-artwork { overflow: hidden; }
-  .cake-artwork img { display: block; width: 100%; height: 100%; }
-  .cake-missing {
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
-    font-size: 8mm;
-    font-weight: 800;
-    color: #000;
-    text-align: center;
-    border: 1mm solid #000;
-    padding: 6mm 8mm;
-    max-width: 170mm;
-  }
-  .cake-round-guide {
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
-    border: 0.2mm solid #999;
-    border-radius: 50%;
-    pointer-events: none;
-  }
-  .cake-crop { position: absolute; }
-  .cake-crop span { position: absolute; background: #000; }
-  .cake-label {
-    position: absolute;
-    top: 6mm;
-    left: 8mm;
-    font-size: 16mm;
-    line-height: 1;
-    font-weight: 800;
-    font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
-    letter-spacing: -0.02em;
-  }
-  .cake-label small { display: block; font-size: 3mm; font-weight: 600; letter-spacing: 0.12em; }
-  .cake-foot {
-    position: absolute;
-    left: 8mm;
-    right: 8mm;
-    bottom: 5mm;
-    font-size: 3mm;
-    line-height: 1.4;
-    display: flex;
-    justify-content: space-between;
-    gap: 4mm;
-  }
-  .cake-ruler { position: absolute; left: 8mm; bottom: 12mm; height: 6mm; }
-  .cake-ruler .bar { position: absolute; left: 0; bottom: 0; height: 0.4mm; background: #000; }
-  .cake-ruler .tick { position: absolute; bottom: 0; width: 0.3mm; background: #000; }
-  .cake-ruler .cap { position: absolute; bottom: 6.5mm; font-size: 2.6mm; }
-  .cake-warn { position: absolute; top: 6mm; right: 8mm; font-size: 3mm; color: #b45309; max-width: 80mm; text-align: right; }
-`;
-
-function el(doc: Document, tag: string, cls?: string, text?: string) {
-  const n = doc.createElement(tag);
-  if (cls) n.className = cls;
-  if (text != null) n.textContent = text;
-  return n;
-}
-
-/** Klippemerker i hjørnene av bildeflaten. */
-function addCropMarks(
-  doc: Document,
-  sheet: HTMLElement,
-  wMm: number,
-  hMm: number,
-) {
-  const len = 5; // mm
-  const gap = 2; // mm
-  const corners: Array<[number, number]> = [
-    [-1, -1],
-    [1, -1],
-    [-1, 1],
-    [1, 1],
-  ];
-  for (const [sx, sy] of corners) {
-    const x = A4.widthMm / 2 + (sx * wMm) / 2;
-    const y = A4.heightMm / 2 + (sy * hMm) / 2;
-    const holder = el(doc, "div", "cake-crop");
-    holder.style.left = `${x}mm`;
-    holder.style.top = `${y}mm`;
-    // vannrett merke
-    const h = el(doc, "span");
-    h.style.height = "0.3mm";
-    h.style.width = `${len}mm`;
-    h.style.top = "0";
-    h.style.left = sx < 0 ? `${-(gap + len)}mm` : `${gap}mm`;
-    // loddrett merke
-    const v = el(doc, "span");
-    v.style.width = "0.3mm";
-    v.style.height = `${len}mm`;
-    v.style.left = "0";
-    v.style.top = sy < 0 ? `${-(gap + len)}mm` : `${gap}mm`;
-    holder.appendChild(h);
-    holder.appendChild(v);
-    sheet.appendChild(holder);
-  }
-}
-
-function addRuler(doc: Document, sheet: HTMLElement, scale: number) {
-  const ruler = el(doc, "div", "cake-ruler");
-  ruler.style.width = `${RULER_MM * scale}mm`;
-  const bar = el(doc, "div", "bar");
-  bar.style.width = `${RULER_MM * scale}mm`;
-  ruler.appendChild(bar);
-  for (let mm = 0; mm <= RULER_MM; mm += 10) {
-    const t = el(doc, "div", "tick");
-    t.style.left = `${mm * scale}mm`;
-    t.style.height = mm % 50 === 0 ? "4mm" : "2.5mm";
-    ruler.appendChild(t);
-  }
-  const cap = el(
-    doc,
-    "div",
-    "cap",
-    `${RULER_MM} mm — mål etter med linjal. Stemmer den ikke, har skriveren skalert.`,
-  );
-  ruler.appendChild(cap);
-  sheet.appendChild(ruler);
-}
-
-/**
- * Bygger ett A4-ark for ett kakebilde. DOM-API, aldri string-interpolering av
- * brukerdata.
- */
-export function buildCakeSheet(
-  doc: Document,
-  item: CakePrintItem,
-  scale = 1,
-  scaleY = scale,
-): HTMLElement {
-  const sheet = el(doc, "div", "cake-sheet");
-
-  const wMm = applyScale(item.widthMm, scale);
-  const hMm = applyScale(item.heightMm, scaleY);
-  const known = !!wMm && !!hMm;
-
-  const art = el(doc, "div", "cake-artwork");
-  if (known) {
-    art.style.width = `${wMm}mm`;
-    art.style.height = `${hMm}mm`;
-  } else {
-    // Ukjent fysisk størrelse — vi sier fra i stedet for å strekke i stillhet.
-    art.style.width = "150mm";
-    art.style.height = "150mm";
-  }
-  if (item.isRound) art.style.borderRadius = "50%";
-  if (item.url) {
-    const img = doc.createElement("img");
-    img.src = item.url;
-    img.alt = item.title ?? "Kakebilde";
-    art.appendChild(img);
-  }
-  sheet.appendChild(art);
-
-  if (!item.url) {
-    // Et blankt ark som ser normalt ut er verre enn en synlig feil.
-    sheet.appendChild(
-      el(doc, "div", "cake-missing", "BILDE MANGLER — ikke bruk dette arket"),
-    );
-  }
-
-  if (known) {
-    addCropMarks(doc, sheet, wMm!, hMm!);
-    if (item.isRound) {
-      const guide = el(doc, "div", "cake-round-guide");
-      guide.style.width = `${wMm}mm`;
-      guide.style.height = `${hMm}mm`;
-      sheet.appendChild(guide);
-    }
-  } else {
-    const warn = el(
-      doc,
-      "div",
-      "cake-warn",
-      "Bildet mangler fysisk størrelse — velg format i editoren før utskrift.",
-    );
-    sheet.appendChild(warn);
-  }
-
-  if (item.labelNumber) {
-    const label = el(doc, "div", "cake-label");
-    label.appendChild(el(doc, "small", undefined, "ETIKETT"));
-    label.appendChild(doc.createTextNode(`#${item.labelNumber}`));
-    sheet.appendChild(label);
-  }
-
-  addRuler(doc, sheet, scale);
-
-  const foot = el(doc, "div", "cake-foot");
-  const left = el(doc, "div");
-  left.appendChild(
-    el(
-      doc,
-      "div",
-      undefined,
-      [item.orderRef ? `Ordre ${item.orderRef}` : "Uten ordre", item.customerName ?? ""]
-        .filter(Boolean)
-        .join(" · "),
-    ),
-  );
-  left.appendChild(
-    el(doc, "div", undefined, item.deliveryDate ? `Hentedato ${item.deliveryDate}` : ""),
-  );
-  const right = el(
-    doc,
-    "div",
-    undefined,
-    known
-      ? `${Math.round(item.widthMm!)} × ${Math.round(item.heightMm!)} mm${
-          scale !== 1 || scaleY !== 1
-            ? ` · korrigert ${Math.round(scale * 10000) / 100} % × ${Math.round(scaleY * 10000) / 100} %`
-            : ""
-        }`
-      : "Ukjent størrelse",
-  );
-  foot.appendChild(left);
-  foot.appendChild(right);
-  sheet.appendChild(foot);
-
-  return sheet;
-}
-
 async function urlToDataUrl(url: string): Promise<string> {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -366,7 +116,7 @@ async function urlToDataUrl(url: string): Promise<string> {
  * ingen nettverkskall igjen når PDF-en lages — hverken utløpt signert URL
  * eller kappløp mot `print()` kan gi tomme ark.
  */
-export async function embedCakeImages(
+async function embedCakeImages(
   items: CakePrintItem[],
 ): Promise<{ items: CakePrintItem[]; failed: CakePrintItem[] }> {
   const failed: CakePrintItem[] = [];
@@ -411,6 +161,67 @@ const PAGE_MARGIN_MM = 10;
 /** Etikettstripe under hvert bilde: QR + nummer + kunde. */
 const CAPTION_MM = 12;
 const QR_MM = 10;
+
+/**
+ * Hvor bildet faktisk skal tegnes for en plassering, og hvor etikettstripa
+ * havner. Pakkeren regner CAPTION_MM inn i høyden på bildet; når plasseringen
+ * er rotert bytter bredde og høyde plass, og stripa havner i margen til høyre.
+ */
+export function placementGeometry(
+  place: Placement,
+  captionMm = CAPTION_MM,
+): {
+  xMm: number;
+  yMm: number;
+  widthMm: number;
+  heightMm: number;
+  rotated: boolean;
+  captionXMm: number;
+  captionYMm: number;
+} {
+  if (!place.rotated) {
+    const heightMm = place.heightMm - captionMm;
+    return {
+      xMm: place.xMm,
+      yMm: place.yMm,
+      widthMm: place.widthMm,
+      heightMm,
+      rotated: false,
+      captionXMm: place.xMm,
+      captionYMm: place.yMm + heightMm + 2,
+    };
+  }
+  const widthMm = place.widthMm - captionMm;
+  return {
+    xMm: place.xMm,
+    yMm: place.yMm,
+    widthMm,
+    heightMm: place.heightMm,
+    rotated: true,
+    captionXMm: place.xMm + widthMm + 2,
+    captionYMm: place.yMm,
+  };
+}
+
+/**
+ * jsPDF roterer bildet rundt nedre venstre hjørne av den uroterte boksen.
+ * Her regner vi om til de argumentene som gir nøyaktig den boksen vi vil ha
+ * på arket: `paperWidthMm` × `paperHeightMm` med øvre venstre hjørne i (x, y).
+ */
+export function rotatedImageDraw(
+  xMm: number,
+  yMm: number,
+  paperWidthMm: number,
+  paperHeightMm: number,
+): { xMm: number; yMm: number; widthMm: number; heightMm: number; rotation: 90 } {
+  return {
+    xMm: xMm + paperWidthMm,
+    yMm: yMm + paperHeightMm - paperWidthMm,
+    widthMm: paperHeightMm,
+    heightMm: paperWidthMm,
+    rotation: 90,
+  };
+}
 
 export const PRINT_INSTRUCTION =
   "Skriv ut i 100 % — ingen tilpasning til side («scale to fit» av).";
@@ -625,17 +436,33 @@ export async function buildCakePdf(
     for (const place of page.placements) {
       const item = byId.get(place.id);
       if (!item) continue;
-      const wMm = place.widthMm;
-      const hMm = place.heightMm - CAPTION_MM;
-      const x = place.xMm;
-      const y = place.yMm;
+      const geo = placementGeometry(place);
+      const wMm = geo.widthMm;
+      const hMm = geo.heightMm;
+      const x = geo.xMm;
+      const y = geo.yMm;
 
       if (item.url) {
         const src = item.url.startsWith("data:")
           ? item.url
           : await urlToDataUrl(item.url);
         const enc = await encodeArtwork(src);
-        pdf.addImage(enc.data, enc.format, x, y, wMm, hMm, undefined, "FAST", 0);
+        if (geo.rotated) {
+          const r = rotatedImageDraw(x, y, wMm, hMm);
+          pdf.addImage(
+            enc.data,
+            enc.format,
+            r.xMm,
+            r.yMm,
+            r.widthMm,
+            r.heightMm,
+            undefined,
+            "FAST",
+            r.rotation,
+          );
+        } else {
+          pdf.addImage(enc.data, enc.format, x, y, wMm, hMm, undefined, "FAST", 0);
+        }
       }
 
       // Klippemerker rundt hvert bilde
@@ -653,20 +480,24 @@ export async function buildCakePdf(
       }
       if (item.isRound) pdf.circle(x + wMm / 2, y + hMm / 2, wMm / 2);
 
-      // Etikettstripe: QR til editoren, etikettnummer, kunde, produkt og kaketekst
-      const capY = y + hMm + 2;
-      let textX = x;
+      // Etikettstripe: QR til editoren, etikettnummer, kunde, produkt og kaketekst.
+      // Roterte bilder får stripen i margen ved siden av — teksten roteres ikke med bildet.
+      const capX = geo.captionXMm;
+      const capY = geo.captionYMm;
+      let textX = capX;
       if (item.image?.id) {
         const qr = await qrDataUrl(editorUrlFor(item.image.id));
         if (qr) {
-          pdf.addImage(qr, "PNG", x, capY, QR_MM, QR_MM);
-          textX = x + QR_MM + 2;
+          pdf.addImage(qr, "PNG", capX, capY, QR_MM, QR_MM);
+          if (!geo.rotated) textX = capX + QR_MM + 2;
         }
       }
       if (item.labelNumber) {
         pdf.setFontSize(12);
-        pdf.text(`#${item.labelNumber}`, textX, capY + 4);
+        if (geo.rotated) pdf.text(`#${item.labelNumber}`, capX + 4, capY + QR_MM + 4);
+        else pdf.text(`#${item.labelNumber}`, textX, capY + 4);
       }
+
       pdf.setFontSize(7);
       const line1 = [item.customerName, item.orderRef ? `Ordre ${item.orderRef}` : null]
         .filter(Boolean)
@@ -674,8 +505,14 @@ export async function buildCakePdf(
       const line2 = [item.productName, item.cakeText ? `Tekst: ${item.cakeText}` : null]
         .filter(Boolean)
         .join(" · ");
-      if (line1) pdf.text(line1, textX + (item.labelNumber ? 16 : 0), capY + 4);
-      if (line2) pdf.text(line2, textX, capY + 8);
+      if (geo.rotated) {
+        const txt = [line1, line2].filter(Boolean).join(" · ");
+        if (txt) pdf.text(txt, capX + 4, capY + hMm - 2, { angle: 90 });
+      } else {
+        if (line1) pdf.text(line1, textX + (item.labelNumber ? 16 : 0), capY + 4);
+        if (line2) pdf.text(line2, textX, capY + 8);
+      }
+
     }
     drawFootBand(pdf, size, scale, scaleY, sheet, orientation, printerLabel);
   }
@@ -821,32 +658,15 @@ export async function printCakeItems(
   };
 }
 
-/**
- * Eldre inngang (editoren): skriver ut og melder fra etterpå.
- * Nye flyter bruker `printCakeItems` og bekrefter med brukeren først.
- */
-export async function openCakePrintWindow(
-  items: CakePrintItem[],
-  opts: CakePdfOptions & {
-    onPrinted?: () => void;
-    title?: string;
-    embed?: boolean;
-  } = {},
-): Promise<CakePrintJobResult> {
-  const res = await printCakeItems(items, opts);
-  opts.onPrinted?.();
-  return res;
-}
-
 /** Laster ned arkene som PDF. */
 export async function cakeSheetsToPdf(
   items: CakePrintItem[],
   opts: CakePdfOptions & { fileName?: string; embed?: boolean } = {},
-): Promise<{ skipped: CakeSkipped[] }> {
+): Promise<{ skipped: CakeSkipped[]; sheet: string; orientation: SheetOrientation }> {
   const prepared = await prepareItems(items, opts.embed !== false);
   const res = await buildCakePdf(prepared, opts);
   res.pdf.save(opts.fileName ?? "kakebilder.pdf");
-  return { skipped: res.skipped };
+  return { skipped: res.skipped, sheet: res.sheet, orientation: res.orientation };
 }
 
 /** Blob-URL til forhåndsvisning i iframe — samme PDF som papiret. */

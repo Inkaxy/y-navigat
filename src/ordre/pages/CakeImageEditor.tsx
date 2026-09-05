@@ -86,10 +86,12 @@ import {
 } from "@/ordre/lib/cakeFormats";
 import {
   cakeSheetsToPdf,
-  openCakePrintWindow,
   type CakePrintItem,
 } from "@/ordre/lib/cakePrint";
 import { useCakePrinterSelection } from "@/ordre/hooks/useCakeCalibration";
+import { useCakePrintFlow } from "@/ordre/hooks/useCakePrintFlow";
+import { fetchCakeLineDetails } from "@/ordre/lib/cakeImages";
+import { resolveLabelNumber } from "@/ordre/lib/labelNumber";
 import { CakePrintHistory } from "@/ordre/components/cake-images/CakePrintHistory";
 import { showError } from "@/lib/userError";
 import { fitZoom, pxPerMm } from "@/ordre/lib/cakeEditorMath";
@@ -235,8 +237,17 @@ export default function CakeImageEditor() {
     scaleX: printScale,
     scaleY: printScaleY,
     scaleXPct: printScalePct,
+    scaleYPct: printScaleYPct,
+    isCalibrated: printerCalibrated,
   } = useCakePrinterSelection();
+  const printFlow = useCakePrintFlow({
+    scale: printScale,
+    scaleY: printScaleY,
+    printerLabel,
+    scaleAppliedPct: printScalePct,
+  });
   const { data: image, isLoading } = useCakeImage(id);
+
 
   const viewRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -1041,41 +1052,43 @@ export default function CakeImageEditor() {
     qc.invalidateQueries({ queryKey: ["cake-image", image.id] });
   };
 
-  const buildItem = (dataUrl: string): CakePrintItem => ({
-    image: image ?? null,
-    url: dataUrl,
-    widthMm: dims.widthMm,
-    heightMm: dims.heightMm,
-    isRound: dims.isRound,
-    labelNumber: image?.label_number ?? null,
-    orderRef: image?.order_ref ?? null,
-    customerName: image?.customer_name ?? null,
-    deliveryDate: image?.delivery_date ?? null,
-    title: image?.title ?? null,
-  });
+  /** Samme innhold på arket som fra listen: ark, utfall, etikettnummer og linjetekst. */
+  const buildItem = async (dataUrl: string): Promise<CakePrintItem> => {
+    let productName: string | null = null;
+    let cakeText: string | null = null;
+    if (image?.order_line_id) {
+      try {
+        const details = await fetchCakeLineDetails([image.order_line_id]);
+        const d = details[image.order_line_id];
+        productName = d?.productName ?? null;
+        cakeText = d?.cakeText ?? null;
+      } catch (e) {
+        console.error("[CakeImageEditor] kunne ikke hente linjeteksten", e);
+      }
+    }
+    return {
+      image: image ?? null,
+      url: dataUrl,
+      widthMm: dims.widthMm,
+      heightMm: dims.heightMm,
+      isRound: dims.isRound,
+      labelNumber: image ? resolveLabelNumber(image) : null,
+      sheet: format?.sheet ?? "A4",
+      bleedMm: format?.bleed_mm ?? 0,
+      productName,
+      cakeText,
+      orderRef: image?.order_ref ?? null,
+      customerName: image?.customer_name ?? null,
+      deliveryDate: image?.delivery_date ?? null,
+      title: image?.title ?? null,
+    };
+  };
 
   const printNow = async () => {
-    const dataUrl = renderDataUrl();
-    const imageId = image?.id ?? null;
-    const wasPrinted = image?.status === "skrevet_ut";
+    if (!image) return;
     try {
-      await openCakePrintWindow([buildItem(dataUrl)], {
-        scale: printScale,
-        scaleY: printScaleY,
-        title: image?.title ?? "Kakebilde",
-        onPrinted: () => {
-          if (!imageId) return;
-          markPrinted([imageId], wasPrinted ? "reprint" : "print", "A4", null, {
-            printerLabel,
-            scaleAppliedPct: printScalePct,
-          })
-            .then(() => {
-              qc.invalidateQueries({ queryKey: ["cake-images"] });
-              qc.invalidateQueries({ queryKey: ["cake-image-prints", imageId] });
-            })
-            .catch((e) => console.error("[CakeImageEditor] markPrinted feilet", e));
-        },
-      });
+      const item = await buildItem(renderDataUrl());
+      await printFlow.printItems([item], { [image.id]: image.status });
     } catch (e) {
       showError(
         "CakeImageEditor.print",
@@ -1090,13 +1103,14 @@ export default function CakeImageEditor() {
     const safeName =
       (image?.title ?? "kakebilde").replace(/[^\p{L}\p{N} _-]/gu, "_").slice(0, 80) ||
       "kakebilde";
-    await cakeSheetsToPdf([buildItem(dataUrl)], {
+    const res = await cakeSheetsToPdf([await buildItem(dataUrl)], {
       scale: printScale,
       scaleY: printScaleY,
+      printerLabel,
       fileName: `${safeName}.pdf`,
     });
     if (image) {
-      await markPrinted([image.id], "pdf", "A4", null, {
+      await markPrinted([image.id], "pdf", res.sheet, null, {
         printerLabel,
         scaleAppliedPct: printScalePct,
       });
@@ -1666,16 +1680,33 @@ export default function CakeImageEditor() {
             <CheckCircle2 className="mr-2 h-4 w-4" />
             Lagre & marker ferdig
           </Button>
-          <Button
-            variant="brand"
-            className="h-10"
-            onClick={async () => {
-              if (await doSave(false)) void printNow();
-            }}
-          >
-            <Printer className="mr-2 h-4 w-4" />
-            Skriv ut
-          </Button>
+          <div className="flex flex-col items-start">
+            <Button
+              variant="brand"
+              className="h-10"
+              disabled={printFlow.busy || saving}
+              onClick={async () => {
+                if (await doSave(false)) void printNow();
+              }}
+            >
+              {printFlow.busy ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Printer className="mr-2 h-4 w-4" />
+              )}
+              Skriv ut
+            </Button>
+            <span className="mt-0.5 text-[11px] text-muted-foreground">
+              {printerLabel
+                ? `${printerLabel} · ${
+                    printerCalibrated
+                      ? `korreksjon ${printScalePct} % × ${printScaleYPct} %`
+                      : "ikke kalibrert (100 %)"
+                  }`
+                : "Velg skriver i utskriftsvisningen"}
+            </span>
+          </div>
+
           <Button
             variant="outline"
             className="h-10"
@@ -1689,10 +1720,13 @@ export default function CakeImageEditor() {
         </div>
       </div>
 
+      {printFlow.dialog}
+
       <UnsavedChangesDialog
         {...guard.dialogProps}
         description="Kakebildet har endringer som ikke er lagret. Fortsetter du, forsvinner de."
       />
+
 
       <AlertDialog
         open={!!draftPrompt}
