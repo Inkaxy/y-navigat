@@ -377,39 +377,33 @@ export default function MatrixPage() {
 
   const visibleDates = useMemo(() => new Set(columns.map((c) => c.date)), [columns]);
 
-  const existingQty = useMemo(() => {
-    const map: Record<CellKey, number> = {};
-    if (!matrix) return map;
-    for (const c of matrix.existing_cells) {
-      if (!c.delivery_tour_id) continue;
-      map[ckey(c.delivery_date, c.delivery_tour_id, c.product_id)] = Number(c.quantity);
-    }
-    return map;
-  }, [matrix]);
+  /** Ett samlet oppslag over lagrede celler — duplikate ordre summeres. */
+  const existingIndex = useMemo(
+    () => aggregateExistingCells(matrix?.existing_cells ?? []),
+    [matrix],
+  );
 
-  const existingMerknad = useMemo(() => {
-    const map: Record<CellKey, Merknad> = {};
-    if (!matrix) return map;
-    for (const c of matrix.existing_cells) {
-      if (!c.delivery_tour_id) continue;
-      const m = parseMerknad(c.merknad);
-      if (m) map[ckey(c.delivery_date, c.delivery_tour_id, c.product_id)] = m;
-    }
-    return map;
-  }, [matrix]);
+  const existingQty = existingIndex.qty;
+  const existingMerknad = existingIndex.merknad;
+  const fallbackCells = existingIndex.fallback;
+  const cellOrderIds = existingIndex.orderIds;
 
-  /** Celler der lagret pris er 0 og mengde > 0 — visuell rød advarsel ("Pris ikke funnet"). */
-  const fallbackCells = useMemo(() => {
-    const map: Record<CellKey, true> = {};
-    if (!matrix) return map;
-    for (const c of matrix.existing_cells) {
-      if (!c.delivery_tour_id) continue;
-      if (Number(c.quantity) > 0 && Number(c.unit_price) === 0) {
-        map[ckey(c.delivery_date, c.delivery_tour_id, c.product_id)] = true;
-      }
-    }
-    return map;
-  }, [matrix]);
+  // Ordre-id per kolonne (dato|tur) → livssyklus/ordretype for kolonne-header
+  const colOrderId = existingIndex.colOrderId;
+
+  const hasColumnOrder = useCallback(
+    (date: string, tourId: string) => colOrderId.has(colKeyOf(date, tourId)),
+    [colOrderId],
+  );
+  const isPausedCol = useCallback(
+    (date: string, tourId: string) => !!isPaused(pauseMap, date, tourId),
+    [pauseMap],
+  );
+
+  const ghostRuleBase = useMemo(
+    () => ({ edits, existingQty, ghostMap, hasColumnOrder, isPausedCol }),
+    [edits, existingQty, ghostMap, hasColumnOrder, isPausedCol],
+  );
 
   /**
    * Fastordre ER ordren: når cellen ikke har lagret linje og kolonnen ikke har
@@ -420,20 +414,14 @@ export default function MatrixPage() {
     if (key in edits) return edits[key];
     const v = existingQty[key];
     if (v) return String(v);
-    return isGhostCell(key) ? String(ghostMap!.get(key)) : "";
+    const g = visibleGhostQty({ key, ...ghostRuleBase });
+    return g > 0 ? String(g) : "";
   }
 
   /** True når cellen viser et fastordre-tall som ennå ikke er materialisert. */
   function isGhostCell(key: CellKey): boolean {
-    if (key in edits) return false;
-    if (existingQty[key]) return false;
-    const [date, tourId] = key.split("|");
-    if (colOrderId.has(`${date}|${tourId}`)) return false;
-    if (isPaused(pauseMap, date, tourId)) return false;
-    const g = ghostMap?.get(key);
-    return !!g && g > 0;
+    return visibleGhostQty({ key, ...ghostRuleBase }) > 0;
   }
-
 
   function getEffectiveQty(key: CellKey): number {
     if (key in edits) return Number(edits[key] || 0);
@@ -453,17 +441,10 @@ export default function MatrixPage() {
     setEdits((prev) => ({ ...prev, [key]: cleaned }));
   }
 
-  const dirtyChanges = useMemo<MatrixChange[]>(() => {
-    const out: MatrixChange[] = [];
-    for (const [key, raw] of Object.entries(edits)) {
-      const [date, tour_id, product_id] = key.split("|");
-      const editedNum = Number(raw || 0);
-      const existing = existingQty[key] ?? 0;
-      if (editedNum === existing) continue;
-      out.push({ date, tour_id, product_id, quantity: editedNum });
-    }
-    return out;
-  }, [edits, existingQty]);
+  const dirtyChanges = useMemo<MatrixChange[]>(
+    () => computeDirtyChanges(edits, existingQty),
+    [edits, existingQty],
+  );
 
   const dirtyCount = dirtyChanges.length;
 
