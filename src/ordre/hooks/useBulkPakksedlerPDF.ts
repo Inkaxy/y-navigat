@@ -226,7 +226,11 @@ export function useBulkPakksedlerPDF(scope: BulkScope | null) {
           .select("order_line_id, label_unit_id, label_number, edited_path, original_path")
           .in("order_line_id", orderLineIds);
         if (cakeErr) throw cakeErr;
-        const rows = (cakeRows ?? []) as unknown as CakeRow[];
+        // `label_number` kan komme som tall fra basen — normaliser til tekst.
+        const rows = ((cakeRows ?? []) as unknown as CakeRow[]).map((r) => ({
+          ...r,
+          label_number: r.label_number == null ? null : String(r.label_number),
+        }));
         const numberByUnit = await fetchLabelNumbersByUnit(rows);
         const paths = rows
           .map((r) => r.edited_path || r.original_path)
