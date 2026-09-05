@@ -139,13 +139,21 @@ export function CustomerOrdersDeliveryTab({ customerId }: { customerId: string }
 
       {/* (c) Pauser og neste levering */}
       <Card>
-        <CardHeader>
-          <CardTitle>Leveransepauser</CardTitle>
-          <CardDescription>
-            {nextDelivery
-              ? `Neste planlagte levering: ${formatDate(nextDelivery)}`
-              : "Ingen planlagt levering utledet av fastordre"}
-          </CardDescription>
+        <CardHeader className="flex flex-row items-start justify-between gap-3">
+          <div>
+            <CardTitle>Leveransepauser</CardTitle>
+            <CardDescription>
+              {nextDelivery
+                ? `Neste planlagte levering: ${formatDate(nextDelivery)}`
+                : "Ingen planlagt levering utledet av fastordre"}
+            </CardDescription>
+          </div>
+          <Button asChild variant="outline" size="sm" className="shrink-0">
+            <Link to={`/ordre/leveringskalender?customer=${customerId}`}>
+              <CalendarDays className="mr-2 h-4 w-4" aria-hidden="true" />
+              Leveringskalender
+            </Link>
+          </Button>
         </CardHeader>
         <CardContent>
           <QueryState
