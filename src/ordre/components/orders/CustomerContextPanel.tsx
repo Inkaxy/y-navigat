@@ -9,6 +9,8 @@ import {
   ShieldAlert,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { useEffectivePriceList } from "@/kunder/hooks/useEffectivePriceList";
+import { todayOslo } from "@/lib/osloDate";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -134,27 +136,12 @@ export function CustomerContextPanel({
     },
   });
 
-  // 2) Effektiv prisliste (navn).
-  const priceList = useQuery({
-    queryKey: ["customer-context", "price-list", customerId],
-    enabled: !!customerId,
-    staleTime: 5 * 60_000,
-    queryFn: async (): Promise<string | null> => {
-      const { data: id, error } = await supabase.rpc("customer_effective_price_list", {
-        _customer_id: customerId,
-      });
-      if (error) throw error;
-      const listId = (id as string | null) ?? null;
-      if (!listId) return null;
-      const { data: row, error: listErr } = await supabase
-        .from("price_lists")
-        .select("display_name")
-        .eq("id", listId)
-        .maybeSingle();
-      if (listErr) throw listErr;
-      return row?.display_name ?? null;
-    },
-  });
+  // 2) Effektiv prisliste — samme kilde som kundekortet.
+  const priceList = useEffectivePriceList(
+    customerId,
+    customer.price_list_id ?? null,
+    null,
+  );
 
   // 3) Fem siste ordre.
   const recent = useRecentOrdersForCustomer(customerId, true);
@@ -182,7 +169,7 @@ export function CustomerContextPanel({
   const fixedDays = useMemo(() => {
     const days = new Set<number>();
     const tourIds = new Set<string>();
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayOslo();
     for (const s of recurring.data ?? []) {
       if (s.valid_from && s.valid_from > today) continue;
       if (s.valid_to && s.valid_to < today) continue;
