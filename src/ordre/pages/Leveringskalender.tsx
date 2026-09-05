@@ -1660,6 +1660,14 @@ export default function MatrixPage() {
               colMeta={colMeta}
               colTone={colTone}
               isGhostCell={isGhostCell}
+              orderCount={(key) => cellOrderIds[key]?.length ?? 0}
+              noTourByDate={noTourByDate}
+              onMoveToTour={(entry) =>
+                setMoveTourOrder({
+                  orderId: entry.orderIds[0],
+                  orderNumber: entry.orderNumbers[0] ?? "",
+                })
+              }
               canEdit={canEdit}
               onOpenTourOrder={(date, tour) => {
                 if (!colOrderId.has(`${date}|${tour.id}`)) {
