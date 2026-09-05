@@ -45,7 +45,31 @@ export function useDeliveryNotesList(
     queryKey: ["delivery-notes-list", date, tourId, mode],
     queryFn: async (): Promise<DeliveryNoteRow[]> => {
       const fromDate = mode === "correction" ? correctionFromDate(date) : date;
-      const data = await fetchAllRows<any>((from, to) => {
+      type RawLine = {
+        id: string;
+        line_number: number | string | null;
+        quantity: number | string | null;
+        sales_unit: string | null;
+        notes: string | null;
+        product_id: string;
+        product_snapshot: Record<string, unknown> | null;
+        order: { recurring_schedule_id: string | null } | null;
+      };
+      type RawNote = {
+        id: string;
+        display_number: string;
+        customer_id: string;
+        customer_snapshot: Record<string, unknown> | null;
+        delivery_tour_id: string | null;
+        delivery_date: string;
+        route_label: string | null;
+        status: string;
+        total_incl_vat: number | string | null;
+        notes: string | null;
+        delivery_note_lines: RawLine[] | null;
+      };
+
+      const data = await fetchAllRows<RawNote>((from, to) => {
         let q = supabase
           .from("delivery_notes")
           .select(
@@ -64,13 +88,13 @@ export function useDeliveryNotesList(
         if (tourId === NULL_TOUR_KEY) q = q.is("delivery_tour_id", null);
         else if (tourId !== "all") q = q.eq("delivery_tour_id", tourId);
 
-        return q as unknown as PromiseLike<{ data: any[] | null; error: { message: string } | null }>;
+        return q as unknown as PromiseLike<{ data: RawNote[] | null; error: { message: string } | null }>;
       });
 
-      return (data as any[]).map((row) => {
+      return data.map((row) => {
         const rawLines = Array.isArray(row.delivery_note_lines) ? row.delivery_note_lines : [];
         const lines: DeliveryNoteLineRow[] = rawLines
-          .map((l: any) => ({
+          .map((l: RawLine) => ({
             id: l.id,
             line_number: Number(l.line_number ?? 0),
             quantity: Number(l.quantity ?? 0),
