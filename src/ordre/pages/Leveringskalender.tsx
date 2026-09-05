@@ -10,6 +10,7 @@ import {
   RotateCcw,
   Plus,
   StickyNote,
+  Layers,
   ArrowRight,
   MoreHorizontal,
   Copy,
