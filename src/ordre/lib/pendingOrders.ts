@@ -2,6 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
 import { fetchAllRows } from "@/lib/supabasePaging";
 import { osloDateISO } from "@/lib/osloDate";
+import { osloDateISO } from "@/lib/osloDate";
 
 /**
  * ÉN felles definisjon av hvilke ordre som er «gjenstående» (ventende) for
