@@ -988,11 +988,6 @@ export default function MatrixPage() {
     [pauseMap, colTone],
   );
 
-  /** Stabil lagre-referanse så cellene ikke re-rendrer ved hver endring. */
-  const handleSaveRef = useRef<() => void | Promise<void>>(() => {});
-  const stableSave = useCallback(() => {
-    void handleSaveRef.current();
-  }, []);
 
   /**
    * «Kopier forrige uke»: fyller tomme celler i perioden med mengdene fra
