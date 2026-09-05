@@ -2,6 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
 import { NULL_TOUR_KEY } from "@/ordre/hooks/useTourRunStatus";
+import { fetchAllRows } from "@/lib/supabasePaging";
+import { correctionFromDate } from "@/ordre/lib/pendingOrders";
 
 export type DeliveryNotesListMode = "date" | "correction";
 
@@ -42,28 +44,57 @@ export function useDeliveryNotesList(
   return useQuery({
     queryKey: ["delivery-notes-list", date, tourId, mode],
     queryFn: async (): Promise<DeliveryNoteRow[]> => {
-      let q = supabase
-        .from("delivery_notes")
-        .select(
-          "id, display_number, customer_id, customer_snapshot, delivery_tour_id, delivery_date, route_label, status, total_incl_vat, notes, delivery_note_lines(id, line_number, quantity, sales_unit, notes, product_id, product_snapshot, order:orders(recurring_schedule_id))"
-        )
-        .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
-        .neq("status", "cancelled")
-        .order("delivery_date", { ascending: true })
-        .order("display_number", { ascending: true });
+      const fromDate = mode === "correction" ? correctionFromDate(date) : date;
+      type RawLine = {
+        id: string;
+        line_number: number | string | null;
+        quantity: number | string | null;
+        sales_unit: string | null;
+        notes: string | null;
+        product_id: string;
+        product_snapshot: Record<string, unknown> | null;
+        order: { recurring_schedule_id: string | null } | null;
+      };
+      type RawNote = {
+        id: string;
+        display_number: string;
+        customer_id: string;
+        customer_snapshot: Record<string, unknown> | null;
+        delivery_tour_id: string | null;
+        delivery_date: string;
+        route_label: string | null;
+        status: string;
+        total_incl_vat: number | string | null;
+        notes: string | null;
+        delivery_note_lines: RawLine[] | null;
+      };
 
-      q = mode === "correction" ? q.lte("delivery_date", date) : q.eq("delivery_date", date);
+      const data = await fetchAllRows<RawNote>((from, to) => {
+        let q = supabase
+          .from("delivery_notes")
+          .select(
+            "id, display_number, customer_id, customer_snapshot, delivery_tour_id, delivery_date, route_label, status, total_incl_vat, notes, delivery_note_lines(id, line_number, quantity, sales_unit, notes, product_id, product_snapshot, order:orders(recurring_schedule_id))"
+          )
+          .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
+          .neq("status", "cancelled")
+          // Returpakksedler hører hjemme under Retur, ikke i pakkseddel-lista.
+          .eq("is_return", false)
+          .gte("delivery_date", fromDate)
+          .lte("delivery_date", date)
+          .order("delivery_date", { ascending: true })
+          .order("display_number", { ascending: true })
+          .range(from, to);
 
-      if (tourId === NULL_TOUR_KEY) q = q.is("delivery_tour_id", null);
-      else if (tourId !== "all") q = q.eq("delivery_tour_id", tourId);
+        if (tourId === NULL_TOUR_KEY) q = q.is("delivery_tour_id", null);
+        else if (tourId !== "all") q = q.eq("delivery_tour_id", tourId);
 
-      const { data, error } = await q;
-      if (error) throw error;
+        return q as unknown as PromiseLike<{ data: RawNote[] | null; error: { message: string } | null }>;
+      });
 
-      return ((data ?? []) as any[]).map((row) => {
+      return data.map((row) => {
         const rawLines = Array.isArray(row.delivery_note_lines) ? row.delivery_note_lines : [];
         const lines: DeliveryNoteLineRow[] = rawLines
-          .map((l: any) => ({
+          .map((l: RawLine) => ({
             id: l.id,
             line_number: Number(l.line_number ?? 0),
             quantity: Number(l.quantity ?? 0),

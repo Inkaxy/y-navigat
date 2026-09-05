@@ -42,9 +42,15 @@ import { useUndoDeliveryRuns } from "@/ordre/hooks/useUndoDeliveryRuns";
 import { supabase } from "@/integrations/supabase/client";
 import { ReturnsSection } from "@/ordre/components/returer/ReturnsSection";
 import { usePendingReturnsCount } from "@/ordre/hooks/useReturnDeliveryNotes";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { logAudit } from "@/ordre/lib/audit";
 
 // HANDLING_ITEMS bygges nå dynamisk inni komponenten — for å støtte tilstand-aware
 // handlinger (Tilleggkjøring/Korreksjonskjøring krever at hovedkjøring er kjørt).
+
+/** Minste lengde på begrunnelse ved angring av kjøring. */
+const UNDO_REASON_MIN = 10;
 
 export default function DeliveryNoteDashboard() {
   const navigate = useNavigate();
@@ -292,6 +298,7 @@ export default function DeliveryNoteDashboard() {
   }
 
   async function runUndo() {
+    if (undoReason.trim().length < UNDO_REASON_MIN) return;
     setConfirmUndoOpen(false);
     const tourFilter =
       tourId === "all" || tourId === NULL_TOUR_KEY ? null : [tourId];
@@ -306,6 +313,22 @@ export default function DeliveryNoteDashboard() {
         parts.push(`${result.recurring_orders_deleted} fastordre fjernet`);
       }
       toast.success(`Angring fullført — ${parts.join(", ")}.`);
+      await logAudit({
+        action: "undo_delivery_runs",
+        entity_type: "delivery_note_run",
+        entity_id: null,
+        entity_display_reference: `${date} · ${tourFilter ? `tur ${tourFilter[0]}` : "alle turer"}`,
+        legal_entity_id: NB_LEGAL_ENTITY_ID,
+        changes: {
+          delivery_date: date,
+          tour_filter: tourFilter,
+          notes_deleted: result.notes_deleted,
+          lines_deleted: result.lines_deleted,
+          runs_cancelled: result.runs_cancelled,
+        },
+        reason: undoReason.trim(),
+      });
+      setUndoReason("");
     } catch (e: any) {
       toast.error(e?.message ?? "Uventet feil ved angring");
     }
@@ -318,6 +341,10 @@ export default function DeliveryNoteDashboard() {
     return row?.status === "completed";
   }, [tourId, tourStatus]);
   const modeSuffix = mode === "correction" ? "&mode=correction" : "";
+  const [undoReason, setUndoReason] = useState("");
+  // Korreksjonskjøring skal kun brukes på dagens eller framtidige leveringsdatoer;
+  // for passerte datoer gjøres rettinger via korreksjonsmodus/tilleggkjøring.
+  const isPastDate = date < todayISO();
   const { data: pendingReturns = 0 } = usePendingReturnsCount(undefined, date);
   const [showReturns, setShowReturns] = useState(false);
   const returnsRef = useRef<HTMLDivElement | null>(null);
@@ -567,11 +594,13 @@ export default function DeliveryNoteDashboard() {
                   Tilleggkjøring
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  disabled={!mainCompletedInScope || generate.isPending}
+                  disabled={!mainCompletedInScope || generate.isPending || isPastDate}
                   title={
                     !mainCompletedInScope
                       ? "Krever at hovedkjøring er kjørt for valgt dato/tur"
-                      : undefined
+                      : isPastDate
+                        ? "Korreksjonskjøring er ikke tillatt for passerte leveringsdatoer — bruk korreksjonsmodus eller tilleggkjøring"
+                        : undefined
                   }
                   onSelect={() => setConfirmCorrectionOpen(true)}
                 >
@@ -807,10 +836,21 @@ export default function DeliveryNoteDashboard() {
               automatisk — bruk kun hvis kjøringen ble gjort for en dag det ikke
               skal kjøres.
             </AlertDialogDescription>
+            <div className="mt-4 space-y-2">
+              <Label htmlFor="undo-reason">Begrunnelse (minst {UNDO_REASON_MIN} tegn)</Label>
+              <Textarea
+                id="undo-reason"
+                value={undoReason}
+                onChange={(e) => setUndoReason(e.target.value)}
+                placeholder="Hvorfor skal kjøringen angres?"
+                rows={3}
+              />
+            </div>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Avbryt</AlertDialogCancel>
+            <AlertDialogCancel onClick={() => setUndoReason("")}>Avbryt</AlertDialogCancel>
             <AlertDialogAction
+              disabled={undoReason.trim().length < UNDO_REASON_MIN || undoRuns.isPending}
               onClick={runUndo}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
