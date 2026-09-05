@@ -42,6 +42,7 @@ export function LinkCakeImageOrderDialog({
         description: [
           res.delivery_date ? `Dato: ${formatDate(res.delivery_date)}` : null,
           res.label_number ? `Etikett #${res.label_number}` : "Uten etikettnummer",
+          res.warning,
         ]
           .filter(Boolean)
           .join(" · "),

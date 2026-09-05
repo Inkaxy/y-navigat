@@ -29,6 +29,7 @@ export type CakeImage = {
   production_department_id?: string | null;
   label_number?: string | null;
   label_unit_id?: string | null;
+  resolved_label_number?: string | null;
   // Fysisk størrelse og kvalitet
   format_id?: string | null;
   shape?: string | null;
@@ -47,6 +48,52 @@ export type CakeImage = {
 };
 
 export const CAKE_BUCKET = "cake-images";
+
+type CakeLineCandidate = {
+  id: string;
+  product_id: string;
+  line_number: number;
+  product: {
+    cake_role: string | null;
+    is_cake_component: boolean;
+    label_mode: string | null;
+  } | null;
+};
+
+type LabelUnitCandidate = { id: string; number: number; unit_index: number | null };
+
+export function selectFirstFreeLabelUnit(
+  units: LabelUnitCandidate[],
+  usedIds: Set<string>,
+): LabelUnitCandidate | null {
+  return (
+    [...units]
+      .sort(
+        (a, b) =>
+          (a.unit_index ?? Number.MAX_SAFE_INTEGER) -
+            (b.unit_index ?? Number.MAX_SAFE_INTEGER) || a.number - b.number,
+      )
+      .find((unit) => !usedIds.has(unit.id)) ?? null
+  );
+}
+
+export function selectCakeLine(
+  rows: CakeLineCandidate[],
+  usedLineIds: Set<string>,
+): (CakeLineCandidate & { has_label_product: boolean }) | null {
+  const labelRows = rows.filter(
+    (row) => row.product?.label_mode && row.product.label_mode !== "none",
+  );
+  const labelRow =
+    labelRows.find((row) => !usedLineIds.has(row.id)) ?? labelRows[0];
+  if (labelRow) return { ...labelRow, has_label_product: true };
+
+  const fallback =
+    rows.find((row) => row.product?.cake_role === "base") ??
+    rows.find((row) => row.product?.is_cake_component) ??
+    rows[0];
+  return fallback ? { ...fallback, has_label_product: false } : null;
+}
 
 /** Stier organiseres som <legal_entity_id>/<dato>/<filnavn> for å matche storage-RLS. */
 function buildPath(date: string, suffix: string) {
@@ -98,13 +145,13 @@ export async function findLabelUnitForOrderLine(
 ): Promise<{ id: string; number: number } | null> {
   const { data, error } = await supabase
     .from("label_units")
-    .select("id, number")
+    .select("id, number, unit_index")
     .eq("order_line_id", orderLineId)
     .eq("seq_date", deliveryDate)
     .neq("status", "cancelled")
     .order("number", { ascending: true });
   if (error || !data || data.length === 0) return null;
-  const units = data as unknown as { id: string; number: number }[];
+  const units = data as unknown as LabelUnitCandidate[];
 
   const { data: taken } = await supabase
     .from("cake_images")
@@ -115,7 +162,7 @@ export async function findLabelUnitForOrderLine(
       .map((r) => r.label_unit_id)
       .filter(Boolean) as string[],
   );
-  return units.find((u) => !used.has(u.id)) ?? units[0];
+  return selectFirstFreeLabelUnit(units, used);
 }
 
 export async function createCakeImage(input: {
@@ -139,6 +186,7 @@ export async function createCakeImage(input: {
   source_height_px?: number | null;
   effective_dpi?: number | null;
   quality_flag?: "god" | "akseptabel" | "lav" | "ukjent" | null;
+  require_label_unit?: boolean;
 }): Promise<CakeImage> {
   const { data: u } = await supabase.auth.getUser();
 
@@ -158,6 +206,9 @@ export async function createCakeImage(input: {
       }
     } catch (err) {
       console.warn("[cake_images] Kunne ikke koble til etikett-enhet", err);
+    }
+    if (input.require_label_unit && !labelUnitId) {
+      throw new Error("Alle etiketter på linjen har allerede bilde");
     }
   }
 
@@ -214,6 +265,7 @@ export async function createCakeImageFromTicketAttachment(input: {
   customer_name?: string | null;
   order_ref?: string | null;
   notes?: string | null;
+  require_label_unit?: boolean;
 }): Promise<CakeImage> {
   // 0) Allerede i køen? Unik indeks i basen — men vis eksisterende rad i stedet
   //    for å feile på duplikatnøkkel.
@@ -253,6 +305,7 @@ export async function createCakeImageFromTicketAttachment(input: {
     production_department_id: input.production_department_id ?? null,
     order_ref: input.order_ref ?? null,
     notes: input.notes ?? null,
+    require_label_unit: input.require_label_unit,
   });
 }
 
@@ -308,36 +361,61 @@ export async function attachTicketCakeImagesToOrder(input: {
   if (rows.length === 0) return 0;
 
   const cakeLine = await findCakeLineForOrder(input.order_id).catch(() => null);
-  let labelUnitId: string | null = null;
-  let labelNumber: string | null = null;
+  let availableUnits: LabelUnitCandidate[] = [];
   if (cakeLine?.order_line_id) {
-    const unit = await findLabelUnitForOrderLine(
-      cakeLine.order_line_id,
-      input.delivery_date,
-    ).catch(() => null);
-    if (unit) {
-      labelUnitId = unit.id;
-      labelNumber = String(unit.number);
+    const { data: units, error: unitsError } = await supabase
+      .from("label_units")
+      .select("id, number, unit_index")
+      .eq("order_line_id", cakeLine.order_line_id)
+      .eq("seq_date", input.delivery_date)
+      .neq("status", "cancelled")
+      .order("unit_index", { ascending: true });
+    if (unitsError) throw unitsError;
+
+    const candidates = (units ?? []) as unknown as LabelUnitCandidate[];
+    if (candidates.length > 0) {
+      const { data: taken, error: takenError } = await supabase
+        .from("cake_images")
+        .select("label_unit_id")
+        .in("label_unit_id", candidates.map((unit) => unit.id));
+      if (takenError) throw takenError;
+      const usedIds = new Set(
+        ((taken ?? []) as { label_unit_id: string | null }[])
+          .map((item) => item.label_unit_id)
+          .filter(Boolean) as string[],
+      );
+      availableUnits = candidates
+        .filter((unit) => !usedIds.has(unit.id))
+        .sort(
+          (a, b) =>
+            (a.unit_index ?? Number.MAX_SAFE_INTEGER) -
+              (b.unit_index ?? Number.MAX_SAFE_INTEGER) || a.number - b.number,
+        );
     }
   }
+  if (cakeLine?.has_label_product && availableUnits.length < rows.length) {
+    throw new Error("Alle etiketter på linjen har allerede bilde");
+  }
 
-  const { error: uErr } = await supabase
-    .from("cake_images")
-    .update({
-      order_id: input.order_id,
-      order_ref: input.order_number ?? null,
-      delivery_date: input.delivery_date,
-      order_line_id: cakeLine?.order_line_id ?? null,
-      production_department_id: cakeLine?.production_department_id ?? null,
-      label_unit_id: labelUnitId,
-      label_number: labelNumber,
-    } as never)
-    .in(
-      "id",
-      rows.map((r) => r.id),
-    );
-  if (uErr) return 0;
-  return rows.length;
+  let updated = 0;
+  for (const [index, row] of rows.entries()) {
+    const unit = availableUnits[index] ?? null;
+    const { error: updateError } = await supabase
+      .from("cake_images")
+      .update({
+        order_id: input.order_id,
+        order_ref: input.order_number ?? null,
+        delivery_date: input.delivery_date,
+        order_line_id: cakeLine?.order_line_id ?? null,
+        production_department_id: cakeLine?.production_department_id ?? null,
+        label_unit_id: unit?.id ?? null,
+        label_number: unit ? String(unit.number) : null,
+      } as never)
+      .eq("id", row.id);
+    if (updateError) throw updateError;
+    updated++;
+  }
+  return updated;
 }
 
 
@@ -350,21 +428,27 @@ export async function attachTicketCakeImagesToOrder(input: {
 export async function findCakeLineForOrder(orderId: string): Promise<{
   order_line_id: string;
   production_department_id: string | null;
+  has_label_product: boolean;
 } | null> {
-  const { data: lines } = await supabase
+  const { data: lines, error: linesError } = await supabase
     .from("order_lines")
-    .select("id, line_number, product_id, product:products!order_lines_product_id_fkey(id, cake_role, is_cake_component)")
+    .select("id, line_number, product_id, product:products!order_lines_product_id_fkey(id, cake_role, is_cake_component, label_mode)")
     .eq("order_id", orderId)
     .order("line_number", { ascending: true });
-  const rows = (lines ?? []) as Array<{
-    id: string;
-    product_id: string;
-    product: { cake_role: string | null; is_cake_component: boolean } | null;
-  }>;
-  const cakeLine =
-    rows.find((r) => r.product?.cake_role === "base") ??
-    rows.find((r) => r.product?.is_cake_component) ??
-    rows[0];
+  if (linesError) throw linesError;
+  const rows = (lines ?? []) as unknown as CakeLineCandidate[];
+  const { data: linked, error: linkedError } = await supabase
+    .from("cake_images")
+    .select("order_line_id")
+    .eq("order_id", orderId)
+    .not("order_line_id", "is", null);
+  if (linkedError) throw linkedError;
+  const usedLineIds = new Set(
+    ((linked ?? []) as { order_line_id: string | null }[])
+      .map((row) => row.order_line_id)
+      .filter(Boolean) as string[],
+  );
+  const cakeLine = selectCakeLine(rows, usedLineIds);
   if (!cakeLine) return null;
   const { data: dept } = await supabase
     .from("product_label_departments")
@@ -376,6 +460,7 @@ export async function findCakeLineForOrder(orderId: string): Promise<{
     order_line_id: cakeLine.id,
     production_department_id:
       (dept as { department_id?: string } | null)?.department_id ?? null,
+    has_label_product: cakeLine.has_label_product,
   };
 }
 
@@ -656,7 +741,11 @@ export function statusLabel(s: CakeImageStatus) {
 export async function linkCakeImageToOrder(
   imageId: string,
   orderId: string,
-): Promise<{ delivery_date: string | null; label_number: string | null }> {
+): Promise<{
+  delivery_date: string | null;
+  label_number: string | null;
+  warning: string | null;
+}> {
   const { data: ord, error: ordErr } = await supabase
     .from("orders")
     .select("id, order_number, delivery_date")
@@ -682,6 +771,9 @@ export async function linkCakeImageToOrder(
       labelNumber = String(unit.number);
     }
   }
+  if (cakeLine?.has_label_product && order.delivery_date && !labelUnitId) {
+    throw new Error("Alle etiketter på linjen har allerede bilde");
+  }
 
   const patch: Record<string, unknown> = {
     order_id: orderId,
@@ -699,7 +791,13 @@ export async function linkCakeImageToOrder(
     .eq("id", imageId);
   if (error) throw error;
 
-  return { delivery_date: order.delivery_date, label_number: labelNumber };
+  return {
+    delivery_date: order.delivery_date,
+    label_number: labelNumber,
+    warning: cakeLine && !cakeLine.has_label_product
+      ? "Ingen etikettvare i ordren — bildet får ikke etikettnummer"
+      : null,
+  };
 }
 
 /**

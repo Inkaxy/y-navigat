@@ -51,3 +51,9 @@
 ## Leveranse 3 (ikke startet)
 - Del opp `Leveringskalender.tsx`, virtualisering, én dato-hjelper
 - Ny kundeordre-arbeidsflate + transaksjonell ordre-RPC
+
+## Etiketter frontend (pågår)
+- [ ] Riktig ordrelinjevalg og unik etikettenhet for kakebilder
+- [ ] Nummeroppslag fra label_units i kakebilder og pakksedler
+- [ ] Manuell nummersynk, mangelsvarsler og kakebilder i etikettabellen
+- [ ] Tester, typecheck, lint og bygg

@@ -85,7 +85,8 @@ export default function CakeImagesList() {
     return [...list].sort((a, b) => {
       const p = priority(a) - priority(b);
       if (p !== 0) return p;
-      return (a.label_number ?? "").localeCompare(b.label_number ?? "");
+      return Number(a.resolved_label_number ?? Number.MAX_SAFE_INTEGER) -
+        Number(b.resolved_label_number ?? Number.MAX_SAFE_INTEGER);
     });
   }, [allImages, focus, tourFilter, deptFilter, orderMeta]);
 

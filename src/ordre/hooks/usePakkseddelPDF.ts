@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchLabelNumbersByUnit, resolveLabelNumber } from "@/ordre/lib/labelNumber";
 
 export type PakkseddelPDFLine = {
   id: string;
@@ -94,9 +95,16 @@ export function usePakkseddelPDF(id: string | undefined) {
       if (orderLineIds.length > 0) {
         const { data: cakeRows } = await supabase
           .from("cake_images")
-          .select("order_line_id, label_number, edited_path, original_path")
+          .select("order_line_id, label_unit_id, label_number, edited_path, original_path")
           .in("order_line_id", orderLineIds);
-        const rows = (cakeRows ?? []) as any[];
+        const rows = (cakeRows ?? []) as Array<{
+          order_line_id: string | null;
+          label_unit_id: string | null;
+          label_number: string | null;
+          edited_path: string | null;
+          original_path: string;
+        }>;
+        const numberByUnit = await fetchLabelNumbersByUnit(rows);
         const paths = rows.map((r) => r.edited_path || r.original_path).filter(Boolean);
         const { data: signed } = paths.length
           ? await supabase.storage.from("cake-images").createSignedUrls(paths, 60 * 30)
@@ -106,7 +114,7 @@ export function usePakkseddelPDF(id: string | undefined) {
         );
         for (const r of rows) {
           cakeByLine[r.order_line_id as string] = {
-            label_number: r.label_number ?? null,
+            label_number: resolveLabelNumber(r, numberByUnit),
             url: urlMap[r.edited_path || r.original_path] ?? null,
           };
         }

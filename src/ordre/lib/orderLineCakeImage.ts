@@ -47,6 +47,8 @@ export async function attachCakeImageToOrderLine(
             label_number: String(unit.number),
           } as never)
           .eq("id", row.id);
+      } else {
+        throw new Error("Alle etiketter på linjen har allerede bilde");
       }
     }
   } catch (err) {

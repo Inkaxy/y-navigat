@@ -1,4 +1,5 @@
-import { Tag, Package, FileText, Ban, Printer, AlertTriangle, ChevronDown } from "lucide-react";
+import { Tag, Package, FileText, Ban, Printer, AlertTriangle, ChevronDown, ImageIcon } from "lucide-react";
+import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -23,6 +24,7 @@ import type { ProductionDepartment } from "@/produksjon/features/produksjonsavde
 import type { LabelPrintProfile } from "@/produksjon/features/utskriftsprofiler/types";
 import { useLabelFieldCatalog } from "@/produksjon/features/utskriftsprofiler/hooks/useLabelFieldCatalog";
 import { formatNumberRanges, type LabelUnit } from "../hooks/useLabelUnits";
+import type { LabelUnitCakeImage } from "../hooks/useLabelUnitCakeImages";
 
 interface Props {
   rows: LabelProductRow[] | undefined;
@@ -36,6 +38,7 @@ interface Props {
   missingFieldsByProduct?: Record<string, string[]>;
   /** product_id -> etikett-enheter (numre) for valgt dato. */
   unitsByProduct?: Record<string, LabelUnit[]>;
+  cakeImagesByUnit?: Record<string, LabelUnitCakeImage>;
   onPrint?: (row: LabelProductRow) => void;
   onPickProfile?: (row: LabelProductRow) => void;
 }
@@ -116,6 +119,7 @@ export function LabelProductsTable({
   profiles,
   missingFieldsByProduct,
   unitsByProduct,
+  cakeImagesByUnit,
   onPrint,
   onPickProfile,
 }: Props) {
@@ -154,6 +158,7 @@ export function LabelProductsTable({
             <TableHead className="w-16">Nr</TableHead>
             <TableHead>Navn</TableHead>
             <TableHead>Etikett-nr</TableHead>
+            <TableHead>Kakebilde</TableHead>
             <TableHead>Modus</TableHead>
             <TableHead>Print</TableHead>
             <TableHead>Profil</TableHead>
@@ -178,6 +183,12 @@ export function LabelProductsTable({
               </TableCell>
               <TableCell>
                 <LabelNumbersCell units={unitsByProduct?.[row.product_id]} />
+              </TableCell>
+              <TableCell>
+                <CakeImagesCell
+                  units={unitsByProduct?.[row.product_id]}
+                  imagesByUnit={cakeImagesByUnit}
+                />
               </TableCell>
               <TableCell>
                 <ModeBadge mode={row.label_mode} />
@@ -238,6 +249,39 @@ export function LabelProductsTable({
         </TableBody>
       </Table>
     </Card>
+  );
+}
+
+function CakeImagesCell({
+  units,
+  imagesByUnit,
+}: {
+  units?: LabelUnit[];
+  imagesByUnit?: Record<string, LabelUnitCakeImage>;
+}) {
+  const images = (units ?? [])
+    .map((unit) => imagesByUnit?.[unit.id])
+    .filter((image): image is LabelUnitCakeImage => Boolean(image));
+  if (images.length === 0) {
+    return <span className="text-xs text-muted-foreground">—</span>;
+  }
+  return (
+    <div className="flex flex-wrap gap-1">
+      {images.map((image) => (
+        <Link
+          key={image.id}
+          to={`/ordre/kakebilder/editor/${image.id}`}
+          className="grid h-9 w-9 place-items-center overflow-hidden rounded-md border bg-muted"
+          title="Åpne kakebildet"
+        >
+          {image.thumb_url ? (
+            <img src={image.thumb_url} alt="Kakebilde" className="h-full w-full object-cover" />
+          ) : (
+            <ImageIcon className="h-4 w-4 text-muted-foreground" />
+          )}
+        </Link>
+      ))}
+    </div>
   );
 }
 
