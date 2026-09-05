@@ -669,7 +669,6 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
       });
 
       // Sortering
-      const rows = Array.from(agg.values());
       rows.sort((a, b) => {
         // tur først (når ikke summert)
         if (!criteria.sum_tours) {
