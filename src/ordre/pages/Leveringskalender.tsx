@@ -2186,45 +2186,39 @@ function getISOWeek(d: Date): number {
   return Math.ceil(((date.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
 }
 
-/**
- * Bredde på den låste produktkolonnen i matrisen.
- * 240px er minimum for at produktnavn + hurtigknapper skal få plass uten klipping;
- * laptop får 280px og store skjermer 320px.
- */
-const FIRST_COL_WIDTH =
-  "w-[240px] min-w-[240px] lg:w-[280px] lg:min-w-[280px] xl:w-[320px] xl:min-w-[320px]";
-
 function MatrixGrid({
   columns,
   products,
   addedIds,
-  getValue,
-  isDirty,
+  editsByProduct,
+  getBaseValue,
+  isBaseGhost,
+  ghostQty,
+  existingQty,
   isFallback,
-  onChange,
   hasMerknad,
-  hasData,
+  orderCount,
+  colInfo,
+  onChange,
+  onReset,
+  onSave,
+  onPausedClick,
   onOpenMerknad,
   onCopyNextDay,
   rowTotals,
   colTotals,
   grandTotal,
   weatherMap,
-  ghostMap,
   pauseMap,
   columnComments,
   onColCopy,
-  onColComment,
   onColDelete,
   onColPackingNote,
   colHasData,
   colMeta,
   colTone,
-  isGhostCell,
-  orderCount,
   noTourByDate,
   onMoveToTour,
-
   canEdit,
   onOpenTourOrder,
   onOpenWeekEditor,
@@ -2232,35 +2226,36 @@ function MatrixGrid({
   columns: { date: string; tour: MatrixTour }[];
   products: MatrixProduct[];
   addedIds: Set<string>;
-  getValue: (key: CellKey) => string;
-  isDirty: (key: CellKey) => boolean;
+  editsByProduct: Map<string, Record<CellKey, string>>;
+  getBaseValue: (key: CellKey) => string;
+  isBaseGhost: (key: CellKey) => boolean;
+  ghostQty: (key: CellKey) => number;
+  existingQty: (key: CellKey) => number;
   isFallback: (key: CellKey) => boolean;
-  onChange: (key: CellKey, value: string) => void;
   hasMerknad: (key: CellKey) => boolean;
-  hasData: (key: CellKey) => boolean;
-  onOpenMerknad: (date: string, tour: MatrixTour, productId: string) => void;
-  onCopyNextDay: (date: string, tour: MatrixTour, productId: string) => void;
+  orderCount: (key: CellKey) => number;
+  colInfo: (date: string, tourId: string) => CellColInfo;
+  onChange: (key: CellKey, value: string) => void;
+  onReset: (key: CellKey) => void;
+  onSave: () => void;
+  onPausedClick: () => void;
+  onOpenMerknad: (date: string, tourId: string, productId: string) => void;
+  onCopyNextDay: (date: string, tourId: string, productId: string) => void;
   rowTotals: Record<string, number>;
   colTotals: Record<string, number>;
   grandTotal: number;
   weatherMap: WeatherMap | undefined;
-  ghostMap: RecurringGhostMap | undefined;
   pauseMap: PauseMap | undefined;
   columnComments: Map<string, string> | undefined;
   onColCopy: (date: string, tour: MatrixTour) => void;
-  onColComment: (date: string, tour: MatrixTour) => void;
   onColDelete: (date: string, tour: MatrixTour) => void;
   onColPackingNote: (date: string, tour: MatrixTour) => void;
   colHasData: (date: string, tourId: string) => boolean;
   colMeta: (date: string, tourId: string) => { order_kind?: string; lifecycle?: string; delivery_note_number?: string | null } | undefined;
   colTone: (date: string, tourId: string) => ColumnTone;
-  isGhostCell: (key: CellKey) => boolean;
-  /** Antall ordre bak cellen (>1 = dublett). */
-  orderCount: (key: CellKey) => number;
   /** Bestilte linjer uten tur, per dato → produkt. */
   noTourByDate: Map<string, Map<string, NoTourEntry>>;
   onMoveToTour: (entry: NoTourEntry) => void;
-
   canEdit: boolean;
   onOpenTourOrder: (date: string, tour: MatrixTour) => void;
   onOpenWeekEditor: (product: MatrixProduct) => void;
@@ -2272,14 +2267,21 @@ function MatrixGrid({
     unit: string | null;
     price: number | null;
   } | null>(null);
+
+  const openProductInfo = useCallback((p: MatrixProduct) => {
+    setInfoProduct({
+      id: p.id,
+      name: p.display_name,
+      number: p.display_number,
+      unit: p.sales_unit,
+      price: p.unit_price ?? null,
+    });
+  }, []);
+
   /**
    * Kolonnene som faktisk rendres: turkolonner, pluss én read-only «Uten tur»-kolonne
    * per dato der kunden har bestilte linjer uten tildelt tur.
    */
-  type RenderCol =
-    | { kind: "tour"; date: string; tour: MatrixTour }
-    | { kind: "notour"; date: string };
-
   const { dateGroups, renderCols } = useMemo(() => {
     const groups: { date: string; count: number }[] = [];
     const cols: RenderCol[] = [];
@@ -2303,20 +2305,53 @@ function MatrixGrid({
     return { dateGroups: groups, renderCols: cols };
   }, [columns, noTourByDate]);
 
+  /** Ferdig utregnede headere — uavhengig av hva brukeren skriver i cellene. */
+  const headerData = useMemo(() => {
+    const m = new Map<string, MatrixColumnHeaderData>();
+    for (const rc of renderCols) {
+      if (rc.kind !== "tour") continue;
+      const key = colKeyOf(rc.date, rc.tour.id);
+      const pause = isPaused(pauseMap, rc.date, rc.tour.id);
+      const tone = colTone(rc.date, rc.tour.id);
+      const meta = colMeta(rc.date, rc.tour.id);
+      const d = new Date(rc.date + "T00:00:00");
+      m.set(key, {
+        date: rc.date,
+        tour: rc.tour,
+        dayLabel: DAY_LABELS[(d.getDay() + 6) % 7],
+        paused: !!pause,
+        pauseReason: pause?.reason ?? null,
+        hasComment: !!columnComments?.has(key),
+        commentText: columnComments?.get(key) ?? null,
+        colHasData: colHasData(rc.date, rc.tour.id),
+        toneKind: tone.kind ?? null,
+        toneVar: tone.kind ? getKindMeta(tone.kind).tokenVar : null,
+        deliveryNote: tone.deliveryNote,
+        deliveryNoteNumber: tone.deliveryNoteNumber,
+        metaKind: meta?.order_kind ?? null,
+        metaLifecycle: meta?.lifecycle ?? null,
+        metaNoteNumber: meta?.delivery_note_number ?? null,
+      });
+    }
+    return m;
+  }, [renderCols, pauseMap, colTone, colMeta, columnComments, colHasData]);
+
   /** Antall-summer: per rad (uke) og per kolonne (dag × tur) — dempet, sekundær info. */
   const qtySums = useMemo(() => {
     const rows: Record<string, number> = {};
     const cols: Record<string, number> = {};
     for (const p of products) {
+      const rowEdits = editsByProduct.get(p.id) ?? EMPTY_EDITS;
       let rowSum = 0;
       for (const c of renderCols) {
-        const n =
-          c.kind === "tour"
-            ? (() => {
-                const v = getValue(ckey(c.date, c.tour.id, p.id));
-                return v ? Number(v.replace(",", ".")) || 0 : 0;
-              })()
-            : noTourByDate.get(c.date)?.get(p.id)?.quantity ?? 0;
+        let n = 0;
+        if (c.kind === "tour") {
+          const key = ckey(c.date, c.tour.id, p.id);
+          const v = key in rowEdits ? rowEdits[key] : getBaseValue(key);
+          n = v ? Number(v.replace(",", ".")) || 0 : 0;
+        } else {
+          n = noTourByDate.get(c.date)?.get(p.id)?.quantity ?? 0;
+        }
         if (!n) continue;
         rowSum += n;
         const k = c.kind === "tour" ? colKeyOf(c.date, c.tour.id) : `${c.date}|`;
@@ -2325,7 +2360,7 @@ function MatrixGrid({
       rows[p.id] = rowSum;
     }
     return { rows, cols };
-  }, [renderCols, products, getValue, noTourByDate]);
+  }, [renderCols, products, editsByProduct, getBaseValue, noTourByDate]);
 
   return (
     <div className="min-w-max">
@@ -2391,309 +2426,57 @@ function MatrixGrid({
                   </th>
                 );
               }
-              const c = rc;
-              const pause = isPaused(pauseMap, c.date, c.tour.id);
-              const hasComment = columnComments?.has(`${c.date}|${c.tour.id}`);
-              const colHas = colHasData(c.date, c.tour.id);
-              const tone = colTone(c.date, c.tour.id);
-              const toneVar = tone.kind ? getKindMeta(tone.kind).tokenVar : null;
-              const d = new Date(c.date + "T00:00:00");
-              const dow = (d.getDay() + 6) % 7;
-              const dayLabel = DAY_LABELS[dow];
+              const key = colKeyOf(rc.date, rc.tour.id);
+              const data = headerData.get(key);
+              if (!data) return null;
               return (
-                <th
-                  key={`${c.date}-${c.tour.id}`}
-                  data-order-kind={tone.kind ?? undefined}
-                  className={cn(
-                    "border-b border-r border-border px-1 py-1 text-center text-[11px] font-medium text-muted-foreground",
-                    pause ? "bg-sky-100 dark:bg-sky-950/40" : "bg-card/80",
-                  )}
-                  style={
-                    !pause && toneVar
-                      ? { backgroundColor: `hsl(var(${toneVar}) / 0.16)` }
-                      : undefined
-                  }
-                  title={`${c.tour.display_name} (${c.tour.time_from.slice(0, 5)}–${c.tour.time_to.slice(0, 5)})${pause?.reason ? ` · Pause: ${pause.reason}` : pause ? " · Pause" : ""}${hasComment ? `\nKommentar: ${columnComments?.get(`${c.date}|${c.tour.id}`)}` : ""}`}
-                >
-                  {tone.deliveryNote && (
-                    <div
-                      className="-mx-1 -mt-1 mb-1 truncate px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white"
-                      style={{ backgroundColor: "hsl(var(--lifecycle-delivery-note))" }}
-                    >
-                      Pakkseddel{tone.deliveryNoteNumber ? ` ${tone.deliveryNoteNumber}` : ""}
-                    </div>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => onOpenTourOrder(c.date, c.tour)}
-                    className="mx-auto block rounded px-1.5 py-0.5 text-[12px] font-semibold text-foreground hover:bg-primary/10 hover:text-primary"
-                    title={colHas ? "Åpne ordre for denne turen" : "Fastordre — skriv i cellene og lagre"}
-                  >
-                    {dayLabel} ({c.tour.tour_number})
-                    {hasComment && <span className="ml-1 text-primary">•</span>}
-                  </button>
-
-                  {(() => {
-                    const meta = colMeta(c.date, c.tour.id);
-                    if (!meta) return null;
-                    return (
-                      <div className="mt-0.5 flex flex-wrap items-center justify-center gap-1">
-                        {meta.order_kind ? (
-                          <OrderKindBadge kind={meta.order_kind as never} size="sm" />
-                        ) : null}
-                        {meta.lifecycle ? (
-                          <LifecycleBadge
-                            lifecycle={meta.lifecycle as never}
-                            deliveryNoteNumber={meta.delivery_note_number}
-                            size="sm"
-                          />
-                        ) : null}
-                      </div>
-                    );
-                  })()}
-                  {pause && (
-                    <div className="mt-0.5 inline-block rounded-sm bg-sky-200/80 px-1 text-[9px] font-semibold uppercase tracking-wide text-sky-900 dark:bg-sky-800/60 dark:text-sky-100">
-                      Pause
-                    </div>
-                  )}
-                  <div className="mt-1 flex items-center justify-center gap-1.5">
-                    <button type="button" disabled={!canEdit || !colHas} onClick={() => onColCopy(c.date, c.tour)} className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-30" title="Kopier kolonne">
-                      <Copy className="h-4 w-4" />
-                    </button>
-                    <button type="button" disabled={!canEdit || !colHas} onClick={() => onColDelete(c.date, c.tour)} className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-30" title="Slett kolonne">
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                    <button type="button" disabled={!colHas} onClick={() => onColPackingNote(c.date, c.tour)} className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-30" title="Lag pakkseddel">
-                      <PackageCheck className="h-4 w-4" />
-                    </button>
-                  </div>
-                </th>
+                <MatrixColumnHeader
+                  key={key}
+                  {...data}
+                  canEdit={canEdit}
+                  onOpenTourOrder={onOpenTourOrder}
+                  onColCopy={onColCopy}
+                  onColDelete={onColDelete}
+                  onColPackingNote={onColPackingNote}
+                />
               );
             })}
           </tr>
         </thead>
         <tbody>
-          {products.map((p) => {
-            const isAdded = addedIds.has(p.id);
-            return (
-              <tr key={p.id} className="hover:bg-muted/30">
-                <th
-                  scope="row"
-                  className={cn(
-                    "sticky left-0 z-10 border-b border-r border-border px-3 py-1.5 text-left font-normal",
-                    FIRST_COL_WIDTH,
-                    isAdded ? "bg-accent/30" : "bg-card",
-                  )}
-                >
-                  <div className="flex items-stretch gap-2">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setInfoProduct({
-                          id: p.id,
-                          name: p.display_name,
-                          number: p.display_number,
-                          unit: p.sales_unit,
-                          price: p.unit_price ?? null,
-                        })
-                      }
-                      className="inline-flex w-9 shrink-0 items-center justify-center self-stretch rounded-md border border-brand-bronze/40 bg-brand-bronze/10 text-brand-bronze shadow-sm transition-colors hover:border-brand-bronze hover:bg-brand-bronze hover:text-brand-ink"
-                      title="Produkthåndbok"
-                      aria-label={`Produkthåndbok for ${p.display_name}`}
-                    >
-                      <BookOpen className="h-5 w-5" strokeWidth={2.25} />
-                    </button>
-                    <div className="min-w-0 flex-1">
-                      <button
-                        type="button"
-                        onClick={() => onOpenWeekEditor(p)}
-                        title="Klikk for å redigere hele uken for denne varen"
-                        className="flex w-full items-center gap-1.5 truncate text-left font-medium hover:text-primary"
-                      >
-                        <span className="font-mono text-xs text-muted-foreground tabular-nums">
-                          {p.display_number}
-                        </span>
-                        <span className="truncate">{p.display_name}</span>
-                        {isAdded && (
-                          <Badge variant="outline" className="ml-1 text-[10px]">Ny</Badge>
-                        )}
-                      </button>
-                      <div className="text-[11px] text-muted-foreground">
-                        {p.sales_unit} ·{" "}
-                        {p.unit_price == null ? (
-                          <TooltipProvider delayDuration={150}>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span className="cursor-help text-muted-foreground/70">—</span>
-                              </TooltipTrigger>
-                              <TooltipContent side="right" className="max-w-xs text-xs">
-                                Ingen pris for denne kunden på valgt dato. Pris må settes i Varer-appen før ordren kan lagres.
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        ) : (
-                          formatNOK(p.unit_price)
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </th>
-                {renderCols.map((rc) => {
-                  if (rc.kind === "notour") {
-                    const entry = noTourByDate.get(rc.date)?.get(p.id);
-                    return (
-                      <td
-                        key={`${rc.date}-notour-${p.id}`}
-                        className="border-b border-r border-border bg-muted/30 px-1 py-1.5 text-center"
-                        title={
-                          entry
-                            ? `Uten tur${entry.orderNumbers.length ? ` · ${entry.orderNumbers.join(", ")}` : ""}`
-                            : undefined
-                        }
-                      >
-                        {entry ? (
-                          <div className="flex flex-col items-center gap-0.5">
-                            <span className="text-base font-semibold tabular-nums">
-                              {entry.quantity}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => onMoveToTour(entry)}
-                              disabled={!canEdit}
-                              className="rounded px-1 text-[10px] font-medium text-primary hover:bg-primary/10 disabled:opacity-40"
-                            >
-                              Flytt til tur
-                            </button>
-                          </div>
-                        ) : null}
-                      </td>
-                    );
-                  }
-                  const c = rc;
-                  const key = ckey(c.date, c.tour.id, p.id);
-                  const dupOrders = orderCount(key);
-                  const value = getValue(key);
-                  const dirty = isDirty(key);
-                  const hasM = hasMerknad(key);
-                  const cellHasData = hasData(key);
-                  const pause = isPaused(pauseMap, c.date, c.tour.id);
-                  const ghost = pause ? undefined : ghostMap?.get(key);
-                  const fromFixed = isGhostCell(key);
-                  const tone = colTone(c.date, c.tour.id);
-                  const toneVar = tone.kind ? getKindMeta(tone.kind).tokenVar : null;
-                  const effectiveQty = value ? Number(value.replace(",", ".") || 0) : 0;
-                  const ghostOverridden = !!ghost && !fromFixed && !!value && effectiveQty !== ghost;
-                  const fb = isFallback(key);
-                  return (
-                    <td
-                      key={key}
-                      data-order-kind={tone.kind ?? undefined}
-                      data-from-fixed={fromFixed ? "true" : undefined}
-                      className={cn(
-                        "group relative border-b border-r border-border p-0",
-                        pause && "bg-sky-50 dark:bg-sky-950/30",
-                        dirty && "bg-warning/25",
-                        fb && "outline outline-2 -outline-offset-2 outline-destructive/70",
-                      )}
-                      style={
-                        !pause && !dirty && toneVar
-                          ? { backgroundColor: `hsl(var(${toneVar}) / 0.07)` }
-                          : undefined
-                      }
-                      title={
-                        fb
-                          ? "Pris ikke funnet — mangler prisliste-rad eller spesialpris"
-                          : fromFixed
-                            ? `Fra fastordre: ${ghost} stk — skriv over for å endre`
-                            : ghost
-                              ? ghostOverridden
-                                ? `Fastordre: ${ghost} stk — overstyrt til ${effectiveQty}`
-                                : `Fastordre: ${ghost} stk`
-                          : pause
-                            ? pause.reason ? `Leveransepause: ${pause.reason}` : "Leveransepause"
-                            : undefined
-                      }
-                    >
-                      <Input
-                        type="text"
-                        inputMode="decimal"
-                        value={value}
-                        readOnly={!!pause}
-                        onChange={(e) => {
-                          if (pause) return;
-                          onChange(key, e.target.value);
-                        }}
-                        onMouseDown={(e) => {
-                          if (pause) {
-                            e.preventDefault();
-                            toast.info("Leveransepause", {
-                              description: "Fjern pausen først om kunden likevel skal få leveranse.",
-                            });
-                          }
-                        }}
-                        className={cn(
-                          "h-9 w-16 rounded-none border-0 bg-transparent px-1 text-center tabular-nums shadow-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-0",
-                          value && "text-base font-semibold text-foreground",
-                          fromFixed && "italic text-muted-foreground",
-                          dirty && "font-bold not-italic text-warning",
-                          pause && "cursor-not-allowed",
-                        )}
-                      />
-                      {hasM && (
-                        <span
-                          className="pointer-events-none absolute right-0.5 top-0.5 text-primary"
-                          aria-label="Har merknad"
-                          title="Har merknad"
-                        >
-                          <StickyNote className="h-2.5 w-2.5" />
-                        </span>
-                      )}
-                      {dupOrders > 1 && (
-                        <span
-                          className="pointer-events-none absolute left-0.5 top-0.5 text-muted-foreground"
-                          aria-label={`${dupOrders} ordre`}
-                          title={`${dupOrders} ordre — antallet er summert`}
-                        >
-                          <Layers className="h-2.5 w-2.5" />
-                        </span>
-                      )}
-                      {cellHasData && !pause && (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <button
-                              type="button"
-                              aria-label="Celle-handlinger"
-                              className="absolute bottom-0 right-0 hidden h-4 w-4 items-center justify-center rounded-tl-sm bg-muted/80 text-muted-foreground hover:bg-muted hover:text-foreground group-hover:flex data-[state=open]:flex"
-                            >
-                              <MoreHorizontal className="h-3 w-3" />
-                            </button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-48">
-                            <DropdownMenuItem onSelect={() => onOpenMerknad(c.date, c.tour, p.id)}>
-                              <StickyNote className="h-4 w-4 mr-2" />
-                              Merknad
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onSelect={() => onCopyNextDay(c.date, c.tour, p.id)}>
-                              <ArrowRight className="h-4 w-4 mr-2" />
-                              Kopier til neste dag
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      )}
-                    </td>
-                  );
-                })}
-                <td className="border-b border-r border-border/60 bg-card px-2 py-1.5 text-right text-xs tabular-nums text-muted-foreground">
-                  {qtySums.rows[p.id] || ""}
-                </td>
-                <td className="border-b border-r border-border bg-card px-3 py-1.5 text-right font-bold tabular-nums">
-                  {formatKrNetto(rowTotals[p.id] ?? 0)}
-                </td>
-              </tr>
-            );
-          })}
+          {products.map((p, rowIndex) => (
+            <MatrixProductRow
+              key={p.id}
+              product={p}
+              isAdded={addedIds.has(p.id)}
+              rowIndex={rowIndex}
+              renderCols={renderCols}
+              editsForRow={editsByProduct.get(p.id) ?? EMPTY_EDITS}
+              getBaseValue={getBaseValue}
+              isBaseGhost={isBaseGhost}
+              ghostQty={ghostQty}
+              existingQty={existingQty}
+              isFallback={isFallback}
+              hasMerknad={hasMerknad}
+              orderCount={orderCount}
+              colInfo={colInfo}
+              noTourByDate={noTourByDate}
+              rowQtySum={qtySums.rows[p.id] ?? 0}
+              rowTotal={rowTotals[p.id] ?? 0}
+              canEdit={canEdit}
+              onChange={onChange}
+              onReset={onReset}
+              onSave={onSave}
+              onPausedClick={onPausedClick}
+              onOpenMerknad={onOpenMerknad}
+              onCopyNextDay={onCopyNextDay}
+              onOpenWeekEditor={onOpenWeekEditor}
+              onOpenProductInfo={openProductInfo}
+              onMoveToTour={onMoveToTour}
+            />
+          ))}
         </tbody>
-        <tfoot>
+        <tfoot className="sticky bottom-0 z-20">
           <tr className="bg-muted/40">
             <th
               scope="row"
@@ -2710,7 +2493,7 @@ function MatrixGrid({
                 <td
                   key={rc.kind === "tour" ? colKey : `${rc.date}-notour-qty`}
                   className={cn(
-                    "border-b border-r border-border px-1 py-1.5 text-right text-xs tabular-nums text-muted-foreground",
+                    "border-b border-r border-border bg-muted/40 px-1 py-1.5 text-right text-xs tabular-nums text-muted-foreground",
                     rc.kind === "notour" && "bg-muted/50",
                   )}
                 >
@@ -2718,10 +2501,10 @@ function MatrixGrid({
                 </td>
               );
             })}
-            <td className="border-b border-r border-border px-2 py-1.5 text-right text-xs font-medium tabular-nums text-muted-foreground">
+            <td className="border-b border-r border-border bg-muted/40 px-2 py-1.5 text-right text-xs font-medium tabular-nums text-muted-foreground">
               {Object.values(qtySums.rows).reduce((a, b) => a + b, 0) || ""}
             </td>
-            <td className="border-b border-r border-border px-3 py-1.5" />
+            <td className="border-b border-r border-border bg-muted/40 px-3 py-1.5" />
           </tr>
           <tr className="bg-muted">
             <th
