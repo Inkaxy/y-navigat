@@ -24,7 +24,7 @@ export async function attachCakeImageToOrderLine(
   originalPath: string,
   title?: string | null,
   notes?: string | null,
-): Promise<string> {
+): Promise<{ imageId: string; labelWarning: string | null }> {
   const { data, error } = await supabase.rpc("upload_cake_image_for_order_line", {
     p_order_line_id: orderLineId,
     p_original_path: originalPath,
@@ -35,6 +35,7 @@ export async function attachCakeImageToOrderLine(
   const imageId = data as string;
 
   // Koble bildet til etikett-enheten slik at det deler nummer med etiketten.
+  let labelWarning: string | null = null;
   try {
     const row = await fetchCakeImageForLine(orderLineId);
     if (row && !row.label_unit_id) {
@@ -48,14 +49,15 @@ export async function attachCakeImageToOrderLine(
           } as never)
           .eq("id", row.id);
       } else {
-        throw new Error("Alle etiketter på linjen har allerede bilde");
+        labelWarning = "Alle etiketter på linjen har allerede bilde";
       }
     }
   } catch (err) {
     console.warn("[cake_images] Kunne ikke koble bilde til etikett-enhet", err);
+    labelWarning = "Bildet fikk ikke etikettnummer — sjekk etikettene på linjen";
   }
 
-  return imageId;
+  return { imageId, labelWarning };
 }
 
 export async function fetchCakeImageForLine(
