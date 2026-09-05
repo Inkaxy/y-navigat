@@ -2039,6 +2039,11 @@ function MatrixGrid({
   colMeta: (date: string, tourId: string) => { order_kind?: string; lifecycle?: string; delivery_note_number?: string | null } | undefined;
   colTone: (date: string, tourId: string) => ColumnTone;
   isGhostCell: (key: CellKey) => boolean;
+  /** Antall ordre bak cellen (>1 = dublett). */
+  orderCount: (key: CellKey) => number;
+  /** Bestilte linjer uten tur, per dato → produkt. */
+  noTourByDate: Map<string, Map<string, NoTourEntry>>;
+  onMoveToTour: (entry: NoTourEntry) => void;
 
   canEdit: boolean;
   onOpenTourOrder: (date: string, tour: MatrixTour) => void;
