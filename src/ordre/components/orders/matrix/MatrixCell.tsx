@@ -68,6 +68,12 @@ function MatrixCellImpl({
   onCopyNextDay,
 }: MatrixCellProps) {
   const effectiveQty = value ? Number(value.replace(",", ".") || 0) : 0;
+  /**
+   * Flere ordre i samme celle kan ikke redigeres her: lagringen oppdaterer
+   * bare ÉN ordre, så en endring ville flyttet antall mellom ordrene.
+   */
+  const multiOrder = orderCount > 1;
+  const locked = paused || multiOrder;
   const ghostOverridden = !!ghostQty && !fromFixed && !!value && effectiveQty !== ghostQty;
 
   const handleFocus = useCallback((e: FocusEvent<HTMLInputElement>) => {
@@ -125,6 +131,7 @@ function MatrixCellImpl({
       className={cn(
         "group relative border-b border-r border-border p-0",
         paused && "bg-sky-50 dark:bg-sky-950/30",
+        multiOrder && !paused && "bg-muted/60",
         dirty && "bg-warning/25",
         fallback && "outline outline-2 -outline-offset-2 outline-destructive/70",
       )}
@@ -134,7 +141,9 @@ function MatrixCellImpl({
           : undefined
       }
       title={
-        fallback
+        multiOrder
+          ? "Flere ordre i cellen — rediger i ordrevisningen"
+          : fallback
           ? "Pris ikke funnet — mangler prisliste-rad eller spesialpris"
           : fromFixed
             ? `Fra fastordre: ${ghostQty} stk — skriv over for å endre`
@@ -156,11 +165,11 @@ function MatrixCellImpl({
         data-cell-row={rowIndex}
         data-cell-col={colIndex}
         value={value}
-        readOnly={paused}
+        readOnly={locked}
         onFocus={handleFocus}
         onKeyDown={handleKeyDown}
         onChange={(e) => {
-          if (paused) return;
+          if (locked) return;
           onChange(cellKey, e.target.value);
         }}
         onMouseDown={(e) => {
@@ -169,12 +178,13 @@ function MatrixCellImpl({
             onPausedClick();
           }
         }}
+        aria-readonly={locked || undefined}
         className={cn(
           "h-9 w-16 rounded-none border-0 bg-transparent px-1 text-center tabular-nums shadow-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-0",
           value && "text-base font-semibold text-foreground",
           fromFixed && "italic text-muted-foreground",
           dirty && "font-bold not-italic text-warning",
-          paused && "cursor-not-allowed",
+          locked && "cursor-not-allowed",
         )}
       />
       {hasMerknad && (
@@ -190,12 +200,12 @@ function MatrixCellImpl({
         <span
           className="pointer-events-none absolute left-0.5 top-0.5 text-muted-foreground"
           aria-label={`${orderCount} ordre`}
-          title={`${orderCount} ordre — antallet er summert`}
+          title="Flere ordre i cellen — rediger i ordrevisningen"
         >
           <Layers className="h-2.5 w-2.5" />
         </span>
       )}
-      {hasData && !paused && (
+      {hasData && !locked && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
