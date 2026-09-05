@@ -37,6 +37,13 @@ export default function CakeImagesList() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const { printerLabel, scaleX, scaleY, scaleXPct } = useCakePrinterSelection();
+  const printFlow = useCakePrintFlow({
+    scale: scaleX,
+    scaleY,
+    printerLabel,
+    scaleAppliedPct: scaleXPct,
+  });
   const status = (searchParams.get("status") as Status) || "for-utskrift";
   const date = searchParams.get("date") || todayISO();
 
@@ -191,6 +198,7 @@ export default function CakeImagesList() {
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-6 space-y-4">
+      {printFlow.dialog}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Button asChild variant="ghost" size="sm">
           <Link to={`/ordre/kakebilder?date=${date}`}>
