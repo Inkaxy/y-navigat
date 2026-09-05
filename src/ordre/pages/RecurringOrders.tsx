@@ -45,6 +45,8 @@ import { osloTodayISO } from "@/lib/osloDate";
 
 
 export default function RecurringOrders() {
+  // Dagens dato i Oslo — hentes ved render, ikke ved modullasting.
+  const TODAY_ISO = useMemo(() => osloTodayISO(), []);
   const [search, setSearch] = useState("");
   const [status, setStatus] =
     useState<NonNullable<RecurringScheduleFilter["status"]>>("active");
