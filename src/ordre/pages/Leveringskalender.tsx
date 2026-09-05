@@ -157,19 +157,32 @@ type CellTarget = {
   quantity: number;
 };
 
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export default function MatrixPage() {
   const qc = useQueryClient();
   const { user } = useAuth();
   const { data: access } = useUserAccess(user);
   const canEdit = access?.hasOrdreWrite ?? false;
 
-  const [customerId, setCustomerId] = useState<string | null>(null);
+  // Dyplenker fra dashbordet: ?date=YYYY-MM-DD og ?customer=<uuid>
+  const [searchParams] = useSearchParams();
+  const paramDate = searchParams.get("date");
+  const paramCustomer = searchParams.get("customer");
+  const initialDate = paramDate && ISO_DATE_RE.test(paramDate) ? paramDate : null;
+
+  const [customerId, setCustomerId] = useState<string | null>(
+    paramCustomer && UUID_RE.test(paramCustomer) ? paramCustomer : null,
+  );
 
   // Date range driven by quick-filter chips OR by week navigation.
-  const initialWeek = isoWeekMonday(todayISO());
+  const initialWeek = isoWeekMonday(initialDate ?? todayISO());
   const [dateFrom, setDateFrom] = useState<string>(initialWeek);
   const [dateTo, setDateTo] = useState<string>(addDays(initialWeek, 6));
-  const [quickFilter, setQuickFilter] = useState<QuickRange | null>("this_week");
+  const [quickFilter, setQuickFilter] = useState<QuickRange | null>(
+    initialDate ? null : "this_week",
+  );
 
   const [pickerOpen, setPickerOpen] = useState(false);
   const [fromDateOpen, setFromDateOpen] = useState(false);
