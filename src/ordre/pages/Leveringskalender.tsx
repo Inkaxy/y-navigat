@@ -1759,6 +1759,20 @@ export default function MatrixPage() {
         }
       />
 
+      {moveTourOrder && (
+        <ChangeTourDialog
+          open={!!moveTourOrder}
+          onOpenChange={(v) => {
+            if (!v) setMoveTourOrder(null);
+          }}
+          orderId={moveTourOrder.orderId}
+          orderNumber={moveTourOrder.orderNumber}
+          legalEntityId={NB_LEGAL_ENTITY_ID}
+          currentTourId={null}
+        />
+      )}
+
+
       {merknadCell && labelProfileByProduct.get(merknadCell.productId) && (
         <MerknadDialog
           open={!!merknadCell}
