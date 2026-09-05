@@ -155,10 +155,14 @@ export function useEntitySearch(rawTerm: string) {
           },
         ];
       }
-      // Kort saksreferanse («T-1a2b»): prefikssøk på id.
-      const orFilter = ticketPrefix
-        ? `id.ilike.${ticketPrefix}%,${buildIlikeOr(["subject", "sender_email", "sender_name"], term)}`
-        : buildIlikeOr(["subject", "sender_email", "sender_name"], term);
+      // Kort saksreferanse («T-1a2b»): uuid har ingen ilike, så prefikset
+      // uttrykkes som et intervall (id mellom lo og hi).
+      const textFilter = buildIlikeOr(["subject", "sender_email", "sender_name"], term);
+      let orFilter = textFilter;
+      if (ticketPrefix) {
+        const { lo, hi } = ticketPrefixRange(ticketPrefix);
+        orFilter = `and(id.gte.${lo},id.lte.${hi}),${textFilter}`;
+      }
       const { data, error } = await supabase
         .from("tickets")
         .select("id, subject, sender_email, sender_name, received_at")
