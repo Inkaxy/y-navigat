@@ -14,11 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  CALIBRATION_MM,
-  CAKE_PRINT_CSS,
-  calibrationSheetHtml,
-} from "@/ordre/lib/cakePrint";
+import { CALIBRATION_MM, printCalibrationSheet } from "@/ordre/lib/cakePrint";
 import {
   correctionPct,
   correctionSentence,
@@ -26,7 +22,6 @@ import {
   useCakePrinterSelection,
   useSaveCakeCalibration,
 } from "@/ordre/hooks/useCakeCalibration";
-import { logCalibrationTestPrint } from "@/ordre/lib/cakeImages";
 
 /**
  * Kalibrering per skriver. Vi skriver ut et kvadrat på 100 × 100 mm, brukeren
@@ -58,29 +53,21 @@ export function CalibratePrinterDialog({
   const my = parse(measuredY);
 
   const preview = useMemo(() => {
-    const rows: Array<{ label: string; pct: number }> = [];
+    const rows: Array<{ label: string; pct: number; measured: number }> = [];
     if (Number.isFinite(mx) && mx > 0)
-      rows.push({ label: "Bredde", pct: correctionPct(CALIBRATION_MM, mx) });
+      rows.push({ label: "Bredde", pct: correctionPct(CALIBRATION_MM, mx), measured: mx });
     if (Number.isFinite(my) && my > 0)
-      rows.push({ label: "Høyde", pct: correctionPct(CALIBRATION_MM, my) });
+      rows.push({ label: "Høyde", pct: correctionPct(CALIBRATION_MM, my), measured: my });
     return rows;
   }, [mx, my]);
 
   const printTestSheet = async () => {
-    const w = window.open("", "_blank", "width=900,height=1100");
-    if (!w) {
-      toast.error("Nettleseren blokkerte utskriftsvinduet");
-      return;
+    try {
+      await printCalibrationSheet(printer.trim() || printerLabel || null);
+    } catch (e) {
+      console.error("[CalibratePrinterDialog] kunne ikke skrive ut testarket", e);
+      toast.error("Kunne ikke starte utskriften av testarket");
     }
-    const style = w.document.createElement("style");
-    style.textContent = CAKE_PRINT_CSS;
-    w.document.head.appendChild(style);
-    w.document.body.appendChild(calibrationSheetHtml(w.document));
-    w.onafterprint = () => {
-      void logCalibrationTestPrint(printer.trim() || printerLabel || "Ukjent skriver");
-    };
-    w.focus();
-    w.print();
   };
 
   const onSave = async () => {
@@ -174,7 +161,9 @@ export function CalibratePrinterDialog({
             <div className="rounded-lg border bg-muted/40 p-3 text-sm">
               {preview.map((r) => (
                 <div key={r.label} className="flex items-baseline justify-between">
-                  <span className="text-muted-foreground">{r.label}</span>
+                  <span className="text-muted-foreground">
+                    {r.label}: målt {r.measured.toLocaleString("nb-NO", { maximumFractionDigits: 1 })} mm av {CALIBRATION_MM} mm
+                  </span>
                   <span className="font-semibold tabular-nums">
                     {r.pct.toLocaleString("nb-NO", { maximumFractionDigits: 2 })} %
                   </span>

@@ -25,6 +25,11 @@ import { UploadButton } from "@/ordre/components/cake-images/UploadButton";
 import { deleteCakeImage, markPrinted, updateCakeImage } from "@/ordre/lib/cakeImages";
 import { useCakePrintFlow } from "@/ordre/hooks/useCakePrintFlow";
 import { useCakePrinterSelection } from "@/ordre/hooks/useCakeCalibration";
+import { evaluatePrintGate } from "@/ordre/lib/cakePrintGate";
+import {
+  BulkResultDialog,
+  type BulkResultRow,
+} from "@/ordre/components/cake-images/BulkResultDialog";
 
 type Status = "for-utskrift" | "skrevet-ut";
 
@@ -118,6 +123,9 @@ export default function CakeImagesList() {
   const urls = useSignedUrls(paths);
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkResult, setBulkResult] = useState<
+    { title: string; rows: BulkResultRow[] } | null
+  >(null);
   const toggle = (id: string, on: boolean) => {
     setSelected((s) => {
       const n = new Set(s);
@@ -139,12 +147,47 @@ export default function CakeImagesList() {
     setSelected(new Set());
   };
 
-  // Utskriften bygges i samme fane, rett fra klikket — ingen popup å sperre.
-  const printSelected = () => {
-    const ids = Array.from(selected);
-    if (ids.length === 0) return;
-    void printFlow.printIds(ids);
+  const imageLabel = (img: (typeof allImages)[number]) =>
+    `${img.resolved_label_number ? `#${img.resolved_label_number} ` : ""}${img.title || "Uten navn"}`;
+
+  /**
+   * Samme regler som editoren: format satt, lav oppløsning bekreftet og
+   * rettigheter avklart. Bulk skal ikke være en snarvei rundt sperrene.
+   */
+  const gateImages = (ids: string[]) => {
+    const passed: string[] = [];
+    const rows: BulkResultRow[] = [];
+    for (const id of ids) {
+      const img = allImages.find((i) => i.id === id);
+      if (!img) {
+        rows.push({ id, label: "Ukjent bilde", outcome: "error", reason: "Fant ikke bildet" });
+        continue;
+      }
+      const gate = evaluatePrintGate(img);
+      if (gate.ok) {
+        passed.push(id);
+        rows.push({ id, label: imageLabel(img), outcome: "ok" });
+      } else {
+        rows.push({ id, label: imageLabel(img), outcome: "skipped", reason: gate.reason });
+      }
+    }
+    return { passed, rows };
   };
+
+  const runPrint = (ids: string[], title: string) => {
+    if (ids.length === 0) return;
+    const { passed, rows } = gateImages(ids);
+    if (rows.some((r) => r.outcome !== "ok")) setBulkResult({ title, rows });
+    if (passed.length === 0) {
+      if (!rows.some((r) => r.outcome !== "ok")) toast.error("Ingen bilder å skrive ut");
+      return;
+    }
+    void printFlow.printIds(passed);
+  };
+
+  // Utskriften bygges i samme fane, rett fra klikket — ingen popup å sperre.
+  const printSelected = () =>
+    runPrint(Array.from(selected), "Skriv ut valgte");
 
   const pdfSelected = () => {
     const ids = Array.from(selected);
@@ -162,36 +205,82 @@ export default function CakeImagesList() {
     [images],
   );
 
-
-  const printAllReady = () => {
-    if (readyIds.length === 0) return;
-    void printFlow.printIds(readyIds);
-  };
+  const printAllReady = () =>
+    runPrint(readyIds, "Skriv ut alle ferdig redigerte");
 
   const markFerdig = async () => {
-    await Promise.all(
-      Array.from(selected).map((id) =>
-        updateCakeImage(id, { status: "ferdig_redigert" }),
-      ),
-    );
-    toast.success(`${selected.size} markert som ferdig redigert`);
+    const { passed, rows } = gateImages(Array.from(selected));
+    const results: BulkResultRow[] = [...rows];
+    for (const id of passed) {
+      try {
+        await updateCakeImage(id, { status: "ferdig_redigert" });
+      } catch (e) {
+        console.error("[CakeImagesList] kunne ikke markere ferdig", e);
+        const row = results.find((r) => r.id === id);
+        if (row) {
+          row.outcome = "error";
+          row.reason = "Kunne ikke lagre statusen";
+        }
+      }
+    }
+    setBulkResult({ title: "Marker ferdig", rows: results });
     setSelected(new Set());
     qc.invalidateQueries({ queryKey: ["cake-images"] });
   };
 
   const markSkrevetUt = async () => {
-    await markPrinted(Array.from(selected));
-    toast.success(`${selected.size} markert som skrevet ut`);
+    const { passed, rows } = gateImages(Array.from(selected));
+    const results: BulkResultRow[] = [...rows];
+    if (passed.length > 0) {
+      try {
+        await markPrinted(passed, "print", null, null, {
+          printerLabel,
+          scaleAppliedPct: scaleXPct,
+        });
+      } catch (e) {
+        console.error("[CakeImagesList] kunne ikke markere som skrevet ut", e);
+        for (const r of results) {
+          if (r.outcome === "ok") {
+            r.outcome = "error";
+            r.reason = "Kunne ikke lagre statusen";
+          }
+        }
+      }
+    }
+    setBulkResult({ title: "Marker som skrevet ut", rows: results });
     setSelected(new Set());
     qc.invalidateQueries({ queryKey: ["cake-images"] });
   };
 
   const deleteSelected = async () => {
-    if (!confirm(`Slette ${selected.size} bilde(r)?`)) return;
-    await Promise.all(
-      images.filter((i) => selected.has(i.id)).map((i) => deleteCakeImage(i)),
-    );
-    toast.success("Slettet");
+    const chosen = images.filter((i) => selected.has(i.id));
+    const deletable = chosen.filter((i) => i.status !== "skrevet_ut");
+    const results: BulkResultRow[] = chosen
+      .filter((i) => i.status === "skrevet_ut")
+      .map((i) => ({
+        id: i.id,
+        label: imageLabel(i),
+        outcome: "skipped" as const,
+        reason: "Bildet er skrevet ut og kan ikke slettes",
+      }));
+    if (deletable.length > 0) {
+      if (!confirm(`Slette ${deletable.length} bilde(r)?`)) return;
+      for (const img of deletable) {
+        try {
+          await deleteCakeImage(img);
+          results.push({ id: img.id, label: imageLabel(img), outcome: "ok" });
+        } catch (e) {
+          console.error("[CakeImagesList] kunne ikke slette bildet", e);
+          results.push({
+            id: img.id,
+            label: imageLabel(img),
+            outcome: "error",
+            reason: "Kunne ikke slette bildet",
+          });
+        }
+      }
+    }
+    setBulkResult({ title: "Slett bilder", rows: results });
     setSelected(new Set());
     qc.invalidateQueries({ queryKey: ["cake-images"] });
   };
@@ -199,6 +288,12 @@ export default function CakeImagesList() {
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-6 space-y-4">
       {printFlow.dialog}
+      <BulkResultDialog
+        open={bulkResult !== null}
+        title={bulkResult?.title ?? ""}
+        rows={bulkResult?.rows ?? []}
+        onClose={() => setBulkResult(null)}
+      />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Button asChild variant="ghost" size="sm">
           <Link to={`/ordre/kakebilder?date=${date}`}>
@@ -324,7 +419,14 @@ export default function CakeImagesList() {
                 </Button>
               </>
             )}
-            <Button size="sm" variant="destructive" onClick={deleteSelected}>
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={deleteSelected}
+              disabled={images
+                .filter((i) => selected.has(i.id))
+                .every((i) => i.status === "skrevet_ut")}
+            >
               <Trash2 className="mr-2 h-4 w-4" />
               Slett
             </Button>
@@ -345,7 +447,7 @@ export default function CakeImagesList() {
               : "Ingen kakebilder er markert som skrevet ut."}
           </p>
           <p className="mt-1 max-w-md text-sm text-muted-foreground">
-            Last opp et bilde, eller legg til demo-bilder for å teste flyten.
+            Last opp et bilde for å komme i gang.
           </p>
         </div>
       ) : (

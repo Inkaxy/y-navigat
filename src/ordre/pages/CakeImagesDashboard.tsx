@@ -23,6 +23,7 @@ import { useCakeImageCounts } from "@/ordre/hooks/useCakeImages";
 import { UploadButton } from "@/ordre/components/cake-images/UploadButton";
 import { CalibratePrinterDialog } from "@/ordre/components/cake-images/CalibratePrinterDialog";
 import { useCakePrinterSelection } from "@/ordre/hooks/useCakeCalibration";
+import { CakeProductionOverview } from "@/ordre/components/cake-images/CakeProductionOverview";
 
 /**
  * Kakebilder — dashboard.
@@ -125,7 +126,7 @@ export default function CakeImagesDashboard() {
   ];
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 py-8 space-y-8">
+    <div className="mx-auto w-full max-w-6xl px-4 py-8 space-y-8">
       <CalibratePrinterDialog open={calibrateOpen} onOpenChange={setCalibrateOpen} />
       {/* Topp — tittel */}
       <div className="flex flex-col items-center gap-2 text-center">
@@ -145,7 +146,9 @@ export default function CakeImagesDashboard() {
           <span className="text-xs text-muted-foreground">
             {isCalibrated
               ? `${printerLabel}: korreksjon ${scaleXPct} % × ${scaleYPct} %`
-              : "Skriveren er ikke kalibrert ennå — utskrifter går i 100 %."}
+              : printerLabel
+                ? `${printerLabel}: ikke kalibrert — utskrifter går i 100 %.`
+                : "Ingen skriver valgt ennå — velg skriver før du skriver ut."}
           </span>
         </div>
       </div>
@@ -253,6 +256,8 @@ export default function CakeImagesDashboard() {
           );
         })}
       </div>
+
+      <CakeProductionOverview date={date} />
 
       <div className="flex justify-center">
         <UploadButton date={date} />

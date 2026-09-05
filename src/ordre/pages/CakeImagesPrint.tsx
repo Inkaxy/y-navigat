@@ -68,7 +68,7 @@ export default function CakeImagesPrint() {
     }
     void (async () => {
       try {
-        const res = await cakePdfPreviewUrl(items, { scale, scaleY });
+        const res = await cakePdfPreviewUrl(items, { scale, scaleY, printerLabel });
         if (cancelled) {
           URL.revokeObjectURL(res.url);
           return;
@@ -89,13 +89,14 @@ export default function CakeImagesPrint() {
       cancelled = true;
       if (created) URL.revokeObjectURL(created);
     };
-  }, [items, scale, scaleY]);
+  }, [items, scale, scaleY, printerLabel]);
 
   const downloadPdf = async () => {
     if (items.length === 0) return;
     const res = await cakeSheetsToPdf(items, {
       scale,
       scaleY,
+      printerLabel,
       fileName: "kakebilder.pdf",
     });
     // PDF er ikke papir: logges, men flytter ikke status.

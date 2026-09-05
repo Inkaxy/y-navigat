@@ -521,6 +521,8 @@ export type CakePdfOptions = {
   scaleY?: number;
   /** Pakk flere små bilder på samme ark. Standard: på. */
   nest?: boolean;
+  /** Navnet på skriveren arket ble laget for — trykkes i bunnteksten. */
+  printerLabel?: string | null;
   /**
    * Hopp over bilder uten format i stedet for å skrive et varselark.
    * Standard: hopp over når det er flere enn ett bilde (bulk).
@@ -539,6 +541,7 @@ export async function buildCakePdf(
   const scale = opts.scale ?? 1;
   const scaleY = opts.scaleY ?? scale;
   const skipMissing = opts.skipMissingFormat ?? items.length > 1;
+  const printerLabel = opts.printerLabel ?? null;
   const skipped: CakeSkipped[] = [];
 
   const printable: CakePrintItem[] = [];
@@ -674,7 +677,7 @@ export async function buildCakePdf(
       if (line1) pdf.text(line1, textX + (item.labelNumber ? 16 : 0), capY + 4);
       if (line2) pdf.text(line2, textX, capY + 8);
     }
-    drawFootBand(pdf, size, scale, scaleY, sheet, orientation);
+    drawFootBand(pdf, size, scale, scaleY, sheet, orientation, printerLabel);
   }
 
   // Bilder uten format: eget varselark, slik at feilen ikke går ubemerket.
@@ -692,7 +695,7 @@ export async function buildCakePdf(
     pdf.text(cakeItemLabel(item), size.widthMm / 2, size.heightMm / 2 + 8, {
       align: "center",
     });
-    drawFootBand(pdf, size, scale, scaleY, sheet, orientation);
+    drawFootBand(pdf, size, scale, scaleY, sheet, orientation, printerLabel);
   }
 
   if (pageIndex === 0) {
@@ -713,6 +716,7 @@ function drawFootBand(
   scaleY: number,
   sheet: string,
   orientation: SheetOrientation,
+  printerLabel: string | null = null,
 ) {
   const rulerY = size.heightMm - 14;
   pdf.setLineWidth(0.3);
@@ -726,6 +730,7 @@ function drawFootBand(
   pdf.text(PRINT_INSTRUCTION, PAGE_MARGIN_MM, size.heightMm - 8);
   pdf.text(
     `${sheet} ${orientation === "landscape" ? "liggende" : "stående"}` +
+      (printerLabel ? ` · ${printerLabel}` : "") +
       (scale !== 1 || scaleY !== 1
         ? ` · korrigert ${Math.round(scale * 10000) / 100} % × ${Math.round(scaleY * 10000) / 100} %`
         : ""),
@@ -864,18 +869,50 @@ export async function cakePdfPreviewUrl(
  */
 export const CALIBRATION_MM = 100;
 
-export function calibrationSheetHtml(doc: Document): HTMLElement {
-  const sheet = el(doc, "div", "cake-sheet");
-  const box = el(doc, "div", "cake-artwork");
-  box.style.width = `${CALIBRATION_MM}mm`;
-  box.style.height = `${CALIBRATION_MM}mm`;
-  box.style.border = "0.3mm solid #000";
-  sheet.appendChild(box);
+/**
+ * Kalibreringsarket bygges med samme PDF-motor som ekte utskrift, i 100 %
+ * uten korreksjon. Måler man arket etter en annen vei enn papiret faktisk
+ * lages, måler man feil.
+ */
+export function buildCalibrationPdf(printerLabel?: string | null): jsPDF {
+  const sheet = "A4";
+  const orientation: SheetOrientation = "portrait";
+  const size = sheetSize(sheet, orientation);
+  const pdf = new jsPDF({ orientation, unit: "mm", format: "a4" });
 
-  const t = el(doc, "div", "cake-label", "");
-  t.style.fontSize = "6mm";
-  t.textContent = `Kalibrering: kvadratet skal måle ${CALIBRATION_MM} × ${CALIBRATION_MM} mm`;
-  sheet.appendChild(t);
-  addRuler(doc, sheet, 1);
-  return sheet;
+  const x = (size.widthMm - CALIBRATION_MM) / 2;
+  const y = 40;
+  pdf.setLineWidth(0.3);
+  pdf.rect(x, y, CALIBRATION_MM, CALIBRATION_MM);
+
+  pdf.setFontSize(12);
+  pdf.text(
+    `Kalibrering: kvadratet skal måle ${CALIBRATION_MM} × ${CALIBRATION_MM} mm`,
+    size.widthMm / 2,
+    y - 8,
+    { align: "center" },
+  );
+  pdf.setFontSize(9);
+  pdf.text(
+    printerLabel ? `Skriver: ${printerLabel}` : "Skriver: ikke valgt",
+    size.widthMm / 2,
+    y + CALIBRATION_MM + 8,
+    { align: "center" },
+  );
+  pdf.text(
+    "Mål bredde og høyde med linjal og skriv inn målene i kalibreringsdialogen.",
+    size.widthMm / 2,
+    y + CALIBRATION_MM + 14,
+    { align: "center" },
+  );
+
+  drawFootBand(pdf, size, 1, 1, sheet, orientation, printerLabel ?? null);
+  return pdf;
+}
+
+/** Skriver ut kalibreringsarket i samme fane som ekte utskrift. */
+export async function printCalibrationSheet(
+  printerLabel?: string | null,
+): Promise<void> {
+  await printPdfInPlace(buildCalibrationPdf(printerLabel).output("blob"));
 }

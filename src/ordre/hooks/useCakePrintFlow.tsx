@@ -40,11 +40,19 @@ export function useCakePrintFlow(opts: CakePrintFlowOptions = {}) {
         toast.error("Ingen kakebilder å skrive ut");
         return;
       }
+      if (!optsRef.current.printerLabel) {
+        toast.error("Velg skriver", {
+          description:
+            "Velg skriveren du skriver ut på — da brukes riktig korreksjon på arket.",
+        });
+        return;
+      }
       setBusy(true);
       try {
         const res = await printCakeItems(items, {
           scale: optsRef.current.scale ?? 1,
           scaleY: optsRef.current.scaleY ?? optsRef.current.scale ?? 1,
+          printerLabel: optsRef.current.printerLabel,
         });
         if (res.skipped.length > 0) {
           toast.warning(
