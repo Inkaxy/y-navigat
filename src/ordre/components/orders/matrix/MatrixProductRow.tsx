@@ -46,6 +46,8 @@ export type MatrixProductRowProps = {
   colInfo: (date: string, tourId: string) => CellColInfo;
   noTourByDate: Map<string, Map<string, NoTourEntry>>;
   rowQtySum: number;
+  /** Antall uten tur — holdes utenfor ukesummen, som «Sum kr» også gjør. */
+  rowNoTourQty: number;
   rowTotal: number;
   canEdit: boolean;
   onChange: (key: string, value: string) => void;
@@ -75,6 +77,7 @@ function MatrixProductRowImpl({
   colInfo,
   noTourByDate,
   rowQtySum,
+  rowNoTourQty,
   rowTotal,
   canEdit,
   onChange,
@@ -218,7 +221,12 @@ function MatrixProductRowImpl({
       })}
 
       <td className="border-b border-r border-border/60 bg-card px-2 py-1.5 text-right text-xs tabular-nums text-muted-foreground">
-        {rowQtySum || ""}
+        <div>{rowQtySum || ""}</div>
+        {rowNoTourQty > 0 && (
+          <div className="text-[10px] text-muted-foreground/80" title="Uten tur — ikke med i ukesummen eller Sum kr">
+            +{rowNoTourQty} uten tur
+          </div>
+        )}
       </td>
       <td className="border-b border-r border-border bg-card px-3 py-1.5 text-right font-bold tabular-nums">
         {formatKrNetto(rowTotal)}

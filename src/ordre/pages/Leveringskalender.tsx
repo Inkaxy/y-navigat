@@ -2387,6 +2387,7 @@ function MatrixGrid({
   /** Antall-summer: per rad (uke) og per kolonne (dag × tur) — dempet, sekundær info. */
   const qtySums = useMemo(() => {
     const rows: Record<string, number> = {};
+    const rowsNoTour: Record<string, number> = {};
     const cols: Record<string, number> = {};
     for (const p of products) {
       const rowEdits = editsByProduct.get(p.id) ?? EMPTY_EDITS;
@@ -2401,13 +2402,15 @@ function MatrixGrid({
           n = noTourByDate.get(c.date)?.get(p.id)?.quantity ?? 0;
         }
         if (!n) continue;
-        rowSum += n;
+        // «Uten tur» holdes utenfor ukesummen — akkurat som «Sum kr» gjør.
+        if (c.kind === "tour") rowSum += n;
+        else rowsNoTour[p.id] = (rowsNoTour[p.id] ?? 0) + n;
         const k = c.kind === "tour" ? colKeyOf(c.date, c.tour.id) : `${c.date}|`;
         cols[k] = (cols[k] ?? 0) + n;
       }
       rows[p.id] = rowSum;
     }
-    return { rows, cols };
+    return { rows, rowsNoTour, cols };
   }, [renderCols, products, editsByProduct, getBaseValue, noTourByDate]);
 
   return (
@@ -2510,6 +2513,7 @@ function MatrixGrid({
               colInfo={colInfo}
               noTourByDate={noTourByDate}
               rowQtySum={qtySums.rows[p.id] ?? 0}
+              rowNoTourQty={qtySums.rowsNoTour[p.id] ?? 0}
               rowTotal={rowTotals[p.id] ?? 0}
               canEdit={canEdit}
               onChange={onChange}
