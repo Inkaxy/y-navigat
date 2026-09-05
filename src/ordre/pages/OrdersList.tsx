@@ -890,8 +890,6 @@ export default function OrdersList() {
             <div className="text-muted-foreground">
               {isError ? (
                 <>Antall ukjent — dataene kunne ikke hentes</>
-              ) : clientLifecycleFilter ? (
-                <>Viser treff på denne siden — bla for flere</>
               ) : (
                 <>
                   Viser {rows.length > 0 ? page * PAGE_SIZE + 1 : 0}–

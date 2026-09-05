@@ -141,7 +141,8 @@ export function useOrderList(filters: OrderListFilters) {
 
       /** Legger alle brukerfiltrene på en spørring (samme sett for id- og radoppslag). */
       const applyFilters = <T extends OrderFilterBuilder>(query: T): T => {
-        let q = query;
+        // PostgREST-byggeren returnerer seg selv; T bevares ved retur.
+        let q: OrderFilterBuilder = query;
         if (statusFilter && statusFilter.length > 0) q = q.in("status", statusFilter);
         if (filters.kinds && filters.kinds.length > 0) q = q.in("order_kind", filters.kinds);
         if (filters.source && filters.source !== "all") q = q.eq("source", filters.source);
@@ -162,7 +163,7 @@ export function useOrderList(filters: OrderListFilters) {
             ].join(","),
           );
         }
-        return q;
+        return q as T;
       };
 
       // «Uten pakkseddel» og «pakkseddel» kan ikke skilles på status alene.
