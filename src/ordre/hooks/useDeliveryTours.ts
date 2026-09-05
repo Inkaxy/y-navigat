@@ -2,6 +2,11 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
 import { fetchPendingRecurringOrderCounts } from "@/ordre/hooks/usePendingRecurringOrders";
+import {
+  PRODUCTION_SCOPE_STATUSES,
+  fetchDeliveryPauses,
+  isPausedForDate,
+} from "@/ordre/lib/pendingOrders";
 
 export type DeliveryTour = {
   id: string;
@@ -97,7 +102,7 @@ export function useDeliveryTours(opts?: { activeOnly?: boolean }) {
  * Status-whitelist som speiler order_is_production_scope(status) i databasen:
  * kun ordre som vil bli plukket opp av Hovedkjøring teller.
  */
-export const TOUR_COUNT_STATUS_WHITELIST = ["confirmed"] as const;
+export const TOUR_COUNT_STATUS_WHITELIST = PRODUCTION_SCOPE_STATUSES;
 
 
 export type TourOrderCounts = {
@@ -115,22 +120,24 @@ export function useTourOrderCounts(isoDate: string) {
     queryKey: ["tour-order-counts", isoDate, toursQ.data],
     enabled: !toursQ.isLoading,
     queryFn: async (): Promise<TourOrderCounts> => {
-      const [{ data, error }, pendingRecurring] = await Promise.all([
+      const [{ data, error }, pendingRecurring, pauses] = await Promise.all([
         supabase
           .from("orders")
-          .select("delivery_tour_id")
+          .select("customer_id, delivery_tour_id")
           .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
           .eq("delivery_date", isoDate)
           .eq("is_return", false)
           .in("status", TOUR_COUNT_STATUS_WHITELIST as unknown as string[]),
         fetchPendingRecurringOrderCounts(isoDate, toursQ.data ?? []),
+        fetchDeliveryPauses(isoDate, isoDate),
       ]);
       if (error) throw error;
       const byTour: Record<string, number> = { ...pendingRecurring.byTour };
       let nullTourCount = pendingRecurring.nullTourCount;
       for (const r of data ?? []) {
-        const id = (r as { delivery_tour_id: string | null }).delivery_tour_id;
-        if (id) byTour[id] = (byTour[id] ?? 0) + 1;
+        const row = r as { customer_id: string; delivery_tour_id: string | null };
+        if (isPausedForDate(pauses, row.customer_id, isoDate, row.delivery_tour_id)) continue;
+        if (row.delivery_tour_id) byTour[row.delivery_tour_id] = (byTour[row.delivery_tour_id] ?? 0) + 1;
         else nullTourCount += 1;
       }
       return { byTour, nullTourCount };
