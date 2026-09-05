@@ -1,11 +1,15 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Command } from "cmdk";
-import { Sun, Moon, Monitor, ExternalLink } from "lucide-react";
+import { Sun, Moon, Monitor, ExternalLink, Users, ShoppingCart, Package, Inbox } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useTheme, type ThemeMode } from "@/providers/ThemeProvider";
 import { useAccessibleApps } from "@/hooks/useAccessibleApps";
 import { getAppInternalRoute } from "@/lib/appRoutes";
+import { useDebouncedValue } from "@/kunder/hooks/useDebouncedValue";
+import { useEntitySearch } from "@/hooks/useEntitySearch";
+import { entityRoute, groupEntityHits, type EntityKind } from "@/lib/entitySearch";
 import { Home, User, Bell, HelpCircle, type LucideIcon } from "lucide-react";
 
 const NAV_ITEMS: { to: string; label: string; icon: LucideIcon }[] = [
@@ -14,7 +18,15 @@ const NAV_ITEMS: { to: string; label: string; icon: LucideIcon }[] = [
   { to: "/varsler", label: "Varsler", icon: Bell },
   { to: "/hjelp", label: "Hjelp", icon: HelpCircle },
 ];
+
+const ENTITY_ICON: Record<EntityKind, LucideIcon> = {
+  customer: Users,
+  order: ShoppingCart,
+  product: Package,
+  ticket: Inbox,
+};
 import { cn } from "@/lib/utils";
+
 
 interface Props {
   open: boolean;
