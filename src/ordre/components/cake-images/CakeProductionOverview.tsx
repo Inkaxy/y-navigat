@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Factory, ExternalLink } from "lucide-react";
+import { Factory, ExternalLink, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
 import { useProductionDepartments } from "@/produksjon/features/produksjonsavdelinger/hooks/useProductionDepartments";
@@ -20,7 +20,13 @@ type UnitRow = {
   number: number;
   order_id: string | null;
   order_line_id: string | null;
-  product: { display_name: string | null } | null;
+  product_id: string | null;
+  product: {
+    display_name: string | null;
+    label_mode: string | null;
+    cake_role: string | null;
+    is_cake_component: boolean | null;
+  } | null;
   order: {
     order_number: string | null;
     delivery_tour_id: string | null;
@@ -69,7 +75,7 @@ export function CakeProductionOverview({ date }: { date: string }) {
       const { data, error } = await supabase
         .from("label_units")
         .select(
-          "id, number, order_id, order_line_id, product:products(display_name), order:orders(order_number, delivery_tour_id, final_customer_name, delivery_tours(name))",
+          "id, number, order_id, order_line_id, product_id, product:products(display_name, label_mode, cake_role, is_cake_component), order:orders(order_number, delivery_tour_id, final_customer_name, delivery_tours(name))",
         )
         .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
         .eq("seq_date", date)
@@ -97,15 +103,59 @@ export function CakeProductionOverview({ date }: { date: string }) {
 
   const departments = useProductionDepartments(NB_LEGAL_ENTITY_ID, false);
 
+  /** Bare kakeprodukter hører hjemme i denne visningen. */
+  const cakeUnits = useMemo(
+    () =>
+      (units.data ?? []).filter(
+        (u) =>
+          (!!u.product?.label_mode && u.product.label_mode !== "none") ||
+          u.product?.cake_role === "base" ||
+          u.product?.is_cake_component === true,
+      ),
+    [units.data],
+  );
+
+  const productIds = useMemo(
+    () =>
+      Array.from(
+        new Set(cakeUnits.map((u) => u.product_id).filter((id): id is string => !!id)),
+      ),
+    [cakeUnits],
+  );
+
+  /** Avdeling for kaker uten bilde kommer fra produktets etikettprofil. */
+  const productDepartments = useQuery({
+    queryKey: ["cake-production", "product-departments", productIds.join(",")],
+    enabled: productIds.length > 0,
+    queryFn: async (): Promise<Record<string, string>> => {
+      const { data, error } = await supabase
+        .from("product_label_departments")
+        .select("product_id, department_id")
+        .in("product_id", productIds);
+      if (error) throw error;
+      const out: Record<string, string> = {};
+      for (const row of (data ?? []) as Array<{
+        product_id: string;
+        department_id: string;
+      }>) {
+        if (!out[row.product_id]) out[row.product_id] = row.department_id;
+      }
+      return out;
+    },
+  });
+
+  const truncated =
+    (units.data?.length ?? 0) >= 500 || (images.data?.length ?? 0) >= 500;
+
   const tours = useMemo(() => {
     const map = new Map<string, string>();
-    for (const u of units.data ?? []) {
+    for (const u of cakeUnits) {
       if (u.order?.delivery_tour_id) {
         map.set(u.order.delivery_tour_id, u.order.delivery_tours?.name ?? "Tur");
       }
     }
     return Array.from(map, ([id, name]) => ({ id, name }));
-  }, [units.data]);
+  }, [cakeUnits]);
 
   const groups = useMemo(() => {
     const byUnit = new Map<string, ImageRow>();
@@ -118,13 +168,17 @@ export function CakeProductionOverview({ date }: { date: string }) {
       (departments.data ?? []).map((d) => [d.id, d.display_name]),
     );
 
-    const rows = (units.data ?? [])
+    const deptByProduct = productDepartments.data ?? {};
+
+    const rows = cakeUnits
       .filter((u) => tour === "all" || u.order?.delivery_tour_id === tour)
       .map((u) => {
         const img =
           byUnit.get(u.id) ?? (u.order_line_id ? byLine.get(u.order_line_id) : undefined);
         const state: CakeState = img ? img.status : "mangler";
-        const deptId = img?.production_department_id ?? null;
+        const deptId =
+          img?.production_department_id ??
+          (u.product_id ? (deptByProduct[u.product_id] ?? null) : null);
         return {
           key: u.id,
           number: u.number,
@@ -148,7 +202,7 @@ export function CakeProductionOverview({ date }: { date: string }) {
     return Array.from(map, ([id, g]) => ({ id, ...g })).sort((a, b) =>
       a.name.localeCompare(b.name, "nb"),
     );
-  }, [units.data, images.data, departments.data, tour]);
+  }, [cakeUnits, images.data, departments.data, productDepartments.data, tour]);
 
   return (
     <section className="space-y-3">
@@ -178,16 +232,36 @@ export function CakeProductionOverview({ date }: { date: string }) {
         </Button>
       </div>
 
+      {truncated && (
+        <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-900">
+          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span>
+            Vi viser de 500 første kakene denne dagen. Velg en tur for å se resten.
+          </span>
+        </div>
+      )}
+
       <QueryState
-        isLoading={units.isLoading || images.isLoading || departments.isLoading}
-        isError={units.isError || images.isError || departments.isError}
-        error={units.error ?? images.error ?? departments.error}
+        isLoading={
+          units.isLoading ||
+          images.isLoading ||
+          departments.isLoading ||
+          productDepartments.isLoading
+        }
+        isError={
+          units.isError || images.isError || departments.isError || productDepartments.isError
+        }
+        error={
+          units.error ?? images.error ?? departments.error ?? productDepartments.error
+        }
         scope="ordre:kakebilder:produksjon"
         onRetry={() => {
           void units.refetch();
           void images.refetch();
           void departments.refetch();
+          void productDepartments.refetch();
         }}
+
         skeletonRows={3}
         isEmpty={groups.length === 0}
         emptyTitle="Ingen kaker registrert på denne dagen."

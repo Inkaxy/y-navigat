@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { markPrinted } from "@/ordre/lib/cakeImages";
 import { cakePdfPreviewUrl, cakeSheetsToPdf } from "@/ordre/lib/cakePrint";
 import { loadCakePrintItems } from "@/ordre/lib/cakePrintJob";
+import { evaluatePrintGate } from "@/ordre/lib/cakePrintGate";
 import { useCakePrinterSelection } from "@/ordre/hooks/useCakeCalibration";
 import { useCakePrintFlow } from "@/ordre/hooks/useCakePrintFlow";
 import { CalibratePrinterDialog } from "@/ordre/components/cake-images/CalibratePrinterDialog";
@@ -91,6 +92,27 @@ export default function CakeImagesPrint() {
     };
   }, [items, scale, scaleY, printerLabel]);
 
+  /** Sperren fra editoren gjelder også her — ingen ark uten format/rettigheter. */
+  const printChecked = () => {
+    const imageById = new Map((job.data?.images ?? []).map((i) => [i.id, i]));
+    const blocked: string[] = [];
+    const allowed = items.filter((item) => {
+      const img = item.image ? imageById.get(item.image.id) : null;
+      if (!img) return true;
+      const gate = evaluatePrintGate(img);
+      if (gate.ok) return true;
+      blocked.push(`${item.labelNumber ?? item.title ?? "Uten navn"} — ${gate.reason}`);
+      return false;
+    });
+    if (blocked.length > 0) {
+      toast.warning(`${blocked.length} bilde(r) kan ikke skrives ut`, {
+        description: blocked.join(" · "),
+      });
+    }
+    if (allowed.length === 0) return;
+    void flow.printItems(allowed, statusById);
+  };
+
   const downloadPdf = async () => {
     if (items.length === 0) return;
     const res = await cakeSheetsToPdf(items, {
@@ -106,7 +128,7 @@ export default function CakeImagesPrint() {
         (id): id is string => !!id && !res.skipped.some((s) => s.item.image?.id === id),
       );
     if (printedIds.length > 0) {
-      await markPrinted(printedIds, "pdf", "A4", null, {
+      await markPrinted(printedIds, "pdf", res.sheet, null, {
         printerLabel,
         scaleAppliedPct: scaleXPct,
       });
@@ -159,7 +181,7 @@ export default function CakeImagesPrint() {
             Kalibrer
           </Button>
           <Button
-            onClick={() => void flow.printItems(items, statusById)}
+            onClick={printChecked}
             disabled={flow.busy || items.length === 0}
           >
             {flow.busy ? (
