@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { ChevronDown, Check } from "lucide-react";
-import { getAppIcon } from "@/lib/appIcons";
+import { FALLBACK_ICON, getAppIcon } from "@/lib/appIcons";
 import {
   Sheet,
   SheetContent,
@@ -60,7 +60,7 @@ export function MobileAppWheel() {
   }, [entries, pathname]);
 
   const current = entries[activeIndex];
-  const CurrentIcon = current?.icon ?? Box;
+  const CurrentIcon = current?.icon ?? FALLBACK_ICON;
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const [selectedIndex, setSelectedIndex] = useState(activeIndex);
