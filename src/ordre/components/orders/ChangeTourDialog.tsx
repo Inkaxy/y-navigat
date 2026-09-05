@@ -76,6 +76,7 @@ export function ChangeTourDialog({
       toast.success("Tur oppdatert");
       void qc.invalidateQueries({ queryKey: ["order", orderId] });
       void qc.invalidateQueries({ queryKey: ["order-events", orderId] });
+      void qc.invalidateQueries({ queryKey: ["matrix"] });
       onOpenChange(false);
     },
     onError: (e: Error) => {

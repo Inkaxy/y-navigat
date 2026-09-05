@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect, useCallback } from "react";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Grid3x3,
   ChevronLeft,
@@ -10,6 +10,7 @@ import {
   RotateCcw,
   Plus,
   StickyNote,
+  Layers,
   ArrowRight,
   MoreHorizontal,
   Copy,
@@ -132,14 +133,20 @@ import {
   buildDateRange,
   formatKrNetto,
 } from "@/ordre/lib/dateRanges";
+import {
+  type CellKey,
+  type NoTourEntry,
+  ckey,
+  colKeyOf,
+  aggregateExistingCells,
+  computeDirtyChanges,
+  computeTotals,
+  effectiveCellQty,
+  visibleGhostQty,
+} from "@/ordre/lib/matrixEdits";
+import { ChangeTourDialog } from "@/ordre/components/orders/ChangeTourDialog";
 
 const DAY_LABELS = ["Ma", "Ti", "On", "To", "Fr", "Lø", "Sø"];
-
-type CellKey = string; // `${date}|${tour_id}|${product_id}`
-
-function ckey(date: string, tourId: string, productId: string): CellKey {
-  return `${date}|${tourId}|${productId}`;
-}
 
 type CellTarget = {
   date: string;
@@ -151,19 +158,32 @@ type CellTarget = {
   quantity: number;
 };
 
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export default function MatrixPage() {
   const qc = useQueryClient();
   const { user } = useAuth();
   const { data: access } = useUserAccess(user);
   const canEdit = access?.hasOrdreWrite ?? false;
 
-  const [customerId, setCustomerId] = useState<string | null>(null);
+  // Dyplenker fra dashbordet: ?date=YYYY-MM-DD og ?customer=<uuid>
+  const [searchParams] = useSearchParams();
+  const paramDate = searchParams.get("date");
+  const paramCustomer = searchParams.get("customer");
+  const initialDate = paramDate && ISO_DATE_RE.test(paramDate) ? paramDate : null;
+
+  const [customerId, setCustomerId] = useState<string | null>(
+    paramCustomer && UUID_RE.test(paramCustomer) ? paramCustomer : null,
+  );
 
   // Date range driven by quick-filter chips OR by week navigation.
-  const initialWeek = isoWeekMonday(todayISO());
+  const initialWeek = isoWeekMonday(initialDate ?? todayISO());
   const [dateFrom, setDateFrom] = useState<string>(initialWeek);
   const [dateTo, setDateTo] = useState<string>(addDays(initialWeek, 6));
-  const [quickFilter, setQuickFilter] = useState<QuickRange | null>("this_week");
+  const [quickFilter, setQuickFilter] = useState<QuickRange | null>(
+    initialDate ? null : "this_week",
+  );
 
   const [pickerOpen, setPickerOpen] = useState(false);
   const [fromDateOpen, setFromDateOpen] = useState(false);
@@ -230,6 +250,10 @@ export default function MatrixPage() {
   const [commentCol, setCommentCol] = useState<{ date: string; tour: MatrixTour } | null>(null);
   const [deleteColConfirm, setDeleteColConfirm] = useState<{ date: string; tour: MatrixTour } | null>(null);
   const [tourOrderCol, setTourOrderCol] = useState<{ date: string; tour: MatrixTour } | null>(null);
+  /** Ordre uten tur som skal flyttes til en tur. */
+  const [moveTourOrder, setMoveTourOrder] = useState<
+    { orderId: string; orderNumber: string } | null
+  >(null);
   const [weekEditorProduct, setWeekEditorProduct] = useState<MatrixProduct | null>(null);
 
   // Handling-meny dialog state
@@ -371,39 +395,45 @@ export default function MatrixPage() {
 
   const visibleDates = useMemo(() => new Set(columns.map((c) => c.date)), [columns]);
 
-  const existingQty = useMemo(() => {
-    const map: Record<CellKey, number> = {};
-    if (!matrix) return map;
-    for (const c of matrix.existing_cells) {
-      if (!c.delivery_tour_id) continue;
-      map[ckey(c.delivery_date, c.delivery_tour_id, c.product_id)] = Number(c.quantity);
-    }
-    return map;
-  }, [matrix]);
+  /** Ett samlet oppslag over lagrede celler — duplikate ordre summeres. */
+  const existingIndex = useMemo(
+    () => aggregateExistingCells(matrix?.existing_cells ?? []),
+    [matrix],
+  );
 
-  const existingMerknad = useMemo(() => {
-    const map: Record<CellKey, Merknad> = {};
-    if (!matrix) return map;
-    for (const c of matrix.existing_cells) {
-      if (!c.delivery_tour_id) continue;
-      const m = parseMerknad(c.merknad);
-      if (m) map[ckey(c.delivery_date, c.delivery_tour_id, c.product_id)] = m;
-    }
-    return map;
-  }, [matrix]);
+  const existingQty = existingIndex.qty;
+  const existingMerknad = existingIndex.merknad;
+  const fallbackCells = existingIndex.fallback;
+  const cellOrderIds = existingIndex.orderIds;
 
-  /** Celler der lagret pris er 0 og mengde > 0 — visuell rød advarsel ("Pris ikke funnet"). */
-  const fallbackCells = useMemo(() => {
-    const map: Record<CellKey, true> = {};
-    if (!matrix) return map;
-    for (const c of matrix.existing_cells) {
-      if (!c.delivery_tour_id) continue;
-      if (Number(c.quantity) > 0 && Number(c.unit_price) === 0) {
-        map[ckey(c.delivery_date, c.delivery_tour_id, c.product_id)] = true;
-      }
+  /** Bestilte linjer uten tur, gruppert per dato → produkt (read-only kolonne). */
+  const noTourByDate = useMemo(() => {
+    const m = new Map<string, Map<string, NoTourEntry>>();
+    for (const e of existingIndex.noTour.values()) {
+      if (e.quantity <= 0) continue;
+      let inner = m.get(e.date);
+      if (!inner) m.set(e.date, (inner = new Map()));
+      inner.set(e.productId, e);
     }
-    return map;
-  }, [matrix]);
+    return m;
+  }, [existingIndex]);
+
+  // Ordre-id per kolonne (dato|tur) → livssyklus/ordretype for kolonne-header
+  const colOrderId = existingIndex.colOrderId;
+
+  const hasColumnOrder = useCallback(
+    (date: string, tourId: string) => colOrderId.has(colKeyOf(date, tourId)),
+    [colOrderId],
+  );
+  const isPausedCol = useCallback(
+    (date: string, tourId: string) => !!isPaused(pauseMap, date, tourId),
+    [pauseMap],
+  );
+
+  const ghostRuleBase = useMemo(
+    () => ({ edits, existingQty, ghostMap, hasColumnOrder, isPausedCol }),
+    [edits, existingQty, ghostMap, hasColumnOrder, isPausedCol],
+  );
 
   /**
    * Fastordre ER ordren: når cellen ikke har lagret linje og kolonnen ikke har
@@ -414,20 +444,14 @@ export default function MatrixPage() {
     if (key in edits) return edits[key];
     const v = existingQty[key];
     if (v) return String(v);
-    return isGhostCell(key) ? String(ghostMap!.get(key)) : "";
+    const g = visibleGhostQty({ key, ...ghostRuleBase });
+    return g > 0 ? String(g) : "";
   }
 
   /** True når cellen viser et fastordre-tall som ennå ikke er materialisert. */
   function isGhostCell(key: CellKey): boolean {
-    if (key in edits) return false;
-    if (existingQty[key]) return false;
-    const [date, tourId] = key.split("|");
-    if (colOrderId.has(`${date}|${tourId}`)) return false;
-    if (isPaused(pauseMap, date, tourId)) return false;
-    const g = ghostMap?.get(key);
-    return !!g && g > 0;
+    return visibleGhostQty({ key, ...ghostRuleBase }) > 0;
   }
-
 
   function getEffectiveQty(key: CellKey): number {
     if (key in edits) return Number(edits[key] || 0);
@@ -447,17 +471,10 @@ export default function MatrixPage() {
     setEdits((prev) => ({ ...prev, [key]: cleaned }));
   }
 
-  const dirtyChanges = useMemo<MatrixChange[]>(() => {
-    const out: MatrixChange[] = [];
-    for (const [key, raw] of Object.entries(edits)) {
-      const [date, tour_id, product_id] = key.split("|");
-      const editedNum = Number(raw || 0);
-      const existing = existingQty[key] ?? 0;
-      if (editedNum === existing) continue;
-      out.push({ date, tour_id, product_id, quantity: editedNum });
-    }
-    return out;
-  }, [edits, existingQty]);
+  const dirtyChanges = useMemo<MatrixChange[]>(
+    () => computeDirtyChanges(edits, existingQty),
+    [edits, existingQty],
+  );
 
   const dirtyCount = dirtyChanges.length;
 
@@ -468,9 +485,19 @@ export default function MatrixPage() {
     const productById = new Map(allProducts.map((p) => [p.id, p]));
     const rowMap = new Map<string, Row>();
 
-    // 1) Lagrede celler (ta med ALLE bestilte linjer, også uten tur)
+    // 1) Lagrede celler (ta med ALLE bestilte linjer, også uten tur).
+    //    Flere ordre på samme dato|tur|produkt summeres til én rad.
     for (const c of matrix.existing_cells) {
       const key = `${c.delivery_date}|${c.delivery_tour_id ?? ""}|${c.product_id}`;
+      const prev = rowMap.get(key);
+      if (prev) {
+        prev.quantity += Number(c.quantity);
+        prev.line_total_incl_vat += Number(c.line_total_incl_vat);
+        if (c.order_id && !prev.order_ids?.includes(c.order_id)) {
+          prev.order_ids = [...(prev.order_ids ?? []), c.order_id];
+        }
+        continue;
+      }
       rowMap.set(key, {
         key,
         delivery_date: c.delivery_date,
@@ -479,10 +506,13 @@ export default function MatrixPage() {
         quantity: Number(c.quantity),
         unit_price: Number(c.unit_price),
         line_total_incl_vat: Number(c.line_total_incl_vat),
+        order_ids: c.order_id ? [c.order_id] : [],
+        order_number: c.order_number ?? null,
+        readOnly: !c.delivery_tour_id,
       });
     }
 
-    // 2) Fastordre (faktiske faste bestillinger fra recurring schedules)
+    // 2) Fastordre — samme ghost-regel som i rutenettet
     if (ghostMap) {
       for (const [gkey, qty] of ghostMap.entries()) {
         if (!qty || qty <= 0) continue;
@@ -490,6 +520,7 @@ export default function MatrixPage() {
         if (!visibleDates.has(date)) continue;
         const key = `${date}|${tour_id}|${product_id}`;
         if (rowMap.has(key)) continue;
+        if (visibleGhostQty({ key, ...ghostRuleBase }) <= 0) continue;
         const p = productById.get(product_id);
         const unitPrice = Number(p?.unit_price ?? 0);
         const mvaRate = Number(p?.mva_rate ?? 0);
@@ -531,7 +562,7 @@ export default function MatrixPage() {
 
     // Filtrer bort qty 0
     return Array.from(rowMap.values()).filter((r) => r.quantity > 0);
-  }, [matrix, edits, allProducts, ghostMap, visibleDates]);
+  }, [matrix, edits, allProducts, ghostMap, visibleDates, ghostRuleBase]);
 
   const unsavedAddedCount = useMemo(() => {
     return addedProducts.filter((p) => {
@@ -542,40 +573,24 @@ export default function MatrixPage() {
   // ----- Totals (net kr) -----
   // Per-cell value = qty * (product.unit_price ?? 0). Per-row sum, per-col sum, grand total.
   const totals = useMemo(() => {
-    const rowTotals: Record<string, number> = {};
-    const colTotals: Record<string, number> = {}; // key: `${date}|${tour_id}`
-    let grand = 0;
-    for (const p of allProducts) {
-      const price = p.unit_price ?? 0;
-      let rowSum = 0;
-      for (const c of columns) {
-        const key = ckey(c.date, c.tour.id, p.id);
-        const ghostQty = ghostMap?.get(`${c.date}|${c.tour.id}|${p.id}`) ?? 0;
-        const qty =
-          key in edits
-            ? Number(edits[key] || 0)
-            : existingQty[key] ?? ghostQty;
-        if (!qty || !price) continue;
-        const amount = qty * price;
-        rowSum += amount;
-        const colKey = `${c.date}|${c.tour.id}`;
-        colTotals[colKey] = (colTotals[colKey] ?? 0) + amount;
-      }
-      rowTotals[p.id] = rowSum;
-      grand += rowSum;
-    }
+    const result = computeTotals({
+      products: allProducts,
+      columns: columns.map((c) => ({ date: c.date, tourId: c.tour.id })),
+      ...ghostRuleBase,
+    });
     // Dev-mode sanity check: row-sum total === col-sum total === grand
     if (import.meta.env.DEV) {
-      const rowSumGrand = Object.values(rowTotals).reduce((a, b) => a + b, 0);
-      const colSumGrand = Object.values(colTotals).reduce((a, b) => a + b, 0);
+      const rowSumGrand = Object.values(result.rowTotals).reduce((a, b) => a + b, 0);
+      const colSumGrand = Object.values(result.colTotals).reduce((a, b) => a + b, 0);
       console.assert(
-        Math.abs(rowSumGrand - grand) < 0.005 && Math.abs(colSumGrand - grand) < 0.005,
+        Math.abs(rowSumGrand - result.grand) < 0.005 &&
+          Math.abs(colSumGrand - result.grand) < 0.005,
         "[Matrix totals] row/col/grand mismatch",
-        { rowSumGrand, colSumGrand, grand },
+        { rowSumGrand, colSumGrand, grand: result.grand },
       );
     }
-    return { rowTotals, colTotals, grand };
-  }, [allProducts, columns, edits, existingQty, ghostMap]);
+    return result;
+  }, [allProducts, columns, ghostRuleBase]);
 
   async function handleSave() {
     if (!customerId || dirtyCount === 0) return;
@@ -834,14 +849,6 @@ export default function MatrixPage() {
     [matrix],
   );
 
-  // Ordre-id per kolonne (dato|tur) → livssyklus/ordretype for kolonne-header
-  const colOrderId = useMemo(() => {
-    const m = new Map<string, string>();
-    for (const c of matrix?.existing_cells ?? []) {
-      m.set(`${c.delivery_date}|${c.delivery_tour_id}`, c.order_id);
-    }
-    return m;
-  }, [matrix]);
 
   const { map: colLifecycleMap } = useOrdersLifecycle(
     useMemo(() => [...new Set(colOrderId.values())], [colOrderId]),
@@ -1622,9 +1629,16 @@ export default function MatrixPage() {
               rows={flatDayFilter ? flatRows.filter((r) => r.delivery_date === flatDayFilter) : flatRows}
               products={allProducts}
               tours={matrix.tours}
-              onQuantityChange={(date, tour_id, product_id, value) =>
-                setCellValue(`${date}|${tour_id ?? ""}|${product_id}` as CellKey, value)
-              }
+              onQuantityChange={(date, tour_id, product_id, value) => {
+                // Linjer uten tur er read-only i matrisen — aldri send tom tour_id til lagring.
+                if (!tour_id) return;
+                setCellValue(ckey(date, tour_id, product_id), value);
+              }}
+              onMoveToTour={(row) => {
+                const orderId = row.order_ids?.[0];
+                if (!orderId) return;
+                setMoveTourOrder({ orderId, orderNumber: row.order_number ?? "" });
+              }}
             />
           </div>
         ) : (
@@ -1658,6 +1672,14 @@ export default function MatrixPage() {
               colMeta={colMeta}
               colTone={colTone}
               isGhostCell={isGhostCell}
+              orderCount={(key) => cellOrderIds[key]?.length ?? 0}
+              noTourByDate={noTourByDate}
+              onMoveToTour={(entry) =>
+                setMoveTourOrder({
+                  orderId: entry.orderIds[0],
+                  orderNumber: entry.orderNumbers[0] ?? "",
+                })
+              }
               canEdit={canEdit}
               onOpenTourOrder={(date, tour) => {
                 if (!colOrderId.has(`${date}|${tour.id}`)) {
@@ -1757,6 +1779,20 @@ export default function MatrixPage() {
             : undefined
         }
       />
+
+      {moveTourOrder && (
+        <ChangeTourDialog
+          open={!!moveTourOrder}
+          onOpenChange={(v) => {
+            if (!v) setMoveTourOrder(null);
+          }}
+          orderId={moveTourOrder.orderId}
+          orderNumber={moveTourOrder.orderNumber}
+          legalEntityId={NB_LEGAL_ENTITY_ID}
+          currentTourId={null}
+        />
+      )}
+
 
       {merknadCell && labelProfileByProduct.get(merknadCell.productId) && (
         <MerknadDialog
@@ -1990,6 +2026,9 @@ function MatrixGrid({
   colMeta,
   colTone,
   isGhostCell,
+  orderCount,
+  noTourByDate,
+  onMoveToTour,
 
   canEdit,
   onOpenTourOrder,
@@ -2021,6 +2060,11 @@ function MatrixGrid({
   colMeta: (date: string, tourId: string) => { order_kind?: string; lifecycle?: string; delivery_note_number?: string | null } | undefined;
   colTone: (date: string, tourId: string) => ColumnTone;
   isGhostCell: (key: CellKey) => boolean;
+  /** Antall ordre bak cellen (>1 = dublett). */
+  orderCount: (key: CellKey) => number;
+  /** Bestilte linjer uten tur, per dato → produkt. */
+  noTourByDate: Map<string, Map<string, NoTourEntry>>;
+  onMoveToTour: (entry: NoTourEntry) => void;
 
   canEdit: boolean;
   onOpenTourOrder: (date: string, tour: MatrixTour) => void;
@@ -2033,15 +2077,36 @@ function MatrixGrid({
     unit: string | null;
     price: number | null;
   } | null>(null);
-  const dateGroups = useMemo(() => {
+  /**
+   * Kolonnene som faktisk rendres: turkolonner, pluss én read-only «Uten tur»-kolonne
+   * per dato der kunden har bestilte linjer uten tildelt tur.
+   */
+  type RenderCol =
+    | { kind: "tour"; date: string; tour: MatrixTour }
+    | { kind: "notour"; date: string };
+
+  const { dateGroups, renderCols } = useMemo(() => {
     const groups: { date: string; count: number }[] = [];
+    const cols: RenderCol[] = [];
     for (const c of columns) {
       const last = groups[groups.length - 1];
       if (last && last.date === c.date) last.count++;
-      else groups.push({ date: c.date, count: 1 });
+      else {
+        if (last && noTourByDate.get(last.date)?.size) {
+          last.count++;
+          cols.push({ kind: "notour", date: last.date });
+        }
+        groups.push({ date: c.date, count: 1 });
+      }
+      cols.push({ kind: "tour", date: c.date, tour: c.tour });
     }
-    return groups;
-  }, [columns]);
+    const last = groups[groups.length - 1];
+    if (last && noTourByDate.get(last.date)?.size) {
+      last.count++;
+      cols.push({ kind: "notour", date: last.date });
+    }
+    return { dateGroups: groups, renderCols: cols };
+  }, [columns, noTourByDate]);
 
   /** Antall-summer: per rad (uke) og per kolonne (dag × tur) — dempet, sekundær info. */
   const qtySums = useMemo(() => {
@@ -2049,18 +2114,23 @@ function MatrixGrid({
     const cols: Record<string, number> = {};
     for (const p of products) {
       let rowSum = 0;
-      for (const c of columns) {
-        const v = getValue(ckey(c.date, c.tour.id, p.id));
-        const n = v ? Number(v.replace(",", ".")) || 0 : 0;
+      for (const c of renderCols) {
+        const n =
+          c.kind === "tour"
+            ? (() => {
+                const v = getValue(ckey(c.date, c.tour.id, p.id));
+                return v ? Number(v.replace(",", ".")) || 0 : 0;
+              })()
+            : noTourByDate.get(c.date)?.get(p.id)?.quantity ?? 0;
         if (!n) continue;
         rowSum += n;
-        const k = `${c.date}|${c.tour.id}`;
+        const k = c.kind === "tour" ? colKeyOf(c.date, c.tour.id) : `${c.date}|`;
         cols[k] = (cols[k] ?? 0) + n;
       }
       rows[p.id] = rowSum;
     }
     return { rows, cols };
-  }, [columns, products, getValue]);
+  }, [renderCols, products, getValue, noTourByDate]);
 
   return (
     <div className="min-w-max">
@@ -2111,7 +2181,22 @@ function MatrixGrid({
             </th>
           </tr>
           <tr>
-            {columns.map((c) => {
+            {renderCols.map((rc) => {
+              if (rc.kind === "notour") {
+                return (
+                  <th
+                    key={`${rc.date}-notour`}
+                    className="border-b border-r border-border bg-muted/50 px-1 py-1 text-center text-[11px] font-medium text-muted-foreground"
+                    title="Bestilte linjer uten tur — flytt til en tur for å redigere"
+                  >
+                    <div className="px-1.5 py-0.5 text-[12px] font-semibold text-foreground">
+                      Uten tur
+                    </div>
+                    <div className="mt-0.5 text-[9px] uppercase tracking-wide">Kun visning</div>
+                  </th>
+                );
+              }
+              const c = rc;
               const pause = isPaused(pauseMap, c.date, c.tour.id);
               const hasComment = columnComments?.has(`${c.date}|${c.tour.id}`);
               const colHas = colHasData(c.date, c.tour.id);
@@ -2258,8 +2343,40 @@ function MatrixGrid({
                     </div>
                   </div>
                 </th>
-                {columns.map((c) => {
+                {renderCols.map((rc) => {
+                  if (rc.kind === "notour") {
+                    const entry = noTourByDate.get(rc.date)?.get(p.id);
+                    return (
+                      <td
+                        key={`${rc.date}-notour-${p.id}`}
+                        className="border-b border-r border-border bg-muted/30 px-1 py-1.5 text-center"
+                        title={
+                          entry
+                            ? `Uten tur${entry.orderNumbers.length ? ` · ${entry.orderNumbers.join(", ")}` : ""}`
+                            : undefined
+                        }
+                      >
+                        {entry ? (
+                          <div className="flex flex-col items-center gap-0.5">
+                            <span className="text-base font-semibold tabular-nums">
+                              {entry.quantity}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => onMoveToTour(entry)}
+                              disabled={!canEdit}
+                              className="rounded px-1 text-[10px] font-medium text-primary hover:bg-primary/10 disabled:opacity-40"
+                            >
+                              Flytt til tur
+                            </button>
+                          </div>
+                        ) : null}
+                      </td>
+                    );
+                  }
+                  const c = rc;
                   const key = ckey(c.date, c.tour.id, p.id);
+                  const dupOrders = orderCount(key);
                   const value = getValue(key);
                   const dirty = isDirty(key);
                   const hasM = hasMerknad(key);
@@ -2336,6 +2453,15 @@ function MatrixGrid({
                           <StickyNote className="h-2.5 w-2.5" />
                         </span>
                       )}
+                      {dupOrders > 1 && (
+                        <span
+                          className="pointer-events-none absolute left-0.5 top-0.5 text-muted-foreground"
+                          aria-label={`${dupOrders} ordre`}
+                          title={`${dupOrders} ordre — antallet er summert`}
+                        >
+                          <Layers className="h-2.5 w-2.5" />
+                        </span>
+                      )}
                       {cellHasData && !pause && (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -2383,12 +2509,15 @@ function MatrixGrid({
             >
               Dagsum (antall)
             </th>
-            {columns.map((c) => {
-              const colKey = `${c.date}|${c.tour.id}`;
+            {renderCols.map((rc) => {
+              const colKey = rc.kind === "tour" ? colKeyOf(rc.date, rc.tour.id) : `${rc.date}|`;
               return (
                 <td
-                  key={colKey}
-                  className="border-b border-r border-border px-1 py-1.5 text-right text-xs tabular-nums text-muted-foreground"
+                  key={rc.kind === "tour" ? colKey : `${rc.date}-notour-qty`}
+                  className={cn(
+                    "border-b border-r border-border px-1 py-1.5 text-right text-xs tabular-nums text-muted-foreground",
+                    rc.kind === "notour" && "bg-muted/50",
+                  )}
                 >
                   {qtySums.cols[colKey] || ""}
                 </td>
@@ -2409,8 +2538,19 @@ function MatrixGrid({
             >
               Sum kr
             </th>
-            {columns.map((c) => {
-              const colKey = `${c.date}|${c.tour.id}`;
+            {renderCols.map((rc) => {
+              if (rc.kind === "notour") {
+                return (
+                  <td
+                    key={`${rc.date}-notour-sum`}
+                    className="border-b border-r border-border bg-muted px-1 py-2 text-right text-xs tabular-nums text-muted-foreground"
+                    title="Linjer uten tur telles ikke med i totalsummen"
+                  >
+                    —
+                  </td>
+                );
+              }
+              const colKey = colKeyOf(rc.date, rc.tour.id);
               return (
                 <td
                   key={colKey}

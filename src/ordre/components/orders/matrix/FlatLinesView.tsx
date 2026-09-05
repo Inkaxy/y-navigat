@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { MatrixProduct, MatrixTour } from "@/ordre/hooks/useMatrix";
 import { formatNOK } from "@/ordre/lib/format";
+import { Button } from "@/components/ui/button";
 
 export type FlatLineRow = {
   key: string;
@@ -11,6 +12,11 @@ export type FlatLineRow = {
   unit_price: number;
   line_total_incl_vat: number;
   isDraft?: boolean;
+  /** Alle ordre som bidrar til linjen (flere ved dublett). */
+  order_ids?: string[];
+  order_number?: string | null;
+  /** Linjer uten tur kan ikke redigeres i matrisen. */
+  readOnly?: boolean;
 };
 
 const WEEKDAYS = ["Søndag", "Mandag", "Tirsdag", "Onsdag", "Torsdag", "Fredag", "Lørdag"];
@@ -58,6 +64,7 @@ export function FlatLinesView({
   products,
   tours,
   onQuantityChange,
+  onMoveToTour,
 }: {
   rows: FlatLineRow[];
   products: MatrixProduct[];
@@ -68,6 +75,7 @@ export function FlatLinesView({
     product_id: string,
     value: string,
   ) => void;
+  onMoveToTour?: (row: FlatLineRow) => void;
 }) {
   const productById = new Map(products.map((p) => [p.id, p]));
   const tourById = new Map(tours.map((t) => [t.id, t]));
@@ -109,16 +117,46 @@ export function FlatLinesView({
               <h3 className="text-xl font-semibold tracking-tight">
                 <span className="font-bold">{weekday}</span>{" "}
                 <span className="text-foreground/80">{date}</span>
-                {t && (
+                {t ? (
                   <>
                     {" "}
                     <span className="text-foreground/60">- tur</span>{" "}
                     <span className="font-bold">{t.tour_number}</span>
                   </>
+                ) : (
+                  <>
+                    {" "}
+                    <span className="text-foreground/60">- uten tur</span>
+                  </>
                 )}
               </h3>
               {t?.display_name && (
                 <p className="mt-0.5 text-xs text-muted-foreground">{t.display_name}</p>
+              )}
+              {!t && (
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Ordrelinjer uten tur kan ikke endres her — flytt dem til en tur først.
+                </p>
+              )}
+              {!t && onMoveToTour && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {Array.from(
+                    new Map(
+                      g.rows
+                        .filter((r) => r.order_ids?.length)
+                        .map((r) => [r.order_ids![0], r] as const),
+                    ).values(),
+                  ).map((r) => (
+                    <Button
+                      key={r.order_ids![0]}
+                      size="sm"
+                      variant="outline"
+                      onClick={() => onMoveToTour(r)}
+                    >
+                      Flytt til tur{r.order_number ? ` (${r.order_number})` : ""}
+                    </Button>
+                  ))}
+                </div>
               )}
             </header>
 
@@ -148,7 +186,7 @@ export function FlatLinesView({
                           )}
                         </td>
                         <td className="w-[96px] px-3 py-2 text-right">
-                          {onQuantityChange ? (
+                          {onQuantityChange && !c.readOnly && c.delivery_tour_id ? (
                             <QtyInput
                               value={c.quantity}
                               onChange={(v) =>
