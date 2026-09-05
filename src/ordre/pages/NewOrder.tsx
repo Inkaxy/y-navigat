@@ -117,9 +117,16 @@ export default function NewOrder() {
         .select("subject, sender_email, sender_name, body_text, body_preview, ai_suggestion")
         .eq("id", ticketId).maybeSingle();
       if (cancelled || !t) return;
-      setTicketAi(normalizeAiSuggestion((t as any).ai_suggestion));
-      setTicketBodyText(((t as any).body_text ?? (t as any).body_preview ?? null) as string | null);
-      const ai = (t as any).ai_suggestion as null | {
+      type TicketRow = {
+        ai_suggestion: unknown;
+        body_text: string | null;
+        body_preview: string | null;
+        sender_name: string | null;
+      };
+      const ticketRow = t as unknown as TicketRow;
+      setTicketAi(normalizeAiSuggestion(ticketRow.ai_suggestion));
+      setTicketBodyText(ticketRow.body_text ?? ticketRow.body_preview ?? null);
+      const ai = ticketRow.ai_suggestion as null | {
         customer_match?: { customer_id: string | null; customer_name?: string | null } | null;
         order_fields?: Record<string, string | null | undefined>;
         products?: Array<{
@@ -132,7 +139,7 @@ export default function NewOrder() {
           decoration?: string | null;
         }>;
       };
-      const senderName = (t as any).sender_name as string | null | undefined;
+      const senderName = ticketRow.sender_name;
 
       // Velg kunde: 1) AI-match, 2) sender_email-ilike
       let pickedCustomer: CustomerOption | null = null;
@@ -234,7 +241,12 @@ export default function NewOrder() {
             .select("id, display_number, code, display_name, unit_of_sale, mva_rate, status, is_for_sale, is_divisible, legal_entity_id")
             .in("id", ids);
           if (cancelled || !prods) return;
-          const byId = new Map(prods.map((p: any) => [p.id, p]));
+          const byId = new Map(
+            (prods as unknown as Array<ProductOption & { legal_entity_id: string }>).map((p) => [
+              p.id,
+              p,
+            ]),
+          );
           const newLines: LineDraft[] = matched
             .map((m): LineDraft | null => {
               const p = byId.get(m.product_id!) as ProductOption | undefined;
@@ -554,7 +566,7 @@ export default function NewOrder() {
             mva_rate: Number(p.mva_rate),
             status: p.status,
             is_for_sale: p.is_for_sale,
-            is_divisible: !!(p as any).is_divisible,
+            is_divisible: !!p.is_divisible,
           }
         : null;
       return {
