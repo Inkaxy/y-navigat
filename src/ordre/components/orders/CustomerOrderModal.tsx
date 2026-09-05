@@ -36,7 +36,14 @@ import {
 } from "@/components/ui/alert-dialog";
 import { fetchEffectivePrice, type ProductOption } from "@/ordre/hooks/useNBProducts";
 import { ProductSearchInput } from "@/ordre/components/orders/ProductSearchInput";
-import { countRiskyPriceLines, focusOrderLineField } from "@/ordre/lib/orderLines";
+import {
+  countRiskyPriceLines,
+  focusOrderLineField,
+  isManualOverride,
+  MANUAL_PRICE_SOURCE,
+  PRICE_OVERRIDE_NOTE_PREFIX,
+} from "@/ordre/lib/orderLines";
+import { PriceOverrideReasonDialog } from "@/ordre/components/orders/PriceOverrideReasonDialog";
 import { ZeroPriceConfirmDialog } from "@/ordre/components/orders/ZeroPriceConfirmDialog";
 import { useDeliveryTours, tourMatches, trimSec } from "@/ordre/hooks/useDeliveryTours";
 import { CustomerContextPanel } from "@/ordre/components/orders/CustomerContextPanel";
@@ -1493,6 +1500,56 @@ export function CustomerOrderModal({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <PriceOverrideReasonDialog
+        open={priceOverrideUid !== null}
+        onOpenChange={(v) => {
+          if (!v) setPriceOverrideUid(null);
+        }}
+        productName={
+          lines.find((l) => l.uid === priceOverrideUid)?.product?.display_name ?? null
+        }
+        originalPrice={(() => {
+          const line = lines.find((l) => l.uid === priceOverrideUid);
+          return line?.effective_price != null ? String(line.effective_price) : null;
+        })()}
+        newPrice={lines.find((l) => l.uid === priceOverrideUid)?.unit_price ?? null}
+        onConfirm={(reason) => {
+          const uid = priceOverrideUid;
+          setPriceOverrideUid(null);
+          if (!uid) return;
+          setLines((prev) =>
+            prev.map((l) =>
+              l.uid === uid
+                ? {
+                    ...l,
+                    merknad: {
+                      ...(l.merknad ?? emptyMerknad),
+                      price_override_reason: `${PRICE_OVERRIDE_NOTE_PREFIX} ${reason.trim()}`,
+                    },
+                  }
+                : l,
+            ),
+          );
+        }}
+        onCancel={() => {
+          const uid = priceOverrideUid;
+          setPriceOverrideUid(null);
+          if (!uid) return;
+          // Uten begrunnelse settes prisen tilbake til prismotorens pris.
+          setLines((prev) =>
+            prev.map((l) =>
+              l.uid === uid && l.effective_price != null
+                ? {
+                    ...l,
+                    unit_price: String(l.effective_price),
+                    unit_price_source: null,
+                  }
+                : l,
+            ),
+          );
+        }}
+      />
 
       <ZeroPriceConfirmDialog
         open={zeroPriceOpen}
