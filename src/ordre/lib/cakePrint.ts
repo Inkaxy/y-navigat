@@ -460,10 +460,12 @@ export async function buildCakePdf(
       const item = byId.get(place.id);
       if (!item) continue;
       const geo = placementGeometry(place);
-      const wMm = geo.widthMm;
-      const hMm = geo.heightMm;
+      const paper = scaledPlacementSize(item, scale, scaleY, geo.rotated);
+      const wMm = paper.widthMm || geo.widthMm;
+      const hMm = paper.heightMm || geo.heightMm;
       const x = geo.xMm;
       const y = geo.yMm;
+
 
       if (item.url) {
         const src = item.url.startsWith("data:")
