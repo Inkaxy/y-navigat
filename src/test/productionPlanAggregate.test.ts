@@ -46,8 +46,9 @@ describe("summering per product_id i produksjonsplanen", () => {
     expect(Object.keys(sums)).toHaveLength(2);
   });
 
-  it("standardkriteriene summerer ikke turer", () => {
-    expect(DEFAULT_CRITERIA.sum_tours).toBe(false);
-    expect(productionRowKey(3, "p9", DEFAULT_CRITERIA)).toBe("t3::p:p9");
+  it("standardkriteriene summerer turer", () => {
+    expect(DEFAULT_CRITERIA.sum_tours).toBe(true);
+    expect(productionRowKey(3, "p9", DEFAULT_CRITERIA)).toBe("ALL::p:p9");
+    expect(productionRowKey(3, "p9", { sum_tours: false })).toBe("t3::p:p9");
   });
 });
