@@ -45,6 +45,8 @@ import { usePendingReturnsCount } from "@/ordre/hooks/useReturnDeliveryNotes";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { logAudit } from "@/ordre/lib/audit";
+import { fetchAllRows } from "@/lib/supabasePaging";
+import { correctionFromDate, PRODUCTION_SCOPE_STATUSES } from "@/ordre/lib/pendingOrders";
 
 // HANDLING_ITEMS bygges nå dynamisk inni komponenten — for å støtte tilstand-aware
 // handlinger (Tilleggkjøring/Korreksjonskjøring krever at hovedkjøring er kjørt).
