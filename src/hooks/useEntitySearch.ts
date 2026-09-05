@@ -5,6 +5,8 @@ import {
   MAX_HITS_PER_GROUP,
   MIN_SEARCH_LENGTH,
   buildIlikeOr,
+  isNumericTerm,
+  parseTicketRef,
   sanitizeSearchTerm,
   type EntityHit,
 } from "@/lib/entitySearch";
@@ -17,7 +19,9 @@ export function useEntitySearch(rawTerm: string) {
   const { data: company } = useCompany();
   const entityId = company?.id ?? null;
   const term = sanitizeSearchTerm(rawTerm);
-  const enabled = term.length >= MIN_SEARCH_LENGTH && !!entityId;
+  const ticketRef = parseTicketRef(rawTerm);
+  const numeric = isNumericTerm(term);
+  const enabled = (term.length >= MIN_SEARCH_LENGTH || !!ticketRef) && !!entityId;
 
   const customers = useQuery({
     queryKey: ["entity-search", "customers", entityId, term],
@@ -73,7 +77,7 @@ export function useEntitySearch(rawTerm: string) {
   });
 
   const products = useQuery({
-    queryKey: ["entity-search", "products", entityId, term],
+    queryKey: ["entity-search", "products", entityId, term, numeric],
     enabled,
     staleTime: 30_000,
     queryFn: async (): Promise<EntityHit[]> => {
@@ -91,6 +95,23 @@ export function useEntitySearch(rawTerm: string) {
             subtitle: p.display_number ?? undefined,
           }),
         );
+      }
+      // Rene tall: slå opp varenummeret direkte (trgm treffer dårlig på tall).
+      if (numeric) {
+        const byNumber = await supabase
+          .from("products")
+          .select("id, display_name, display_number")
+          .eq("legal_entity_id", entityId!)
+          .eq("display_number", Number(term))
+          .limit(MAX_HITS_PER_GROUP);
+        if (!byNumber.error && byNumber.data && byNumber.data.length > 0) {
+          return byNumber.data.map((p) => ({
+            kind: "product" as const,
+            id: p.id,
+            title: p.display_name,
+            subtitle: p.display_number != null ? String(p.display_number) : undefined,
+          }));
+        }
       }
       // Fallback hvis RPC-en feiler: enkelt ilike-søk.
       const fb = await supabase
@@ -110,10 +131,28 @@ export function useEntitySearch(rawTerm: string) {
   });
 
   const tickets = useQuery({
-    queryKey: ["entity-search", "tickets", entityId, term],
+    queryKey: ["entity-search", "tickets", entityId, term, ticketRef],
     enabled,
     staleTime: 30_000,
     queryFn: async (): Promise<EntityHit[]> => {
+      // Direkte saksreferanse («T-<uuid>» eller ren uuid) slår opp saken selv.
+      if (ticketRef) {
+        const { data, error } = await supabase
+          .from("tickets")
+          .select("id, subject, sender_email, sender_name")
+          .eq("id", ticketRef)
+          .maybeSingle();
+        if (error) throw error;
+        if (!data) return [];
+        return [
+          {
+            kind: "ticket" as const,
+            id: data.id,
+            title: data.subject ?? "(uten emne)",
+            subtitle: data.sender_name ?? data.sender_email ?? undefined,
+          },
+        ];
+      }
       const { data, error } = await supabase
         .from("tickets")
         .select("id, subject, sender_email, sender_name, received_at")
