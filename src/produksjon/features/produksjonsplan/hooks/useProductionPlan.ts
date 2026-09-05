@@ -2,9 +2,33 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRows } from "@/lib/supabasePaging";
 import { isoDayOfWeek } from "@/ordre/hooks/useDeliveryTours";
+import { osloDateISO } from "@/lib/osloDate";
+import { fetchDeliveryPauses } from "@/ordre/lib/pendingOrders";
+import {
+  excludePausedLines,
+  ordersNewAfterRun,
+  pickCompletedMainRun,
+  productionStatusesForDate,
+  runCompletedAt,
+  sortSources,
+  type PlanSource,
+  type RunLike,
+} from "../lib/planSource";
 import { productionRowKey } from "./useProductionPlanSnapshots";
 
 import type { ProductionPlanRow, ProductionPlanRowDetail, ProduksjonsplanCriteria } from "../types";
+
+/** Metadata om hvilket grunnlag planen er bygget på. */
+export interface ProductionPlanBasis {
+  mode: "pakksedler" | "bestillinger";
+  /** Når hovedkjøringen ble fullført (kun i pakkseddel-modus). */
+  runAt: string | null;
+  /** Antall pakksedler som inngår (kun i pakkseddel-modus). */
+  noteCount: number;
+  /** Antall ordre lagt inn etter kjøringen som ennå mangler pakkseddel. */
+  newAfterRunCount: number;
+}
+
 
 const DAY_KEYS = [
   "active_monday",
@@ -55,29 +79,54 @@ interface MainCategoryRow {
   sort_order: number;
 }
 
+const EMPTY_BASIS: ProductionPlanBasis = {
+  mode: "bestillinger",
+  runAt: null,
+  noteCount: 0,
+  newAfterRunCount: 0,
+};
+
 export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
   return useQuery({
     queryKey: ["produksjonsplan", "rows", legalEntityId, date, criteria],
     enabled: !!legalEntityId && !!date,
-    queryFn: async (): Promise<{ rows: ProductionPlanRow[]; orderCounts: { fast: number; datert: number; pakkseddel: number } }> => {
-      if (!legalEntityId) return { rows: [], orderCounts: { fast: 0, datert: 0, pakkseddel: 0 } };
+    queryFn: async (): Promise<{
+      rows: ProductionPlanRow[];
+      orderCounts: { fast: number; datert: number; pakkseddel: number };
+      basis: ProductionPlanBasis;
+    }> => {
+      if (!legalEntityId) {
+        return { rows: [], orderCounts: { fast: 0, datert: 0, pakkseddel: 0 }, basis: EMPTY_BASIS };
+      }
 
       // 1) Hent ordrer for dato + selskap (inkl. kansellerte — de brukes til å
       //    overstyre fastordre slik at en avbestilt vare ikke produseres likevel)
-      const allOrders = await fetchAllRows((from, to) =>
-        supabase
-          .from("orders")
-          .select("id, delivery_tour_id, customer_id, status, source")
-          .eq("legal_entity_id", legalEntityId)
-          .eq("delivery_date", date)
-          .range(from, to),
-      );
+      const [allOrders, pauses] = await Promise.all([
+        fetchAllRows((from, to) =>
+          supabase
+            .from("orders")
+            .select("id, delivery_tour_id, customer_id, status, source, is_return")
+            .eq("legal_entity_id", legalEntityId)
+            .eq("delivery_date", date)
+            .range(from, to),
+        ),
+        fetchDeliveryPauses(date, date, legalEntityId),
+      ]);
       // Speiler order_is_production_scope(status) i databasen —
       // awaiting_confirmation er godkjenningsporten og skal IKKE produseres.
-      const ACTIVE_STATUSES = ["confirmed", "delivered"];
+      // `delivered` tas kun med for datoer som er passert.
+      const ACTIVE_STATUSES = productionStatusesForDate(date, osloDateISO(new Date()));
       const cancelledOrders = (allOrders ?? []).filter((o) => o.status === "cancelled");
       // Kun statuser som også havner på pakksedler/etiketter — utkast og på-vent teller ikke.
-      const orders = (allOrders ?? []).filter((o) => ACTIVE_STATUSES.includes(o.status));
+      // Kunder i leveransepause skal ikke produseres for.
+      const orders = excludePausedLines(
+        (allOrders ?? [])
+          .filter((o) => ACTIVE_STATUSES.includes(o.status))
+          .map((o) => ({ ...o, tour_id: o.delivery_tour_id as string | null })),
+        pauses,
+        date,
+      );
+
 
 
       // Hent alle aktive turer for selskapet (trenger info for ekspandering av fastordre uten tur).
@@ -87,15 +136,22 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
           "id, tour_number, display_name, status, active_monday, active_tuesday, active_wednesday, active_thursday, active_friday, active_saturday, active_sunday",
         )
         .eq("legal_entity_id", legalEntityId);
+      type TourRow = {
+        id: string;
+        tour_number: number | null;
+        display_name: string;
+        status: string;
+      } & Record<(typeof DAY_KEYS)[number], boolean>;
+      const tourRows = (allTours ?? []) as TourRow[];
       const tourMap = new Map<string, number | null>(
-        (allTours ?? []).map((t: any) => [t.id, t.tour_number as number | null]),
+        tourRows.map((t) => [t.id, t.tour_number]),
       );
       const dow = isoDayOfWeek(date);
       const dayKey = DAY_KEYS[dow - 1];
-      const activeToursForDow = (allTours ?? [])
-        .filter((t: any) => t.status === "active" && t[dayKey])
-        .sort((a: any, b: any) => (a.tour_number ?? 9999) - (b.tour_number ?? 9999));
-      const defaultTourIdForDow: string | null = (activeToursForDow[0]?.id as string) ?? null;
+      const activeToursForDow = tourRows
+        .filter((t) => t.status === "active" && t[dayKey])
+        .sort((a, b) => (a.tour_number ?? 9999) - (b.tour_number ?? 9999));
+      const defaultTourIdForDow: string | null = activeToursForDow[0]?.id ?? null;
 
 
       const filteredOrders: (OrderRow & { tour_number: number | null })[] = (orders ?? [])
@@ -112,7 +168,7 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
         });
 
       // Kundegruppe-filter
-      let customerGroupMap = new Map<string, Set<string>>(); // customer_id -> Set<group_id>
+      const customerGroupMap = new Map<string, Set<string>>(); // customer_id -> Set<group_id>
       if (criteria.customer_group_ids.length > 0 && filteredOrders.length > 0) {
         const customerIds = Array.from(new Set(filteredOrders.map((o) => o.customer_id)));
         const { data: members } = await supabase
@@ -244,39 +300,189 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
             (r) => r.tour_number !== null && criteria.tour_numbers.includes(r.tour_number),
           );
 
-      // Tellinger til status-tekst (fastordre teller én pr unik kunde)
+      // === Grunnlag: pakksedler når hovedkjøringen er fullført ================
+      const { data: runRows } = await supabase
+        .from("delivery_note_runs")
+        .select("id, completed_at, finished_at, tour_filter, notes_generated")
+        .eq("legal_entity_id", legalEntityId)
+        .eq("delivery_date", date)
+        .eq("run_type", "main")
+        .eq("status", "completed")
+        .order("created_at", { ascending: false })
+        .limit(10);
+      const mainRun = pickCompletedMainRun(
+        (runRows ?? []) as RunLike[],
+        criteria.tour_numbers,
+        tourMap,
+      );
+
+      type BasisLine = {
+        customer_id: string;
+        tour_number: number | null;
+        product_id: string;
+        quantity: number;
+        source: PlanSource;
+      };
+      const basisLines: BasisLine[] = [];
       const orderCounts = { fast: 0, datert: 0, pakkseddel: 0 };
-      for (const o of finalOrders) {
-        if ((o as { source?: string }).source === "recurring") orderCounts.fast++;
-        else if ((o as { source?: string }).source === "delivery_note") orderCounts.pakkseddel++;
-        else orderCounts.datert++;
-      }
-      orderCounts.fast += new Set(tourFilteredRecurring.map((r) => r.customer_id)).size;
+      const basis: ProductionPlanBasis = {
+        mode: mainRun ? "pakksedler" : "bestillinger",
+        runAt: mainRun ? runCompletedAt(mainRun) : null,
+        noteCount: 0,
+        newAfterRunCount: 0,
+      };
 
-      if (finalOrders.length === 0 && tourFilteredRecurring.length === 0) {
-        return { rows: [], orderCounts };
-      }
+      /** null = ingen kundegruppe-filter, ellers settet med tillatte kunder. */
+      const allowedByGroup = async (customerIds: string[]): Promise<Set<string> | null> => {
+        if (criteria.customer_group_ids.length === 0 || customerIds.length === 0) return null;
+        const { data: members } = await supabase
+          .from("customer_group_members")
+          .select("customer_id, group_id")
+          .in("customer_id", customerIds);
+        const map = new Map<string, Set<string>>();
+        for (const m of members ?? []) {
+          const set = map.get(m.customer_id) ?? new Set<string>();
+          set.add(m.group_id);
+          map.set(m.customer_id, set);
+        }
+        const allowed = new Set<string>();
+        for (const [cid, groups] of map) {
+          if (criteria.customer_group_ids.some((g) => groups.has(g))) allowed.add(cid);
+        }
+        return allowed;
+      };
 
-      // 2) Hent ordrelinjer
-      const orderIds = finalOrders.map((o) => o.id);
-      let lines: OrderLineRow[] = [];
-      if (orderIds.length > 0) {
-        lines = (await fetchAllRows((from, to) =>
+      const fetchOrderLines = async (ids: string[]): Promise<OrderLineRow[]> => {
+        if (ids.length === 0) return [];
+        return (await fetchAllRows((from, to) =>
           supabase
             .from("order_lines")
             .select("order_id, product_id, quantity")
-            .in("order_id", orderIds)
+            .in("order_id", ids)
             .range(from, to),
         )) as OrderLineRow[];
+      };
+
+      if (mainRun) {
+        // Fasit etter kjøring: pakkseddellinjene.
+        const notes = await fetchAllRows((from, to) =>
+          supabase
+            .from("delivery_notes")
+            .select("id, customer_id, delivery_tour_id, delivery_note_lines(order_id, product_id, quantity)")
+            .eq("legal_entity_id", legalEntityId)
+            .eq("delivery_date", date)
+            .eq("is_return", false)
+            .neq("status", "cancelled")
+            .range(from, to),
+        );
+        type NoteRow = {
+          id: string;
+          customer_id: string;
+          delivery_tour_id: string | null;
+          delivery_note_lines: Array<{ order_id: string | null; product_id: string | null; quantity: number | string | null }> | null;
+        };
+        const noteRows = (notes ?? []) as NoteRow[];
+        const scopedNotes = noteRows.filter((n) => {
+          const tn = n.delivery_tour_id ? tourMap.get(n.delivery_tour_id) ?? null : null;
+          if (criteria.tour_numbers.length === 0) return true;
+          if (tn === null) return true;
+          return criteria.tour_numbers.includes(tn);
+        });
+        const allowedNoteCustomers = await allowedByGroup(
+          Array.from(new Set(scopedNotes.map((n) => n.customer_id))),
+        );
+        const packedOrderIds = new Set<string>();
+        for (const n of noteRows) {
+          for (const l of n.delivery_note_lines ?? []) {
+            if (l.order_id) packedOrderIds.add(l.order_id);
+          }
+        }
+        for (const n of scopedNotes) {
+          if (allowedNoteCustomers && !allowedNoteCustomers.has(n.customer_id)) continue;
+          basis.noteCount += 1;
+          const tn = n.delivery_tour_id ? tourMap.get(n.delivery_tour_id) ?? null : null;
+          for (const l of n.delivery_note_lines ?? []) {
+            if (!l.product_id) continue;
+            const qty = Number(l.quantity ?? 0);
+            if (!qty) continue;
+            basisLines.push({
+              customer_id: n.customer_id,
+              tour_number: tn,
+              product_id: l.product_id,
+              quantity: qty,
+              source: "pakkseddel",
+            });
+          }
+        }
+
+        // Ordre lagt inn etter kjøringen som ennå ikke har pakkseddel.
+        const newOrders = ordersNewAfterRun(
+          finalOrders.map((o) => ({
+            id: o.id,
+            customer_id: o.customer_id,
+            status: o.status,
+            is_return: (o as { is_return?: boolean | null }).is_return ?? false,
+            delivery_tour_id: o.delivery_tour_id,
+            delivery_date: date,
+            tour_number: o.tour_number,
+          })),
+          packedOrderIds,
+          pauses,
+        );
+        basis.newAfterRunCount = newOrders.length;
+        const newById = new Map(newOrders.map((o) => [o.id, o] as const));
+        for (const l of await fetchOrderLines(newOrders.map((o) => o.id))) {
+          const o = newById.get(l.order_id);
+          if (!o || !l.product_id) continue;
+          basisLines.push({
+            customer_id: o.customer_id,
+            tour_number: o.tour_number,
+            product_id: l.product_id,
+            quantity: Number(l.quantity),
+            source: "ny_etter_kjoring",
+          });
+        }
+        orderCounts.pakkseddel = basis.noteCount;
+        orderCounts.datert = newOrders.length;
+      } else {
+        for (const o of finalOrders) {
+          if ((o as { source?: string }).source === "recurring") orderCounts.fast++;
+          else if ((o as { source?: string }).source === "delivery_note") orderCounts.pakkseddel++;
+          else orderCounts.datert++;
+        }
+        orderCounts.fast += new Set(tourFilteredRecurring.map((r) => r.customer_id)).size;
+
+        const orderTour = new Map(finalOrders.map((o) => [o.id, o.tour_number] as const));
+        const orderCust = new Map(finalOrders.map((o) => [o.id, o.customer_id] as const));
+        for (const l of await fetchOrderLines(finalOrders.map((o) => o.id))) {
+          const cid = orderCust.get(l.order_id);
+          if (!cid || !l.product_id) continue;
+          basisLines.push({
+            customer_id: cid,
+            tour_number: orderTour.get(l.order_id) ?? null,
+            product_id: l.product_id,
+            quantity: Number(l.quantity),
+            source: "bestilling",
+          });
+        }
+        for (const r of tourFilteredRecurring) {
+          basisLines.push({
+            customer_id: r.customer_id,
+            tour_number: r.tour_number,
+            product_id: r.product_id,
+            quantity: r.quantity,
+            source: "fastordre",
+          });
+        }
       }
 
+      if (basisLines.length === 0) return { rows: [], orderCounts, basis };
+
       const productIds = Array.from(
-        new Set([
-          ...lines.map((l) => l.product_id).filter(Boolean) as string[],
-          ...tourFilteredRecurring.map((r) => r.product_id).filter(Boolean) as string[],
-        ]),
+        new Set(basisLines.map((l) => l.product_id).filter(Boolean) as string[]),
       );
-      if (productIds.length === 0) return { rows: [], orderCounts };
+      if (productIds.length === 0) return { rows: [], orderCounts, basis };
+
 
       // 3) Hent produkter
       const { data: products, error: prodErr } = await supabase
@@ -418,6 +624,7 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
         originalProduct: ProductRow;
         quantity: number;
         customerId: string | null;
+        source: PlanSource;
       }[] = [];
       const passesCategoryFilter = (product: ProductRow): boolean => {
         if (criteria.main_category_ids.length > 0) {
@@ -433,40 +640,30 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
         return true;
       };
 
-      for (const l of lines) {
+      for (const l of basisLines) {
         const product = productMap.get(l.product_id);
         if (!product) continue;
         if (!passesCategoryFilter(product)) continue;
-        const tour = orderTourMap.get(l.order_id) ?? null;
-        const cid = orderCustomerMap.get(l.order_id) ?? null;
         includedLines.push({
-          tour,
+          tour: l.tour_number,
           product: effectiveProductFor(product),
           originalProduct: product,
-          quantity: Number(l.quantity),
-          customerId: cid,
+          quantity: l.quantity,
+          customerId: l.customer_id,
+          source: l.source,
         });
       }
 
-      // Fastordre-linjer
-      for (const r of tourFilteredRecurring) {
-        const product = productMap.get(r.product_id);
-        if (!product) continue;
-        if (!passesCategoryFilter(product)) continue;
-        includedLines.push({
-          tour: r.tour_number,
-          product: effectiveProductFor(product),
-          originalProduct: product,
-          quantity: r.quantity,
-          customerId: r.customer_id,
-        });
-      }
 
       // Aggregeringsnøkkel — delt med snapshot/korreksjonslista (productionRowKey)
       // slik at diffen sammenligner samme rader.
       const agg = new Map<string, ProductionPlanRow>();
-      for (const { tour, product, originalProduct, quantity, customerId } of includedLines) {
+      const sourcesByKey = new Map<string, Set<PlanSource>>();
+      for (const { tour, product, originalProduct, quantity, customerId, source } of includedLines) {
         const k = productionRowKey(criteria.sum_tours ? null : tour, product.id, criteria);
+        const sourceSet = sourcesByKey.get(k) ?? new Set<PlanSource>();
+        sourceSet.add(source);
+        sourcesByKey.set(k, sourceSet);
 
         let row = agg.get(k);
         if (!row) {
@@ -497,6 +694,7 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
             liters: null,
             on_stock: null,
             tour_number: criteria.sum_tours ? null : tour,
+            sources: [],
             details: [],
           };
           agg.set(k, row);
@@ -516,10 +714,16 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
               originalProduct.display_number != null ? String(originalProduct.display_number) : null,
             quantity,
             unit_of_sale: originalProduct.unit_of_sale,
+            source,
           };
           row.details.push(detail);
         }
       }
+
+      for (const [k, row] of agg) {
+        row.sources = sortSources(sourcesByKey.get(k) ?? []);
+      }
+
 
       // Sorter detaljer per rad: tur, så kundenummer
       for (const row of agg.values()) {
@@ -566,7 +770,7 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
           supabase.from("stock_item_balance").select("id, on_hand").eq("legal_entity_id", legalEntityId),
         ]);
         const linkByProduct = new Map<string, { stock_item_id: string; units_per_sold_unit: number }>(
-          ((linkRes.data ?? []) as Record<string, any>[]).map((l) => [
+          ((linkRes.data ?? []) as Record<string, unknown>[]).map((l) => [
             l.product_id as string,
             {
               stock_item_id: l.stock_item_id as string,
@@ -575,7 +779,7 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
           ]),
         );
         const avail = new Map<string, number>(
-          ((balRes.data ?? []) as Record<string, any>[]).map((b) => [b.id as string, Number(b.on_hand ?? 0)]),
+          ((balRes.data ?? []) as Record<string, unknown>[]).map((b) => [b.id as string, Number(b.on_hand ?? 0)]),
         );
         for (const row of rows) {
           const link = linkByProduct.get(row.product_id);
@@ -602,7 +806,7 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
         }
       }
 
-      return { rows, orderCounts };
+      return { rows, orderCounts, basis };
 
     },
   });

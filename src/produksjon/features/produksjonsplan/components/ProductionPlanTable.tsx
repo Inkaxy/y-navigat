@@ -1,6 +1,11 @@
 import { Fragment, useState } from "react";
 import { ChevronRight } from "lucide-react";
 import type { ProductionPlanRow } from "../types";
+import {
+  PLAN_SOURCE_LABEL,
+  PLAN_SOURCE_SHORT,
+  PLAN_SOURCE_TOOLTIP,
+} from "../lib/planSource";
 
 import {
   Table,
@@ -195,6 +200,21 @@ export function ProductionPlanTable({ rows, showByMainGroup, showTraysWithPlus, 
                 <TableCell>
                   <div className="flex items-center gap-2">
                     <span>{r.product_name}</span>
+                    {(r.sources ?? []).map((s) => (
+                      <span
+                        key={s}
+                        className={cn(
+                          "rounded px-1.5 py-0.5 text-[10px] font-semibold print:hidden",
+                          s === "ny_etter_kjoring"
+                            ? "bg-warning/15 text-warning"
+                            : "bg-muted text-muted-foreground",
+                        )}
+                        title={PLAN_SOURCE_TOOLTIP[s]}
+                        aria-label={PLAN_SOURCE_LABEL[s]}
+                      >
+                        {PLAN_SOURCE_SHORT[s]}
+                      </span>
+                    ))}
                     {r.quantity_from_stock > 0 && (
                       <span
                         className={cn(
@@ -284,6 +304,7 @@ export function ProductionPlanTable({ rows, showByMainGroup, showTraysWithPlus, 
                             <th className="text-left font-medium py-1 pr-3">Varenr</th>
                             <th className="text-right font-medium py-1 pr-3">Antall</th>
                             <th className="text-left font-medium py-1 pr-3">Enhet</th>
+                            <th className="text-left font-medium py-1 pr-3">Kilde</th>
                             <th className="text-left font-medium py-1 pr-3">Rute</th>
                             <th className="text-left font-medium py-1">Adresse</th>
                           </tr>
@@ -299,6 +320,9 @@ export function ProductionPlanTable({ rows, showByMainGroup, showTraysWithPlus, 
                               <td className="font-mono py-1 pr-3">{d.product_code ?? ""}</td>
                               <td className="text-right tabular-nums py-1 pr-3">{fmtNum(d.quantity)}</td>
                               <td className="py-1 pr-3 text-muted-foreground">{d.unit_of_sale ?? ""}</td>
+                              <td className="py-1 pr-3 text-muted-foreground" title={PLAN_SOURCE_TOOLTIP[d.source]}>
+                                {PLAN_SOURCE_LABEL[d.source]}
+                              </td>
                               <td className="py-1 pr-3 text-muted-foreground">
                                 {d.tour_name ?? (d.tour_number == null ? "Henting / uten tur" : "")}
                               </td>

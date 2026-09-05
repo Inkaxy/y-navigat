@@ -13,7 +13,9 @@ import {
   Printer,
   X,
   Plus,
+  FileText,
 } from "lucide-react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
@@ -188,6 +190,7 @@ export default function ProduksjonsplanPage() {
 
   const counts = plan.data?.orderCounts;
   const rows = plan.data?.rows ?? [];
+  const basis = plan.data?.basis ?? null;
 
   const applyTemplate = (t: CriteriaTemplate) => {
     setCriteria({ ...DEFAULT_CRITERIA, ...t.criteria });
@@ -446,7 +449,33 @@ export default function ProduksjonsplanPage() {
           <div className={cn("print-area space-y-3", (printJob?.alternateRowGray ?? true) && "print-zebra-rows")}>
             {/* Skjerm-visning: kun den vanlige tabellen én gang */}
             <div className="print:hidden">
+              {basis && (
+                <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md border border-line-subtle bg-muted/40 px-3 py-2 text-xs">
+                  <FileText className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
+                  {basis.mode === "pakksedler" ? (
+                    <>
+                      <span>
+                        Grunnlag: pakksedler kjørt
+                        {basis.runAt ? ` kl. ${format(new Date(basis.runAt), "HH:mm")}` : ""} (
+                        {basis.noteCount} pakksedler)
+                        {basis.newAfterRunCount > 0
+                          ? ` + ${basis.newAfterRunCount} ordre lagt inn etter kjøringen`
+                          : ""}
+                      </span>
+                      <Link
+                        to={`/ordre/pakksedler?date=${dateStr}`}
+                        className="font-medium underline underline-offset-2"
+                      >
+                        Se pakksedler
+                      </Link>
+                    </>
+                  ) : (
+                    <span>Grunnlag: bestillinger og fastordre — hovedkjøring ikke kjørt ennå</span>
+                  )}
+                </div>
+              )}
               <ProductionPlanTable
+
                 rows={rows}
                 showByMainGroup={prefs.showByMainGroup}
                 showTraysWithPlus={prefs.showTraysWithPlus}
