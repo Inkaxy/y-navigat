@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { AtSign, Forward, MailPlus, Users2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,10 @@ import { TEAM_LABEL, TEAMS, type TicketTeam } from "@/ordre/lib/teams";
 import { useAddInternalComment } from "@/ordre/hooks/useInternalComments";
 import { useUpdateTicket, type Ticket } from "@/ordre/hooks/useTickets";
 import { useActiveUsers } from "@/ordre/hooks/useActiveUsers";
+import {
+  DEFAULT_ORDRE_DESK_SETTINGS,
+  useOrdreDeskSettings,
+} from "@/ordre/hooks/useOrdreDeskSettings";
 import { createNotifications } from "@/ordre/hooks/useNotifications";
 import { useInboundMessages, type InboundMessage } from "@/ordre/hooks/useInboundMessages";
 import { useTicketReplies, type TicketReply } from "@/ordre/hooks/useTicketReplies";
@@ -48,9 +52,18 @@ export default function TicketComposerActions({
   const [transferTarget, setTransferTarget] = useState<string>("");
   const [forwardOpen, setForwardOpen] = useState(false);
   const [forwardEmail, setForwardEmail] = useState("");
-  const [forwardMessage, setForwardMessage] = useState(
-    `Hei! Videresender en henvendelse fra en av kundene våre (under) — kan dere se på dette og svare oss? På forhånd takk!\n\nMvh Lars, ordrekontoret Nøtterø Bakeri`,
-  );
+  const { data: desk } = useOrdreDeskSettings();
+  const signature = desk?.forwardSignature ?? DEFAULT_ORDRE_DESK_SETTINGS.forwardSignature;
+  const [forwardMessage, setForwardMessage] = useState("");
+  const [forwardTouched, setForwardTouched] = useState(false);
+  // Standardteksten følger signaturen fra Innstillinger, men overskriver aldri
+  // det brukeren har skrevet selv.
+  useEffect(() => {
+    if (forwardTouched) return;
+    setForwardMessage(
+      `Hei! Videresender en henvendelse fra en av kundene våre (under) — kan dere se på dette og svare oss? På forhånd takk!\n\n${signature}`,
+    );
+  }, [signature, forwardTouched]);
   const [sending, setSending] = useState(false);
 
   const { data: inbound = [] } = useInboundMessages(ticket.id);
