@@ -1,3 +1,5 @@
+import type { PlanSource } from "./lib/planSource";
+
 export interface ProduksjonsplanCriteria {
   /** Tur-numre som skal inkluderes; tom = alle */
   tour_numbers: number[];
@@ -57,6 +59,8 @@ export interface ProductionPlanRow {
   on_stock: number | null;
   /** Sortering: tur-nummer rad er knyttet til (når sum_tours=false) */
   tour_number: number | null;
+  /** Hvilke grunnlag raden består av (pakkseddel/bestilling/fastordre/ny etter kjøring) */
+  sources: PlanSource[];
   /** Per-kunde linjer som inngår i denne aggregerte raden (for «trykk for å se hvem som har bestilt») */
   details: ProductionPlanRowDetail[];
 }
@@ -72,6 +76,8 @@ export interface ProductionPlanRowDetail {
   product_code: string | null;
   quantity: number;
   unit_of_sale: string | null;
+  /** Hvor linja kommer fra */
+  source: PlanSource;
 }
 
 export interface CriteriaTemplate {
