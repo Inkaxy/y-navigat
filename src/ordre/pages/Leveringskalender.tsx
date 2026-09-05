@@ -465,11 +465,75 @@ export default function MatrixPage() {
     return editedNum !== existing;
   }
 
-  function setCellValue(key: CellKey, value: string) {
+  const setCellValue = useCallback((key: CellKey, value: string) => {
     const cleaned = value.replace(",", ".");
     if (cleaned !== "" && !/^\d*\.?\d*$/.test(cleaned)) return;
     setEdits((prev) => ({ ...prev, [key]: cleaned }));
-  }
+  }, []);
+
+  /** Esc i en celle: forkast den ulagrede endringen. */
+  const resetCellValue = useCallback((key: CellKey) => {
+    setEdits((prev) => {
+      if (!(key in prev)) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  }, []);
+
+  /**
+   * Verdi og fastordre-status UTEN hensyn til ulagrede endringer.
+   * Radkomponenten legger på egne endringer, slik at én tastetrykk kun
+   * re-rendrer den berørte cellen.
+   */
+  const ghostRuleNoEdits = useMemo(
+    () => ({ edits: EMPTY_EDITS, existingQty, ghostMap, hasColumnOrder, isPausedCol }),
+    [existingQty, ghostMap, hasColumnOrder, isPausedCol],
+  );
+
+  const getBaseValue = useCallback(
+    (key: CellKey): string => {
+      const v = existingQty[key];
+      if (v) return String(v);
+      const g = visibleGhostQty({ key, ...ghostRuleNoEdits });
+      return g > 0 ? String(g) : "";
+    },
+    [existingQty, ghostRuleNoEdits],
+  );
+
+  const isBaseGhost = useCallback(
+    (key: CellKey): boolean =>
+      !existingQty[key] && visibleGhostQty({ key, ...ghostRuleNoEdits }) > 0,
+    [existingQty, ghostRuleNoEdits],
+  );
+
+  const ghostQtyFor = useCallback((key: CellKey) => ghostMap?.get(key) ?? 0, [ghostMap]);
+  const existingQtyFor = useCallback((key: CellKey) => existingQty[key] ?? 0, [existingQty]);
+  const isFallbackCell = useCallback((key: CellKey) => !!fallbackCells[key], [fallbackCells]);
+  const hasMerknadCell = useCallback((key: CellKey) => !!existingMerknad[key], [existingMerknad]);
+  const orderCountFor = useCallback(
+    (key: CellKey) => cellOrderIds[key]?.length ?? 0,
+    [cellOrderIds],
+  );
+
+  const notifyPaused = useCallback(() => {
+    toast.info("Leveransepause", {
+      description: "Fjern pausen først om kunden likevel skal få leveranse.",
+    });
+  }, []);
+
+  /** Ulagrede endringer gruppert per produkt — gir stabile props per rad. */
+  const editsByProduct = useMemo(() => {
+    const m = new Map<string, Record<CellKey, string>>();
+    for (const [key, value] of Object.entries(edits)) {
+      const productId = key.split("|")[2];
+      if (!productId) continue;
+      const bucket = m.get(productId);
+      if (bucket) bucket[key] = value;
+      else m.set(productId, { [key]: value });
+    }
+    return m;
+  }, [edits]);
 
   const dirtyChanges = useMemo<MatrixChange[]>(
     () => computeDirtyChanges(edits, existingQty),
