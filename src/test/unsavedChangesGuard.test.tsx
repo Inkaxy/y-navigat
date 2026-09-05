@@ -57,6 +57,30 @@ describe("useUnsavedChangesGuard", () => {
     expect(result.current.isBlocked).toBe(false);
   });
 
+  it("blokkerer klikk på en intern lenke", () => {
+    const { result } = renderHook(() => useUnsavedChangesGuard(true), { wrapper });
+
+    const a = document.createElement("a");
+    a.href = "/ordre/ordrer";
+    document.body.appendChild(a);
+    act(() => {
+      a.dispatchEvent(new MouseEvent("click", { bubbles: true, button: 0, cancelable: true }));
+    });
+
+    expect(result.current.isBlocked).toBe(true);
+    a.remove();
+  });
+
+  it("blokkerer nettleserens tilbake-knapp", () => {
+    const { result } = renderHook(() => useUnsavedChangesGuard(true), { wrapper });
+
+    act(() => {
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
+
+    expect(result.current.isBlocked).toBe(true);
+  });
+
   it("slutter å blokkere når endringene er lagret", () => {
     const action = vi.fn();
     const { result, rerender } = renderHook(
