@@ -563,13 +563,16 @@ export async function buildCakePdf(
         .filter(Boolean)
         .join(" · ");
       if (geo.rotated) {
-        const txt = [line1, line2].filter(Boolean).join(" · ");
+        let txt = [line1, line2].filter(Boolean).join(" · ");
+        // Teksten løper oppover fra bunnen av stripa; kort den ned slik at den
+        // aldri når opp i etikettnummeret på korte plasseringer.
+        const maxLenMm = hMm - 2 - rotatedTextStartMm;
+        while (txt && pdf.getTextWidth(txt) > maxLenMm) txt = txt.slice(0, -1);
         if (txt) pdf.text(txt, capX + 4, capY + hMm - 2, { angle: 90 });
       } else {
         if (line1) pdf.text(line1, textX + (item.labelNumber ? 16 : 0), capY + 4);
         if (line2) pdf.text(line2, textX, capY + 8);
       }
-
     }
     drawFootBand(pdf, size, scale, scaleY, sheet, orientation, printerLabel);
   }
