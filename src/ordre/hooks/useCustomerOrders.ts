@@ -212,6 +212,9 @@ export type CustomerOrderLineInput = {
   product_mva_rate?: number | null;
   quantity: number;
   unit_price: number;
+  /** Settes til 'manual_override' når operatøren har overstyrt prisen. */
+  unit_price_source?: string | null;
+  unit_price_source_id?: string | null;
   merknad?: Merknad | null;
 };
 
@@ -302,11 +305,17 @@ export function useCreateCustomerOrder() {
 
         const lineRows = input.lines.map((l, idx) => {
           const ep = priceMap.get(l.product_id);
-          const unitPrice = ep ? ep.price : 0;
+          // Manuell overstyring vinner over prismotoren.
+          const overridden = isManualOverride(l.unit_price_source ?? null);
+          const unitPrice = overridden ? l.unit_price : ep ? ep.price : 0;
           const vatRate = ep?.vat_rate ?? l.product_mva_rate ?? 15;
-          const source = ep?.source ?? "fallback_zero";
-          const sourceId = ep?.special_price_id ?? ep?.price_list_id ?? null;
-          if (!ep || ep.is_fallback) fallbackLineIndices.push(idx);
+          const source = overridden
+            ? (l.unit_price_source as string)
+            : ep?.source ?? "fallback_zero";
+          const sourceId = overridden
+            ? l.unit_price_source_id ?? null
+            : ep?.special_price_id ?? ep?.price_list_id ?? null;
+          if (!overridden && (!ep || ep.is_fallback)) fallbackLineIndices.push(idx);
           const subtotal = l.quantity * unitPrice;
           const vat = subtotal * (vatRate / 100);
           return {
@@ -464,7 +473,13 @@ export function useUpdateCustomerOrder() {
             let vatRate: number;
             let source: string;
             let sourceId: string | null;
-            if (existing) {
+            if (isManualOverride(l.unit_price_source ?? null)) {
+              // Manuell overstyring vinner over både lagret og ny pris.
+              unitPrice = l.unit_price;
+              vatRate = l.product_mva_rate ?? existing?.vat_rate ?? 15;
+              source = l.unit_price_source as string;
+              sourceId = l.unit_price_source_id ?? null;
+            } else if (existing) {
               // Uendret linje — behold pris og kilde nøyaktig som bestilt.
               unitPrice = existing.unit_price;
               vatRate = existing.vat_rate ?? l.product_mva_rate ?? 15;
