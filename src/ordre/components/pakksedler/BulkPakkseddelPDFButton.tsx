@@ -154,7 +154,7 @@ export function BulkPakkseddelPDFButton({
             for (const p of pages) merged.addPage(p);
           }
           const bytes = await merged.save();
-          finalBlob = new Blob([bytes as unknown as BlobPart], { type: "application/pdf" });
+          finalBlob = new Blob([new Uint8Array(bytes)], { type: "application/pdf" });
         } catch (mergeErr) {
           console.error("[BulkPDF] Sammenslåing feilet:", mergeErr);
           toast.error(`Kunne ikke sette sammen PDF-en: ${errMsg(mergeErr)}`);
