@@ -4,12 +4,9 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
   ArrowLeft,
-  AtSign,
   Link2,
   Loader2,
-  Lock,
   Paperclip,
-  Send,
   Sparkles,
   UserPlus,
   X,
@@ -17,16 +14,6 @@ import {
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
@@ -39,14 +26,9 @@ import {
   type TicketAttachment,
 } from "@/ordre/hooks/useTickets";
 import { useUserAccess } from "@/ordre/hooks/useUserAccess";
-import { useTicketReplies, useSendTicketReply, safeUuid } from "@/ordre/hooks/useTicketReplies";
-import {
-  useInternalComments,
-  useAddInternalComment,
-} from "@/ordre/hooks/useInternalComments";
+import { useTicketReplies } from "@/ordre/hooks/useTicketReplies";
 import { useInboundMessages, type InboundMessage } from "@/ordre/hooks/useInboundMessages";
 import { useUserNames } from "@/ordre/hooks/useUserNames";
-import { useActiveUsers } from "@/ordre/hooks/useActiveUsers";
 import { useSlaSettings } from "@/ordre/hooks/useSlaSettings";
 import { computeDeadline, formatCountdown } from "@/ordre/lib/sla";
 import {
@@ -62,9 +44,7 @@ import {
   TICKET_STATUS_LABEL,
   TICKET_STATUS_STYLE,
 } from "@/ordre/lib/ticketFormat";
-import { logTicketEvent } from "@/ordre/lib/ticketEvents";
-import { TEAM_LABEL, TEAMS, type TicketTeam } from "@/ordre/lib/teams";
-import { createNotifications } from "@/ordre/hooks/useNotifications";
+import { TEAM_LABEL } from "@/ordre/lib/teams";
 import ConversationItem from "@/ordre/components/tickets/ConversationItem";
 import TimelineEvent, {
   type TimelineEventRow,
@@ -321,7 +301,6 @@ export default function TicketDetail() {
   const { data: customerCard } = useCustomerCard(ticket?.sender_email);
   const { data: linked } = useLinkedOrder(ticket?.related_order_id ?? null);
   const { data: sla } = useSlaSettings();
-  const { data: activeUsers = [] } = useActiveUsers();
 
   const [reanalyzing, setReanalyzing] = useState(false);
   const [showEvents, setShowEvents] = useState(true);
