@@ -70,6 +70,7 @@ import TimelineEvent, {
   type TimelineEventRow,
 } from "@/ordre/components/tickets/TimelineEvent";
 import TicketActionBar from "@/ordre/components/tickets/TicketActionBar";
+import TicketComposer from "@/ordre/components/tickets/TicketComposer";
 import { useIsMobile } from "@/hooks/use-mobile";
 import OrderLinkCard from "@/ordre/components/tickets/OrderLinkCard";
 import EmailBody, { sanitizeEmailHtml, extractCidRefs } from "@/ordre/components/tickets/EmailBody";
@@ -758,117 +759,17 @@ export default function TicketDetail() {
             <div key={it.key}>{it.node}</div>
           ))}
 
-          {/* C) Skrivefelt */}
-          <div className="rounded-lg border bg-[hsl(var(--brand-cream))] p-4 shadow-sm">
-            <div className="mb-3 flex flex-wrap gap-1.5">
-              {(["reply", "note", "ask"] as ComposerTab[]).map((t) => (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => setTab(t)}
-                  className={cn(
-                    "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-                    tab === t
-                      ? TAB_META[t].cls
-                      : "bg-background text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  {TAB_META[t].label}
-                </button>
-              ))}
-            </div>
-
-            {tab === "ask" && (
-              <Select value={mention} onValueChange={setMention}>
-                <SelectTrigger className="mb-2 h-9 w-full bg-background md:w-[280px]">
-                  <SelectValue placeholder="Velg team eller person …" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectLabel>Team</SelectLabel>
-                    {TEAMS.map((t) => (
-                      <SelectItem key={`t-${t}`} value={`team:${t}`}>
-                        @{TEAM_LABEL[t]}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                  <SelectGroup>
-                    <SelectLabel>Personer</SelectLabel>
-                    {activeUsers.map((u) => (
-                      <SelectItem key={`u-${u.id}`} value={`user:${u.id}`}>
-                        @{u.display_name}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            )}
-
-            <Textarea
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              disabled={!canWrite}
-              className={cn(
-                "min-h-[130px] resize-y bg-background",
-                tab !== "reply" && "border-amber-400/60",
-              )}
-              placeholder={
-                tab === "reply"
-                  ? `Skriv svar til ${ticket.sender_email} …`
-                  : tab === "note"
-                    ? "Skriv et internt notat — kunden ser ikke dette."
-                    : "Hva lurer du på? Notatet er kun synlig internt."
-              }
-            />
-
-            {tab !== "reply" && (
-              <p className="mt-1 flex items-center gap-1 text-xs text-amber-700 dark:text-amber-300">
-                <Lock className="h-3 w-3" /> Kun synlig internt — sendes ikke til kunden.
-              </p>
-            )}
-
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              {tab === "reply" && (
-                <>
-                  <Button onClick={onSend} disabled={sendDisabled} className="gap-2">
-                    <Send className="h-4 w-4" /> Send svar til {ticket.sender_email}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={onAiDraft}
-                    disabled={!canWrite || draftLoading}
-                    className="gap-2"
-                  >
-                    {draftLoading ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Sparkles className="h-4 w-4" />
-                    )}
-                    Sett inn AI-utkast
-                  </Button>
-                </>
-              )}
-              {tab === "note" && (
-                <Button
-                  onClick={onSaveNote}
-                  disabled={sendDisabled}
-                  className="gap-2 bg-amber-500 text-amber-950 hover:bg-amber-500/90"
-                >
-                  <Lock className="h-4 w-4" /> Lagre internt notat
-                </Button>
-              )}
-              {tab === "ask" && (
-                <Button
-                  onClick={onAsk}
-                  disabled={sendDisabled}
-                  className="gap-2 bg-amber-500 text-amber-950 hover:bg-amber-500/90"
-                >
-                  <AtSign className="h-4 w-4" />
-                  Send spørsmål til {mentionLabel || "…"}
-                </Button>
-              )}
-            </div>
-          </div>
+          {/* C) Skrivefelt — samme komposer som i innboksen */}
+          <TicketComposer
+            ticket={ticket}
+            canWrite={canWrite}
+            onAfterSend={() => {
+              qc.invalidateQueries({ queryKey: ["ticket", id] });
+              qc.invalidateQueries({ queryKey: ["ticket-events", id] });
+              qc.invalidateQueries({ queryKey: ["ticket-replies", id] });
+              qc.invalidateQueries({ queryKey: ["ticket-internal-comments", id] });
+            }}
+          />
         </div>
 
         {/* D) Høyre kolonne */}
