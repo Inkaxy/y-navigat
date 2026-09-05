@@ -712,6 +712,10 @@ export default function MatrixPage() {
     }
   }
 
+  handleSaveRef.current = handleSave;
+
+
+
   function handleDiscardClick() {
     if (addedProducts.length > 0 || dirtyCount > 0) {
       setDiscardOpen(true);
