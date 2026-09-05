@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { OrderConflictError } from "@/ordre/lib/orderConflict";
 
 export type TourOrderLine = {
   id: string;
@@ -36,13 +37,7 @@ export type TourOrder = {
   lines: TourOrderLine[];
 };
 
-/** Kastes når ordren er endret av noen andre siden den ble lastet. */
-export class OrderConflictError extends Error {
-  constructor() {
-    super("Ordren er endret av noen andre — laster på nytt");
-    this.name = "OrderConflictError";
-  }
-}
+export { OrderConflictError };
 
 /**
  * Optimistisk lås: bumper ordrens `updated_at` kun hvis raden fremdeles står
@@ -102,6 +97,8 @@ export function useTourOrder({ customerId, date, tourId }: Args) {
     },
   });
 
+  const loadedOrderId = query.data?.id ?? null;
+
   useEffect(() => {
     if (!enabled) return;
     const channel = supabase
@@ -110,18 +107,27 @@ export function useTourOrder({ customerId, date, tourId }: Args) {
         "postgres_changes",
         { event: "*", schema: "public", table: "orders", filter: `customer_id=eq.${customerId}` },
         () => qc.invalidateQueries({ queryKey }),
-      )
-      .on(
+      );
+    // Linjer abonneres kun for den faktiske ordren — uten filter fikk vi
+    // invalidering på hver eneste ordrelinje i hele databasen.
+    if (loadedOrderId) {
+      channel.on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "order_lines" },
+        {
+          event: "*",
+          schema: "public",
+          table: "order_lines",
+          filter: `order_id=eq.${loadedOrderId}`,
+        },
         () => qc.invalidateQueries({ queryKey }),
-      )
-      .subscribe();
+      );
+    }
+    channel.subscribe();
     return () => {
       supabase.removeChannel(channel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [customerId, date, tourId, enabled]);
+  }, [customerId, date, tourId, enabled, loadedOrderId]);
 
   return query;
 }

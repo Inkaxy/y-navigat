@@ -19,8 +19,18 @@ import { logAudit } from "@/ordre/lib/audit";
 import type { OrderListRow } from "@/ordre/hooks/useOrders";
 import { osloTodayISO } from "@/lib/osloDate";
 import { useAuth } from "@/hooks/useAuth";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  StatusChangeDialog,
+  type StatusChangeIntent,
+} from "@/ordre/components/orders/StatusChangeDialog";
+import { handleOrderConflict, isOrderConflict } from "@/ordre/lib/orderConflict";
 
 interface Props {
+  /** Skjuler avbryt-handlingen for brukere med kun lesetilgang */
+  canWrite?: boolean;
+  /** Skjuler slett-handlingen for alle uten admin */
+  canDelete?: boolean;
   selected: OrderListRow[];
   onClear: () => void;
   /** Refresh listen etter bulk-mutasjon */
@@ -37,9 +47,18 @@ interface Props {
  *  - "Eksporter CSV": laster ned valgte rader som .csv (norsk format)
  *  - "Fjern alle": deselect alle
  */
-export function OrderBulkActionBar({ selected, onClear, onMutated, csvHeaders }: Props) {
+export function OrderBulkActionBar({
+  canWrite = false,
+  canDelete = false,
+  selected,
+  onClear,
+  onMutated,
+  csvHeaders,
+}: Props) {
   const { user } = useAuth();
+  const qc = useQueryClient();
   const [running, setRunning] = useState(false);
+  const [cancelOpen, setCancelOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteText, setDeleteText] = useState("");
   const count = selected.length;
@@ -66,9 +85,8 @@ export function OrderBulkActionBar({ selected, onClear, onMutated, csvHeaders }:
           const { error: delErr } = await supabase.from("orders").delete().eq("id", order.id);
           if (delErr) throw delErr;
           ok++;
-        } catch (e: any) {
+        } catch (e) {
           failed++;
-          // eslint-disable-next-line no-console
           console.error(`Bulk-sletting feilet for ${order.order_number}`, e);
         }
       }
@@ -87,19 +105,20 @@ export function OrderBulkActionBar({ selected, onClear, onMutated, csvHeaders }:
   }
 
 
-  async function cancelSelected() {
-    const reason = window.prompt(
-      `Avbryt ${count} valgte ordre. Hvorfor avbrytes de?`,
-      "",
-    );
-    if (reason === null) return;
-    if (reason.trim().length === 0) {
-      toast.error("Begrunnelse er påkrevd");
-      return;
-    }
+  const cancelIntent: StatusChangeIntent = {
+    to: "cancelled",
+    label: "Avbryt valgte",
+    requireComment: true,
+    commentLabel: `Hvorfor avbrytes ${count} ${count === 1 ? "ordre" : "ordrer"}?`,
+    confirmVariant: "destructive",
+    warning: "Alle valgte ordre avbrytes med samme begrunnelse.",
+  };
+
+  async function cancelSelected(reason: string) {
     setRunning(true);
     let ok = 0;
     let failed = 0;
+    let conflicts = 0;
     const toastId = toast.loading(`Avbryter 0 av ${count}…`);
     try {
       for (let i = 0; i < selected.length; i++) {
@@ -112,19 +131,26 @@ export function OrderBulkActionBar({ selected, onClear, onMutated, csvHeaders }:
             customerName: order.customer_snapshot?.display_name ?? "Ukjent kunde",
             fromStatus: order.status,
             toStatus: "cancelled",
-            comment: reason.trim(),
+            comment: reason,
             userId: user?.id ?? null,
             isCancel: true,
           });
           ok++;
         } catch (e) {
-          failed++;
-          // eslint-disable-next-line no-console
+          if (isOrderConflict(e)) conflicts++;
+          else failed++;
           console.error(`Avbryt feilet for ${order.order_number}`, e);
         }
       }
-      if (failed === 0) toast.success(`${ok} ordre avbrutt.`, { id: toastId });
-      else toast.error(`${ok} avbrutt, ${failed} feilet.`, { id: toastId });
+      if (failed === 0 && conflicts === 0) {
+        toast.success(`${ok} ordre avbrutt.`, { id: toastId });
+      } else {
+        toast.error(
+          `${ok} avbrutt, ${failed + conflicts} feilet.`,
+          { id: toastId },
+        );
+      }
+      if (conflicts > 0) await handleOrderConflict(qc);
       onMutated();
       onClear();
     } finally {
@@ -178,16 +204,18 @@ export function OrderBulkActionBar({ selected, onClear, onMutated, csvHeaders }:
       </Button>
 
       <div className="ml-auto flex items-center gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={cancelSelected}
-          disabled={running}
-          className="h-8 gap-1.5 text-destructive"
-        >
-          {running ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Ban className="h-3.5 w-3.5" />}
-          Avbryt valgte
-        </Button>
+        {canWrite && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCancelOpen(true)}
+            disabled={running}
+            className="h-8 gap-1.5 text-destructive"
+          >
+            {running ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Ban className="h-3.5 w-3.5" />}
+            Avbryt valgte
+          </Button>
+        )}
 
 
         <Button
@@ -201,20 +229,32 @@ export function OrderBulkActionBar({ selected, onClear, onMutated, csvHeaders }:
           Eksporter CSV
         </Button>
 
-        <Button
-          variant="destructive"
-          size="sm"
-          onClick={() => {
-            setDeleteText("");
-            setDeleteOpen(true);
-          }}
-          disabled={running}
-          className="h-8 gap-1.5"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-          Slett
-        </Button>
+        {canDelete && (
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => {
+              setDeleteText("");
+              setDeleteOpen(true);
+            }}
+            disabled={running}
+            className="h-8 gap-1.5"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Slett
+          </Button>
+        )}
       </div>
+
+      <StatusChangeDialog
+        open={cancelOpen}
+        onOpenChange={setCancelOpen}
+        intent={cancelIntent}
+        currentStatus={selected[0]?.status ?? "confirmed"}
+        orderNumber={`${count} ${count === 1 ? "ordre" : "ordrer"}`}
+        customerName="valgte ordre"
+        onConfirm={cancelSelected}
+      />
 
       <Dialog open={deleteOpen} onOpenChange={(o) => !running && setDeleteOpen(o)}>
         <DialogContent>
