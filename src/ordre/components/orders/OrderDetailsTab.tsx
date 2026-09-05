@@ -11,24 +11,9 @@ import { useDeliveryTours, trimSec } from "@/ordre/hooks/useDeliveryTours";
 import { ChangeTourDialog } from "@/ordre/components/orders/ChangeTourDialog";
 import type { OrderDetail, OrderLineDetail } from "@/ordre/hooks/useOrderDetail";
 import { StockAvailabilityWarning } from "@/ordre/components/orders/StockAvailabilityWarning";
+import { PriceSourceBadge } from "@/ordre/components/orders/PriceSourceBadge";
 
 const KUNDER_APP_BASE = "https://kunder.nbos.app"; // ekstern app — kommer som env-konfig senere
-
-function PriceSourceBadge({ source }: { source: string | null }) {
-  const cat = categorizePriceSource(source);
-  const styles: Record<string, string> = {
-    standard: "bg-muted text-muted-foreground",
-    special_general: "bg-warning/15 text-warning",
-    special_customer: "bg-primary/15 text-primary",
-    manual: "bg-destructive/15 text-destructive",
-    none: "bg-muted text-muted-foreground",
-  };
-  return (
-    <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ${styles[cat.category]}`}>
-      {cat.label}
-    </span>
-  );
-}
 
 export function OrderDetailsTab({ order, lines }: { order: OrderDetail; lines: OrderLineDetail[] }) {
   const { data: liveCustomer } = useCustomerById(order.customer_id);
