@@ -218,16 +218,27 @@ export default function DeliveryNoteDashboard() {
       // Hent unike leveringsdatoer for pending datert/retur t.o.m. valgt dato,
       // og kjør hovedkjøring sekvensielt per dato.
       try {
-        let q = supabase
-          .from("orders")
-          .select("delivery_date")
-          .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
-          .lte("delivery_date", date)
-          .in("order_kind", ["dated", "extra", "return"]);
-        if (tourId === NULL_TOUR_KEY) q = q.is("delivery_tour_id", null);
-        else if (tourId !== "all") q = q.eq("delivery_tour_id", tourId);
-        const { data: dateRows, error: dateErr } = await q;
-        if (dateErr) throw dateErr;
+        // Samme regel som korreksjonsmodus ellers: 60 dager bakover,
+        // produksjonsscope og ingen returer. Paginert for å få med alt.
+        const dateRows = await fetchAllRows<{ delivery_date: string }>((from, to) => {
+          let q = supabase
+            .from("orders")
+            .select("delivery_date")
+            .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
+            .gte("delivery_date", correctionFromDate(date))
+            .lte("delivery_date", date)
+            .eq("is_return", false)
+            .in("status", PRODUCTION_SCOPE_STATUSES as unknown as string[])
+            .order("delivery_date", { ascending: true })
+            .range(from, to);
+          if (tourId === NULL_TOUR_KEY) q = q.is("delivery_tour_id", null);
+          else if (tourId !== "all") q = q.eq("delivery_tour_id", tourId);
+          return q as unknown as PromiseLike<{
+            data: Array<{ delivery_date: string }> | null;
+            error: { message: string } | null;
+          }>;
+        });
+
         const uniqueDates = Array.from(
           new Set(((dateRows ?? []) as Array<{ delivery_date: string }>).map((r) => r.delivery_date)),
         ).sort();
