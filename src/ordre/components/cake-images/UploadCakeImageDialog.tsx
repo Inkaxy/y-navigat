@@ -31,6 +31,10 @@ import {
 } from "@/ordre/components/cake-images/OrderSearchSelect";
 import { useCakeFormats, defaultFormat } from "@/ordre/hooks/useCakeFormats";
 import {
+  DEFAULT_ORDRE_DESK_SETTINGS,
+  useOrdreDeskSettings,
+} from "@/ordre/hooks/useOrdreDeskSettings";
+import {
   computeEffectiveDpi,
   formatDims,
   formatSizeLabel,
@@ -66,6 +70,8 @@ export function UploadCakeImageDialog({
   const [formatId, setFormatId] = useState<string>("");
 
   const { data: formats = [] } = useCakeFormats();
+  const { data: desk } = useOrdreDeskSettings();
+  const maxAttachmentMb = desk?.maxAttachmentMb ?? DEFAULT_ORDRE_DESK_SETTINGS.maxAttachmentMb;
   useEffect(() => {
     if (!formatId && formats.length > 0) {
       setFormatId(defaultFormat(formats)?.id ?? "");
@@ -87,13 +93,19 @@ export function UploadCakeImageDialog({
   };
 
   const pickFiles = async (files: File[]) => {
+    const maxBytes = maxAttachmentMb * 1024 * 1024;
     const images = files.filter((f) => f.type.startsWith("image/"));
     if (images.length < files.length) {
       toast.warning("Filer som ikke er bilder ble hoppet over");
     }
-    setItems(images.map((file) => ({ file, analysis: null })));
+    const tooBig = images.filter((f) => f.size > maxBytes);
+    if (tooBig.length > 0) {
+      toast.error(`Filer over ${maxAttachmentMb} MB ble hoppet over: ${tooBig.map((f) => f.name).join(", ")}`);
+    }
+    const accepted = images.filter((f) => f.size <= maxBytes);
+    setItems(accepted.map((file) => ({ file, analysis: null })));
     const analyzed = await Promise.all(
-      images.map(async (file) => ({
+      accepted.map(async (file) => ({
         file,
         analysis: await analyzeImageFile(file).catch(() => null),
       })),
