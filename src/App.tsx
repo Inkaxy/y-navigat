@@ -9,6 +9,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { ThemeProvider } from "@/providers/ThemeProvider";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { AppShell } from "@/components/layout/AppShell";
+import { UnsavedGuardProvider } from "@/providers/UnsavedGuardProvider";
 import { ErrorBoundary } from "@/components/errors/ErrorBoundary";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
@@ -308,6 +309,7 @@ const App = () => (
           <Toaster />
           <Sonner />
           <BrowserRouter>
+            <UnsavedGuardProvider>
             <AuthProvider>
             <Suspense fallback={<div className="p-8 text-sm text-muted-foreground">Laster …</div>}>
               <Routes>
@@ -538,6 +540,7 @@ const App = () => (
             </Routes>
             </Suspense>
             </AuthProvider>
+            </UnsavedGuardProvider>
           </BrowserRouter>
         </TooltipProvider>
       </ThemeProvider>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useGuardedNavigate } from "@/providers/UnsavedGuardProvider";
 import { Command } from "cmdk";
 import { Sun, Moon, Monitor, ExternalLink, Users, ShoppingCart, Package, Inbox } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -36,7 +36,7 @@ interface Props {
 const CURRENT_APP_SLUG = "nbhub";
 
 export function CommandPalette({ open, onOpenChange }: Props) {
-  const navigate = useNavigate();
+  const navigate = useGuardedNavigate();
   const { setMode } = useTheme();
   const { data: apps } = useAccessibleApps();
   const [query, setQuery] = useState("");
