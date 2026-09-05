@@ -16,7 +16,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
 import { tomorrow, todayISO, formatNOK } from "@/ordre/lib/format";
 import { type CustomerOption } from "@/ordre/hooks/useNBCustomers";
-import { fetchEffectivePrice, type ProductOption } from "@/ordre/hooks/useNBProducts";
+import {
+  fetchEffectivePrice,
+  fetchEffectivePricesBatch,
+  type EffectivePrice,
+  type ProductOption,
+} from "@/ordre/hooks/useNBProducts";
 import { CustomerCombobox } from "@/ordre/components/orders/CustomerCombobox";
 import { CustomerContextPanel } from "@/ordre/components/orders/CustomerContextPanel";
 import {
@@ -380,63 +385,53 @@ export default function NewOrder() {
     if (!customer) return;
     const cust = customer;
     const date = deliveryDate;
-    setLines((prev) => prev.map((l) => (l.product ? { ...l, _refetch: Date.now() } as LineDraft : l)));
-    // For hver linje med produkt: hent ny pris, og flett KUN prisfeltene inn
-    // med funksjonell oppdatering (brukerens mengde/rabatt/notat bevares).
+    // For hver linje med produkt: hent nye priser i ÉN batch, og flett KUN
+    // prisfeltene inn (brukerens mengde/rabatt/notat bevares).
     void (async () => {
       const snapshot = linesRef.current;
-      const failed: string[] = [];
-      const results = await Promise.all(
-        snapshot.map(async (l) => {
-          if (!l.product || isManualOverride(l.unit_price_source)) return null;
-          try {
-            const ep = await fetchEffectivePrice({
-              productId: l.product.id,
-              customerId: cust.id,
-              date,
-              caller: "new_order_form",
-            });
-            if (!ep) return null;
-            return {
-              uid: l.uid,
-              productId: l.product.id,
-              unit_price: String(ep.price ?? 0),
-              unit_price_source: ep.source,
-              unit_price_source_id: ep.special_price_id ?? ep.price_list_id ?? null,
-              effective_price: ep.price,
-            };
-          } catch (err) {
-            // Feil skjules ikke: operatøren må vite at prisen ikke ble oppdatert.
-            logAppError(err, { scope: "ordre:ny-ordre:reprising" });
-            failed.push(l.product.display_name);
-            return null;
-          }
-        }),
+      const repriceable = snapshot.filter(
+        (l) => l.product && !isManualOverride(l.unit_price_source),
       );
-      type PriceUpdate = NonNullable<(typeof results)[number]>;
-      const byUid = new Map<string, PriceUpdate>(
-        results.filter((r): r is PriceUpdate => r !== null).map((r) => [r.uid, r]),
+      if (repriceable.length === 0) return;
+      const productIds = Array.from(
+        new Set(repriceable.map((l) => l.product!.id)),
       );
-      if (failed.length > 0) {
+      let prices: Map<string, EffectivePrice>;
+      try {
+        prices = await fetchEffectivePricesBatch({
+          productIds,
+          customerId: cust.id,
+          date,
+          caller: "new_order_form",
+        });
+      } catch (err) {
+        // Feil skjules ikke: operatøren må vite at prisene ikke ble oppdatert.
+        logAppError(err, { scope: "ordre:ny-ordre:reprising" });
+        toast.error("Fant ikke nye priser. Kontroller prisene før du lagrer.");
+        return;
+      }
+      const missing = repriceable
+        .filter((l) => !prices.has(l.product!.id))
+        .map((l) => l.product!.display_name);
+      if (missing.length > 0) {
         toast.error(
-          failed.length === 1
-            ? `Fant ikke ny pris for ${failed[0]}. Kontroller prisen før du lagrer.`
-            : `Fant ikke ny pris for ${failed.length} varer. Kontroller prisene før du lagrer.`,
+          missing.length === 1
+            ? `Fant ikke ny pris for ${missing[0]}. Kontroller prisen før du lagrer.`
+            : `Fant ikke ny pris for ${missing.length} varer. Kontroller prisene før du lagrer.`,
         );
       }
-      if (byUid.size === 0) return;
       setLines((prev) =>
         prev.map((l) => {
-          const upd = byUid.get(l.uid);
-          // Ikke overskriv hvis brukeren har byttet produkt eller låst prisen i mellomtiden
-          if (!upd || !l.product || l.product.id !== upd.productId) return l;
-          if (isManualOverride(l.unit_price_source)) return l;
+          if (!l.product || isManualOverride(l.unit_price_source)) return l;
+          const ep = prices.get(l.product.id);
+          if (!ep) return l;
           return {
             ...l,
-            unit_price: upd.unit_price,
-            unit_price_source: upd.unit_price_source,
-            unit_price_source_id: upd.unit_price_source_id,
-            effective_price: upd.effective_price,
+            unit_price: String(ep.price ?? 0),
+            unit_price_source: ep.source,
+            unit_price_source_id: ep.special_price_id ?? ep.price_list_id ?? null,
+            effective_price: ep.price,
+            is_fallback: ep.is_fallback,
           };
         }),
       );
