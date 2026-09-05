@@ -557,6 +557,19 @@ export default function MatrixPage() {
 
   const dirtyCount = dirtyChanges.length;
 
+  /**
+   * Ulagret-vakt: hindrer at celleendringer forsvinner stille ved navigasjon,
+   * lukking av fanen eller bytte av kunde/periode.
+   */
+  const unsavedGuard = useUnsavedChangesGuard(
+    dirtyCount > 0 || addedProducts.length > 0,
+    () => {
+      setEdits({});
+      setAddedProducts([]);
+    },
+  );
+  const guardAction = unsavedGuard.requestAction;
+
   // Effektive rader for "enkel tabell"-visning: lagrede celler + ulagrede endringer + nye rader.
   const flatRows = useMemo(() => {
     if (!matrix) return [] as import("@/ordre/components/orders/matrix/FlatLinesView").FlatLineRow[];
