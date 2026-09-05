@@ -38,6 +38,8 @@ type FilterTab = "all" | RefundStatus;
 
 export default function RefundsQueue() {
   const { data: refunds = [], isLoading } = useRefunds();
+  const { data: desk } = useOrdreDeskSettings();
+  const approvalLimit = desk?.refundApprovalLimit ?? DEFAULT_ORDRE_DESK_SETTINGS.refundApprovalLimit;
   const { data: scope } = useMyOrdreScope();
   const approve = useApproveRefund();
   const markPaid = useMarkRefundPaid();
