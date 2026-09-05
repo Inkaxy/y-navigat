@@ -968,6 +968,80 @@ export default function MatrixPage() {
     [colMeta, colGhostSet],
   );
 
+  /** Kolonneavhengig celleinfo (pause + fargetone) — brukes av hver celle. */
+  const cellColInfo = useCallback(
+    (date: string, tourId: string): CellColInfo => {
+      const pause = isPaused(pauseMap, date, tourId);
+      const tone = colTone(date, tourId);
+      return {
+        paused: !!pause,
+        pauseReason: pause?.reason ?? null,
+        toneKind: tone.kind ?? null,
+        toneVar: tone.kind ? getKindMeta(tone.kind).tokenVar : null,
+      };
+    },
+    [pauseMap, colTone],
+  );
+
+  /** Stabil lagre-referanse så cellene ikke re-rendrer ved hver endring. */
+  const handleSaveRef = useRef<() => void | Promise<void>>(() => {});
+  const stableSave = useCallback(() => {
+    void handleSaveRef.current();
+  }, []);
+
+  /**
+   * «Kopier forrige uke»: fyller tomme celler i perioden med mengdene fra
+   * samme ukedag og tur uken før. Kun som ulagrede endringer.
+   */
+  const [copyPrevWeekBusy, setCopyPrevWeekBusy] = useState(false);
+  const copyPreviousWeek = useCallback(async () => {
+    if (!customerId || columns.length === 0) return;
+    setCopyPrevWeekBusy(true);
+    try {
+      const { data, error } = await supabase.rpc("get_customer_matrix_data", {
+        p_customer_id: customerId,
+        p_date_from: addDays(dateFrom, -7),
+        p_date_to: addDays(dateTo, -7),
+      });
+      if (error) throw error;
+      const rows = (data ?? []) as { section: string; payload: Record<string, unknown> }[];
+      const cells =
+        (rows.find((r) => r.section === "existing_cells")?.payload.items as
+          | MatrixCell[]
+          | undefined) ?? [];
+      const prev = aggregateExistingCells(cells).qty;
+
+      const next: Record<CellKey, string> = {};
+      let filled = 0;
+      for (const c of columns) {
+        if (isPausedCol(c.date, c.tour.id)) continue;
+        for (const p of allProducts) {
+          const key = ckey(c.date, c.tour.id, p.id);
+          if (key in edits) continue;
+          if (getBaseValue(key)) continue;
+          const qty = prev[ckey(addDays(c.date, -7), c.tour.id, p.id)] ?? 0;
+          if (qty > 0) {
+            next[key] = String(qty);
+            filled++;
+          }
+        }
+      }
+      if (filled === 0) {
+        toast.info("Ingenting å kopiere", {
+          description: "Fant ingen mengder fra forrige uke for de tomme cellene.",
+        });
+        return;
+      }
+      setEdits((p) => ({ ...p, ...next }));
+      toast.success(`Kopierte ${filled} celle${filled === 1 ? "" : "r"} fra forrige uke`, {
+        description: "Endringene er ikke lagret ennå.",
+      });
+    } catch (err) {
+      toast.error("Kunne ikke kopiere forrige uke", { description: (err as Error).message });
+    } finally {
+      setCopyPrevWeekBusy(false);
+    }
+  }, [customerId, columns, dateFrom, dateTo, isPausedCol, allProducts, edits, getBaseValue]);
 
 
   async function executeColumnCopy(source: { date: string; tour: MatrixTour }, input: CopyColumnInput) {
