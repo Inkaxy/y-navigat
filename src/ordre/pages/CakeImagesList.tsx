@@ -23,6 +23,8 @@ import {
 import { CakeImageCard } from "@/ordre/components/cake-images/CakeImageCard";
 import { UploadButton } from "@/ordre/components/cake-images/UploadButton";
 import { deleteCakeImage, markPrinted, updateCakeImage } from "@/ordre/lib/cakeImages";
+import { useCakePrintFlow } from "@/ordre/hooks/useCakePrintFlow";
+import { useCakePrinterSelection } from "@/ordre/hooks/useCakeCalibration";
 
 type Status = "for-utskrift" | "skrevet-ut";
 
@@ -35,6 +37,13 @@ export default function CakeImagesList() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const { printerLabel, scaleX, scaleY, scaleXPct } = useCakePrinterSelection();
+  const printFlow = useCakePrintFlow({
+    scale: scaleX,
+    scaleY,
+    printerLabel,
+    scaleAppliedPct: scaleXPct,
+  });
   const status = (searchParams.get("status") as Status) || "for-utskrift";
   const date = searchParams.get("date") || todayISO();
 
@@ -130,10 +139,11 @@ export default function CakeImagesList() {
     setSelected(new Set());
   };
 
+  // Utskriften bygges i samme fane, rett fra klikket — ingen popup å sperre.
   const printSelected = () => {
     const ids = Array.from(selected);
     if (ids.length === 0) return;
-    window.open(`/ordre/kakebilder/print?ids=${ids.join(",")}&auto=1`, "_blank");
+    void printFlow.printIds(ids);
   };
 
   const pdfSelected = () => {
@@ -155,10 +165,7 @@ export default function CakeImagesList() {
 
   const printAllReady = () => {
     if (readyIds.length === 0) return;
-    window.open(
-      `/ordre/kakebilder/print?ids=${readyIds.join(",")}&auto=1`,
-      "_blank",
-    );
+    void printFlow.printIds(readyIds);
   };
 
   const markFerdig = async () => {
@@ -191,6 +198,7 @@ export default function CakeImagesList() {
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-6 space-y-4">
+      {printFlow.dialog}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Button asChild variant="ghost" size="sm">
           <Link to={`/ordre/kakebilder?date=${date}`}>
