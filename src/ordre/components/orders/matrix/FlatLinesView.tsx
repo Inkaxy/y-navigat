@@ -116,16 +116,26 @@ export function FlatLinesView({
               <h3 className="text-xl font-semibold tracking-tight">
                 <span className="font-bold">{weekday}</span>{" "}
                 <span className="text-foreground/80">{date}</span>
-                {t && (
+                {t ? (
                   <>
                     {" "}
                     <span className="text-foreground/60">- tur</span>{" "}
                     <span className="font-bold">{t.tour_number}</span>
                   </>
+                ) : (
+                  <>
+                    {" "}
+                    <span className="text-foreground/60">- uten tur</span>
+                  </>
                 )}
               </h3>
               {t?.display_name && (
                 <p className="mt-0.5 text-xs text-muted-foreground">{t.display_name}</p>
+              )}
+              {!t && (
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Ordrelinjer uten tur kan ikke endres her — flytt dem til en tur først.
+                </p>
               )}
             </header>
 
