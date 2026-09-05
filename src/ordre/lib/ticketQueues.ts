@@ -10,6 +10,7 @@ import type { TicketTeam } from "@/ordre/lib/teams";
 export type PrimaryQueue = "mine" | "unassigned" | "now" | "waiting";
 
 export type SecondaryQueue =
+  | "new"
   | "all_open"
   | "resolved"
   | "closed"
@@ -77,6 +78,8 @@ export function matchesQueue(
       return isMustHandleNow(t);
     case "waiting":
       return isOpenTicket(t) && isWaiting(t);
+    case "new":
+      return t.status === "new";
     case "all_open":
       return isOpenTicket(t);
     case "resolved":
@@ -113,6 +116,7 @@ export function isArchiveQueue(queue: QueueKey): boolean {
 }
 
 const KNOWN_FIXED: QueueKey[] = [
+  "new",
   "mine",
   "unassigned",
   "now",
@@ -135,7 +139,6 @@ export function parseQueueParam(
   if ((KNOWN_FIXED as string[]).includes(raw)) return raw as QueueKey;
   // Bakoverkompatible aliaser fra forrige innboks.
   if (raw === "all") return "all_open";
-  if (raw === "new") return "unassigned";
   if (raw === "awaiting_customer") return "waiting";
   if (raw.startsWith("intent:") && opts.intents.includes(raw.slice("intent:".length))) {
     return raw as QueueKey;

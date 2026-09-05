@@ -302,6 +302,7 @@ export default function TicketsInbox() {
   const counts = useMemo(() => {
     const keys: QueueKey[] = [
       ...PRIMARY_QUEUES.map((q) => q.key),
+      "new",
       "all_open",
       "resolved",
       "closed",
@@ -443,6 +444,12 @@ export default function TicketsInbox() {
           ))}
 
           <SectionLabel>Alle saker</SectionLabel>
+          <QueueButton
+            active={queue === "new"}
+            onClick={() => setQueue("new")}
+            label="Nye"
+            count={counts.new ?? 0}
+          />
           <QueueButton
             active={queue === "all_open"}
             onClick={() => setQueue("all_open")}
