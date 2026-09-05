@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { showError } from "@/lib/userError";
 import { fmtNum } from "@/varer/lib/breadscale";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
+import { UnsavedChangesDialog } from "@/varer/components/products/detail/UnsavedChangesDialog";
 import { useUserDisplayName, type RecipeLabelCalculated } from "@/varer/hooks/useRecipeLabel";
 import {
   NUTRITION_KEYS,
@@ -101,7 +102,7 @@ export function DeclarationNutritionSection({
     form.mayContain !== saved.mayContain ||
     NUTRITION_KEYS.some((k) => (form.nutrition[k] ?? "") !== (saved.nutrition[k] ?? ""));
   dirtyRef.current = dirty;
-  useUnsavedChangesGuard(dirty && canWrite);
+  const unsavedGuard = useUnsavedChangesGuard(dirty && canWrite);
 
   const setField = <K extends "ingredientText" | "contains" | "mayContain">(key: K, value: string) =>
     setForm((f) => ({ ...f, [key]: value }));
@@ -453,6 +454,11 @@ export function DeclarationNutritionSection({
           </div>
         )}
       </CardContent>
+      <UnsavedChangesDialog
+        open={unsavedGuard.isBlocked}
+        onConfirm={unsavedGuard.discard}
+        onCancel={unsavedGuard.stay}
+      />
     </Card>
   );
 }
