@@ -91,7 +91,8 @@ import {
 import { useCakePrinterSelection } from "@/ordre/hooks/useCakeCalibration";
 import { useCakePrintFlow } from "@/ordre/hooks/useCakePrintFlow";
 import { fetchCakeLineDetails } from "@/ordre/lib/cakeImages";
-import { resolveLabelNumber } from "@/ordre/lib/labelNumber";
+import { evaluatePrintGate } from "@/ordre/lib/cakePrintGate";
+import { withResolvedLabelNumbers } from "@/ordre/lib/labelNumber";
 import { CakePrintHistory } from "@/ordre/components/cake-images/CakePrintHistory";
 import { showError } from "@/lib/userError";
 import { fitZoom, pxPerMm } from "@/ordre/lib/cakeEditorMath";
@@ -1072,7 +1073,10 @@ export default function CakeImageEditor() {
       widthMm: dims.widthMm,
       heightMm: dims.heightMm,
       isRound: dims.isRound,
-      labelNumber: image ? resolveLabelNumber(image) : null,
+      labelNumber: image
+        ? ((await withResolvedLabelNumbers([image]))[0]?.resolved_label_number ?? null)
+        : null,
+
       sheet: format?.sheet ?? "A4",
       bleedMm: format?.bleed_mm ?? 0,
       productName,
@@ -1084,8 +1088,34 @@ export default function CakeImageEditor() {
     };
   };
 
+  /**
+   * Samme sperre som listen bruker, men med editorens gjeldende tilstand:
+   * valgt format, bekreftet lav oppløsning og avklarte rettigheter. Kjøres
+   * FØR lagring, slik at et bilde uten format aldri kan bli et «MANGLER
+   * FORMAT»-ark som bekreftes som skrevet ut.
+   */
+  const checkPrintGate = (): boolean => {
+    if (!image) return false;
+    const gate = evaluatePrintGate({
+      format_id: format?.id ?? null,
+      width_mm: dims.widthMm ?? null,
+      height_mm: dims.heightMm ?? null,
+      quality_flag: needsQualityAck ? "lav" : "god",
+      quality_ack_at: needsQualityAck ? null : new Date().toISOString(),
+      rights_cleared: rightsAnswered,
+      rights_note: rightsNote,
+    });
+    if (!gate.ok) {
+      toast.error("Kan ikke skrives ut ennå", { description: gate.reason });
+      return false;
+    }
+    return true;
+  };
+
   const printNow = async () => {
     if (!image) return;
+    if (!checkPrintGate()) return;
+
     try {
       const item = await buildItem(renderDataUrl());
       await printFlow.printItems([item], { [image.id]: image.status });
@@ -1684,10 +1714,13 @@ export default function CakeImageEditor() {
             <Button
               variant="brand"
               className="h-10"
-              disabled={printFlow.busy || saving}
+              disabled={printFlow.busy || saving || !format}
+              title={!format ? "Velg format før utskrift" : undefined}
               onClick={async () => {
+                if (!checkPrintGate()) return;
                 if (await doSave(false)) void printNow();
               }}
+
             >
               {printFlow.busy ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

@@ -75,15 +75,21 @@ export function CakeProductionOverview({ date }: { date: string }) {
       const { data, error } = await supabase
         .from("label_units")
         .select(
-          "id, number, order_id, order_line_id, product_id, product:products(display_name, label_mode, cake_role, is_cake_component), order:orders(order_number, delivery_tour_id, final_customer_name, delivery_tours(name))",
+          "id, number, order_id, order_line_id, product_id, product:products!inner(display_name, label_mode, cake_role, is_cake_component), order:orders(order_number, delivery_tour_id, final_customer_name, delivery_tours(name))",
         )
         .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
         .eq("seq_date", date)
         .neq("status", "cancelled")
+        // Bare kakeprodukter — filtreres i spørringen, ellers spiser andre
+        // etikett-enheter opp grensen på 500.
+        .or("label_mode.not.in.(none),cake_role.eq.base,is_cake_component.is.true", {
+          referencedTable: "product",
+        })
         .order("number", { ascending: true })
         .limit(500);
       if (error) throw error;
       return (data ?? []) as unknown as UnitRow[];
+
     },
   });
 
@@ -130,8 +136,11 @@ export function CakeProductionOverview({ date }: { date: string }) {
     queryFn: async (): Promise<Record<string, string>> => {
       const { data, error } = await supabase
         .from("product_label_departments")
-        .select("product_id, department_id")
-        .in("product_id", productIds);
+        .select("product_id, department_id, created_at")
+        .in("product_id", productIds)
+        // Deterministisk rekkefølge: eldste kobling først, så alfabetisk.
+        .order("created_at", { ascending: true })
+        .order("department_id", { ascending: true });
       if (error) throw error;
       const out: Record<string, string> = {};
       for (const row of (data ?? []) as Array<{
@@ -236,7 +245,7 @@ export function CakeProductionOverview({ date }: { date: string }) {
         <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-900">
           <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <span>
-            Vi viser de 500 første kakene denne dagen. Velg en tur for å se resten.
+            Bare de 500 første kakene denne dagen vises.
           </span>
         </div>
       )}

@@ -98,6 +98,25 @@ export function applyScale(mm: number | null | undefined, scale = 1) {
   return Math.round(mm * scale * 100) / 100;
 }
 
+/**
+ * Kalibreringen korrigerer skriverens akser, ikke bildets. Når pakkeren legger
+ * bildet på tvers, bytter bildets bredde og høyde plass på arket — da må
+ * X-korreksjonen følge arkets bredde og Y-korreksjonen arkets høyde.
+ */
+export function scaledPlacementSize(
+  item: { widthMm?: number | null; heightMm?: number | null },
+  scale: number,
+  scaleY: number,
+  rotated: boolean,
+): { widthMm: number; heightMm: number } {
+  const w = item.widthMm ?? 0;
+  const h = item.heightMm ?? 0;
+  return rotated
+    ? { widthMm: (applyScale(h, scale) ?? 0), heightMm: (applyScale(w, scaleY) ?? 0) }
+    : { widthMm: (applyScale(w, scale) ?? 0), heightMm: (applyScale(h, scaleY) ?? 0) };
+}
+
+
 async function urlToDataUrl(url: string): Promise<string> {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -379,14 +398,18 @@ export async function buildCakePdf(
   const packItems: PackItem[] = printable.map((item, idx) => {
     const id = item.image?.id ?? `item-${idx}`;
     byId.set(id, item);
+    // Pakkes med den største korreksjonen på begge akser, slik at bildet får
+    // plass uansett om pakkeren snur det. Selve tegningen bruker aksene under.
+    const packScale = Math.max(scale, scaleY);
     return {
       id,
-      widthMm: applyScale(item.widthMm, scale) ?? 0,
-      heightMm: (applyScale(item.heightMm, scaleY) ?? 0) + CAPTION_MM,
+      widthMm: applyScale(item.widthMm, packScale) ?? 0,
+      heightMm: (applyScale(item.heightMm, packScale) ?? 0) + CAPTION_MM,
       bleedMm: item.bleedMm ?? 0,
       isRound: item.isRound,
       rotatable: !item.isRound,
     };
+
   });
 
   const packed = opts.nest === false
@@ -437,10 +460,12 @@ export async function buildCakePdf(
       const item = byId.get(place.id);
       if (!item) continue;
       const geo = placementGeometry(place);
-      const wMm = geo.widthMm;
-      const hMm = geo.heightMm;
+      const paper = scaledPlacementSize(item, scale, scaleY, geo.rotated);
+      const wMm = paper.widthMm || geo.widthMm;
+      const hMm = paper.heightMm || geo.heightMm;
       const x = geo.xMm;
       const y = geo.yMm;
+
 
       if (item.url) {
         const src = item.url.startsWith("data:")
@@ -493,10 +518,16 @@ export async function buildCakePdf(
         }
       }
       if (item.labelNumber) {
-        pdf.setFontSize(12);
-        if (geo.rotated) pdf.text(`#${item.labelNumber}`, capX + 4, capY + QR_MM + 4);
-        else pdf.text(`#${item.labelNumber}`, textX, capY + 4);
+        if (geo.rotated) {
+          // Stripen er bare 10 mm bred — nummeret settes på høykant i 9 pt.
+          pdf.setFontSize(9);
+          pdf.text(`#${item.labelNumber}`, capX + 3.5, capY + QR_MM + 4, { angle: 90 });
+        } else {
+          pdf.setFontSize(12);
+          pdf.text(`#${item.labelNumber}`, textX, capY + 4);
+        }
       }
+
 
       pdf.setFontSize(7);
       const line1 = [item.customerName, item.orderRef ? `Ordre ${item.orderRef}` : null]
