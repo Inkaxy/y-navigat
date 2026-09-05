@@ -2,12 +2,36 @@ import { describe, expect, it } from "vitest";
 import {
   buildIlikeOr,
   isNumericTerm,
+  parseTicketPrefix,
   parseTicketRef,
+  ticketPrefixRange,
   entityRoute,
   groupEntityHits,
   sanitizeSearchTerm,
   type EntityHit,
 } from "@/lib/entitySearch";
+
+describe("parseTicketPrefix", () => {
+  it("godtar korte hex-referanser", () => {
+    expect(parseTicketPrefix("T-1a2b")).toBe("1a2b");
+    expect(parseTicketPrefix("#ab")).toBe("ab");
+  });
+
+  it("returnerer null for full uuid og ugyldig tekst", () => {
+    expect(parseTicketPrefix("3f1a2b3c-4d5e-6f70-8192-a3b4c5d6e7f8")).toBeNull();
+    expect(parseTicketPrefix("kringle")).toBeNull();
+    expect(parseTicketPrefix("z1")).toBeNull();
+  });
+});
+
+describe("ticketPrefixRange", () => {
+  it("bygger uuid-intervall som tilsvarer «begynner med»", () => {
+    expect(ticketPrefixRange("1a2b")).toEqual({
+      lo: "1a2b0000-0000-0000-0000-000000000000",
+      hi: "1a2bffff-ffff-ffff-ffff-ffffffffffff",
+    });
+  });
+});
 
 describe("sanitizeSearchTerm", () => {
   it("fjerner tegn som bryter PostgREST-filtersyntaksen", () => {

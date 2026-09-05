@@ -333,8 +333,8 @@ export function RecurringScheduleDialog({
           </DialogTitle>
           <DialogDescription>
             En fastordre er en ukentlig mal som beskriver hva en kunde normalt mottar.
-            Malen blir automatisk til faktiske ordre i matrisen og på pakksedlene for
-            hver leveringsdag.
+            Fastordre materialiseres ved hovedkjøring av pakksedler og ved lagring i
+            leveringskalenderen.
           </DialogDescription>
         </DialogHeader>
 

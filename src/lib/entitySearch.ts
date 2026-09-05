@@ -45,6 +45,19 @@ export function parseTicketPrefix(raw: string): string | null {
   return /^[0-9a-f]{2,8}$/i.test(t) ? t.toLowerCase() : null;
 }
 
+/**
+ * Gjør et hex-prefiks om til et uuid-intervall. Postgres har ingen `ilike` for
+ * uuid, men uuid sammenlignes bytevis — så «begynner med» kan uttrykkes som
+ * `id >= lo and id <= hi`.
+ */
+export function ticketPrefixRange(prefix: string): { lo: string; hi: string } {
+  const p = prefix.toLowerCase();
+  return {
+    lo: `${p.padEnd(8, "0")}-0000-0000-0000-000000000000`,
+    hi: `${p.padEnd(8, "f")}-ffff-ffff-ffff-ffffffffffff`,
+  };
+}
+
 /** Er søket bare siffer? Da er det trolig et ordre-, kunde- eller varenummer. */
 export function isNumericTerm(raw: string): boolean {
   return /^\d+$/.test(raw.trim());
