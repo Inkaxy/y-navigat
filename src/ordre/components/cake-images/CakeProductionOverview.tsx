@@ -232,16 +232,36 @@ export function CakeProductionOverview({ date }: { date: string }) {
         </Button>
       </div>
 
+      {truncated && (
+        <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-900">
+          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span>
+            Vi viser de 500 første kakene denne dagen. Velg en tur for å se resten.
+          </span>
+        </div>
+      )}
+
       <QueryState
-        isLoading={units.isLoading || images.isLoading || departments.isLoading}
-        isError={units.isError || images.isError || departments.isError}
-        error={units.error ?? images.error ?? departments.error}
+        isLoading={
+          units.isLoading ||
+          images.isLoading ||
+          departments.isLoading ||
+          productDepartments.isLoading
+        }
+        isError={
+          units.isError || images.isError || departments.isError || productDepartments.isError
+        }
+        error={
+          units.error ?? images.error ?? departments.error ?? productDepartments.error
+        }
         scope="ordre:kakebilder:produksjon"
         onRetry={() => {
           void units.refetch();
           void images.refetch();
           void departments.refetch();
+          void productDepartments.refetch();
         }}
+
         skeletonRows={3}
         isEmpty={groups.length === 0}
         emptyTitle="Ingen kaker registrert på denne dagen."
