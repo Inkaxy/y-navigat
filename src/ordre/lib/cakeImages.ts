@@ -350,7 +350,7 @@ export async function attachTicketCakeImagesToOrder(input: {
   order_id: string;
   order_number?: string | null;
   delivery_date: string;
-}): Promise<number> {
+}): Promise<{ updated: number; skipped: number }> {
   const { data, error } = await supabase
     .from("cake_images")
     .select("id")
@@ -393,13 +393,17 @@ export async function attachTicketCakeImagesToOrder(input: {
         );
     }
   }
-  if (cakeLine?.has_label_product && availableUnits.length < rows.length) {
-    throw new Error("Alle etiketter på linjen har allerede bilde");
-  }
+  // Færre ledige etiketter enn bilder: koble dem som får enhet, og rapporter resten.
+  const needsUnit = !!cakeLine?.has_label_product;
+  let skipped = 0;
 
   let updated = 0;
   for (const [index, row] of rows.entries()) {
     const unit = availableUnits[index] ?? null;
+    if (needsUnit && !unit) {
+      skipped++;
+      continue;
+    }
     const { error: updateError } = await supabase
       .from("cake_images")
       .update({
@@ -415,7 +419,7 @@ export async function attachTicketCakeImagesToOrder(input: {
     if (updateError) throw updateError;
     updated++;
   }
-  return updated;
+  return { updated, skipped };
 }
 
 

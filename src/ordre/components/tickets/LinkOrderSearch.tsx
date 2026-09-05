@@ -114,12 +114,19 @@ export default function LinkOrderSearch({ ticketId, onLinked }: Props) {
           .maybeSingle();
         const deliveryDate = (ord as { delivery_date: string | null } | null)?.delivery_date;
         if (deliveryDate) {
-          await attachTicketCakeImagesToOrder({
+          const res = await attachTicketCakeImagesToOrder({
             ticket_id: ticketId,
             order_id: o.id,
             order_number: o.order_number,
             delivery_date: deliveryDate,
           });
+          if (res.skipped > 0) {
+            toast.warning(
+              res.skipped === 1
+                ? "Ett kakebilde ble ikke koblet: alle etiketter på linjen har allerede bilde"
+                : `${res.skipped} kakebilder ble ikke koblet: alle etiketter på linjen har allerede bilde`,
+            );
+          }
         }
       } catch (cakeErr) {
         console.warn("[cake_images] Kunne ikke koble kakebilder til ordren", cakeErr);
