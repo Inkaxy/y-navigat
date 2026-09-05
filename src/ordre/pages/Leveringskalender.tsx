@@ -496,6 +496,26 @@ export default function MatrixPage() {
     void handleSaveRef.current();
   }, []);
 
+  /** Ctrl/Cmd+S lagrer matrisen fra hele siden, ikke bare fra en celle. */
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== "s") return;
+      if (e.defaultPrevented) return;
+      const el = e.target as HTMLElement | null;
+      const inDialog = !!el?.closest?.("[role='dialog']");
+      const inOtherInput =
+        !!el &&
+        (el.tagName === "TEXTAREA" ||
+          el.isContentEditable ||
+          (el.tagName === "INPUT" && !el.hasAttribute("data-cell")));
+      if (inDialog || inOtherInput) return;
+      e.preventDefault();
+      stableSave();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [stableSave]);
+
   const setCellValue = useCallback((key: CellKey, value: string) => {
     const cleaned = value.replace(",", ".");
     if (cleaned !== "" && !/^\d*\.?\d*$/.test(cleaned)) return;
