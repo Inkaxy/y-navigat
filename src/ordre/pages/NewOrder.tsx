@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 import { UnsavedChangesDialog } from "@/components/common/UnsavedChangesDialog";
-import { ArrowLeft, Loader2, Plus, Trash2, AlertTriangle, Check, Search, Copy } from "lucide-react";
+import { ArrowLeft, Loader2, Plus, Trash2, AlertTriangle, Copy } from "lucide-react";
 import { AppBanner } from "@/ordre/components/shell/AppBanner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,15 +11,30 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
 import { tomorrow, todayISO, formatNOK } from "@/ordre/lib/format";
-import { useNBCustomers, type CustomerOption } from "@/ordre/hooks/useNBCustomers";
-import { useNBProducts, fetchEffectivePrice, categorizePriceSource, type ProductOption } from "@/ordre/hooks/useNBProducts";
-import { useDebouncedValue } from "@/ordre/hooks/useDebouncedValue";
+import { type CustomerOption } from "@/ordre/hooks/useNBCustomers";
+import { fetchEffectivePrice, type ProductOption } from "@/ordre/hooks/useNBProducts";
+import { CustomerCombobox } from "@/ordre/components/orders/CustomerCombobox";
+import { ProductSearchInput } from "@/ordre/components/orders/ProductSearchInput";
+import { PriceSourceBadge } from "@/ordre/components/orders/PriceSourceBadge";
+import { ZeroPriceConfirmDialog } from "@/ordre/components/orders/ZeroPriceConfirmDialog";
+import { PriceOverrideReasonDialog } from "@/ordre/components/orders/PriceOverrideReasonDialog";
+import {
+  calcLineTotals,
+  countRiskyPriceLines,
+  focusOrderLineField,
+  isManualOverride,
+  isPriceRisky,
+  MANUAL_PRICE_SOURCE,
+  PRICE_OVERRIDE_NOTE_PREFIX,
+  shouldRepriceCopiedLine,
+  withPriceOverrideNote,
+} from "@/ordre/lib/orderLines";
 import { logAudit } from "@/ordre/lib/audit";
+import { persistAppError } from "@/lib/errorLog";
 import { logTicketEvent } from "@/ordre/lib/ticketEvents";
 import { TourPicker } from "@/ordre/components/orders/TourPicker";
 import { CopyFromPreviousOrderDialog } from "@/ordre/components/orders/CopyFromPreviousOrderDialog";
@@ -63,174 +78,6 @@ function newLine(): LineDraft {
   };
 }
 
-function calcLineTotals(line: LineDraft) {
-  const qty = Number(line.quantity) || 0;
-  const price = Number(line.unit_price) || 0;
-  const disc = Number(line.discount_percent) || 0;
-  const subtotal = qty * price * (1 - disc / 100);
-  const vat = subtotal * (Number(line.vat_rate) / 100);
-  return { subtotal, vat, total: subtotal + vat };
-}
-
-function CustomerCombobox({
-  value,
-  onSelect,
-}: {
-  value: CustomerOption | null;
-  onSelect: (c: CustomerOption | null) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [q, setQ] = useState("");
-  const debouncedQ = useDebouncedValue(q, 250);
-  const { data: customers, isLoading } = useNBCustomers(debouncedQ);
-
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button variant="outline" role="combobox" className="w-full justify-between">
-          {value ? `${value.customer_number} — ${value.display_name}` : "Velg kunde..."}
-          <Search className="ml-2 h-4 w-4 opacity-60" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent align="start" className="w-[420px] p-0">
-        <div className="border-b border-border p-2">
-          <Input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Søk navn, kundenr, orgnr..."
-            autoFocus
-          />
-        </div>
-        <div className="max-h-[320px] overflow-y-auto">
-          {isLoading ? (
-            <div className="p-4 text-center text-sm text-muted-foreground">
-              <Loader2 className="mx-auto h-4 w-4 animate-spin" />
-            </div>
-          ) : !customers || customers.length === 0 ? (
-            <div className="p-4 text-center text-sm text-muted-foreground">Ingen treff</div>
-          ) : (
-            customers.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                className="flex w-full items-start gap-2 border-b border-border px-3 py-2 text-left text-sm hover:bg-accent"
-                onClick={() => {
-                  onSelect(c);
-                  setOpen(false);
-                }}
-              >
-                <div className="flex-1">
-                  <div className="font-medium">{c.display_name}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {c.customer_number}
-                    {c.organization_number ? ` · ${c.organization_number}` : ""}
-                  </div>
-                </div>
-                {value?.id === c.id && <Check className="h-4 w-4 text-primary" />}
-              </button>
-            ))
-          )}
-        </div>
-      </PopoverContent>
-    </Popover>
-  );
-}
-
-function ProductCombobox({
-  onSelect,
-  autoFocus,
-  priceListId,
-}: {
-  onSelect: (p: ProductOption) => void;
-  autoFocus?: boolean;
-  priceListId: string | null;
-}) {
-  const [open, setOpen] = useState(false);
-  const [q, setQ] = useState("");
-  const debouncedQ = useDebouncedValue(q, 250);
-  const { data: products, isLoading } = useNBProducts(debouncedQ, priceListId);
-
-  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    // Shortcut 6.4: Enter i produktsøk velger første treff
-    if (e.key === "Enter" && products && products.length > 0) {
-      e.preventDefault();
-      onSelect(products[0]);
-      setOpen(false);
-    }
-  }
-
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button variant="outline" size="sm" className="h-8 w-full justify-start text-left" autoFocus={autoFocus}>
-          <Search className="mr-1.5 h-3.5 w-3.5" />
-          <span className="truncate text-xs text-muted-foreground">Velg produkt...</span>
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent align="start" className="w-[420px] p-0">
-        <div className="border-b border-border p-2">
-          <Input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Søk produktnavn eller kode... (Enter velger første treff)"
-            autoFocus
-          />
-        </div>
-        <div className="max-h-[320px] overflow-y-auto">
-          {isLoading ? (
-            <div className="p-4 text-center text-sm text-muted-foreground">
-              <Loader2 className="mx-auto h-4 w-4 animate-spin" />
-            </div>
-          ) : !priceListId ? (
-            <div className="p-4 text-center text-sm text-muted-foreground">
-              Kunden har ingen prisliste. Sett standard prisliste på kunden for å kunne velge varer.
-            </div>
-          ) : !products || products.length === 0 ? (
-            <div className="p-4 text-center text-sm text-muted-foreground">Ingen varer i kundens prisliste{q ? " matcher søket" : ""}.</div>
-          ) : (
-            products.map((p, idx) => (
-              <button
-                key={p.id}
-                type="button"
-                className={`flex w-full items-start gap-2 border-b border-border px-3 py-2 text-left text-sm hover:bg-accent ${idx === 0 ? "bg-accent/30" : ""}`}
-                onClick={() => {
-                  onSelect(p);
-                  setOpen(false);
-                }}
-              >
-                <div className="flex-1">
-                  <div className="font-medium">{p.display_name}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {p.code} · {p.unit_of_sale} · MVA {p.mva_rate}%
-                  </div>
-                </div>
-                {idx === 0 && <span className="text-[10px] uppercase text-muted-foreground">↵</span>}
-              </button>
-            ))
-          )}
-        </div>
-      </PopoverContent>
-    </Popover>
-  );
-}
-
-function PriceSourceBadge({ source }: { source: string | null }) {
-  const cat = categorizePriceSource(source);
-  const styles: Record<string, string> = {
-    standard: "bg-muted text-muted-foreground",
-    special_general: "bg-warning/15 text-warning",
-    special_customer: "bg-primary/15 text-primary",
-    manual: "bg-destructive/15 text-destructive",
-    none: "bg-muted text-muted-foreground",
-  };
-  return (
-    <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ${styles[cat.category]}`}>
-      {cat.label}
-    </span>
-  );
-}
-
 export default function NewOrder() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -270,9 +117,16 @@ export default function NewOrder() {
         .select("subject, sender_email, sender_name, body_text, body_preview, ai_suggestion")
         .eq("id", ticketId).maybeSingle();
       if (cancelled || !t) return;
-      setTicketAi(normalizeAiSuggestion((t as any).ai_suggestion));
-      setTicketBodyText(((t as any).body_text ?? (t as any).body_preview ?? null) as string | null);
-      const ai = (t as any).ai_suggestion as null | {
+      type TicketRow = {
+        ai_suggestion: unknown;
+        body_text: string | null;
+        body_preview: string | null;
+        sender_name: string | null;
+      };
+      const ticketRow = t as unknown as TicketRow;
+      setTicketAi(normalizeAiSuggestion(ticketRow.ai_suggestion));
+      setTicketBodyText(ticketRow.body_text ?? ticketRow.body_preview ?? null);
+      const ai = ticketRow.ai_suggestion as null | {
         customer_match?: { customer_id: string | null; customer_name?: string | null } | null;
         order_fields?: Record<string, string | null | undefined>;
         products?: Array<{
@@ -285,7 +139,7 @@ export default function NewOrder() {
           decoration?: string | null;
         }>;
       };
-      const senderName = (t as any).sender_name as string | null | undefined;
+      const senderName = ticketRow.sender_name;
 
       // Velg kunde: 1) AI-match, 2) sender_email-ilike
       let pickedCustomer: CustomerOption | null = null;
@@ -387,7 +241,12 @@ export default function NewOrder() {
             .select("id, display_number, code, display_name, unit_of_sale, mva_rate, status, is_for_sale, is_divisible, legal_entity_id")
             .in("id", ids);
           if (cancelled || !prods) return;
-          const byId = new Map(prods.map((p: any) => [p.id, p]));
+          const byId = new Map(
+            (prods as unknown as Array<ProductOption & { legal_entity_id: string }>).map((p) => [
+              p.id,
+              p,
+            ]),
+          );
           const newLines: LineDraft[] = matched
             .map((m): LineDraft | null => {
               const p = byId.get(m.product_id!) as ProductOption | undefined;
@@ -478,6 +337,11 @@ export default function NewOrder() {
     productIds: productIdsForCheck,
   });
   const [overrideOpen, setOverrideOpen] = useState(false);
+  /** Linjen som venter på begrunnelse for manuell prisoverstyring. */
+  const [overrideReasonUid, setOverrideReasonUid] = useState<string | null>(null);
+  /** 0-pris må bekreftes eksplisitt før ordren kan opprettes. */
+  const [zeroPriceOpen, setZeroPriceOpen] = useState(false);
+  const [zeroPriceConfirmed, setZeroPriceConfirmed] = useState(false);
   const [pendingOverrideReason, setPendingOverrideReason] = useState<string | null>(null);
 
   // Når kunde endres: pre-fyll adresse + håndter kunde-referanse
@@ -513,9 +377,10 @@ export default function NewOrder() {
     // med funksjonell oppdatering (brukerens mengde/rabatt/notat bevares).
     void (async () => {
       const snapshot = linesRef.current;
+      const failed: string[] = [];
       const results = await Promise.all(
         snapshot.map(async (l) => {
-          if (!l.product || l.unit_price_source === "manual_override") return null;
+          if (!l.product || isManualOverride(l.unit_price_source)) return null;
           try {
             const ep = await fetchEffectivePrice({
               productId: l.product.id,
@@ -532,7 +397,10 @@ export default function NewOrder() {
               unit_price_source_id: ep.special_price_id ?? ep.price_list_id ?? null,
               effective_price: ep.price,
             };
-          } catch {
+          } catch (err) {
+            // Feil skjules ikke: operatøren må vite at prisen ikke ble oppdatert.
+            persistAppError(err, { scope: "ordre:ny-ordre:reprising" });
+            failed.push(l.product.display_name);
             return null;
           }
         }),
@@ -541,13 +409,20 @@ export default function NewOrder() {
       const byUid = new Map<string, PriceUpdate>(
         results.filter((r): r is PriceUpdate => r !== null).map((r) => [r.uid, r]),
       );
+      if (failed.length > 0) {
+        toast.error(
+          failed.length === 1
+            ? `Fant ikke ny pris for ${failed[0]}. Kontroller prisen før du lagrer.`
+            : `Fant ikke ny pris for ${failed.length} varer. Kontroller prisene før du lagrer.`,
+        );
+      }
       if (byUid.size === 0) return;
       setLines((prev) =>
         prev.map((l) => {
           const upd = byUid.get(l.uid);
           // Ikke overskriv hvis brukeren har byttet produkt eller låst prisen i mellomtiden
           if (!upd || !l.product || l.product.id !== upd.productId) return l;
-          if (l.unit_price_source === "manual_override") return l;
+          if (isManualOverride(l.unit_price_source)) return l;
           return {
             ...l,
             unit_price: upd.unit_price,
@@ -580,9 +455,20 @@ export default function NewOrder() {
   }, []);
 
   async function selectProductForLine(uid: string, p: ProductOption) {
-    const ep = customer
-      ? await fetchEffectivePrice({ productId: p.id, customerId: customer.id, date: deliveryDate, caller: "new_order_form" }).catch(() => null)
-      : null;
+    let ep: Awaited<ReturnType<typeof fetchEffectivePrice>> | null = null;
+    if (customer) {
+      try {
+        ep = await fetchEffectivePrice({
+          productId: p.id,
+          customerId: customer.id,
+          date: deliveryDate,
+          caller: "new_order_form",
+        });
+      } catch (err) {
+        persistAppError(err, { scope: "ordre:ny-ordre:pris" });
+        toast.error(`Fant ikke pris for ${p.display_name}. Legg inn pris manuelt.`);
+      }
+    }
     setLines((prev) =>
       prev.map((l) =>
         l.uid === uid
@@ -598,6 +484,8 @@ export default function NewOrder() {
           : l,
       ),
     );
+    // Tastaturflyt: fokus rett til Mengde på linjen som nettopp fikk vare.
+    focusOrderLineField(uid, "qty");
   }
 
   function updateLine(uid: string, patch: Partial<LineDraft>) {
@@ -612,10 +500,36 @@ export default function NewOrder() {
         return {
           ...l,
           unit_price: value,
-          unit_price_source: isOverride ? "manual_override" : l.unit_price_source,
+          unit_price_source: isOverride ? MANUAL_PRICE_SOURCE : l.unit_price_source,
         };
       }),
     );
+  }
+
+  /** Ber om begrunnelse når operatøren forlater et prisfelt hun har overstyrt. */
+  function handlePriceBlur(uid: string) {
+    const line = linesRef.current.find((l) => l.uid === uid);
+    if (!line || !isManualOverride(line.unit_price_source)) return;
+    if (line.notes.includes(PRICE_OVERRIDE_NOTE_PREFIX)) return;
+    setOverrideReasonUid(uid);
+  }
+
+  /**
+   * Enter i Mengde bekrefter linjen: siste linje får en ny tom linje under,
+   * ellers hopper fokus til produktsøket på neste linje.
+   */
+  function confirmLineAndContinue(uid: string) {
+    const current = linesRef.current;
+    const idx = current.findIndex((l) => l.uid === uid);
+    if (idx === -1) return;
+    const next = current[idx + 1];
+    if (next) {
+      focusOrderLineField(next.product ? next.uid : next.uid, next.product ? "qty" : "search");
+      return;
+    }
+    const added = newLine();
+    setLines((prev) => [...prev, added]);
+    focusOrderLineField(added.uid, "search");
   }
 
   function removeLine(uid: string) {
@@ -652,7 +566,7 @@ export default function NewOrder() {
             mva_rate: Number(p.mva_rate),
             status: p.status,
             is_for_sale: p.is_for_sale,
-            is_divisible: !!(p as any).is_divisible,
+            is_divisible: !!p.is_divisible,
           }
         : null;
       return {
@@ -680,7 +594,8 @@ export default function NewOrder() {
       void (async () => {
         const refreshed = await Promise.all(
           newLines.map(async (l) => {
-            if (!l.product) return l;
+            // Forhandlet pris fra forrige ordre skal ikke overskrives.
+            if (!l.product || !shouldRepriceCopiedLine(l)) return l;
             try {
               const ep = await fetchEffectivePrice({
                 productId: l.product.id,
@@ -696,7 +611,8 @@ export default function NewOrder() {
                 unit_price_source_id: ep.special_price_id ?? ep.price_list_id ?? null,
                 effective_price: ep.price,
               };
-            } catch {
+            } catch (err) {
+              persistAppError(err, { scope: "ordre:ny-ordre:kopier-priser" });
               return l;
             }
           }),
@@ -747,7 +663,23 @@ export default function NewOrder() {
   }, [deliveryDate, deliveryTime, lines, customer?.id, ticketAi, ticketBodyText]);
   const qaSummary = summarizeQa(qaChecks);
 
-  async function save(overrideReason: string | null = pendingOverrideReason) {
+  /** Linjer uten reell pris — må bekreftes før ordren opprettes. */
+  const riskyPriceCount = useMemo(
+    () =>
+      countRiskyPriceLines(
+        lines.map((l) => ({ hasProduct: !!l.product, unit_price: l.unit_price })),
+      ),
+    [lines],
+  );
+
+  useEffect(() => {
+    setZeroPriceConfirmed(false);
+  }, [riskyPriceCount]);
+
+  async function save(
+    overrideReason: string | null = pendingOverrideReason,
+    forceZeroPrice = false,
+  ) {
     if (!customer) {
       toast.error("Velg en kunde");
       return;
@@ -769,6 +701,18 @@ export default function NewOrder() {
     // QA: blokkér på røde sjekker med mindre brukeren har bekreftet override
     if (qaSummary.severity === "red" && !qaOverride) {
       toast.error("Kvalitetssikring: røde punkter må løses (eller bekreft override)");
+      return;
+    }
+    const missingReason = validLines.find(
+      (l) => isManualOverride(l.unit_price_source) && !l.notes.includes(PRICE_OVERRIDE_NOTE_PREFIX),
+    );
+    if (missingReason) {
+      toast.error(`Begrunn den manuelle prisen på "${missingReason.product?.display_name}"`);
+      setOverrideReasonUid(missingReason.uid);
+      return;
+    }
+    if (!forceZeroPrice && !zeroPriceConfirmed && riskyPriceCount > 0) {
+      setZeroPriceOpen(true);
       return;
     }
     if (rulesPreview.blocks.length > 0 && !overrideReason) {
@@ -920,6 +864,53 @@ export default function NewOrder() {
 
   return (
     <>
+      <ZeroPriceConfirmDialog
+        open={zeroPriceOpen}
+        onOpenChange={setZeroPriceOpen}
+        count={riskyPriceCount}
+        onConfirm={() => {
+          setZeroPriceOpen(false);
+          setZeroPriceConfirmed(true);
+          void save(pendingOverrideReason, true);
+        }}
+      />
+
+      <PriceOverrideReasonDialog
+        open={overrideReasonUid !== null}
+        onOpenChange={(open) => {
+          if (!open) setOverrideReasonUid(null);
+        }}
+        productName={
+          lines.find((l) => l.uid === overrideReasonUid)?.product?.display_name ?? null
+        }
+        originalPrice={(() => {
+          const line = lines.find((l) => l.uid === overrideReasonUid);
+          return line?.effective_price != null ? formatNOK(line.effective_price) : null;
+        })()}
+        newPrice={lines.find((l) => l.uid === overrideReasonUid)?.unit_price ?? null}
+        onConfirm={(reason) => {
+          const uid = overrideReasonUid;
+          if (!uid) return;
+          setLines((prev) =>
+            prev.map((l) => (l.uid === uid ? { ...l, notes: withPriceOverrideNote(l.notes, reason) } : l)),
+          );
+          setOverrideReasonUid(null);
+        }}
+        onCancel={() => {
+          const uid = overrideReasonUid;
+          if (!uid) return;
+          // Uten begrunnelse settes prisen tilbake til prismotorens pris.
+          setLines((prev) =>
+            prev.map((l) =>
+              l.uid === uid && l.effective_price != null
+                ? { ...l, unit_price: String(l.effective_price), unit_price_source: l.unit_price_source === MANUAL_PRICE_SOURCE ? null : l.unit_price_source }
+                : l,
+            ),
+          );
+          setOverrideReasonUid(null);
+        }}
+      />
+
       <UnsavedChangesDialog
         {...unsavedGuard.dialogProps}
         description="Ordreutkastet er ikke lagret ennå. Forkaster du det, forsvinner linjene du har lagt inn."
@@ -1122,7 +1113,8 @@ export default function NewOrder() {
                 </div>
                 {lines.map((l) => {
                   const t = calcLineTotals(l);
-                  const overridden = l.unit_price_source === "manual_override";
+                  const overridden = isManualOverride(l.unit_price_source);
+                  const priceRisky = isPriceRisky({ hasProduct: !!l.product, unit_price: l.unit_price });
                   const isDivisible = !!l.product?.is_divisible;
                   return (
                     <div key={l.uid} className="rounded-md py-2 transition-colors hover:bg-muted/40">
@@ -1144,7 +1136,12 @@ export default function NewOrder() {
                               </Button>
                             </div>
                           ) : (
-                            <ProductCombobox onSelect={(p) => selectProductForLine(l.uid, p)} priceListId={productPriceListId} />
+                            <ProductSearchInput
+                              onSelect={(p) => void selectProductForLine(l.uid, p)}
+                              priceListId={productPriceListId}
+                              focusKey={l.uid}
+                              scope="ordre:ny-ordre:produktsok"
+                            />
                           )}
                         </div>
                         <Input
@@ -1153,6 +1150,13 @@ export default function NewOrder() {
                           min="1"
                           step={isDivisible ? "0.001" : "1"}
                           value={l.quantity}
+                          data-order-line-qty={l.uid}
+                          aria-label={`Mengde for ${l.product?.display_name ?? "ny linje"}`}
+                          onKeyDown={(e) => {
+                            if (e.key !== "Enter") return;
+                            e.preventDefault();
+                            confirmLineAndContinue(l.uid);
+                          }}
                           onChange={(e) => {
                             const v = e.target.value;
                             if (!isDivisible) {
@@ -1191,8 +1195,13 @@ export default function NewOrder() {
                             step="0.0001"
                             value={l.unit_price}
                             onChange={(e) => setManualPrice(l.uid, e.target.value)}
+                            onBlur={() => handlePriceBlur(l.uid)}
                             disabled={!l.product}
-                            className="h-9 pr-8 text-right text-sm tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                            aria-label={`Pris per enhet for ${l.product?.display_name ?? "ny linje"}`}
+                            aria-invalid={priceRisky}
+                            className={`h-9 pr-8 text-right text-sm tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${
+                              priceRisky ? "border-destructive text-destructive focus-visible:ring-destructive" : ""
+                            }`}
                           />
                           <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
                             kr

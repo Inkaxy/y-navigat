@@ -34,7 +34,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useNBProducts, fetchEffectivePrice, type ProductOption } from "@/ordre/hooks/useNBProducts";
+import { fetchEffectivePrice, type ProductOption } from "@/ordre/hooks/useNBProducts";
+import { ProductSearchInput } from "@/ordre/components/orders/ProductSearchInput";
+import { countRiskyPriceLines, focusOrderLineField } from "@/ordre/lib/orderLines";
+import { ZeroPriceConfirmDialog } from "@/ordre/components/orders/ZeroPriceConfirmDialog";
 import { useDeliveryTours, tourMatches, trimSec } from "@/ordre/hooks/useDeliveryTours";
 import { useDebouncedValue } from "@/ordre/hooks/useDebouncedValue";
 import {
@@ -323,6 +326,22 @@ export function CustomerOrderModal({
 
   const [dirty, setDirty] = useState(false);
   const [merknadFor, setMerknadFor] = useState<string | null>(null);
+  /** 0-pris må bekreftes aktivt før lagring. */
+  const [zeroPriceOpen, setZeroPriceOpen] = useState(false);
+  const [zeroPriceConfirmed, setZeroPriceConfirmed] = useState(false);
+  /** Linjer uten reell pris (0 kr eller fallback) — må bekreftes før lagring. */
+  const riskyPriceLines = useMemo(
+    () =>
+      countRiskyPriceLines(
+        lines.map((l) => ({
+          hasProduct: !!l.product,
+          unit_price: l.unit_price,
+          is_fallback: l.is_fallback,
+        })),
+      ),
+    [lines],
+  );
+  const [pendingSaveReason, setPendingSaveReason] = useState<string | null>(null);
 
   // Vedlegg fra e-posten (ticket) — brukerens valg per vedlegg
   const [attachmentChoice, setAttachmentChoice] = useState<
@@ -448,7 +467,18 @@ export function CustomerOrderModal({
         .in("id", ids);
       if (cancelled) return;
       const byId = new Map<string, ProductOption>();
-      for (const p of (data ?? []) as any[]) {
+      type ProductRow = {
+        id: string;
+        display_number: number | string;
+        code: string;
+        display_name: string;
+        unit_of_sale: string;
+        mva_rate: number | string | null;
+        status: string;
+        is_for_sale: boolean;
+        is_divisible: boolean | null;
+      };
+      for (const p of (data ?? []) as unknown as ProductRow[]) {
         byId.set(p.id, {
           id: p.id,
           display_number: Number(p.display_number),
@@ -490,7 +520,6 @@ export function CustomerOrderModal({
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, isEdit, initialValues, customer.id]);
 
   // Mark dirty on any field change after init
@@ -500,6 +529,11 @@ export function CustomerOrderModal({
     // intentional shallow listing of dependencies for "dirty" detection
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [name, email, phone, deliveryDate, hour, minute, tourId, distribution, source, sendSms, sendEmail, isPaid, lines]);
+
+  // Ny prisrisiko må bekreftes på nytt.
+  useEffect(() => {
+    setZeroPriceConfirmed(false);
+  }, [riskyPriceLines]);
 
   const { data: tours } = useDeliveryTours({ activeOnly: true });
   const validTours = useMemo(() => {
@@ -581,6 +615,15 @@ export function CustomerOrderModal({
       const cleaned = prev.filter((l) => l.product);
       return [...cleaned, draft];
     });
+    // Tastaturflyt: fokus hopper rett til Antall på den nye linjen.
+    focusOrderLineField(draft.uid, "qty");
+  }
+
+  /** Enter i Antall bekrefter linjen og sender operatøren tilbake til produktsøket. */
+  function handleQtyKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    focusOrderLineField("kundeordre", "search");
   }
 
   function setLineQty(uid: string, value: string) {
@@ -686,9 +729,14 @@ export function CustomerOrderModal({
 
   }
 
-  async function handleSave(overrideReason: string | null = null) {
+  async function handleSave(overrideReason: string | null = null, forceZeroPrice = false) {
     const input = buildInput(overrideReason);
     if (!input) return;
+    if (!forceZeroPrice && !zeroPriceConfirmed && riskyPriceLines > 0) {
+      setPendingSaveReason(overrideReason);
+      setZeroPriceOpen(true);
+      return;
+    }
     setSubmitting(true);
     try {
       let fallbackCount = 0;
@@ -1053,9 +1101,12 @@ export function CustomerOrderModal({
                 </div>
 
                 {/* Add via inline search — always available */}
-                <ProductCombobox
+                <ProductSearchInput
                   onSelect={appendProductLine}
                   priceListId={customer.default_price_list_id}
+                  focusKey="kundeordre"
+                  label="Ny ordrelinje"
+                  scope="ordre:kundeordre:produktsok"
                 />
 
 
@@ -1119,7 +1170,10 @@ export function CustomerOrderModal({
                             type="text"
                             inputMode="decimal"
                             value={l.quantity}
+                            data-order-line-qty={l.uid}
                             onChange={(e) => setLineQty(l.uid, e.target.value)}
+                            onKeyDown={handleQtyKeyDown}
+                            aria-label={`Antall for ${l.product!.display_name}`}
                             className="h-9 text-right tabular-nums"
                           />
                           <Input
@@ -1356,6 +1410,17 @@ export function CustomerOrderModal({
         </AlertDialogContent>
       </AlertDialog>
 
+      <ZeroPriceConfirmDialog
+        open={zeroPriceOpen}
+        onOpenChange={setZeroPriceOpen}
+        count={riskyPriceLines}
+        onConfirm={() => {
+          setZeroPriceOpen(false);
+          setZeroPriceConfirmed(true);
+          void handleSave(pendingSaveReason, true);
+        }}
+      />
+
       <UnsavedChangesDialog
         {...unsavedGuard.dialogProps}
         description="Ordren har endringer som ikke er lagret. Forkaster du dem, forsvinner de."
@@ -1497,143 +1562,3 @@ function NameField({
     </div>
   );
 }
-
-function ProductCombobox({
-  onSelect,
-  priceListId,
-}: {
-  onSelect: (p: ProductOption) => void;
-  priceListId?: string | null;
-}) {
-  const [q, setQ] = useState("");
-  const [focused, setFocused] = useState(false);
-  const [activeIdx, setActiveIdx] = useState(0);
-  const debounced = useDebouncedValue(q, 200);
-  const { data: products, isLoading } = useNBProducts(debounced, priceListId);
-  const inputRef = useRef<HTMLInputElement | null>(null);
-  const listRef = useRef<HTMLDivElement | null>(null);
-
-  const items = products ?? [];
-  const open = focused && q.length > 0;
-
-  useEffect(() => {
-    setActiveIdx(0);
-  }, [debounced, focused]);
-
-  // Scroll active item into view
-  useEffect(() => {
-    if (!open || !listRef.current) return;
-    const el = listRef.current.querySelector<HTMLElement>(`[data-idx="${activeIdx}"]`);
-    el?.scrollIntoView({ block: "nearest" });
-  }, [activeIdx, open]);
-
-  function pick(p: ProductOption) {
-    onSelect(p);
-    setQ("");
-    setActiveIdx(0);
-    // keep focus so user can quickly add more
-    requestAnimationFrame(() => inputRef.current?.focus());
-  }
-
-  function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (!open || items.length === 0) {
-      if (e.key === "Escape") {
-        setQ("");
-        inputRef.current?.blur();
-      }
-      return;
-    }
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      setActiveIdx((i) => Math.min(i + 1, items.length - 1));
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      setActiveIdx((i) => Math.max(i - 1, 0));
-    } else if (e.key === "Enter") {
-      e.preventDefault();
-      const p = items[activeIdx];
-      if (p) pick(p);
-    } else if (e.key === "Escape") {
-      e.preventDefault();
-      setQ("");
-    }
-  }
-
-  return (
-    <div className="relative">
-      <div className="flex items-stretch gap-2">
-        <div className="flex items-center rounded-md border border-border bg-muted/40 px-3 text-sm font-medium text-foreground">
-          Ny ordrelinje
-        </div>
-        <div className="relative flex-1">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            ref={inputRef}
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            onFocus={() => setFocused(true)}
-            onBlur={() => setTimeout(() => setFocused(false), 150)}
-            onKeyDown={onKeyDown}
-            placeholder={priceListId ? "Søk varenr eller navn …" : "Kunden mangler prisliste"}
-            disabled={!priceListId}
-            className="h-9 pl-8"
-            aria-autocomplete="list"
-            aria-expanded={open}
-          />
-        </div>
-      </div>
-
-      {open && (
-        <div className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-md border border-border bg-popover text-popover-foreground shadow-md">
-          <div className="flex items-center justify-end border-b border-border px-2 py-1">
-            <span className="rounded bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
-              {isLoading ? "…" : `${items.length} treff`}
-            </span>
-          </div>
-          <div ref={listRef} className="max-h-[320px] overflow-y-auto" role="listbox">
-            {isLoading ? (
-              <div className="p-4 text-center text-sm text-muted-foreground">
-                <Loader2 className="mx-auto h-4 w-4 animate-spin" />
-              </div>
-            ) : items.length === 0 ? (
-              <div className="p-4 text-center text-sm text-muted-foreground">
-                Ingen treff
-              </div>
-            ) : (
-              items.map((p, idx) => {
-                const active = idx === activeIdx;
-                return (
-                  <button
-                    key={p.id}
-                    type="button"
-                    data-idx={idx}
-                    role="option"
-                    aria-selected={active}
-                    onMouseDown={(e) => e.preventDefault()}
-                    onMouseEnter={() => setActiveIdx(idx)}
-                    onClick={() => pick(p)}
-                    className={`flex w-full items-center gap-3 px-3 py-1.5 text-left text-sm border-b border-border/60 last:border-b-0 ${
-                      active
-                        ? "bg-primary text-primary-foreground"
-                        : "hover:bg-accent hover:text-accent-foreground"
-                    }`}
-                  >
-                    <span
-                      className={`tabular-nums w-12 text-[13px] ${
-                        active ? "text-primary-foreground/90" : "text-muted-foreground"
-                      }`}
-                    >
-                      {p.display_number}
-                    </span>
-                    <span className="flex-1 truncate">{p.display_name}</span>
-                  </button>
-                );
-              })
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-

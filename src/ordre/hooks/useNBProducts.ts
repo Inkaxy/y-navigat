@@ -44,18 +44,33 @@ export function useNBProducts(search?: string, priceListId?: string | null) {
         .neq("products.status", "discontinued")
         .limit(2000);
 
-      if (search && search.trim().length > 0) {
-        const s = search.trim().replace(/[%,]/g, " ");
-        q = q.or(`display_name.ilike.%${s}%,code.ilike.%${s}%`, {
-          foreignTable: "products",
-        });
+      const rawSearch = search?.trim() ?? "";
+      const isNumericSearch = /^\d+$/.test(rawSearch);
+      if (rawSearch.length > 0) {
+        const s = rawSearch.replace(/[%,]/g, " ");
+        // Numerisk søk: operatøren skriver varenummeret hun ser i UI-et.
+        const filters = isNumericSearch
+          ? [`display_number.eq.${Number(s)}`, `code.ilike.%${s}%`, `display_name.ilike.%${s}%`]
+          : [`display_name.ilike.%${s}%`, `code.ilike.%${s}%`];
+        q = q.or(filters.join(","), { foreignTable: "products" });
       }
 
       const { data, error } = await q;
       if (error) throw error;
       const seen = new Set<string>();
       const out: ProductOption[] = [];
-      for (const row of (data ?? []) as any[]) {
+      type ProductRow = {
+        id: string;
+        display_number: number | string;
+        code: string;
+        display_name: string;
+        unit_of_sale: string;
+        mva_rate: number | string | null;
+        status: string;
+        is_for_sale: boolean;
+        is_divisible: boolean | null;
+      };
+      for (const row of (data ?? []) as unknown as Array<{ products: ProductRow | null }>) {
         const p = row.products;
         if (!p || seen.has(p.id)) continue;
         seen.add(p.id);
@@ -68,11 +83,25 @@ export function useNBProducts(search?: string, priceListId?: string | null) {
           mva_rate: Number(p.mva_rate ?? 0),
           status: p.status,
           is_for_sale: p.is_for_sale,
-          is_divisible: p.is_divisible,
+          is_divisible: !!p.is_divisible,
         });
       }
-      out.sort((a, b) => b.display_number - a.display_number);
+      if (isNumericSearch) {
+        // Eksakt varenummer først, deretter kodetreff, så navnetreff.
+        const n = Number(rawSearch);
+        const lower = rawSearch.toLowerCase();
+        const rank = (p: ProductOption) => {
+          if (p.display_number === n) return 0;
+          if ((p.code ?? "").toLowerCase() === lower) return 1;
+          if ((p.code ?? "").toLowerCase().includes(lower)) return 2;
+          return 3;
+        };
+        out.sort((a, b) => rank(a) - rank(b) || b.display_number - a.display_number);
+      } else {
+        out.sort((a, b) => b.display_number - a.display_number);
+      }
       return out.slice(0, 500);
+
     },
     staleTime: 30_000,
   });
