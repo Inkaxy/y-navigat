@@ -44,11 +44,15 @@ export function useNBProducts(search?: string, priceListId?: string | null) {
         .neq("products.status", "discontinued")
         .limit(2000);
 
-      if (search && search.trim().length > 0) {
-        const s = search.trim().replace(/[%,]/g, " ");
-        q = q.or(`display_name.ilike.%${s}%,code.ilike.%${s}%`, {
-          foreignTable: "products",
-        });
+      const rawSearch = search?.trim() ?? "";
+      const isNumericSearch = /^\d+$/.test(rawSearch);
+      if (rawSearch.length > 0) {
+        const s = rawSearch.replace(/[%,]/g, " ");
+        // Numerisk søk: operatøren skriver varenummeret hun ser i UI-et.
+        const filters = isNumericSearch
+          ? [`display_number.eq.${Number(s)}`, `code.ilike.%${s}%`, `display_name.ilike.%${s}%`]
+          : [`display_name.ilike.%${s}%`, `code.ilike.%${s}%`];
+        q = q.or(filters.join(","), { foreignTable: "products" });
       }
 
       const { data, error } = await q;
@@ -71,8 +75,22 @@ export function useNBProducts(search?: string, priceListId?: string | null) {
           is_divisible: p.is_divisible,
         });
       }
-      out.sort((a, b) => b.display_number - a.display_number);
+      if (isNumericSearch) {
+        // Eksakt varenummer først, deretter kodetreff, så navnetreff.
+        const n = Number(rawSearch);
+        const lower = rawSearch.toLowerCase();
+        const rank = (p: ProductOption) => {
+          if (p.display_number === n) return 0;
+          if ((p.code ?? "").toLowerCase() === lower) return 1;
+          if ((p.code ?? "").toLowerCase().includes(lower)) return 2;
+          return 3;
+        };
+        out.sort((a, b) => rank(a) - rank(b) || b.display_number - a.display_number);
+      } else {
+        out.sort((a, b) => b.display_number - a.display_number);
+      }
       return out.slice(0, 500);
+
     },
     staleTime: 30_000,
   });
