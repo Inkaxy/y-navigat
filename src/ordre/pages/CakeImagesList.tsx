@@ -23,6 +23,8 @@ import {
 import { CakeImageCard } from "@/ordre/components/cake-images/CakeImageCard";
 import { UploadButton } from "@/ordre/components/cake-images/UploadButton";
 import { deleteCakeImage, markPrinted, updateCakeImage } from "@/ordre/lib/cakeImages";
+import { useCakePrintFlow } from "@/ordre/hooks/useCakePrintFlow";
+import { useCakePrinterSelection } from "@/ordre/hooks/useCakeCalibration";
 
 type Status = "for-utskrift" | "skrevet-ut";
 
@@ -130,10 +132,11 @@ export default function CakeImagesList() {
     setSelected(new Set());
   };
 
+  // Utskriften bygges i samme fane, rett fra klikket — ingen popup å sperre.
   const printSelected = () => {
     const ids = Array.from(selected);
     if (ids.length === 0) return;
-    window.open(`/ordre/kakebilder/print?ids=${ids.join(",")}&auto=1`, "_blank");
+    void printFlow.printIds(ids);
   };
 
   const pdfSelected = () => {
@@ -155,10 +158,7 @@ export default function CakeImagesList() {
 
   const printAllReady = () => {
     if (readyIds.length === 0) return;
-    window.open(
-      `/ordre/kakebilder/print?ids=${readyIds.join(",")}&auto=1`,
-      "_blank",
-    );
+    void printFlow.printIds(readyIds);
   };
 
   const markFerdig = async () => {
