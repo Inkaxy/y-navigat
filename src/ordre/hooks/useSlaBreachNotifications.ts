@@ -7,7 +7,7 @@ import {
   rememberNotifiedBreaches,
   type SlaBreachCandidate,
 } from "@/ordre/lib/slaBreach";
-import { persistAppError } from "@/lib/errorLog";
+import { logAppError } from "@/lib/errorLog";
 
 /**
  * Oppretter `ticket.sla_breach`-varsel når en sak brukeren eier eller har åpen
@@ -49,7 +49,7 @@ export function useSlaBreachNotifications(
         qc.invalidateQueries({ queryKey: ["notifications"] });
       })
       .catch((e: unknown) => {
-        persistAppError("ticket.sla_breach-varsel", e);
+        logAppError(e, { source: "useSlaBreachNotifications" });
       })
       .finally(() => {
         running.current = false;
