@@ -10,14 +10,12 @@ import {
   pickCompletedMainRun,
   productionStatusesForDate,
   runCompletedAt,
-  sortSources,
   type PlanSource,
   type RunLike,
 } from "../lib/planSource";
-import { productionRowKey } from "./useProductionPlanSnapshots";
 import { aggregateProductionLines } from "../lib/aggregate";
 
-import type { ProductionPlanRow, ProductionPlanRowDetail, ProduksjonsplanCriteria } from "../types";
+import type { ProductionPlanRow, ProduksjonsplanCriteria } from "../types";
 
 /** Metadata om hvilket grunnlag planen er bygget på. */
 export interface ProductionPlanBasis {
