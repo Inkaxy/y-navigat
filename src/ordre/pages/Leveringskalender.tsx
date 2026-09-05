@@ -249,6 +249,10 @@ export default function MatrixPage() {
   const [commentCol, setCommentCol] = useState<{ date: string; tour: MatrixTour } | null>(null);
   const [deleteColConfirm, setDeleteColConfirm] = useState<{ date: string; tour: MatrixTour } | null>(null);
   const [tourOrderCol, setTourOrderCol] = useState<{ date: string; tour: MatrixTour } | null>(null);
+  /** Ordre uten tur som skal flyttes til en tur. */
+  const [moveTourOrder, setMoveTourOrder] = useState<
+    { orderId: string; orderNumber: string } | null
+  >(null);
   const [weekEditorProduct, setWeekEditorProduct] = useState<MatrixProduct | null>(null);
 
   // Handling-meny dialog state
