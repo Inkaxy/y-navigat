@@ -6,7 +6,8 @@ import { cn } from "@/lib/utils";
 import type { MatrixProduct, MatrixTour } from "@/ordre/hooks/useMatrix";
 import type { NoTourEntry } from "@/ordre/lib/matrixEdits";
 import { ckey } from "@/ordre/lib/matrixEdits";
-import { formatNOK, formatKrNetto } from "@/ordre/lib/format";
+import { formatNOK } from "@/ordre/lib/format";
+import { formatKrNetto } from "@/ordre/lib/dateRanges";
 import { MatrixCell } from "./MatrixCell";
 
 /** Kolonnene som faktisk rendres i rutenettet. */
