@@ -4,6 +4,7 @@ import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { fetchAllRows } from "@/lib/supabasePaging";
 import { toast } from "sonner";
 import type { MovementType } from "@/ravarer/lib/stock";
+import { osloDateISOPlusDays } from "@/lib/osloDate";
 
 export interface StockMovementRow {
   id: string;
@@ -349,7 +350,7 @@ export function useMissingBaseQuantityLines() {
       const ids = Array.from(nameById.keys());
       if (ids.length === 0) return [];
 
-      const since = new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10);
+      const since = osloDateISOPlusDays(-90);
       const { data, error } = await supabase
         .from("invoice_lines")
         .select("id, invoice_id, description, quantity, unit, raw_material_id, invoice:invoices!inner(id, invoice_number, invoice_date, legal_entity_id)")
