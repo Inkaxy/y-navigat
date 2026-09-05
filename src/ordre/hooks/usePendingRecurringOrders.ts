@@ -4,6 +4,7 @@ import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
 import { useDeliveryTours } from "@/ordre/hooks/useDeliveryTours";
 import { NULL_TOUR_KEY } from "@/ordre/hooks/useTourRunStatus";
 import { pickEffectiveSchedulesForDate } from "@/ordre/lib/recurringOverrides";
+import { fetchDeliveryPauses, isPausedForDate } from "@/ordre/lib/pendingOrders";
 
 type DeliveryTourLike = {
   id: string;
@@ -63,7 +64,7 @@ export async function fetchPendingRecurringOrderCounts(
   const weekday = isoDayOfWeek(date);
   const fallbackTourId = resolveFallbackTourId(tours, weekday);
 
-  const [{ data: schedules, error: schedulesError }, { data: existingOrders, error: ordersError }, { data: pauses, error: pausesError }] =
+  const [{ data: schedules, error: schedulesError }, { data: existingOrders, error: ordersError }, pauses] =
     await Promise.all([
       supabase
         .from("recurring_order_schedules")
@@ -80,24 +81,17 @@ export async function fetchPendingRecurringOrderCounts(
         .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
         .eq("delivery_date", date)
         .not("recurring_schedule_id", "is", null),
-      supabase
-        .from("delivery_pauses")
-        .select("customer_id")
-        .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
-        .lte("pause_from", date)
-        .or(`pause_to.is.null,pause_to.gte.${date}`),
+      fetchDeliveryPauses(date, date),
     ]);
 
   if (schedulesError) throw schedulesError;
   if (ordersError) throw ordersError;
-  if (pausesError) throw pausesError;
 
   const materializedScheduleIds = new Set(
     (existingOrders ?? [])
       .map((row) => row.recurring_schedule_id)
       .filter((id): id is string => Boolean(id)),
   );
-  const pausedCustomerIds = new Set((pauses ?? []).map((row) => row.customer_id));
   const byTour: Record<string, number> = {};
   let nullTourCount = 0;
   let total = 0;
@@ -108,7 +102,7 @@ export async function fetchPendingRecurringOrderCounts(
   );
 
   for (const schedule of effective) {
-    if (materializedScheduleIds.has(schedule.id) || pausedCustomerIds.has(schedule.customer_id)) continue;
+    if (materializedScheduleIds.has(schedule.id)) continue;
 
     const tourIds = new Set(
       (schedule.recurring_order_items ?? [])
@@ -116,6 +110,8 @@ export async function fetchPendingRecurringOrderCounts(
         .map((item) => item.tour_id ?? fallbackTourId),
     );
     const resolvedTourId = Array.from(tourIds).filter(Boolean).sort()[0] ?? null;
+    // Pause kan gjelde kun enkelte turer (tour_filter).
+    if (isPausedForDate(pauses, schedule.customer_id, date, resolvedTourId)) continue;
 
     if (resolvedTourId) byTour[resolvedTourId] = (byTour[resolvedTourId] ?? 0) + 1;
     else nullTourCount += 1;
@@ -141,7 +137,7 @@ export async function fetchPendingRecurringOrderRows(
   const weekday = isoDayOfWeek(date);
   const fallbackTourId = resolveFallbackTourId(tours, weekday);
 
-  const [{ data: schedules, error: schedulesError }, { data: existingOrders, error: ordersError }, { data: pauses, error: pausesError }] =
+  const [{ data: schedules, error: schedulesError }, { data: existingOrders, error: ordersError }, pauses] =
     await Promise.all([
       supabase
         .from("recurring_order_schedules")
@@ -158,22 +154,15 @@ export async function fetchPendingRecurringOrderRows(
         .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
         .eq("delivery_date", date)
         .not("recurring_schedule_id", "is", null),
-      supabase
-        .from("delivery_pauses")
-        .select("customer_id")
-        .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
-        .lte("pause_from", date)
-        .or(`pause_to.is.null,pause_to.gte.${date}`),
+      fetchDeliveryPauses(date, date),
     ]);
 
   if (schedulesError) throw schedulesError;
   if (ordersError) throw ordersError;
-  if (pausesError) throw pausesError;
 
   const materialized = new Set(
     (existingOrders ?? []).map((r) => r.recurring_schedule_id).filter((id): id is string => Boolean(id)),
   );
-  const paused = new Set((pauses ?? []).map((r) => r.customer_id));
   const tourById = new Map(tours.map((t) => [t.id, t] as const));
 
   type Row = {
@@ -187,13 +176,14 @@ export async function fetchPendingRecurringOrderRows(
   const effectiveRows = pickEffectiveSchedulesForDate((schedules ?? []) as Row[], date);
   const filtered: Array<{ row: Row; resolvedTourId: string | null }> = [];
   for (const s of effectiveRows) {
-    if (materialized.has(s.id) || paused.has(s.customer_id)) continue;
+    if (materialized.has(s.id)) continue;
     const tourIds = new Set(
       (s.recurring_order_items ?? [])
         .filter((it) => Number(it.quantity ?? 0) > 0)
         .map((it) => it.tour_id ?? fallbackTourId),
     );
     const resolvedTourId = Array.from(tourIds).filter(Boolean).sort()[0] ?? null;
+    if (isPausedForDate(pauses, s.customer_id, date, resolvedTourId)) continue;
 
     if (tourFilter === NULL_TOUR_KEY) {
       if (resolvedTourId !== null) continue;

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
+import { fetchPendingReturnNotesCount } from "@/ordre/lib/pendingOrders";
 
 export type ReturnTab = "pending" | "approved" | "rejected";
 
@@ -119,20 +120,7 @@ export function usePendingReturnsCount(
 ) {
   return useQuery({
     queryKey: ["return-delivery-notes", "pending-count", legalEntityId, maxDate ?? null],
-    queryFn: async (): Promise<number> => {
-      let q = supabase
-        .from("delivery_notes")
-        .select("id", { count: "exact", head: true })
-        .eq("legal_entity_id", legalEntityId)
-        .eq("is_return", true)
-        .eq("status", "draft")
-        .is("approved_at", null)
-        .is("rejected_at", null);
-      if (maxDate) q = q.lte("delivery_date", maxDate);
-      const { count, error } = await q;
-      if (error) return 0;
-      return count ?? 0;
-    },
+    queryFn: () => fetchPendingReturnNotesCount(maxDate, legalEntityId),
     staleTime: 30_000,
     refetchInterval: 60_000,
   });
