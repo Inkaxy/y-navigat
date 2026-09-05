@@ -1087,7 +1087,32 @@ export default function CakeImageEditor() {
     };
   };
 
+  /**
+   * Samme sperre som listen bruker, men med editorens gjeldende tilstand:
+   * valgt format, bekreftet lav oppløsning og avklarte rettigheter. Kjøres
+   * FØR lagring, slik at et bilde uten format aldri kan bli et «MANGLER
+   * FORMAT»-ark som bekreftes som skrevet ut.
+   */
+  const checkPrintGate = (): boolean => {
+    if (!image) return false;
+    const gate = evaluatePrintGate({
+      format_id: format?.id ?? null,
+      width_mm: dims.widthMm ?? null,
+      height_mm: dims.heightMm ?? null,
+      quality_flag: needsQualityAck ? "lav" : "god",
+      quality_ack_at: needsQualityAck ? null : new Date().toISOString(),
+      rights_cleared: rightsAnswered,
+      rights_note: rightsNote,
+    });
+    if (!gate.ok) {
+      toast.error("Kan ikke skrives ut ennå", { description: gate.reason });
+      return false;
+    }
+    return true;
+  };
+
   const printNow = async () => {
+
     if (!image) return;
     try {
       const item = await buildItem(renderDataUrl());
