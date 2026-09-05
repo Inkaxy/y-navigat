@@ -26,6 +26,7 @@ import {
   findCakeLineForOrder,
   type CakeImage,
 } from "@/ordre/lib/cakeImages";
+import { withResolvedLabelNumbers } from "@/ordre/lib/labelNumber";
 import type { TicketAttachment } from "@/ordre/hooks/useTickets";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -58,7 +59,13 @@ export default function AttachmentCakePrintButton({
 
   const { data: existing } = useQuery({
     queryKey: ["cake-image-for-attachment", att.id],
-    queryFn: () => findCakeImageByTicketAttachment(att.id),
+    queryFn: async () => {
+      const image = await findCakeImageByTicketAttachment(att.id);
+      if (!image) return null;
+      // Etikett-enheten er fasit for nummeret, ikke kopifeltet på bildet.
+      const [resolved] = await withResolvedLabelNumbers([image]);
+      return resolved;
+    },
   });
 
   const create = async (deliveryDate: string) => {
@@ -121,7 +128,10 @@ export default function AttachmentCakePrintButton({
       >
         <CakeSlice className="h-3 w-3" />
         I kakeprint
-        {existing.label_number ? ` · etikett #${existing.label_number}` : " · Mangler etikett"} ·{" "}
+        {existing.resolved_label_number
+          ? ` · etikett #${existing.resolved_label_number}`
+          : " · Mangler etikett"}{" "}
+        ·{" "}
         {STATUS_LABEL[existing.status] ?? existing.status}
       </Link>
     );
