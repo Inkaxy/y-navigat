@@ -1640,14 +1640,16 @@ export default function MatrixPage() {
             {(dirtyCount > 0 || addedProducts.length > 0) && (
               <>
                 {dirtyCount > 0 && (
-                  <Badge variant="secondary">{dirtyCount} endring{dirtyCount === 1 ? "" : "er"}</Badge>
+                  <Badge variant="secondary" className="font-semibold">
+                    Ulagret: {dirtyCount} celle{dirtyCount === 1 ? "" : "r"}
+                  </Badge>
                 )}
                 {addedProducts.length > 0 && (
                   <Badge variant="outline">+{addedProducts.length} ny rad{addedProducts.length === 1 ? "" : "er"}</Badge>
                 )}
                 <Button variant="ghost" size="sm" onClick={handleDiscardClick}>
                   <RotateCcw />
-                  Forkast
+                  Avbryt
                 </Button>
               </>
             )}
