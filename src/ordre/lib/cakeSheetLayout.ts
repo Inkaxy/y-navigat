@@ -140,45 +140,42 @@ export function packSheets(items: PackItem[], opts: PackOptions = {}): PackResul
     shelfHeight = 0;
   };
 
+  /** Naturlig retning hvis den får plass i bredden, ellers rotert. */
+  const orient = (item: PackItem, widthBudget: number) => {
+    const o = outer(item);
+    if (o.w <= widthBudget) return { w: o.w, h: o.h, rotated: false };
+    const canRotate = item.rotatable !== false && !item.isRound;
+    if (canRotate && o.h <= widthBudget) return { w: o.h, h: o.w, rotated: true };
+    return null;
+  };
+
   for (const item of queue) {
     const o = outer(item);
-    let w = o.w;
-    let h = o.h;
-    let rotated = false;
+    let pick = orient(item, margin + availW - cursorX);
 
-    const canRotate = item.rotatable !== false && !item.isRound;
-    const usedWidth = cursorX - margin;
-    const remaining = availW - usedWidth - (placements.length > 0 && cursorX > margin ? 0 : 0);
-
-    if (w > remaining && canRotate && h <= remaining && w <= availH) {
-      [w, h] = [h, w];
-      rotated = true;
-    }
-
-    if (w > availW - (cursorX - margin)) {
+    if (!pick) {
       // Ny hylle
       shelfY += shelfHeight + (shelfHeight > 0 ? gap : 0);
       cursorX = margin;
       shelfHeight = 0;
-      w = o.w;
-      h = o.h;
-      rotated = false;
-      if (w > availW && canRotate && h <= availW) {
-        [w, h] = [h, w];
-        rotated = true;
+      pick = orient(item, availW);
+    }
+    if (!pick) {
+      unplaceable.push(item);
+      continue;
+    }
+
+    if (shelfY + pick.h > margin + availH) {
+      newPage();
+      pick = orient(item, availW);
+      if (!pick) {
+        unplaceable.push(item);
+        continue;
       }
     }
 
-    if (shelfY + h > margin + availH) {
-      newPage();
-      w = o.w;
-      h = o.h;
-      rotated = false;
-      if (w > availW && canRotate && h <= availW) {
-        [w, h] = [h, w];
-        rotated = true;
-      }
-    }
+    const { w, h, rotated } = pick;
+
 
     placements.push({
       id: item.id,
