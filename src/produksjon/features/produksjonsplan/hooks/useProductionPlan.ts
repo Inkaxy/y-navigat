@@ -272,10 +272,13 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
         }
       }
 
+      // Kunder i leveransepause skal heller ikke produseres for på fastordre.
+      const activeRecurring = excludePausedLines(recurringLines, pauses, date);
+
       // Kundegruppe-filter på fastordre
-      let finalRecurring = recurringLines;
-      if (criteria.customer_group_ids.length > 0 && recurringLines.length > 0) {
-        const recCustomerIds = Array.from(new Set(recurringLines.map((r) => r.customer_id)));
+      let finalRecurring = activeRecurring;
+      if (criteria.customer_group_ids.length > 0 && activeRecurring.length > 0) {
+        const recCustomerIds = Array.from(new Set(activeRecurring.map((r) => r.customer_id)));
         const { data: members } = await supabase
           .from("customer_group_members")
           .select("customer_id, group_id")
@@ -286,7 +289,7 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
           set.add(m.group_id);
           map.set(m.customer_id, set);
         }
-        finalRecurring = recurringLines.filter((r) => {
+        finalRecurring = activeRecurring.filter((r) => {
           const groups = map.get(r.customer_id);
           if (!groups) return false;
           return criteria.customer_group_ids.some((g) => groups.has(g));
