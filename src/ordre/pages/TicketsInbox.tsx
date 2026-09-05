@@ -13,6 +13,7 @@ import { QueryErrorState, QueryState } from "@/components/common/QueryState";
 import { PageHeader } from "@/ordre/components/shell/PageHeader";
 import { normalizeAiSuggestion, REQUEST_TYPE_LABEL, type RequestType } from "@/ordre/lib/aiSuggestion";
 import { TEAMS, TEAM_LABEL, type TicketTeam } from "@/ordre/lib/teams";
+import { useSlaBreachNotifications } from "@/ordre/hooks/useSlaBreachNotifications";
 import { useSlaSettings } from "@/ordre/hooks/useSlaSettings";
 import {
   useLatestReplyByTicket,
@@ -280,6 +281,9 @@ export default function TicketsInbox() {
         };
       });
     }, [tickets, sla, latestReply, latestInbound]);
+
+  // Varsle brukeren når egne/åpne saker passerer SLA-fristen.
+  useSlaBreachNotifications(rows, user?.id ?? null, selectedId);
 
   // Lukket/søppel lastes bare delvis ned — hent eksakt antall fra serveren.
   const { data: archiveCounts } = useQuery({
