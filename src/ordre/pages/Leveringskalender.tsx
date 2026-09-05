@@ -1612,9 +1612,16 @@ export default function MatrixPage() {
               rows={flatDayFilter ? flatRows.filter((r) => r.delivery_date === flatDayFilter) : flatRows}
               products={allProducts}
               tours={matrix.tours}
-              onQuantityChange={(date, tour_id, product_id, value) =>
-                setCellValue(`${date}|${tour_id ?? ""}|${product_id}` as CellKey, value)
-              }
+              onQuantityChange={(date, tour_id, product_id, value) => {
+                // Linjer uten tur er read-only i matrisen — aldri send tom tour_id til lagring.
+                if (!tour_id) return;
+                setCellValue(ckey(date, tour_id, product_id), value);
+              }}
+              onMoveToTour={(row) => {
+                const orderId = row.order_ids?.[0];
+                if (!orderId) return;
+                setMoveTourOrder({ orderId, orderNumber: row.order_number ?? "" });
+              }}
             />
           </div>
         ) : (
