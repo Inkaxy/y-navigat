@@ -137,6 +137,26 @@ export function FlatLinesView({
                   Ordrelinjer uten tur kan ikke endres her — flytt dem til en tur først.
                 </p>
               )}
+              {!t && onMoveToTour && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {Array.from(
+                    new Map(
+                      g.rows
+                        .filter((r) => r.order_ids?.length)
+                        .map((r) => [r.order_ids![0], r] as const),
+                    ).values(),
+                  ).map((r) => (
+                    <Button
+                      key={r.order_ids![0]}
+                      size="sm"
+                      variant="outline"
+                      onClick={() => onMoveToTour(r)}
+                    >
+                      Flytt til tur{r.order_number ? ` (${r.order_number})` : ""}
+                    </Button>
+                  ))}
+                </div>
+              )}
             </header>
 
             <div className="overflow-hidden rounded-lg border">
