@@ -14,6 +14,10 @@ import {
   type RefundStatus,
   type RefundWithJoins,
 } from "@/ordre/hooks/useRefunds";
+import {
+  DEFAULT_ORDRE_DESK_SETTINGS,
+  useOrdreDeskSettings,
+} from "@/ordre/hooks/useOrdreDeskSettings";
 
 const STATUS_LABEL: Record<RefundStatus, string> = {
   pending: "Venter godkjenning",
