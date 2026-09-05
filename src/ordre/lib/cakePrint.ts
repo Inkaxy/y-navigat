@@ -112,10 +112,15 @@ export function scaledPlacementSize(
   const w = item.widthMm ?? 0;
   const h = item.heightMm ?? 0;
   return rotated
-    ? { widthMm: (applyScale(h, scale) ?? 0), heightMm: (applyScale(w, scaleY) ?? 0) }
-    : { widthMm: (applyScale(w, scale) ?? 0), heightMm: (applyScale(h, scaleY) ?? 0) };
+    ? {
+        widthMm: applyScale(h, scale) ?? 0,
+        heightMm: applyScale(w, scaleY) ?? 0,
+      }
+    : {
+        widthMm: applyScale(w, scale) ?? 0,
+        heightMm: applyScale(h, scaleY) ?? 0,
+      };
 }
-
 
 async function urlToDataUrl(url: string): Promise<string> {
   const res = await fetch(url);
@@ -179,7 +184,27 @@ const FOOT_BAND_MM = 22;
 const PAGE_MARGIN_MM = 10;
 /** Etikettstripe under hvert bilde: QR + nummer + kunde. */
 const CAPTION_MM = 12;
-const QR_MM = 10;
+export const QR_MM = 10;
+
+/**
+ * Y-intervaller i den roterte etikettstripa, målt fra toppen av stripa.
+ * jsPDF tegner rotert tekst oppover fra ankeret, så nummeret forankres med
+ * sin egen lengde under QR-en, og linjeteksten får aldri lov til å starte
+ * høyere enn nummeret slutter.
+ */
+export function rotatedCaptionSpans(labelLenMm: number, hMm: number) {
+  const qr = { startMm: 0, endMm: QR_MM };
+  const number = { startMm: QR_MM + 2, endMm: QR_MM + 2 + labelLenMm };
+  const textStartMm = number.endMm + 2;
+  const textEndMm = hMm - 2;
+  return {
+    qr,
+    number,
+    textStartMm,
+    textEndMm,
+    textLenMm: Math.max(0, textEndMm - textStartMm),
+  };
+}
 
 /**
  * Hvor bildet faktisk skal tegnes for en plassering, og hvor etikettstripa
@@ -232,7 +257,13 @@ export function rotatedImageDraw(
   yMm: number,
   paperWidthMm: number,
   paperHeightMm: number,
-): { xMm: number; yMm: number; widthMm: number; heightMm: number; rotation: 90 } {
+): {
+  xMm: number;
+  yMm: number;
+  widthMm: number;
+  heightMm: number;
+  rotation: 90;
+} {
   return {
     xMm: xMm + paperWidthMm,
     yMm: yMm + paperHeightMm - paperWidthMm,
@@ -409,35 +440,35 @@ export async function buildCakePdf(
       isRound: item.isRound,
       rotatable: !item.isRound,
     };
-
   });
 
-  const packed = opts.nest === false
-    ? {
-        pages: packItems.map((p) => ({
+  const packed =
+    opts.nest === false
+      ? {
+          pages: packItems.map((p) => ({
+            sheet,
+            orientation,
+            ...size,
+            placements: [
+              {
+                id: p.id,
+                xMm: (size.widthMm - p.widthMm) / 2,
+                yMm: (size.heightMm - FOOT_BAND_MM - p.heightMm) / 2,
+                widthMm: p.widthMm,
+                heightMm: p.heightMm,
+                bleedMm: p.bleedMm ?? 0,
+                rotated: false,
+              },
+            ],
+          })),
+          unplaceable: [] as PackItem[],
+        }
+      : packSheets(packItems, {
           sheet,
           orientation,
-          ...size,
-          placements: [
-            {
-              id: p.id,
-              xMm: (size.widthMm - p.widthMm) / 2,
-              yMm: (size.heightMm - FOOT_BAND_MM - p.heightMm) / 2,
-              widthMm: p.widthMm,
-              heightMm: p.heightMm,
-              bleedMm: p.bleedMm ?? 0,
-              rotated: false,
-            },
-          ],
-        })),
-        unplaceable: [] as PackItem[],
-      }
-    : packSheets(packItems, {
-        sheet,
-        orientation,
-        marginMm: PAGE_MARGIN_MM,
-        reservedBottomMm: FOOT_BAND_MM,
-      });
+          marginMm: PAGE_MARGIN_MM,
+          reservedBottomMm: FOOT_BAND_MM,
+        });
 
   for (const u of packed.unplaceable) {
     const item = byId.get(u.id);
@@ -450,7 +481,8 @@ export async function buildCakePdf(
 
   let pageIndex = 0;
   const startPage = () => {
-    if (pageIndex > 0) pdf.addPage(sheet.toLowerCase() as "a4" | "a3", orientation);
+    if (pageIndex > 0)
+      pdf.addPage(sheet.toLowerCase() as "a4" | "a3", orientation);
     pageIndex++;
   };
 
@@ -465,7 +497,6 @@ export async function buildCakePdf(
       const hMm = paper.heightMm || geo.heightMm;
       const x = geo.xMm;
       const y = geo.yMm;
-
 
       if (item.url) {
         const src = item.url.startsWith("data:")
@@ -486,7 +517,17 @@ export async function buildCakePdf(
             r.rotation,
           );
         } else {
-          pdf.addImage(enc.data, enc.format, x, y, wMm, hMm, undefined, "FAST", 0);
+          pdf.addImage(
+            enc.data,
+            enc.format,
+            x,
+            y,
+            wMm,
+            hMm,
+            undefined,
+            "FAST",
+            0,
+          );
         }
       }
 
@@ -507,9 +548,12 @@ export async function buildCakePdf(
 
       // Etikettstripe: QR til editoren, etikettnummer, kunde, produkt og kaketekst.
       // Roterte bilder får stripen i margen ved siden av — teksten roteres ikke med bildet.
-      const capX = geo.captionXMm;
-      const capY = geo.captionYMm;
+      // Stripa følger den tegnede størrelsen, ikke sloten — ellers får den
+      // luft når X- og Y-korreksjonen er ulike.
+      const capX = geo.rotated ? x + wMm + 2 : geo.captionXMm;
+      const capY = geo.rotated ? geo.captionYMm : y + hMm + 2;
       let textX = capX;
+      let rotatedTextStartMm = QR_MM + 2;
       if (item.image?.id) {
         const qr = await qrDataUrl(editorUrlFor(item.image.id));
         if (qr) {
@@ -520,30 +564,43 @@ export async function buildCakePdf(
       if (item.labelNumber) {
         if (geo.rotated) {
           // Stripen er bare 10 mm bred — nummeret settes på høykant i 9 pt.
+          // jsPDF tegner oppover fra ankeret, så vi forankrer med tekstlengden.
           pdf.setFontSize(9);
-          pdf.text(`#${item.labelNumber}`, capX + 3.5, capY + QR_MM + 4, { angle: 90 });
+          const label = `#${item.labelNumber}`;
+          const spans = rotatedCaptionSpans(pdf.getTextWidth(label), hMm);
+          pdf.text(label, capX + 3.5, capY + spans.number.endMm, { angle: 90 });
+          rotatedTextStartMm = spans.textStartMm;
         } else {
           pdf.setFontSize(12);
           pdf.text(`#${item.labelNumber}`, textX, capY + 4);
         }
       }
 
-
       pdf.setFontSize(7);
-      const line1 = [item.customerName, item.orderRef ? `Ordre ${item.orderRef}` : null]
+      const line1 = [
+        item.customerName,
+        item.orderRef ? `Ordre ${item.orderRef}` : null,
+      ]
         .filter(Boolean)
         .join(" · ");
-      const line2 = [item.productName, item.cakeText ? `Tekst: ${item.cakeText}` : null]
+      const line2 = [
+        item.productName,
+        item.cakeText ? `Tekst: ${item.cakeText}` : null,
+      ]
         .filter(Boolean)
         .join(" · ");
       if (geo.rotated) {
-        const txt = [line1, line2].filter(Boolean).join(" · ");
+        let txt = [line1, line2].filter(Boolean).join(" · ");
+        // Teksten løper oppover fra bunnen av stripa; kort den ned slik at den
+        // aldri når opp i etikettnummeret på korte plasseringer.
+        const maxLenMm = hMm - 2 - rotatedTextStartMm;
+        while (txt && pdf.getTextWidth(txt) > maxLenMm) txt = txt.slice(0, -1);
         if (txt) pdf.text(txt, capX + 4, capY + hMm - 2, { angle: 90 });
       } else {
-        if (line1) pdf.text(line1, textX + (item.labelNumber ? 16 : 0), capY + 4);
+        if (line1)
+          pdf.text(line1, textX + (item.labelNumber ? 16 : 0), capY + 4);
         if (line2) pdf.text(line2, textX, capY + 8);
       }
-
     }
     drawFootBand(pdf, size, scale, scaleY, sheet, orientation, printerLabel);
   }
@@ -556,9 +613,14 @@ export async function buildCakePdf(
       align: "center",
     });
     pdf.setFontSize(12);
-    pdf.text("Sett format i editoren før utskrift.", size.widthMm / 2, size.heightMm / 2, {
-      align: "center",
-    });
+    pdf.text(
+      "Sett format i editoren før utskrift.",
+      size.widthMm / 2,
+      size.heightMm / 2,
+      {
+        align: "center",
+      },
+    );
     pdf.setFontSize(9);
     pdf.text(cakeItemLabel(item), size.widthMm / 2, size.heightMm / 2 + 8, {
       align: "center",
@@ -574,7 +636,13 @@ export async function buildCakePdf(
     });
   }
 
-  return { pdf, skipped, pageCount: Math.max(pageIndex, 1), sheet, orientation };
+  return {
+    pdf,
+    skipped,
+    pageCount: Math.max(pageIndex, 1),
+    sheet,
+    orientation,
+  };
 }
 
 function drawFootBand(
@@ -594,7 +662,11 @@ function drawFootBand(
     pdf.line(x, rulerY, x, rulerY - (mm % 50 === 0 ? 4 : 2.5));
   }
   pdf.setFontSize(7);
-  pdf.text(`${RULER_MM} mm — mål etter med linjal.`, PAGE_MARGIN_MM, rulerY - 5.5);
+  pdf.text(
+    `${RULER_MM} mm — mål etter med linjal.`,
+    PAGE_MARGIN_MM,
+    rulerY - 5.5,
+  );
   pdf.text(PRINT_INSTRUCTION, PAGE_MARGIN_MM, size.heightMm - 8);
   pdf.text(
     `${sheet} ${orientation === "landscape" ? "liggende" : "stående"}` +
@@ -693,11 +765,19 @@ export async function printCakeItems(
 export async function cakeSheetsToPdf(
   items: CakePrintItem[],
   opts: CakePdfOptions & { fileName?: string; embed?: boolean } = {},
-): Promise<{ skipped: CakeSkipped[]; sheet: string; orientation: SheetOrientation }> {
+): Promise<{
+  skipped: CakeSkipped[];
+  sheet: string;
+  orientation: SheetOrientation;
+}> {
   const prepared = await prepareItems(items, opts.embed !== false);
   const res = await buildCakePdf(prepared, opts);
   res.pdf.save(opts.fileName ?? "kakebilder.pdf");
-  return { skipped: res.skipped, sheet: res.sheet, orientation: res.orientation };
+  return {
+    skipped: res.skipped,
+    sheet: res.sheet,
+    orientation: res.orientation,
+  };
 }
 
 /** Blob-URL til forhåndsvisning i iframe — samme PDF som papiret. */
