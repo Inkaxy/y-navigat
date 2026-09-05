@@ -132,14 +132,20 @@ import {
   buildDateRange,
   formatKrNetto,
 } from "@/ordre/lib/dateRanges";
+import {
+  type CellKey,
+  type NoTourEntry,
+  ckey,
+  colKeyOf,
+  aggregateExistingCells,
+  computeDirtyChanges,
+  computeTotals,
+  effectiveCellQty,
+  visibleGhostQty,
+} from "@/ordre/lib/matrixEdits";
+import { ChangeTourDialog } from "@/ordre/components/orders/ChangeTourDialog";
 
 const DAY_LABELS = ["Ma", "Ti", "On", "To", "Fr", "Lø", "Sø"];
-
-type CellKey = string; // `${date}|${tour_id}|${product_id}`
-
-function ckey(date: string, tourId: string, productId: string): CellKey {
-  return `${date}|${tourId}|${productId}`;
-}
 
 type CellTarget = {
   date: string;
