@@ -20,6 +20,7 @@ import {
   CONFIDENCE_SHORT,
   CONFIDENCE_TOKEN,
   confidenceLevel,
+  DEFAULT_CONFIDENCE_THRESHOLDS,
 } from "@/ordre/lib/aiConfidence";
 import { useOrdreDeskSettings } from "@/ordre/hooks/useOrdreDeskSettings";
 
@@ -85,6 +86,10 @@ export default function OrderLinkCard({
   children?: React.ReactNode;
 }) {
   const qc = useQueryClient();
+  const { data: desk } = useOrdreDeskSettings();
+  const thresholds = desk
+    ? { high: desk.confidenceHigh, medium: desk.confidenceMedium }
+    : DEFAULT_CONFIDENCE_THRESHOLDS;
   const [switching, setSwitching] = useState(false);
   const { data: extraLinks = [] } = useTicketOrderLinks(ticket.id);
   const order = linked?.order ?? null;
