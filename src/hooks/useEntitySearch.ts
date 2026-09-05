@@ -104,7 +104,7 @@ export function useEntitySearch(rawTerm: string) {
         kind: "product" as const,
         id: p.id,
         title: p.display_name,
-        subtitle: p.display_number ?? undefined,
+        subtitle: p.display_number != null ? String(p.display_number) : undefined,
       }));
     },
   });
