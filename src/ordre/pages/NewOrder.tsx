@@ -14,6 +14,7 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
+import { usePickupLocations } from "@/kunder/hooks/usePickupLocations";
 import { tomorrow, todayISO, formatNOK } from "@/ordre/lib/format";
 import { type CustomerOption } from "@/ordre/hooks/useNBCustomers";
 import {
