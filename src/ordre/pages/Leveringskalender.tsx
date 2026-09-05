@@ -835,14 +835,6 @@ export default function MatrixPage() {
     [matrix],
   );
 
-  // Ordre-id per kolonne (dato|tur) → livssyklus/ordretype for kolonne-header
-  const colOrderId = useMemo(() => {
-    const m = new Map<string, string>();
-    for (const c of matrix?.existing_cells ?? []) {
-      m.set(`${c.delivery_date}|${c.delivery_tour_id}`, c.order_id);
-    }
-    return m;
-  }, [matrix]);
 
   const { map: colLifecycleMap } = useOrdersLifecycle(
     useMemo(() => [...new Set(colOrderId.values())], [colOrderId]),
