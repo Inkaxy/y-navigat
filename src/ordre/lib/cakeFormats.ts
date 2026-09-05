@@ -5,10 +5,10 @@
 
 export const CAKE_DPI = 300;
 
-/** Ark vi trykker på. Ett bilde per ark. */
-export const SHEETS: Record<string, { widthMm: number; heightMm: number }> = {
-  A4: { widthMm: 210, heightMm: 297 },
-};
+/** Ark vi trykker på. Deles med nestingen. */
+export { SHEET_SIZES as SHEETS, sheetSize } from "@/ordre/lib/cakeSheetLayout";
+export type { SheetOrientation } from "@/ordre/lib/cakeSheetLayout";
+
 
 export type CakeImageFormat = {
   id: string;
