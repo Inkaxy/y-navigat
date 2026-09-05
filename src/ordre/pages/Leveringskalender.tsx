@@ -1008,7 +1008,7 @@ export default function MatrixPage() {
       const rows = (data ?? []) as { section: string; payload: Record<string, unknown> }[];
       const cells =
         (rows.find((r) => r.section === "existing_cells")?.payload.items as
-          | MatrixCell[]
+          | MatrixCellRow[]
           | undefined) ?? [];
       const prev = aggregateExistingCells(cells).qty;
 
