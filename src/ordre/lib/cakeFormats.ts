@@ -6,8 +6,16 @@
 export const CAKE_DPI = 300;
 
 /** Ark vi trykker på. Deles med nestingen. */
-export { SHEET_SIZES as SHEETS, sheetSize } from "@/ordre/lib/cakeSheetLayout";
-export type { SheetOrientation } from "@/ordre/lib/cakeSheetLayout";
+import {
+  SHEET_SIZES,
+  sheetSize,
+  DEFAULT_MARGIN_MM,
+  type SheetOrientation,
+} from "@/ordre/lib/cakeSheetLayout";
+
+export { SHEET_SIZES as SHEETS, sheetSize };
+export type { SheetOrientation };
+
 
 
 export type CakeImageFormat = {
