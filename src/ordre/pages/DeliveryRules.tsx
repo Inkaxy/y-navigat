@@ -1,3 +1,4 @@
+import { osloTodayISO } from "@/lib/osloDate";
 import { useMemo, useState } from "react";
 import { Plus, Pencil, Trash2, Loader2, ListChecks, Search, Copy, ShieldAlert, TrendingUp, Ban, AlertTriangle, Info, Check } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -146,7 +147,7 @@ export default function DeliveryRules() {
     ruleType: "all",
   });
 
-  const todayISO = new Date().toISOString().slice(0, 10);
+  const todayISO = osloTodayISO();
   const rules = useMemo(
     () =>
       rawRules.filter((r) => {

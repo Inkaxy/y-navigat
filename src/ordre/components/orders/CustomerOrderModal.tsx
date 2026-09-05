@@ -48,6 +48,7 @@ import {
   isManualOverride,
   MANUAL_PRICE_SOURCE,
   PRICE_OVERRIDE_NOTE_PREFIX,
+  withPriceOverrideNote,
 } from "@/ordre/lib/orderLines";
 import { PriceOverrideReasonDialog } from "@/ordre/components/orders/PriceOverrideReasonDialog";
 import { ZeroPriceConfirmDialog } from "@/ordre/components/orders/ZeroPriceConfirmDialog";
@@ -77,7 +78,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { logAudit } from "@/ordre/lib/audit";
 import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
 import { MerknadDialog } from "@/ordre/components/orders/MerknadDialog";
-import { type Merknad, isMerknadEmpty, emptyMerknad } from "@/ordre/lib/merknad";
+import { type Merknad, isMerknadEmpty } from "@/ordre/lib/merknad";
 import {
   PENDING_CAKE_IMAGE_KEY,
   flushPendingCakeImages,
@@ -172,6 +173,8 @@ type LineDraft = {
   unit_price_source?: string | null;
   unit_price_source_id?: string | null;
   merknad: Merknad | null;
+  /** Fritekstnotat på linjen — bl.a. begrunnelse for manuell prisoverstyring. */
+  notes: string;
 };
 
 function newLine(): LineDraft {
@@ -182,6 +185,7 @@ function newLine(): LineDraft {
     unit_price: "0",
     is_fallback: false,
     merknad: null,
+    notes: "",
   };
 }
 
@@ -421,6 +425,7 @@ export function CustomerOrderModal({
               quantity: String(l.quantity),
               unit_price: String(l.unit_price),
               merknad: l.merknad,
+              notes: l.notes ?? "",
 
               // Synthetic ProductOption-ish for re-submission
               ...({
@@ -439,6 +444,7 @@ export function CustomerOrderModal({
             }))
           : [newLine()],
       );
+      skipNextDirtyRef.current = true;
       setDirty(false);
     } else if (!isEdit) {
       const iv = initialValues ?? null;
@@ -470,6 +476,7 @@ export function CustomerOrderModal({
       }
       setAttachmentChoice(initialChoice);
 
+      skipNextDirtyRef.current = true;
       setLines([newLine()]);
       setDirty(false);
     }
@@ -542,6 +549,7 @@ export function CustomerOrderModal({
           is_fallback: !ep || ep.is_fallback,
           effective_price: ep?.price ?? null,
           merknad: null,
+          notes: "",
         });
       }
       if (cancelled || drafts.length === 0) return;
@@ -699,6 +707,7 @@ export function CustomerOrderModal({
       product_unit_of_sale: p.unit_of_sale,
       product_mva_rate: p.mva_rate,
       quantity: "1",
+      notes: "",
       unit_price: ep ? String(ep.price) : "0",
       is_fallback: !ep || ep.is_fallback,
       merknad: null,
@@ -746,9 +755,7 @@ export function CustomerOrderModal({
   function handlePriceBlur(uid: string) {
     const line = lines.find((l) => l.uid === uid);
     if (!line || !isManualOverride(line.unit_price_source)) return;
-    const existing = (line.merknad as { price_override_reason?: string } | null)
-      ?.price_override_reason;
-    if (existing) return;
+    if (line.notes.includes(PRICE_OVERRIDE_NOTE_PREFIX)) return;
     setPriceOverrideUid(uid);
   }
 
@@ -830,7 +837,7 @@ export function CustomerOrderModal({
       unit_price_source: l.unit_price_source ?? null,
       unit_price_source_id: l.unit_price_source_id ?? null,
       merknad: l.merknad && !isMerknadEmpty(l.merknad) ? l.merknad : null,
-
+      notes: l.notes.trim() || null,
     }));
 
     return {
@@ -1576,15 +1583,7 @@ export function CustomerOrderModal({
           if (!uid) return;
           setLines((prev) =>
             prev.map((l) =>
-              l.uid === uid
-                ? {
-                    ...l,
-                    merknad: {
-                      ...(l.merknad ?? emptyMerknad),
-                      price_override_reason: `${PRICE_OVERRIDE_NOTE_PREFIX} ${reason.trim()}`,
-                    },
-                  }
-                : l,
+              l.uid === uid ? { ...l, notes: withPriceOverrideNote(l.notes, reason) } : l,
             ),
           );
         }}

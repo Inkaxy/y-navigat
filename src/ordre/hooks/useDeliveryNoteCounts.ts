@@ -74,7 +74,7 @@ export function useDeliveryNoteCounts(
 
       const pendingRecurring = isCorrection
         ? { total: 0, nullTourCount: 0, byTour: {} as Record<string, number> }
-        : await fetchPendingRecurringOrderCounts(date, toursQ.data ?? []);
+        : await fetchPendingRecurringOrderCounts(date, toursQ.data ?? [], pauses);
 
       const pendingFastordre = isCorrection
         ? 0

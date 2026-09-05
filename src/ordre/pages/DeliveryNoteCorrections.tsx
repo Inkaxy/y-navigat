@@ -20,6 +20,7 @@ type CorrectionRun = {
   status: string;
   started_at: string | null;
   finished_at: string | null;
+  completed_at: string | null;
   triggered_by: string | null;
   details: Record<string, unknown> | null;
 };
@@ -30,9 +31,10 @@ function useCorrectionRuns(dateFilter?: string) {
     queryFn: async (): Promise<CorrectionRun[]> => {
       let q = supabase
         .from("delivery_note_runs")
-        .select("id, delivery_date, tour_filter, notes_generated, orders_processed, orders_skipped, status, started_at, finished_at, triggered_by, details")
+        .select("id, delivery_date, tour_filter, notes_generated, orders_processed, orders_skipped, status, started_at, finished_at, completed_at, triggered_by, details")
         .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
         .eq("run_type", "correction")
+        .order("completed_at", { ascending: false, nullsFirst: false })
         .order("finished_at", { ascending: false, nullsFirst: false })
         .limit(200);
       if (dateFilter) q = q.eq("delivery_date", dateFilter);
@@ -121,7 +123,7 @@ export default function DeliveryNoteCorrections() {
               <TableBody>
                 {list.map((r) => {
                   const cancelled = (r.details as { notes_cancelled?: number } | null)?.notes_cancelled ?? 0;
-                  const ts = r.finished_at ?? r.started_at;
+                  const ts = r.completed_at ?? r.finished_at ?? r.started_at;
                   return (
                     <TableRow key={r.id}>
                       <TableCell className="font-mono text-xs">

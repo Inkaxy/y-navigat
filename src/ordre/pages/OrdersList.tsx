@@ -37,7 +37,6 @@ import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { QueryErrorState } from "@/components/common/QueryState";
 import {
-  needsClientLifecycleRefinement,
   useOrderList,
   type OrderListRow,
 } from "@/ordre/hooks/useOrders";
@@ -165,12 +164,9 @@ export default function OrdersList() {
       : r.status === "awaiting_confirmation"
         ? "awaiting"
         : "open");
-  // Kun «uten pakkseddel»/«pakkseddel» trenger en siste avgrensning på klienten.
-  const clientLifecycleFilter =
-    !acceptanceOnly && needsClientLifecycleRefinement(lifecycleFilter);
-  const rows = clientLifecycleFilter
-    ? allRows.filter((r) => lifecycleOf(r) === lifecycleFilter)
-    : allRows;
+  // Livssyklusen avgrenses nå i spørringen (samme kilde som orders_lifecycle),
+  // så den lastede siden vises som den er.
+  const rows = allRows;
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
 

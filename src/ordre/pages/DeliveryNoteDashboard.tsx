@@ -132,19 +132,20 @@ export default function DeliveryNoteDashboard() {
 
   const buttonState = useMemo(() => {
     if (mode === "correction") {
-      const pending = (counts?.datert ?? 0) + (counts?.ekstra ?? 0) + (counts?.retur ?? 0);
+      // Returer godkjennes for seg og skal ikke telles med i hovedkjøringen.
+      const pending = (counts?.datert ?? 0) + (counts?.ekstra ?? 0);
       if (pending === 0) {
         return {
           mode: "all_done" as const,
           label: "Ingen ordre å korrigere",
-          tooltip: "Alle daterte ordre og returordre t.o.m. valgt dato har pakksedler.",
+          tooltip: "Alle daterte og ekstra ordre t.o.m. valgt dato har pakksedler.",
           disabled: true,
         };
       }
       return {
         mode: "pending" as const,
         label: `Hovedkjøring (${pending} ordre t.o.m. ${formatDate(date)})`,
-        tooltip: "Generer pakksedler for alle daterte/retur-ordre t.o.m. valgt dato.",
+        tooltip: "Generer pakksedler for alle daterte og ekstra ordre t.o.m. valgt dato.",
         disabled: false,
       };
     }

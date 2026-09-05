@@ -65,7 +65,8 @@ export function CakeTextPanel({ obj, onLive, onCommit }: Props) {
   const curveDir = obj.cakeCurveDirection ?? "up";
 
   return (
-    <div className="space-y-3">
+    // Under 1024 px skal alle knappene være minst 40 px høye (touch-mål).
+    <div className="space-y-3 [&_button]:h-10 lg:[&_button]:h-8">
       <div className="text-sm font-semibold">Tekst</div>
 
       <Textarea

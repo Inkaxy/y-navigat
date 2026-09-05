@@ -20,7 +20,7 @@ export default tseslint.config(
     rules: {
       ...reactHooks.configs.recommended.rules,
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
-      "@typescript-eslint/no-unused-vars": "off",
+      "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
       "no-restricted-syntax": [
         "error",
         {
@@ -30,7 +30,7 @@ export default tseslint.config(
         },
         {
           selector:
-            "CallExpression[callee.property.name='slice'][callee.object.callee.property.name='toISOString']",
+            "CallExpression[callee.property.name='slice'][callee.object.callee.property.name='toISOString'][arguments.0.value=0][arguments.1.value=10]",
           message:
             "Bruk osloTodayISO()/osloDateISO() fra @/lib/osloDate i stedet for toISOString().slice(0, 10).",
         },

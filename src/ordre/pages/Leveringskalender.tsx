@@ -13,10 +13,7 @@ import {
   Loader2,
   RotateCcw,
   Plus,
-  StickyNote,
-  Layers,
   ArrowRight,
-  MoreHorizontal,
   Copy,
   MessageSquare,
   Trash2,
@@ -24,23 +21,18 @@ import {
   ChevronDown,
   Repeat,
   Eye,
-  BookOpen,
   CalendarIcon,
-  ShoppingCart,
 } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { format as fmtDate } from "date-fns";
 import { nb } from "date-fns/locale";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { AppBanner } from "@/ordre/components/shell/AppBanner";
 import { QueryEmptyState, QueryErrorState } from "@/components/common/QueryState";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -93,7 +85,6 @@ import {
   useDeleteMatrixColumn,
 } from "@/ordre/hooks/useColumnComments";
 import { useGenerateDeliveryNotes } from "@/ordre/hooks/useGenerateDeliveryNotes";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useNBCustomers, useCustomerById } from "@/ordre/hooks/useNBCustomers";
 import {
   useMatrixData,
@@ -113,10 +104,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useUserAccess } from "@/ordre/hooks/useUserAccess";
 import { useCustomerWeather, type WeatherMap } from "@/ordre/hooks/useCustomerWeather";
 import { WeatherCell } from "@/ordre/components/orders/WeatherCell";
-import { useRecurringGhost, type RecurringGhostMap } from "@/ordre/hooks/useRecurringGhost";
+import { useRecurringGhost } from "@/ordre/hooks/useRecurringGhost";
 import { useOrdersLifecycle } from "@/ordre/hooks/useOrdersLifecycle";
-import { OrderKindBadge } from "@/ordre/components/orders/OrderKindBadge";
-import { LifecycleBadge } from "@/ordre/components/orders/LifecycleBadge";
 import { getKindMeta, type OrderKind } from "@/ordre/lib/orderStatus";
 
 /** Fargetone for en matrisekolonne — styrer bakgrunn i header og celler. */
@@ -132,11 +121,10 @@ import {
   useDeliveryPausesForCustomer,
   isPaused,
   type PauseMap,
-  type PauseInfo,
 } from "@/ordre/hooks/useDeliveryPausesForCustomer";
-import { formatNOK, todayISO } from "@/ordre/lib/format";
+import { todayISO } from "@/ordre/lib/format";
 import { cn } from "@/lib/utils";
-import { type Merknad, isMerknadEmpty, parseMerknad } from "@/ordre/lib/merknad";
+import { type Merknad, isMerknadEmpty } from "@/ordre/lib/merknad";
 import {
   type QuickRange,
   rangeFor,
@@ -153,7 +141,6 @@ import {
   aggregateExistingCells,
   computeDirtyChanges,
   computeTotals,
-  effectiveCellQty,
   visibleGhostQty,
 } from "@/ordre/lib/matrixEdits";
 import { ChangeTourDialog } from "@/ordre/components/orders/ChangeTourDialog";
@@ -473,21 +460,9 @@ export default function MatrixPage() {
     return g > 0 ? String(g) : "";
   }
 
-  /** True når cellen viser et fastordre-tall som ennå ikke er materialisert. */
-  function isGhostCell(key: CellKey): boolean {
-    return visibleGhostQty({ key, ...ghostRuleBase }) > 0;
-  }
-
   function getEffectiveQty(key: CellKey): number {
     if (key in edits) return Number(edits[key] || 0);
     return existingQty[key] ?? 0;
-  }
-
-  function isDirty(key: CellKey): boolean {
-    if (!(key in edits)) return false;
-    const editedNum = Number(edits[key] || 0);
-    const existing = existingQty[key] ?? 0;
-    return editedNum !== existing;
   }
 
   /** Stabil lagre-referanse så cellene ikke re-rendrer ved hver endring. */
@@ -730,12 +705,6 @@ export default function MatrixPage() {
     // Filtrer bort qty 0
     return Array.from(rowMap.values()).filter((r) => r.quantity > 0);
   }, [matrix, edits, allProducts, ghostMap, visibleDates, ghostRuleBase]);
-
-  const unsavedAddedCount = useMemo(() => {
-    return addedProducts.filter((p) => {
-      return !dirtyChanges.some((c) => c.product_id === p.id && c.quantity > 0);
-    }).length;
-  }, [addedProducts, dirtyChanges]);
 
   // ----- Totals (net kr) -----
   // Per-cell value = qty * (product.unit_price ?? 0). Per-row sum, per-col sum, grand total.

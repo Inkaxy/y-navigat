@@ -93,6 +93,7 @@ export type CustomerOrderLineDraftLoaded = {
   quantity: number;
   unit_price: number;
   merknad: Merknad | null;
+  notes: string;
 };
 
 
@@ -121,7 +122,7 @@ export function useCustomerOrderDetail(orderId: string | null) {
 
       const { data: lines, error: linesErr } = await supabase
         .from("order_lines")
-        .select("id, product_id, product_snapshot, quantity, unit_price, sales_unit, line_number, merknad")
+        .select("id, product_id, product_snapshot, quantity, unit_price, sales_unit, line_number, merknad, notes")
         .eq("order_id", orderId!)
         .order("line_number", { ascending: true });
       if (linesErr) throw linesErr;
@@ -159,6 +160,7 @@ export function useCustomerOrderDetail(orderId: string | null) {
             quantity: Number(l.quantity),
             unit_price: Number(l.unit_price),
             merknad: parseMerknad(l.merknad),
+            notes: (l as { notes?: string | null }).notes ?? "",
           };
         }),
       };
@@ -217,6 +219,8 @@ export type CustomerOrderLineInput = {
   unit_price_source?: string | null;
   unit_price_source_id?: string | null;
   merknad?: Merknad | null;
+  /** Fritekstnotat på linjen (bl.a. begrunnelse for manuell prisoverstyring). */
+  notes?: string | null;
 };
 
 
@@ -341,7 +345,7 @@ export function useCreateCustomerOrder() {
             line_vat: Number(vat.toFixed(2)),
             line_total_incl_vat: Number((subtotal + vat).toFixed(2)),
             merknad: l.merknad ? (l.merknad as unknown as Record<string, unknown>) : null,
-
+            notes: l.notes ?? null,
           };
         });
         const { error: linesErr } = await supabase.from("order_lines").insert(lineRows as never);
@@ -519,6 +523,7 @@ export function useUpdateCustomerOrder() {
               line_vat: Number(vat.toFixed(2)),
               line_total_incl_vat: Number((subtotal + vat).toFixed(2)),
               merknad: l.merknad ? (l.merknad as unknown as Record<string, unknown>) : null,
+              notes: l.notes ?? null,
             };
           });
         }
@@ -612,7 +617,7 @@ export function useDeleteCustomerOrder() {
           console.warn("[useDeleteCustomerOrder] kunne ikke slette kakebilde", err);
         }
       }
-      // Delete lines first (no FK CASCADE configured, do it explicitly)
+      // Slett linjene eksplisitt før ordrehodet.
       const { error: lineErr } = await supabase.from("order_lines").delete().eq("order_id", orderId);
       if (lineErr) throw lineErr;
       const { error } = await supabase.from("orders").delete().eq("id", orderId);

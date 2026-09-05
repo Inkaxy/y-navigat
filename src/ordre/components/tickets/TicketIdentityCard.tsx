@@ -57,7 +57,7 @@ export default function TicketIdentityCard({
           {known ? (
             <>
               <Link
-                to={`/kunder/kunder/${customer!.id}`}
+                to={`/kunder/kundeliste/${customer!.id}`}
                 className="font-display block truncate text-base font-semibold text-foreground underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 {customer!.display_name}
@@ -177,7 +177,7 @@ function CustomerQuickContext({ customerId }: { customerId: string }) {
         </ul>
       )}
       <Link
-        to={`/kunder/kunder/${customerId}`}
+        to={`/kunder/kundeliste/${customerId}`}
         className="inline-block text-caption text-primary underline-offset-2 hover:underline"
       >
         Åpne kundekort
