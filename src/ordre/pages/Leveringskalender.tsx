@@ -2056,15 +2056,36 @@ function MatrixGrid({
     unit: string | null;
     price: number | null;
   } | null>(null);
-  const dateGroups = useMemo(() => {
+  /**
+   * Kolonnene som faktisk rendres: turkolonner, pluss én read-only «Uten tur»-kolonne
+   * per dato der kunden har bestilte linjer uten tildelt tur.
+   */
+  type RenderCol =
+    | { kind: "tour"; date: string; tour: MatrixTour }
+    | { kind: "notour"; date: string };
+
+  const { dateGroups, renderCols } = useMemo(() => {
     const groups: { date: string; count: number }[] = [];
+    const cols: RenderCol[] = [];
     for (const c of columns) {
       const last = groups[groups.length - 1];
       if (last && last.date === c.date) last.count++;
-      else groups.push({ date: c.date, count: 1 });
+      else {
+        if (last && noTourByDate.get(last.date)?.size) {
+          last.count++;
+          cols.push({ kind: "notour", date: last.date });
+        }
+        groups.push({ date: c.date, count: 1 });
+      }
+      cols.push({ kind: "tour", date: c.date, tour: c.tour });
     }
-    return groups;
-  }, [columns]);
+    const last = groups[groups.length - 1];
+    if (last && noTourByDate.get(last.date)?.size) {
+      last.count++;
+      cols.push({ kind: "notour", date: last.date });
+    }
+    return { dateGroups: groups, renderCols: cols };
+  }, [columns, noTourByDate]);
 
   /** Antall-summer: per rad (uke) og per kolonne (dag × tur) — dempet, sekundær info. */
   const qtySums = useMemo(() => {
@@ -2072,18 +2093,23 @@ function MatrixGrid({
     const cols: Record<string, number> = {};
     for (const p of products) {
       let rowSum = 0;
-      for (const c of columns) {
-        const v = getValue(ckey(c.date, c.tour.id, p.id));
-        const n = v ? Number(v.replace(",", ".")) || 0 : 0;
+      for (const c of renderCols) {
+        const n =
+          c.kind === "tour"
+            ? (() => {
+                const v = getValue(ckey(c.date, c.tour.id, p.id));
+                return v ? Number(v.replace(",", ".")) || 0 : 0;
+              })()
+            : noTourByDate.get(c.date)?.get(p.id)?.quantity ?? 0;
         if (!n) continue;
         rowSum += n;
-        const k = `${c.date}|${c.tour.id}`;
+        const k = c.kind === "tour" ? colKeyOf(c.date, c.tour.id) : `${c.date}|`;
         cols[k] = (cols[k] ?? 0) + n;
       }
       rows[p.id] = rowSum;
     }
     return { rows, cols };
-  }, [columns, products, getValue]);
+  }, [renderCols, products, getValue, noTourByDate]);
 
   return (
     <div className="min-w-max">
