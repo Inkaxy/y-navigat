@@ -648,7 +648,10 @@ export default function NewOrder() {
     setZeroPriceConfirmed(false);
   }, [riskyPriceCount]);
 
-  async function save(overrideReason: string | null = pendingOverrideReason) {
+  async function save(
+    overrideReason: string | null = pendingOverrideReason,
+    forceZeroPrice = false,
+  ) {
     if (!customer) {
       toast.error("Velg en kunde");
       return;
@@ -680,7 +683,7 @@ export default function NewOrder() {
       setOverrideReasonUid(missingReason.uid);
       return;
     }
-    if (!zeroPriceConfirmed && riskyPriceCount > 0) {
+    if (!forceZeroPrice && !zeroPriceConfirmed && riskyPriceCount > 0) {
       setZeroPriceOpen(true);
       return;
     }
@@ -1035,7 +1038,8 @@ export default function NewOrder() {
                 </div>
                 {lines.map((l) => {
                   const t = calcLineTotals(l);
-                  const overridden = l.unit_price_source === "manual_override";
+                  const overridden = isManualOverride(l.unit_price_source);
+                  const priceRisky = isPriceRisky({ hasProduct: !!l.product, unit_price: l.unit_price });
                   const isDivisible = !!l.product?.is_divisible;
                   return (
                     <div key={l.uid} className="rounded-md py-2 transition-colors hover:bg-muted/40">
@@ -1057,7 +1061,12 @@ export default function NewOrder() {
                               </Button>
                             </div>
                           ) : (
-                            <ProductCombobox onSelect={(p) => selectProductForLine(l.uid, p)} priceListId={productPriceListId} />
+                            <ProductSearchInput
+                              onSelect={(p) => void selectProductForLine(l.uid, p)}
+                              priceListId={productPriceListId}
+                              focusKey={l.uid}
+                              scope="ordre:ny-ordre:produktsok"
+                            />
                           )}
                         </div>
                         <Input
@@ -1066,6 +1075,13 @@ export default function NewOrder() {
                           min="1"
                           step={isDivisible ? "0.001" : "1"}
                           value={l.quantity}
+                          data-order-line-qty={l.uid}
+                          aria-label={`Mengde for ${l.product?.display_name ?? "ny linje"}`}
+                          onKeyDown={(e) => {
+                            if (e.key !== "Enter") return;
+                            e.preventDefault();
+                            confirmLineAndContinue(l.uid);
+                          }}
                           onChange={(e) => {
                             const v = e.target.value;
                             if (!isDivisible) {
@@ -1104,7 +1120,10 @@ export default function NewOrder() {
                             step="0.0001"
                             value={l.unit_price}
                             onChange={(e) => setManualPrice(l.uid, e.target.value)}
+                            onBlur={() => handlePriceBlur(l.uid)}
                             disabled={!l.product}
+                            aria-label={`Pris per enhet for ${l.product?.display_name ?? "ny linje"}`}
+                            aria-invalid={priceRisky}
                             className="h-9 pr-8 text-right text-sm tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                           />
                           <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
