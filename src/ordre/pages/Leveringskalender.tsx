@@ -406,6 +406,18 @@ export default function MatrixPage() {
   const fallbackCells = existingIndex.fallback;
   const cellOrderIds = existingIndex.orderIds;
 
+  /** Bestilte linjer uten tur, gruppert per dato → produkt (read-only kolonne). */
+  const noTourByDate = useMemo(() => {
+    const m = new Map<string, Map<string, NoTourEntry>>();
+    for (const e of existingIndex.noTour.values()) {
+      if (e.quantity <= 0) continue;
+      let inner = m.get(e.date);
+      if (!inner) m.set(e.date, (inner = new Map()));
+      inner.set(e.productId, e);
+    }
+    return m;
+  }, [existingIndex]);
+
   // Ordre-id per kolonne (dato|tur) → livssyklus/ordretype for kolonne-header
   const colOrderId = existingIndex.colOrderId;
 
