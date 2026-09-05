@@ -438,6 +438,8 @@ export default function NewOrder() {
   linesRef.current = lines;
   const [submitting, setSubmitting] = useState(false);
   const [copyDialogOpen, setCopyDialogOpen] = useState(false);
+  /** Settes når ordren er lagret — da skal ikke ulagret-vakten slå til. */
+  const [savedOrder, setSavedOrder] = useState(false);
   const submittingRef = useRef(submitting);
   submittingRef.current = submitting;
   const today = todayISO();
@@ -897,6 +899,7 @@ export default function NewOrder() {
       }
 
       toast.success(`Ordre ${numRow.order_number} opprettet`);
+      setSavedOrder(true);
       navigate("/ordre/ordrer");
     } catch (e) {
       console.error(e);
@@ -909,8 +912,16 @@ export default function NewOrder() {
   // Bind save til ref for keyboard shortcuts
   saveRef.current = save;
 
+  /** Ulagret-vakt: ordreutkast med kunde eller varelinjer skal ikke forsvinne stille. */
+  const hasDraftLines = lines.some((l) => l.product || Number(l.quantity) > 0);
+  const unsavedGuard = useUnsavedChangesGuard(!savedOrder && (!!customer || hasDraftLines));
+
   return (
     <>
+      <UnsavedChangesDialog
+        {...unsavedGuard.dialogProps}
+        description="Ordreutkastet er ikke lagret ennå. Forkaster du det, forsvinner linjene du har lagt inn."
+      />
       <AppBanner
         title={isReturn ? "Ny returordre" : "Ny ordre"}
         subtitle={isReturn ? "Manuell registrering av returordre" : "Manuell registrering av salgsordre"}
