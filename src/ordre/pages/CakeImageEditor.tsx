@@ -1072,7 +1072,10 @@ export default function CakeImageEditor() {
       widthMm: dims.widthMm,
       heightMm: dims.heightMm,
       isRound: dims.isRound,
-      labelNumber: image ? resolveLabelNumber(image) : null,
+      labelNumber: image
+        ? ((await withResolvedLabelNumbers([image]))[0]?.resolved_label_number ?? null)
+        : null,
+
       sheet: format?.sheet ?? "A4",
       bleedMm: format?.bleed_mm ?? 0,
       productName,
