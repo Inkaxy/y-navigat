@@ -1638,6 +1638,13 @@ export default function MatrixPage() {
                   <Copy className="h-4 w-4 mr-2" />
                   For alle dager
                 </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() => void copyPreviousWeek()}
+                  disabled={!canEdit || copyPrevWeekBusy || allProducts.length === 0}
+                >
+                  <Copy className="h-4 w-4 mr-2" />
+                  Kopier forrige uke
+                </DropdownMenuItem>
                 <DropdownMenuItem onSelect={(e) => { e.preventDefault(); toggleShowAllProducts(); }}>
                   <Plus className="h-4 w-4 mr-2" />
                   Vis alle varer {showAllProducts ? "✓" : ""}
