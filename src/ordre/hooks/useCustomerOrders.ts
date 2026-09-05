@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
 import { fetchEffectivePricesBatch, type PriceCaller } from "@/ordre/hooks/useNBProducts";
 import { parseMerknad, type Merknad } from "@/ordre/lib/merknad";
+import { isManualOverride } from "@/ordre/lib/orderLines";
 import { deleteCakeImage, type CakeImage } from "@/ordre/lib/cakeImages";
 
 export type CustomerOrderRow = {
