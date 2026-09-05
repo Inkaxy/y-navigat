@@ -21,6 +21,7 @@ import {
   CONFIDENCE_TOKEN,
   confidenceLevel,
 } from "@/ordre/lib/aiConfidence";
+import { useOrdreDeskSettings } from "@/ordre/hooks/useOrdreDeskSettings";
 
 export interface LinkedOrderData {
   order: {
@@ -245,8 +246,8 @@ export default function OrderLinkCard({
                   Foreslått ordre
                 </span>
                 <StatusPill
-                  label={CONFIDENCE_LABEL[(confidenceLevel(best.match_confidence) ?? "low")]}
-                  tokenVar={CONFIDENCE_TOKEN[(confidenceLevel(best.match_confidence) ?? "low")]}
+                  label={CONFIDENCE_LABEL[(confidenceLevel(best.match_confidence, thresholds) ?? "low")]}
+                  tokenVar={CONFIDENCE_TOKEN[(confidenceLevel(best.match_confidence, thresholds) ?? "low")]}
                   size="sm"
                 />
               </div>
@@ -311,8 +312,8 @@ export default function OrderLinkCard({
                     #{c.order_number ?? c.order_id.slice(0, 8)}
                     {c.snapshot?.customer_name ? ` · ${c.snapshot.customer_name}` : ""}
                     <StatusPill
-                      label={CONFIDENCE_SHORT[(confidenceLevel(c.match_confidence) ?? "low")]}
-                      tokenVar={CONFIDENCE_TOKEN[(confidenceLevel(c.match_confidence) ?? "low")]}
+                      label={CONFIDENCE_SHORT[(confidenceLevel(c.match_confidence, thresholds) ?? "low")]}
+                      tokenVar={CONFIDENCE_TOKEN[(confidenceLevel(c.match_confidence, thresholds) ?? "low")]}
                       size="sm"
                       hideDot
                     />

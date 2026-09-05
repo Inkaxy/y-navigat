@@ -8,6 +8,7 @@ import {
   type ConfidenceThresholds,
   type FieldSuggestion,
 } from "@/ordre/lib/aiConfidence";
+import { useOrdreDeskSettings } from "@/ordre/hooks/useOrdreDeskSettings";
 import type { AiSuggestion } from "@/ordre/lib/aiSuggestion";
 
 /** Norske etiketter for feltene AI kan foreslå på en henvendelse. */
@@ -79,7 +80,13 @@ export default function AiFieldSuggestions({
   ai: AiSuggestion | null;
   max?: number;
 }) {
-  const suggestions = buildFieldSuggestions(ai).slice(0, max);
+  const { data: desk } = useOrdreDeskSettings();
+  const suggestions = buildFieldSuggestions(
+    ai,
+    desk
+      ? { high: desk.confidenceHigh, medium: desk.confidenceMedium }
+      : DEFAULT_CONFIDENCE_THRESHOLDS,
+  ).slice(0, max);
 
   if (suggestions.length === 0) {
     return (
