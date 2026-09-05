@@ -1113,8 +1113,9 @@ export default function CakeImageEditor() {
   };
 
   const printNow = async () => {
-
     if (!image) return;
+    if (!checkPrintGate()) return;
+
     try {
       const item = await buildItem(renderDataUrl());
       await printFlow.printItems([item], { [image.id]: image.status });

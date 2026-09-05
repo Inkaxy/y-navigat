@@ -75,15 +75,21 @@ export function CakeProductionOverview({ date }: { date: string }) {
       const { data, error } = await supabase
         .from("label_units")
         .select(
-          "id, number, order_id, order_line_id, product_id, product:products(display_name, label_mode, cake_role, is_cake_component), order:orders(order_number, delivery_tour_id, final_customer_name, delivery_tours(name))",
+          "id, number, order_id, order_line_id, product_id, product:products!inner(display_name, label_mode, cake_role, is_cake_component), order:orders(order_number, delivery_tour_id, final_customer_name, delivery_tours(name))",
         )
         .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
         .eq("seq_date", date)
         .neq("status", "cancelled")
+        // Bare kakeprodukter — filtreres i spørringen, ellers spiser andre
+        // etikett-enheter opp grensen på 500.
+        .or("label_mode.not.in.(none),cake_role.eq.base,is_cake_component.is.true", {
+          referencedTable: "product",
+        })
         .order("number", { ascending: true })
         .limit(500);
       if (error) throw error;
       return (data ?? []) as unknown as UnitRow[];
+
     },
   });
 
