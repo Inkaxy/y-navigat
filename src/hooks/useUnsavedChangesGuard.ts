@@ -1,15 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useUnsavedGuardContext } from "@/providers/UnsavedGuardProvider";
 
 /**
  * Felles vakt mot å miste ulagrede endringer.
  *
  * NBhub kjører `<BrowserRouter>` (ikke data-router), så `useBlocker` fra
- * react-router-dom kan ikke brukes. Vakten dekker derfor de tre reelle
+ * react-router-dom kan ikke brukes. Vakten dekker derfor de fire reelle
  * måtene arbeid går tapt på:
  *  1. Klikk på en intern lenke (fanges i capture-fasen før routeren).
- *  2. Nettleserens tilbake-knapp (`popstate`).
- *  3. Lukking/oppdatering av fanen (`beforeunload`).
+ *  2. Nettleserens tilbake-knapp (`popstate`, med en ekstra historikk-
+ *     oppføring slik at routeren ikke rekker å bytte side først).
+ *  3. Programmatisk navigasjon i skallet (`useGuardedNavigate`).
+ *  4. Lukking/oppdatering av fanen (`beforeunload`).
  * I tillegg kan siden selv be om bekreftelse for egne handlinger
  * (bytte av kunde, periode, lukking av panel) via `requestAction`.
  */
@@ -32,6 +35,13 @@ export type UnsavedChangesGuard = {
   dialogProps: UnsavedGuardDialogProps;
 };
 
+const GUARD_STATE = { nbhubUnsavedGuard: true };
+
+function hasSentinel() {
+  const state = window.history.state as { nbhubUnsavedGuard?: boolean } | null;
+  return !!state?.nbhubUnsavedGuard;
+}
+
 export function useUnsavedChangesGuard(
   isDirty: boolean,
   onDiscard?: () => void,
@@ -42,7 +52,9 @@ export function useUnsavedChangesGuard(
   onDiscardRef.current = onDiscard;
 
   const navigate = useNavigate();
+  const guardCtx = useUnsavedGuardContext();
   const pendingRef = useRef<(() => void) | null>(null);
+  const sentinelRef = useRef(false);
   const [blocked, setBlocked] = useState(false);
 
   const requestAction = useCallback((action: () => void) => {
@@ -63,9 +75,16 @@ export function useUnsavedChangesGuard(
     const action = pendingRef.current;
     pendingRef.current = null;
     setBlocked(false);
+    dirtyRef.current = false;
     onDiscardRef.current?.();
     action?.();
   }, []);
+
+  // 0) Programmatisk navigasjon i skallet går gjennom denne vakten.
+  useEffect(() => {
+    if (!guardCtx || !isDirty) return;
+    return guardCtx.register((action) => requestAction(action));
+  }, [guardCtx, isDirty, requestAction]);
 
   // 1) Interne lenkeklikk
   useEffect(() => {
@@ -90,13 +109,28 @@ export function useUnsavedChangesGuard(
     return () => document.removeEventListener("click", onClick, true);
   }, [navigate]);
 
-  // 2) Nettleserens tilbake-knapp
+  // 2) Tilbake-knappen: legg inn en ekstra oppføring på samme adresse mens
+  //    arbeidet er ulagret, slik at «tilbake» treffer vakten og ikke routeren.
+  useEffect(() => {
+    if (isDirty && !sentinelRef.current) {
+      window.history.pushState(GUARD_STATE, "", window.location.href);
+      sentinelRef.current = true;
+    } else if (!isDirty && sentinelRef.current) {
+      sentinelRef.current = false;
+      if (hasSentinel()) window.history.back();
+    }
+  }, [isDirty]);
+
   useEffect(() => {
     const onPopState = () => {
       if (!dirtyRef.current) return;
-      // Legg tilbake gjeldende adresse, og gå ett steg tilbake først når brukeren forkaster.
-      window.history.pushState(null, "", window.location.href);
-      pendingRef.current = () => window.history.go(-1);
+      // Legg tilbake vakt-oppføringen, og gå to steg tilbake når brukeren forkaster.
+      window.history.pushState(GUARD_STATE, "", window.location.href);
+      sentinelRef.current = true;
+      pendingRef.current = () => {
+        sentinelRef.current = false;
+        window.history.go(-2);
+      };
       setBlocked(true);
     };
     window.addEventListener("popstate", onPopState);
