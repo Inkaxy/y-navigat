@@ -7,9 +7,18 @@
  * Ingen max-width, ingen object-fit: contain.
  */
 import jsPDF from "jspdf";
+import QRCode from "qrcode";
 import type { CakeImage } from "@/ordre/lib/cakeImages";
 import type { CakeImageFormat } from "@/ordre/lib/cakeFormats";
 import { formatDims } from "@/ordre/lib/cakeFormats";
+import {
+  fitsOnSheet,
+  packSheets,
+  sheetSize,
+  type PackItem,
+  type SheetOrientation,
+} from "@/ordre/lib/cakeSheetLayout";
+import { resolveLabelNumber } from "@/ordre/lib/labelNumber";
 
 export const A4 = { widthMm: 210, heightMm: 297 };
 /** Linjal langs kanten — måler du 50 mm med linjal, har skriveren ikke skalert. */
@@ -29,6 +38,12 @@ export type CakePrintItem = {
   customerName?: string | null;
   deliveryDate?: string | null;
   title?: string | null;
+  /** Ark formatet krever (A4/A3). */
+  sheet?: string | null;
+  bleedMm?: number | null;
+  /** Fra ordrelinjen: produktnavn og tekst på kaken. */
+  productName?: string | null;
+  cakeText?: string | null;
 };
 
 export type CakePrintKind = "print" | "reprint" | "pdf" | "test";
@@ -56,6 +71,7 @@ export function itemToPrint(
   image: CakeImage,
   url: string,
   format?: CakeImageFormat | null,
+  extra?: { productName?: string | null; cakeText?: string | null },
 ): CakePrintItem {
   const size = physicalSize(image, format);
   return {
@@ -64,7 +80,11 @@ export function itemToPrint(
     widthMm: size.widthMm,
     heightMm: size.heightMm,
     isRound: size.isRound,
-    labelNumber: image.label_number ?? null,
+    labelNumber: image.resolved_label_number ?? resolveLabelNumber(image),
+    sheet: format?.sheet ?? "A4",
+    bleedMm: format?.bleed_mm ?? 0,
+    productName: extra?.productName ?? null,
+    cakeText: extra?.cakeText ?? null,
     orderRef: image.order_ref ?? null,
     customerName: image.customer_name ?? null,
     deliveryDate: image.delivery_date ?? null,
