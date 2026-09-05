@@ -43,7 +43,6 @@ import { RecurringScheduleDialog } from "@/ordre/components/orders/RecurringSche
 import { isScheduleLiveNow } from "@/ordre/lib/recurringOverrides";
 import { osloTodayISO } from "@/lib/osloDate";
 
-const TODAY_ISO = osloTodayISO();
 
 export default function RecurringOrders() {
   const [search, setSearch] = useState("");
@@ -166,8 +165,8 @@ export default function RecurringOrders() {
                       <div className="text-sm font-medium">Ingen fastordre ennå</div>
                       <p className="text-xs text-muted-foreground">
                         Fastordre er ukentlige maler som beskriver hva en kunde normalt
-                        mottar. De brukes som referanse — de genererer ikke automatisk
-                        faktiske ordre.
+                        mottar. Malen blir automatisk til faktiske ordre i matrisen og på
+                        pakksedlene for hver leveringsdag.
                       </p>
                       <Button onClick={openNew} size="sm" className="gap-1.5">
                         <Plus className="h-3.5 w-3.5" /> Opprett din første fastordre

@@ -328,7 +328,7 @@ export default function DeliveryNoteDashboard() {
       }
       toast.success(`Angring fullført — ${parts.join(", ")}.`);
       await logAudit({
-        action: "undo_delivery_runs",
+        action: "undo",
         entity_type: "delivery_note_run",
         entity_id: null,
         entity_display_reference: `${date} · ${tourFilter ? `tur ${tourFilter[0]}` : "alle turer"}`,
