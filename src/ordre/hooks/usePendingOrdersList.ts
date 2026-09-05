@@ -139,6 +139,7 @@ export function usePendingOrdersList(
           date,
           tours,
           tourId,
+          pauses,
         );
         for (const p of pending) {
           rows.push({
