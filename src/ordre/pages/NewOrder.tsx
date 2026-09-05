@@ -16,9 +16,24 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
 import { tomorrow, todayISO, formatNOK } from "@/ordre/lib/format";
-import { useNBCustomers, type CustomerOption } from "@/ordre/hooks/useNBCustomers";
-import { useNBProducts, fetchEffectivePrice, categorizePriceSource, type ProductOption } from "@/ordre/hooks/useNBProducts";
-import { useDebouncedValue } from "@/ordre/hooks/useDebouncedValue";
+import { type CustomerOption } from "@/ordre/hooks/useNBCustomers";
+import { fetchEffectivePrice, type ProductOption } from "@/ordre/hooks/useNBProducts";
+import { CustomerCombobox } from "@/ordre/components/orders/CustomerCombobox";
+import { ProductSearchInput } from "@/ordre/components/orders/ProductSearchInput";
+import { PriceSourceBadge } from "@/ordre/components/orders/PriceSourceBadge";
+import { ZeroPriceConfirmDialog } from "@/ordre/components/orders/ZeroPriceConfirmDialog";
+import { PriceOverrideReasonDialog } from "@/ordre/components/orders/PriceOverrideReasonDialog";
+import {
+  calcLineTotals,
+  countRiskyPriceLines,
+  focusOrderLineField,
+  isManualOverride,
+  isPriceRisky,
+  MANUAL_PRICE_SOURCE,
+  PRICE_OVERRIDE_NOTE_PREFIX,
+  shouldRepriceCopiedLine,
+  withPriceOverrideNote,
+} from "@/ordre/lib/orderLines";
 import { logAudit } from "@/ordre/lib/audit";
 import { logTicketEvent } from "@/ordre/lib/ticketEvents";
 import { TourPicker } from "@/ordre/components/orders/TourPicker";
@@ -61,174 +76,6 @@ function newLine(): LineDraft {
     vat_rate: 15,
     notes: "",
   };
-}
-
-function calcLineTotals(line: LineDraft) {
-  const qty = Number(line.quantity) || 0;
-  const price = Number(line.unit_price) || 0;
-  const disc = Number(line.discount_percent) || 0;
-  const subtotal = qty * price * (1 - disc / 100);
-  const vat = subtotal * (Number(line.vat_rate) / 100);
-  return { subtotal, vat, total: subtotal + vat };
-}
-
-function CustomerCombobox({
-  value,
-  onSelect,
-}: {
-  value: CustomerOption | null;
-  onSelect: (c: CustomerOption | null) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [q, setQ] = useState("");
-  const debouncedQ = useDebouncedValue(q, 250);
-  const { data: customers, isLoading } = useNBCustomers(debouncedQ);
-
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button variant="outline" role="combobox" className="w-full justify-between">
-          {value ? `${value.customer_number} — ${value.display_name}` : "Velg kunde..."}
-          <Search className="ml-2 h-4 w-4 opacity-60" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent align="start" className="w-[420px] p-0">
-        <div className="border-b border-border p-2">
-          <Input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Søk navn, kundenr, orgnr..."
-            autoFocus
-          />
-        </div>
-        <div className="max-h-[320px] overflow-y-auto">
-          {isLoading ? (
-            <div className="p-4 text-center text-sm text-muted-foreground">
-              <Loader2 className="mx-auto h-4 w-4 animate-spin" />
-            </div>
-          ) : !customers || customers.length === 0 ? (
-            <div className="p-4 text-center text-sm text-muted-foreground">Ingen treff</div>
-          ) : (
-            customers.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                className="flex w-full items-start gap-2 border-b border-border px-3 py-2 text-left text-sm hover:bg-accent"
-                onClick={() => {
-                  onSelect(c);
-                  setOpen(false);
-                }}
-              >
-                <div className="flex-1">
-                  <div className="font-medium">{c.display_name}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {c.customer_number}
-                    {c.organization_number ? ` · ${c.organization_number}` : ""}
-                  </div>
-                </div>
-                {value?.id === c.id && <Check className="h-4 w-4 text-primary" />}
-              </button>
-            ))
-          )}
-        </div>
-      </PopoverContent>
-    </Popover>
-  );
-}
-
-function ProductCombobox({
-  onSelect,
-  autoFocus,
-  priceListId,
-}: {
-  onSelect: (p: ProductOption) => void;
-  autoFocus?: boolean;
-  priceListId: string | null;
-}) {
-  const [open, setOpen] = useState(false);
-  const [q, setQ] = useState("");
-  const debouncedQ = useDebouncedValue(q, 250);
-  const { data: products, isLoading } = useNBProducts(debouncedQ, priceListId);
-
-  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    // Shortcut 6.4: Enter i produktsøk velger første treff
-    if (e.key === "Enter" && products && products.length > 0) {
-      e.preventDefault();
-      onSelect(products[0]);
-      setOpen(false);
-    }
-  }
-
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button variant="outline" size="sm" className="h-8 w-full justify-start text-left" autoFocus={autoFocus}>
-          <Search className="mr-1.5 h-3.5 w-3.5" />
-          <span className="truncate text-xs text-muted-foreground">Velg produkt...</span>
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent align="start" className="w-[420px] p-0">
-        <div className="border-b border-border p-2">
-          <Input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Søk produktnavn eller kode... (Enter velger første treff)"
-            autoFocus
-          />
-        </div>
-        <div className="max-h-[320px] overflow-y-auto">
-          {isLoading ? (
-            <div className="p-4 text-center text-sm text-muted-foreground">
-              <Loader2 className="mx-auto h-4 w-4 animate-spin" />
-            </div>
-          ) : !priceListId ? (
-            <div className="p-4 text-center text-sm text-muted-foreground">
-              Kunden har ingen prisliste. Sett standard prisliste på kunden for å kunne velge varer.
-            </div>
-          ) : !products || products.length === 0 ? (
-            <div className="p-4 text-center text-sm text-muted-foreground">Ingen varer i kundens prisliste{q ? " matcher søket" : ""}.</div>
-          ) : (
-            products.map((p, idx) => (
-              <button
-                key={p.id}
-                type="button"
-                className={`flex w-full items-start gap-2 border-b border-border px-3 py-2 text-left text-sm hover:bg-accent ${idx === 0 ? "bg-accent/30" : ""}`}
-                onClick={() => {
-                  onSelect(p);
-                  setOpen(false);
-                }}
-              >
-                <div className="flex-1">
-                  <div className="font-medium">{p.display_name}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {p.code} · {p.unit_of_sale} · MVA {p.mva_rate}%
-                  </div>
-                </div>
-                {idx === 0 && <span className="text-[10px] uppercase text-muted-foreground">↵</span>}
-              </button>
-            ))
-          )}
-        </div>
-      </PopoverContent>
-    </Popover>
-  );
-}
-
-function PriceSourceBadge({ source }: { source: string | null }) {
-  const cat = categorizePriceSource(source);
-  const styles: Record<string, string> = {
-    standard: "bg-muted text-muted-foreground",
-    special_general: "bg-warning/15 text-warning",
-    special_customer: "bg-primary/15 text-primary",
-    manual: "bg-destructive/15 text-destructive",
-    none: "bg-muted text-muted-foreground",
-  };
-  return (
-    <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ${styles[cat.category]}`}>
-      {cat.label}
-    </span>
-  );
 }
 
 export default function NewOrder() {
