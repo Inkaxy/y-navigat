@@ -167,8 +167,8 @@ export default function RecurringOrders() {
                       <div className="text-sm font-medium">Ingen fastordre ennå</div>
                       <p className="text-xs text-muted-foreground">
                         Fastordre er ukentlige maler som beskriver hva en kunde normalt
-                        mottar. Malen blir automatisk til faktiske ordre i matrisen og på
-                        pakksedlene for hver leveringsdag.
+                        mottar. Fastordre materialiseres ved hovedkjøring av pakksedler og
+                        ved lagring i leveringskalenderen.
                       </p>
                       <Button onClick={openNew} size="sm" className="gap-1.5">
                         <Plus className="h-3.5 w-3.5" /> Opprett din første fastordre

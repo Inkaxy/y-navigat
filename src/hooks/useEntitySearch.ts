@@ -8,6 +8,7 @@ import {
   isNumericTerm,
   parseTicketPrefix,
   parseTicketRef,
+  ticketPrefixRange,
   sanitizeSearchTerm,
   type EntityHit,
 } from "@/lib/entitySearch";
