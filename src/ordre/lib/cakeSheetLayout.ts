@@ -19,8 +19,8 @@ export const SHEET_SIZES: Record<string, SheetSize> = {
 };
 
 export const DEFAULT_MARGIN_MM = 8;
-/** Kuttmarg mellom to bilder — plass til klippemerker og saks. */
-export const DEFAULT_GAP_MM = 8;
+/** Kuttmarg mellom to bilder — plass til klippemerker, QR og etikettstripe. */
+export const DEFAULT_GAP_MM = 14;
 
 export function sheetSize(
   sheet: string,
@@ -68,6 +68,8 @@ export type PackOptions = {
   orientation?: SheetOrientation;
   marginMm?: number;
   gapMm?: number;
+  /** Bånd nederst på arket som er reservert til linjal og instruks. */
+  reservedBottomMm?: number;
 };
 
 export type PackResult = {
@@ -88,10 +90,11 @@ export function fitsOnSheet(
   item: PackItem,
   size: SheetSize,
   marginMm = DEFAULT_MARGIN_MM,
+  reservedBottomMm = 0,
 ): { fits: boolean; rotated: boolean } {
   const { w, h } = outer(item);
   const availW = size.widthMm - 2 * marginMm;
-  const availH = size.heightMm - 2 * marginMm;
+  const availH = size.heightMm - 2 * marginMm - reservedBottomMm;
   if (w <= availW && h <= availH) return { fits: true, rotated: false };
   if (item.rotatable !== false && !item.isRound && h <= availW && w <= availH) {
     return { fits: true, rotated: true };
@@ -106,8 +109,9 @@ export function packSheets(items: PackItem[], opts: PackOptions = {}): PackResul
   const size = sheetSize(sheet, orientation);
   const margin = opts.marginMm ?? DEFAULT_MARGIN_MM;
   const gap = opts.gapMm ?? DEFAULT_GAP_MM;
+  const reservedBottom = opts.reservedBottomMm ?? 0;
   const availW = size.widthMm - 2 * margin;
-  const availH = size.heightMm - 2 * margin;
+  const availH = size.heightMm - 2 * margin - reservedBottom;
 
   const unplaceable: PackItem[] = [];
   const queue = [...items]
@@ -116,7 +120,7 @@ export function packSheets(items: PackItem[], opts: PackOptions = {}): PackResul
         unplaceable.push(it);
         return false;
       }
-      if (!fitsOnSheet(it, size, margin).fits) {
+      if (!fitsOnSheet(it, size, margin, reservedBottom).fits) {
         unplaceable.push(it);
         return false;
       }
