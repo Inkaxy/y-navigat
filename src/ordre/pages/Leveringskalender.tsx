@@ -474,6 +474,12 @@ export default function MatrixPage() {
     return editedNum !== existing;
   }
 
+  /** Stabil lagre-referanse så cellene ikke re-rendrer ved hver endring. */
+  const handleSaveRef = useRef<() => void | Promise<void>>(() => {});
+  const stableSave = useCallback(() => {
+    void handleSaveRef.current();
+  }, []);
+
   const setCellValue = useCallback((key: CellKey, value: string) => {
     const cleaned = value.replace(",", ".");
     if (cleaned !== "" && !/^\d*\.?\d*$/.test(cleaned)) return;
