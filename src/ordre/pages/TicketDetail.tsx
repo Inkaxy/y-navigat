@@ -27,6 +27,7 @@ import {
 } from "@/ordre/hooks/useTickets";
 import { useUserAccess } from "@/ordre/hooks/useUserAccess";
 import { useTicketReplies } from "@/ordre/hooks/useTicketReplies";
+import { useInternalComments } from "@/ordre/hooks/useInternalComments";
 import { useInboundMessages, type InboundMessage } from "@/ordre/hooks/useInboundMessages";
 import { useUserNames } from "@/ordre/hooks/useUserNames";
 import { useSlaSettings } from "@/ordre/hooks/useSlaSettings";
