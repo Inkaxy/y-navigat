@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 import { UnsavedChangesDialog } from "@/components/common/UnsavedChangesDialog";
-import { ArrowLeft, Loader2, Plus, Trash2, AlertTriangle, Check, Search, Copy } from "lucide-react";
+import { ArrowLeft, Loader2, Plus, Trash2, AlertTriangle, Copy } from "lucide-react";
 import { AppBanner } from "@/ordre/components/shell/AppBanner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +11,6 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
@@ -360,9 +359,10 @@ export default function NewOrder() {
     // med funksjonell oppdatering (brukerens mengde/rabatt/notat bevares).
     void (async () => {
       const snapshot = linesRef.current;
+      const failed: string[] = [];
       const results = await Promise.all(
         snapshot.map(async (l) => {
-          if (!l.product || l.unit_price_source === "manual_override") return null;
+          if (!l.product || isManualOverride(l.unit_price_source)) return null;
           try {
             const ep = await fetchEffectivePrice({
               productId: l.product.id,
@@ -379,7 +379,10 @@ export default function NewOrder() {
               unit_price_source_id: ep.special_price_id ?? ep.price_list_id ?? null,
               effective_price: ep.price,
             };
-          } catch {
+          } catch (err) {
+            // Feil skjules ikke: operatøren må vite at prisen ikke ble oppdatert.
+            persistAppError(err, { scope: "ordre:ny-ordre:reprising" });
+            failed.push(l.product.display_name);
             return null;
           }
         }),
@@ -388,13 +391,20 @@ export default function NewOrder() {
       const byUid = new Map<string, PriceUpdate>(
         results.filter((r): r is PriceUpdate => r !== null).map((r) => [r.uid, r]),
       );
+      if (failed.length > 0) {
+        toast.error(
+          failed.length === 1
+            ? `Fant ikke ny pris for ${failed[0]}. Kontroller prisen før du lagrer.`
+            : `Fant ikke ny pris for ${failed.length} varer. Kontroller prisene før du lagrer.`,
+        );
+      }
       if (byUid.size === 0) return;
       setLines((prev) =>
         prev.map((l) => {
           const upd = byUid.get(l.uid);
           // Ikke overskriv hvis brukeren har byttet produkt eller låst prisen i mellomtiden
           if (!upd || !l.product || l.product.id !== upd.productId) return l;
-          if (l.unit_price_source === "manual_override") return l;
+          if (isManualOverride(l.unit_price_source)) return l;
           return {
             ...l,
             unit_price: upd.unit_price,
@@ -427,9 +437,20 @@ export default function NewOrder() {
   }, []);
 
   async function selectProductForLine(uid: string, p: ProductOption) {
-    const ep = customer
-      ? await fetchEffectivePrice({ productId: p.id, customerId: customer.id, date: deliveryDate, caller: "new_order_form" }).catch(() => null)
-      : null;
+    let ep: Awaited<ReturnType<typeof fetchEffectivePrice>> | null = null;
+    if (customer) {
+      try {
+        ep = await fetchEffectivePrice({
+          productId: p.id,
+          customerId: customer.id,
+          date: deliveryDate,
+          caller: "new_order_form",
+        });
+      } catch (err) {
+        persistAppError(err, { scope: "ordre:ny-ordre:pris" });
+        toast.error(`Fant ikke pris for ${p.display_name}. Legg inn pris manuelt.`);
+      }
+    }
     setLines((prev) =>
       prev.map((l) =>
         l.uid === uid
@@ -445,6 +466,8 @@ export default function NewOrder() {
           : l,
       ),
     );
+    // Tastaturflyt: fokus rett til Mengde på linjen som nettopp fikk vare.
+    focusOrderLineField(uid, "qty");
   }
 
   function updateLine(uid: string, patch: Partial<LineDraft>) {
@@ -459,10 +482,18 @@ export default function NewOrder() {
         return {
           ...l,
           unit_price: value,
-          unit_price_source: isOverride ? "manual_override" : l.unit_price_source,
+          unit_price_source: isOverride ? MANUAL_PRICE_SOURCE : l.unit_price_source,
         };
       }),
     );
+  }
+
+  /** Ber om begrunnelse når operatøren forlater et prisfelt hun har overstyrt. */
+  function handlePriceBlur(uid: string) {
+    const line = linesRef.current.find((l) => l.uid === uid);
+    if (!line || !isManualOverride(line.unit_price_source)) return;
+    if (line.notes.includes(PRICE_OVERRIDE_NOTE_PREFIX)) return;
+    setOverrideReasonUid(uid);
   }
 
   function removeLine(uid: string) {
@@ -527,7 +558,8 @@ export default function NewOrder() {
       void (async () => {
         const refreshed = await Promise.all(
           newLines.map(async (l) => {
-            if (!l.product) return l;
+            // Forhandlet pris fra forrige ordre skal ikke overskrives.
+            if (!l.product || !shouldRepriceCopiedLine(l)) return l;
             try {
               const ep = await fetchEffectivePrice({
                 productId: l.product.id,
@@ -544,6 +576,9 @@ export default function NewOrder() {
                 effective_price: ep.price,
               };
             } catch {
+              return l;
+            } catch (err) {
+              persistAppError(err, { scope: "ordre:ny-ordre:kopier-priser" });
               return l;
             }
           }),
