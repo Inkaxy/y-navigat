@@ -462,6 +462,11 @@ export default function EtiketterPage() {
             <RefreshCw className={cn("h-4 w-4", syncNumbers.isPending && "animate-spin")} />
             Synkroniser nummer
           </Button>
+           <span className="hidden text-xs text-muted-foreground xl:inline">
+             {lastNumberSyncAt
+               ? `Sist synkronisert ${format(lastNumberSyncAt, "HH:mm:ss")}`
+               : "Ikke synkronisert ennå"}
+           </span>
           {bulkDisabledReason ? (
             <Tooltip>
               <TooltipTrigger asChild>

@@ -361,17 +361,45 @@ export async function attachTicketCakeImagesToOrder(input: {
   if (rows.length === 0) return 0;
 
   const cakeLine = await findCakeLineForOrder(input.order_id).catch(() => null);
-  let updated = 0;
-  for (const row of rows) {
-    const unit = cakeLine?.order_line_id
-      ? await findLabelUnitForOrderLine(
-          cakeLine.order_line_id,
-          input.delivery_date,
-        ).catch(() => null)
-      : null;
-    if (cakeLine?.has_label_product && !unit) {
-      throw new Error("Alle etiketter på linjen har allerede bilde");
+  let availableUnits: LabelUnitCandidate[] = [];
+  if (cakeLine?.order_line_id) {
+    const { data: units, error: unitsError } = await supabase
+      .from("label_units")
+      .select("id, number, unit_index")
+      .eq("order_line_id", cakeLine.order_line_id)
+      .eq("seq_date", input.delivery_date)
+      .neq("status", "cancelled")
+      .order("unit_index", { ascending: true });
+    if (unitsError) throw unitsError;
+
+    const candidates = (units ?? []) as unknown as LabelUnitCandidate[];
+    if (candidates.length > 0) {
+      const { data: taken, error: takenError } = await supabase
+        .from("cake_images")
+        .select("label_unit_id")
+        .in("label_unit_id", candidates.map((unit) => unit.id));
+      if (takenError) throw takenError;
+      const usedIds = new Set(
+        ((taken ?? []) as { label_unit_id: string | null }[])
+          .map((item) => item.label_unit_id)
+          .filter(Boolean) as string[],
+      );
+      availableUnits = candidates
+        .filter((unit) => !usedIds.has(unit.id))
+        .sort(
+          (a, b) =>
+            (a.unit_index ?? Number.MAX_SAFE_INTEGER) -
+              (b.unit_index ?? Number.MAX_SAFE_INTEGER) || a.number - b.number,
+        );
     }
+  }
+  if (cakeLine?.has_label_product && availableUnits.length < rows.length) {
+    throw new Error("Alle etiketter på linjen har allerede bilde");
+  }
+
+  let updated = 0;
+  for (const [index, row] of rows.entries()) {
+    const unit = availableUnits[index] ?? null;
     const { error: updateError } = await supabase
       .from("cake_images")
       .update({
