@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   placementGeometry,
   rotatedImageDraw,
+  rotatedCaptionSpans,
   scaledPlacementSize,
 } from "@/ordre/lib/cakePrint";
 import { packSheets } from "@/ordre/lib/cakeSheetLayout";
@@ -21,7 +22,12 @@ describe("placementGeometry", () => {
       rotated: false,
     };
     const geo = placementGeometry(place);
-    expect(geo).toMatchObject({ xMm: 10, yMm: 20, widthMm: 150, heightMm: 100 });
+    expect(geo).toMatchObject({
+      xMm: 10,
+      yMm: 20,
+      widthMm: 150,
+      heightMm: 100,
+    });
     expect(geo.captionYMm).toBe(122);
   });
 
@@ -67,5 +73,22 @@ describe("scaledPlacementSize", () => {
     expect(
       scaledPlacementSize({ widthMm: 100, heightMm: 200 }, 1.02, 0.98, true),
     ).toEqual({ widthMm: 204, heightMm: 98 });
+  });
+});
+
+describe("rotatedCaptionSpans", () => {
+  it("legger nummeret under QR-en uten overlapp på en 100 mm rotert stripe", () => {
+    const spans = rotatedCaptionSpans(8, 100);
+    expect(spans.number.startMm).toBeGreaterThanOrEqual(spans.qr.endMm);
+    expect(spans.number).toEqual({ startMm: 12, endMm: 20 });
+    expect(spans.textStartMm).toBe(22);
+    expect(spans.textEndMm).toBe(98);
+    expect(spans.textLenMm).toBe(76);
+  });
+
+  it("gir ingen tekstplass når stripa er for kort", () => {
+    const spans = rotatedCaptionSpans(20, 30);
+    expect(spans.textLenMm).toBe(0);
+    expect(spans.number.endMm).toBeGreaterThan(spans.qr.endMm);
   });
 });
