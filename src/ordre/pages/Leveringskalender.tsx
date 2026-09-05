@@ -1833,44 +1833,44 @@ export default function MatrixPage() {
             />
           </div>
         ) : (
-          /* Én tydelig horisontal scroll-container rundt hele matrisen (inkl. summer og legende). */
-          <div className="w-full overflow-x-auto">
+          /*
+           * Én scroll-container for hele matrisen: den scroller både horisontalt og
+           * vertikalt, slik at dato-header og sumrad faktisk fester seg.
+           */
+          <div className="w-full overflow-auto max-h-[calc(100vh-19rem)]">
             <MatrixGrid
-
               columns={columns}
               products={allProducts}
-              addedIds={new Set(addedProducts.map((p) => p.id))}
-              getValue={getCellValue}
-              isDirty={isDirty}
-              isFallback={(key) => !!fallbackCells[key]}
+              addedIds={addedIdSet}
+              editsByProduct={editsByProduct}
+              getBaseValue={getBaseValue}
+              isBaseGhost={isBaseGhost}
+              ghostQty={ghostQtyFor}
+              existingQty={existingQtyFor}
+              isFallback={isFallbackCell}
+              hasMerknad={hasMerknadCell}
+              orderCount={orderCountFor}
+              colInfo={cellColInfo}
               onChange={setCellValue}
-              hasMerknad={(key) => !!existingMerknad[key]}
-              hasData={(key) => getEffectiveQty(key) > 0 || !!existingMerknad[key]}
-              onOpenMerknad={openMerknad}
-              onCopyNextDay={handleCopyToNextDay}
+              onReset={resetCellValue}
+              onSave={stableSave}
+              onPausedClick={notifyPaused}
+              onOpenMerknad={openMerknadByIds}
+              onCopyNextDay={copyNextDayByIds}
               rowTotals={totals.rowTotals}
               colTotals={totals.colTotals}
               grandTotal={totals.grand}
               weatherMap={weatherMap}
-              ghostMap={ghostMap}
               pauseMap={pauseMap}
               columnComments={columnComments}
               onColCopy={(date, tour) => setCopyColCol({ date, tour })}
-              onColComment={(date, tour) => setCommentCol({ date, tour })}
               onColDelete={(date, tour) => setDeleteColConfirm({ date, tour })}
               onColPackingNote={(date, tour) => generatePackingNoteForColumn(date, tour)}
               colHasData={colHasAnyData}
               colMeta={colMeta}
               colTone={colTone}
-              isGhostCell={isGhostCell}
-              orderCount={(key) => cellOrderIds[key]?.length ?? 0}
               noTourByDate={noTourByDate}
-              onMoveToTour={(entry) =>
-                setMoveTourOrder({
-                  orderId: entry.orderIds[0],
-                  orderNumber: entry.orderNumbers[0] ?? "",
-                })
-              }
+              onMoveToTour={moveNoTourToTour}
               canEdit={canEdit}
               onOpenTourOrder={(date, tour) => {
                 if (!colOrderId.has(`${date}|${tour.id}`)) {
@@ -1882,8 +1882,7 @@ export default function MatrixPage() {
                 }
                 setTourOrderCol({ date, tour });
               }}
-
-              onOpenWeekEditor={(p) => setWeekEditorProduct(p)}
+              onOpenWeekEditor={openWeekEditor}
             />
             <div className="sticky left-0 flex flex-wrap items-center gap-2 border-t border-border bg-card px-4 py-3 sm:px-6">
               {hasAddable ? (
