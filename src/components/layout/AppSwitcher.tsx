@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
-import { ChevronDown, Search, Box, LayoutDashboard, X, ExternalLink } from "lucide-react";
-import * as Icons from "lucide-react";
+import { ChevronDown, Search, LayoutDashboard, X, ExternalLink } from "lucide-react";
+import { getAppIcon } from "@/lib/appIcons";
 import {
   Popover,
   PopoverContent,
@@ -15,10 +15,6 @@ import {
 import { Logo } from "@/components/brand/Logo";
 import { cn } from "@/lib/utils";
 
-const iconMap = Icons as unknown as Record<
-  string,
-  React.ComponentType<{ className?: string }>
->;
 
 import { APP_INTERNAL_ROUTES as INTERNAL_ROUTES } from "@/lib/appRoutes";
 
@@ -364,7 +360,7 @@ export function AppSwitcher() {
               );
             }
             const a = row.app;
-            const Icon = iconMap[a.icon_name] ?? Box;
+            const Icon = getAppIcon(a.icon_name);
             const active = isAppActive(a, pathname);
             const myAppIdx = appIdx.indexOf(i);
 

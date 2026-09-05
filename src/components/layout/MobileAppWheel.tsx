@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { Box, ChevronDown, Check } from "lucide-react";
-import * as Icons from "lucide-react";
+import { ChevronDown, Check } from "lucide-react";
+import { getAppIcon } from "@/lib/appIcons";
 import {
   Sheet,
   SheetContent,
@@ -13,7 +13,6 @@ import { Button } from "@/components/ui/button";
 import { useAccessibleApps, type AccessibleApp } from "@/hooks/useAccessibleApps";
 import { cn } from "@/lib/utils";
 
-const iconMap = Icons as unknown as Record<string, React.ComponentType<{ className?: string }>>;
 
 import { APP_INTERNAL_ROUTES as INTERNAL_ROUTES } from "@/lib/appRoutes";
 
@@ -42,7 +41,7 @@ export function MobileAppWheel() {
         label: a.display_name,
         to: INTERNAL_ROUTES[a.slug],
         color: a.color_hex ?? "#a47236",
-        icon: iconMap[a.icon_name] ?? Box,
+        icon: getAppIcon(a.icon_name),
       }));
     const nbhubIdx = list.findIndex((e) => e.key === "nbhub");
     if (nbhubIdx > 0) {
