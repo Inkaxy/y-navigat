@@ -1470,7 +1470,9 @@ export default function MatrixPage() {
                           key={c.id}
                           value={c.id}
                           onSelect={() => {
-                            setCustomerId(c.id);
+                            guardAction(() => {
+                              setCustomerId(c.id);
+                            });
                             setPickerOpen(false);
                           }}
                         >
