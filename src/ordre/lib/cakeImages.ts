@@ -825,3 +825,38 @@ export async function logCalibrationTestPrint(printerLabel: string) {
   } as never);
   if (error) console.error("[cakeImages] kunne ikke logge kalibreringsark", error);
 }
+
+export type CakeLineDetails = {
+  productName: string | null;
+  cakeText: string | null;
+};
+
+/**
+ * Produktnavn og «tekst på kaken» fra ordrelinjen — det som skal stå ved
+ * bildet på arket, slik at bakeren ser hva bildet hører til.
+ */
+export async function fetchCakeLineDetails(
+  lineIds: (string | null | undefined)[],
+): Promise<Record<string, CakeLineDetails>> {
+  const ids = Array.from(new Set(lineIds.filter(Boolean) as string[]));
+  if (ids.length === 0) return {};
+  const { data, error } = await supabase
+    .from("order_lines")
+    .select("id, merknad, product_snapshot")
+    .in("id", ids);
+  if (error) throw error;
+  const out: Record<string, CakeLineDetails> = {};
+  for (const row of (data ?? []) as Array<{
+    id: string;
+    merknad: Record<string, unknown> | null;
+    product_snapshot: Record<string, unknown> | null;
+  }>) {
+    const text = row.merknad?.["tekst"];
+    const name = row.product_snapshot?.["display_name"];
+    out[row.id] = {
+      productName: typeof name === "string" && name ? name : null,
+      cakeText: typeof text === "string" && text.trim() ? text.trim() : null,
+    };
+  }
+  return out;
+}
