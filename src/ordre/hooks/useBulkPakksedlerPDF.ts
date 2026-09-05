@@ -25,11 +25,14 @@ export type BulkScope =
 
 const NULL_TOUR_KEY = "__null__";
 
+type CakeInfo = { label_number: string | null; url: string | null };
+
 function mapNote(
   note: any,
   lines: any[],
   orderNumbers: string[],
   legal: PakkseddelPDFData["legal_entity"],
+  cakeByLine: Record<string, CakeInfo>,
 ): PakkseddelPDFData {
   const cs = (note.customer_snapshot ?? {}) as Record<string, unknown>;
   const addr = (note.delivery_address_snapshot ?? {}) as Record<string, unknown>;
@@ -47,6 +50,8 @@ function mapNote(
         (ps["display_name"] as string) ?? (ps["name"] as string) ?? "—",
       quantity: Number(l.quantity ?? 0),
       sales_unit: l.sales_unit ?? "",
+      cake_label_number: l.order_line_id ? (cakeByLine[l.order_line_id]?.label_number ?? null) : null,
+      cake_thumb_url: l.order_line_id ? (cakeByLine[l.order_line_id]?.url ?? null) : null,
     };
   });
 
@@ -109,7 +114,9 @@ export function useBulkPakksedlerPDF(scope: BulkScope | null) {
           "id, display_number, delivery_date, route_label, notes, delivery_tour_id, customer_snapshot, delivery_address_snapshot",
         )
         .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
-        .neq("status", "cancelled");
+        .neq("status", "cancelled")
+        // Returpakksedler skrives ut fra Retur-fanen, ikke i bulk.
+        .eq("is_return", false);
 
       if (scope.kind === "date_tour") {
         notesQuery = notesQuery.eq("delivery_date", scope.date);
@@ -141,7 +148,7 @@ export function useBulkPakksedlerPDF(scope: BulkScope | null) {
         await Promise.all([
           supabase
             .from("delivery_note_lines")
-            .select("id, delivery_note_id, line_number, product_snapshot, quantity, sales_unit")
+            .select("id, delivery_note_id, line_number, product_snapshot, quantity, sales_unit, order_line_id")
             .in("delivery_note_id", noteIds)
             .order("line_number", { ascending: true }),
           supabase
@@ -156,6 +163,31 @@ export function useBulkPakksedlerPDF(scope: BulkScope | null) {
       if (linesErr) throw linesErr;
       if (linksErr) throw linksErr;
       if (toursErr) throw toursErr;
+
+      // Kakebilder + etikettnummer — samme oppslag som enkeltpakkseddelen.
+      const orderLineIds = ((allLines ?? []) as any[])
+        .map((l) => l.order_line_id)
+        .filter(Boolean) as string[];
+      const cakeByLine: Record<string, CakeInfo> = {};
+      if (orderLineIds.length > 0) {
+        const { data: cakeRows, error: cakeErr } = await supabase
+          .from("cake_images")
+          .select("order_line_id, label_number, edited_path, original_path")
+          .in("order_line_id", orderLineIds);
+        if (cakeErr) throw cakeErr;
+        const rows = (cakeRows ?? []) as any[];
+        const paths = rows.map((r) => r.edited_path || r.original_path).filter(Boolean);
+        const { data: signed } = paths.length
+          ? await supabase.storage.from("cake-images").createSignedUrls(paths, 60 * 30)
+          : { data: [] as any[] };
+        const urlMap = Object.fromEntries((signed ?? []).map((sg: any) => [sg.path, sg.signedUrl]));
+        for (const r of rows) {
+          cakeByLine[r.order_line_id as string] = {
+            label_number: r.label_number ?? null,
+            url: urlMap[r.edited_path || r.original_path] ?? null,
+          };
+        }
+      }
 
       const linesByNote = new Map<string, any[]>();
       for (const l of allLines ?? []) {
@@ -185,7 +217,7 @@ export function useBulkPakksedlerPDF(scope: BulkScope | null) {
       const mapped: PakkseddelPDFData[] = (notes as any[]).map((n) => {
         const lines = linesByNote.get(n.id) ?? [];
         const orderNumbers = Array.from(orderNumbersByNote.get(n.id) ?? []).sort();
-        return mapNote(n, lines, orderNumbers, legal);
+        return mapNote(n, lines, orderNumbers, legal, cakeByLine);
       });
 
       // 5) Grupper per delivery_tour_id (NULL = Uten tur)
