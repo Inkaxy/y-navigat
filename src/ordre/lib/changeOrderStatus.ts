@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { logAudit } from "@/ordre/lib/audit";
 import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
+import { OrderConflictError } from "@/ordre/lib/orderConflict";
 import type { OrderStatus } from "@/ordre/lib/orderStatus";
 
 export type ChangeStatusInput = {
@@ -40,11 +41,15 @@ export async function changeOrderStatus(input: ChangeStatusInput) {
     updates.confirmed_by = input.userId;
   }
 
-  const { error } = await supabase
+  // Optimistisk lås: raden må fremdeles stå på statusen brukeren så.
+  const { data: updated, error } = await supabase
     .from("orders")
     .update(updates as never)
-    .eq("id", input.orderId);
+    .eq("id", input.orderId)
+    .eq("status", input.fromStatus)
+    .select("id");
   if (error) throw error;
+  if (!updated || updated.length === 0) throw new OrderConflictError();
 
   // Kansellert ordre → flagg kakebildene så de ikke printes/telles videre.
   if (isCancel) {

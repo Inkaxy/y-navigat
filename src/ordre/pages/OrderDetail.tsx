@@ -13,6 +13,7 @@ import {
   Ban,
   RefreshCw,
   History,
+  UserSquare,
 } from "lucide-react";
 import { AppBanner } from "@/ordre/components/shell/AppBanner";
 import { Button } from "@/components/ui/button";
@@ -69,6 +70,11 @@ import {
 } from "@/ordre/lib/orderStatus";
 import { formatDateLong, formatNOK } from "@/ordre/lib/format";
 import { logAudit } from "@/ordre/lib/audit";
+import {
+  handleOrderConflict,
+  invalidateOrderQueries,
+  isOrderConflict,
+} from "@/ordre/lib/orderConflict";
 import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -197,19 +203,17 @@ export default function OrderDetail() {
         isCancel: intent.to === "cancelled",
       });
     } catch (err) {
+      if (isOrderConflict(err)) {
+        await handleOrderConflict(qc, order.id);
+        throw err;
+      }
       console.error("[OrderDetail] performStatusChange", err);
       toast.error("Kunne ikke lagre. Prøv igjen — kontakt support hvis det gjentar seg.");
       throw err;
     }
 
     toast.success(`Status endret til ${getStatusMeta(intent.to).label}`);
-    await Promise.all([
-      qc.invalidateQueries({ queryKey: ["order", order.id] }),
-      qc.invalidateQueries({ queryKey: ["order-events", order.id] }),
-      qc.invalidateQueries({ queryKey: ["orders"] }),
-      qc.invalidateQueries({ queryKey: ["orders-lifecycle"] }),
-      qc.invalidateQueries({ queryKey: ["order-status-counts"] }),
-    ]);
+    await invalidateOrderQueries(qc, order.id);
   }
 
   async function handleCreateDeliveryNote() {
@@ -239,6 +243,13 @@ export default function OrderDetail() {
 
   async function performDelete() {
     if (!order) return;
+    const { error: delErr } = await supabase.from("orders").delete().eq("id", order.id);
+    if (delErr) {
+      toast.error(delErr.message);
+      return;
+    }
+
+    // Audit-raden skrives først når slettingen faktisk gikk gjennom.
     await logAudit({
       action: "deleted",
       entity_type: "order",
@@ -251,13 +262,8 @@ export default function OrderDetail() {
       },
     });
 
-    const { error: delErr } = await supabase.from("orders").delete().eq("id", order.id);
-    if (delErr) {
-      toast.error(delErr.message);
-      return;
-    }
     toast.success("Ordre slettet");
-    await qc.invalidateQueries({ queryKey: ["orders"] });
+    await invalidateOrderQueries(qc);
     navigate("/ordre/ordrer");
   }
 
@@ -271,6 +277,13 @@ export default function OrderDetail() {
             {backUrl && (
               <Button size="sm" className="gap-2" onClick={() => navigate(backUrl)}>
                 <ArrowLeft className="h-4 w-4" /> Ferdig — tilbake til fakturering
+              </Button>
+            )}
+            {order.customer_id && (
+              <Button asChild variant="outline" size="sm" className="gap-2">
+                <Link to={`/kunder/kundeliste/${order.customer_id}`}>
+                  <UserSquare className="h-4 w-4" /> Åpne kundekort
+                </Link>
               </Button>
             )}
             <Button asChild variant="outline" size="sm" className="gap-2">
@@ -312,7 +325,7 @@ export default function OrderDetail() {
           </div>
 
           <div className="ml-auto flex flex-wrap items-center gap-2">
-            {approveAction && (
+            {approveAction && isWriter && (
               <Button
                 size="sm"
                 onClick={() =>
@@ -322,7 +335,7 @@ export default function OrderDetail() {
                 {approveAction.label}
               </Button>
             )}
-            {rejectAction && (
+            {rejectAction && isWriter && (
               <Button
                 size="sm"
                 variant="destructive"
@@ -363,11 +376,15 @@ export default function OrderDetail() {
                   <History className="mr-2 h-4 w-4" />
                   Historikk ({events.length})
                 </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={openCancel} disabled={cancelDisabled}>
-                  <Ban className="mr-2 h-4 w-4" />
-                  Avbryt ordre
-                </DropdownMenuItem>
+                {isWriter && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={openCancel} disabled={cancelDisabled}>
+                      <Ban className="mr-2 h-4 w-4" />
+                      Avbryt ordre
+                    </DropdownMenuItem>
+                  </>
+                )}
                 {showDelete && (
                   <DropdownMenuItem
                     onClick={() => setDeleteDialogOpen(true)}

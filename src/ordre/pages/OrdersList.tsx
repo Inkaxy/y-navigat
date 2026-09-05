@@ -6,6 +6,12 @@ import { useAuth } from "@/hooks/useAuth";
 import { useAcceptanceQueueCount } from "@/ordre/hooks/useAcceptanceQueueCount";
 import { changeOrderStatus } from "@/ordre/lib/changeOrderStatus";
 import {
+  handleOrderConflict,
+  invalidateOrderQueries,
+  isOrderConflict,
+} from "@/ordre/lib/orderConflict";
+import { useUserAccess } from "@/ordre/hooks/useUserAccess";
+import {
   StatusChangeDialog,
   type StatusChangeIntent,
 } from "@/ordre/components/orders/StatusChangeDialog";
@@ -30,7 +36,11 @@ import {
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { QueryErrorState } from "@/components/common/QueryState";
-import { useOrderList, type OrderListRow } from "@/ordre/hooks/useOrders";
+import {
+  needsClientLifecycleRefinement,
+  useOrderList,
+  type OrderListRow,
+} from "@/ordre/hooks/useOrders";
 import { OrderRuleFlagsIndicator } from "@/ordre/components/orders/OrderRuleFlagsIndicator";
 import { useDebouncedValue } from "@/ordre/hooks/useDebouncedValue";
 import {
@@ -97,6 +107,10 @@ export default function OrdersList() {
   } | null>(null);
 
   const { user } = useAuth();
+  const { data: access } = useUserAccess(user);
+  // RLS er sannheten — dette skjuler bare handlinger brukeren likevel ikke får utført.
+  const canWrite = access?.hasOrdreWrite ?? false;
+  const isAdmin = access?.hasOrdreAdmin ?? false;
   const queryClient = useQueryClient();
   const { data: tours = [] } = useDeliveryTours();
   const { data: queueCount = 0 } = useAcceptanceQueueCount();
@@ -105,7 +119,17 @@ export default function OrdersList() {
   // B.3 — Deselect ved filter-endring (unngår skjulte valg som overrasker bulk-ops)
   useEffect(() => {
     setSelectedIds(new Set());
-  }, [debouncedSearch, statuses, source, deliveryFrom, deliveryTo, tourIds, page]);
+  }, [
+    debouncedSearch,
+    statuses,
+    source,
+    deliveryFrom,
+    deliveryTo,
+    tourIds,
+    kinds,
+    lifecycleFilter,
+    page,
+  ]);
 
   const effectiveStatuses: OrderStatus[] | undefined = acceptanceOnly
     ? ["awaiting_confirmation"]
@@ -113,17 +137,15 @@ export default function OrdersList() {
       ? undefined
       : statuses;
 
-  // Livssyklus «venter godkjenning»/«avbrutt» filtreres server-side på status
-  const lifecycleStatuses: OrderStatus[] | undefined =
-    lifecycleFilter === "awaiting"
-      ? ["awaiting_confirmation"]
-      : lifecycleFilter === "cancelled"
-        ? ["cancelled"]
-        : undefined;
+  // Livssyklusfilteret gjelder hele resultatsettet: det snevres inn på status
+  // i selve spørringen. Kun «uten pakkseddel» vs «pakkseddel» må skilles på
+  // den utledede livssyklusen, siden begge har status «confirmed».
+  const activeLifecycle: OrderLifecycle | "all" = acceptanceOnly ? "all" : lifecycleFilter;
 
   const { data, isLoading, isFetching, isError, error, refetch } = useOrderList({
     search: debouncedSearch,
-    statuses: lifecycleStatuses ?? effectiveStatuses,
+    statuses: effectiveStatuses,
+    lifecycle: activeLifecycle,
     kinds: acceptanceOnly || kinds.length === 0 ? undefined : kinds,
     source: acceptanceOnly ? "all" : source,
     deliveryFrom: acceptanceOnly ? null : deliveryFrom || null,
@@ -143,9 +165,9 @@ export default function OrdersList() {
       : r.status === "awaiting_confirmation"
         ? "awaiting"
         : "open");
-  // Klient-side livssyklusfilter på lastet side (jf. trinn 1).
-  // Server-side filter kommer i trinn 3 — da blir totaltallene ærlige igjen.
-  const clientLifecycleFilter = lifecycleFilter !== "all" && !lifecycleStatuses;
+  // Kun «uten pakkseddel»/«pakkseddel» trenger en siste avgrensning på klienten.
+  const clientLifecycleFilter =
+    !acceptanceOnly && needsClientLifecycleRefinement(lifecycleFilter);
   const rows = clientLifecycleFilter
     ? allRows.filter((r) => lifecycleOf(r) === lifecycleFilter)
     : allRows;
@@ -268,10 +290,14 @@ export default function OrdersList() {
           : `Bestilling ${row.order_number} avvist`,
       );
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["orders"] }),
+        invalidateOrderQueries(queryClient, row.id),
         queryClient.invalidateQueries({ queryKey: ["orders", "acceptance-queue-count"] }),
       ]);
     } catch (e) {
+      if (isOrderConflict(e)) {
+        await handleOrderConflict(queryClient, row.id);
+        throw e;
+      }
       toast.error(e instanceof Error ? e.message : String(e));
       throw e;
     }
@@ -601,9 +627,11 @@ export default function OrdersList() {
 
         {/* Bulk-aksjon-rad — kun synlig når noe er valgt (B.2) */}
         <OrderBulkActionBar
+          canWrite={canWrite}
+          canDelete={isAdmin}
           selected={rows.filter((r) => selectedIds.has(r.id))}
           onClear={() => setSelectedIds(new Set())}
-          onMutated={() => queryClient.invalidateQueries({ queryKey: ["orders"] })}
+          onMutated={() => void invalidateOrderQueries(queryClient)}
           csvHeaders={[
             { key: "order_number", label: "Ordrenr", format: (r) => r.order_number },
             { key: "status", label: "Status", format: (r) => getStatusMeta(r.status).label },
@@ -828,7 +856,7 @@ export default function OrdersList() {
                             className="px-3 py-1.5 text-right"
                             onClick={(e) => e.stopPropagation()}
                           >
-                            {r.status === "awaiting_confirmation" ? (
+                            {r.status === "awaiting_confirmation" && canWrite ? (
                               <div className="flex items-center justify-end gap-1.5">
                                 <Button
                                   size="sm"
@@ -993,7 +1021,7 @@ export default function OrdersList() {
                           {formatNOK(r.total_incl_vat)}
                         </span>
                       </div>
-                      {acceptanceOnly && r.status === "awaiting_confirmation" && (
+                      {acceptanceOnly && canWrite && r.status === "awaiting_confirmation" && (
                         <div
                           className="mt-3 flex gap-2"
                           onClick={(e) => e.stopPropagation()}
