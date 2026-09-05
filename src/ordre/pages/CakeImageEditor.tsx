@@ -1734,6 +1734,3 @@ export default function CakeImageEditor() {
     </div>
   );
 }
-
-/** Eksporteres for gjenbruk i tester og andre kakeverktøy. */
-export { applyTextCurve };
