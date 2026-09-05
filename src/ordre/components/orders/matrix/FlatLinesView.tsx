@@ -165,7 +165,7 @@ export function FlatLinesView({
                           )}
                         </td>
                         <td className="w-[96px] px-3 py-2 text-right">
-                          {onQuantityChange ? (
+                          {onQuantityChange && !c.readOnly && c.delivery_tour_id ? (
                             <QtyInput
                               value={c.quantity}
                               onChange={(v) =>
