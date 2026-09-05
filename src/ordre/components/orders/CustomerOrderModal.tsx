@@ -36,7 +36,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { fetchEffectivePrice, type ProductOption } from "@/ordre/hooks/useNBProducts";
 import { ProductSearchInput } from "@/ordre/components/orders/ProductSearchInput";
-import { focusOrderLineField } from "@/ordre/lib/orderLines";
+import { countRiskyPriceLines, focusOrderLineField } from "@/ordre/lib/orderLines";
+import { ZeroPriceConfirmDialog } from "@/ordre/components/orders/ZeroPriceConfirmDialog";
 import { useDeliveryTours, tourMatches, trimSec } from "@/ordre/hooks/useDeliveryTours";
 import { useDebouncedValue } from "@/ordre/hooks/useDebouncedValue";
 import {
@@ -325,6 +326,9 @@ export function CustomerOrderModal({
 
   const [dirty, setDirty] = useState(false);
   const [merknadFor, setMerknadFor] = useState<string | null>(null);
+  /** 0-pris må bekreftes aktivt før lagring. */
+  const [zeroPriceOpen, setZeroPriceOpen] = useState(false);
+  const [zeroPriceConfirmed, setZeroPriceConfirmed] = useState(false);
 
   // Vedlegg fra e-posten (ticket) — brukerens valg per vedlegg
   const [attachmentChoice, setAttachmentChoice] = useState<
@@ -503,6 +507,11 @@ export function CustomerOrderModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [name, email, phone, deliveryDate, hour, minute, tourId, distribution, source, sendSms, sendEmail, isPaid, lines]);
 
+  // Ny prisrisiko må bekreftes på nytt.
+  useEffect(() => {
+    setZeroPriceConfirmed(false);
+  }, [riskyPriceLines]);
+
   const { data: tours } = useDeliveryTours({ activeOnly: true });
   const validTours = useMemo(() => {
     if (!tours) return [];
@@ -619,6 +628,20 @@ export function CustomerOrderModal({
     return { qty, sum, count: lines.filter((l) => l.product).length };
   }, [lines]);
 
+  /** Linjer uten reell pris (0 kr eller fallback) — må bekreftes før lagring. */
+  const riskyPriceLines = useMemo(
+    () =>
+      countRiskyPriceLines(
+        lines.map((l) => ({
+          hasProduct: !!l.product,
+          unit_price: l.unit_price,
+          is_fallback: l.is_fallback,
+        })),
+      ),
+    [lines],
+  );
+  const [pendingSaveReason, setPendingSaveReason] = useState<string | null>(null);
+
   const fmtKr = (n: number) =>
     n.toLocaleString("nb-NO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -700,6 +723,11 @@ export function CustomerOrderModal({
   async function handleSave(overrideReason: string | null = null) {
     const input = buildInput(overrideReason);
     if (!input) return;
+    if (!zeroPriceConfirmed && riskyPriceLines > 0) {
+      setPendingSaveReason(overrideReason);
+      setZeroPriceOpen(true);
+      return;
+    }
     setSubmitting(true);
     try {
       let fallbackCount = 0;
@@ -1372,6 +1400,17 @@ export function CustomerOrderModal({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <ZeroPriceConfirmDialog
+        open={zeroPriceOpen}
+        onOpenChange={setZeroPriceOpen}
+        count={riskyPriceLines}
+        onConfirm={() => {
+          setZeroPriceOpen(false);
+          setZeroPriceConfirmed(true);
+          void handleSave(pendingSaveReason);
+        }}
+      />
 
       <UnsavedChangesDialog
         {...unsavedGuard.dialogProps}
