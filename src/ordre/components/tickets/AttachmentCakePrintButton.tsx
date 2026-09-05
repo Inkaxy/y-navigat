@@ -67,6 +67,9 @@ export default function AttachmentCakePrintButton({
       const cakeLine = order?.id
         ? await findCakeLineForOrder(order.id).catch(() => null)
         : null;
+      if (order && cakeLine && !cakeLine.has_label_product) {
+        toast.warning("Ingen etikettvare i ordren — bildet får ikke etikettnummer");
+      }
       const image: CakeImage = await createCakeImageFromTicketAttachment({
         attachment_id: att.id,
         file_name: att.file_name,
@@ -117,7 +120,7 @@ export default function AttachmentCakePrintButton({
       >
         <CakeSlice className="h-3 w-3" />
         I kakeprint
-        {existing.label_number ? ` · nr ${existing.label_number}` : ""} ·{" "}
+        {existing.label_number ? ` · etikett #${existing.label_number}` : " · Mangler etikett"} ·{" "}
         {STATUS_LABEL[existing.status] ?? existing.status}
       </Link>
     );

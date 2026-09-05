@@ -38,3 +38,13 @@ export async function fetchLabelNumbersByUnit(
     (data ?? []).map((unit) => [String(unit.id), String(unit.number)]),
   );
 }
+
+export async function withResolvedLabelNumbers<T extends LabelNumberImage>(
+  images: T[],
+): Promise<Array<T & { resolved_label_number: string | null }>> {
+  const numberByUnit = await fetchLabelNumbersByUnit(images);
+  return images.map((image) => ({
+    ...image,
+    resolved_label_number: resolveLabelNumber(image, numberByUnit),
+  }));
+}

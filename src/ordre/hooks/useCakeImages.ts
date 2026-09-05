@@ -7,6 +7,7 @@ import {
   type CakeImage,
   type CakeImageStatus,
 } from "@/ordre/lib/cakeImages";
+import { withResolvedLabelNumbers } from "@/ordre/lib/labelNumber";
 
 /** Liste for en dato + status-bucket ('for-utskrift' = venter + ferdig_redigert) */
 export function useCakeImageList(
@@ -31,7 +32,7 @@ export function useCakeImageList(
         .in("status", statuses)
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return (data ?? []) as CakeImage[];
+      return withResolvedLabelNumbers((data ?? []) as CakeImage[]);
     },
   });
 

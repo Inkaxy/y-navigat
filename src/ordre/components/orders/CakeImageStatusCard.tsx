@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { signedUrl, type CakeImage, type CakeImageStatus } from "@/ordre/lib/cakeImages";
 import { cn } from "@/lib/utils";
+import { withResolvedLabelNumbers } from "@/ordre/lib/labelNumber";
 
 const STATUS_LABEL: Record<CakeImageStatus, string> = {
   venter: "Venter",
@@ -42,7 +43,7 @@ function useCakeImagesFor(args: {
         .or(ors.join(","))
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return (data ?? []) as CakeImage[];
+      return withResolvedLabelNumbers((data ?? []) as CakeImage[]);
     },
     staleTime: 15_000,
   });
@@ -120,10 +121,14 @@ export function CakeImageStatusCard({
               <Thumb path={img.original_path} />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5">
-                  {img.label_number && (
+                  {img.resolved_label_number ? (
                     <span className="inline-flex items-center rounded bg-brand-ink px-1.5 py-0.5 font-mono text-[10px] font-semibold text-brand-cream">
-                      #{img.label_number}
+                      Etikett #{img.resolved_label_number}
                     </span>
+                  ) : (
+                    <Badge variant="outline" className="text-[10px] text-muted-foreground">
+                      Mangler etikett
+                    </Badge>
                   )}
                   <div className="truncate text-sm font-medium">{img.title}</div>
                 </div>

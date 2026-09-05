@@ -79,10 +79,14 @@ export function CakeImageCard({
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
-              {image.label_number && (
+              {image.resolved_label_number ? (
                 <span className="inline-flex items-center rounded bg-brand-ink px-1.5 py-0.5 font-mono text-[11px] font-semibold text-brand-cream">
-                  #{image.label_number}
+                  Etikett #{image.resolved_label_number}
                 </span>
+              ) : (
+                <Badge variant="outline" className="text-[10px] text-muted-foreground">
+                  Mangler etikett
+                </Badge>
               )}
               <div className="truncate text-sm font-semibold" title={image.title}>
                 {image.title}

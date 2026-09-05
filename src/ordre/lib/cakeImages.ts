@@ -29,6 +29,7 @@ export type CakeImage = {
   production_department_id?: string | null;
   label_number?: string | null;
   label_unit_id?: string | null;
+  resolved_label_number?: string | null;
   // Fysisk størrelse og kvalitet
   format_id?: string | null;
   shape?: string | null;
@@ -706,7 +707,11 @@ export function statusLabel(s: CakeImageStatus) {
 export async function linkCakeImageToOrder(
   imageId: string,
   orderId: string,
-): Promise<{ delivery_date: string | null; label_number: string | null }> {
+): Promise<{
+  delivery_date: string | null;
+  label_number: string | null;
+  warning: string | null;
+}> {
   const { data: ord, error: ordErr } = await supabase
     .from("orders")
     .select("id, order_number, delivery_date")
