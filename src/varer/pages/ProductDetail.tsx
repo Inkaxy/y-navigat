@@ -33,7 +33,7 @@ import {
 import { logAudit } from "@/varer/lib/audit";
 import { useAppContext } from "@/varer/context/AppContext";
 import { ProductStatus } from "@/varer/lib/constants";
-import { useUnsavedChangesWarning } from "@/varer/hooks/useUnsavedChangesWarning";
+import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 import { DetailLayout } from "@/varer/components/products/detail/DetailLayout";
 import type { TabConfig } from "@/varer/components/products/detail/TabNavItem";
 import { UnsavedChangesDialog } from "@/varer/components/products/detail/UnsavedChangesDialog";
@@ -223,7 +223,7 @@ export default function ProductDetail() {
     cakeLinksKey(cakeLinks) !== cakeLinksKey(originalCakeLinks);
 
   const isDirty = form.formState.isDirty || junctionsDirty;
-  const blocker = useUnsavedChangesWarning(isDirty && !saving);
+  const unsavedGuard = useUnsavedChangesGuard(isDirty && !saving);
 
   // Beregn dirty/error tabs
   const dirtyTabs = useMemo(() => {
@@ -555,9 +555,9 @@ export default function ProductDetail() {
       </DetailLayout>
 
       <UnsavedChangesDialog
-        open={blocker.state === "blocked"}
-        onConfirm={() => blocker.proceed?.()}
-        onCancel={() => blocker.reset?.()}
+        open={unsavedGuard.isBlocked}
+        onConfirm={unsavedGuard.discard}
+        onCancel={unsavedGuard.stay}
       />
     </FormProvider>
   );
