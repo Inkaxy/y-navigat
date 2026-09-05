@@ -533,6 +533,7 @@ export function CustomerOrderModal({
           quantity: String(spec.quantity),
           unit_price: ep ? String(ep.price) : "0",
           is_fallback: !ep || ep.is_fallback,
+          effective_price: ep?.price ?? null,
           merknad: null,
         });
       }
@@ -564,6 +565,53 @@ export function CustomerOrderModal({
     // intentional shallow listing of dependencies for "dirty" detection
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [name, email, phone, deliveryDate, hour, minute, tourId, distribution, source, sendSms, sendEmail, isPaid, lines]);
+
+  // Ny dato kan gi ny pris: hent alle linjeprisene i én runde. Manuelt
+  // overstyrte priser røres ikke.
+  useEffect(() => {
+    if (!open || !deliveryDate) return;
+    const customerId = customer.id;
+    const date = deliveryDate;
+    let cancelled = false;
+    void (async () => {
+      const repriceable = linesRef.current.filter(
+        (l) => l.product && !isManualOverride(l.unit_price_source),
+      );
+      if (repriceable.length === 0) return;
+      let prices: Map<string, EffectivePrice>;
+      try {
+        prices = await fetchEffectivePricesBatch({
+          productIds: Array.from(new Set(repriceable.map((l) => l.product!.id))),
+          customerId,
+          date,
+          caller: "customer_order_create",
+        });
+      } catch (err) {
+        logAppError(err, { scope: "ordre:kundeordre:reprising" });
+        toast.error("Fant ikke nye priser for datoen. Kontroller prisene før du lagrer.");
+        return;
+      }
+      if (cancelled) return;
+      setLines((prev) =>
+        prev.map((l) => {
+          if (!l.product || isManualOverride(l.unit_price_source)) return l;
+          const ep = prices.get(l.product.id);
+          if (!ep) return l;
+          return {
+            ...l,
+            unit_price: String(ep.price ?? 0),
+            is_fallback: ep.is_fallback,
+            effective_price: ep.price,
+          };
+        }),
+      );
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // Kun ved datoendring — linjeendringer prises der de oppstår.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deliveryDate, open, customer.id]);
 
   // Ny prisrisiko må bekreftes på nytt.
   useEffect(() => {
