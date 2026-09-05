@@ -1,7 +1,8 @@
 import { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import type { MatrixCell as MatrixCellRow } from "@/ordre/hooks/useMatrix";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
+import { useGuardedNavigate } from "@/providers/UnsavedGuardProvider";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 import { UnsavedChangesDialog } from "@/components/common/UnsavedChangesDialog";
 import {
@@ -245,7 +246,7 @@ export default function MatrixPage() {
   const upsertColumnComment = useUpsertColumnComment();
   const deleteMatrixColumn = useDeleteMatrixColumn();
   const generateNotes = useGenerateDeliveryNotes();
-  const navigate = useNavigate();
+  const navigate = useGuardedNavigate();
   const { data: weatherMap } = useCustomerWeather(customerId, dateFrom, dateTo);
   const { data: ghostMap } = useRecurringGhost(customerId, dateFrom, dateTo);
   const { data: pauseMap } = useDeliveryPausesForCustomer(customerId, dateFrom, dateTo);
@@ -254,7 +255,6 @@ export default function MatrixPage() {
   const [edits, setEdits] = useState<Record<CellKey, string>>({});
   const [addedProducts, setAddedProducts] = useState<MatrixProduct[]>([]);
   const [addOpen, setAddOpen] = useState(false);
-  const [discardOpen, setDiscardOpen] = useState(false);
 
   // Column action dialog state
   const [copyColCol, setCopyColCol] = useState<{ date: string; tour: MatrixTour } | null>(null);
@@ -311,11 +311,21 @@ export default function MatrixPage() {
     | null
   >(null);
 
+  /**
+   * Kommer brukeren fra en dyplenke med ?date=, skal den datoen vinne over
+   * kundens lagrede hurtigfilter ved første kundevalg.
+   */
+  const honorDateParamRef = useRef(!!initialDate);
+
   // When customer changes: load stored quick-filter (default this_week), apply.
   useEffect(() => {
     setEdits({});
     setAddedProducts([]);
     if (!customerId) return;
+    if (honorDateParamRef.current) {
+      honorDateParamRef.current = false;
+      return;
+    }
     const stored = loadStoredRange(customerId) ?? "this_week";
     const r = rangeFor(stored);
     setQuickFilter(stored);
@@ -543,7 +553,12 @@ export default function MatrixPage() {
     });
   }, []);
 
-  /** Ulagrede endringer gruppert per produkt — gir stabile props per rad. */
+  /**
+   * Ulagrede endringer gruppert per produkt — gir stabile props per rad.
+   * Uendrede produkter beholder NØYAKTIG samme objekt, slik at bare den
+   * berørte raden (og sumraden) rendres på nytt ved et tastetrykk.
+   */
+  const editsByProductRef = useRef<Map<string, Record<CellKey, string>>>(new Map());
   const editsByProduct = useMemo(() => {
     const m = new Map<string, Record<CellKey, string>>();
     for (const [key, value] of Object.entries(edits)) {
@@ -553,6 +568,15 @@ export default function MatrixPage() {
       if (bucket) bucket[key] = value;
       else m.set(productId, { [key]: value });
     }
+    const prev = editsByProductRef.current;
+    for (const [productId, bucket] of m) {
+      const before = prev.get(productId);
+      if (!before) continue;
+      const keys = Object.keys(bucket);
+      const sameKeys = Object.keys(before).length === keys.length;
+      if (sameKeys && keys.every((k) => before[k] === bucket[k])) m.set(productId, before);
+    }
+    editsByProductRef.current = m;
     return m;
   }, [edits]);
 
@@ -741,16 +765,9 @@ export default function MatrixPage() {
 
 
 
+  /** «Forkast» bruker den felles ulagret-dialogen. */
   function handleDiscardClick() {
-    if (addedProducts.length > 0 || dirtyCount > 0) {
-      setDiscardOpen(true);
-    }
-  }
-
-  function confirmDiscard() {
-    setEdits({});
-    setAddedProducts([]);
-    setDiscardOpen(false);
+    if (addedProducts.length > 0 || dirtyCount > 0) guardAction(() => {});
   }
 
   function handleAddProduct(p: AddableProduct) {
@@ -2039,28 +2056,6 @@ export default function MatrixPage() {
         {...unsavedGuard.dialogProps}
         description="Celleendringene i matrisen er ikke lagret ennå. Forkaster du dem, forsvinner de."
       />
-
-      <AlertDialog open={discardOpen} onOpenChange={setDiscardOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Kast endringer?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {addedProducts.length > 0 && unsavedAddedCount > 0 ? (
-                <>
-                  {unsavedAddedCount} produkt{unsavedAddedCount === 1 ? "" : "er"} uten lagrede mengder vil bli fjernet fra matrisen.
-                  {dirtyCount > 0 && <> {dirtyCount} celle-endring{dirtyCount === 1 ? "" : "er"} vil også gå tapt.</>}
-                </>
-              ) : (
-                <>{dirtyCount} celle-endring{dirtyCount === 1 ? "" : "er"} vil gå tapt.</>
-              )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Avbryt</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDiscard}>Kast endringer</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       <AlertDialog open={!!copyConfirm} onOpenChange={(v) => !v && setCopyConfirm(null)}>
         <AlertDialogContent>
