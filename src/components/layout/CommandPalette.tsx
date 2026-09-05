@@ -39,7 +39,10 @@ export function CommandPalette({ open, onOpenChange }: Props) {
   const navigate = useNavigate();
   const { setMode } = useTheme();
   const { data: apps } = useAccessibleApps();
-
+  const [query, setQuery] = useState("");
+  const debouncedQuery = useDebouncedValue(query, 250);
+  const { hits, isSearching, isSettled, enabled } = useEntitySearch(debouncedQuery);
+  const groups = groupEntityHits(hits);
 
   // Global ⌘K / Ctrl+K toggle
   useEffect(() => {
@@ -52,6 +55,10 @@ export function CommandPalette({ open, onOpenChange }: Props) {
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
   }, [open, onOpenChange]);
+
+  useEffect(() => {
+    if (!open) setQuery("");
+  }, [open]);
 
   const close = () => onOpenChange(false);
 
@@ -73,6 +80,8 @@ export function CommandPalette({ open, onOpenChange }: Props) {
     close();
   };
 
+  const showNoHits = enabled && isSettled && !isSearching && hits.length === 0;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
@@ -84,13 +93,57 @@ export function CommandPalette({ open, onOpenChange }: Props) {
         <Command label="Kommandopalett" className="flex flex-col">
           <Command.Input
             autoFocus
-            placeholder="Søk eller skriv kommando"
+            value={query}
+            onValueChange={setQuery}
+            placeholder="Søk kunde, ordre, vare eller sak — eller skriv kommando"
             className="h-12 w-full border-0 border-b border-line bg-transparent px-[18px] text-[14px] text-ink-primary placeholder:text-ink-tertiary focus:outline-none focus:ring-0"
           />
           <Command.List className="max-h-[420px] overflow-y-auto p-1">
             <Command.Empty className="px-[18px] py-6 text-sm text-ink-tertiary">
-              Ingen treff.
+              {isSearching ? "Søker …" : "Ingen treff."}
             </Command.Empty>
+
+            {isSearching && groups.length === 0 && (
+              <div className="space-y-2 px-[18px] py-3" aria-busy="true">
+                <Skeleton className="h-5 w-2/3" />
+                <Skeleton className="h-5 w-1/2" />
+                <Skeleton className="h-5 w-3/5" />
+              </div>
+            )}
+
+            {showNoHits && (
+              <div className="px-[18px] py-3 text-sm text-ink-tertiary">
+                Ingen treff på kunder, ordrer, varer eller saker.
+              </div>
+            )}
+
+            {groups.map((group) => {
+              const Icon = ENTITY_ICON[group.kind];
+              return (
+                <Command.Group
+                  key={group.kind}
+                  heading={group.label}
+                  className="[&_[cmdk-group-heading]]:eyebrow [&_[cmdk-group-heading]]:px-[18px] [&_[cmdk-group-heading]]:pb-1 [&_[cmdk-group-heading]]:pt-2.5"
+                >
+                  {group.hits.map((hit) => (
+                    <PaletteItem
+                      key={`${hit.kind}-${hit.id}`}
+                      onSelect={() => handleNav(entityRoute(hit))}
+                      value={`${group.label} ${hit.title} ${hit.subtitle ?? ""} ${debouncedQuery}`}
+                    >
+                      <Icon className="h-4 w-4 opacity-70" />
+                      <span className="truncate">{hit.title}</span>
+                      {hit.subtitle && (
+                        <span className="ml-auto truncate text-[12px] text-ink-tertiary">
+                          {hit.subtitle}
+                        </span>
+                      )}
+                    </PaletteItem>
+                  ))}
+                </Command.Group>
+              );
+            })}
+
 
             <Command.Group
               heading="Naviger"
