@@ -527,9 +527,12 @@ export async function buildCakePdf(
 
       // Etikettstripe: QR til editoren, etikettnummer, kunde, produkt og kaketekst.
       // Roterte bilder får stripen i margen ved siden av — teksten roteres ikke med bildet.
-      const capX = geo.captionXMm;
-      const capY = geo.captionYMm;
+      // Stripa følger den tegnede størrelsen, ikke sloten — ellers får den
+      // luft når X- og Y-korreksjonen er ulike.
+      const capX = geo.rotated ? x + wMm + 2 : geo.captionXMm;
+      const capY = geo.rotated ? geo.captionYMm : y + hMm + 2;
       let textX = capX;
+      let rotatedTextStartMm = QR_MM + 2;
       if (item.image?.id) {
         const qr = await qrDataUrl(editorUrlFor(item.image.id));
         if (qr) {
@@ -540,14 +543,17 @@ export async function buildCakePdf(
       if (item.labelNumber) {
         if (geo.rotated) {
           // Stripen er bare 10 mm bred — nummeret settes på høykant i 9 pt.
+          // jsPDF tegner oppover fra ankeret, så vi forankrer med tekstlengden.
           pdf.setFontSize(9);
-          pdf.text(`#${item.labelNumber}`, capX + 3.5, capY + QR_MM + 4, { angle: 90 });
+          const label = `#${item.labelNumber}`;
+          const spans = rotatedCaptionSpans(pdf.getTextWidth(label), hMm);
+          pdf.text(label, capX + 3.5, capY + spans.number.endMm, { angle: 90 });
+          rotatedTextStartMm = spans.textStartMm;
         } else {
           pdf.setFontSize(12);
           pdf.text(`#${item.labelNumber}`, textX, capY + 4);
         }
       }
-
 
       pdf.setFontSize(7);
       const line1 = [item.customerName, item.orderRef ? `Ordre ${item.orderRef}` : null]
