@@ -300,8 +300,6 @@ function SideCard({
   );
 }
 
-type ComposerTab = "reply" | "note" | "ask";
-
 // ────────────────────────── main page
 
 export default function TicketDetail() {
@@ -324,29 +322,12 @@ export default function TicketDetail() {
   const { data: sla } = useSlaSettings();
   const { data: activeUsers = [] } = useActiveUsers();
 
-  const sendReply = useSendTicketReply();
-  const addComment = useAddInternalComment();
-
-  const [tab, setTab] = useState<ComposerTab>("reply");
-  const [text, setText] = useState("");
-  const [mention, setMention] = useState("");
-  const [draftLoading, setDraftLoading] = useState(false);
-  const [reanalyzing, setReanalyzing] = useState(false);
+, setReanalyzing] = useState(false);
   const [showEvents, setShowEvents] = useState(true);
   const [refundOpen, setRefundOpen] = useState(false);
   const [lightbox, setLightbox] = useState<{ url: string; name: string } | null>(null);
-  /**
-   * Idempotens-nøkkel for gjeldende svarutkast. Genereres én gang når brukeren
-   * begynner å skrive, og nullstilles først etter vellykket sending — slik at
-   * unik-indeksen i basen faktisk stopper dobbeltsending.
-   */
   const [createCustomerOpen, setCreateCustomerOpen] = useState(false);
   const [linkCustomerOpen, setLinkCustomerOpen] = useState(false);
-  const [draftKey, setDraftKey] = useState<string | null>(null);
-  useEffect(() => {
-    if (text.trim() && !draftKey) setDraftKey(safeUuid());
-  }, [text, draftKey]);
-
   // Navn på aktører i hendelser + følgere + ansvarlig
   const nameIds = useMemo(
     () => [
@@ -633,119 +614,7 @@ export default function TicketDetail() {
 
   // ─── handlers
 
-  const onSend = async () => {
-    if (!text.trim() || !id) return;
-    try {
-      await sendReply.mutateAsync({
-        ticket_id: id,
-        body_text: text.trim(),
-        idempotency_key: draftKey ?? undefined,
-      });
-      setText("");
-      setDraftKey(null);
-      toast.success(`Svar sendt til ${ticket.sender_email}`);
-    } catch (e) {
-      toast.error(`Kunne ikke sende: ${e instanceof Error ? e.message : String(e)}`);
-    }
-  };
 
-  const onSaveNote = async () => {
-    if (!text.trim() || !id) return;
-    try {
-      await addComment.mutateAsync({ ticket_id: id, body: text.trim(), mentioned_teams: [] });
-      await logTicketEvent({
-        ticket_id: id,
-        event_type: "note.added",
-        summary: "Internt notat lagt til",
-      });
-      setText("");
-      qc.invalidateQueries({ queryKey: ["ticket-events", id] });
-      toast.success("Internt notat lagret");
-    } catch (e) {
-      toast.error(`Kunne ikke lagre: ${e instanceof Error ? e.message : String(e)}`);
-    }
-  };
-
-  const mentionLabel = mention.startsWith("team:")
-    ? `@${TEAM_LABEL[mention.slice(5) as TicketTeam]}`
-    : mention.startsWith("user:")
-      ? `@${activeUsers.find((u) => u.id === mention.slice(5))?.display_name ?? "bruker"}`
-      : "";
-
-  const onAsk = async () => {
-    if (!id || !mention || !text.trim()) return;
-    try {
-      const mentionedTeams: TicketTeam[] = mention.startsWith("team:")
-        ? [mention.slice(5) as TicketTeam]
-        : [];
-      await addComment.mutateAsync({
-        ticket_id: id,
-        body: `${mentionLabel}\n\n${text.trim()}`,
-        mentioned_teams: mentionedTeams,
-      });
-      await supabase
-        .from("tickets")
-        .update({ awaiting_internal: true } as never)
-        .eq("id", id);
-      await logTicketEvent({
-        ticket_id: id,
-        event_type: "ticket.internal_ask",
-        summary: `Spurt internt ${mentionLabel}`,
-        payload: { mention },
-      });
-      const recipients = new Set<string>();
-      if (mention.startsWith("team:")) {
-        const { data: members } = await supabase
-          .from("user_team_memberships")
-          .select("user_id")
-          .eq("team", mention.slice(5) as TicketTeam);
-        for (const m of members ?? []) if (m.user_id) recipients.add(m.user_id as string);
-      } else {
-        recipients.add(mention.slice(5));
-      }
-      if (user?.id) recipients.delete(user.id);
-      await createNotifications(
-        Array.from(recipients).map((user_id) => ({
-          user_id,
-          type: "ticket.team_mention",
-          title: `${mentionLabel} spurte om saken`,
-          body: ticket.subject ?? null,
-          link: `/ordre/ticket/${id}`,
-          ticket_id: id,
-          refund_id: null,
-          order_id: ticket.related_order_id ?? null,
-        })),
-      );
-      setText("");
-      setMention("");
-      qc.invalidateQueries({ queryKey: ["ticket", id] });
-      qc.invalidateQueries({ queryKey: ["ticket-events", id] });
-      toast.success(`Spørsmål sendt til ${mentionLabel}`);
-    } catch (e) {
-      toast.error(`Kunne ikke sende: ${e instanceof Error ? e.message : String(e)}`);
-    }
-  };
-
-  const onAiDraft = async () => {
-    if (!id) return;
-    setDraftLoading(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("generate-ticket-reply", {
-        body: { ticket_id: id, reply_type: "reply" },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      const draft = (data?.draft ?? {}) as { body_text?: string };
-      if (draft.body_text) setText(draft.body_text);
-      toast.success("AI-utkast satt inn — rediger før sending");
-    } catch (e) {
-      toast.error(`AI-utkast feilet: ${e instanceof Error ? e.message : String(e)}`);
-    } finally {
-      setDraftLoading(false);
-    }
-  };
-
-  const onReanalyze = async () => {
     if (!id) return;
     setReanalyzing(true);
     try {
