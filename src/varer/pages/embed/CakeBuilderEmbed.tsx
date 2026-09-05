@@ -33,6 +33,21 @@ import { AlertTriangle, Loader2 } from "lucide-react";
  * Frame-ancestors enforcement is intentionally NOT done in F1.2.
  * Real CSP via HTTP response headers comes in F1.3 with edge proxy.
  */
+/**
+ * `return_url` kan sende nettleseren videre — tillat kun verter som står i
+ * origins-allowlisten (samme prinsipp som Login.tsx). Ellers ignoreres den.
+ */
+function resolveReturnUrl(raw: string | null): string | null {
+  if (!raw) return null;
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== "https:" && url.protocol !== "http:") return null;
+    return isAllowedOrigin(url.origin) ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function CakeBuilderEmbed() {
   const { categoryId } = useParams<{ categoryId: string }>();
   const [searchParams] = useSearchParams();
@@ -42,7 +57,7 @@ export default function CakeBuilderEmbed() {
   const defaultPickupLocationId = searchParams.get("default_pickup_location_id");
   const theme = (searchParams.get("theme") as "light" | "dark") || "light";
   const vatToggle = searchParams.get("vat_toggle") !== "false";
-  const returnUrl = searchParams.get("return_url");
+  const returnUrl = resolveReturnUrl(searchParams.get("return_url"));
   const source = searchParams.get("source");
   const needsInjectedSession = source === "kiosk" || source === "portal";
   const [authReady, setAuthReady] = useState(!needsInjectedSession);

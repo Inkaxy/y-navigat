@@ -36,6 +36,7 @@ import {
   ngFileName,
   ngRowCells,
 } from "@/rapporter/lib/ngFormat";
+import { osloDateISO } from "@/lib/osloDate";
 
 function lastMonthValue(): string {
   const now = new Date();
@@ -47,7 +48,7 @@ function periodFromMonth(month: string): { start: string; end: string } {
   const [y, m] = month.split("-").map(Number);
   const start = new Date(Date.UTC(y, m - 1, 1));
   const end = new Date(Date.UTC(y, m, 0));
-  const iso = (d: Date) => d.toISOString().slice(0, 10);
+  const iso = (d: Date) => osloDateISO(d);
   return { start: iso(start), end: iso(end) };
 }
 

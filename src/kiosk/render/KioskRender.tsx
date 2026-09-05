@@ -11,7 +11,7 @@ import {
   Utensils,
   X as XIcon,
 } from "lucide-react";
-import { icons as LucideIcons } from "lucide-react";
+import { getLucideIcon } from "@/lib/appIcons";
 import type { CSSProperties, ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
@@ -101,7 +101,7 @@ interface Props {
 
 function IconByName({ name, className }: { name?: string | null; className?: string }) {
   if (!name) return null;
-  const Comp = (LucideIcons as Record<string, React.ComponentType<{ className?: string }>>)[name];
+  const Comp = getLucideIcon(name);
   if (!Comp) return null;
   return <Comp className={className} />;
 }

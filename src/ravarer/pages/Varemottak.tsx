@@ -20,9 +20,10 @@ import { useRawMaterialUnits, useRawMaterialUnitsFor } from "@/ravarer/hooks/use
 import { useReceiptInvoices, useReceiptLines, useReceiptMovement, type ReceiptLine } from "@/ravarer/hooks/useGoodsReceipt";
 import { UnitAmountRows, emptyRow, rowsToBase, type UnitAmountRow } from "@/ravarer/components/stock/UnitAmountRows";
 import { formatDate, formatNok, formatNumber } from "@/ravarer/lib/constants";
+import { osloDateISOPlusDays, osloTodayISO } from "@/lib/osloDate";
 
-const isoDaysAgo = (days: number) => new Date(Date.now() - days * 86400_000).toISOString().slice(0, 10);
-const today = () => new Date().toISOString().slice(0, 10);
+const isoDaysAgo = (days: number) => osloDateISOPlusDays(-days);
+const today = () => osloTodayISO();
 
 export default function Varemottak() {
   const { canWrite } = useRavarer();

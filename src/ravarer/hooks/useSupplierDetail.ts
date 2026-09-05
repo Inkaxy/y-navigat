@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { SupplierRow } from "@/ravarer/hooks/useSuppliers";
+import { osloDateISOPlusDays } from "@/lib/osloDate";
 
 export interface SupplierItemRow {
   id: string;
@@ -92,7 +93,7 @@ export function useSupplierSpend(supplierId: string | undefined) {
     queryKey: ["supplier-spend", supplierId],
     enabled: !!supplierId,
     queryFn: async () => {
-      const since = new Date(Date.now() - 365 * 86_400_000).toISOString().slice(0, 10);
+      const since = osloDateISOPlusDays(-365);
       const { data, error } = await supabase
         .from("invoices")
         .select("total_amount")

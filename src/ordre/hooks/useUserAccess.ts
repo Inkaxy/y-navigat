@@ -14,7 +14,7 @@ export type AccessInfo = {
 /** Sjekker brukerens tilgang til Ordre-appen og om de har stilling i Nøtterø Bakeri AS */
 export function useUserAccess(user: User | null) {
   return useQuery({
-    queryKey: ["user-access", user?.id],
+    queryKey: ["ordre-access", user?.id],
     enabled: !!user,
     queryFn: async (): Promise<AccessInfo> => {
       const today = osloTodayISO();

@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { LayoutDashboard, Box, MoreHorizontal } from "lucide-react";
-import * as Icons from "lucide-react";
+import { LayoutDashboard, MoreHorizontal } from "lucide-react";
+import { getAppIcon } from "@/lib/appIcons";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,7 +11,6 @@ import {
 import { useAccessibleApps, type AccessibleApp } from "@/hooks/useAccessibleApps";
 import { cn } from "@/lib/utils";
 
-const iconMap = Icons as unknown as Record<string, React.ComponentType<{ className?: string }>>;
 
 import { APP_INTERNAL_ROUTES as INTERNAL_ROUTES } from "@/lib/appRoutes";
 
@@ -39,7 +38,7 @@ export function AppTabs() {
         label: a.display_name,
         to: INTERNAL_ROUTES[a.slug],
         color: a.color_hex ?? "#a47236",
-        icon: iconMap[a.icon_name] ?? Box,
+        icon: getAppIcon(a.icon_name),
       }));
     // Sørg for at NBhub alltid vises først hvis vi har den
     const nbhubIdx = list.findIndex((e) => e.key === "nbhub");
