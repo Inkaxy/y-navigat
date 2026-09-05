@@ -11,6 +11,11 @@ export type FlatLineRow = {
   unit_price: number;
   line_total_incl_vat: number;
   isDraft?: boolean;
+  /** Alle ordre som bidrar til linjen (flere ved dublett). */
+  order_ids?: string[];
+  order_number?: string | null;
+  /** Linjer uten tur kan ikke redigeres i matrisen. */
+  readOnly?: boolean;
 };
 
 const WEEKDAYS = ["Søndag", "Mandag", "Tirsdag", "Onsdag", "Torsdag", "Fredag", "Lørdag"];
