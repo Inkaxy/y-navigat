@@ -398,14 +398,18 @@ export async function buildCakePdf(
   const packItems: PackItem[] = printable.map((item, idx) => {
     const id = item.image?.id ?? `item-${idx}`;
     byId.set(id, item);
+    // Pakkes med den største korreksjonen på begge akser, slik at bildet får
+    // plass uansett om pakkeren snur det. Selve tegningen bruker aksene under.
+    const packScale = Math.max(scale, scaleY);
     return {
       id,
-      widthMm: applyScale(item.widthMm, scale) ?? 0,
-      heightMm: (applyScale(item.heightMm, scaleY) ?? 0) + CAPTION_MM,
+      widthMm: applyScale(item.widthMm, packScale) ?? 0,
+      heightMm: (applyScale(item.heightMm, packScale) ?? 0) + CAPTION_MM,
       bleedMm: item.bleedMm ?? 0,
       isRound: item.isRound,
       rotatable: !item.isRound,
     };
+
   });
 
   const packed = opts.nest === false
