@@ -22,6 +22,10 @@ import {
 } from "@/components/ui/select";
 import { useActiveOutlets, useCreateRefund, type RefundMethod, type RefundRoute } from "@/ordre/hooks/useRefunds";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  DEFAULT_ORDRE_DESK_SETTINGS,
+  useOrdreDeskSettings,
+} from "@/ordre/hooks/useOrdreDeskSettings";
 
 interface Props {
   open: boolean;
@@ -65,7 +69,9 @@ export default function CreateRefundDialog({
   }, [open, suggestedAmount, suggestedReason]);
 
   const amountNumber = Number.parseFloat(amount.replace(",", "."));
-  const requiresApproval = Number.isFinite(amountNumber) && amountNumber > 500;
+  const { data: desk } = useOrdreDeskSettings();
+  const approvalLimit = desk?.refundApprovalLimit ?? DEFAULT_ORDRE_DESK_SETTINGS.refundApprovalLimit;
+  const requiresApproval = Number.isFinite(amountNumber) && amountNumber > approvalLimit;
   const canSubmit =
     Number.isFinite(amountNumber) &&
     amountNumber > 0 &&
@@ -145,7 +151,7 @@ export default function CreateRefundDialog({
             </div>
             {requiresApproval && (
               <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
-                ⚠️ Over 500 kr — krever godkjenning fra daglig leder før utbetaling.
+                {`⚠️ Over ${approvalLimit} kr — krever godkjenning fra daglig leder før utbetaling.`}
               </p>
             )}
           </div>

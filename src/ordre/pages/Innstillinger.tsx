@@ -24,6 +24,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { RichTextEditor, type RichTextEditorHandle } from "@/ordre/components/shell/RichTextEditor";
 import { AiSettingsCard } from "@/ordre/components/shell/AiSettingsCard";
 import { SlaSettingsCard } from "@/ordre/components/shell/SlaSettingsCard";
+import { OrdreDeskSettingsCard } from "@/ordre/components/shell/OrdreDeskSettingsCard";
 import { CakeImagesSettingsCard } from "@/ordre/components/shell/CakeImagesSettingsCard";
 
 import { useToast } from "@/components/ui/use-toast";
@@ -196,6 +197,9 @@ export default function OrdreInnstillingerPage() {
 
       {/* Kort 4b: SLA-frister */}
       <SlaSettingsCard />
+
+      {/* Ordrekontor — grenser og standardtekster */}
+      <OrdreDeskSettingsCard />
 
 
       {/* Kort 5: Kakebilder */}

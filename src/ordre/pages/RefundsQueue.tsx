@@ -14,6 +14,10 @@ import {
   type RefundStatus,
   type RefundWithJoins,
 } from "@/ordre/hooks/useRefunds";
+import {
+  DEFAULT_ORDRE_DESK_SETTINGS,
+  useOrdreDeskSettings,
+} from "@/ordre/hooks/useOrdreDeskSettings";
 
 const STATUS_LABEL: Record<RefundStatus, string> = {
   pending: "Venter godkjenning",
@@ -38,6 +42,8 @@ type FilterTab = "all" | RefundStatus;
 
 export default function RefundsQueue() {
   const { data: refunds = [], isLoading } = useRefunds();
+  const { data: desk } = useOrdreDeskSettings();
+  const approvalLimit = desk?.refundApprovalLimit ?? DEFAULT_ORDRE_DESK_SETTINGS.refundApprovalLimit;
   const { data: scope } = useMyOrdreScope();
   const approve = useApproveRefund();
   const markPaid = useMarkRefundPaid();
@@ -120,7 +126,7 @@ export default function RefundsQueue() {
       <div className="mb-4 rounded-lg border border-sky-400/40 bg-sky-500/10 p-3 text-sm text-sky-900 dark:text-sky-200">
         💡 I NBHub styres denne køen av stillingstilgang: <b>Utsalg</b> ser bare sine (og får varsel + Hjem-widget),
         <b> Økonomi</b> ser kreditnotaene, og ordrekontoret ser status på alt de har opprettet.
-        Beløp over 500 kr krever godkjenning fra daglig leder.
+        {` Beløp over ${approvalLimit} kr krever godkjenning fra daglig leder, og de som kan godkjenne får varsel.`}
       </div>
 
       <div className="mb-3 flex flex-wrap gap-2">
@@ -200,7 +206,7 @@ export default function RefundsQueue() {
                     )}
                     <div className="mt-1 text-xs text-muted-foreground">
                       opprettet {formatDistanceToNow(new Date(r.created_at), { locale: nb, addSuffix: true })}
-                      {r.requires_approval && r.status === "pending" && " · over 500 kr · venter godkjenning"}
+                      {r.requires_approval && r.status === "pending" && ` · over ${approvalLimit} kr · venter godkjenning`}
                       {r.status === "approved" && " · godkjent ✓"}
                       {r.method && r.route === "utsalg" && ` · ${r.method}`}
                     </div>

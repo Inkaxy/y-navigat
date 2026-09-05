@@ -32,11 +32,19 @@ export function normalizeScore(raw: number | null | undefined): number | null {
   return v;
 }
 
-export function confidenceLevel(raw: number | null | undefined): ConfidenceLevel | null {
+export type ConfidenceThresholds = { high: number; medium: number };
+
+/** Standardgrenser — kan overstyres i Innstillinger → Ordrekontor. */
+export const DEFAULT_CONFIDENCE_THRESHOLDS: ConfidenceThresholds = { high: 0.85, medium: 0.6 };
+
+export function confidenceLevel(
+  raw: number | null | undefined,
+  thresholds: ConfidenceThresholds = DEFAULT_CONFIDENCE_THRESHOLDS,
+): ConfidenceLevel | null {
   const v = normalizeScore(raw);
   if (v == null) return null;
-  if (v >= 0.85) return "high";
-  if (v >= 0.6) return "medium";
+  if (v >= thresholds.high) return "high";
+  if (v >= thresholds.medium) return "medium";
   return "low";
 }
 

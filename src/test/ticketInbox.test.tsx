@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi } from "vitest";
+import { pickSlaBreaches } from "@/ordre/lib/slaBreach";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import {
   countQueues,
@@ -155,5 +156,46 @@ describe("bulkhandlinger", () => {
   it("har norske etiketter", () => {
     expect(BULK_LABEL.assign_me).toMatch(/ta/i);
     expect(BULK_LABEL.resolve).toMatch(/ferdig/i);
+  });
+});
+
+describe("SLA-brudd-varsel", () => {
+  const base = {
+    subject: "Manglende levering",
+    status: "new",
+    assigned_to: "u1",
+  };
+
+  it("varsler egne saker som har passert fristen", () => {
+    const past = new Date(Date.now() - 60_000);
+    const out = pickSlaBreaches([{ id: "t1", ...base, deadline: past }], { userId: "u1" });
+    expect(out.map((t) => t.id)).toEqual(["t1"]);
+  });
+
+  it("varsler ikke to ganger for samme sak", () => {
+    const past = new Date(Date.now() - 60_000);
+    const out = pickSlaBreaches([{ id: "t1", ...base, deadline: past }], {
+      userId: "u1",
+      alreadyNotified: ["t1"],
+    });
+    expect(out).toEqual([]);
+  });
+
+  it("varsler ikke saker som ikke er dine, med mindre de er åpne på skjermen", () => {
+    const past = new Date(Date.now() - 60_000);
+    const rows = [{ id: "t2", ...base, assigned_to: "u9", deadline: past }];
+    expect(pickSlaBreaches(rows, { userId: "u1" })).toEqual([]);
+    expect(pickSlaBreaches(rows, { userId: "u1", openTicketId: "t2" })).toHaveLength(1);
+  });
+
+  it("varsler ikke lukkede saker eller saker innenfor fristen", () => {
+    const past = new Date(Date.now() - 60_000);
+    const future = new Date(Date.now() + 60_000);
+    expect(
+      pickSlaBreaches([{ id: "t3", ...base, status: "closed", deadline: past }], { userId: "u1" }),
+    ).toEqual([]);
+    expect(
+      pickSlaBreaches([{ id: "t4", ...base, deadline: future }], { userId: "u1" }),
+    ).toEqual([]);
   });
 });

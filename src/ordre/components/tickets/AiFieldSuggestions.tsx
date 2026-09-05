@@ -4,8 +4,11 @@ import {
   CONFIDENCE_SHORT,
   CONFIDENCE_TOKEN,
   confidenceLevel,
+  DEFAULT_CONFIDENCE_THRESHOLDS,
+  type ConfidenceThresholds,
   type FieldSuggestion,
 } from "@/ordre/lib/aiConfidence";
+import { useOrdreDeskSettings } from "@/ordre/hooks/useOrdreDeskSettings";
 import type { AiSuggestion } from "@/ordre/lib/aiSuggestion";
 
 /** Norske etiketter for feltene AI kan foreslå på en henvendelse. */
@@ -32,14 +35,17 @@ const FIELD_LABEL: Record<string, string> = {
  * Gjør AI-forslaget om til feltvise forslag med belegg og sikkerhetsnivå.
  * Eksportert for testbarhet.
  */
-export function buildFieldSuggestions(ai: AiSuggestion | null): FieldSuggestion[] {
+export function buildFieldSuggestions(
+  ai: AiSuggestion | null,
+  thresholds: ConfidenceThresholds = DEFAULT_CONFIDENCE_THRESHOLDS,
+): FieldSuggestion[] {
   if (!ai) return [];
   const out: FieldSuggestion[] = [];
   const fields = ai.order_fields ?? {};
   for (const [field, raw] of Object.entries(fields)) {
     if (raw == null || String(raw).trim() === "") continue;
     const level =
-      confidenceLevel(ai.field_confidence?.[field] ?? ai.confidence_score) ?? "low";
+      confidenceLevel(ai.field_confidence?.[field] ?? ai.confidence_score, thresholds) ?? "low";
     out.push({
       field,
       label: FIELD_LABEL[field] ?? field,
@@ -54,7 +60,7 @@ export function buildFieldSuggestions(ai: AiSuggestion | null): FieldSuggestion[
       field: `product:${p.product_name}`,
       label: "Produkt",
       value: `${p.quantity} × ${p.product_name}`,
-      level: confidenceLevel(p.match_confidence) ?? "low",
+      level: confidenceLevel(p.match_confidence, thresholds) ?? "low",
       evidence: [p.size_or_servings, p.flavor, p.filling, p.decoration]
         .filter(Boolean)
         .join(" · ") || null,
@@ -74,7 +80,13 @@ export default function AiFieldSuggestions({
   ai: AiSuggestion | null;
   max?: number;
 }) {
-  const suggestions = buildFieldSuggestions(ai).slice(0, max);
+  const { data: desk } = useOrdreDeskSettings();
+  const suggestions = buildFieldSuggestions(
+    ai,
+    desk
+      ? { high: desk.confidenceHigh, medium: desk.confidenceMedium }
+      : DEFAULT_CONFIDENCE_THRESHOLDS,
+  ).slice(0, max);
 
   if (suggestions.length === 0) {
     return (

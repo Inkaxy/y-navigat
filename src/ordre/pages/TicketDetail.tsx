@@ -4,12 +4,9 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
   ArrowLeft,
-  AtSign,
   Link2,
   Loader2,
-  Lock,
   Paperclip,
-  Send,
   Sparkles,
   UserPlus,
   X,
@@ -17,16 +14,6 @@ import {
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
@@ -39,14 +26,10 @@ import {
   type TicketAttachment,
 } from "@/ordre/hooks/useTickets";
 import { useUserAccess } from "@/ordre/hooks/useUserAccess";
-import { useTicketReplies, useSendTicketReply, safeUuid } from "@/ordre/hooks/useTicketReplies";
-import {
-  useInternalComments,
-  useAddInternalComment,
-} from "@/ordre/hooks/useInternalComments";
+import { useTicketReplies } from "@/ordre/hooks/useTicketReplies";
+import { useInternalComments } from "@/ordre/hooks/useInternalComments";
 import { useInboundMessages, type InboundMessage } from "@/ordre/hooks/useInboundMessages";
 import { useUserNames } from "@/ordre/hooks/useUserNames";
-import { useActiveUsers } from "@/ordre/hooks/useActiveUsers";
 import { useSlaSettings } from "@/ordre/hooks/useSlaSettings";
 import { computeDeadline, formatCountdown } from "@/ordre/lib/sla";
 import {
@@ -62,14 +45,13 @@ import {
   TICKET_STATUS_LABEL,
   TICKET_STATUS_STYLE,
 } from "@/ordre/lib/ticketFormat";
-import { logTicketEvent } from "@/ordre/lib/ticketEvents";
-import { TEAM_LABEL, TEAMS, type TicketTeam } from "@/ordre/lib/teams";
-import { createNotifications } from "@/ordre/hooks/useNotifications";
+import { TEAM_LABEL } from "@/ordre/lib/teams";
 import ConversationItem from "@/ordre/components/tickets/ConversationItem";
 import TimelineEvent, {
   type TimelineEventRow,
 } from "@/ordre/components/tickets/TimelineEvent";
 import TicketActionBar from "@/ordre/components/tickets/TicketActionBar";
+import TicketComposer from "@/ordre/components/tickets/TicketComposer";
 import { useIsMobile } from "@/hooks/use-mobile";
 import OrderLinkCard from "@/ordre/components/tickets/OrderLinkCard";
 import EmailBody, { sanitizeEmailHtml, extractCidRefs } from "@/ordre/components/tickets/EmailBody";
@@ -300,8 +282,6 @@ function SideCard({
   );
 }
 
-type ComposerTab = "reply" | "note" | "ask";
-
 // ────────────────────────── main page
 
 export default function TicketDetail() {
@@ -322,31 +302,13 @@ export default function TicketDetail() {
   const { data: customerCard } = useCustomerCard(ticket?.sender_email);
   const { data: linked } = useLinkedOrder(ticket?.related_order_id ?? null);
   const { data: sla } = useSlaSettings();
-  const { data: activeUsers = [] } = useActiveUsers();
 
-  const sendReply = useSendTicketReply();
-  const addComment = useAddInternalComment();
-
-  const [tab, setTab] = useState<ComposerTab>("reply");
-  const [text, setText] = useState("");
-  const [mention, setMention] = useState("");
-  const [draftLoading, setDraftLoading] = useState(false);
   const [reanalyzing, setReanalyzing] = useState(false);
   const [showEvents, setShowEvents] = useState(true);
   const [refundOpen, setRefundOpen] = useState(false);
   const [lightbox, setLightbox] = useState<{ url: string; name: string } | null>(null);
-  /**
-   * Idempotens-nøkkel for gjeldende svarutkast. Genereres én gang når brukeren
-   * begynner å skrive, og nullstilles først etter vellykket sending — slik at
-   * unik-indeksen i basen faktisk stopper dobbeltsending.
-   */
   const [createCustomerOpen, setCreateCustomerOpen] = useState(false);
   const [linkCustomerOpen, setLinkCustomerOpen] = useState(false);
-  const [draftKey, setDraftKey] = useState<string | null>(null);
-  useEffect(() => {
-    if (text.trim() && !draftKey) setDraftKey(safeUuid());
-  }, [text, draftKey]);
-
   // Navn på aktører i hendelser + følgere + ansvarlig
   const nameIds = useMemo(
     () => [
@@ -633,118 +595,6 @@ export default function TicketDetail() {
 
   // ─── handlers
 
-  const onSend = async () => {
-    if (!text.trim() || !id) return;
-    try {
-      await sendReply.mutateAsync({
-        ticket_id: id,
-        body_text: text.trim(),
-        idempotency_key: draftKey ?? undefined,
-      });
-      setText("");
-      setDraftKey(null);
-      toast.success(`Svar sendt til ${ticket.sender_email}`);
-    } catch (e) {
-      toast.error(`Kunne ikke sende: ${e instanceof Error ? e.message : String(e)}`);
-    }
-  };
-
-  const onSaveNote = async () => {
-    if (!text.trim() || !id) return;
-    try {
-      await addComment.mutateAsync({ ticket_id: id, body: text.trim(), mentioned_teams: [] });
-      await logTicketEvent({
-        ticket_id: id,
-        event_type: "note.added",
-        summary: "Internt notat lagt til",
-      });
-      setText("");
-      qc.invalidateQueries({ queryKey: ["ticket-events", id] });
-      toast.success("Internt notat lagret");
-    } catch (e) {
-      toast.error(`Kunne ikke lagre: ${e instanceof Error ? e.message : String(e)}`);
-    }
-  };
-
-  const mentionLabel = mention.startsWith("team:")
-    ? `@${TEAM_LABEL[mention.slice(5) as TicketTeam]}`
-    : mention.startsWith("user:")
-      ? `@${activeUsers.find((u) => u.id === mention.slice(5))?.display_name ?? "bruker"}`
-      : "";
-
-  const onAsk = async () => {
-    if (!id || !mention || !text.trim()) return;
-    try {
-      const mentionedTeams: TicketTeam[] = mention.startsWith("team:")
-        ? [mention.slice(5) as TicketTeam]
-        : [];
-      await addComment.mutateAsync({
-        ticket_id: id,
-        body: `${mentionLabel}\n\n${text.trim()}`,
-        mentioned_teams: mentionedTeams,
-      });
-      await supabase
-        .from("tickets")
-        .update({ awaiting_internal: true } as never)
-        .eq("id", id);
-      await logTicketEvent({
-        ticket_id: id,
-        event_type: "ticket.internal_ask",
-        summary: `Spurt internt ${mentionLabel}`,
-        payload: { mention },
-      });
-      const recipients = new Set<string>();
-      if (mention.startsWith("team:")) {
-        const { data: members } = await supabase
-          .from("user_team_memberships")
-          .select("user_id")
-          .eq("team", mention.slice(5) as TicketTeam);
-        for (const m of members ?? []) if (m.user_id) recipients.add(m.user_id as string);
-      } else {
-        recipients.add(mention.slice(5));
-      }
-      if (user?.id) recipients.delete(user.id);
-      await createNotifications(
-        Array.from(recipients).map((user_id) => ({
-          user_id,
-          type: "ticket.team_mention",
-          title: `${mentionLabel} spurte om saken`,
-          body: ticket.subject ?? null,
-          link: `/ordre/ticket/${id}`,
-          ticket_id: id,
-          refund_id: null,
-          order_id: ticket.related_order_id ?? null,
-        })),
-      );
-      setText("");
-      setMention("");
-      qc.invalidateQueries({ queryKey: ["ticket", id] });
-      qc.invalidateQueries({ queryKey: ["ticket-events", id] });
-      toast.success(`Spørsmål sendt til ${mentionLabel}`);
-    } catch (e) {
-      toast.error(`Kunne ikke sende: ${e instanceof Error ? e.message : String(e)}`);
-    }
-  };
-
-  const onAiDraft = async () => {
-    if (!id) return;
-    setDraftLoading(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("generate-ticket-reply", {
-        body: { ticket_id: id, reply_type: "reply" },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      const draft = (data?.draft ?? {}) as { body_text?: string };
-      if (draft.body_text) setText(draft.body_text);
-      toast.success("AI-utkast satt inn — rediger før sending");
-    } catch (e) {
-      toast.error(`AI-utkast feilet: ${e instanceof Error ? e.message : String(e)}`);
-    } finally {
-      setDraftLoading(false);
-    }
-  };
-
   const onReanalyze = async () => {
     if (!id) return;
     setReanalyzing(true);
@@ -761,22 +611,6 @@ export default function TicketDetail() {
     } finally {
       setReanalyzing(false);
     }
-  };
-
-  const sendDisabled =
-    !canWrite ||
-    !text.trim() ||
-    sendReply.isPending ||
-    addComment.isPending ||
-    (tab === "ask" && !mention);
-
-  const TAB_META: Record<ComposerTab, { label: string; cls: string }> = {
-    reply: { label: "Svar til kunde", cls: "bg-primary text-primary-foreground" },
-    note: {
-      label: "Internt notat",
-      cls: "bg-amber-500/20 text-amber-900 dark:text-amber-100",
-    },
-    ask: { label: "Spør internt / @tagg", cls: "bg-amber-500/20 text-amber-900 dark:text-amber-100" },
   };
 
   const actionBar = (
@@ -905,117 +739,17 @@ export default function TicketDetail() {
             <div key={it.key}>{it.node}</div>
           ))}
 
-          {/* C) Skrivefelt */}
-          <div className="rounded-lg border bg-[hsl(var(--brand-cream))] p-4 shadow-sm">
-            <div className="mb-3 flex flex-wrap gap-1.5">
-              {(["reply", "note", "ask"] as ComposerTab[]).map((t) => (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => setTab(t)}
-                  className={cn(
-                    "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-                    tab === t
-                      ? TAB_META[t].cls
-                      : "bg-background text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  {TAB_META[t].label}
-                </button>
-              ))}
-            </div>
-
-            {tab === "ask" && (
-              <Select value={mention} onValueChange={setMention}>
-                <SelectTrigger className="mb-2 h-9 w-full bg-background md:w-[280px]">
-                  <SelectValue placeholder="Velg team eller person …" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectLabel>Team</SelectLabel>
-                    {TEAMS.map((t) => (
-                      <SelectItem key={`t-${t}`} value={`team:${t}`}>
-                        @{TEAM_LABEL[t]}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                  <SelectGroup>
-                    <SelectLabel>Personer</SelectLabel>
-                    {activeUsers.map((u) => (
-                      <SelectItem key={`u-${u.id}`} value={`user:${u.id}`}>
-                        @{u.display_name}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            )}
-
-            <Textarea
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              disabled={!canWrite}
-              className={cn(
-                "min-h-[130px] resize-y bg-background",
-                tab !== "reply" && "border-amber-400/60",
-              )}
-              placeholder={
-                tab === "reply"
-                  ? `Skriv svar til ${ticket.sender_email} …`
-                  : tab === "note"
-                    ? "Skriv et internt notat — kunden ser ikke dette."
-                    : "Hva lurer du på? Notatet er kun synlig internt."
-              }
-            />
-
-            {tab !== "reply" && (
-              <p className="mt-1 flex items-center gap-1 text-xs text-amber-700 dark:text-amber-300">
-                <Lock className="h-3 w-3" /> Kun synlig internt — sendes ikke til kunden.
-              </p>
-            )}
-
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              {tab === "reply" && (
-                <>
-                  <Button onClick={onSend} disabled={sendDisabled} className="gap-2">
-                    <Send className="h-4 w-4" /> Send svar til {ticket.sender_email}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={onAiDraft}
-                    disabled={!canWrite || draftLoading}
-                    className="gap-2"
-                  >
-                    {draftLoading ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Sparkles className="h-4 w-4" />
-                    )}
-                    Sett inn AI-utkast
-                  </Button>
-                </>
-              )}
-              {tab === "note" && (
-                <Button
-                  onClick={onSaveNote}
-                  disabled={sendDisabled}
-                  className="gap-2 bg-amber-500 text-amber-950 hover:bg-amber-500/90"
-                >
-                  <Lock className="h-4 w-4" /> Lagre internt notat
-                </Button>
-              )}
-              {tab === "ask" && (
-                <Button
-                  onClick={onAsk}
-                  disabled={sendDisabled}
-                  className="gap-2 bg-amber-500 text-amber-950 hover:bg-amber-500/90"
-                >
-                  <AtSign className="h-4 w-4" />
-                  Send spørsmål til {mentionLabel || "…"}
-                </Button>
-              )}
-            </div>
-          </div>
+          {/* C) Skrivefelt — samme komposer som i innboksen */}
+          <TicketComposer
+            ticket={ticket}
+            canWrite={canWrite}
+            onAfterSend={() => {
+              qc.invalidateQueries({ queryKey: ["ticket", id] });
+              qc.invalidateQueries({ queryKey: ["ticket-events", id] });
+              qc.invalidateQueries({ queryKey: ["ticket-replies", id] });
+              qc.invalidateQueries({ queryKey: ["ticket-internal-comments", id] });
+            }}
+          />
         </div>
 
         {/* D) Høyre kolonne */}

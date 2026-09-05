@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { osloTodayISO } from "@/lib/osloDate";
+import { fetchOrdreDeskSettings } from "@/ordre/hooks/useOrdreDeskSettings";
+import { createNotifications } from "@/ordre/hooks/useNotifications";
 
 export type RefundRoute = "utsalg" | "okonomi";
 export type RefundStatus = "pending" | "approved" | "paid" | "rejected";
@@ -130,7 +132,8 @@ export function useCreateRefund() {
     mutationFn: async (input: CreateRefundInput) => {
       const { data: u } = await supabase.auth.getUser();
       const uid = u.user?.id ?? null;
-      const requires_approval = input.amount > 500;
+      const desk = await fetchOrdreDeskSettings();
+      const requires_approval = input.amount > desk.refundApprovalLimit;
       const { data, error } = await supabase
         .from("refunds")
         .insert({
@@ -161,11 +164,39 @@ export function useCreateRefund() {
         }`,
         payload: { refund_id: refundId, amount: input.amount, route: input.route },
       } as never);
+
+      // Varsle dem som faktisk skal handle: godkjennere når beløpet er over
+      // grensen, ellers laget som skal betale ut.
+      const team = requires_approval ? "admin" : input.route === "utsalg" ? "butikk" : "admin";
+      const { data: members } = await supabase
+        .from("user_team_memberships")
+        .select("user_id")
+        .eq("team", team as never);
+      const recipients = new Set<string>();
+      for (const m of (members ?? []) as Array<{ user_id: string | null }>) {
+        if (m.user_id) recipients.add(m.user_id);
+      }
+      if (uid) recipients.delete(uid);
+      await createNotifications(
+        Array.from(recipients).map((user_id) => ({
+          user_id,
+          type: "refund.assigned" as const,
+          title: requires_approval
+            ? `Tilbakebetaling til godkjenning — ${input.amount.toFixed(2)} kr`
+            : `Tilbakebetaling til utbetaling — ${input.amount.toFixed(2)} kr`,
+          body: input.reason,
+          link: "/ordre/tilbakebetalinger",
+          ticket_id: input.ticket_id,
+          refund_id: refundId,
+          order_id: input.order_id,
+        })),
+      );
       return refundId;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["refunds"] });
       qc.invalidateQueries({ queryKey: ["ticket-events"] });
+      qc.invalidateQueries({ queryKey: ["notifications"] });
     },
   });
 }
