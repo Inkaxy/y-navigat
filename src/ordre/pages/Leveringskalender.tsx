@@ -2,6 +2,8 @@ import { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import type { MatrixCell as MatrixCellRow } from "@/ordre/hooks/useMatrix";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
+import { UnsavedChangesDialog } from "@/components/common/UnsavedChangesDialog";
 import {
   Grid3x3,
   ChevronLeft,
