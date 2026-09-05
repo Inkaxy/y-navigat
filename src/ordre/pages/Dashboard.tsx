@@ -133,6 +133,16 @@ export default function Dashboard() {
             }}
           />
           <OrderDeskKpi
+            label="Over frist"
+            value={kpi.tickets.nowCount}
+            sub="e-post må tas nå"
+            icon={Mail}
+            tone={kpi.tickets.nowCount > 0 ? "critical" : "ok"}
+            loading={kpi.tickets.isLoading}
+            failed={kpi.tickets.isError}
+            to="/ordre/ticket?queue=now"
+          />
+          <OrderDeskKpi
             label="Nettbutikk"
             value={kpi.website.count}
             sub="til behandling"

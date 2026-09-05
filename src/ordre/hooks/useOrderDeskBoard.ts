@@ -302,6 +302,7 @@ export function useOrderDeskBoard(options: { pendingDate?: string } = {}) {
         openCount: (ticketsQ.data?.newCount ?? 0) + (ticketsQ.data?.inProgressCount ?? 0),
         mineCount: ticketsQ.data?.mineCount ?? 0,
         unassignedCount: ticketsQ.data?.unassignedCount ?? 0,
+        nowCount: ticketsQ.data?.nowCount ?? 0,
         isLoading: ticketsQ.isLoading,
         isError: ticketsQ.isError,
         error: ticketsQ.error,
