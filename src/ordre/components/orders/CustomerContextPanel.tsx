@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useEffectivePriceList, effectivePriceListSourceLabel } from "@/kunder/hooks/useEffectivePriceList";
-import { todayOslo } from "@/lib/osloDate";
+import { osloTodayISO } from "@/lib/osloDate";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -49,6 +49,7 @@ export type CustomerContextCustomer = {
   credit_days?: number | null;
   notes?: string | null;
   delivery_instructions?: string | null;
+  default_price_list_id?: string | null;
 };
 
 export type CustomerContextPanelProps = {
@@ -169,7 +170,7 @@ export function CustomerContextPanel({
   const fixedDays = useMemo(() => {
     const days = new Set<number>();
     const tourIds = new Set<string>();
-    const today = todayOslo();
+    const today = osloTodayISO();
     for (const s of recurring.data ?? []) {
       if (s.valid_from && s.valid_from > today) continue;
       if (s.valid_to && s.valid_to < today) continue;
