@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
+import { UnsavedChangesDialog } from "@/components/common/UnsavedChangesDialog";
 import { ArrowLeft, Loader2, Plus, Trash2, AlertTriangle, Check, Search, Copy } from "lucide-react";
 import { AppBanner } from "@/ordre/components/shell/AppBanner";
 import { Button } from "@/components/ui/button";
@@ -438,6 +440,8 @@ export default function NewOrder() {
   linesRef.current = lines;
   const [submitting, setSubmitting] = useState(false);
   const [copyDialogOpen, setCopyDialogOpen] = useState(false);
+  /** Settes når ordren er lagret — da skal ikke ulagret-vakten slå til. */
+  const [savedOrder, setSavedOrder] = useState(false);
   const submittingRef = useRef(submitting);
   submittingRef.current = submitting;
   const today = todayISO();
@@ -897,6 +901,7 @@ export default function NewOrder() {
       }
 
       toast.success(`Ordre ${numRow.order_number} opprettet`);
+      setSavedOrder(true);
       navigate("/ordre/ordrer");
     } catch (e) {
       console.error(e);
@@ -909,8 +914,16 @@ export default function NewOrder() {
   // Bind save til ref for keyboard shortcuts
   saveRef.current = save;
 
+  /** Ulagret-vakt: ordreutkast med kunde eller varelinjer skal ikke forsvinne stille. */
+  const hasDraftLines = lines.some((l) => l.product || Number(l.quantity) > 0);
+  const unsavedGuard = useUnsavedChangesGuard(!savedOrder && (!!customer || hasDraftLines));
+
   return (
     <>
+      <UnsavedChangesDialog
+        {...unsavedGuard.dialogProps}
+        description="Ordreutkastet er ikke lagret ennå. Forkaster du det, forsvinner linjene du har lagt inn."
+      />
       <AppBanner
         title={isReturn ? "Ny returordre" : "Ny ordre"}
         subtitle={isReturn ? "Manuell registrering av returordre" : "Manuell registrering av salgsordre"}

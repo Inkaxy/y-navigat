@@ -2,6 +2,8 @@ import { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import type { MatrixCell as MatrixCellRow } from "@/ordre/hooks/useMatrix";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
+import { UnsavedChangesDialog } from "@/components/common/UnsavedChangesDialog";
 import {
   Grid3x3,
   ChevronLeft,
@@ -287,9 +289,11 @@ export default function MatrixPage() {
   }, [dateFrom, dateTo]);
 
   function setDaysCount(n: number) {
-    const clamped = Math.max(1, Math.min(31, n));
-    setDateTo(addDays(dateFrom, clamped - 1));
-    setQuickFilter(null);
+    guardAction(() => {
+      const clamped = Math.max(1, Math.min(31, n));
+      setDateTo(addDays(dateFrom, clamped - 1));
+      setQuickFilter(null);
+    });
   }
 
   // Merknad dialog state
@@ -327,11 +331,13 @@ export default function MatrixPage() {
 
   function applyQuickFilter(kind: QuickRange) {
     if (!customerId) return;
-    const r = rangeFor(kind);
-    setQuickFilter(kind);
-    setDateFrom(r.from);
-    setDateTo(r.to);
-    saveStoredRange(customerId, kind);
+    guardAction(() => {
+      const r = rangeFor(kind);
+      setQuickFilter(kind);
+      setDateFrom(r.from);
+      setDateTo(r.to);
+      saveStoredRange(customerId, kind);
+    });
   }
 
   // Drop locally-added products that have arrived in the server response (after save+refresh)
@@ -557,6 +563,19 @@ export default function MatrixPage() {
 
   const dirtyCount = dirtyChanges.length;
 
+  /**
+   * Ulagret-vakt: hindrer at celleendringer forsvinner stille ved navigasjon,
+   * lukking av fanen eller bytte av kunde/periode.
+   */
+  const unsavedGuard = useUnsavedChangesGuard(
+    dirtyCount > 0 || addedProducts.length > 0,
+    () => {
+      setEdits({});
+      setAddedProducts([]);
+    },
+  );
+  const guardAction = unsavedGuard.requestAction;
+
   // Effektive rader for "enkel tabell"-visning: lagrede celler + ulagrede endringer + nye rader.
   const flatRows = useMemo(() => {
     if (!matrix) return [] as import("@/ordre/components/orders/matrix/FlatLinesView").FlatLineRow[];
@@ -750,35 +769,39 @@ export default function MatrixPage() {
   }
 
   function shiftWeek(delta: number) {
-    // Manual nav clears chip selection but does NOT touch localStorage.
-    setQuickFilter(null);
-    const span = Math.max(1, daysCount);
-    if (span >= 7) {
-      // Uke-visning: hopp hele uker og hold mandag-justering.
-      const baseMon = isoWeekMonday(dateFrom);
-      const newMon = addDays(baseMon, delta * 7);
-      setDateFrom(newMon);
-      setDateTo(addDays(newMon, span - 1));
-    } else {
-      // Kortere visning: bla ett vindu (= span dager) om gangen.
-      const newFrom = addDays(dateFrom, delta * span);
-      setDateFrom(newFrom);
-      setDateTo(addDays(newFrom, span - 1));
-    }
+    guardAction(() => {
+      // Manual nav clears chip selection but does NOT touch localStorage.
+      setQuickFilter(null);
+      const span = Math.max(1, daysCount);
+      if (span >= 7) {
+        // Uke-visning: hopp hele uker og hold mandag-justering.
+        const baseMon = isoWeekMonday(dateFrom);
+        const newMon = addDays(baseMon, delta * 7);
+        setDateFrom(newMon);
+        setDateTo(addDays(newMon, span - 1));
+      } else {
+        // Kortere visning: bla ett vindu (= span dager) om gangen.
+        const newFrom = addDays(dateFrom, delta * span);
+        setDateFrom(newFrom);
+        setDateTo(addDays(newFrom, span - 1));
+      }
+    });
   }
 
   function jumpToday() {
-    setQuickFilter(null);
-    const span = Math.max(1, daysCount);
-    if (span >= 7) {
-      const mon = isoWeekMonday(todayISO());
-      setDateFrom(mon);
-      setDateTo(addDays(mon, span - 1));
-    } else {
-      const today = todayISO();
-      setDateFrom(today);
-      setDateTo(addDays(today, span - 1));
-    }
+    guardAction(() => {
+      setQuickFilter(null);
+      const span = Math.max(1, daysCount);
+      if (span >= 7) {
+        const mon = isoWeekMonday(todayISO());
+        setDateFrom(mon);
+        setDateTo(addDays(mon, span - 1));
+      } else {
+        const today = todayISO();
+        setDateFrom(today);
+        setDateTo(addDays(today, span - 1));
+      }
+    });
   }
 
   // ----- Cell action helpers -----
@@ -1447,7 +1470,9 @@ export default function MatrixPage() {
                           key={c.id}
                           value={c.id}
                           onSelect={() => {
-                            setCustomerId(c.id);
+                            guardAction(() => {
+                              setCustomerId(c.id);
+                            });
                             setPickerOpen(false);
                           }}
                         >
@@ -1499,9 +1524,11 @@ export default function MatrixPage() {
                     onSelect={(d) => {
                       if (!d) return;
                       const iso = fmtDate(d, "yyyy-MM-dd");
-                      setDateFrom(iso);
-                      setDateTo(addDays(iso, Math.max(daysCount, 1) - 1));
-                      setQuickFilter(null);
+                      guardAction(() => {
+                        setDateFrom(iso);
+                        setDateTo(addDays(iso, Math.max(daysCount, 1) - 1));
+                        setQuickFilter(null);
+                      });
                       setFromDateOpen(false);
                     }}
                     initialFocus
@@ -1613,14 +1640,16 @@ export default function MatrixPage() {
             {(dirtyCount > 0 || addedProducts.length > 0) && (
               <>
                 {dirtyCount > 0 && (
-                  <Badge variant="secondary">{dirtyCount} endring{dirtyCount === 1 ? "" : "er"}</Badge>
+                  <Badge variant="secondary" className="font-semibold">
+                    Ulagret: {dirtyCount} celle{dirtyCount === 1 ? "" : "r"}
+                  </Badge>
                 )}
                 {addedProducts.length > 0 && (
                   <Badge variant="outline">+{addedProducts.length} ny rad{addedProducts.length === 1 ? "" : "er"}</Badge>
                 )}
                 <Button variant="ghost" size="sm" onClick={handleDiscardClick}>
                   <RotateCcw />
-                  Forkast
+                  Avbryt
                 </Button>
               </>
             )}
@@ -2005,6 +2034,11 @@ export default function MatrixPage() {
           onClear={() => saveMerknadForCell(merknadCell, null)}
         />
       )}
+
+      <UnsavedChangesDialog
+        {...unsavedGuard.dialogProps}
+        description="Celleendringene i matrisen er ikke lagret ennå. Forkaster du dem, forsvinner de."
+      />
 
       <AlertDialog open={discardOpen} onOpenChange={setDiscardOpen}>
         <AlertDialogContent>
