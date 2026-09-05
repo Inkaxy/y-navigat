@@ -69,29 +69,70 @@ export function formatSizeLabel(f: CakeImageFormat) {
 }
 
 /**
- * Passer formatet på arket? A4 er 210 mm bredt, så et rundt format over
- * 20 cm får ikke plass — da skal vi si fra, ikke skalere ned i stillhet.
+ * Passer formatet på arket det er satt opp med? Vi regner med utfall og
+ * trykkmarg, og prøver både stående og liggende. Får bildet ikke plass,
+ * foreslår vi et ark og en retning som faktisk holder.
  */
 export function sheetFit(f: CakeImageFormat): {
   fits: boolean;
   sheet: { widthMm: number; heightMm: number } | null;
+  orientation: SheetOrientation;
+  suggestion: { sheet: string; orientation: SheetOrientation } | null;
   message: string | null;
 } {
-  const sheet = SHEETS[f.sheet] ?? null;
-  if (!sheet) return { fits: true, sheet: null, message: null };
+  const base = SHEET_SIZES[f.sheet] ?? null;
   const d = formatDims(f);
   const total = { w: d.widthMm + 2 * d.bleedMm, h: d.heightMm + 2 * d.bleedMm };
-  const fits =
-    (total.w <= sheet.widthMm && total.h <= sheet.heightMm) ||
-    (total.h <= sheet.widthMm && total.w <= sheet.heightMm);
+  const m = 2 * DEFAULT_MARGIN_MM;
+
+  const tryFit = (name: string, orientation: SheetOrientation) => {
+    const s = sheetSize(name, orientation);
+    return total.w <= s.widthMm - m && total.h <= s.heightMm - m;
+  };
+
+  const candidates: Array<{ sheet: string; orientation: SheetOrientation }> = [
+    { sheet: f.sheet, orientation: "portrait" },
+    { sheet: f.sheet, orientation: "landscape" },
+    { sheet: "A3", orientation: "portrait" },
+    { sheet: "A3", orientation: "landscape" },
+  ];
+
+  if (!base) {
+    return {
+      fits: false,
+      sheet: null,
+      orientation: "portrait",
+      suggestion: null,
+      message: `Formatet «${f.name}» har et ukjent ark (${f.sheet}). Velg A4 eller A3.`,
+    };
+  }
+
+  for (const c of candidates.slice(0, 2)) {
+    if (tryFit(c.sheet, c.orientation)) {
+      return {
+        fits: true,
+        sheet: sheetSize(c.sheet, c.orientation),
+        orientation: c.orientation,
+        suggestion: null,
+        message: null,
+      };
+    }
+  }
+
+  const better = candidates.find((c) => tryFit(c.sheet, c.orientation)) ?? null;
   return {
-    fits,
-    sheet,
-    message: fits
-      ? null
-      : `${f.name} (${Math.round(total.w)} × ${Math.round(total.h)} mm med utfall) er større enn ${f.sheet} (${sheet.widthMm} × ${sheet.heightMm} mm). Bildet kan ikke trykkes i riktig størrelse på dette arket.`,
+    fits: false,
+    sheet: base,
+    orientation: "portrait",
+    suggestion: better,
+    message:
+      `${f.name} (${Math.round(total.w)} × ${Math.round(total.h)} mm med utfall) får ikke plass på ${f.sheet} ` +
+      (better
+        ? `stående. Bruk ${better.sheet} ${better.orientation === "landscape" ? "liggende" : "stående"}.`
+        : `— heller ikke på A3. Bildet kan ikke trykkes i riktig størrelse.`),
   };
 }
+
 
 export type QualityFlag = "god" | "akseptabel" | "lav" | "ukjent";
 
