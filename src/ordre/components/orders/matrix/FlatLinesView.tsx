@@ -63,6 +63,7 @@ export function FlatLinesView({
   products,
   tours,
   onQuantityChange,
+  onMoveToTour,
 }: {
   rows: FlatLineRow[];
   products: MatrixProduct[];
@@ -73,6 +74,7 @@ export function FlatLinesView({
     product_id: string,
     value: string,
   ) => void;
+  onMoveToTour?: (row: FlatLineRow) => void;
 }) {
   const productById = new Map(products.map((p) => [p.id, p]));
   const tourById = new Map(tours.map((t) => [t.id, t]));
