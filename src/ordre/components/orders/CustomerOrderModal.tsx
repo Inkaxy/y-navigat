@@ -71,7 +71,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { logAudit } from "@/ordre/lib/audit";
 import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
 import { MerknadDialog } from "@/ordre/components/orders/MerknadDialog";
-import { type Merknad, isMerknadEmpty } from "@/ordre/lib/merknad";
+import { type Merknad, isMerknadEmpty, emptyMerknad } from "@/ordre/lib/merknad";
 import {
   PENDING_CAKE_IMAGE_KEY,
   flushPendingCakeImages,
