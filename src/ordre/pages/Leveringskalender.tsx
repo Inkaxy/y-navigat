@@ -72,6 +72,14 @@ import {
 } from "@/ordre/components/orders/matrix/MatrixActionDialogs";
 import { CorrectionsDialog } from "@/ordre/components/orders/matrix/CorrectionsDialog";
 import { FlatLinesView } from "@/ordre/components/orders/matrix/FlatLinesView";
+import {
+  MatrixProductRow,
+  FIRST_COL_WIDTH,
+  EMPTY_ROW_EDITS as EMPTY_EDITS,
+  type RenderCol,
+  type CellColInfo,
+} from "@/ordre/components/orders/matrix/MatrixProductRow";
+import { MatrixColumnHeader, type MatrixColumnHeaderData } from "@/ordre/components/orders/matrix/MatrixColumnHeader";
 import { ProductInfoDialog } from "@/ordre/components/orders/matrix/ProductInfoDialog";
 import { ProductWeekEditor } from "@/ordre/components/orders/matrix/ProductWeekEditor";
 import { TourOrderDialog } from "@/ordre/components/orders/matrix/TourOrderDialog";
