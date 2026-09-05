@@ -29,7 +29,6 @@ import {
   useNgSupplier,
 } from "@/rapporter/hooks/useNgExport";
 import {
-import { osloDateISO } from "@/lib/osloDate";
   NG_COLUMNS,
   buildNgFile,
   downloadNgFile,
@@ -37,6 +36,7 @@ import { osloDateISO } from "@/lib/osloDate";
   ngFileName,
   ngRowCells,
 } from "@/rapporter/lib/ngFormat";
+import { osloDateISO } from "@/lib/osloDate";
 
 function lastMonthValue(): string {
   const now = new Date();
