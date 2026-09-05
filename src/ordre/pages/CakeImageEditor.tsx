@@ -1,78 +1,82 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import * as fabric from "fabric";
+import { initAligningGuidelines } from "fabric/extensions";
 import {
+  AlertTriangle,
   ArrowLeft,
-  Bold,
+  CheckCircle2,
+  Cake,
+  Cookie,
   Download,
-  FlipHorizontal,
-  Italic,
+  Heart,
+  Image as ImageIcon,
   Layers as LayersIcon,
   Loader2,
-  Plus,
+  Maximize,
   Printer,
   Redo2,
-  RotateCw,
+  Ruler,
   Save,
-  Square,
-  CheckCircle2,
+  ShieldCheck,
+  ShoppingBag,
+  SlidersHorizontal,
   Trash2,
   Type as TypeIcon,
   Undo2,
   ZoomIn,
   ZoomOut,
-  Image as ImageIcon,
-  Cookie,
-  Cake,
-  Heart,
-  ShoppingBag,
-  AlertTriangle,
-  Ruler,
-  ShieldCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
-import jsPDF from "jspdf";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Slider } from "@/components/ui/slider";
 import { Separator } from "@/components/ui/separator";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 
-import { useCakeImage, useSignedUrls } from "@/ordre/hooks/useCakeImages";
+import { useCakeImage } from "@/ordre/hooks/useCakeImages";
 import {
   CAKE_BUCKET,
   markPrinted,
   signedUrl,
   updateCakeImage,
   uploadEditedPng,
-  uploadOriginal,
   updateCakeImageGuarded,
   CakeImageConflictError,
 } from "@/ordre/lib/cakeImages";
 import { supabase } from "@/integrations/supabase/client";
 import { CakeFontPicker } from "@/ordre/components/cake-images/CakeFontPicker";
 import { loadCakeFont } from "@/ordre/lib/cakeFonts";
-
 import { useCakeFormats, defaultFormat } from "@/ordre/hooks/useCakeFormats";
 import {
   computeEffectiveDpi,
-  exportMultiplier,
   formatDims,
   formatSizeLabel,
   qualityFlagFor,
@@ -87,19 +91,36 @@ import {
 } from "@/ordre/lib/cakePrint";
 import { useCakePrinterSelection } from "@/ordre/hooks/useCakeCalibration";
 import { CakePrintHistory } from "@/ordre/components/cake-images/CakePrintHistory";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Textarea } from "@/components/ui/textarea";
 import { showError } from "@/lib/userError";
+import { fitZoom, pxPerMm } from "@/ordre/lib/cakeEditorMath";
+import { loadCakeSource, loadCakeSourceFromUrl } from "@/ordre/lib/cakeSource";
+import {
+  CakeTextPanel,
+  applyTextCurve,
+  type CakeCurvedText,
+} from "@/ordre/components/cake-images/CakeTextPanel";
+import { CakeImageLayerPanel } from "@/ordre/components/cake-images/CakeImageLayerPanel";
+import { CakeLayerList, type CakeLayerAction } from "@/ordre/components/cake-images/CakeLayerList";
+import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
+import { UnsavedChangesDialog } from "@/components/common/UnsavedChangesDialog";
 
 /** Nåværende versjon av editor_state-formatet vi skriver. */
 const EDITOR_STATE_VERSION = 2;
 
-
-const TEXT_PRESETS = [
-  { id: "title", label: "Tittel (stor)", size: 72, weight: "bold" },
-  { id: "subtitle", label: "Undertittel", size: 44, weight: "600" },
-  { id: "label", label: "Etikett (liten)", size: 24, weight: "normal" },
+const CANVAS_JSON_PROPS = [
+  "cakeStoragePath",
+  "cakeFilters",
+  "cakeCurveRadius",
+  "cakeCurveDirection",
+  "selectable",
+  "evented",
+  "visible",
 ];
+
+const AUTOSAVE_MS = 10_000;
+const draftKey = (id: string) => `cake-editor-draft-${id}`;
+
+type CakeFabricImage = fabric.FabricImage & { cakeStoragePath?: string };
 
 const CLIPART: { id: string; label: string; Icon: typeof Cake }[] = [
   { id: "cake", label: "Kake", Icon: Cake },
@@ -108,9 +129,11 @@ const CLIPART: { id: string; label: string; Icon: typeof Cake }[] = [
   { id: "bag", label: "Pose", Icon: ShoppingBag },
 ];
 
-const CANVAS_JSON_PROPS = ["cakeStoragePath"];
-
-type CakeFabricImage = fabric.FabricImage & { cakeStoragePath?: string };
+const TEXT_TEMPLATES = [
+  { id: "navn-alder", label: "Navn + alder" },
+  { id: "gratulerer", label: "Gratulerer med dagen" },
+  { id: "fritekst", label: "Fritekst" },
+] as const;
 
 function canvasSnapshot(canvas: fabric.Canvas) {
   const toJSON = (canvas as unknown as {
@@ -132,6 +155,13 @@ function extractCakePathFromUrl(src: unknown) {
   }
 }
 
+async function cakeObjectUrl(path: string | null | undefined) {
+  if (!path) return null;
+  const { data, error } = await supabase.storage.from(CAKE_BUCKET).download(path);
+  if (!error && data) return URL.createObjectURL(data);
+  return signedUrl(path);
+}
+
 async function prepareEditorStateForLoad(state: unknown) {
   const cloned = JSON.parse(JSON.stringify(state)) as unknown;
   const cache = new Map<string, string | null>();
@@ -147,13 +177,11 @@ async function prepareEditorStateForLoad(state: unknown) {
       await Promise.all(node.map(walk));
       return;
     }
-
     const obj = node as Record<string, unknown>;
     const path =
       typeof obj.cakeStoragePath === "string"
         ? obj.cakeStoragePath
         : extractCakePathFromUrl(obj.src);
-
     if (path && typeof obj.src === "string") {
       const refreshed = await resolve(path);
       if (refreshed) {
@@ -162,7 +190,6 @@ async function prepareEditorStateForLoad(state: unknown) {
         obj.cakeStoragePath = path;
       }
     }
-
     await Promise.all(Object.values(obj).map(walk));
   };
 
@@ -170,15 +197,7 @@ async function prepareEditorStateForLoad(state: unknown) {
   return cloned;
 }
 
-async function cakeObjectUrl(path: string | null | undefined) {
-  if (!path) return null;
-  const { data, error } = await supabase.storage.from(CAKE_BUCKET).download(path);
-  if (!error && data) return URL.createObjectURL(data);
-  return signedUrl(path);
-}
-
 function iconSvg(id: string): string {
-  // Enkle SVG-er (samme set som lucide ville rendret). Bredde/høyde settes via Fabric.
   switch (id) {
     case "cake":
       return `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='#1f1b16' stroke-width='1.5'><path d='M20 21v-8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8'/><path d='M4 16s1.5-2 4-2 3.5 2 6 2 4-2 4-2'/><path d='M2 21h20'/><path d='M7 8v2'/><path d='M12 8v2'/><path d='M17 8v2'/><path d='M7 4h.01'/><path d='M12 4h.01'/><path d='M17 4h.01'/></svg>`;
@@ -192,11 +211,25 @@ function iconSvg(id: string): string {
   return "";
 }
 
+function useIsCompact() {
+  const [compact, setCompact] = useState(
+    () => typeof window !== "undefined" && window.innerWidth < 1024,
+  );
+  useEffect(() => {
+    const mql = window.matchMedia("(max-width: 1023px)");
+    const onChange = () => setCompact(mql.matches);
+    onChange();
+    mql.addEventListener("change", onChange);
+    return () => mql.removeEventListener("change", onChange);
+  }, []);
+  return compact;
+}
+
 export default function CakeImageEditor() {
   const { id } = useParams();
   const navigate = useNavigate();
   const qc = useQueryClient();
-  /** Korreksjonsfaktor fra skriverkalibreringen. */
+  const compact = useIsCompact();
   const {
     printerLabel,
     scaleX: printScale,
@@ -205,11 +238,11 @@ export default function CakeImageEditor() {
   } = useCakePrinterSelection();
   const { data: image, isLoading } = useCakeImage(id);
 
-  const wrapRef = useRef<HTMLDivElement>(null);
+  const viewRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fabRef = useRef<fabric.Canvas | null>(null);
+  const [canvasReady, setCanvasReady] = useState(false);
 
-  // Formatene kommer fra basen — lerretet settes opp fra fysisk størrelse.
   const { data: formats = [] } = useCakeFormats();
   const [formatId, setFormatId] = useState<string>("");
   const format: CakeImageFormat | null =
@@ -229,82 +262,271 @@ export default function CakeImageEditor() {
           },
     [format],
   );
+  const dimsRef = useRef(dims);
   const fit = format ? sheetFit(format) : null;
 
-  const [zoom, setZoom] = useState(0.25);
+  const [zoom, setZoomState] = useState(0.25);
   const [textInput, setTextInput] = useState("");
-  const [textPreset, setTextPreset] = useState("title");
   const [fontFamily, setFontFamily] = useState<string>("Inter");
-  const [brightness, setBrightness] = useState(0);
-  const [contrast, setContrast] = useState(0);
-  const [grayscale, setGrayscale] = useState(false);
-  const [selVersion, setSelVersion] = useState(0); // tvinger re-render av høyre-panel
+  const [selVersion, setSelVersion] = useState(0);
+  const [activeObj, setActiveObj] = useState<fabric.Object | null>(null);
   const [layers, setLayers] = useState<fabric.Object[]>([]);
   const [saving, setSaving] = useState(false);
+  const [loadingSource, setLoadingSource] = useState(false);
   const [stateLoadFailed, setStateLoadFailed] = useState(false);
+  const [sourceError, setSourceError] = useState<string | null>(null);
   const [rightsCleared, setRightsCleared] = useState(false);
   const [rightsNote, setRightsNote] = useState("");
   const [qualityAcked, setQualityAcked] = useState(false);
+  const [title, setTitle] = useState("");
+  const [dirty, setDirty] = useState(false);
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
+  const [draftPrompt, setDraftPrompt] = useState<string | null>(null);
+  const [leftOpen, setLeftOpen] = useState(false);
+  const [rightOpen, setRightOpen] = useState(false);
 
-
-  // Undo/redo (enkel snapshot-stack av canvas.toJSON())
   const undoStack = useRef<string[]>([]);
   const redoStack = useRef<string[]>([]);
   const skipSnapshotRef = useRef(false);
-
+  const exportingRef = useRef(false);
+  const spaceRef = useRef(false);
+  const loadedIdRef = useRef<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // signed URL til original / redigert
-  const paths = useMemo(
-    () => [image?.original_path, image?.edited_path].filter(Boolean) as string[],
-    [image?.original_path, image?.edited_path],
-  );
-  const urls = useSignedUrls(paths);
+  const guard = useUnsavedChangesGuard(dirty);
+
+  useEffect(() => {
+    dimsRef.current = dims;
+  }, [dims]);
+
+  const refreshStacks = useCallback(() => {
+    setCanUndo(undoStack.current.length > 1);
+    setCanRedo(redoStack.current.length > 0);
+  }, []);
+
+  const snapshot = useCallback(() => {
+    const c = fabRef.current;
+    if (!c || skipSnapshotRef.current) return;
+    const snap = canvasSnapshot(c);
+    if (undoStack.current[undoStack.current.length - 1] === snap) return;
+    undoStack.current.push(snap);
+    if (undoStack.current.length > 60) undoStack.current.shift();
+    redoStack.current = [];
+    setDirty(true);
+    setLayers([...c.getObjects()]);
+    setSelVersion((v) => v + 1);
+    refreshStacks();
+  }, [refreshStacks]);
+
+  const live = useCallback(() => {
+    fabRef.current?.requestRenderAll();
+    setSelVersion((v) => v + 1);
+  }, []);
+
+  // ---- Visning: zoom og panorering i viewportTransform ----
+  const applyZoom = useCallback((z: number, point?: fabric.Point) => {
+    const c = fabRef.current;
+    if (!c) return;
+    const next = Math.max(0.05, Math.min(4, z));
+    if (point) c.zoomToPoint(point, next);
+    else c.setZoom(next);
+    setZoomState(next);
+    c.requestRenderAll();
+  }, []);
+
+  const fitToView = useCallback(() => {
+    const c = fabRef.current;
+    if (!c) return;
+    const d = dimsRef.current;
+    const z = fitZoom(d.widthPx, d.heightPx, c.getWidth(), c.getHeight(), 48);
+    c.setViewportTransform([
+      z,
+      0,
+      0,
+      z,
+      (c.getWidth() - d.widthPx * z) / 2,
+      (c.getHeight() - d.heightPx * z) / 2,
+    ]);
+    setZoomState(z);
+    c.requestRenderAll();
+  }, []);
 
   // ---- init Fabric ----
   useEffect(() => {
-    if (!canvasRef.current) return;
+    if (!canvasRef.current || !viewRef.current) return;
+    fabric.config.textureSize = 8192;
     const c = new fabric.Canvas(canvasRef.current, {
       backgroundColor: "",
       preserveObjectStacking: true,
-      width: dims.widthPx,
-      height: dims.heightPx,
+      enableRetinaScaling: false,
+      width: viewRef.current.clientWidth || 800,
+      height: viewRef.current.clientHeight || 600,
     });
     fabRef.current = c;
+    const disposeGuides = initAligningGuidelines(c);
 
-    const refreshLayers = () => setLayers([...c.getObjects()]);
-    const bumpSel = () => setSelVersion((v) => v + 1);
-    const snapshot = () => {
-      if (skipSnapshotRef.current) return;
-      undoStack.current.push(canvasSnapshot(c));
-      if (undoStack.current.length > 50) undoStack.current.shift();
-      redoStack.current = [];
+    const onChanged = () => snapshot();
+    const onSelection = () => {
+      setActiveObj(c.getActiveObject() ?? null);
+      setSelVersion((v) => v + 1);
     };
+    c.on("object:added", onChanged);
+    c.on("object:removed", onChanged);
+    c.on("object:modified", onChanged);
+    c.on("selection:created", onSelection);
+    c.on("selection:updated", onSelection);
+    c.on("selection:cleared", onSelection);
 
-    c.on("object:added", () => {
-      refreshLayers();
-      snapshot();
+    // Papiret og hjelpelinjene tegnes rundt objektene (ikke med i eksporten).
+    c.on("before:render", ({ ctx }: { ctx: CanvasRenderingContext2D }) => {
+      if (exportingRef.current) return;
+      const d = dimsRef.current;
+      const vpt = c.viewportTransform;
+      ctx.save();
+      ctx.transform(vpt[0], vpt[1], vpt[2], vpt[3], vpt[4], vpt[5]);
+      ctx.fillStyle = "#ffffff";
+      if (d.isRound) {
+        ctx.beginPath();
+        ctx.arc(d.widthPx / 2, d.heightPx / 2, Math.min(d.widthPx, d.heightPx) / 2, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        ctx.fillRect(0, 0, d.widthPx, d.heightPx);
+      }
+      ctx.restore();
     });
-    c.on("object:removed", () => {
-      refreshLayers();
-      snapshot();
+
+    c.on("after:render", ({ ctx }: { ctx: CanvasRenderingContext2D }) => {
+      if (exportingRef.current) return;
+      const d = dimsRef.current;
+      const vpt = c.viewportTransform;
+      ctx.save();
+      ctx.transform(vpt[0], vpt[1], vpt[2], vpt[3], vpt[4], vpt[5]);
+      ctx.lineWidth = 2 / (vpt[0] || 1);
+      ctx.strokeStyle = "rgba(31,27,22,0.35)";
+      if (d.isRound) {
+        ctx.beginPath();
+        ctx.arc(d.widthPx / 2, d.heightPx / 2, Math.min(d.widthPx, d.heightPx) / 2, 0, Math.PI * 2);
+        ctx.stroke();
+      } else {
+        ctx.strokeRect(0, 0, d.widthPx, d.heightPx);
+      }
+      if (d.bleedPx > 0) {
+        ctx.setLineDash([12 / (vpt[0] || 1), 8 / (vpt[0] || 1)]);
+        ctx.strokeStyle = "rgba(200,60,60,0.7)";
+        if (d.isRound) {
+          ctx.beginPath();
+          ctx.arc(
+            d.widthPx / 2,
+            d.heightPx / 2,
+            Math.max(1, Math.min(d.widthPx, d.heightPx) / 2 - d.bleedPx),
+            0,
+            Math.PI * 2,
+          );
+          ctx.stroke();
+        } else {
+          ctx.strokeRect(
+            d.bleedPx,
+            d.bleedPx,
+            Math.max(1, d.widthPx - 2 * d.bleedPx),
+            Math.max(1, d.heightPx - 2 * d.bleedPx),
+          );
+        }
+      }
+      ctx.restore();
     });
-    c.on("object:modified", () => {
-      refreshLayers();
-      snapshot();
+
+    // Hjul- og pinch-zoom, panorering med mellomrom eller Alt.
+    c.on("mouse:wheel", (opt) => {
+      const e = opt.e as WheelEvent;
+      e.preventDefault();
+      e.stopPropagation();
+      const dy = e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 100 : 1);
+      applyZoom(c.getZoom() * Math.exp(-dy * 0.0015), opt.scenePoint ?? undefined);
     });
-    c.on("selection:created", bumpSel);
-    c.on("selection:updated", bumpSel);
-    c.on("selection:cleared", bumpSel);
+
+    let panning = false;
+    let lastX = 0;
+    let lastY = 0;
+    c.on("mouse:down", (opt) => {
+      const e = opt.e as MouseEvent;
+      if (!spaceRef.current && !e.altKey) return;
+      panning = true;
+      c.selection = false;
+      lastX = e.clientX;
+      lastY = e.clientY;
+    });
+    c.on("mouse:move", (opt) => {
+      if (!panning) return;
+      const e = opt.e as MouseEvent;
+      const vpt = c.viewportTransform;
+      vpt[4] += e.clientX - lastX;
+      vpt[5] += e.clientY - lastY;
+      lastX = e.clientX;
+      lastY = e.clientY;
+      c.setViewportTransform(vpt);
+    });
+    c.on("mouse:up", () => {
+      panning = false;
+      c.selection = true;
+    });
+
+    const ro = new ResizeObserver(() => {
+      const el = viewRef.current;
+      if (!el) return;
+      c.setDimensions({ width: el.clientWidth, height: el.clientHeight });
+      c.requestRenderAll();
+    });
+    ro.observe(viewRef.current);
+
+    setCanvasReady(true);
 
     return () => {
+      ro.disconnect();
+      disposeGuides();
       c.dispose();
       fabRef.current = null;
+      setCanvasReady(false);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Velg format: bildets eget, ellers standardformatet (Rund 20 cm).
+  // Pinch-zoom på touch
+  useEffect(() => {
+    const c = fabRef.current;
+    const el = c?.upperCanvasEl;
+    if (!c || !el) return;
+    let startDist = 0;
+    let startZoom = 1;
+    const dist = (t: TouchList) =>
+      Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+    const onStart = (e: TouchEvent) => {
+      if (e.touches.length !== 2) return;
+      startDist = dist(e.touches);
+      startZoom = c.getZoom();
+    };
+    const onMove = (e: TouchEvent) => {
+      if (e.touches.length !== 2 || !startDist) return;
+      e.preventDefault();
+      const rect = el.getBoundingClientRect();
+      const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left;
+      const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top;
+      applyZoom((dist(e.touches) / startDist) * startZoom, new fabric.Point(cx, cy));
+    };
+    const onEnd = () => {
+      startDist = 0;
+    };
+    el.addEventListener("touchstart", onStart, { passive: true });
+    el.addEventListener("touchmove", onMove, { passive: false });
+    el.addEventListener("touchend", onEnd);
+    return () => {
+      el.removeEventListener("touchstart", onStart);
+      el.removeEventListener("touchmove", onMove);
+      el.removeEventListener("touchend", onEnd);
+    };
+  }, [canvasReady, applyZoom]);
+
+  // Velg format: bildets eget, ellers standardformatet.
   useEffect(() => {
     if (formatId || formats.length === 0) return;
     const own = image?.format_id
@@ -313,253 +535,402 @@ export default function CakeImageEditor() {
     setFormatId((own ?? defaultFormat(formats))?.id ?? "");
   }, [formats, image?.format_id, formatId]);
 
-  // Rettigheter / kvalitetsbekreftelse fra raden
+  // Rettigheter, kvalitet og tittel — kun når vi bytter bilde.
   useEffect(() => {
     if (!image) return;
     setRightsCleared(!!image.rights_cleared);
     setRightsNote(image.rights_note ?? "");
     setQualityAcked(!!image.quality_ack_at);
-  }, [image?.id, image?.rights_cleared, image?.rights_note, image?.quality_ack_at]);
+    setTitle(image.title ?? "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [image?.id]);
 
-  // Lerretet settes opp fra fysisk størrelse, ikke omvendt.
+  // Formatbytte: masken oppdateres og innholdet re-sentreres/re-tilpasses.
+  const prevDimsRef = useRef<{ w: number; h: number } | null>(null);
   useEffect(() => {
     const c = fabRef.current;
     if (!c) return;
-    c.setDimensions({ width: dims.widthPx, height: dims.heightPx });
-    if (dims.isRound) {
-      c.clipPath = new fabric.Circle({
-        radius: Math.min(dims.widthPx, dims.heightPx) / 2,
+    c.clipPath = dims.isRound
+      ? new fabric.Circle({
+          radius: Math.min(dims.widthPx, dims.heightPx) / 2,
+          originX: "center",
+          originY: "center",
+          left: dims.widthPx / 2,
+          top: dims.heightPx / 2,
+          absolutePositioned: true,
+        })
+      : new fabric.Rect({
+          width: dims.widthPx,
+          height: dims.heightPx,
+          left: 0,
+          top: 0,
+          absolutePositioned: true,
+        });
+
+    const prev = prevDimsRef.current;
+    if (prev && (prev.w !== dims.widthPx || prev.h !== dims.heightPx) && c.getObjects().length) {
+      const k = Math.min(dims.widthPx / prev.w, dims.heightPx / prev.h);
+      c.getObjects().forEach((o) => {
+        o.set({
+          scaleX: (o.scaleX ?? 1) * k,
+          scaleY: (o.scaleY ?? 1) * k,
+          left: dims.widthPx / 2 + ((o.left ?? 0) - prev.w / 2) * k,
+          top: dims.heightPx / 2 + ((o.top ?? 0) - prev.h / 2) * k,
+        });
+        o.setCoords();
+      });
+      snapshot();
+    }
+    prevDimsRef.current = { w: dims.widthPx, h: dims.heightPx };
+    fitToView();
+  }, [dims, fitToView, snapshot, canvasReady]);
+
+  // ---- Last inn lagret state / original — kun når bilde-ID endres ----
+  const imageRef = useRef(image);
+  imageRef.current = image;
+
+  const loadOriginal = useCallback(async () => {
+    const c = fabRef.current;
+    const img = imageRef.current;
+    if (!c || !img) return;
+    setLoadingSource(true);
+    setSourceError(null);
+    try {
+      const url = await cakeObjectUrl(img.original_path);
+      if (!url) throw new Error("Bildet finnes ikke i lageret");
+      const src = await loadCakeSourceFromUrl(url);
+      const fabImg = await fabric.FabricImage.fromURL(src.url, {
+        crossOrigin: "anonymous",
+      });
+      (fabImg as CakeFabricImage).cakeStoragePath = img.original_path;
+      const d = dimsRef.current;
+      const scale = Math.min(d.widthPx / fabImg.width!, d.heightPx / fabImg.height!) * 0.95;
+      fabImg.scale(scale);
+      fabImg.set({
+        left: d.widthPx / 2,
+        top: d.heightPx / 2,
         originX: "center",
         originY: "center",
-        left: dims.widthPx / 2,
-        top: dims.heightPx / 2,
-        absolutePositioned: true,
       });
-    } else {
-      c.clipPath = undefined;
+      c.add(fabImg);
+      c.requestRenderAll();
+    } catch (e) {
+      console.error("[CakeImageEditor] kilden kunne ikke åpnes", e);
+      setSourceError(
+        "Bildefilen kunne ikke åpnes i nettleseren. Be om filen som JPG eller PNG, eller last den opp på nytt.",
+      );
+    } finally {
+      setLoadingSource(false);
     }
-    c.renderAll();
-  }, [dims]);
+  }, []);
 
-  // Last inn lagret state / original
   useEffect(() => {
     const c = fabRef.current;
-    if (!c || !image) return;
-    skipSnapshotRef.current = true;
+    if (!c || !image || !canvasReady) return;
+    if (loadedIdRef.current === image.id) return;
+    loadedIdRef.current = image.id;
 
-    const loadOriginal = async () => {
-      const url = await cakeObjectUrl(image.original_path);
-      if (!url) {
-        skipSnapshotRef.current = false;
-        return;
-      }
-      const img = await fabric.FabricImage.fromURL(url, { crossOrigin: "anonymous" });
-      (img as CakeFabricImage).cakeStoragePath = image.original_path;
-      const cw = c.getWidth();
-      const ch = c.getHeight();
-      const scale = Math.min(cw / img.width!, ch / img.height!) * 0.95;
-      img.scale(scale);
-      img.set({ left: cw / 2, top: ch / 2, originX: "center", originY: "center" });
-      c.add(img);
-      c.renderAll();
-      setLayers([...c.getObjects()]);
-      undoStack.current = [canvasSnapshot(c)];
+    const finish = () => {
+      const canvas = fabRef.current;
+      if (!canvas) return;
+      undoStack.current = [canvasSnapshot(canvas)];
       redoStack.current = [];
       skipSnapshotRef.current = false;
+      setLayers([...canvas.getObjects()]);
+      setDirty(false);
+      refreshStacks();
+      fitToView();
     };
 
     const load = async () => {
+      skipSnapshotRef.current = true;
       if (image.editor_state) {
         try {
-          await c.loadFromJSON((await prepareEditorStateForLoad(image.editor_state)) as never);
+          await c.loadFromJSON(
+            (await prepareEditorStateForLoad(image.editor_state)) as never,
+          );
           if (c.getObjects().length > 0) {
-            // Preload alle skrifttyper som brukes i lagret state, og re-render.
             const families = new Set<string>();
             c.getObjects().forEach((o) => {
-              const f = (o as fabric.IText).fontFamily;
+              const f = (o as fabric.Textbox).fontFamily;
               if (typeof f === "string") families.add(f);
             });
             await Promise.all([...families].map((f) => loadCakeFont(f)));
-            c.renderAll();
-            setLayers([...c.getObjects()]);
-            undoStack.current = [canvasSnapshot(c)];
-            redoStack.current = [];
-            skipSnapshotRef.current = false;
+            c.requestRenderAll();
             setStateLoadFailed(false);
+            finish();
             return;
           }
         } catch (e) {
           console.error("[CakeImageEditor] editor_state kunne ikke åpnes", e);
         }
-        // Redigeringen kunne ikke åpnes. Vi tømmer IKKE lerretet i stillhet —
-        // vi viser originalbildet og sier tydelig fra.
         setStateLoadFailed(true);
       }
       await loadOriginal();
+      finish();
     };
-    load();
-  }, [image]);
+    void load();
 
+    // Finnes et lokalt utkast som er nyere enn det lagrede?
+    try {
+      const raw = window.localStorage.getItem(draftKey(image.id));
+      if (raw) {
+        const parsed = JSON.parse(raw) as { ts?: string };
+        if (parsed?.ts && parsed.ts > (image.updated_at ?? "")) setDraftPrompt(raw);
+      }
+    } catch {
+      // et ødelagt utkast skal ikke stoppe editoren
+    }
+  }, [image, canvasReady, loadOriginal, fitToView, refreshStacks]);
 
-  // ---- helpers ----
-  const active = fabRef.current?.getActiveObject() ?? null;
-  const isText = active && (active as fabric.IText).isType?.("i-text");
+  // ---- Autolagring til nettleseren ----
+  useEffect(() => {
+    if (!image?.id) return;
+    const t = window.setInterval(() => {
+      const c = fabRef.current;
+      if (!c || !dirty) return;
+      try {
+        window.localStorage.setItem(
+          draftKey(image.id),
+          JSON.stringify({ ts: new Date().toISOString(), state: canvasSnapshot(c) }),
+        );
+      } catch {
+        // fullt lager — ikke noe brukeren skal stoppes av
+      }
+    }, AUTOSAVE_MS);
+    return () => window.clearInterval(t);
+  }, [image?.id, dirty]);
 
-  const addText = async () => {
+  const restoreDraft = async () => {
+    const c = fabRef.current;
+    if (!c || !draftPrompt) return;
+    try {
+      const parsed = JSON.parse(draftPrompt) as { state: string };
+      skipSnapshotRef.current = true;
+      await c.loadFromJSON(
+        (await prepareEditorStateForLoad(JSON.parse(parsed.state))) as never,
+      );
+      c.requestRenderAll();
+      setLayers([...c.getObjects()]);
+      skipSnapshotRef.current = false;
+      undoStack.current.push(canvasSnapshot(c));
+      setDirty(true);
+      refreshStacks();
+      toast.success("Utkastet er gjenopprettet");
+    } catch {
+      toast.error("Utkastet kunne ikke gjenopprettes");
+    } finally {
+      setDraftPrompt(null);
+    }
+  };
+
+  // ---- Handlinger på lerretet ----
+  const addTemplateText = async (template: (typeof TEXT_TEMPLATES)[number]["id"]) => {
     const c = fabRef.current;
     if (!c) return;
-    const preset = TEXT_PRESETS.find((p) => p.id === textPreset)!;
     await loadCakeFont(fontFamily);
-    const txt = new fabric.IText(textInput || "Tekst", {
-      left: c.getWidth() / 2,
-      top: c.getHeight() / 2,
+    const d = dimsRef.current;
+    const conf =
+      template === "navn-alder"
+        ? { text: textInput || "Navn\n5 år", size: d.widthPx * 0.11, top: 0.42 }
+        : template === "gratulerer"
+          ? { text: textInput || "Gratulerer med dagen", size: d.widthPx * 0.06, top: 0.25 }
+          : { text: textInput || "Tekst", size: d.widthPx * 0.07, top: 0.5 };
+    const txt = new fabric.Textbox(conf.text, {
+      width: d.widthPx * 0.8,
+      left: d.widthPx / 2,
+      top: d.heightPx * conf.top,
       originX: "center",
       originY: "center",
+      textAlign: "center",
       fontFamily,
-      fontSize: preset.size,
-      fontWeight: preset.weight,
+      fontSize: conf.size,
       fill: "#1f1b16",
     });
     c.add(txt);
     c.setActiveObject(txt);
-    c.renderAll();
+    c.requestRenderAll();
     setTextInput("");
+    setActiveObj(txt);
   };
 
   const addClipart = async (cid: string) => {
     const c = fabRef.current;
     if (!c) return;
-    const svg = iconSvg(cid);
-    const dataUrl = "data:image/svg+xml;utf8," + encodeURIComponent(svg);
+    const dataUrl = "data:image/svg+xml;utf8," + encodeURIComponent(iconSvg(cid));
     const img = await fabric.FabricImage.fromURL(dataUrl);
-    img.scaleToWidth(160);
-    img.set({ left: c.getWidth() / 2, top: c.getHeight() / 2, originX: "center", originY: "center" });
+    const d = dimsRef.current;
+    img.scaleToWidth(d.widthPx * 0.2);
+    img.set({
+      left: d.widthPx / 2,
+      top: d.heightPx / 2,
+      originX: "center",
+      originY: "center",
+    });
     c.add(img);
     c.setActiveObject(img);
-    c.renderAll();
+    c.requestRenderAll();
   };
 
   const addImageFromFile = async (file: File) => {
     const c = fabRef.current;
     if (!c) return;
-    const dataUrl = await new Promise<string>((res, rej) => {
-      const r = new FileReader();
-      r.onload = () => res(r.result as string);
-      r.onerror = rej;
-      r.readAsDataURL(file);
-    });
-    const img = await fabric.FabricImage.fromURL(dataUrl);
-    img.scaleToWidth(Math.min(c.getWidth() * 0.6, img.width || 600));
-    img.set({ left: c.getWidth() / 2, top: c.getHeight() / 2, originX: "center", originY: "center" });
-    c.add(img);
-    c.setActiveObject(img);
-    c.renderAll();
-  };
-
-  const deleteActive = () => {
-    const c = fabRef.current;
-    if (!c) return;
-    const obj = c.getActiveObject();
-    if (obj) {
-      c.remove(obj);
-      c.discardActiveObject();
-      c.renderAll();
+    setLoadingSource(true);
+    setSourceError(null);
+    try {
+      const src = await loadCakeSource(file, file.name);
+      const img = await fabric.FabricImage.fromURL(src.url, {
+        crossOrigin: "anonymous",
+      });
+      const d = dimsRef.current;
+      img.scaleToWidth(d.widthPx * 0.6);
+      img.set({
+        left: d.widthPx / 2,
+        top: d.heightPx / 2,
+        originX: "center",
+        originY: "center",
+      });
+      c.add(img);
+      c.setActiveObject(img);
+      c.requestRenderAll();
+      if (src.downscaled) {
+        toast.message("Bildet ble skalert ned", {
+          description: "Store filer skaleres til 5000 px så nettbrettet klarer dem.",
+        });
+      }
+    } catch (e) {
+      console.error("[CakeImageEditor] filen kunne ikke åpnes", e);
+      setSourceError(
+        "Denne filen kunne ikke åpnes. Prøv en JPG eller PNG — HEIC fra iPhone konverteres normalt automatisk.",
+      );
+    } finally {
+      setLoadingSource(false);
     }
   };
 
-  const rotateActive = (deg = 15) => {
+  const deleteActive = useCallback(() => {
     const c = fabRef.current;
     const obj = c?.getActiveObject();
-    if (!obj || !c) return;
-    obj.rotate(((obj.angle ?? 0) + deg) % 360);
-    c.renderAll();
-    setSelVersion((v) => v + 1);
-  };
+    if (!c || !obj) return;
+    c.remove(obj);
+    c.discardActiveObject();
+    c.requestRenderAll();
+    setActiveObj(null);
+  }, []);
 
-  const flipActive = () => {
+  const duplicateActive = useCallback(async () => {
     const c = fabRef.current;
     const obj = c?.getActiveObject();
-    if (!obj || !c) return;
-    obj.set("flipX", !obj.flipX);
-    c.renderAll();
-    setSelVersion((v) => v + 1);
-  };
+    if (!c || !obj) return;
+    const clone = await obj.clone(CANVAS_JSON_PROPS);
+    clone.set({ left: (obj.left ?? 0) + 30, top: (obj.top ?? 0) + 30 });
+    c.add(clone);
+    c.setActiveObject(clone);
+    c.requestRenderAll();
+  }, []);
 
-  const resizeActive = (factor: number) => {
-    const c = fabRef.current;
-    const obj = c?.getActiveObject();
-    if (!obj || !c) return;
-    obj.scaleX = (obj.scaleX ?? 1) * factor;
-    obj.scaleY = (obj.scaleY ?? 1) * factor;
-    obj.setCoords();
-    c.renderAll();
-    setSelVersion((v) => v + 1);
-  };
+  const nudge = useCallback(
+    (dx: number, dy: number) => {
+      const c = fabRef.current;
+      const obj = c?.getActiveObject();
+      if (!c || !obj) return;
+      obj.set({ left: (obj.left ?? 0) + dx, top: (obj.top ?? 0) + dy });
+      obj.setCoords();
+      c.requestRenderAll();
+      snapshot();
+    },
+    [snapshot],
+  );
 
-  const applyImageFilters = () => {
-    const c = fabRef.current;
-    const obj = c?.getActiveObject();
-    if (!obj || !c) return;
-    if (!(obj instanceof fabric.FabricImage)) return;
-    const filters: fabric.filters.BaseFilter<string>[] = [];
-    if (brightness !== 0)
-      filters.push(new fabric.filters.Brightness({ brightness: brightness / 100 }));
-    if (contrast !== 0)
-      filters.push(new fabric.filters.Contrast({ contrast: contrast / 100 }));
-    if (grayscale) filters.push(new fabric.filters.Grayscale());
-    obj.filters = filters;
-    obj.applyFilters();
-    c.renderAll();
-  };
+  const restore = useCallback(
+    async (json: string) => {
+      const c = fabRef.current;
+      if (!c) return;
+      skipSnapshotRef.current = true;
+      await c.loadFromJSON(JSON.parse(json));
+      c.requestRenderAll();
+      setLayers([...c.getObjects()]);
+      setActiveObj(null);
+      skipSnapshotRef.current = false;
+      setSelVersion((v) => v + 1);
+      refreshStacks();
+    },
+    [refreshStacks],
+  );
 
-  useEffect(() => {
-    applyImageFilters();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [brightness, contrast, grayscale]);
-
-  const undo = () => {
-    const c = fabRef.current;
-    if (!c || undoStack.current.length <= 1) return;
+  const undo = useCallback(async () => {
+    if (undoStack.current.length <= 1) return;
     const cur = undoStack.current.pop()!;
     redoStack.current.push(cur);
-    const prev = undoStack.current[undoStack.current.length - 1];
-    skipSnapshotRef.current = true;
-    c.loadFromJSON(JSON.parse(prev)).then(() => {
-      c.renderAll();
-      setLayers([...c.getObjects()]);
-      skipSnapshotRef.current = false;
-    });
-  };
-  const redo = () => {
+    await restore(undoStack.current[undoStack.current.length - 1]);
+    setDirty(true);
+  }, [restore]);
+
+  const redo = useCallback(async () => {
+    const next = redoStack.current.pop();
+    if (!next) return;
+    undoStack.current.push(next);
+    await restore(next);
+    setDirty(true);
+  }, [restore]);
+
+  const layerAction = (obj: fabric.Object, action: CakeLayerAction) => {
     const c = fabRef.current;
-    if (!c || redoStack.current.length === 0) return;
-    const next = redoStack.current.pop()!;
-    skipSnapshotRef.current = true;
-    c.loadFromJSON(JSON.parse(next)).then(() => {
-      c.renderAll();
-      setLayers([...c.getObjects()]);
-      undoStack.current.push(next);
-      skipSnapshotRef.current = false;
+    if (!c) return;
+    switch (action) {
+      case "up":
+        c.bringObjectForward(obj);
+        break;
+      case "down":
+        c.sendObjectBackwards(obj);
+        break;
+      case "visible":
+        obj.set("visible", obj.visible === false);
+        break;
+      case "lock":
+        obj.set({
+          selectable: obj.selectable === false,
+          evented: obj.selectable === false,
+        });
+        break;
+      case "delete":
+        c.remove(obj);
+        break;
+    }
+    c.requestRenderAll();
+    setLayers([...c.getObjects()]);
+    snapshot();
+  };
+
+  // ---- Eksport ----
+  const exportCanvasElement = () => {
+    const c = fabRef.current!;
+    const d = dimsRef.current;
+    const vpt = [...c.viewportTransform] as fabric.TMat2D;
+    exportingRef.current = true;
+    c.viewportTransform = [1, 0, 0, 1, 0, 0];
+    try {
+      return c.toCanvasElement(1, { width: d.widthPx, height: d.heightPx });
+    } finally {
+      c.viewportTransform = vpt;
+      exportingRef.current = false;
+      c.requestRenderAll();
+    }
+  };
+
+  const renderPng = (): Promise<Blob> => {
+    const el = exportCanvasElement();
+    return new Promise((resolve, reject) => {
+      el.toBlob((b) => {
+        if (b) resolve(b);
+        else reject(new Error("Bildet kunne ikke lages"));
+      }, "image/png");
     });
   };
 
-  /**
-   * Eksporten skal alltid ha nok piksler: multiplikatoren regnes ut fra fysisk
-   * størrelse slik at resultatet lander på minst 300 DPI, uansett hvor stort
-   * lerretet tilfeldigvis er.
-   */
-  const exportScale = () =>
-    exportMultiplier(fabRef.current?.getWidth() ?? 0, dims.widthMm);
+  const renderDataUrl = () => exportCanvasElement().toDataURL("image/png");
 
-  const renderPng = async (): Promise<Blob> => {
-    const c = fabRef.current!;
-    const dataUrl = c.toDataURL({ format: "png", multiplier: exportScale() });
-    const res = await fetch(dataUrl);
-    return await res.blob();
-  };
-
-  // Kvalitet regnes på nytt hver gang formatet endres — et bilde som holder
-  // til kvartark holder ikke til A4.
+  // ---- Kvalitet, lagring og utskrift ----
   const effectiveDpi = computeEffectiveDpi(
     image?.source_width_px ?? null,
     image?.source_height_px ?? null,
@@ -567,7 +938,7 @@ export default function CakeImageEditor() {
   );
   const qualityFlag = qualityFlagFor(effectiveDpi);
   const needsQualityAck = qualityFlag === "lav" && !qualityAcked;
-  const rightsAnswered = rightsCleared || (rightsNote.trim().length > 0);
+  const rightsAnswered = rightsCleared || rightsNote.trim().length > 0;
   const canMarkFerdig = !needsQualityAck && rightsAnswered && !!format;
 
   const doSave = async (
@@ -589,8 +960,6 @@ export default function CakeImageEditor() {
     try {
       const blob = await renderPng();
       const editedPath = await uploadEditedPng(blob, image.delivery_date);
-      // Optimistisk låsing mot raden slik den ble lastet — hindrer at to
-      // redaktører overskriver hverandre.
       const { previousEditedPath } = await updateCakeImageGuarded(
         image.id,
         image.updated_at,
@@ -598,8 +967,6 @@ export default function CakeImageEditor() {
           edited_path: editedPath,
           editor_state: JSON.parse(canvasSnapshot(fabRef.current)) as never,
           editor_state_version: EDITOR_STATE_VERSION,
-          // Et vanlig «Lagre» skal ALDRI nedgradere et ferdigmarkert bilde.
-          // Statusen endres bare når brukeren aktivt ber om det.
           status: markFerdig ? "ferdig_redigert" : image.status,
           format_id: format?.id ?? image.format_id ?? null,
           shape: format?.shape ?? image.shape ?? null,
@@ -609,9 +976,9 @@ export default function CakeImageEditor() {
           quality_flag: qualityFlag,
           rights_cleared: rightsCleared,
           rights_note: rightsNote.trim() || null,
+          title: title.trim() || image.title,
         },
       );
-      // Rydd forrige edited-fil basert på DB-verdien (ikke lokal state)
       if (previousEditedPath && previousEditedPath !== editedPath) {
         await supabase.storage.from(CAKE_BUCKET).remove([previousEditedPath]);
       }
@@ -619,9 +986,13 @@ export default function CakeImageEditor() {
         qc.invalidateQueries({ queryKey: ["cake-images"] }),
         qc.invalidateQueries({ queryKey: ["cake-image", image.id] }),
       ]);
-      toast.success(
-        markFerdig ? "Lagret og markert som ferdig redigert" : "Lagret",
-      );
+      setDirty(false);
+      try {
+        window.localStorage.removeItem(draftKey(image.id));
+      } catch {
+        // ingen konsekvens for brukeren
+      }
+      toast.success(markFerdig ? "Lagret og markert som ferdig redigert" : "Lagret");
       if (opts.navigateBack) {
         navigate(
           `/ordre/kakebilder/liste?date=${image.delivery_date}&status=for-utskrift`,
@@ -630,7 +1001,6 @@ export default function CakeImageEditor() {
       return true;
     } catch (e) {
       if (e instanceof CakeImageConflictError) {
-        // Rydd opp den nye filen vi nettopp lastet opp forgjeves
         await qc.invalidateQueries({ queryKey: ["cake-image", image.id] });
         toast.error("Noen andre lagret dette kakebildet", {
           description: "Bildet er lastet på nytt — gjør endringene om igjen.",
@@ -646,8 +1016,18 @@ export default function CakeImageEditor() {
       setSaving(false);
     }
   };
+  const saveRef = useRef(doSave);
+  saveRef.current = doSave;
 
-  /** Bekreft lav oppløsning — lagres på raden så noen har tatt stilling. */
+  const saveTitle = async () => {
+    if (!image) return;
+    const next = title.trim();
+    if (!next || next === image.title) return;
+    await updateCakeImage(image.id, { title: next });
+    qc.invalidateQueries({ queryKey: ["cake-image", image.id] });
+    qc.invalidateQueries({ queryKey: ["cake-images"] });
+  };
+
   const ackQuality = async () => {
     if (!image) return;
     const { data: u } = await supabase.auth.getUser();
@@ -661,8 +1041,6 @@ export default function CakeImageEditor() {
     qc.invalidateQueries({ queryKey: ["cake-image", image.id] });
   };
 
-
-  /** Bygger arket via den felles utskriftsveien — samme papir som fra køen. */
   const buildItem = (dataUrl: string): CakePrintItem => ({
     image: image ?? null,
     url: dataUrl,
@@ -677,8 +1055,7 @@ export default function CakeImageEditor() {
   });
 
   const printNow = async () => {
-    const c = fabRef.current!;
-    const dataUrl = c.toDataURL({ format: "png", multiplier: exportScale() });
+    const dataUrl = renderDataUrl();
     const imageId = image?.id ?? null;
     const wasPrinted = image?.status === "skrevet_ut";
     try {
@@ -688,7 +1065,6 @@ export default function CakeImageEditor() {
         title: image?.title ?? "Kakebilde",
         onPrinted: () => {
           if (!imageId) return;
-          // Status settes først NÅR utskriften faktisk er utført.
           markPrinted([imageId], wasPrinted ? "reprint" : "print", "A4", null, {
             printerLabel,
             scaleAppliedPct: printScalePct,
@@ -701,13 +1077,16 @@ export default function CakeImageEditor() {
         },
       });
     } catch (e) {
-      showError("CakeImageEditor.print", e, "Kunne ikke skrive ut. Prøv igjen — kontakt support hvis det gjentar seg.");
+      showError(
+        "CakeImageEditor.print",
+        e,
+        "Kunne ikke skrive ut. Prøv igjen — kontakt support hvis det gjentar seg.",
+      );
     }
   };
 
   const downloadPdf = async () => {
-    const c = fabRef.current!;
-    const dataUrl = c.toDataURL({ format: "png", multiplier: exportScale() });
+    const dataUrl = renderDataUrl();
     const safeName =
       (image?.title ?? "kakebilde").replace(/[^\p{L}\p{N} _-]/gu, "_").slice(0, 80) ||
       "kakebilde";
@@ -716,9 +1095,7 @@ export default function CakeImageEditor() {
       scaleY: printScaleY,
       fileName: `${safeName}.pdf`,
     });
-
     if (image) {
-      // PDF er ikke papir — loggføres, men flytter ikke status.
       await markPrinted([image.id], "pdf", "A4", null, {
         printerLabel,
         scaleAppliedPct: printScalePct,
@@ -726,6 +1103,382 @@ export default function CakeImageEditor() {
       qc.invalidateQueries({ queryKey: ["cake-image-prints", image.id] });
     }
   };
+
+  // ---- Hurtigtaster ----
+  useEffect(() => {
+    const isTyping = (t: EventTarget | null) => {
+      const el = t as HTMLElement | null;
+      if (!el) return false;
+      const tag = el.tagName;
+      return (
+        tag === "INPUT" ||
+        tag === "TEXTAREA" ||
+        tag === "SELECT" ||
+        el.isContentEditable ||
+        !!el.closest?.("[role='dialog']")
+      );
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.code === "Space") spaceRef.current = true;
+      const c = fabRef.current;
+      if (!c || isTyping(e.target)) return;
+      const editing = c
+        .getObjects()
+        .some((o) => (o as fabric.Textbox).isEditing === true);
+      if (editing) return;
+      const meta = e.metaKey || e.ctrlKey;
+      const step = e.shiftKey ? 10 : 1;
+
+      if (meta && e.key.toLowerCase() === "z") {
+        e.preventDefault();
+        void (e.shiftKey ? redo() : undo());
+        return;
+      }
+      if (meta && e.key.toLowerCase() === "y") {
+        e.preventDefault();
+        void redo();
+        return;
+      }
+      if (meta && e.key.toLowerCase() === "d") {
+        e.preventDefault();
+        void duplicateActive();
+        return;
+      }
+      if (meta && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        void saveRef.current(false);
+        return;
+      }
+      if (meta) return;
+
+      switch (e.key) {
+        case "Delete":
+        case "Backspace":
+          e.preventDefault();
+          deleteActive();
+          break;
+        case "ArrowLeft":
+          e.preventDefault();
+          nudge(-step, 0);
+          break;
+        case "ArrowRight":
+          e.preventDefault();
+          nudge(step, 0);
+          break;
+        case "ArrowUp":
+          e.preventDefault();
+          nudge(0, -step);
+          break;
+        case "ArrowDown":
+          e.preventDefault();
+          nudge(0, step);
+          break;
+        case "Escape":
+          c.discardActiveObject();
+          c.requestRenderAll();
+          setActiveObj(null);
+          break;
+        case "+":
+        case "=":
+          applyZoom(c.getZoom() * 1.15);
+          break;
+        case "-":
+          applyZoom(c.getZoom() / 1.15);
+          break;
+        case "0":
+          fitToView();
+          break;
+      }
+    };
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.code === "Space") spaceRef.current = false;
+    };
+    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("keyup", onKeyUp);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("keyup", onKeyUp);
+    };
+  }, [undo, redo, duplicateActive, deleteActive, nudge, applyZoom, fitToView]);
+
+  const ppm = pxPerMm(dims.widthPx, dims.widthMm);
+  const isTextActive =
+    activeObj instanceof fabric.Textbox || activeObj instanceof fabric.IText;
+
+  // ---- Paneler ----
+  const leftPanel = (
+    <Accordion type="multiple" defaultValue={["mal", "tekst", "bilde"]}>
+      <AccordionItem value="mal">
+        <AccordionTrigger className="text-sm">Format og størrelse</AccordionTrigger>
+        <AccordionContent>
+          <div className="grid grid-cols-2 gap-2">
+            {formats.map((f) => {
+              const d = formatDims(f);
+              return (
+                <button
+                  key={f.id}
+                  onClick={() => setFormatId(f.id)}
+                  className={cn(
+                    "min-h-10 rounded-md border p-2 text-left text-xs hover:bg-accent",
+                    formatId === f.id && "border-primary ring-1 ring-primary",
+                  )}
+                >
+                  <div
+                    className={cn(
+                      "mx-auto mb-1 border bg-muted",
+                      d.isRound ? "rounded-full" : "rounded-sm",
+                    )}
+                    style={{
+                      width: 60,
+                      height: (60 * d.heightMm) / (d.widthMm || 1),
+                      maxHeight: 60,
+                    }}
+                  />
+                  <div className="truncate font-medium">{f.name}</div>
+                  <div className="truncate text-[11px] text-muted-foreground">
+                    {d.isRound ? `Ø ${d.widthMm} mm` : `${d.widthMm} × ${d.heightMm} mm`}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {format && (
+            <div className="mt-3 flex items-start gap-2 rounded-md border bg-muted/40 p-2 text-xs">
+              <Ruler className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <span>{formatSizeLabel(format)}</span>
+            </div>
+          )}
+
+          {fit && !fit.fits && (
+            <div className="mt-2 flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
+              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <span>{fit.message}</span>
+            </div>
+          )}
+
+          {dims.bleedMm > 0 && (
+            <p className="mt-2 text-[11px] text-muted-foreground">
+              {dims.bleedMm} mm utfallende sone rundt kanten klippes bort — la bildet
+              gå helt ut, ellers blir det hvit rand.
+            </p>
+          )}
+        </AccordionContent>
+      </AccordionItem>
+
+      <AccordionItem value="kvalitet">
+        <AccordionTrigger className="text-sm">Kvalitet og rettigheter</AccordionTrigger>
+        <AccordionContent className="space-y-3">
+          <div
+            className={cn(
+              "rounded-md border p-2 text-xs",
+              qualityFlag === "lav"
+                ? "border-destructive/40 bg-destructive/10 text-destructive"
+                : qualityFlag === "akseptabel"
+                  ? "border-amber-300 bg-amber-50 text-amber-900"
+                  : "bg-muted/40",
+            )}
+          >
+            {qualityMessage(effectiveDpi, format)}
+          </div>
+
+          {qualityFlag === "lav" && (
+            <label className="flex items-start gap-2 text-xs">
+              <Checkbox
+                checked={qualityAcked}
+                onCheckedChange={(v) => {
+                  if (v) void ackQuality();
+                  else setQualityAcked(false);
+                }}
+              />
+              <span>Jeg har sett oppløsningen og vil trykke bildet likevel.</span>
+            </label>
+          )}
+
+          <Separator />
+
+          <label className="flex items-start gap-2 text-xs">
+            <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <Checkbox
+              checked={rightsCleared}
+              onCheckedChange={(v) => setRightsCleared(!!v)}
+            />
+            <span>Rettigheter avklart</span>
+          </label>
+          <Textarea
+            value={rightsNote}
+            onChange={(e) => setRightsNote(e.target.value)}
+            rows={2}
+            placeholder="Notat om rettigheter (hvem har godkjent, kilde …)"
+            className="text-xs"
+          />
+          {!rightsAnswered && (
+            <p className="text-[11px] text-muted-foreground">
+              Ta stilling til rettighetene før bildet markeres ferdig.
+            </p>
+          )}
+        </AccordionContent>
+      </AccordionItem>
+
+      <AccordionItem value="bilde">
+        <AccordionTrigger className="text-sm">Bilder</AccordionTrigger>
+        <AccordionContent className="space-y-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*,.heic,.heif"
+            hidden
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) void addImageFromFile(f);
+              if (fileInputRef.current) fileInputRef.current.value = "";
+            }}
+          />
+          <Button
+            variant="outline"
+            className="h-10 w-full"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={loadingSource}
+          >
+            {loadingSource ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <ImageIcon className="mr-2 h-4 w-4" />
+            )}
+            Legg til bilde-lag
+          </Button>
+          {sourceError && (
+            <p className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
+              {sourceError}
+            </p>
+          )}
+        </AccordionContent>
+      </AccordionItem>
+
+      <AccordionItem value="tekst">
+        <AccordionTrigger className="text-sm">Tekst</AccordionTrigger>
+        <AccordionContent className="space-y-2">
+          <div>
+            <Label className="mb-1 block text-[10px] uppercase tracking-wide text-muted-foreground">
+              Skrifttype
+            </Label>
+            <CakeFontPicker value={fontFamily} onChange={setFontFamily} />
+          </div>
+          <Input
+            value={textInput}
+            onChange={(e) => setTextInput(e.target.value)}
+            placeholder="Skriv tekst …"
+            className="h-10"
+          />
+          <div className="grid gap-1">
+            {TEXT_TEMPLATES.map((t) => (
+              <Button
+                key={t.id}
+                size="sm"
+                variant={t.id === "fritekst" ? "default" : "outline"}
+                className="h-10 justify-start"
+                onClick={() => void addTemplateText(t.id)}
+              >
+                <TypeIcon className="mr-2 h-4 w-4" />
+                {t.label}
+              </Button>
+            ))}
+          </div>
+        </AccordionContent>
+      </AccordionItem>
+
+      <AccordionItem value="clipart">
+        <AccordionTrigger className="text-sm">Clipart</AccordionTrigger>
+        <AccordionContent>
+          <div className="grid grid-cols-3 gap-2">
+            {CLIPART.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => void addClipart(c.id)}
+                className="flex aspect-square min-h-10 flex-col items-center justify-center rounded-md border bg-muted text-xs hover:bg-accent"
+              >
+                <c.Icon className="mb-1 h-6 w-6" />
+                {c.label}
+              </button>
+            ))}
+          </div>
+        </AccordionContent>
+      </AccordionItem>
+    </Accordion>
+  );
+
+  const rightPanel = image ? (
+    <div className="space-y-3">
+      <div>
+        <Label className="text-xs">Tittel</Label>
+        <Input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          onBlur={() => void saveTitle()}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+          }}
+          className="h-10"
+        />
+      </div>
+      <div>
+        <Label className="text-xs">Kunde</Label>
+        <Input
+          defaultValue={image.customer_name ?? ""}
+          onBlur={(e) =>
+            updateCakeImage(image.id, { customer_name: e.target.value || null })
+          }
+          className="h-10"
+        />
+      </div>
+
+      <Separator />
+
+      <div className="flex items-center gap-2 text-sm font-semibold">
+        <LayersIcon className="h-4 w-4" />
+        Lag
+      </div>
+      <CakeLayerList
+        layers={layers}
+        active={activeObj}
+        onSelect={(o) => {
+          fabRef.current?.setActiveObject(o);
+          fabRef.current?.requestRenderAll();
+          setActiveObj(o);
+        }}
+        onAction={layerAction}
+      />
+
+      <Separator />
+
+      {isTextActive && (
+        <CakeTextPanel
+          obj={activeObj as CakeCurvedText}
+          onLive={live}
+          onCommit={snapshot}
+        />
+      )}
+
+      {activeObj instanceof fabric.FabricImage && (
+        <CakeImageLayerPanel
+          obj={activeObj}
+          boxW={dims.widthPx}
+          boxH={dims.heightPx}
+          pxPerMmValue={ppm}
+          onLive={live}
+          onCommit={snapshot}
+        />
+      )}
+
+      <Separator />
+
+      <div className="space-y-1 text-xs text-muted-foreground">
+        <div>Status: {image.status}</div>
+        <div>Skrevet ut: {image.print_count}×</div>
+        <CakePrintHistory cakeImageId={image.id} />
+      </div>
+    </div>
+  ) : null;
 
   if (isLoading || !image) {
     return (
@@ -738,550 +1491,249 @@ export default function CakeImageEditor() {
   return (
     <div className="flex h-[calc(100vh-7rem)] flex-col">
       {/* Topp toolbar */}
-      <div className="flex flex-wrap items-center gap-2 border-b bg-card px-3 py-2">
-        <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
+      <div className="flex flex-wrap items-center gap-1 border-b bg-card px-3 py-2">
+        <Button
+          variant="ghost"
+          className="h-10"
+          onClick={() => guard.requestAction(() => navigate(-1))}
+        >
           <ArrowLeft className="mr-1 h-4 w-4" />
           Tilbake
         </Button>
         <Separator orientation="vertical" className="h-6" />
-        <Button variant="ghost" size="sm" onClick={undo}>
+        <Button
+          variant="ghost"
+          className="h-10 w-10 p-0"
+          aria-label="Angre"
+          disabled={!canUndo}
+          onClick={() => void undo()}
+        >
           <Undo2 className="h-4 w-4" />
         </Button>
-        <Button variant="ghost" size="sm" onClick={redo}>
+        <Button
+          variant="ghost"
+          className="h-10 w-10 p-0"
+          aria-label="Gjør om"
+          disabled={!canRedo}
+          onClick={() => void redo()}
+        >
           <Redo2 className="h-4 w-4" />
         </Button>
-        <Separator orientation="vertical" className="h-6" />
-        <Button variant="ghost" size="sm" onClick={() => resizeActive(1.1)}>
-          <Plus className="h-4 w-4" />
-          Større
-        </Button>
-        <Button variant="ghost" size="sm" onClick={() => resizeActive(0.9)}>
-          <Square className="h-4 w-4" />
-          Mindre
-        </Button>
-        <Button variant="ghost" size="sm" onClick={() => rotateActive(15)}>
-          <RotateCw className="h-4 w-4" />
-        </Button>
-        <Button variant="ghost" size="sm" onClick={flipActive}>
-          <FlipHorizontal className="h-4 w-4" />
-        </Button>
-        <Button variant="ghost" size="sm" onClick={deleteActive}>
+        <Button
+          variant="ghost"
+          className="h-10 w-10 p-0"
+          aria-label="Slett valgt lag"
+          onClick={deleteActive}
+        >
           <Trash2 className="h-4 w-4" />
         </Button>
-        <Separator orientation="vertical" className="h-6" />
-        <div className="ml-auto flex items-center gap-2">
-          <ZoomOut className="h-4 w-4 text-muted-foreground" />
-          <Slider
-            min={0.2}
-            max={1.5}
-            step={0.05}
-            value={[zoom]}
-            onValueChange={(v) => setZoom(v[0])}
-            className="w-32"
-          />
-          <ZoomIn className="h-4 w-4 text-muted-foreground" />
-          <span className="w-10 text-right text-xs tabular-nums">
+        {dirty && (
+          <span className="ml-1 rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
+            Ulagrede endringer
+          </span>
+        )}
+        <div className="ml-auto flex items-center gap-1">
+          <Button
+            variant="ghost"
+            className="h-10 w-10 p-0"
+            aria-label="Zoom ut"
+            onClick={() => applyZoom(zoom / 1.15)}
+          >
+            <ZoomOut className="h-4 w-4" />
+          </Button>
+          <span className="w-12 text-center text-xs tabular-nums">
             {Math.round(zoom * 100)}%
           </span>
+          <Button
+            variant="ghost"
+            className="h-10 w-10 p-0"
+            aria-label="Zoom inn"
+            onClick={() => applyZoom(zoom * 1.15)}
+          >
+            <ZoomIn className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            className="h-10 w-10 p-0"
+            aria-label="Tilpass visningen"
+            onClick={fitToView}
+          >
+            <Maximize className="h-4 w-4" />
+          </Button>
         </div>
       </div>
 
-      {/* 3 kolonner */}
-      <div className="grid flex-1 min-h-0 grid-cols-[260px_1fr_280px]">
-        {/* Venstre panel */}
-        <aside className="overflow-y-auto border-r bg-background p-3">
-          <Accordion type="multiple" defaultValue={["mal", "bilde", "tekst"]}>
-            <AccordionItem value="mal">
-              <AccordionTrigger className="text-sm">
-                Format og størrelse
-              </AccordionTrigger>
-              <AccordionContent>
-                <div className="grid grid-cols-2 gap-2">
-                  {formats.map((f) => {
-                    const d = formatDims(f);
-                    return (
-                      <button
-                        key={f.id}
-                        onClick={() => setFormatId(f.id)}
-                        className={cn(
-                          "rounded-md border p-2 text-left text-xs hover:bg-accent",
-                          formatId === f.id && "border-primary ring-1 ring-primary",
-                        )}
-                      >
-                        <div
-                          className={cn(
-                            "mx-auto mb-1 border bg-muted",
-                            d.isRound ? "rounded-full" : "rounded-sm",
-                          )}
-                          style={{
-                            width: 60,
-                            height: (60 * d.heightMm) / (d.widthMm || 1),
-                            maxHeight: 60,
-                          }}
-                        />
-                        <div className="truncate font-medium">{f.name}</div>
-                        <div className="truncate text-[11px] text-muted-foreground">
-                          {d.isRound
-                            ? `Ø ${d.widthMm} mm`
-                            : `${d.widthMm} × ${d.heightMm} mm`}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {format && (
-                  <div className="mt-3 flex items-start gap-2 rounded-md border bg-muted/40 p-2 text-xs">
-                    <Ruler className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                    <span>{formatSizeLabel(format)}</span>
-                  </div>
-                )}
-
-                {fit && !fit.fits && (
-                  <div className="mt-2 flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
-                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                    <span>{fit.message}</span>
-                  </div>
-                )}
-
-                {dims.bleedMm > 0 && (
-                  <p className="mt-2 text-[11px] text-muted-foreground">
-                    {dims.bleedMm} mm utfallende sone rundt kanten klippes bort —
-                    la bildet gå helt ut, ellers blir det hvit rand.
-                  </p>
-                )}
-              </AccordionContent>
-            </AccordionItem>
-
-            <AccordionItem value="kvalitet">
-              <AccordionTrigger className="text-sm">
-                Kvalitet og rettigheter
-              </AccordionTrigger>
-              <AccordionContent className="space-y-3">
-                <div
-                  className={cn(
-                    "rounded-md border p-2 text-xs",
-                    qualityFlag === "lav"
-                      ? "border-destructive/40 bg-destructive/10 text-destructive"
-                      : qualityFlag === "akseptabel"
-                        ? "border-amber-300 bg-amber-50 text-amber-900"
-                        : "bg-muted/40",
-                  )}
-                >
-                  {qualityMessage(effectiveDpi, format)}
-                </div>
-
-                {qualityFlag === "lav" && (
-                  <label className="flex items-start gap-2 text-xs">
-                    <Checkbox
-                      checked={qualityAcked}
-                      onCheckedChange={(v) => {
-                        if (v) void ackQuality();
-                        else setQualityAcked(false);
-                      }}
-                    />
-                    <span>
-                      Jeg har sett oppløsningen og vil trykke bildet likevel.
-                    </span>
-                  </label>
-                )}
-
-                <Separator />
-
-                <label className="flex items-start gap-2 text-xs">
-                  <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                  <Checkbox
-                    checked={rightsCleared}
-                    onCheckedChange={(v) => setRightsCleared(!!v)}
-                  />
-                  <span>Rettigheter avklart</span>
-                </label>
-                <Textarea
-                  value={rightsNote}
-                  onChange={(e) => setRightsNote(e.target.value)}
-                  rows={2}
-                  placeholder="Notat om rettigheter (hvem har godkjent, kilde …)"
-                  className="text-xs"
-                />
-                {!rightsAnswered && (
-                  <p className="text-[11px] text-muted-foreground">
-                    Ta stilling til rettighetene før bildet markeres ferdig.
-                  </p>
-                )}
-              </AccordionContent>
-            </AccordionItem>
-
-
-            <AccordionItem value="bilde">
-              <AccordionTrigger className="text-sm">Bilder</AccordionTrigger>
-              <AccordionContent>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  hidden
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f) addImageFromFile(f);
-                    if (fileInputRef.current) fileInputRef.current.value = "";
-                  }}
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <ImageIcon className="mr-2 h-4 w-4" />
-                  Legg til bilde-lag
-                </Button>
-              </AccordionContent>
-            </AccordionItem>
-
-            <AccordionItem value="tekst">
-              <AccordionTrigger className="text-sm">Tekst</AccordionTrigger>
-              <AccordionContent className="space-y-2">
-                <Select value={textPreset} onValueChange={setTextPreset}>
-                  <SelectTrigger className="h-8">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {TEXT_PRESETS.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <div>
-                  <Label className="mb-1 block text-[10px] uppercase tracking-wide text-muted-foreground">
-                    Skrifttype
-                  </Label>
-                  <CakeFontPicker value={fontFamily} onChange={setFontFamily} />
-                </div>
-                <Input
-                  value={textInput}
-                  onChange={(e) => setTextInput(e.target.value)}
-                  placeholder="Skriv tekst …"
-                  className="h-8"
-                />
-                <Button size="sm" className="w-full" onClick={addText}>
-                  <TypeIcon className="mr-2 h-4 w-4" />
-                  Legg til tekst
-                </Button>
-              </AccordionContent>
-            </AccordionItem>
-
-            <AccordionItem value="clipart">
-              <AccordionTrigger className="text-sm">Clipart</AccordionTrigger>
-              <AccordionContent>
-                <div className="grid grid-cols-3 gap-2">
-                  {CLIPART.map((c) => (
-                    <button
-                      key={c.id}
-                      onClick={() => addClipart(c.id)}
-                      className="flex aspect-square flex-col items-center justify-center rounded-md border bg-muted text-xs hover:bg-accent"
-                    >
-                      <c.Icon className="mb-1 h-6 w-6" />
-                      {c.label}
-                    </button>
-                  ))}
-                </div>
-              </AccordionContent>
-            </AccordionItem>
-          </Accordion>
-        </aside>
+      <div
+        className={cn(
+          "grid flex-1 min-h-0",
+          compact ? "grid-cols-1" : "grid-cols-[280px_1fr_320px]",
+        )}
+      >
+        {!compact && (
+          <aside className="overflow-y-auto border-r bg-background p-3">{leftPanel}</aside>
+        )}
 
         {/* Lerret */}
-        <div
-          ref={wrapRef}
-          className="relative overflow-auto bg-[hsl(var(--muted))] p-6"
-          style={{ backgroundImage: "linear-gradient(45deg,hsl(var(--muted)) 25%,transparent 25%),linear-gradient(-45deg,hsl(var(--muted)) 25%,transparent 25%),linear-gradient(45deg,transparent 75%,hsl(var(--muted)) 75%),linear-gradient(-45deg,transparent 75%,hsl(var(--muted)) 75%)", backgroundSize: "16px 16px", backgroundPosition: "0 0, 0 8px, 8px -8px, -8px 0" }}
-        >
-          {stateLoadFailed && (
-            <div className="mx-auto mb-3 flex max-w-xl items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+        <div className="relative min-h-0 overflow-hidden bg-[hsl(var(--muted))]">
+          {(stateLoadFailed || sourceError) && (
+            <div className="absolute inset-x-3 top-3 z-10 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
               <span className="flex-1">
-                Den lagrede redigeringen kunne ikke åpnes. Originalbildet vises i
-                stedet — ingenting er slettet. Lagrer du nå, erstattes den gamle
-                redigeringen.
+                {sourceError ??
+                  "Den lagrede redigeringen kunne ikke åpnes. Originalbildet vises i stedet — ingenting er slettet."}
               </span>
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => setStateLoadFailed(false)}
+                onClick={() => {
+                  setStateLoadFailed(false);
+                  setSourceError(null);
+                }}
               >
-                Begynn på nytt
+                Lukk
               </Button>
             </div>
           )}
-
-          {format && (
-            <div className="mx-auto mb-2 w-fit rounded-full border bg-background px-3 py-1 text-[11px] text-muted-foreground">
-              {formatSizeLabel(format)}
+          <div ref={viewRef} className="h-full w-full touch-none">
+            <canvas ref={canvasRef} />
+          </div>
+          {loadingSource && (
+            <div className="pointer-events-none absolute inset-0 grid place-items-center">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
           )}
-
-          <div
-            className={cn(
-              "relative mx-auto bg-white shadow-lg",
-              dims.isRound ? "rounded-full" : "",
-            )}
-            style={{
-              width: dims.widthPx * zoom,
-              height: dims.heightPx * zoom,
-              transform: "translateZ(0)",
-              overflow: "hidden",
-            }}
-          >
-            <div
-              style={{
-                width: dims.widthPx,
-                height: dims.heightPx,
-                transform: `scale(${zoom})`,
-                transformOrigin: "top left",
-              }}
-            >
-              <canvas ref={canvasRef} />
-            </div>
-
-            {/* Utfallende sone — det som klippes bort */}
-            {dims.bleedPx > 0 && (
-              <div
-                className={cn(
-                  "pointer-events-none absolute border border-dashed border-destructive/60",
-                  dims.isRound ? "rounded-full" : "",
-                )}
-                style={{ inset: dims.bleedPx * zoom }}
-                aria-hidden
-              >
-                <span className="absolute -top-4 left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] text-destructive/80">
-                  klippes bort
-                </span>
-              </div>
-            )}
-
-            {/* Hjelpelinje: her slutter kaken */}
-            {dims.isRound && (
-              <div
-                className="pointer-events-none absolute inset-0 rounded-full border border-primary/50"
-                aria-hidden
-              />
-            )}
-          </div>
         </div>
 
-
-        {/* Høyre panel */}
-        <aside className="overflow-y-auto border-l bg-background p-3">
-          <div className="space-y-3">
-            <div>
-              <Label className="text-xs">Tittel</Label>
-              <Input
-                value={image.title}
-                onChange={(e) =>
-                  updateCakeImage(image.id, { title: e.target.value }).then(() =>
-                    qc.invalidateQueries({ queryKey: ["cake-image", image.id] }),
-                  )
-                }
-                className="h-8"
-              />
-            </div>
-            <div>
-              <Label className="text-xs">Kunde</Label>
-              <Input
-                defaultValue={image.customer_name ?? ""}
-                onBlur={(e) =>
-                  updateCakeImage(image.id, { customer_name: e.target.value || null })
-                }
-                className="h-8"
-              />
-            </div>
-
-            <Separator />
-
-            <div className="flex items-center gap-2 text-sm font-semibold">
-              <LayersIcon className="h-4 w-4" />
-              Lag
-            </div>
-            <div className="space-y-1">
-              {layers.length === 0 && (
-                <p className="text-xs text-muted-foreground">Ingen lag enda.</p>
-              )}
-              {[...layers].reverse().map((o, i) => {
-                const label =
-                  o instanceof fabric.IText
-                    ? `T: ${(o.text ?? "").slice(0, 18)}`
-                    : o instanceof fabric.FabricImage
-                      ? "Bilde"
-                      : o.type ?? "Objekt";
-                return (
-                  <button
-                    key={i}
-                    onClick={() => {
-                      fabRef.current?.setActiveObject(o);
-                      fabRef.current?.renderAll();
-                      setSelVersion((v) => v + 1);
-                    }}
-                    className={cn(
-                      "flex w-full items-center justify-between rounded border px-2 py-1 text-left text-xs",
-                      active === o ? "border-primary bg-accent" : "border-border",
-                    )}
-                  >
-                    <span className="truncate">{label}</span>
-                    <Trash2
-                      className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        fabRef.current?.remove(o);
-                        fabRef.current?.renderAll();
-                      }}
-                    />
-                  </button>
-                );
-              })}
-            </div>
-
-            <Separator />
-
-            {isText && active && (
-              <div className="space-y-2">
-                <div className="text-sm font-semibold">Tekst</div>
-                <Input
-                  value={(active as fabric.IText).text ?? ""}
-                  onChange={(e) => {
-                    (active as fabric.IText).set("text", e.target.value);
-                    fabRef.current?.renderAll();
-                    setSelVersion((v) => v + 1);
-                  }}
-                  className="h-8"
-                />
-                <div>
-                  <Label className="mb-1 block text-[10px] uppercase tracking-wide text-muted-foreground">
-                    Skrifttype
-                  </Label>
-                  <CakeFontPicker
-                    compact
-                    value={((active as fabric.IText).fontFamily as string) ?? "Inter"}
-                    onChange={(family) => {
-                      loadCakeFont(family).then(() => {
-                        (active as fabric.IText).set("fontFamily", family);
-                        fabRef.current?.renderAll();
-                        setSelVersion((v) => v + 1);
-                      });
-                    }}
-                  />
-                </div>
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant={(active as fabric.IText).fontWeight === "bold" ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => {
-                      const cur = (active as fabric.IText).fontWeight;
-                      (active as fabric.IText).set("fontWeight", cur === "bold" ? "normal" : "bold");
-                      fabRef.current?.renderAll();
-                      setSelVersion((v) => v + 1);
-                    }}
-                  >
-                    <Bold className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant={(active as fabric.IText).fontStyle === "italic" ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => {
-                      const cur = (active as fabric.IText).fontStyle;
-                      (active as fabric.IText).set("fontStyle", cur === "italic" ? "normal" : "italic");
-                      fabRef.current?.renderAll();
-                      setSelVersion((v) => v + 1);
-                    }}
-                  >
-                    <Italic className="h-4 w-4" />
-                  </Button>
-                  <Input
-                    type="color"
-                    value={((active as fabric.IText).fill as string) ?? "#000000"}
-                    onChange={(e) => {
-                      (active as fabric.IText).set("fill", e.target.value);
-                      fabRef.current?.renderAll();
-                    }}
-                    className="h-8 w-12 p-1"
-                  />
-                </div>
-                <div>
-                  <Label className="text-xs">Størrelse: {Math.round((active as fabric.IText).fontSize ?? 0)}</Label>
-                  <Slider
-                    min={10}
-                    max={200}
-                    step={1}
-                    value={[(active as fabric.IText).fontSize ?? 40]}
-                    onValueChange={(v) => {
-                      (active as fabric.IText).set("fontSize", v[0]);
-                      fabRef.current?.renderAll();
-                      setSelVersion((x) => x + 1);
-                    }}
-                  />
-                </div>
-              </div>
-            )}
-
-            {active instanceof fabric.FabricImage && (
-              <div className="space-y-2">
-                <div className="text-sm font-semibold">Bildejustering</div>
-                <div>
-                  <Label className="text-xs">Lysstyrke: {brightness}</Label>
-                  <Slider min={-100} max={100} step={1} value={[brightness]} onValueChange={(v) => setBrightness(v[0])} />
-                </div>
-                <div>
-                  <Label className="text-xs">Kontrast: {contrast}</Label>
-                  <Slider min={-100} max={100} step={1} value={[contrast]} onValueChange={(v) => setContrast(v[0])} />
-                </div>
-                <Button
-                  variant={grayscale ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setGrayscale((g) => !g)}
-                >
-                  Gråtoner
-                </Button>
-              </div>
-            )}
-
-            <Separator />
-
-            <div className="space-y-1 text-xs text-muted-foreground">
-              <div>Status: {image.status}</div>
-              <div>Skrevet ut: {image.print_count}×</div>
-              <CakePrintHistory cakeImageId={image.id} />
-            </div>
-          </div>
-        </aside>
+        {!compact && (
+          <aside className="overflow-y-auto border-l bg-background p-3">{rightPanel}</aside>
+        )}
       </div>
 
       {/* Bunn-bar */}
-      <div className="flex flex-wrap items-center justify-end gap-2 border-t bg-card px-3 py-2">
-        <Button variant="ghost" onClick={() => navigate(-1)}>
-          Avbryt
-        </Button>
-        <Button variant="outline" onClick={() => doSave(false, { navigateBack: true })} disabled={saving}>
-          {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-          Lagre
-        </Button>
-        <Button variant="default" onClick={() => doSave(true, { navigateBack: true })} disabled={saving}>
-          <CheckCircle2 className="mr-2 h-4 w-4" />
-          Lagre & marker ferdig
-        </Button>
-        <Button variant="brand" onClick={async () => { if (await doSave(false)) printNow(); }}>
-          <Printer className="mr-2 h-4 w-4" />
-          Skriv ut
-        </Button>
-        <Button variant="outline" onClick={async () => { if (await doSave(false)) downloadPdf(); }}>
-          <Download className="mr-2 h-4 w-4" />
-          PDF
-        </Button>
+      <div className="flex flex-wrap items-center gap-2 border-t bg-card px-3 py-2">
+        {compact && (
+          <>
+            <Sheet open={leftOpen} onOpenChange={setLeftOpen}>
+              <SheetTrigger asChild>
+                <Button variant="outline" className="h-10">
+                  <SlidersHorizontal className="mr-2 h-4 w-4" />
+                  Verktøy
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-[320px] overflow-y-auto">
+                <SheetHeader>
+                  <SheetTitle>Verktøy</SheetTitle>
+                </SheetHeader>
+                <div className="mt-3">{leftPanel}</div>
+              </SheetContent>
+            </Sheet>
+            <Sheet open={rightOpen} onOpenChange={setRightOpen}>
+              <SheetTrigger asChild>
+                <Button variant="outline" className="h-10">
+                  <LayersIcon className="mr-2 h-4 w-4" />
+                  Lag
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-[340px] overflow-y-auto">
+                <SheetHeader>
+                  <SheetTitle>Lag og detaljer</SheetTitle>
+                </SheetHeader>
+                <div className="mt-3">{rightPanel}</div>
+              </SheetContent>
+            </Sheet>
+          </>
+        )}
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          <Button
+            variant="outline"
+            className="h-10"
+            onClick={() => doSave(false, { navigateBack: true })}
+            disabled={saving}
+          >
+            {saving ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="mr-2 h-4 w-4" />
+            )}
+            Lagre
+          </Button>
+          <Button
+            variant="default"
+            className="h-10"
+            onClick={() => doSave(true, { navigateBack: true })}
+            disabled={saving}
+          >
+            <CheckCircle2 className="mr-2 h-4 w-4" />
+            Lagre & marker ferdig
+          </Button>
+          <Button
+            variant="brand"
+            className="h-10"
+            onClick={async () => {
+              if (await doSave(false)) void printNow();
+            }}
+          >
+            <Printer className="mr-2 h-4 w-4" />
+            Skriv ut
+          </Button>
+          <Button
+            variant="outline"
+            className="h-10"
+            onClick={async () => {
+              if (await doSave(false)) void downloadPdf();
+            }}
+          >
+            <Download className="mr-2 h-4 w-4" />
+            PDF
+          </Button>
+        </div>
       </div>
-      {/* tving re-render når selVersion endres */}
+
+      <UnsavedChangesDialog
+        {...guard.dialogProps}
+        description="Kakebildet har endringer som ikke er lagret. Fortsetter du, forsvinner de."
+      />
+
+      <AlertDialog
+        open={!!draftPrompt}
+        onOpenChange={(v) => {
+          if (!v) setDraftPrompt(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Gjenopprett utkast?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Det ligger et nyere utkast av dette kakebildet i nettleseren. Vil du
+              hente det tilbake?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => {
+                if (image) {
+                  try {
+                    window.localStorage.removeItem(draftKey(image.id));
+                  } catch {
+                    // ingen konsekvens
+                  }
+                }
+                setDraftPrompt(null);
+              }}
+            >
+              Forkast utkastet
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={() => void restoreDraft()}>
+              Gjenopprett
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <span hidden>{selVersion}</span>
-      {/* uses urls just to keep hook stable */}
-      <span hidden>{Object.keys(urls).length}</span>
     </div>
   );
 }
+
+/** Eksporteres for gjenbruk i tester og andre kakeverktøy. */
+export { applyTextCurve };
