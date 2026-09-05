@@ -120,7 +120,10 @@ export function useTourOrderCounts(isoDate: string) {
     queryKey: ["tour-order-counts", isoDate, toursQ.data],
     enabled: !toursQ.isLoading,
     queryFn: async (): Promise<TourOrderCounts> => {
-      const [{ data, error }, pendingRecurring, pauses] = await Promise.all([
+      // Pausene hentes én gang og sendes videre, slik at fastordre-tellingen
+      // ikke gjør et nytt oppslag på samme data.
+      const pauses = await fetchDeliveryPauses(isoDate, isoDate);
+      const [{ data, error }, pendingRecurring] = await Promise.all([
         supabase
           .from("orders")
           .select("customer_id, delivery_tour_id")
@@ -128,8 +131,7 @@ export function useTourOrderCounts(isoDate: string) {
           .eq("delivery_date", isoDate)
           .eq("is_return", false)
           .in("status", TOUR_COUNT_STATUS_WHITELIST as unknown as string[]),
-        fetchPendingRecurringOrderCounts(isoDate, toursQ.data ?? []),
-        fetchDeliveryPauses(isoDate, isoDate),
+        fetchPendingRecurringOrderCounts(isoDate, toursQ.data ?? [], pauses),
       ]);
       if (error) throw error;
       const byTour: Record<string, number> = { ...pendingRecurring.byTour };
