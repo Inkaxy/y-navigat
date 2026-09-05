@@ -614,7 +614,7 @@ export default function TicketDetail() {
 
   // ─── handlers
 
-
+  const onReanalyze = async () => {
     if (!id) return;
     setReanalyzing(true);
     try {
@@ -630,22 +630,6 @@ export default function TicketDetail() {
     } finally {
       setReanalyzing(false);
     }
-  };
-
-  const sendDisabled =
-    !canWrite ||
-    !text.trim() ||
-    sendReply.isPending ||
-    addComment.isPending ||
-    (tab === "ask" && !mention);
-
-  const TAB_META: Record<ComposerTab, { label: string; cls: string }> = {
-    reply: { label: "Svar til kunde", cls: "bg-primary text-primary-foreground" },
-    note: {
-      label: "Internt notat",
-      cls: "bg-amber-500/20 text-amber-900 dark:text-amber-100",
-    },
-    ask: { label: "Spør internt / @tagg", cls: "bg-amber-500/20 text-amber-900 dark:text-amber-100" },
   };
 
   const actionBar = (
