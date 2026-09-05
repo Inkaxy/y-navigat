@@ -59,7 +59,18 @@ export function useNBProducts(search?: string, priceListId?: string | null) {
       if (error) throw error;
       const seen = new Set<string>();
       const out: ProductOption[] = [];
-      for (const row of (data ?? []) as any[]) {
+      type ProductRow = {
+        id: string;
+        display_number: number | string;
+        code: string;
+        display_name: string;
+        unit_of_sale: string;
+        mva_rate: number | string | null;
+        status: string;
+        is_for_sale: boolean;
+        is_divisible: boolean | null;
+      };
+      for (const row of (data ?? []) as unknown as Array<{ products: ProductRow | null }>) {
         const p = row.products;
         if (!p || seen.has(p.id)) continue;
         seen.add(p.id);
@@ -72,7 +83,7 @@ export function useNBProducts(search?: string, priceListId?: string | null) {
           mva_rate: Number(p.mva_rate ?? 0),
           status: p.status,
           is_for_sale: p.is_for_sale,
-          is_divisible: p.is_divisible,
+          is_divisible: !!p.is_divisible,
         });
       }
       if (isNumericSearch) {

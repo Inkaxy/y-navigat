@@ -599,8 +599,6 @@ export default function NewOrder() {
                 unit_price_source_id: ep.special_price_id ?? ep.price_list_id ?? null,
                 effective_price: ep.price,
               };
-            } catch {
-              return l;
             } catch (err) {
               persistAppError(err, { scope: "ordre:ny-ordre:kopier-priser" });
               return l;

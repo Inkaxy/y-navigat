@@ -467,7 +467,18 @@ export function CustomerOrderModal({
         .in("id", ids);
       if (cancelled) return;
       const byId = new Map<string, ProductOption>();
-      for (const p of (data ?? []) as any[]) {
+      type ProductRow = {
+        id: string;
+        display_number: number | string;
+        code: string;
+        display_name: string;
+        unit_of_sale: string;
+        mva_rate: number | string | null;
+        status: string;
+        is_for_sale: boolean;
+        is_divisible: boolean | null;
+      };
+      for (const p of (data ?? []) as unknown as ProductRow[]) {
         byId.set(p.id, {
           id: p.id,
           display_number: Number(p.display_number),
@@ -509,7 +520,6 @@ export function CustomerOrderModal({
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, isEdit, initialValues, customer.id]);
 
   // Mark dirty on any field change after init
