@@ -532,7 +532,7 @@ export default function MatrixPage() {
 
     // Filtrer bort qty 0
     return Array.from(rowMap.values()).filter((r) => r.quantity > 0);
-  }, [matrix, edits, allProducts, ghostMap, visibleDates]);
+  }, [matrix, edits, allProducts, ghostMap, visibleDates, ghostRuleBase]);
 
   const unsavedAddedCount = useMemo(() => {
     return addedProducts.filter((p) => {
