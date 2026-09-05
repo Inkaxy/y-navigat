@@ -85,9 +85,8 @@ export function OrderBulkActionBar({
           const { error: delErr } = await supabase.from("orders").delete().eq("id", order.id);
           if (delErr) throw delErr;
           ok++;
-        } catch (e: any) {
+        } catch (e) {
           failed++;
-          // eslint-disable-next-line no-console
           console.error(`Bulk-sletting feilet for ${order.order_number}`, e);
         }
       }
@@ -140,7 +139,6 @@ export function OrderBulkActionBar({
         } catch (e) {
           if (isOrderConflict(e)) conflicts++;
           else failed++;
-          // eslint-disable-next-line no-console
           console.error(`Avbryt feilet for ${order.order_number}`, e);
         }
       }
