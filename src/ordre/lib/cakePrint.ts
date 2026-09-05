@@ -342,8 +342,8 @@ async function urlToDataUrl(url: string): Promise<string> {
 }
 
 /**
- * Baker bildene inn som data-URL-er FØR utskriftsvinduet åpnes. Da finnes det
- * ingen nettverkskall igjen i utskriftsvinduet — hverken utløpt signert URL
+ * Baker bildene inn som data-URL-er FØR utskriften bygges. Da finnes det
+ * ingen nettverkskall igjen når PDF-en lages — hverken utløpt signert URL
  * eller kappløp mot `print()` kan gi tomme ark.
  */
 export async function embedCakeImages(
@@ -381,161 +381,462 @@ export function cakeItemLabel(item: CakePrintItem): string {
   );
 }
 
+/* ------------------------------------------------------------------ */
+/* Ark, retning og bildekoding                                         */
+/* ------------------------------------------------------------------ */
+
+/** Nederste bånd på arket: linjal, instruks og bunntekst. */
+const FOOT_BAND_MM = 22;
+const PAGE_MARGIN_MM = 10;
+/** Etikettstripe under hvert bilde: QR + nummer + kunde. */
+const CAPTION_MM = 12;
+const QR_MM = 10;
+
+export const PRINT_INSTRUCTION =
+  "Skriv ut i 100 % — ingen tilpasning til side («scale to fit» av).";
+
+export function hasPrintableSize(item: CakePrintItem): boolean {
+  return !!item.widthMm && !!item.heightMm;
+}
+
+/** Hvilket ark og hvilken retning holder for alle bildene? */
+export function chooseSheet(items: CakePrintItem[]): {
+  sheet: string;
+  orientation: SheetOrientation;
+} {
+  const sized = items.filter(hasPrintableSize);
+  const wanted = sized.some((i) => (i.sheet ?? "A4") === "A3") ? "A3" : "A4";
+  const candidates: Array<{ sheet: string; orientation: SheetOrientation }> = [
+    { sheet: wanted, orientation: "portrait" },
+    { sheet: wanted, orientation: "landscape" },
+    { sheet: "A3", orientation: "portrait" },
+    { sheet: "A3", orientation: "landscape" },
+  ];
+  for (const c of candidates) {
+    const size = sheetSize(c.sheet, c.orientation);
+    const ok = sized.every(
+      (i) =>
+        fitsOnSheet(
+          {
+            id: i.image?.id ?? "x",
+            widthMm: i.widthMm ?? 0,
+            heightMm: i.heightMm ?? 0,
+            bleedMm: i.bleedMm ?? 0,
+            isRound: i.isRound,
+          },
+          size,
+          PAGE_MARGIN_MM,
+          FOOT_BAND_MM,
+        ).fits,
+    );
+    if (ok) return c;
+  }
+  return { sheet: wanted, orientation: "portrait" };
+}
+
 /**
- * Åpner utskriftsdialogen med arkene.
- *
- * Vi bygger nøyaktig samme PDF som «Last ned PDF» og sender den til skriveren.
- * HTML-arket i et about:blank-vindu droppet bildet i Chrome (kun ramme og
- * hjelpelinjer kom ut på papir), mens PDF-en alltid har bildet med.
+ * Fotolag komprimeres til JPEG (mindre PDF), men bilder med gjennomsiktighet
+ * — typisk tekstlag fra editoren — må forbli PNG.
+ */
+export async function encodeArtwork(
+  dataUrl: string,
+): Promise<{ data: string; format: "JPEG" | "PNG" }> {
+  if (typeof document === "undefined") return { data: dataUrl, format: "PNG" };
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const i = new Image();
+      i.onload = () => resolve(i);
+      i.onerror = () => reject(new Error("Kunne ikke dekode bildet"));
+      i.src = dataUrl;
+    });
+    const canvas = document.createElement("canvas");
+    canvas.width = img.naturalWidth || img.width;
+    canvas.height = img.naturalHeight || img.height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return { data: dataUrl, format: "PNG" };
+    ctx.drawImage(img, 0, 0);
+    const px = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    let transparent = false;
+    const step = Math.max(4, Math.floor(px.length / 4 / 20000) * 4);
+    for (let i = 3; i < px.length; i += step) {
+      if (px[i] < 250) {
+        transparent = true;
+        break;
+      }
+    }
+    if (transparent) return { data: dataUrl, format: "PNG" };
+    return { data: canvas.toDataURL("image/jpeg", 0.92), format: "JPEG" };
+  } catch (e) {
+    console.warn("[cakePrint] kunne ikke rekode bildet, bruker original", e);
+    return { data: dataUrl, format: "PNG" };
+  }
+}
+
+export function editorUrlFor(id: string): string {
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  return `${origin}/ordre/kakebilder/editor/${id}`;
+}
+
+async function qrDataUrl(text: string): Promise<string | null> {
+  try {
+    return await QRCode.toDataURL(text, { margin: 0, width: 256 });
+  } catch (e) {
+    console.warn("[cakePrint] kunne ikke lage QR-kode", e);
+    return null;
+  }
+}
+
+export type CakeSkipped = { item: CakePrintItem; reason: string };
+
+export type CakePdfResult = {
+  pdf: jsPDF;
+  skipped: CakeSkipped[];
+  pageCount: number;
+  sheet: string;
+  orientation: SheetOrientation;
+};
+
+export type CakePdfOptions = {
+  scale?: number;
+  scaleY?: number;
+  /** Pakk flere små bilder på samme ark. Standard: på. */
+  nest?: boolean;
+  /**
+   * Hopp over bilder uten format i stedet for å skrive et varselark.
+   * Standard: hopp over når det er flere enn ett bilde (bulk).
+   */
+  skipMissingFormat?: boolean;
+};
+
+/**
+ * Bygger PDF-en som både forhåndsvisning, skriver og nedlasting bruker.
+ * Millimeter hele veien, aldri punkter.
+ */
+export async function buildCakePdf(
+  items: CakePrintItem[],
+  opts: CakePdfOptions = {},
+): Promise<CakePdfResult> {
+  const scale = opts.scale ?? 1;
+  const scaleY = opts.scaleY ?? scale;
+  const skipMissing = opts.skipMissingFormat ?? items.length > 1;
+  const skipped: CakeSkipped[] = [];
+
+  const printable: CakePrintItem[] = [];
+  const missingFormat: CakePrintItem[] = [];
+  for (const item of items) {
+    if (hasPrintableSize(item)) printable.push(item);
+    else if (skipMissing)
+      skipped.push({
+        item,
+        reason: "Mangler format — sett format i editoren før utskrift.",
+      });
+    else missingFormat.push(item);
+  }
+
+  const { sheet, orientation } = chooseSheet(printable);
+  const size = sheetSize(sheet, orientation);
+  const pdf = new jsPDF({
+    orientation,
+    unit: "mm",
+    format: sheet.toLowerCase() as "a4" | "a3",
+  });
+
+  const byId = new Map<string, CakePrintItem>();
+  const packItems: PackItem[] = printable.map((item, idx) => {
+    const id = item.image?.id ?? `item-${idx}`;
+    byId.set(id, item);
+    return {
+      id,
+      widthMm: applyScale(item.widthMm, scale) ?? 0,
+      heightMm: (applyScale(item.heightMm, scaleY) ?? 0) + CAPTION_MM,
+      bleedMm: item.bleedMm ?? 0,
+      isRound: item.isRound,
+      rotatable: !item.isRound,
+    };
+  });
+
+  const packed = opts.nest === false
+    ? {
+        pages: packItems.map((p) => ({
+          sheet,
+          orientation,
+          ...size,
+          placements: [
+            {
+              id: p.id,
+              xMm: (size.widthMm - p.widthMm) / 2,
+              yMm: (size.heightMm - FOOT_BAND_MM - p.heightMm) / 2,
+              widthMm: p.widthMm,
+              heightMm: p.heightMm,
+              bleedMm: p.bleedMm ?? 0,
+              rotated: false,
+            },
+          ],
+        })),
+        unplaceable: [] as PackItem[],
+      }
+    : packSheets(packItems, {
+        sheet,
+        orientation,
+        marginMm: PAGE_MARGIN_MM,
+        reservedBottomMm: FOOT_BAND_MM,
+      });
+
+  for (const u of packed.unplaceable) {
+    const item = byId.get(u.id);
+    if (!item) continue;
+    skipped.push({
+      item,
+      reason: `Bildet (${Math.round(u.widthMm)} × ${Math.round(u.heightMm - CAPTION_MM)} mm) er større enn ${sheet}. Velg et større ark i formatet.`,
+    });
+  }
+
+  let pageIndex = 0;
+  const startPage = () => {
+    if (pageIndex > 0) pdf.addPage(sheet.toLowerCase() as "a4" | "a3", orientation);
+    pageIndex++;
+  };
+
+  for (const page of packed.pages) {
+    startPage();
+    for (const place of page.placements) {
+      const item = byId.get(place.id);
+      if (!item) continue;
+      const wMm = place.widthMm;
+      const hMm = place.heightMm - CAPTION_MM;
+      const x = place.xMm;
+      const y = place.yMm;
+
+      if (item.url) {
+        const src = item.url.startsWith("data:")
+          ? item.url
+          : await urlToDataUrl(item.url);
+        const enc = await encodeArtwork(src);
+        pdf.addImage(enc.data, enc.format, x, y, wMm, hMm, undefined, "FAST", 0);
+      }
+
+      // Klippemerker rundt hvert bilde
+      pdf.setLineWidth(0.2);
+      for (const [sx, sy] of [
+        [-1, -1],
+        [1, -1],
+        [-1, 1],
+        [1, 1],
+      ] as Array<[number, number]>) {
+        const cx = x + wMm / 2 + (sx * wMm) / 2;
+        const cy = y + hMm / 2 + (sy * hMm) / 2;
+        pdf.line(cx + sx * 2, cy, cx + sx * 6, cy);
+        pdf.line(cx, cy + sy * 2, cx, cy + sy * 6);
+      }
+      if (item.isRound) pdf.circle(x + wMm / 2, y + hMm / 2, wMm / 2);
+
+      // Etikettstripe: QR til editoren, etikettnummer, kunde, produkt og kaketekst
+      const capY = y + hMm + 2;
+      let textX = x;
+      if (item.image?.id) {
+        const qr = await qrDataUrl(editorUrlFor(item.image.id));
+        if (qr) {
+          pdf.addImage(qr, "PNG", x, capY, QR_MM, QR_MM);
+          textX = x + QR_MM + 2;
+        }
+      }
+      if (item.labelNumber) {
+        pdf.setFontSize(12);
+        pdf.text(`#${item.labelNumber}`, textX, capY + 4);
+      }
+      pdf.setFontSize(7);
+      const line1 = [item.customerName, item.orderRef ? `Ordre ${item.orderRef}` : null]
+        .filter(Boolean)
+        .join(" · ");
+      const line2 = [item.productName, item.cakeText ? `Tekst: ${item.cakeText}` : null]
+        .filter(Boolean)
+        .join(" · ");
+      if (line1) pdf.text(line1, textX + (item.labelNumber ? 16 : 0), capY + 4);
+      if (line2) pdf.text(line2, textX, capY + 8);
+    }
+    drawFootBand(pdf, size, scale, scaleY, sheet, orientation);
+  }
+
+  // Bilder uten format: eget varselark, slik at feilen ikke går ubemerket.
+  for (const item of missingFormat) {
+    startPage();
+    pdf.setFontSize(20);
+    pdf.text("MANGLER FORMAT", size.widthMm / 2, size.heightMm / 2 - 8, {
+      align: "center",
+    });
+    pdf.setFontSize(12);
+    pdf.text("Sett format i editoren før utskrift.", size.widthMm / 2, size.heightMm / 2, {
+      align: "center",
+    });
+    pdf.setFontSize(9);
+    pdf.text(cakeItemLabel(item), size.widthMm / 2, size.heightMm / 2 + 8, {
+      align: "center",
+    });
+    drawFootBand(pdf, size, scale, scaleY, sheet, orientation);
+  }
+
+  if (pageIndex === 0) {
+    // jsPDF har alltid én side; gjør den tydelig tom.
+    pdf.setFontSize(12);
+    pdf.text("Ingen bilder kunne skrives ut.", size.widthMm / 2, 40, {
+      align: "center",
+    });
+  }
+
+  return { pdf, skipped, pageCount: Math.max(pageIndex, 1), sheet, orientation };
+}
+
+function drawFootBand(
+  pdf: jsPDF,
+  size: { widthMm: number; heightMm: number },
+  scale: number,
+  scaleY: number,
+  sheet: string,
+  orientation: SheetOrientation,
+) {
+  const rulerY = size.heightMm - 14;
+  pdf.setLineWidth(0.3);
+  pdf.line(PAGE_MARGIN_MM, rulerY, PAGE_MARGIN_MM + RULER_MM * scale, rulerY);
+  for (let mm = 0; mm <= RULER_MM; mm += 10) {
+    const x = PAGE_MARGIN_MM + mm * scale;
+    pdf.line(x, rulerY, x, rulerY - (mm % 50 === 0 ? 4 : 2.5));
+  }
+  pdf.setFontSize(7);
+  pdf.text(`${RULER_MM} mm — mål etter med linjal.`, PAGE_MARGIN_MM, rulerY - 5.5);
+  pdf.text(PRINT_INSTRUCTION, PAGE_MARGIN_MM, size.heightMm - 8);
+  pdf.text(
+    `${sheet} ${orientation === "landscape" ? "liggende" : "stående"}` +
+      (scale !== 1 || scaleY !== 1
+        ? ` · korrigert ${Math.round(scale * 10000) / 100} % × ${Math.round(scaleY * 10000) / 100} %`
+        : ""),
+    size.widthMm - PAGE_MARGIN_MM,
+    size.heightMm - 8,
+    { align: "right" },
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Utskrift og nedlasting                                              */
+/* ------------------------------------------------------------------ */
+
+async function prepareItems(
+  items: CakePrintItem[],
+  embed: boolean,
+): Promise<CakePrintItem[]> {
+  if (!embed) return items;
+  const res = await embedCakeImages(items);
+  if (res.failed.length > 0) {
+    throw new Error(
+      `Kunne ikke hente ${res.failed.length} bilde(r): ${res.failed
+        .map(cakeItemLabel)
+        .join(", ")}. Utskriften ble ikke startet.`,
+    );
+  }
+  return res.items;
+}
+
+/**
+ * Sender PDF-en til skriveren i samme fane, via en skjult iframe.
+ * Ingen `window.open` — da kan heller ingen popup-sperre stoppe utskriften.
+ */
+export function printPdfInPlace(blob: Blob): Promise<void> {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(blob);
+    const frame = document.createElement("iframe");
+    frame.style.position = "fixed";
+    frame.style.right = "0";
+    frame.style.bottom = "0";
+    frame.style.width = "1px";
+    frame.style.height = "1px";
+    frame.style.opacity = "0";
+    frame.src = url;
+    frame.onload = () => {
+      try {
+        frame.contentWindow?.focus();
+        frame.contentWindow?.print();
+      } catch (e) {
+        console.error("[cakePrint] kunne ikke åpne utskriftsdialogen", e);
+      }
+      resolve();
+    };
+    document.body.appendChild(frame);
+    window.setTimeout(() => {
+      URL.revokeObjectURL(url);
+      frame.remove();
+    }, 120_000);
+  });
+}
+
+export type CakePrintJobResult = {
+  skipped: CakeSkipped[];
+  printedItems: CakePrintItem[];
+  pageCount: number;
+  sheet: string;
+  orientation: SheetOrientation;
+};
+
+/**
+ * Bygger arkene og åpner utskriftsdialogen. Status røres ikke — den settes
+ * først når brukeren har bekreftet at arket kom riktig ut.
+ */
+export async function printCakeItems(
+  items: CakePrintItem[],
+  opts: CakePdfOptions & { embed?: boolean } = {},
+): Promise<CakePrintJobResult> {
+  const prepared = await prepareItems(items, opts.embed !== false);
+  const res = await buildCakePdf(prepared, opts);
+  const skippedIds = new Set(res.skipped.map((s) => s.item.image?.id));
+  await printPdfInPlace(res.pdf.output("blob"));
+  return {
+    skipped: res.skipped,
+    printedItems: prepared.filter((i) => !skippedIds.has(i.image?.id)),
+    pageCount: res.pageCount,
+    sheet: res.sheet,
+    orientation: res.orientation,
+  };
+}
+
+/**
+ * Eldre inngang (editoren): skriver ut og melder fra etterpå.
+ * Nye flyter bruker `printCakeItems` og bekrefter med brukeren først.
  */
 export async function openCakePrintWindow(
   items: CakePrintItem[],
-  opts: {
-    scale?: number;
-    scaleY?: number;
+  opts: CakePdfOptions & {
     onPrinted?: () => void;
     title?: string;
-    /** Sett false hvis kildene allerede er data-URL-er. */
     embed?: boolean;
   } = {},
-): Promise<void> {
-  let sheets = items;
-  if (opts.embed !== false) {
-    const res = await embedCakeImages(items);
-    if (res.failed.length > 0) {
-      // Heller stoppe enn å skrive ut noen ark og la brukeren tro alt gikk bra.
-      throw new Error(
-        `Kunne ikke hente ${res.failed.length} bilde(r): ${res.failed
-          .map(cakeItemLabel)
-          .join(", ")}. Utskriften ble ikke startet.`,
-      );
-    }
-    sheets = res.items;
-  }
-
-  const missing = sheets.filter((s) => !s.url);
-  if (missing.length > 0) {
-    throw new Error(
-      `${missing.length} bilde(r) kunne ikke vises. Utskriften ble ikke startet.`,
-    );
-  }
-
-  const pdf = await buildCakePdf(sheets, { scale: opts.scale, scaleY: opts.scaleY });
-  pdf.autoPrint();
-  const url = URL.createObjectURL(pdf.output("blob"));
-  const w = window.open(url, "_blank");
-  if (!w) {
-    URL.revokeObjectURL(url);
-    throw new Error("Nettleseren blokkerte utskriftsvinduet");
-  }
-  w.focus();
-  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+): Promise<CakePrintJobResult> {
+  const res = await printCakeItems(items, opts);
   opts.onPrinted?.();
-}
-
-
-
-/** Samme ark som på papir, men som PDF. Millimeter, ikke punkter. */
-export async function buildCakePdf(
-  items: CakePrintItem[],
-  opts: { scale?: number; scaleY?: number } = {},
-): Promise<jsPDF> {
-  const scale = opts.scale ?? 1;
-  const scaleY = opts.scaleY ?? scale;
-  const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-
-  for (let i = 0; i < items.length; i++) {
-    if (i > 0) pdf.addPage();
-    const item = items[i];
-    const wMm = applyScale(item.widthMm, scale) ?? 150;
-    const hMm = applyScale(item.heightMm, scaleY) ?? 150;
-    if (item.url) {
-      const dataUrl = item.url.startsWith("data:")
-        ? item.url
-        : await urlToDataUrl(item.url);
-      pdf.addImage(
-        dataUrl,
-        "PNG",
-        (A4.widthMm - wMm) / 2,
-        (A4.heightMm - hMm) / 2,
-        wMm,
-        hMm,
-      );
-    }
-
-    // Klippemerker
-    pdf.setLineWidth(0.2);
-    const cx = A4.widthMm / 2;
-    const cy = A4.heightMm / 2;
-    const corners: Array<[number, number]> = [
-      [-1, -1],
-      [1, -1],
-      [-1, 1],
-      [1, 1],
-    ];
-    for (const [sx, sy] of corners) {
-      const x = cx + (sx * wMm) / 2;
-      const y = cy + (sy * hMm) / 2;
-      pdf.line(x + sx * 2, y, x + sx * 7, y);
-      pdf.line(x, y + sy * 2, x, y + sy * 7);
-    }
-    if (item.isRound) {
-      pdf.circle(cx, cy, wMm / 2);
-    }
-
-    // Etikettnummer i margen
-    if (item.labelNumber) {
-      pdf.setFontSize(8);
-      pdf.text("ETIKETT", 8, 10);
-      pdf.setFontSize(38);
-      pdf.text(`#${item.labelNumber}`, 8, 24);
-    }
-
-    // Millimeterskala
-    const rulerY = A4.heightMm - 16;
-    pdf.setLineWidth(0.3);
-    pdf.line(8, rulerY, 8 + RULER_MM * scale, rulerY);
-    for (let mm = 0; mm <= RULER_MM; mm += 10) {
-      const x = 8 + mm * scale;
-      pdf.line(x, rulerY, x, rulerY - (mm % 50 === 0 ? 4 : 2.5));
-    }
-    pdf.setFontSize(7);
-    pdf.text(
-      `${RULER_MM} mm — mål etter med linjal. Stemmer den ikke, har skriveren skalert.`,
-      8,
-      rulerY - 5.5,
-    );
-
-    // Bunntekst
-    pdf.setFontSize(8);
-    pdf.text(
-      [item.orderRef ? `Ordre ${item.orderRef}` : "Uten ordre", item.customerName ?? ""]
-        .filter(Boolean)
-        .join(" · "),
-      8,
-      A4.heightMm - 8,
-    );
-    pdf.text(
-      `${Math.round(item.widthMm ?? 0)} × ${Math.round(item.heightMm ?? 0)} mm${
-        item.deliveryDate ? ` · ${item.deliveryDate}` : ""
-      }`,
-      A4.widthMm - 8,
-      A4.heightMm - 8,
-      { align: "right" },
-    );
-  }
-  return pdf;
+  return res;
 }
 
 /** Laster ned arkene som PDF. */
 export async function cakeSheetsToPdf(
   items: CakePrintItem[],
-  opts: { scale?: number; scaleY?: number; fileName?: string } = {},
-): Promise<void> {
-  const pdf = await buildCakePdf(items, opts);
-  pdf.save(opts.fileName ?? "kakebilder.pdf");
+  opts: CakePdfOptions & { fileName?: string; embed?: boolean } = {},
+): Promise<{ skipped: CakeSkipped[] }> {
+  const prepared = await prepareItems(items, opts.embed !== false);
+  const res = await buildCakePdf(prepared, opts);
+  res.pdf.save(opts.fileName ?? "kakebilder.pdf");
+  return { skipped: res.skipped };
 }
 
+/** Blob-URL til forhåndsvisning i iframe — samme PDF som papiret. */
+export async function cakePdfPreviewUrl(
+  items: CakePrintItem[],
+  opts: CakePdfOptions & { embed?: boolean } = {},
+): Promise<{ url: string; skipped: CakeSkipped[]; pageCount: number }> {
+  const prepared = await prepareItems(items, opts.embed !== false);
+  const res = await buildCakePdf(prepared, opts);
+  return {
+    url: URL.createObjectURL(res.pdf.output("blob")),
+    skipped: res.skipped,
+    pageCount: res.pageCount,
+  };
+}
 
 /**
  * Testark for kalibrering: en rute med kjente mål. Måler man noe annet enn
@@ -551,12 +852,7 @@ export function calibrationSheetHtml(doc: Document): HTMLElement {
   box.style.border = "0.3mm solid #000";
   sheet.appendChild(box);
 
-  const t = el(
-    doc,
-    "div",
-    "cake-label",
-    "",
-  );
+  const t = el(doc, "div", "cake-label", "");
   t.style.fontSize = "6mm";
   t.textContent = `Kalibrering: kvadratet skal måle ${CALIBRATION_MM} × ${CALIBRATION_MM} mm`;
   sheet.appendChild(t);
