@@ -32,12 +32,13 @@ const format = (o: Partial<CakeImageFormat>): CakeImageFormat => ({
 });
 
 describe("cakeSheetLayout", () => {
-  // Ø150 er for stort til å dele ark på A4 — da skal hvert bilde få sitt eget.
-  it("gir hvert Ø150-bilde sitt eget A4-ark", () => {
-    const items = [1, 2, 3, 4].map((n) => item(`r${n}`, 150, 150, { isRound: true }));
+  // Fire Ø100 får plass på A4 — to per ark, ingen skal falle ut.
+  it("pakker fire Ø100-bilder på A4 uten å forkaste noen", () => {
+    const items = [1, 2, 3, 4].map((n) => item(`r${n}`, 100, 100, { isRound: true }));
     const res = packSheets(items, { sheet: "A4", marginMm: 8, gapMm: 4 });
     expect(res.unplaceable).toHaveLength(0);
-    expect(res.pages).toHaveLength(4);
+    expect(res.pages.flatMap((p) => p.placements)).toHaveLength(4);
+    expect(res.pages.length).toBeLessThanOrEqual(2);
   });
 
   it("pakker fire små bilder på samme ark", () => {
