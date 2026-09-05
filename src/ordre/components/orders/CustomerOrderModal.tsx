@@ -39,6 +39,8 @@ import { ProductSearchInput } from "@/ordre/components/orders/ProductSearchInput
 import { countRiskyPriceLines, focusOrderLineField } from "@/ordre/lib/orderLines";
 import { ZeroPriceConfirmDialog } from "@/ordre/components/orders/ZeroPriceConfirmDialog";
 import { useDeliveryTours, tourMatches, trimSec } from "@/ordre/hooks/useDeliveryTours";
+import { CustomerContextPanel } from "@/ordre/components/orders/CustomerContextPanel";
+import { evaluateCustomerContext, withCreditOverrideNote } from "@/ordre/lib/customerContext";
 import { useDebouncedValue } from "@/ordre/hooks/useDebouncedValue";
 import {
   useFinalCustomerSuggestions,
@@ -314,6 +316,8 @@ export function CustomerOrderModal({
   const [hour, setHour] = useState<string>("--");
   const [minute, setMinute] = useState<string>("00");
   const [tourId, setTourId] = useState<string>("none");
+  /** Begrunnelse når kredittstopp overstyres. */
+  const [creditOverrideReason, setCreditOverrideReason] = useState<string | null>(null);
   const [distribution, setDistribution] = useState<"delivery" | "pickup">("delivery");
   const [source, setSource] = useState<"phone" | "email" | "in_store" | "manual">("phone");
   const [sendSms, setSendSms] = useState(false);
@@ -488,7 +492,7 @@ export function CustomerOrderModal({
           mva_rate: Number(p.mva_rate ?? 0),
           status: p.status,
           is_for_sale: p.is_for_sale,
-          is_divisible: p.is_divisible,
+          is_divisible: p.is_divisible ?? false,
         });
       }
       const drafts: LineDraft[] = [];
@@ -681,6 +685,21 @@ export function CustomerOrderModal({
       toast.error("Legg til minst én linje med produkt og mengde");
       return null;
     }
+    const customerContext = evaluateCustomerContext({
+      creditHold: customer.credit_hold === true,
+      creditHoldReason: customer.credit_hold_reason,
+      creditOverrideReason,
+      canOverrideCreditHold: hasOrdreWrite,
+      status: customer.status,
+    });
+    if (customerContext.blocked) {
+      toast.error(
+        hasOrdreWrite
+          ? `${customerContext.blockMessage} Begrunn overstyringen i kundekontekst-panelet.`
+          : `${customerContext.blockMessage} Kontakt ordrekontoret.`,
+      );
+      return null;
+    }
     if (rulesPreview.blocks.length > 0 && !overrideReason) {
       toast.error(
         `Kan ikke lagre — bryter leveringsregel: ${rulesPreview.blocks[0].message}`,
@@ -723,7 +742,11 @@ export function CustomerOrderModal({
       sendSms,
       sendEmail,
       isPaid,
-      ruleOverrideReason: overrideReason,
+      // Kundeordre-RPC-en har ikke eget notatfelt — kredittstopp-begrunnelsen
+      // følger derfor overstyringsteksten på ordren.
+      ruleOverrideReason: creditOverrideReason
+        ? withCreditOverrideNote(overrideReason ?? "", creditOverrideReason)
+        : overrideReason,
       lines: inputLines,
     };
 
@@ -949,6 +972,16 @@ export function CustomerOrderModal({
               )}
             </DialogDescription>
           </DialogHeader>
+
+          <CustomerContextPanel
+            customer={customer}
+            deliveryDate={deliveryDate || null}
+            tourId={tourId === "none" ? null : tourId}
+            canOverrideCreditHold={hasOrdreWrite}
+            creditOverrideReason={creditOverrideReason}
+            onCreditOverrideChange={setCreditOverrideReason}
+            className="mt-2"
+          />
 
           {isEdit && loadingExisting ? (
             <div className="grid place-items-center py-12">

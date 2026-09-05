@@ -6,6 +6,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { QueryState } from "@/components/common/QueryState";
 import { useNBCustomers, type CustomerOption } from "@/ordre/hooks/useNBCustomers";
 import { useDebouncedValue } from "@/ordre/hooks/useDebouncedValue";
+import { customerStatusLabel } from "@/ordre/lib/customerContext";
 
 export type CustomerComboboxProps = {
   value: CustomerOption | null;
@@ -26,7 +27,9 @@ export function CustomerCombobox({
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const debouncedQ = useDebouncedValue(q, 250);
-  const { data: customers, isLoading, isError, error, refetch } = useNBCustomers(debouncedQ);
+  const { data: customers, isLoading, isError, error, refetch } = useNBCustomers(debouncedQ, {
+    includeInactive: true,
+  });
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -64,18 +67,27 @@ export function CustomerCombobox({
             skeletonRows={4}
             skeletonRowClassName="h-9"
           >
-            {(customers ?? []).map((c) => (
+            {(customers ?? []).map((c) => {
+              const inactive = c.status !== "active";
+              return (
               <button
                 key={c.id}
                 type="button"
-                className="flex w-full items-start gap-2 border-b border-border px-3 py-2 text-left text-sm hover:bg-accent"
+                className={`flex w-full items-start gap-2 border-b border-border px-3 py-2 text-left text-sm hover:bg-accent ${inactive ? "opacity-60" : ""}`}
                 onClick={() => {
                   onSelect(c);
                   setOpen(false);
                 }}
               >
                 <div className="flex-1">
-                  <div className="font-medium">{c.display_name}</div>
+                  <div className="flex items-center gap-2 font-medium">
+                    {c.display_name}
+                    {inactive && (
+                      <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] font-normal text-muted-foreground">
+                        {customerStatusLabel(c.status)}
+                      </span>
+                    )}
+                  </div>
                   <div className="text-xs text-muted-foreground">
                     {c.customer_number}
                     {c.organization_number ? ` · ${c.organization_number}` : ""}
@@ -83,7 +95,8 @@ export function CustomerCombobox({
                 </div>
                 {value?.id === c.id && <Check className="h-4 w-4 text-primary" />}
               </button>
-            ))}
+              );
+            })}
           </QueryState>
         </div>
       </PopoverContent>

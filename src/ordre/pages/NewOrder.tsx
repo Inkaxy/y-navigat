@@ -18,6 +18,11 @@ import { tomorrow, todayISO, formatNOK } from "@/ordre/lib/format";
 import { type CustomerOption } from "@/ordre/hooks/useNBCustomers";
 import { fetchEffectivePrice, type ProductOption } from "@/ordre/hooks/useNBProducts";
 import { CustomerCombobox } from "@/ordre/components/orders/CustomerCombobox";
+import { CustomerContextPanel } from "@/ordre/components/orders/CustomerContextPanel";
+import {
+  evaluateCustomerContext,
+  withCreditOverrideNote,
+} from "@/ordre/lib/customerContext";
 import { ProductSearchInput } from "@/ordre/components/orders/ProductSearchInput";
 import { PriceSourceBadge } from "@/ordre/components/orders/PriceSourceBadge";
 import { ZeroPriceConfirmDialog } from "@/ordre/components/orders/ZeroPriceConfirmDialog";
@@ -34,7 +39,7 @@ import {
   withPriceOverrideNote,
 } from "@/ordre/lib/orderLines";
 import { logAudit } from "@/ordre/lib/audit";
-import { persistAppError } from "@/lib/errorLog";
+import { logAppError } from "@/lib/errorLog";
 import { logTicketEvent } from "@/ordre/lib/ticketEvents";
 import { TourPicker } from "@/ordre/components/orders/TourPicker";
 import { CopyFromPreviousOrderDialog } from "@/ordre/components/orders/CopyFromPreviousOrderDialog";
@@ -90,6 +95,8 @@ export default function NewOrder() {
   const [ticketAi, setTicketAi] = useState<AiSuggestion | null>(null);
   const [ticketBodyText, setTicketBodyText] = useState<string | null>(null);
   const [qaOverride, setQaOverride] = useState(false);
+  /** Begrunnelse når kredittstopp overstyres — lagres i ordrens interne notat. */
+  const [creditOverrideReason, setCreditOverrideReason] = useState<string | null>(null);
 
   // Pre-velg kunde fra URL-param ved første render
   useEffect(() => {
@@ -98,7 +105,7 @@ export default function NewOrder() {
     (async () => {
       const { data } = await supabase
         .from("customers")
-        .select("id, customer_number, display_name, organization_number, primary_contact_name, primary_contact_email, invoice_recipient_customer_id, delivery_address_line1, delivery_address_line2, delivery_postal_code, delivery_city, delivery_country, delivery_instructions, custom_reference, enforce_custom_reference, default_price_list_id")
+        .select("id, customer_number, display_name, organization_number, primary_contact_name, primary_contact_email, invoice_recipient_customer_id, delivery_address_line1, delivery_address_line2, delivery_postal_code, delivery_city, delivery_country, delivery_instructions, custom_reference, enforce_custom_reference, default_price_list_id, credit_hold, credit_hold_reason, status, credit_days, notes")
         .eq("id", prefilledCustomerId)
         .maybeSingle();
       if (cancelled || !data) return;
@@ -148,14 +155,14 @@ export default function NewOrder() {
         if (aiCustomerId) {
           const { data: c } = await supabase
             .from("customers")
-            .select("id, customer_number, display_name, organization_number, primary_contact_name, primary_contact_email, invoice_recipient_customer_id, delivery_address_line1, delivery_address_line2, delivery_postal_code, delivery_city, delivery_country, delivery_instructions, custom_reference, enforce_custom_reference, default_price_list_id")
+            .select("id, customer_number, display_name, organization_number, primary_contact_name, primary_contact_email, invoice_recipient_customer_id, delivery_address_line1, delivery_address_line2, delivery_postal_code, delivery_city, delivery_country, delivery_instructions, custom_reference, enforce_custom_reference, default_price_list_id, credit_hold, credit_hold_reason, status, credit_days, notes")
             .eq("id", aiCustomerId).maybeSingle();
           if (c) pickedCustomer = c as unknown as CustomerOption;
         }
         if (!pickedCustomer && t.sender_email) {
           const { data: c } = await supabase
             .from("customers")
-            .select("id, customer_number, display_name, organization_number, primary_contact_name, primary_contact_email, invoice_recipient_customer_id, delivery_address_line1, delivery_address_line2, delivery_postal_code, delivery_city, delivery_country, delivery_instructions, custom_reference, enforce_custom_reference, default_price_list_id")
+            .select("id, customer_number, display_name, organization_number, primary_contact_name, primary_contact_email, invoice_recipient_customer_id, delivery_address_line1, delivery_address_line2, delivery_postal_code, delivery_city, delivery_country, delivery_instructions, custom_reference, enforce_custom_reference, default_price_list_id, credit_hold, credit_hold_reason, status, credit_days, notes")
             .ilike("primary_contact_email", t.sender_email)
             .maybeSingle();
           if (c) pickedCustomer = c as unknown as CustomerOption;
@@ -346,6 +353,7 @@ export default function NewOrder() {
 
   // Når kunde endres: pre-fyll adresse + håndter kunde-referanse
   useEffect(() => {
+    setCreditOverrideReason(null);
     if (customer) {
       setDelAddr({
         line1: customer.delivery_address_line1 ?? "",
@@ -399,7 +407,7 @@ export default function NewOrder() {
             };
           } catch (err) {
             // Feil skjules ikke: operatøren må vite at prisen ikke ble oppdatert.
-            persistAppError(err, { scope: "ordre:ny-ordre:reprising" });
+            logAppError(err, { scope: "ordre:ny-ordre:reprising" });
             failed.push(l.product.display_name);
             return null;
           }
@@ -465,7 +473,7 @@ export default function NewOrder() {
           caller: "new_order_form",
         });
       } catch (err) {
-        persistAppError(err, { scope: "ordre:ny-ordre:pris" });
+        logAppError(err, { scope: "ordre:ny-ordre:pris" });
         toast.error(`Fant ikke pris for ${p.display_name}. Legg inn pris manuelt.`);
       }
     }
@@ -612,7 +620,7 @@ export default function NewOrder() {
                 effective_price: ep.price,
               };
             } catch (err) {
-              persistAppError(err, { scope: "ordre:ny-ordre:kopier-priser" });
+              logAppError(err, { scope: "ordre:ny-ordre:kopier-priser" });
               return l;
             }
           }),
@@ -698,6 +706,22 @@ export default function NewOrder() {
       toast.error(`Mengde for "${badQty.product?.display_name}" må være et helt tall`);
       return;
     }
+    const customerContext = evaluateCustomerContext({
+      creditHold: customer.credit_hold === true,
+      creditHoldReason: customer.credit_hold_reason,
+      creditOverrideReason,
+      canOverrideCreditHold: hasOrdreWrite,
+      status: customer.status,
+    });
+    if (customerContext.blocked) {
+      toast.error(
+        hasOrdreWrite
+          ? `${customerContext.blockMessage} Begrunn overstyringen i kundekontekst-panelet.`
+          : `${customerContext.blockMessage} Kontakt ordrekontoret.`,
+      );
+      return;
+    }
+
     // QA: blokkér på røde sjekker med mindre brukeren har bekreftet override
     if (qaSummary.severity === "red" && !qaOverride) {
       toast.error("Kvalitetssikring: røde punkter må løses (eller bekreft override)");
@@ -768,7 +792,10 @@ export default function NewOrder() {
           delivery_country: useCustomerAddress ? customer.delivery_country : delAddr.country || "NO",
           delivery_instructions: deliveryInstructions || null,
           use_customer_default_address: useCustomerAddress,
-          internal_notes: internalNotes?.trim() || null,
+          internal_notes:
+            (creditOverrideReason
+              ? withCreditOverrideNote(internalNotes ?? "", creditOverrideReason)
+              : internalNotes?.trim()) || null,
           rule_override_reason: overrideReason,
           production_notes: productionNotes.trim() || null,
           store_notes: storeNotes.trim() || null,
@@ -966,11 +993,6 @@ export default function NewOrder() {
                       </div>
                     )}
                   </div>
-                  {customer.credit_hold && (
-                    <span className="inline-flex items-center gap-1 rounded bg-destructive/10 px-2 py-1 text-xs font-medium text-destructive">
-                      <AlertTriangle className="h-3 w-3" /> Kredittstopp
-                    </span>
-                  )}
                 </div>
                 {customer.invoice_recipient_customer_id && (
                   <div className="mt-2 text-xs text-muted-foreground">
@@ -981,6 +1003,17 @@ export default function NewOrder() {
             )}
           </CardContent>
         </Card>
+
+        {customer && (
+          <CustomerContextPanel
+            customer={customer}
+            deliveryDate={deliveryDate || null}
+            tourId={manualTourId}
+            canOverrideCreditHold={hasOrdreWrite}
+            creditOverrideReason={creditOverrideReason}
+            onCreditOverrideChange={setCreditOverrideReason}
+          />
+        )}
 
         {/* 6.2 Dublett-advarsel */}
         {customer && deliveryDate && duplicates.length > 0 && (
