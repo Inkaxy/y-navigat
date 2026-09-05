@@ -2489,12 +2489,15 @@ function MatrixGrid({
             >
               Dagsum (antall)
             </th>
-            {columns.map((c) => {
-              const colKey = `${c.date}|${c.tour.id}`;
+            {renderCols.map((rc) => {
+              const colKey = rc.kind === "tour" ? colKeyOf(rc.date, rc.tour.id) : `${rc.date}|`;
               return (
                 <td
-                  key={colKey}
-                  className="border-b border-r border-border px-1 py-1.5 text-right text-xs tabular-nums text-muted-foreground"
+                  key={rc.kind === "tour" ? colKey : `${rc.date}-notour-qty`}
+                  className={cn(
+                    "border-b border-r border-border px-1 py-1.5 text-right text-xs tabular-nums text-muted-foreground",
+                    rc.kind === "notour" && "bg-muted/50",
+                  )}
                 >
                   {qtySums.cols[colKey] || ""}
                 </td>
@@ -2515,8 +2518,19 @@ function MatrixGrid({
             >
               Sum kr
             </th>
-            {columns.map((c) => {
-              const colKey = `${c.date}|${c.tour.id}`;
+            {renderCols.map((rc) => {
+              if (rc.kind === "notour") {
+                return (
+                  <td
+                    key={`${rc.date}-notour-sum`}
+                    className="border-b border-r border-border bg-muted px-1 py-2 text-right text-xs tabular-nums text-muted-foreground"
+                    title="Linjer uten tur telles ikke med i totalsummen"
+                  >
+                    —
+                  </td>
+                );
+              }
+              const colKey = colKeyOf(rc.date, rc.tour.id);
               return (
                 <td
                   key={colKey}
