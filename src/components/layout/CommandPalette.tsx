@@ -100,7 +100,7 @@ export function CommandPalette({ open, onOpenChange }: Props) {
           />
           <Command.List className="max-h-[420px] overflow-y-auto p-1">
             <Command.Empty className="px-[18px] py-6 text-sm text-ink-tertiary">
-              {isSearching ? "Søker …" : "Ingen treff."}
+              {isSearching ? "Søker …" : null}
             </Command.Empty>
 
             {isSearching && groups.length === 0 && (

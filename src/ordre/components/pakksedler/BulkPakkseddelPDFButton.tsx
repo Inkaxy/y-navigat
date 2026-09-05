@@ -115,9 +115,10 @@ export function BulkPakkseddelPDFButton({
             ? "alle"
             : slugify(data.scope_label);
 
+      // Bitene bygges hver for seg (minne), men slås til slutt sammen til ÉN fil.
+      const parts: ArrayBuffer[] = [];
       let done = 0;
-      for (let i = 0; i < chunks.length; i += 1) {
-        const chunk = chunks[i];
+      for (const chunk of chunks) {
         const fromNo = done + 1;
         const toNo = done + chunk.total_notes;
         setProgress(chunks.length > 1 ? `Genererer ${fromNo}–${toNo} av ${total}…` : null);
@@ -135,25 +136,44 @@ export function BulkPakkseddelPDFButton({
           toast.error("Kunne ikke generere PDF: tomt resultat");
           return;
         }
-
-        const part = chunks.length > 1 ? `_del${i + 1}av${chunks.length}` : "";
-        const fileName = `Pakksedler_${data.delivery_date}_${tourSlug}${part}.pdf`;
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = fileName;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        parts.push(await blob.arrayBuffer());
         done = toNo;
       }
 
-      toast.success(
-        chunks.length > 1
-          ? `${total} pakksedler lastet ned i ${chunks.length} filer`
-          : `PDF lastet ned (${total} pakksedler)`,
-      );
+      setProgress(chunks.length > 1 ? "Setter sammen filen…" : null);
+      let finalBlob: Blob;
+      if (parts.length === 1) {
+        finalBlob = new Blob([parts[0]], { type: "application/pdf" });
+      } else {
+        try {
+          const { PDFDocument } = await import("pdf-lib");
+          const merged = await PDFDocument.create();
+          for (const part of parts) {
+            const src = await PDFDocument.load(part);
+            const pages = await merged.copyPages(src, src.getPageIndices());
+            for (const p of pages) merged.addPage(p);
+          }
+          const bytes = await merged.save();
+          finalBlob = new Blob([bytes as unknown as BlobPart], { type: "application/pdf" });
+        } catch (mergeErr) {
+          console.error("[BulkPDF] Sammenslåing feilet:", mergeErr);
+          toast.error(`Kunne ikke sette sammen PDF-en: ${errMsg(mergeErr)}`);
+          return;
+        }
+      }
+
+      const fileName = `Pakksedler_${data.delivery_date}_${tourSlug}.pdf`;
+      const url = URL.createObjectURL(finalBlob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+      toast.success(`PDF lastet ned (${total} pakksedler)`);
+
     } catch (err) {
       console.error("[BulkPDF] Uventet feil:", err);
       toast.error(`Kunne ikke generere PDF: ${errMsg(err)}`);

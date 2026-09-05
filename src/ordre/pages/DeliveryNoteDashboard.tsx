@@ -45,6 +45,8 @@ import { usePendingReturnsCount } from "@/ordre/hooks/useReturnDeliveryNotes";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { logAudit } from "@/ordre/lib/audit";
+import { fetchAllRows } from "@/lib/supabasePaging";
+import { correctionFromDate, PRODUCTION_SCOPE_STATUSES } from "@/ordre/lib/pendingOrders";
 
 // HANDLING_ITEMS bygges nå dynamisk inni komponenten — for å støtte tilstand-aware
 // handlinger (Tilleggkjøring/Korreksjonskjøring krever at hovedkjøring er kjørt).
@@ -218,16 +220,27 @@ export default function DeliveryNoteDashboard() {
       // Hent unike leveringsdatoer for pending datert/retur t.o.m. valgt dato,
       // og kjør hovedkjøring sekvensielt per dato.
       try {
-        let q = supabase
-          .from("orders")
-          .select("delivery_date")
-          .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
-          .lte("delivery_date", date)
-          .in("order_kind", ["dated", "extra", "return"]);
-        if (tourId === NULL_TOUR_KEY) q = q.is("delivery_tour_id", null);
-        else if (tourId !== "all") q = q.eq("delivery_tour_id", tourId);
-        const { data: dateRows, error: dateErr } = await q;
-        if (dateErr) throw dateErr;
+        // Samme regel som korreksjonsmodus ellers: 60 dager bakover,
+        // produksjonsscope og ingen returer. Paginert for å få med alt.
+        const dateRows = await fetchAllRows<{ delivery_date: string }>((from, to) => {
+          let q = supabase
+            .from("orders")
+            .select("delivery_date")
+            .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
+            .gte("delivery_date", correctionFromDate(date))
+            .lte("delivery_date", date)
+            .eq("is_return", false)
+            .in("status", PRODUCTION_SCOPE_STATUSES as unknown as string[])
+            .order("delivery_date", { ascending: true })
+            .range(from, to);
+          if (tourId === NULL_TOUR_KEY) q = q.is("delivery_tour_id", null);
+          else if (tourId !== "all") q = q.eq("delivery_tour_id", tourId);
+          return q as unknown as PromiseLike<{
+            data: Array<{ delivery_date: string }> | null;
+            error: { message: string } | null;
+          }>;
+        });
+
         const uniqueDates = Array.from(
           new Set(((dateRows ?? []) as Array<{ delivery_date: string }>).map((r) => r.delivery_date)),
         ).sort();
@@ -315,7 +328,7 @@ export default function DeliveryNoteDashboard() {
       }
       toast.success(`Angring fullført — ${parts.join(", ")}.`);
       await logAudit({
-        action: "undo_delivery_runs",
+        action: "undo",
         entity_type: "delivery_note_run",
         entity_id: null,
         entity_display_reference: `${date} · ${tourFilter ? `tur ${tourFilter[0]}` : "alle turer"}`,
@@ -577,48 +590,69 @@ export default function DeliveryNoteDashboard() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-64">
+                <TooltipProvider delayDuration={200}>
                 <DropdownMenuItem
                   disabled={!canRunMain}
                   onSelect={() => setConfirmOpen(true)}
                 >
                   Hovedkjøring
                 </DropdownMenuItem>
-                <DropdownMenuItem
-                  disabled={!mainCompletedInScope || generate.isPending}
-                  title={
-                    !mainCompletedInScope
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="block">
+                      <DropdownMenuItem
+                        disabled={!mainCompletedInScope || generate.isPending}
+                        onSelect={() => runTilleggkjoring()}
+                      >
+                        Tilleggkjøring
+                      </DropdownMenuItem>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="left" className="max-w-xs">
+                    {!mainCompletedInScope
                       ? "Krever at hovedkjøring er kjørt for valgt dato/tur"
-                      : undefined
-                  }
-                  onSelect={() => runTilleggkjoring()}
-                >
-                  Tilleggkjøring
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  disabled={!mainCompletedInScope || generate.isPending || isPastDate}
-                  title={
-                    !mainCompletedInScope
+                      : "Generer pakksedler for ordre som har kommet til etter hovedkjøringen"}
+                  </TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="block">
+                      <DropdownMenuItem
+                        disabled={!mainCompletedInScope || generate.isPending || isPastDate}
+                        onSelect={() => setConfirmCorrectionOpen(true)}
+                      >
+                        Korreksjonskjøring
+                      </DropdownMenuItem>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="left" className="max-w-xs">
+                    {!mainCompletedInScope
                       ? "Krever at hovedkjøring er kjørt for valgt dato/tur"
                       : isPastDate
                         ? "Korreksjonskjøring er ikke tillatt for passerte leveringsdatoer — bruk korreksjonsmodus eller tilleggkjøring"
-                        : undefined
-                  }
-                  onSelect={() => setConfirmCorrectionOpen(true)}
-                >
-                  Korreksjonskjøring
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  disabled={!mainCompletedInScope || undoRuns.isPending || generate.isPending}
-                  title={
-                    !mainCompletedInScope
+                        : "Bygg pakksedlene på nytt for valgt dato/tur"}
+                  </TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="block">
+                      <DropdownMenuItem
+                        disabled={!mainCompletedInScope || undoRuns.isPending || generate.isPending}
+                        onSelect={() => setConfirmUndoOpen(true)}
+                        className="text-destructive focus:text-destructive"
+                      >
+                        Angre kjøring
+                      </DropdownMenuItem>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="left" className="max-w-xs">
+                    {!mainCompletedInScope
                       ? "Ingen kjøring å angre for valgt dato/tur"
-                      : "Slett pakksedler og angre kjøringen for valgt dato/tur"
-                  }
-                  onSelect={() => setConfirmUndoOpen(true)}
-                  className="text-destructive focus:text-destructive"
-                >
-                  Angre kjøring
-                </DropdownMenuItem>
+                      : "Slett pakksedler og angre kjøringen for valgt dato/tur"}
+                  </TooltipContent>
+                </Tooltip>
+                </TooltipProvider>
+
 
                 <DropdownMenuSeparator />
                 <DropdownMenuItem

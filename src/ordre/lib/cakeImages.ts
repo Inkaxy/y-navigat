@@ -350,15 +350,15 @@ export async function attachTicketCakeImagesToOrder(input: {
   order_id: string;
   order_number?: string | null;
   delivery_date: string;
-}): Promise<number> {
+}): Promise<{ updated: number; skipped: number }> {
   const { data, error } = await supabase
     .from("cake_images")
     .select("id")
     .eq("ticket_id", input.ticket_id)
     .is("order_id", null);
-  if (error) return 0;
+  if (error) return { updated: 0, skipped: 0 };
   const rows = (data ?? []) as { id: string }[];
-  if (rows.length === 0) return 0;
+  if (rows.length === 0) return { updated: 0, skipped: 0 };
 
   const cakeLine = await findCakeLineForOrder(input.order_id).catch(() => null);
   let availableUnits: LabelUnitCandidate[] = [];
@@ -393,13 +393,17 @@ export async function attachTicketCakeImagesToOrder(input: {
         );
     }
   }
-  if (cakeLine?.has_label_product && availableUnits.length < rows.length) {
-    throw new Error("Alle etiketter på linjen har allerede bilde");
-  }
+  // Færre ledige etiketter enn bilder: koble dem som får enhet, og rapporter resten.
+  const needsUnit = !!cakeLine?.has_label_product;
+  let skipped = 0;
 
   let updated = 0;
   for (const [index, row] of rows.entries()) {
     const unit = availableUnits[index] ?? null;
+    if (needsUnit && !unit) {
+      skipped++;
+      continue;
+    }
     const { error: updateError } = await supabase
       .from("cake_images")
       .update({
@@ -415,7 +419,7 @@ export async function attachTicketCakeImagesToOrder(input: {
     if (updateError) throw updateError;
     updated++;
   }
-  return updated;
+  return { updated, skipped };
 }
 
 
