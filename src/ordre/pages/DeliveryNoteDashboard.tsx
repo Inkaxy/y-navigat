@@ -217,7 +217,7 @@ export default function DeliveryNoteDashboard() {
       tourId === "all" || tourId === NULL_TOUR_KEY ? null : [tourId];
 
     if (mode === "correction") {
-      // Hent unike leveringsdatoer for pending datert/retur t.o.m. valgt dato,
+      // Hent unike leveringsdatoer i produksjonsscope (uten returer) t.o.m. valgt dato,
       // og kjør hovedkjøring sekvensielt per dato.
       try {
         // Samme regel som korreksjonsmodus ellers: 60 dager bakover,
@@ -590,7 +590,6 @@ export default function DeliveryNoteDashboard() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-64">
-                <TooltipProvider delayDuration={200}>
                 <DropdownMenuItem
                   disabled={!canRunMain}
                   onSelect={() => setConfirmOpen(true)}
@@ -651,7 +650,6 @@ export default function DeliveryNoteDashboard() {
                       : "Slett pakksedler og angre kjøringen for valgt dato/tur"}
                   </TooltipContent>
                 </Tooltip>
-                </TooltipProvider>
 
 
                 <DropdownMenuSeparator />
@@ -668,12 +666,22 @@ export default function DeliveryNoteDashboard() {
                     />
                   </div>
                 </DropdownMenuItem>
-                <DropdownMenuItem disabled title="Kommer senere">
-                  Send alle på epost
-                </DropdownMenuItem>
-                <DropdownMenuItem disabled title="Kommer senere">
-                  Skriv ut kundeordrer
-                </DropdownMenuItem>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="block">
+                      <DropdownMenuItem disabled>Send alle på epost</DropdownMenuItem>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="left">Kommer senere</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="block">
+                      <DropdownMenuItem disabled>Skriv ut kundeordrer</DropdownMenuItem>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="left">Kommer senere</TooltipContent>
+                </Tooltip>
                 <DropdownMenuItem
                   onSelect={() => navigate(`/ordre/pakksedler/korrigeringer?date=${date}`)}
                 >
@@ -681,18 +689,28 @@ export default function DeliveryNoteDashboard() {
                 </DropdownMenuItem>
 
                 <DropdownMenuSeparator />
-                <DropdownMenuItem disabled title="Kommer senere">
-                  Kalkulere priser på nytt
-                </DropdownMenuItem>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="block">
+                      <DropdownMenuItem disabled>Kalkulere priser på nytt</DropdownMenuItem>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="left">Kommer senere</TooltipContent>
+                </Tooltip>
                 <DropdownMenuItem onSelect={() => navigate("/ordre/pakksedler/innstillinger")}>
                   Innstillinger
                 </DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => navigate("/ordre/turer")}>
                   Turnavn
                 </DropdownMenuItem>
-                <DropdownMenuItem disabled title="Kommer senere">
-                  Automatisk kjøring
-                </DropdownMenuItem>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="block">
+                      <DropdownMenuItem disabled>Automatisk kjøring</DropdownMenuItem>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="left">Kommer senere</TooltipContent>
+                </Tooltip>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
