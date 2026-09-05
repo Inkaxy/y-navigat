@@ -39,7 +39,6 @@ export type CakeImage = {
   source_height_px?: number | null;
   effective_dpi?: number | null;
   quality_flag?: "god" | "akseptabel" | "lav" | "ukjent" | null;
-  require_label_unit?: boolean;
   quality_ack_by?: string | null;
   quality_ack_at?: string | null;
   rights_cleared?: boolean | null;
@@ -187,6 +186,7 @@ export async function createCakeImage(input: {
   source_height_px?: number | null;
   effective_dpi?: number | null;
   quality_flag?: "god" | "akseptabel" | "lav" | "ukjent" | null;
+  require_label_unit?: boolean;
 }): Promise<CakeImage> {
   const { data: u } = await supabase.auth.getUser();
 
@@ -203,11 +203,12 @@ export async function createCakeImage(input: {
       if (unit) {
         labelUnitId = unit.id;
         labelNumber = String(unit.number);
-      } else if (input.require_label_unit) {
-        throw new Error("Alle etiketter på linjen har allerede bilde");
       }
     } catch (err) {
       console.warn("[cake_images] Kunne ikke koble til etikett-enhet", err);
+    }
+    if (input.require_label_unit && !labelUnitId) {
+      throw new Error("Alle etiketter på linjen har allerede bilde");
     }
   }
 
