@@ -289,9 +289,11 @@ export default function MatrixPage() {
   }, [dateFrom, dateTo]);
 
   function setDaysCount(n: number) {
-    const clamped = Math.max(1, Math.min(31, n));
-    setDateTo(addDays(dateFrom, clamped - 1));
-    setQuickFilter(null);
+    guardAction(() => {
+      const clamped = Math.max(1, Math.min(31, n));
+      setDateTo(addDays(dateFrom, clamped - 1));
+      setQuickFilter(null);
+    });
   }
 
   // Merknad dialog state
