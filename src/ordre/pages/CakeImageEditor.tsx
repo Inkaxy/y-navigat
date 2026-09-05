@@ -91,6 +91,7 @@ import {
 import { useCakePrinterSelection } from "@/ordre/hooks/useCakeCalibration";
 import { useCakePrintFlow } from "@/ordre/hooks/useCakePrintFlow";
 import { fetchCakeLineDetails } from "@/ordre/lib/cakeImages";
+import { evaluatePrintGate } from "@/ordre/lib/cakePrintGate";
 import { withResolvedLabelNumbers } from "@/ordre/lib/labelNumber";
 import { CakePrintHistory } from "@/ordre/components/cake-images/CakePrintHistory";
 import { showError } from "@/lib/userError";
