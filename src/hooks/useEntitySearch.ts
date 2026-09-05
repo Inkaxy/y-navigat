@@ -6,6 +6,7 @@ import {
   MIN_SEARCH_LENGTH,
   buildIlikeOr,
   isNumericTerm,
+  parseTicketPrefix,
   parseTicketRef,
   sanitizeSearchTerm,
   type EntityHit,
@@ -20,6 +21,7 @@ export function useEntitySearch(rawTerm: string) {
   const entityId = company?.id ?? null;
   const term = sanitizeSearchTerm(rawTerm);
   const ticketRef = parseTicketRef(rawTerm);
+  const ticketPrefix = parseTicketPrefix(rawTerm);
   const numeric = isNumericTerm(term);
   const enabled = (term.length >= MIN_SEARCH_LENGTH || !!ticketRef) && !!entityId;
 
@@ -118,7 +120,7 @@ export function useEntitySearch(rawTerm: string) {
         .from("products")
         .select("id, display_name, display_number")
         .eq("legal_entity_id", entityId!)
-        .or(buildIlikeOr(["display_name", "display_number"], term))
+        .ilike("display_name", `%${term}%`)
         .limit(MAX_HITS_PER_GROUP);
       if (fb.error) throw fb.error;
       return (fb.data ?? []).map((p) => ({
@@ -131,7 +133,7 @@ export function useEntitySearch(rawTerm: string) {
   });
 
   const tickets = useQuery({
-    queryKey: ["entity-search", "tickets", entityId, term, ticketRef],
+    queryKey: ["entity-search", "tickets", entityId, term, ticketRef, ticketPrefix],
     enabled,
     staleTime: 30_000,
     queryFn: async (): Promise<EntityHit[]> => {
@@ -153,10 +155,14 @@ export function useEntitySearch(rawTerm: string) {
           },
         ];
       }
+      // Kort saksreferanse («T-1a2b»): prefikssøk på id.
+      const orFilter = ticketPrefix
+        ? `id.ilike.${ticketPrefix}%,${buildIlikeOr(["subject", "sender_email", "sender_name"], term)}`
+        : buildIlikeOr(["subject", "sender_email", "sender_name"], term);
       const { data, error } = await supabase
         .from("tickets")
         .select("id, subject, sender_email, sender_name, received_at")
-        .or(buildIlikeOr(["subject", "sender_email", "sender_name"], term))
+        .or(orFilter)
         .order("received_at", { ascending: false })
         .limit(MAX_HITS_PER_GROUP);
       if (error) throw error;

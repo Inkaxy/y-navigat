@@ -35,6 +35,16 @@ export function parseTicketRef(raw: string): string | null {
   return UUID_RE.test(t) ? t.toLowerCase() : null;
 }
 
+/**
+ * Kort saksreferanse: de første tegnene av UUID-en, slik den vises som «T-1a2b».
+ * Brukes til prefikssøk på `tickets.id::text`.
+ */
+export function parseTicketPrefix(raw: string): string | null {
+  const t = raw.trim().replace(/^[#tT]-?/, "").trim();
+  if (UUID_RE.test(t)) return null;
+  return /^[0-9a-f]{2,8}$/i.test(t) ? t.toLowerCase() : null;
+}
+
 /** Er søket bare siffer? Da er det trolig et ordre-, kunde- eller varenummer. */
 export function isNumericTerm(raw: string): boolean {
   return /^\d+$/.test(raw.trim());
