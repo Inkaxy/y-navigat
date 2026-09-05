@@ -9,7 +9,7 @@ import {
   ShieldAlert,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { useEffectivePriceList } from "@/kunder/hooks/useEffectivePriceList";
+import { useEffectivePriceList, effectivePriceListSourceLabel } from "@/kunder/hooks/useEffectivePriceList";
 import { todayOslo } from "@/lib/osloDate";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -139,7 +139,7 @@ export function CustomerContextPanel({
   // 2) Effektiv prisliste — samme kilde som kundekortet.
   const priceList = useEffectivePriceList(
     customerId,
-    customer.price_list_id ?? null,
+    customer.default_price_list_id ?? null,
     null,
   );
 
@@ -326,7 +326,15 @@ export function CustomerContextPanel({
                 skeletonRowClassName="h-5"
               >
                 <div className="text-muted-foreground">
-                  <div>Prisliste: {priceList.data ?? "Standard"}</div>
+                  <div>
+                    Prisliste: {priceList.data?.display_name ?? "Standard"}
+                    {priceList.data ? (
+                      <span className="text-muted-foreground">
+                        {" "}
+                        ({effectivePriceListSourceLabel(priceList.data.source)})
+                      </span>
+                    ) : null}
+                  </div>
                   {typeof customer.credit_days === "number" && (
                     <div>Betalingsvilkår: {customer.credit_days} dager</div>
                   )}
