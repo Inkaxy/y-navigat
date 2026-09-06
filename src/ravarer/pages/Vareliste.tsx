@@ -15,6 +15,7 @@ import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { useDeclarationWorklist } from "@/ravarer/hooks/useDeclarationNames";
 import { ItemTypeBadge } from "@/ravarer/components/ItemTypeBadge";
 import { CategorySelectItems } from "@/ravarer/components/CategorySelectItems";
+import { QueryState } from "@/components/common/QueryState";
 
 type SortKey = "name" | "volume_12m";
 
@@ -26,7 +27,7 @@ export default function VarelistePage() {
     () => new Set((declWorklist ?? []).map((d) => d.raw_material_id)),
     [declWorklist],
   );
-  const { data: rows = [], isLoading } = useRawMaterials();
+  const { data: rows = [], isLoading, isError, error, refetch } = useRawMaterials();
   const { data: suppliers = [] } = useSuppliers();
   const { data: statsMap } = useAllRawMaterialPurchaseStats();
   const [open, setOpen] = useState(false);
@@ -121,10 +122,21 @@ export default function VarelistePage() {
       </Card>
 
       <Card className="overflow-hidden">
-        {isLoading ? (
-          <div className="flex items-center justify-center p-12 text-ink-secondary">
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Laster…
-          </div>
+        {isLoading || isError ? (
+          <QueryState
+            isLoading={isLoading}
+            isError={isError}
+            error={error}
+            onRetry={() => void refetch()}
+            scope="varelisten"
+            loadingFallback={
+              <div className="flex items-center justify-center p-12 text-ink-secondary">
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Laster…
+              </div>
+            }
+          >
+            {null}
+          </QueryState>
         ) : rows.length === 0 ? (
           <div className="flex flex-col items-center justify-center p-12 text-center">
             <Package className="mb-3 h-10 w-10 text-ink-secondary" />
