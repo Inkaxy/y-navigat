@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
@@ -12,6 +12,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { InvoiceDocumentPanel } from "@/fakturaer/components/InvoiceDocumentPanel";
 import { InvoiceDocumentButton } from "@/fakturaer/components/InvoiceDocumentButton";
 import { toast } from "sonner";
+import { showError } from "@/lib/userError";
 import { supabase } from "@/integrations/supabase/client";
 import { FakturaerHeaderBanner } from "@/fakturaer/components/FakturaerHeaderBanner";
 import { InvoiceStatusBadge } from "@/fakturaer/components/InvoiceStatusBadge";
@@ -161,8 +162,8 @@ export default function InvoiceDetailPage() {
       if (error) throw error;
       toast.success("Auto-match kjørt på nytt");
       qc.invalidateQueries({ queryKey: ["invoice", id] });
-    } catch (e: any) {
-      toast.error(e.message ?? "Kunne ikke kjøre auto-match");
+    } catch (e: unknown) {
+      showError("faktura-automatch", e, "Kunne ikke kjøre auto-match");
     } finally {
       setRematching(false);
     }
@@ -178,8 +179,8 @@ export default function InvoiceDetailPage() {
       if ((res as any)?.feilet > 0) toast.error("Kunne ikke hente linjer fra PDF");
       else toast.success("Linjer hentet fra PDF");
       qc.invalidateQueries({ queryKey: ["invoice", id] });
-    } catch (e: any) {
-      toast.error(e.message ?? "Kunne ikke hente linjer");
+    } catch (e: unknown) {
+      showError("faktura-hent-linjer", e, "Kunne ikke hente linjer");
     } finally {
       setFetchingLines(false);
     }

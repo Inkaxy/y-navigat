@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { showError } from "@/lib/userError";
 import { RavarerHeaderBanner } from "@/ravarer/components/RavarerHeaderBanner";
 import { useMatchTolerances, FALLBACK_TOLERANCE_PCT } from "@/fakturaer/hooks/useMatchTolerances";
 import { QueryState } from "@/components/common/QueryState";
@@ -95,7 +96,7 @@ export default function MatchToleranserPage() {
       invalidate();
       toast.success("Innstillinger lagret");
     },
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Kunne ikke lagre innstillingene"),
+    onError: (e) => showError("match-innstillinger", e, "Kunne ikke lagre innstillingene"),
   });
 
   const upsert = useMutation({
@@ -121,7 +122,7 @@ export default function MatchToleranserPage() {
       setNewCat("");
       setNewPct("5");
     },
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Kunne ikke lagre toleransen"),
+    onError: (e) => showError("match-toleranse", e, "Kunne ikke lagre toleransen"),
   });
 
   const del = useMutation({
@@ -134,7 +135,7 @@ export default function MatchToleranserPage() {
       setDeleteRow(null);
       toast.success("Kategorien er fjernet");
     },
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Kunne ikke slette kategorien"),
+    onError: (e) => showError("match-toleranse-slett", e, "Kunne ikke slette kategorien"),
   });
 
   const s = tolerances.settings;

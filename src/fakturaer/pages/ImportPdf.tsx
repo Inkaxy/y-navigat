@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ArrowLeft, Upload, Loader2, Sparkles, CheckCircle2, AlertCircle, AlertTriangle, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { showError } from "@/lib/userError";
 import { supabase } from "@/integrations/supabase/client";
 import { FakturaerHeaderBanner } from "@/fakturaer/components/FakturaerHeaderBanner";
 import { useFakturaer } from "@/fakturaer/context/FakturaerContext";
@@ -178,8 +179,8 @@ export default function ImportPdfPage({ embedded = false }: { embedded?: boolean
       // Local preview URL
       const url = URL.createObjectURL(file);
       setPdfPreviewUrl(url);
-    } catch (err: any) {
-      toast.error(`PDF-lesing feilet: ${err?.message ?? err}`);
+    } catch (err: unknown) {
+      showError("pdf-lesing", err, "Kunne ikke lese PDF-en");
     } finally {
       setParsing(false);
     }
@@ -345,8 +346,8 @@ export default function ImportPdfPage({ embedded = false }: { embedded?: boolean
         toast.success("Faktura opprettet og matchet");
         navigate(`/ravarer/fakturaer/til-behandling?faktura=${invoice.id}`);
       }
-    } catch (e: any) {
-      toast.error(`Opplasting feilet: ${e?.message ?? e}`);
+    } catch (e: unknown) {
+      showError("pdf-import", e, "Opplastingen feilet");
     } finally {
       setBusy(false);
     }

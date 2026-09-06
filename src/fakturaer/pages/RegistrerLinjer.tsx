@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ArrowLeft, Plus, Trash2, Save, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { showError } from "@/lib/userError";
 import { supabase } from "@/integrations/supabase/client";
 import { FakturaerHeaderBanner } from "@/fakturaer/components/FakturaerHeaderBanner";
 import { useFakturaer } from "@/fakturaer/context/FakturaerContext";
@@ -148,7 +149,7 @@ export default function RegistrerLinjerPage() {
         package_size: l.package_size, package_unit: l.package_unit,
         count_per_package: l.count_per_package,
       }));
-      const { error: replaceErr } = await (supabase as any).rpc("replace_child_rows", {
+      const { error: replaceErr } = await supabase.rpc("replace_child_rows", {
         p_table: "invoice_lines",
         p_parent_column: "invoice_id",
         p_parent_id: id,
@@ -156,7 +157,7 @@ export default function RegistrerLinjerPage() {
       });
       if (replaceErr) throw replaceErr;
 
-      const header = invoiceQ.data as any;
+      const header = invoiceQ.data;
       const sumCheck = computeLinesSum({
         lineTotals: lines.map((l) => l.total_amount),
         totalAmount: header?.total_amount ?? null,
@@ -184,8 +185,8 @@ export default function RegistrerLinjerPage() {
       toast.success("Linjer lagret");
       invalidateInvoice(qc, id);
       navigate(`/ravarer/fakturaer/til-behandling?faktura=${id}`);
-    } catch (e: any) {
-      toast.error(`Lagring feilet: ${e?.message ?? e}`);
+    } catch (e: unknown) {
+      showError("registrer-linjer", e, "Kunne ikke lagre linjene");
     } finally {
       setBusy(false);
     }
@@ -214,7 +215,7 @@ export default function RegistrerLinjerPage() {
 
       <FakturaerHeaderBanner
         title="Registrer linjer"
-        subtitle={`${(inv.supplier as any)?.name ?? "Ukjent leverandør"} · Faktura ${inv.invoice_number}`}
+        subtitle={`${inv.supplier?.name ?? "Ukjent leverandør"} · Faktura ${inv.invoice_number}`}
       />
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
