@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -33,9 +33,11 @@ interface Props {
   row: PackageWorklistRow | null;
   open: boolean;
   onOpenChange: (v: boolean) => void;
+  /** Forhåndsutfylt forslag, f.eks. fra et datablad. Kan alltid overstyres. */
+  suggestion?: { size: number | null; unit: string | null } | null;
 }
 
-export function SetPackageDialog({ row, open, onOpenChange }: Props) {
+export function SetPackageDialog({ row, open, onOpenChange, suggestion }: Props) {
   const [step, setStep] = useState<1 | 2>(1);
   const [units, setUnits] = useState("");
   const [packageUnit, setPackageUnit] = useState("");
@@ -67,6 +69,13 @@ export function SetPackageDialog({ row, open, onOpenChange }: Props) {
     setPreview(null);
     setSupplierOpen(false);
   };
+
+  // Et forslag fylles inn når dialogen åpnes, men lagres aldri av seg selv.
+  useEffect(() => {
+    if (!open || !suggestion) return;
+    if (suggestion.size != null) setUnits(String(suggestion.size));
+    if (suggestion.unit) setPackageUnit(suggestion.unit);
+  }, [open, suggestion]);
 
   const handleOpenChange = (v: boolean) => {
     if (!v) reset();

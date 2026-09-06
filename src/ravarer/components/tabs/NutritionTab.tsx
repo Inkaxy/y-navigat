@@ -28,6 +28,8 @@ import { DatasheetSection } from "./DatasheetSection";
 import { MatvaretabellenSourceCard } from "@/ravarer/components/matvaretabellen/MatvaretabellenSourceCard";
 import { useRawMaterial } from "@/ravarer/hooks/useRawMaterials";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
+import { useNutritionDraft } from "@/ravarer/hooks/useNutritionDraft";
+import { QueryState } from "@/components/common/QueryState";
 import { UnsavedChangesDialog } from "@/components/common/UnsavedChangesDialog";
 
 const ALLERGEN_LABEL_BY_VALUE: Record<string, string> = Object.fromEntries(ALLERGENS.map((a) => [a.value, a.label]));
@@ -50,43 +52,21 @@ interface Props {
   registerSave?: (save: () => void) => void;
 }
 
-const empty: NutritionRow = {
-  raw_material_id: "",
-  energy_kj: null, energy_kcal: null,
-  fat_g: null, saturated_fat_g: null,
-  carbs_g: null, sugars_g: null,
-  fiber_g: null, protein_g: null, salt_g: null,
-  ingredient_declaration: null, country_of_origin: null,
-  e_numbers: null, source: null, source_document_url: null,
-  verified_at: null, verified_by: null,
-};
 
 export function NutritionTab({ rawMaterialId, registerSave }: Props) {
   const { canWrite, user } = useRavarer();
-  const { data: existing } = useNutrition(rawMaterialId);
+  const nutritionQuery = useNutrition(rawMaterialId);
+  const existing = nutritionQuery.data;
   const { data: rm } = useRawMaterial(rawMaterialId);
   const upsert = useUpsertNutrition();
   const { data: allergens = [] } = useAllergens(rawMaterialId);
   const setAllergen = useSetAllergen();
 
-  const [draft, setDraft] = useState<NutritionRow>(empty);
-  const dirty = JSON.stringify(draft) !== JSON.stringify(existing ?? { ...empty, raw_material_id: rawMaterialId });
-
-  // Skjemaet fylles fra databasen, men et bakgrunnsoppdatert svar skal aldri
-  // kaste bort noe brukeren har skrevet. Vi synker derfor bare når feltene er
-  // urørte, eller når vi bytter til en annen råvare.
-  const syncRef = useRef<{ id: string; snapshot: string } | null>(null);
-  useEffect(() => {
-    const base = existing ?? { ...empty, raw_material_id: rawMaterialId };
-    const snapshot = JSON.stringify(base);
-    const switched = syncRef.current?.id !== rawMaterialId;
-    if (!switched) {
-      if (syncRef.current?.snapshot === snapshot) return;
-      if (dirty) return;
-    }
-    syncRef.current = { id: rawMaterialId, snapshot };
-    setDraft(base);
-  }, [existing, rawMaterialId, dirty]);
+  const { draft, setDraft, dirty, hydrated } = useNutritionDraft(
+    rawMaterialId,
+    existing,
+    nutritionQuery.isSuccess,
+  );
 
   const macroSum = useMemo(() => {
     return (Number(draft.fat_g ?? 0) + Number(draft.carbs_g ?? 0) + Number(draft.protein_g ?? 0) + Number(draft.fiber_g ?? 0) + Number(draft.salt_g ?? 0));
@@ -116,6 +96,13 @@ export function NutritionTab({ rawMaterialId, registerSave }: Props) {
   const [suggestions, setSuggestions] = useState<AllergenSuggestion[] | null>(null);
   const [rejectedCount, setRejectedCount] = useState(0);
   const [chosen, setChosen] = useState<Set<string>>(new Set());
+
+  // Bytter vi råvare, gjelder ikke gamle forslag lenger.
+  useEffect(() => {
+    setSuggestions(null);
+    setChosen(new Set());
+    setRejectedCount(0);
+  }, [rawMaterialId]);
 
   const suggestAllergens = async () => {
     setSuggesting(true);
@@ -177,7 +164,7 @@ export function NutritionTab({ rawMaterialId, registerSave }: Props) {
   const guard = useUnsavedChangesGuard(dirty && canWrite);
 
   const save = () => {
-    if (!canWrite || !dirty || upsert.isPending) return;
+    if (!canWrite || !dirty || !hydrated || upsert.isPending) return;
     // Redigerer noen tallene fra Matvaretabellen eller et datablad, er kilden ikke lenger den.
     upsert.mutate({
       ...draft,
@@ -197,6 +184,18 @@ export function NutritionTab({ rawMaterialId, registerSave }: Props) {
     ALLERGENS.forEach(a => { (groups[a.group] ??= []).push(a); });
     return groups;
   }, []);
+
+  if (!hydrated || nutritionQuery.isError) {
+    return (
+      <QueryState
+        scope="ravarer:naering"
+        isLoading={!hydrated && !nutritionQuery.isError}
+        isError={nutritionQuery.isError}
+        error={nutritionQuery.error}
+        onRetry={() => void nutritionQuery.refetch()}
+      />
+    );
+  }
 
   return (
     <div className="space-y-5">

@@ -18,6 +18,8 @@ import { useRawMaterial } from "@/ravarer/hooks/useRawMaterials";
 import { ALLERGENS, formatNumber } from "@/ravarer/lib/constants";
 import { diffAllergens, normalizeAllergenCode } from "@/ravarer/lib/allergenDiff";
 import { NUTRITION_NUMBER_FIELDS } from "@/ravarer/lib/nutritionSource";
+import { SetPackageDialog } from "@/ravarer/components/packages/SetPackageDialog";
+import type { PackageWorklistRow } from "@/ravarer/hooks/usePackageSizes";
 
 const NUTRITION_LABELS: Record<string, string> = {
   energy_kj: "Energi (kJ)",
@@ -57,7 +59,19 @@ export function DatasheetSection({ rawMaterialId }: Props) {
   const [extracted, setExtracted] = useState<any | null>(null);
   const [datasheetId, setDatasheetId] = useState<string | null>(null);
   const [accepted, setAccepted] = useState<Set<string>>(new Set());
+  /** Felt-for-felt-valg på næring. Bare disse skrives. */
+  const [acceptedNutrition, setAcceptedNutrition] = useState<Set<string>>(new Set());
+  /** Fjerning av allergener er en matsikkerhetsbeslutning — aldri forhåndsvalgt. */
+  const [allowRemovals, setAllowRemovals] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [packageSuggestion, setPackageSuggestion] = useState<{ size: number | null; unit: string | null } | null>(null);
+  const [packageDialogOpen, setPackageDialogOpen] = useState(false);
+
+  const allergenDiff = extracted?.allergens
+    ? diffAllergens(currentAllergens, extracted.allergens as { allergen?: unknown; presence?: unknown }[])
+    : null;
+  const removals = allergenDiff?.removed ?? [];
+  const removalsBlocked = (allergenDiff?.rejected.length ?? 0) > 0;
 
   const handleUpload = async (file: File) => {
     if (!canWrite) return;
@@ -97,28 +111,66 @@ export function DatasheetSection({ rawMaterialId }: Props) {
   const handleApply = async () => {
     if (!datasheetId) return;
     try {
+      const fields = Array.from(accepted);
+      if (allowRemovals && accepted.has("allergens")) fields.push("allergen_removals");
       const { data, error } = await supabase.functions.invoke("apply-datasheet-update", {
-        body: { datasheet_id: datasheetId, raw_material_id: rawMaterialId, accepted_fields: Array.from(accepted) },
+        body: {
+          datasheet_id: datasheetId,
+          raw_material_id: rawMaterialId,
+          accepted_fields: fields,
+          accepted_nutrition_fields: accepted.has("nutrition") ? Array.from(acceptedNutrition) : [],
+        },
       });
       if (error) throw error;
       if (data.error) throw new Error(data.error);
       if (Array.isArray(data.failures) && data.failures.length > 0) {
         throw new Error(`Noe ble ikke lagret: ${data.failures.join(" · ")}`);
       }
-      toast.success(`Lagret ${data.changes_logged} endringer · ${data.affected_products} produkter flagget`);
-      const pkg = data.follow_ups?.package_suggestion;
-      if (pkg) {
-        toast.info(
-          `Databladet oppgir pakning ${pkg.suggested.size} ${pkg.suggested.unit ?? ""} — bekreft i pakningsdialogen for å oppdatere kostprisen.`,
-        );
+      if (!data.applied) {
+        throw new Error("Databladet ble ikke registrert som anvendt. Ingenting er bekreftet.");
       }
+      toast.success(`Lagret ${data.changes_logged} endringer · ${data.affected_products} produkter flagget`);
+      const skipped = data.follow_ups?.allergen_removals_skipped;
+      if (Array.isArray(skipped) && skipped.length > 0) {
+        toast.warning(`Allergener som IKKE ble fjernet: ${skipped.join(", ")}. Fjern dem manuelt hvis det er riktig.`);
+      }
+      const pkg = data.follow_ups?.package_suggestion;
+      // Pakningen er ikke lagret — den må bekreftes i pakningsdialogen.
+      setPackageSuggestion(pkg ? { size: pkg.suggested?.size ?? null, unit: pkg.suggested?.unit ?? null } : null);
       setExtracted(null);
       setDatasheetId(null);
+      setAllowRemovals(false);
       invalidateRawMaterial(qc, rawMaterialId);
     } catch (e: any) {
       toast.error(e.message);
     }
   };
+
+  const toggleNutritionField = (f: string) => {
+    setAcceptedNutrition((prev) => {
+      const n = new Set(prev);
+      n.has(f) ? n.delete(f) : n.add(f);
+      return n;
+    });
+  };
+
+  /** Minimal rad til pakningsdialogen — den henter selv resten den trenger. */
+  const packageRow: PackageWorklistRow | null = rm
+    ? {
+        id: rm.id,
+        legal_entity_id: legalEntityId ?? null,
+        name: rm.name,
+        base_unit: rm.base_unit,
+        category: rm.category ?? null,
+        current_cost_price: rm.current_cost_price ?? null,
+        pakningsfaktor: null, faktor_kilde: null, bekreftet_dato: null,
+        antall_fakturalinjer: null, antall_leverandorer: null, enheter_i_bruk: null,
+        linjer_uten_pris: null, kjopt_kr_totalt: null, siste_faktura: null,
+        pris_spredning: null, implisert_mengde: null, referansepris: null,
+        referansekilde: null, referansedato: null, referanse_faktor: null,
+        foreslatt_fra_navn: null, foreslatt_fra_referanse: null, status: null,
+      }
+    : null;
 
   const toggle = (k: string) => {
     const n = new Set(accepted);
@@ -184,6 +236,7 @@ export function DatasheetSection({ rawMaterialId }: Props) {
                   <table className="mt-2 w-full text-xs">
                     <thead>
                       <tr className="text-ink-secondary">
+                        <th className="py-1 text-left font-medium">Bruk</th>
                         <th className="py-1 text-left font-medium">Felt</th>
                         <th className="py-1 text-right font-medium">I dag</th>
                         <th className="py-1 text-right font-medium">Fra datablad</th>
@@ -196,6 +249,14 @@ export function DatasheetSection({ rawMaterialId }: Props) {
                         const newV = Number(extracted.nutrition[f]);
                         return (
                           <tr key={f} className="border-t border-line-subtle/60">
+                            <td className="py-1">
+                              <Checkbox
+                                aria-label={`Bruk ${NUTRITION_LABELS[f] ?? f} fra databladet`}
+                                checked={acceptedNutrition.has(f)}
+                                disabled={!accepted.has("nutrition")}
+                                onCheckedChange={() => toggleNutritionField(f)}
+                              />
+                            </td>
                             <td className="py-1">{NUTRITION_LABELS[f] ?? f}</td>
                             <td className="py-1 text-right tabular-nums">{oldV == null ? "—" : formatNumber(oldV, 1)}</td>
                             <td className="py-1 text-right tabular-nums font-medium">{formatNumber(newV, 1)}</td>
@@ -207,7 +268,24 @@ export function DatasheetSection({ rawMaterialId }: Props) {
                   </table>
                 )}
                 {k === "allergens" && (
-                  <AllergenPreview current={currentAllergens} incoming={extracted.allergens ?? []} />
+                  <>
+                    <AllergenPreview current={currentAllergens} incoming={extracted.allergens ?? []} />
+                    {removals.length > 0 && (
+                      <label className="mt-2 flex items-start gap-2 rounded-lg border border-warning/40 bg-warning/10 p-2 text-xs cursor-pointer">
+                        <Checkbox
+                          checked={allowRemovals}
+                          disabled={!accepted.has("allergens") || removalsBlocked}
+                          onCheckedChange={() => setAllowRemovals(v => !v)}
+                          aria-label="Bekreft fjerning av allergener"
+                        />
+                        <span>
+                          <span className="font-medium">Fjern {removals.length} allergen(er)</span> — dette er ikke valgt
+                          på forhånd. Før: {removals.map(r => `${r.allergen} (${r.presence})`).join(", ")} · Etter: ikke oppført.
+                          {removalsBlocked && " Ugyldige verdier i databladet gjør at fjerning er sperret."}
+                        </span>
+                      </label>
+                    )}
+                  </>
                 )}
                 {k === "ingredient_declaration" && (
                   <BeforeAfter
@@ -234,10 +312,40 @@ export function DatasheetSection({ rawMaterialId }: Props) {
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" onClick={() => { setExtracted(null); setDatasheetId(null); }}>Avbryt</Button>
-            <Button onClick={handleApply} disabled={accepted.size === 0}>Anvend valgte ({accepted.size})</Button>
+            <Button
+              onClick={handleApply}
+              disabled={accepted.size === 0 || (accepted.has("nutrition") && acceptedNutrition.size === 0)}
+            >
+              Anvend valgte ({accepted.size})
+            </Button>
           </div>
         </div>
       )}
+
+      {packageSuggestion && (
+        <div className="rounded-xl border border-line-subtle bg-muted/30 p-3 text-sm flex items-center justify-between gap-3">
+          <span>
+            Databladet foreslår pakning{" "}
+            <span className="font-medium">
+              {packageSuggestion.size ?? "—"} {packageSuggestion.unit ?? ""}
+            </span>
+            . Dette er <span className="font-medium">ikke lagret</span> — bekreft i pakningsdialogen.
+          </span>
+          <div className="flex gap-2">
+            <Button size="sm" onClick={() => setPackageDialogOpen(true)} disabled={!canWrite || !packageRow}>
+              Åpne pakning
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setPackageSuggestion(null)}>Skjul</Button>
+          </div>
+        </div>
+      )}
+
+      <SetPackageDialog
+        row={packageDialogOpen ? packageRow : null}
+        open={packageDialogOpen}
+        onOpenChange={setPackageDialogOpen}
+        suggestion={packageSuggestion}
+      />
 
       {datasheets.length > 0 && (
         <div className="text-xs text-ink-secondary">
