@@ -151,3 +151,54 @@ Deno-tester 17 passed, exit 0 · `npm run build` exit 0 ·
 - Ingen live database- eller edge-utrullingsbekreftelse i dette miljøet.
 - Databladoppdateringen er fortsatt ikke transaksjonell (krever databaseendring).
 - Flere kjøpshendelser per råvare på samme faktura krever F2 (fakturalinje-ID i historikken).
+
+## Blokkerende krasj i «Næring & deklarasjon» (NBH-Q8HZQB-3B18)
+
+**Årsak bekreftet:** `useRawMaterialPage` la BOOLEAN i `["raw_material_nutrition", id]`
+og ANTALL i `["raw_material_allergens", id]` — nøyaktig de nøklene `useNutrition`
+og `useAllergens` leser som rad/liste. `allergens.find(...)` krasjet på tallet.
+
+**Retting — én datakontrakt per query-nøkkel:**
+- `src/ravarer/hooks/useNutrition.ts`: `nutritionQueryOptions` / `allergensQueryOptions`
+  (komplette rader), `useNutrition`/`useAllergens` bruker dem.
+- `src/ravarer/hooks/useRmSuppliers.ts`: `rmSuppliersQueryOptions`.
+- `src/ravarer/hooks/useDatasheets.ts`: `datasheetsQueryOptions` + `DatasheetListRow`.
+  Den tidligere avvikende nøkkelen `["raw-material-datasheets", id, "current"]` er borte —
+  detaljsiden bruker nå samme liste som databladseksjonen.
+- `src/ravarer/hooks/useRawMaterialPage.ts` gjenbruker alle fire og utleder
+  `hasNutrition`, `allergenCount`, `hasDatasheet`, `recipeCount` lokalt. Ingen
+  `Array.isArray`-fallback. `isLoading`/`isError`/`error` dekker nå ALLE delspørringer,
+  ikke bare råvaren. Hydreringen/dirty-baselinen fra forrige runde er urørt.
+- `useNutrition.ts` er også ryddet for `any` (allergenkoden bruker DB-enumen).
+
+**Integrasjonstest:** `src/test/rawMaterialNutritionCache.test.tsx` (4 tester) monterer
+`useRawMaterialPage` og `NutritionTab`/`useNutrition`/`useAllergens` mot SAMME
+QueryClient (cachen mockes ikke bort), i begge monteringsrekkefølger, med og uten
+næringsrad/allergener, og verifiserer KPI-oppdatering etter invalidering.
+
+## RFQ-pris er per grunnenhet (A–F-oppfølging)
+
+`SupplierPortal.tsx` ber om «Pris pr {baseUnit} (NOK)». `ForhandlingDetail.tsx` sender nå
+`agreed_price_unit: rmBaseUnit(it.raw_material_id)` i stedet for `null`, slik at prisen ikke
+deles på pakningsstørrelsen en gang til. Tester i
+`supabase/functions/apply-negotiation-outcome/validate_test.ts`: 100 kr/kg med 25 kg pakning
+= 100 kr/kg, og 0,10 kr/g = 100 kr/kg.
+
+## Verifisering (exit-koder)
+- `npm run typecheck` (tsc) — exit 0
+- `npx vitest run` — exit 0, 43 filer / 400 tester (var 42 / 396)
+- Deno-tester (reconcile-invoice, apply-negotiation-outcome, validate-rfq-access) — exit 0, 19 tester
+- `npm run build` — exit 0
+- `npx eslint` på berørte filer — exit 0 (forhåndseksisterende `any` i `ForhandlingDetail.tsx`
+  og `RecipePartCard.tsx` er ikke rørt)
+
+## Presisering av testdekning i innlogget app
+Testet innlogget via brukerens Chrome/Lovable-iframe: 373 aktive varer, 21/327 matråvarer med
+full næring, 2121 matvarer, søk «331-7», og retur fra råvarekort bevarer filter i mobilvisning
+(393 px). Ingen levende DB-definisjoner og ingen backend-deploy er verifisert herfra.
+
+## Restarbeid — manuell datakvalitet (ikke rettet automatisk)
+- «ANANAS FINSKÅRET I JUICE 227G» er koblet til «Ananas, hermetisk, med sukkerlake» i
+  Matvaretabellen. Feil variant (juice vs. sukkerlake) — krever manuell gjennomgang.
+- Databladoppdateringen er fortsatt ikke transaksjonell (krever databaseendring).
+- Flere kjøpshendelser per råvare på samme faktura krever F2.

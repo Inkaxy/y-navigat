@@ -87,3 +87,36 @@ Deno.test("uten apply_to_supplier lagres utfallet uten prisomregning", () => {
   assertEquals(prepared[0].agreed_price_per_base_unit, null);
   assertEquals(prepared[0].set_as_primary, false);
 });
+
+Deno.test("RFQ-pris er per grunnenhet og deles ikke på pakningen", () => {
+  // Leverandørportalen ber om «Pris pr kg», så 100 kr/kg med 25 kg sekk er 100 kr/kg.
+  const { errors, prepared } = run([
+    {
+      negotiation_item_id: "item-1",
+      winner_recipient_id: "rec-1",
+      winner_response_id: "resp-1",
+      agreed_price: 100,
+      agreed_price_unit: "kg",
+      agreed_package_size: 25,
+      agreed_package_unit: "kg",
+      apply_to_supplier: true,
+    },
+  ]);
+  assertEquals(errors, []);
+  assertEquals(prepared[0].agreed_price_per_base_unit, 100);
+});
+
+Deno.test("pris oppgitt per gram regnes om til baseenheten kg", () => {
+  const { prepared } = run([
+    {
+      negotiation_item_id: "item-1",
+      winner_recipient_id: "rec-1",
+      agreed_price: 0.1,
+      agreed_price_unit: "g",
+      agreed_package_size: 25,
+      agreed_package_unit: "kg",
+      apply_to_supplier: true,
+    },
+  ]);
+  assertEquals(Math.round((prepared[0].agreed_price_per_base_unit ?? 0) * 100) / 100, 100);
+});

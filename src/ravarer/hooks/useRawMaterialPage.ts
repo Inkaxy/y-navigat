@@ -1,11 +1,16 @@
 import { useQueries } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { RawMaterialRow } from "@/ravarer/hooks/useRawMaterials";
-import type { RmSupplierRow } from "@/ravarer/hooks/useRmSuppliers";
+import { rmSuppliersQueryOptions, type RmSupplierRow } from "@/ravarer/hooks/useRmSuppliers";
+import { allergensQueryOptions, nutritionQueryOptions, type AllergenRow, type NutritionRow } from "@/ravarer/hooks/useNutrition";
+import { datasheetsQueryOptions, type DatasheetListRow } from "@/ravarer/hooks/useDatasheets";
 
 export interface RawMaterialPageData {
   rm: RawMaterialRow | null;
   links: RmSupplierRow[];
+  nutrition: NutritionRow | null;
+  allergens: AllergenRow[];
+  datasheets: DatasheetListRow[];
   hasNutrition: boolean;
   hasDatasheet: boolean;
   allergenCount: number;
@@ -17,9 +22,10 @@ export interface RawMaterialPageData {
 }
 
 /**
- * Én felles henting for hele råvaredetaljen: råvaren, leverandørkoblingene og
- * statusene som KPI-stripa og fanene trenger — i parallell, med de samme
- * query-nøklene som de enkeltstående hookene, slik at invalidering treffer.
+ * Én felles henting for hele råvaredetaljen. Hver nøkkel har NØYAKTIG samme
+ * datakontrakt som den enkeltstående hooken (komplette rader) — KPI-statuser og
+ * tellere utledes lokalt her. Legger vi en boolean eller et tall i en delt
+ * nøkkel, får fanene feil type fra cachen og krasjer (f.eks. `allergens.find`).
  */
 export function useRawMaterialPage(id: string | undefined): RawMaterialPageData {
   const results = useQueries({
@@ -33,59 +39,10 @@ export function useRawMaterialPage(id: string | undefined): RawMaterialPageData 
           return (data ?? null) as RawMaterialRow | null;
         },
       },
-      {
-        queryKey: ["raw_material_suppliers", id],
-        enabled: !!id,
-        queryFn: async () => {
-          const { data, error } = await supabase
-            .from("raw_material_suppliers")
-            .select("*")
-            .eq("raw_material_id", id!)
-            .order("is_primary", { ascending: false });
-          if (error) throw error;
-          return (data ?? []) as RmSupplierRow[];
-        },
-      },
-      {
-        queryKey: ["raw_material_nutrition", id],
-        enabled: !!id,
-        queryFn: async () => {
-          const { data, error } = await supabase
-            .from("raw_material_nutrition")
-            .select("raw_material_id")
-            .eq("raw_material_id", id!)
-            .maybeSingle();
-          if (error) throw error;
-          return !!data;
-        },
-      },
-      {
-        queryKey: ["raw-material-datasheets", id, "current"],
-        enabled: !!id,
-        queryFn: async () => {
-          const { data, error } = await supabase
-            .from("raw_material_datasheets")
-            .select("id")
-            .eq("raw_material_id", id!)
-            .eq("is_current", true)
-            .limit(1);
-          if (error) throw error;
-          return (data ?? []).length > 0;
-        },
-      },
-      {
-        queryKey: ["raw_material_allergens", id],
-        enabled: !!id,
-        queryFn: async () => {
-          const { data, error } = await supabase
-            .from("raw_material_allergens")
-            .select("allergen")
-            .eq("raw_material_id", id!)
-            .limit(200);
-          if (error) throw error;
-          return (data ?? []).length;
-        },
-      },
+      rmSuppliersQueryOptions(id),
+      nutritionQueryOptions(id),
+      datasheetsQueryOptions(id),
+      allergensQueryOptions(id),
       {
         queryKey: ["recipe-usage-count", id],
         enabled: !!id,
@@ -104,16 +61,26 @@ export function useRawMaterialPage(id: string | undefined): RawMaterialPageData 
 
   const [rmQ, linksQ, nutritionQ, datasheetQ, allergenQ, recipeQ] = results;
 
+  const nutrition = (nutritionQ.data as NutritionRow | null | undefined) ?? null;
+  const allergens = (allergenQ.data as AllergenRow[] | undefined) ?? [];
+  const datasheets = (datasheetQ.data as DatasheetListRow[] | undefined) ?? [];
+
+  // Feil fra hvilken som helst av delspørringene skal vises, ikke bare råvaren.
+  const failed = results.find((r) => r.isError);
+
   return {
     rm: (rmQ.data as RawMaterialRow | null | undefined) ?? null,
     links: (linksQ.data as RmSupplierRow[] | undefined) ?? [],
-    hasNutrition: (nutritionQ.data as boolean | undefined) ?? false,
-    hasDatasheet: (datasheetQ.data as boolean | undefined) ?? false,
-    allergenCount: (allergenQ.data as number | undefined) ?? 0,
+    nutrition,
+    allergens,
+    datasheets,
+    hasNutrition: nutrition != null,
+    hasDatasheet: datasheets.some((d) => d.is_current === true),
+    allergenCount: allergens.length,
     recipeCount: (recipeQ.data as number | undefined) ?? 0,
-    isLoading: rmQ.isLoading,
-    isError: rmQ.isError,
-    error: rmQ.error,
+    isLoading: results.some((r) => r.isLoading),
+    isError: !!failed,
+    error: failed?.error ?? null,
     refetch: () => {
       for (const r of results) void r.refetch();
     },

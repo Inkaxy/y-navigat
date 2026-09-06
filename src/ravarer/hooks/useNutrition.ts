@@ -1,6 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import type { Database } from "@/integrations/supabase/types";
+
+type AllergenCode = Database["public"]["Enums"]["allergen_type"];
 
 export interface NutritionRow {
   raw_material_id: string;
@@ -30,20 +33,29 @@ export interface AllergenRow {
   presence: "contains" | "may_contain" | "free_from";
 }
 
-export function useNutrition(rawMaterialId: string | undefined) {
-  return useQuery({
-    queryKey: ["raw_material_nutrition", rawMaterialId],
+/**
+ * Én datakontrakt per query-nøkkel: alle som bruker ["raw_material_nutrition", id]
+ * må hente HELE raden. Statuser (finnes/mangler) utledes lokalt, aldri ved å
+ * legge en boolean i samme cache-nøkkel.
+ */
+export function nutritionQueryOptions(rawMaterialId: string | undefined) {
+  return {
+    queryKey: ["raw_material_nutrition", rawMaterialId] as const,
     enabled: !!rawMaterialId,
-    queryFn: async () => {
+    queryFn: async (): Promise<NutritionRow | null> => {
       const { data, error } = await supabase
         .from("raw_material_nutrition")
         .select("*")
         .eq("raw_material_id", rawMaterialId!)
         .maybeSingle();
       if (error) throw error;
-      return data as NutritionRow | null;
+      return (data ?? null) as NutritionRow | null;
     },
-  });
+  };
+}
+
+export function useNutrition(rawMaterialId: string | undefined) {
+  return useQuery(nutritionQueryOptions(rawMaterialId));
 }
 
 export function useUpsertNutrition() {
@@ -58,19 +70,20 @@ export function useUpsertNutrition() {
       if (error) throw error;
       return data;
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data: { raw_material_id: string }) => {
       qc.invalidateQueries({ queryKey: ["raw_material_nutrition", data.raw_material_id] });
       toast.success("Næringsinnhold lagret");
     },
-    onError: (e: any) => toast.error(`Kunne ikke lagre: ${e.message ?? e}`),
+    onError: (e: unknown) => toast.error(`Kunne ikke lagre: ${e instanceof Error ? e.message : String(e)}`),
   });
 }
 
-export function useAllergens(rawMaterialId: string | undefined) {
-  return useQuery({
-    queryKey: ["raw_material_allergens", rawMaterialId],
+/** Samme kontrakt for ["raw_material_allergens", id]: alltid komplette rader. */
+export function allergensQueryOptions(rawMaterialId: string | undefined) {
+  return {
+    queryKey: ["raw_material_allergens", rawMaterialId] as const,
     enabled: !!rawMaterialId,
-    queryFn: async () => {
+    queryFn: async (): Promise<AllergenRow[]> => {
       const { data, error } = await supabase
         .from("raw_material_allergens")
         .select("*")
@@ -78,7 +91,11 @@ export function useAllergens(rawMaterialId: string | undefined) {
       if (error) throw error;
       return (data ?? []) as AllergenRow[];
     },
-  });
+  };
+}
+
+export function useAllergens(rawMaterialId: string | undefined) {
+  return useQuery(allergensQueryOptions(rawMaterialId));
 }
 
 export function useSetAllergen() {
@@ -94,7 +111,7 @@ export function useSetAllergen() {
           .from("raw_material_allergens")
           .delete()
           .eq("raw_material_id", input.raw_material_id)
-          .eq("allergen", input.allergen as any);
+          .eq("allergen", input.allergen as AllergenCode);
         if (error) throw error;
         return null;
       }
@@ -103,7 +120,7 @@ export function useSetAllergen() {
         .upsert(
           {
             raw_material_id: input.raw_material_id,
-            allergen: input.allergen as any,
+            allergen: input.allergen as AllergenCode,
             presence: input.presence,
           },
           { onConflict: "raw_material_id,allergen" },
@@ -116,6 +133,7 @@ export function useSetAllergen() {
     onSuccess: (_d, vars) => {
       qc.invalidateQueries({ queryKey: ["raw_material_allergens", vars.raw_material_id] });
     },
-    onError: (e: any) => toast.error(`Kunne ikke lagre allergen: ${e.message ?? e}`),
+    onError: (e: unknown) =>
+      toast.error(`Kunne ikke lagre allergen: ${e instanceof Error ? e.message : String(e)}`),
   });
 }
