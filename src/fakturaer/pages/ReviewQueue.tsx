@@ -15,7 +15,7 @@ import { useQueryClient } from "@tanstack/react-query";
 
 import { FakturaerHeaderBanner } from "@/fakturaer/components/FakturaerHeaderBanner";
 import { QueryState } from "@/components/common/QueryState";
-import { useReviewLines, type ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
+import { useReviewLines, useReviewLineCounts, type ReviewLineRow, type ReviewLineCountRow } from "@/fakturaer/hooks/useReviewLines";
 import { useFakturaerLegalEntities } from "@/fakturaer/hooks/useFakturaerLegalEntities";
 import { useSuppliersFor } from "@/fakturaer/hooks/useSuppliersFor";
 import { useInboxInvoices } from "@/fakturaer/hooks/useInboxInvoices";
@@ -77,7 +77,7 @@ const LS_OPEN = "nbhub.faktura.docpanel.open";
 const LS_SIZE = "nbhub.faktura.docpanel.size";
 
 /** Hører linjen hjemme under fanen? review_reason kan inneholde flere årsaker. */
-export function matchesTab(line: ReviewLineRow, tab: TabValue): boolean {
+export function matchesTab(line: ReviewLineCountRow | ReviewLineRow, tab: TabValue): boolean {
   if (tab === "all") return true;
   if (tab === "no_baseline") return line.variance_status === "no_baseline" && !!line.raw_material_id;
   const reasons = reasonsOf(line);
@@ -163,14 +163,17 @@ export default function FakturaerInboxPage() {
     return scoped.filter((l) => matchesTab(l, tab));
   }, [lines, expandedId, tab]);
 
+  // Tellerne skal gjelde HELE køen, ikke bare de linjene som er hentet inn.
+  const countsQuery = useReviewLineCounts({ ...filters, invoiceId: expandedId, onlyReady });
+  const countRows = useMemo(() => countsQuery.data ?? [], [countsQuery.data]);
+
   const counts = useMemo(() => {
-    const scoped = expandedId ? lines.filter((l) => l.invoice_id === expandedId) : lines;
     const c = {} as Record<TabValue, number>;
     TABS.forEach((t) => {
-      c[t.value] = scoped.filter((l) => matchesTab(l, t.value)).length;
+      c[t.value] = countRows.filter((l) => matchesTab(l, t.value)).length;
     });
     return c;
-  }, [lines, expandedId]);
+  }, [countRows]);
 
   // Kø-tilstand (aktiv linje + angre)
   const [queue, dispatch] = useReducer(queueReducer, emptyQueueState);
@@ -698,7 +701,7 @@ export default function FakturaerInboxPage() {
           )}
 
           <span className="ml-auto text-sm text-ink-secondary">
-            {invoices.length} fakturaer · {lines.length} linjer til behandling
+            {invoices.length} fakturaer · {countRows.length} linjer til behandling
           </span>
         </div>
 
