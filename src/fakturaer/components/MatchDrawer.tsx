@@ -19,6 +19,7 @@ import { CreateRawMaterialDialog } from "@/fakturaer/components/CreateRawMateria
 import { ItemTypeBadge } from "@/ravarer/components/ItemTypeBadge";
 import { InvoiceDocumentButton } from "@/fakturaer/components/InvoiceDocumentButton";
 import { acceptMatch } from "@/fakturaer/lib/acceptMatch";
+import { normalizeMatchKey } from "@/fakturaer/lib/matchNormalize";
 
 interface Props {
   open: boolean;
@@ -101,7 +102,12 @@ export function MatchDrawer({ open, onOpenChange, line, onAcceptedNext }: Props)
     queryKey: ["rm-search", legalEntityId, search],
     enabled: !!legalEntityId && search.length > 1,
     queryFn: async () => {
-      const term = `%${search}%`;
+      // Komma og parentes er skilletegn i PostgREST-filtre — fjernes fra søket.
+      const safe = search.trim().replace(/[,()]/g, " ");
+      const term = `%${safe}%`;
+      // Alias er lagret normalisert i databasen — søket må normaliseres likt,
+      // ellers finner vi ikke «Hvetemel, 25 kg» når brukeren skriver «hvetemel 25kg».
+      const normTerm = `%${normalizeMatchKey(search)}%`;
 
       const [bySupplier, byAlias] = await Promise.all([
         supabase
@@ -112,7 +118,7 @@ export function MatchDrawer({ open, onOpenChange, line, onAcceptedNext }: Props)
         supabase
           .from("raw_material_supplier_aliases")
           .select("alias_value, raw_material_suppliers!inner(raw_material_id)")
-          .ilike("alias_value", term)
+          .or(`alias_value_normalized.ilike.${normTerm},alias_value.ilike.${term}`)
           .limit(50),
       ]);
       if (bySupplier.error) throw bySupplier.error;

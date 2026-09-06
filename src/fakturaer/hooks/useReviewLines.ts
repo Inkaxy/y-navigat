@@ -84,6 +84,13 @@ interface Filters {
   supplierId?: string | null;
   /** Begrens køen til én faktura — brukes når et fakturakort er ekspandert. */
   invoiceId?: string | null;
+  /** Samme «klar for prismatch»-filter som fakturakortene bruker. */
+  onlyReady?: boolean;
+  /**
+   * Tak på antall linjer i listen over alle fakturaer. Uten tak kan
+   * spørringen dra inn titusenvis av rader. `null` henter alt.
+   */
+  limit?: number | null;
 }
 
 /**
@@ -97,7 +104,7 @@ export function useReviewLines(filters: Filters) {
   return useQuery({
     queryKey: ["fakturaer-review-lines", filters],
     queryFn: async () => {
-      const rows = await fetchAllRows<ReviewLineRow>((from, to) => {
+      const build = (from: number, to: number) => {
         let q = supabase
           .from("invoice_lines")
           .select(SELECT)
@@ -112,11 +119,26 @@ export function useReviewLines(filters: Filters) {
         if (filters.legalEntityId) q = q.eq("invoice.legal_entity_id", filters.legalEntityId);
         if (filters.supplierId) q = q.eq("invoice.supplier_id", filters.supplierId);
         if (filters.invoiceId) q = q.eq("invoice_id", filters.invoiceId);
+        if (filters.onlyReady) q = q.eq("invoice.status", "ready");
         return q as unknown as PromiseLike<{ data: ReviewLineRow[] | null; error: { message: string } | null }>;
-      });
+      };
+
+      const limit = filters.limit ?? null;
+      let rows: ReviewLineRow[];
+      let hasMore = false;
+      if (limit != null) {
+        // Ett ekstra treff avslører om det finnes flere linjer enn taket.
+        const { data, error } = await build(0, limit);
+        if (error) throw new Error(error.message);
+        rows = data ?? [];
+        hasMore = rows.length > limit;
+        if (hasMore) rows = rows.slice(0, limit);
+      } else {
+        rows = await fetchAllRows<ReviewLineRow>(build);
+      }
 
       rows.forEach((r) => r.suggestions?.sort((a, b) => a.rank - b.rank));
-      return { rows, totalCount: rows.length, hiddenCount: 0 };
+      return { rows, totalCount: rows.length, hiddenCount: 0, hasMore };
     },
     refetchInterval: 30000,
   });

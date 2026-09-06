@@ -17,6 +17,8 @@ export interface InboxInvoice {
   lines_sum_variance_pct: number | null;
   source_document_url: string | null;
   line_extraction_status: string | null;
+  source: string | null;
+  notes: string | null;
   line_count: number;
   assessment: InboxAssessment;
 }
@@ -42,6 +44,8 @@ interface RawInvoice {
   lines_sum_variance_pct: number | null;
   source_document_url: string | null;
   line_extraction_status: string | null;
+  source: string | null;
+  notes: string | null;
   suppliers: { name: string } | null;
   invoice_lines:
     | Array<{
@@ -57,7 +61,7 @@ interface RawInvoice {
 /** Fakturaer som fortsatt er i arbeid — kortene øverst i innboksen. */
 export function useInboxInvoices(
   filters: Filters,
-  toleranceFor: (category?: string | null) => number,
+  toleranceFor: (legalEntityId: string | null, category?: string | null) => number,
 ) {
   return useQuery({
     queryKey: ["fakturaer-inbox", filters],
@@ -68,7 +72,7 @@ export function useInboxInvoices(
         .select(
           `id, invoice_number, invoice_date, status, legal_entity_id, supplier_id, is_credit_note,
            total_amount, total_vat, lines_sum_status, lines_sum_variance_pct, source_document_url,
-           line_extraction_status, suppliers(name),
+           line_extraction_status, source, notes, suppliers(name),
            invoice_lines(raw_material_id, requires_review, price_variance_pct, variance_status, raw_materials(category))`,
         )
         .in("status", filters.onlyReady ? ["ready"] : ["imported", "needs_review", "ready", "flagged"])
@@ -104,15 +108,18 @@ export function useInboxInvoices(
           lines_sum_variance_pct: r.lines_sum_variance_pct,
           source_document_url: r.source_document_url,
           line_extraction_status: r.line_extraction_status,
+          source: r.source,
+          notes: r.notes,
           line_count: lines.length,
           assessment: assessInboxInvoice(
             {
               status: r.status,
               is_credit_note: r.is_credit_note,
               lines_sum_status: r.lines_sum_status,
+              notes: r.notes,
               lines,
             },
-            toleranceFor,
+            (category) => toleranceFor(r.legal_entity_id, category),
           ),
         };
       });

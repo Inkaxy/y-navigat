@@ -13,6 +13,7 @@ import {
   invoiceActionBlockedReason,
 } from "@/fakturaer/lib/statusGuards";
 import { resolveTolerance, FALLBACK_TOLERANCE_PCT } from "@/fakturaer/hooks/useMatchTolerances";
+import { creditNoteOriginalRef } from "@/fakturaer/lib/inbox";
 
 const snap: QueueLineSnapshot = {
   raw_material_id: null,
@@ -122,5 +123,17 @@ describe("resolveTolerance", () => {
   it("null-toleranse på kategori faller tilbake på global", () => {
     expect(resolveTolerance("Mel", 4, {})).toBe(4);
     expect(resolveTolerance("Mel", 0, { Mel: 0 })).toBe(0);
+  });
+});
+
+describe("creditNoteOriginalRef", () => {
+  it("leser fakturanummeret fra notatet", () => {
+    expect(creditNoteOriginalRef("Opprinnelig faktura: 12345")).toBe("12345");
+    expect(creditNoteOriginalRef("Retur\nOpprinnelig faktura: A-77")).toBe("A-77");
+  });
+
+  it("gir null når koblingen mangler", () => {
+    expect(creditNoteOriginalRef(null)).toBeNull();
+    expect(creditNoteOriginalRef("Retur av varer")).toBeNull();
   });
 });

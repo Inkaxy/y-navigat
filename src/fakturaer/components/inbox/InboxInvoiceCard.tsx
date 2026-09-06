@@ -2,7 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { CheckCircle2, ChevronDown, ChevronRight, ExternalLink, Flag, Loader2, RefreshCw } from "lucide-react";
+import { CheckCircle2, ChevronDown, ChevronRight, ExternalLink, Flag, Link2, Loader2, RefreshCw } from "lucide-react";
 import { InvoiceStatusBadge } from "@/fakturaer/components/InvoiceStatusBadge";
 import { formatDate, formatNok } from "@/fakturaer/lib/constants";
 import { INBOX_ISSUE_LABELS } from "@/fakturaer/lib/inbox";
@@ -21,6 +21,7 @@ interface Props {
   onRunMatch: () => void;
   onReconcile: () => void;
   onUnflag: () => void;
+  onLinkCreditNote: () => void;
   onOpen: () => void;
 }
 
@@ -36,6 +37,7 @@ export function InboxInvoiceCard({
   onRunMatch,
   onReconcile,
   onUnflag,
+  onLinkCreditNote,
   onOpen,
 }: Props) {
   const a = invoice.assessment;
@@ -96,6 +98,12 @@ export function InboxInvoiceCard({
             <Button size="sm" variant="outline" onClick={onRunMatch} disabled={busyAction === "match"} className="gap-1.5">
               {busyAction === "match" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
               Kjør match
+            </Button>
+          )}
+
+          {canWrite && a.issues.includes("credit_note_unlinked") && (
+            <Button size="sm" variant="outline" onClick={onLinkCreditNote} className="gap-1.5">
+              <Link2 className="h-3.5 w-3.5" /> Knytt til faktura
             </Button>
           )}
 
