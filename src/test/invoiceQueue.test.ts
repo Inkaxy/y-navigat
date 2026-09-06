@@ -124,3 +124,15 @@ describe("resolveTolerance", () => {
     expect(resolveTolerance("Mel", 0, { Mel: 0 })).toBe(0);
   });
 });
+
+describe("creditNoteOriginalRef", () => {
+  it("leser fakturanummeret fra notatet", () => {
+    expect(creditNoteOriginalRef("Opprinnelig faktura: 12345")).toBe("12345");
+    expect(creditNoteOriginalRef("Retur\nOpprinnelig faktura: A-77")).toBe("A-77");
+  });
+
+  it("gir null når koblingen mangler", () => {
+    expect(creditNoteOriginalRef(null)).toBeNull();
+    expect(creditNoteOriginalRef("Retur av varer")).toBeNull();
+  });
+});
