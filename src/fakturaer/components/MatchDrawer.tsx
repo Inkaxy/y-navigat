@@ -61,6 +61,9 @@ export function MatchDrawer({ open, onOpenChange, line, onAcceptedNext }: Props)
   const [rememberSku, setRememberSku] = useState(true);
   const [rememberName, setRememberName] = useState(true);
   const [setAsPrimary, setSetAsPrimary] = useState(false);
+  // Pakningen som tolkes fra linjen er et FORSLAG. Den lagres som bekreftet
+  // bare når brukeren aktivt sier at den stemmer.
+  const [confirmPackage, setConfirmPackage] = useState(false);
   const [busy, setBusy] = useState(false);
   const [agreedPrice, setAgreedPrice] = useState("");
   const [packageSize, setPackageSize] = useState("");
@@ -74,6 +77,7 @@ export function MatchDrawer({ open, onOpenChange, line, onAcceptedNext }: Props)
     setRememberSku(!!line?.supplier_sku);
     setRememberName(!!line?.description && line?.description !== line?.supplier_sku);
     setSetAsPrimary(false);
+    setConfirmPackage(false);
     setAgreedPrice("");
     // Forhåndsutfyll pakning fra linjens lagrede felter, ellers fra beskrivelsen.
     const pkg = line ? deriveLinePackage({
@@ -244,6 +248,10 @@ export function MatchDrawer({ open, onOpenChange, line, onAcceptedNext }: Props)
         rememberSku,
         rememberName,
         setAsPrimary,
+        confirmPackage,
+        rejectedRawMaterialIds: suggestions
+          .map((sg) => sg.raw_material_id)
+          .filter((id): id is string => !!id && id !== selectedRmId),
         applyToAll,
       });
 
@@ -444,6 +452,18 @@ export function MatchDrawer({ open, onOpenChange, line, onAcceptedNext }: Props)
                   <label className="flex items-start gap-2">
                     <Checkbox checked={rememberName} onCheckedChange={(v) => setRememberName(!!v)} disabled={!line.description} />
                     <span>Husk produktnavn «{line.description}» for denne leverandøren</span>
+                  </label>
+                  <label className="flex items-start gap-2">
+                    <Checkbox checked={confirmPackage} onCheckedChange={(v) => setConfirmPackage(!!v)} />
+                    <span>
+                      Bekreft pakningen for denne leverandøren
+                      {cost?.baseUnitsPerPackage
+                        ? ` (${cost.baseUnitsPerPackage} ${selectedRm?.base_unit ?? ""} per pakning)`
+                        : ""}
+                      <span className="block text-xs text-ink-secondary">
+                        Uten avkrysning brukes pakningen kun som forslag ved senere fakturaer.
+                      </span>
+                    </span>
                   </label>
                   {!anyPrimary && (
                     <label className="flex items-start gap-2">

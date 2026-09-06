@@ -1,6 +1,13 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { normalizeUnit, parseDecimal, resolveLineCost, deriveLinePackage } from "@/fakturaer/lib/units";
+import {
+  normalizeUnit,
+  parseDecimal,
+  resolveLineCost,
+  deriveLinePackage,
+  parsePackageFromDescription,
+  stripPackageTokens,
+} from "@/fakturaer/lib/units";
 
 describe("resolveLineCost", () => {
   it("Norgesmøllene: 600 kg à 20,18 kr — pakningen skal ikke brukes", () => {
@@ -206,7 +213,7 @@ describe("package_size = 1-fellen", () => {
     expect(r.pricePerBaseUnit).toBeCloseTo(31.58, 2);
   });
 
-  it("bekreftet pakning overstyrer alt — 1 sekk er da virkelig 1 kg", () => {
+  it("bekreftet «1 sekk» uten innhold gir ingen pris — mennesket må fylle inn", () => {
     const r = resolveLineCost({
       quantity: 1,
       unit: "sekk",
@@ -216,11 +223,30 @@ describe("package_size = 1-fellen", () => {
       baseUnit: "kg",
       supplierPackage: { packageSize: 1, packageUnit: "sekk", packageConfirmedAt: "2026-01-01T00:00:00Z" },
     });
-    expect(r.baseUnitsPerPackage).toBe(1);
-    expect(r.pricePerBaseUnit).toBeCloseTo(789.5, 2);
+    expect(r.needsInput).toBe("package_size");
+    expect(r.reason).toContain("innhold per pakning");
   });
 
-  it("ubekreftet 1 kg mot «REGAL RUGMEL 25KG» — varenavnet vinner", () => {
+  it("bekreftet innhold per pakning brukes som sannhet", () => {
+    const r = resolveLineCost({
+      quantity: 1,
+      unit: "sekk",
+      unitPrice: 789.5,
+      totalAmount: 789.5,
+      description: "DEMERARA SUKKER 25KG",
+      baseUnit: "kg",
+      supplierPackage: {
+        packageSize: 1,
+        packageUnit: "sekk",
+        baseUnitsPerPackage: 25,
+        packageConfirmedAt: "2026-01-01T00:00:00Z",
+      },
+    });
+    expect(r.baseUnitsPerPackage).toBe(25);
+    expect(r.pricePerBaseUnit).toBeCloseTo(31.58, 2);
+  });
+
+  it("ubekreftet 1 kg mot «REGAL RUGMEL 25KG» — uenighet krever menneske", () => {
     const r = resolveLineCost({
       quantity: 1,
       unit: "sekk",
@@ -230,10 +256,7 @@ describe("package_size = 1-fellen", () => {
       baseUnit: "kg",
       supplierPackage: { packageSize: 1, packageUnit: "kg" },
     });
-    expect(r.baseUnitsPerPackage).toBe(25);
-    expect(r.pricePerBaseUnit).toBeCloseTo(15.16, 2);
-    expect(r.confidenceLevel).not.toBe("high");
-    expect(r.explanation).toContain("men varenavnet sier");
+    expect(r.needsInput).toBe("package_size");
     expect(r.reason).toContain("Bekreft pakningen");
   });
 
@@ -269,11 +292,102 @@ describe("package_size = 1-fellen", () => {
 
 
 
-describe("units.ts-speilet", () => {
-  it("frontend-speilet er identisk med edge-versjonen", () => {
-    const front = readFileSync("src/fakturaer/lib/units.ts", "utf8").split("\n");
+describe("delte filer mot _shared", () => {
+  it("units.ts er byte-identisk med edge-versjonen", () => {
+    const front = readFileSync("src/fakturaer/lib/units.ts", "utf8");
     const shared = readFileSync("supabase/functions/_shared/units.ts", "utf8");
-    // De to første linjene i speilet er en henvisning til kilden.
-    expect(front.slice(2).join("\n")).toBe(shared);
+    expect(front).toBe(shared);
+  });
+
+  it("matchNormalize.ts er byte-identisk med edge-versjonen", () => {
+    const front = readFileSync("src/fakturaer/lib/matchNormalize.ts", "utf8");
+    const shared = readFileSync("supabase/functions/_shared/matchNormalize.ts", "utf8");
+    expect(front).toBe(shared);
+  });
+});
+
+describe("pakningsparser", () => {
+  it("«N x SIZE» gir antall og størrelse", () => {
+    expect(parsePackageFromDescription("HVETEMEL 36X90G")).toMatchObject({ size: 90, unit: "g", count: 36 });
+  });
+
+  it("«SIZE x N» leses riktig vei — 1kg x 10", () => {
+    expect(parsePackageFromDescription("MELIS 1kg x 10")).toMatchObject({ size: 1, unit: "kg", count: 10 });
+  });
+
+  it("«500G X 12» gir 500 g × 12", () => {
+    expect(parsePackageFromDescription("SMØR 500G X 12")).toMatchObject({ size: 500, unit: "g", count: 12 });
+  });
+
+  it("brøk i multiplikasjon: «6 x 1/2 kg»", () => {
+    expect(parsePackageFromDescription("GJÆR 6 x 1/2 kg")).toMatchObject({ size: 0.5, unit: "kg", count: 6 });
+  });
+
+  it("brøk alene: «1/2 kg»", () => {
+    expect(parsePackageFromDescription("GJÆR 1/2 kg")).toMatchObject({ size: 0.5, unit: "kg", count: 1 });
+  });
+
+  it("stk-antall fanges: «10 stk x 500 g»", () => {
+    expect(parsePackageFromDescription("BOLLE 10 stk x 500 g")).toMatchObject({ size: 500, unit: "g", count: 10 });
+  });
+
+  it("velger den pakningsdefinerende størrelsen, ikke den siste", () => {
+    expect(parsePackageFromDescription("OST 10 KG EMB 500 G")).toMatchObject({ size: 10, unit: "kg", count: 1 });
+  });
+
+  it("norsk tusenskille: «1.000 kg» er 1000 kg", () => {
+    expect(parsePackageFromDescription("SALT 1.000 KG")).toMatchObject({ size: 1000, unit: "kg" });
+  });
+
+  it("desimaltall med komma tolkes som desimal", () => {
+    expect(parsePackageFromDescription("FLØTE 0,5 L")).toMatchObject({ size: 0.5, unit: "l" });
+  });
+
+  it("pakningsord fjernes fra navnet", () => {
+    expect(stripPackageTokens("HVETEMEL SIKTET 10X1KG KRT")).toBe("hvetemel siktet");
+    expect(stripPackageTokens("DEMERARA SUKKER 25KG SEKK")).toBe("demerara sukker");
+  });
+});
+
+describe("kartong med stk-antall", () => {
+  it("basisenhet stk: pris per stk = beløp ÷ (kartonger × antall i kartong)", () => {
+    const r = resolveLineCost({
+      quantity: 2,
+      unit: "eske",
+      totalAmount: 400,
+      packageSize: 1,
+      packageUnit: "kg",
+      countPerPackage: 10,
+      description: "RUNDSTYKKE 10 x 1 kg",
+      baseUnit: "stk",
+    });
+    expect(r.needsInput).toBeNull();
+    expect(r.baseQuantity).toBe(20);
+    expect(r.pricePerBaseUnit).toBeCloseTo(20, 6);
+  });
+
+  it("basisenhet kg: 2 KRT à 10 x 1 kg gir 20 kg", () => {
+    const r = resolveLineCost({
+      quantity: 2,
+      unit: "eske",
+      totalAmount: 400,
+      description: "HVETEMEL 2 KRT à 10 x 1 kg",
+      baseUnit: "kg",
+    });
+    expect(r.needsInput).toBeNull();
+    expect(r.baseQuantity).toBe(20);
+    expect(r.pricePerBaseUnit).toBeCloseTo(20, 6);
+  });
+
+  it("stk-antall fra beskrivelsen brukes når basisenheten er stk", () => {
+    const r = resolveLineCost({
+      quantity: 1,
+      unit: "eske",
+      totalAmount: 120,
+      description: "KAKESTYKKE 12 x 100 g",
+      baseUnit: "stk",
+    });
+    expect(r.baseQuantity).toBe(12);
+    expect(r.pricePerBaseUnit).toBeCloseTo(10, 6);
   });
 });
