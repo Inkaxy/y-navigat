@@ -462,6 +462,7 @@ export default function InvoiceDetailPage() {
             lines_sum_variance_pct: data.lines_sum_variance_pct,
             extraction_confidence: data.extraction_confidence,
           }}
+          tolerancePct={defaultTolerancePct}
           onClose={() => setDocOpen(false)}
           className="h-full"
         />
@@ -497,9 +498,6 @@ export default function InvoiceDetailPage() {
         line={matchLineRow}
       />
 
-      <p className="text-center text-xs text-ink-secondary">
-        Avstemming og prisavviks-håndtering kommer i neste pulje. Faktura-lifecycle eies av Tripletex.
-      </p>
     </div>
   );
 }

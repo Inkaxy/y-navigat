@@ -544,6 +544,7 @@ export default function FakturaerInboxPage() {
         price_variance_pct: docLine.price_variance_pct,
         matched_name: docLine.matched_raw_material?.name ?? null,
       }}
+      tolerancePct={toleranceFor(docLine.matched_raw_material?.category ?? null)}
       onClose={() => setDocOpen(false)}
       className="h-full"
     />
