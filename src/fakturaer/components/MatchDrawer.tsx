@@ -105,30 +105,39 @@ export function MatchDrawer({ open, onOpenChange, line, onAcceptedNext }: Props)
       // Komma og parentes er skilletegn i PostgREST-filtre — fjernes fra søket.
       const safe = search.trim().replace(/[,()]/g, " ");
       const term = `%${safe}%`;
-      // Alias er lagret normalisert i databasen — søket må normaliseres likt,
-      // ellers finner vi ikke «Hvetemel, 25 kg» når brukeren skriver «hvetemel 25kg».
-      const normTerm = `%${normalizeMatchKey(search)}%`;
+      const needle = normalizeMatchKey(search);
 
+      // MERK: `alias_value_normalized` i databasen er bare lower(trim(...)),
+      // så et normalisert ilike-søk treffer aldri «crème» eller «hvetemel, 25 kg».
+      // Derfor hentes leverandørens egne alias og filtreres i minnet med samme
+      // normalisering som matchemotoren. Kolonnen bør reberegnes med
+      // normalizeMatchKey i en senere migrasjon, så filteret kan gjøres i SQL.
       const [bySupplier, byAlias] = await Promise.all([
         supabase
           .from("raw_material_suppliers")
           .select("raw_material_id")
           .or(`supplier_sku.ilike.${term},supplier_product_name.ilike.${term}`)
           .limit(50),
-        supabase
-          .from("raw_material_supplier_aliases")
-          .select("alias_value, raw_material_suppliers!inner(raw_material_id)")
-          .or(`alias_value_normalized.ilike.${normTerm},alias_value.ilike.${term}`)
-          .limit(50),
+        supplierId
+          ? supabase
+              .from("raw_material_supplier_aliases")
+              .select("alias_value, raw_material_suppliers!inner(raw_material_id, supplier_id)")
+              .eq("raw_material_suppliers.supplier_id", supplierId)
+              .limit(2000)
+          : Promise.resolve({ data: [], error: null }),
       ]);
       if (bySupplier.error) throw bySupplier.error;
       if (byAlias.error) throw byAlias.error;
 
+      const aliasRows = (byAlias.data ?? []) as unknown as Array<{
+        alias_value: string | null;
+        raw_material_suppliers: { raw_material_id: string } | null;
+      }>;
       const extraIds = [
         ...(bySupplier.data ?? []).map((r) => r.raw_material_id),
-        ...((byAlias.data ?? []) as unknown as Array<{ raw_material_suppliers: { raw_material_id: string } | null }>).map(
-          (r) => r.raw_material_suppliers?.raw_material_id,
-        ),
+        ...aliasRows
+          .filter((r) => normalizeMatchKey(r.alias_value).includes(needle))
+          .map((r) => r.raw_material_suppliers?.raw_material_id),
       ].filter((id): id is string => !!id);
 
       const filter = extraIds.length

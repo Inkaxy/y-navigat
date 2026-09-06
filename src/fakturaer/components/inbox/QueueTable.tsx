@@ -22,7 +22,7 @@ export const REASON_LABELS: Record<string, string> = {
   no_baseline: "Uten avtalepris",
 };
 
-export function reasonsOf(line: ReviewLineRow): string[] {
+export function reasonsOf(line: { review_reason: string | null }): string[] {
   return (line.review_reason ?? "")
     .split(",")
     .map((r) => r.trim())
