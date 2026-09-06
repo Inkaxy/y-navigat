@@ -55,7 +55,7 @@ export default function InvoiceDetailPage() {
         .eq("id", id!)
         .single();
       if (error) throw error;
-      return data as InvoiceDetailRow;
+      return data;
     },
   });
 
