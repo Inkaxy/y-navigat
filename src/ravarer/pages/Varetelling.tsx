@@ -155,12 +155,13 @@ export default function Varetelling() {
       {isLoading || loadError || visible.length === 0 ? (
         <Card className="p-6">
           <QueryState
+            scope="ravarer:varetelling"
             isLoading={isLoading}
+            isError={!!loadError}
             error={loadError}
             isEmpty={visible.length === 0}
             onRetry={retryAll}
-            loadingText="Laster lagerførte varer…"
-            emptyText="Ingen lagerførte varer i utvalget."
+            emptyTitle="Ingen lagerførte varer i utvalget."
           />
         </Card>
       ) : (
