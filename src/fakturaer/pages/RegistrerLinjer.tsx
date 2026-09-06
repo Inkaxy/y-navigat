@@ -119,10 +119,24 @@ export default function RegistrerLinjerPage() {
   }]);
   const remove = (i: number) => setLines((prev) => prev.filter((_, idx) => idx !== i));
 
+  /** Sperrer eller ber om bekreftelse før linjene erstattes. */
+  const requestSave = () => {
+    if (!replaceCheck.allowed) {
+      toast.error(replaceCheck.reason ?? "Linjene kan ikke erstattes");
+      return;
+    }
+    if (replaceCheck.requiresConfirm) {
+      setConfirmOpen(true);
+      return;
+    }
+    void save();
+  };
+
   const save = async () => {
     if (!id) return;
     if (lines.length === 0) { toast.error("Legg til minst én linje"); return; }
     if (lines.some((l) => !l.description.trim())) { toast.error("Alle linjer må ha beskrivelse"); return; }
+    setConfirmOpen(false);
     setBusy(true);
     try {
       // Replace strategy: atomic delete + insert via RPC
