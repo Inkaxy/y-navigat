@@ -97,9 +97,11 @@ export default function RawMaterialDetail() {
         saveRef.current?.();
         return;
       }
-      if (typing) return;
+      if (typing || e.altKey || e.metaKey || e.ctrlKey) return;
+      if (document.querySelector('[role="dialog"], [role="alertdialog"], [role="listbox"]')) return;
       if (e.key === "[" && prev) goTo(prev.id);
       if (e.key === "]" && next) goTo(next.id);
+
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);

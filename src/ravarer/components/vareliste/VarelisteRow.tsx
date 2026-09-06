@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -225,14 +225,27 @@ function RowInner({
 }: VarelisteRowProps & { categoryOptions: readonly string[] }) {
   const show = (id: string) => isColumnVisible(id, hiddenColumns);
   const cell = "px-3 py-2 align-middle";
+  const navigate = useNavigate();
+  const detailUrl = `/ravarer/vareliste/${item.id}${listSearch ? `?${listSearch}` : ""}`;
+
+  /** Hele raden er klikkbar, men ikke når klikket traff en kontroll i raden. */
+  const onRowClick = (e: React.MouseEvent<HTMLTableRowElement>) => {
+    const target = e.target as HTMLElement | null;
+    if (target?.closest('a, button, input, select, label, [role="combobox"], [role="checkbox"]')) {
+      return;
+    }
+    if (window.getSelection()?.toString()) return;
+    navigate(detailUrl);
+  };
 
   return (
     <tr
       className={cn(
-        "border-t border-border/60 odd:bg-muted/20 hover:bg-muted/50",
+        "cursor-pointer border-t border-border/60 odd:bg-muted/20 hover:bg-muted/50",
         focused && "ring-1 ring-inset ring-primary/50",
       )}
       onMouseDown={() => onFocusRow(item.id)}
+      onClick={onRowClick}
     >
       <td className={cn(cell, "w-9")} onClick={(e) => e.stopPropagation()}>
         <Checkbox
@@ -244,7 +257,7 @@ function RowInner({
 
       {show("sku") && (
         <td className={cn(cell, "font-mono text-xs text-muted-foreground")}>
-          <Link to={`/ravarer/vareliste/${item.id}${listSearch ? `?${listSearch}` : ""}`} className="hover:underline">
+          <Link to={detailUrl} className="hover:underline">
             {item.sku}
           </Link>
         </td>
@@ -252,7 +265,7 @@ function RowInner({
 
       <td className={cell}>
         <Link
-          to={`/ravarer/vareliste/${item.id}${listSearch ? `?${listSearch}` : ""}`}
+          to={detailUrl}
           className="block font-medium text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           {item.name}
@@ -378,6 +391,25 @@ function RowInner({
 
       {show("last_invoice") && (
         <td className={cn(cell, "text-muted-foreground")}>{formatDate(item.lastInvoiceDate)}</td>
+      )}
+
+      {show("stock") && (
+        <td className={cn(cell, "text-right tabular-nums")}>
+          {item.stockTracking ? (
+            <span
+              className={cn(
+                item.minStock != null && item.currentStock < item.minStock && "text-destructive",
+              )}
+            >
+              {formatNumber(item.currentStock, 0)}{" "}
+              <span className="text-xs text-muted-foreground">{item.baseUnit}</span>
+            </span>
+          ) : (
+            <span className="text-muted-foreground" title="Uten lagerstyring">
+              —
+            </span>
+          )}
+        </td>
       )}
 
       {show("status") && (

@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   applyView,
   buildSearchText,
+  filterAndSortItems,
   deviationPct,
   matchesSearch,
   normalizeSearch,
@@ -26,6 +27,8 @@ function item(patch: Partial<RawMaterialListItem> = {}): RawMaterialListItem {
     supplierId: "s1",
     supplierName: "Lantmännen",
     supplierSku: "12345",
+    primaryLinkId: "l1",
+
     matchedAlias: null,
     lastInvoicePrice: 10,
     lastInvoiceDate: "2026-01-01",
@@ -54,7 +57,12 @@ describe("normalisering og søk", () => {
     expect(matchesSearch(i.searchText, "12345")).toBe(true);
   });
 
-  it("finner råvaren på bekreftet alias uavhengig av diakritika", () => {
+  it("beholder æ, ø og å, men fjerner aksenter", () => {
+    expect(normalizeSearch("Rå Ærlig Smør")).toBe("rå ærlig smør");
+    expect(normalizeSearch("Crème Brûlée")).toBe("creme brulee");
+  });
+
+  it("finner råvaren på bekreftet alias, uavhengig av store bokstaver og mellomrom", () => {
     const i = item({
       aliases: ["MEL Ø-KVERN"],
       searchText: buildSearchText(["Hvetemel", "RM-1", "MEL Ø-KVERN"]),
@@ -107,6 +115,20 @@ describe("lagrede visninger", () => {
     expect(applyView(items, "not_purchased").map((i) => i.id)).toEqual(["novol"]);
     expect(applyView(items, "no_supplier").map((i) => i.id)).toEqual(["nosup"]);
     expect(applyView(items, "inactive").map((i) => i.id)).toEqual(["inactive"]);
+  });
+
+  it("viser inaktive selv om statusfilteret står på «Aktive»", () => {
+    const list = [item({ id: "a" }), item({ id: "inactive", isActive: false })];
+    const q = {
+      q: "",
+      kat: "all",
+      type: "all",
+      status: "active",
+      view: "inactive",
+      sortKey: "name" as const,
+      sortDir: "asc" as const,
+    };
+    expect(filterAndSortItems(list, q).map((i) => i.id)).toEqual(["inactive"]);
   });
 
   it("respekterer toleransen for avvik", () => {

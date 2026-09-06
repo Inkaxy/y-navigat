@@ -31,7 +31,9 @@ import type { QueryClient } from "@tanstack/react-query";
 const RAW_MATERIAL_GLOBAL_KEYS: readonly string[] = [
   "raw_materials",
   "raw_materials_autocomplete",
+  "raw_material_search_index",
   "raw-material-datasheets",
+
   "raw-material-changelog",
   "raw-material-changelog-count",
   "raw-material-categories",

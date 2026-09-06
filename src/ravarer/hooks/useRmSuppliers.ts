@@ -3,6 +3,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 
+
+function errText(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
+}
+
 export interface RmSupplierRow {
   id: string;
   raw_material_id: string;
@@ -87,7 +92,7 @@ export function useUpsertRmSupplier() {
       invalidateRawMaterial(qc, d.raw_material_id);
       toast.success("Lagret");
     },
-    onError: (e: any) => toast.error(`Kunne ikke lagre: ${e.message ?? e}`),
+    onError: (e: unknown) => toast.error(`Kunne ikke lagre: ${errText(e)}`),
   });
 }
 
@@ -102,7 +107,7 @@ export function useDeleteRmSupplier() {
       invalidateRawMaterial(qc, vars.raw_material_id);
       toast.success("Fjernet");
     },
-    onError: (e: any) => toast.error(`Kunne ikke fjerne: ${e.message ?? e}`),
+    onError: (e: unknown) => toast.error(`Kunne ikke fjerne: ${errText(e)}`),
   });
 }
 
@@ -137,8 +142,10 @@ export function useAddPriceHistory() {
       notes?: string | null;
       set_as_current: boolean;
     }) => {
+      const { data: auth } = await supabase.auth.getUser();
       const { error: histErr } = await supabase.from("raw_material_price_history").insert({
         raw_material_id: input.raw_material_id,
+        created_by: auth.user?.id ?? null,
         supplier_id: input.supplier_id,
         price: input.price,
         effective_date: input.effective_date,
@@ -162,6 +169,6 @@ export function useAddPriceHistory() {
       invalidateRawMaterial(qc, vars.raw_material_id);
       toast.success("Pris registrert");
     },
-    onError: (e: any) => toast.error(`Kunne ikke registrere: ${e.message ?? e}`),
+    onError: (e: unknown) => toast.error(`Kunne ikke registrere: ${errText(e)}`),
   });
 }

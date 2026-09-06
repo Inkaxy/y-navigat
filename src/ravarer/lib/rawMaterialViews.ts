@@ -4,16 +4,34 @@
  * testes direkte (se src/test/rawMaterialViews.test.ts).
  */
 
-/** Små bokstaver, uten diakritika, komprimerte mellomrom. */
+/**
+ * Små bokstaver, uten aksenter, komprimerte mellomrom.
+ * Norske bokstaver (æ, ø, å) beholdes — de er egne bokstaver, ikke aksenter.
+ */
+const NORDIC_PLACEHOLDER: Record<string, string> = {
+  "æ": "\uE000",
+  "ø": "\uE001",
+  "å": "\uE002",
+  "Æ": "\uE000",
+  "Ø": "\uE001",
+  "Å": "\uE002",
+};
+
 export function normalizeSearch(value: string | null | undefined): string {
   if (!value) return "";
   return value
+    .normalize("NFC")
+    .replace(/[æøåÆØÅ]/g, (m) => NORDIC_PLACEHOLDER[m])
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[\uE000\uE001\uE002]/g, (m) =>
+      m === "\uE000" ? "æ" : m === "\uE001" ? "ø" : "å",
+    )
     .toLowerCase()
     .replace(/\s+/g, " ")
     .trim();
 }
+
 
 /** Deler søket i ord — alle ord må finnes (AND). */
 export function searchTokens(query: string): string[] {
@@ -61,6 +79,9 @@ export interface RawMaterialListItem {
   supplierId: string | null;
   supplierName: string | null;
   supplierSku: string | null;
+  /** raw_material_suppliers.id for primærkoblingen — mål for avtaleprisredigering. */
+  primaryLinkId: string | null;
+
   /** Treff i søket som kom fra leverandørnummer/alias (vises som chip). */
   matchedAlias: string | null;
   lastInvoicePrice: number | null;
@@ -241,14 +262,18 @@ export function filterAndSortItems(
   tolerance = DEFAULT_DEVIATION_TOLERANCE,
 ): RawMaterialListItem[] {
   const needle = normalizeSearch(query.q);
+  // Visningen «Inaktive» overstyrer statusfilteret — ellers ville standard
+  // «Aktive» alltid gitt null treff.
+  const ignoreStatus = query.view === "inactive";
   const base = items.filter((i) => {
-    if (query.status === "active" && !i.isActive) return false;
-    if (query.status === "inactive" && i.isActive) return false;
+    if (!ignoreStatus && query.status === "active" && !i.isActive) return false;
+    if (!ignoreStatus && query.status === "inactive" && i.isActive) return false;
     if (query.type !== "all" && i.itemType !== query.type) return false;
     if (query.kat !== "all" && !i.categories.includes(query.kat)) return false;
     if (needle && !matchesSearch(i.searchText, query.q)) return false;
     return true;
   });
+
 
   const withAlias =
     needle.length === 0

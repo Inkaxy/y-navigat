@@ -4,6 +4,11 @@ import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { toast } from "sonner";
 import { invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 
+
+function errText(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
+}
+
 export interface RawMaterialRow {
   id: string;
   legal_entity_id: string;
@@ -108,7 +113,7 @@ export function useCreateRawMaterial() {
       invalidateRawMaterial(qc, data.id);
       toast.success("Råvare opprettet");
     },
-    onError: (e: any) => toast.error(`Kunne ikke opprette: ${e.message ?? e}`),
+    onError: (e: unknown) => toast.error(`Kunne ikke opprette: ${errText(e)}`),
   });
 }
 
@@ -125,13 +130,39 @@ export function useUpdateRawMaterial() {
       if (error) throw error;
       return data as RawMaterialRow;
     },
+    // Optimistisk: listen og detaljen oppdateres med én gang, og rulles
+    // tilbake dersom lagringen feiler.
+    onMutate: async ({ id, ...patch }) => {
+      await qc.cancelQueries({ queryKey: ["raw_materials"] });
+      await qc.cancelQueries({ queryKey: ["raw_material", id] });
+      const lists = qc.getQueriesData<RawMaterialRow[]>({ queryKey: ["raw_materials"] });
+      const detail = qc.getQueriesData<RawMaterialRow | null>({ queryKey: ["raw_material", id] });
+      for (const [key, rows] of lists) {
+        if (!Array.isArray(rows)) continue;
+        qc.setQueryData(
+          key,
+          rows.map((r) => (r.id === id ? { ...r, ...patch } : r)),
+        );
+      }
+      for (const [key, row] of detail) {
+        if (!row) continue;
+        qc.setQueryData(key, { ...row, ...patch });
+      }
+      return { lists, detail };
+    },
+    onError: (e: unknown, _vars, context) => {
+      context?.lists.forEach(([key, rows]) => qc.setQueryData(key, rows));
+      context?.detail.forEach(([key, row]) => qc.setQueryData(key, row));
+      const message = e instanceof Error ? e.message : String(e);
+      toast.error(`Kunne ikke lagre: ${message}`);
+    },
     onSuccess: (data) => {
       invalidateRawMaterial(qc, data.id);
       toast.success("Lagret");
     },
-    onError: (e: any) => toast.error(`Kunne ikke lagre: ${e.message ?? e}`),
   });
 }
+
 
 export function useRenameRawMaterial() {
   const qc = useQueryClient();
@@ -145,7 +176,7 @@ export function useRenameRawMaterial() {
       invalidateRawMaterial(qc, data.id);
       toast.success("Navn oppdatert");
     },
-    onError: (e: any) => toast.error(`Kunne ikke endre navn: ${e.message ?? e}`),
+    onError: (e: unknown) => toast.error(`Kunne ikke endre navn: ${errText(e)}`),
   });
 }
 
@@ -160,6 +191,6 @@ export function useDeleteRawMaterial() {
       invalidateRawMaterial(qc);
       toast.success("Slettet");
     },
-    onError: (e: any) => toast.error(`Kunne ikke slette: ${e.message ?? e}`),
+    onError: (e: unknown) => toast.error(`Kunne ikke slette: ${errText(e)}`),
   });
 }

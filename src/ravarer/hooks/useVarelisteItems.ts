@@ -87,7 +87,9 @@ export function useVarelisteItems() {
         supplierId,
         supplierName,
         supplierSku: primary?.supplierSku ?? supplierSkus[0] ?? null,
+        primaryLinkId: primary?.id ?? null,
         matchedAlias: null,
+
         lastInvoicePrice: lastInvoice.price,
         lastInvoiceDate: lastInvoice.date ?? stat?.last_invoice_date ?? null,
         deviation: deviationPct(lastInvoice.price, r.current_cost_price),
@@ -114,15 +116,22 @@ export function useVarelisteItems() {
     });
   }, [rawMaterials.data, index.data, stats.data, supplierMap]);
 
+  // Feil i søke-/statusindeksen eller kjøpsstatistikken må vises, ikke
+  // svelges — ellers ser listen komplett ut med tomme kolonner.
+  const isError = rawMaterials.isError || index.isError || stats.isError;
+  const error = rawMaterials.error ?? index.error ?? stats.error;
+
   return {
     items,
     suppliers: suppliers.data ?? [],
-    isLoading: rawMaterials.isLoading,
-    isError: rawMaterials.isError,
-    error: rawMaterials.error,
+    isLoading: rawMaterials.isLoading || index.isLoading,
+    isError,
+    error,
     refetch: () => {
       void rawMaterials.refetch();
       void index.refetch();
+      void stats.refetch();
     },
   };
 }
+

@@ -45,7 +45,6 @@ import type {
 import { PurchaseStatsCard } from "@/ravarer/components/PurchaseStatsCard";
 import { osloTodayISO } from "@/lib/osloDate";
 import type { RmSupplierRow } from "@/ravarer/hooks/useRmSuppliers";
-import type { SupplierRow } from "@/ravarer/hooks/useSuppliers";
 import { useRawMaterialUnits } from "@/ravarer/hooks/useRawMaterialUnits";
 
 const BASE_UNIT_KEY = "__base";
@@ -265,7 +264,7 @@ export function SuppliersTab({ rm }: Props) {
         open={linkOpen.open}
         onOpenChange={(v: boolean) => setLinkOpen({ open: v })}
         rawMaterialId={rm.id}
-        existing={links.find((l) => l.id === linkOpen.existingId)}
+        existing={links.find((l) => l.id === linkOpen.existingId) ?? null}
       />
       <AddPriceDialog
         open={priceOpen}
@@ -541,7 +540,7 @@ interface AddPriceDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   rm: RawMaterialRow;
-  suppliers: SupplierRow[];
+  suppliers: { id: string; name: string }[];
 }
 
 function AddPriceDialog({ open, onOpenChange, rm, suppliers }: AddPriceDialogProps) {
