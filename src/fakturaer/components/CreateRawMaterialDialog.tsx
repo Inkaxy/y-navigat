@@ -14,6 +14,7 @@ import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
 import { ITEM_TYPES, defaultCategoryFor, type ItemType } from "@/ravarer/lib/itemTypes";
 import { CategorySelectItems, NEW_CATEGORY_VALUE } from "@/ravarer/components/CategorySelectItems";
 import { InvoiceDocumentButton } from "@/fakturaer/components/InvoiceDocumentButton";
+import { Checkbox } from "@/components/ui/checkbox";
 import { createRawMaterialFromLine } from "@/fakturaer/lib/createRawMaterial";
 import { CANONICAL_BASE_UNITS, CANONICAL_PACKAGE_UNITS, deriveLinePackage, fmtNum, normalizeUnit, parseDecimal, resolveLineCost } from "@/fakturaer/lib/units";
 
@@ -61,10 +62,12 @@ export function CreateRawMaterialDialog({ open, onOpenChange, line, onCreated }:
   const [itemType, setItemType] = useState<ItemType>("ravare");
   const [sku, setSku] = useState("");
   const [supplierSku, setSupplierSku] = useState("");
+  const [confirmPackage, setConfirmPackage] = useState(false);
 
   useEffect(() => {
     if (!line || !open) return;
     setItemType("ravare");
+    setConfirmPackage(false);
     setName(line.description ?? "");
     setBaseUnit(inferBaseUnit(line.unit));
     setSupplierSku(line.supplier_sku ?? "");
@@ -147,6 +150,7 @@ export function CreateRawMaterialDialog({ open, onOpenChange, line, onCreated }:
         baseUnitsPerPackage: cost?.baseUnitsPerPackage ?? null,
         pricePerBaseUnit: pricePerBase,
         baseQuantity: cost?.baseQuantity ?? null,
+        confirmPackage,
       });
 
       toast.success(`Råvare «${name}» opprettet`, { description: "Husk å fylle inn næringsinnhold senere." });
@@ -273,6 +277,11 @@ export function CreateRawMaterialDialog({ open, onOpenChange, line, onCreated }:
               </Select>
             </Field>
           </div>
+
+          <label className="flex items-center gap-2 text-sm text-ink-secondary">
+            <Checkbox checked={confirmPackage} onCheckedChange={(v) => setConfirmPackage(!!v)} />
+            Bekreft pakningen for denne leverandøren
+          </label>
 
           {/* Regnestykket vises åpent — ikke bare svaret. */}
           <div className="space-y-2 rounded-lg border border-line-subtle bg-muted/30 p-3 text-sm">

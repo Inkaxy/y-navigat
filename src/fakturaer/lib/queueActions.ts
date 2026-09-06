@@ -27,7 +27,7 @@ async function currentUserId(): Promise<string> {
  * acceptMatch som match-skuffen og masse-godkjenningen bruker.
  * Returnerer navnet på varen som ble koblet.
  */
-export async function acceptTopSuggestion(line: ReviewLineRow): Promise<string> {
+export async function acceptTopSuggestion(line: ReviewLineRow, opts?: { skipRematch?: boolean }): Promise<string> {
   const top = line.suggestions?.[0];
   if (!top) throw new Error("Linjen har ingen forslag å godta");
   const userId = await currentUserId();
@@ -64,9 +64,29 @@ export async function acceptTopSuggestion(line: ReviewLineRow): Promise<string> 
     baseUnitsPerPackage: cost?.baseUnitsPerPackage ?? null,
     rememberSku: !!line.supplier_sku,
     rememberName: !!line.description && line.description !== line.supplier_sku,
+    skipRematch: opts?.skipRematch ?? false,
   });
 
   return top.raw_material?.name ?? "varen";
+}
+
+/**
+ * Kjører matchemotoren ÉN gang per faktura for de oppgitte linjene.
+ * Brukes etter masse-handlinger der hver linje ble lagret med `skipRematch`.
+ */
+export async function rematchLines(lines: Array<{ invoice_id: string; id: string }>): Promise<void> {
+  const byInvoice = new Map<string, string[]>();
+  for (const l of lines) {
+    const arr = byInvoice.get(l.invoice_id) ?? [];
+    arr.push(l.id);
+    byInvoice.set(l.invoice_id, arr);
+  }
+  for (const [invoiceId, lineIds] of byInvoice) {
+    const { error } = await supabase.functions.invoke("match-invoice-lines", {
+      body: { invoice_id: invoiceId, line_ids: lineIds },
+    });
+    if (error) console.warn(`rematchLines: reberegning feilet for faktura ${invoiceId}: ${error.message}`);
+  }
 }
 
 /** Merker linjen som «ikke aktuell» (frakt, gebyr, pant og lignende). */

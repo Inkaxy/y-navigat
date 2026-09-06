@@ -4,6 +4,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.95.0";
 import { corsHeaders } from "npm:@supabase/supabase-js@2.95.0/cors";
 import { normalizeUnit, isPackageUnit, resolveLineCost, stripPackageTokens } from "../_shared/units.ts";
 import { normalizeMatchKey } from "../_shared/matchNormalize.ts";
+import { syncRegisteredPrices, learnPendingAliases } from "../_shared/priceSync.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const ANON = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -63,7 +64,7 @@ Deno.serve(async (req) => {
 
     // Fetch invoice + ensure caller has write
     const { data: inv, error: invErr } = await svc.from("invoices")
-      .select("id, legal_entity_id, supplier_id, total_amount, invoice_date, status, currency, is_credit_note, extraction_confidence, lines_sum_status, original_invoice_id")
+      .select("id, legal_entity_id, supplier_id, total_amount, invoice_date, status, currency, is_credit_note, extraction_confidence, lines_sum_status, notes")
       .eq("id", invoiceId).single();
     if (invErr || !inv) return json({ error: "Invoice not found" }, 404);
 
@@ -110,6 +111,19 @@ Deno.serve(async (req) => {
     const usableAliases = aliases.filter((a) => a.status !== "rejected" && a.status !== "superseded");
     const aliasKey = (a: AnyRec) => normalizeMatchKey(a.alias_value_normalized ?? a.alias_value);
 
+    // Avviste alias er et menneskes «nei» — de skal blokkere også de direkte trinnene (3 og 4).
+    const rejectedKeysByRms = new Map<string, Set<string>>();
+    for (const a of aliases) {
+      if (a.status !== "rejected") continue;
+      const key = aliasKey(a);
+      if (!key) continue;
+      const set = rejectedKeysByRms.get(a.raw_material_supplier_id) ?? new Set<string>();
+      set.add(key);
+      rejectedKeysByRms.set(a.raw_material_supplier_id, set);
+    }
+    const isRejectedFor = (rmsId: string, ...keys: Array<string | null>) =>
+      keys.some((k) => !!k && (rejectedKeysByRms.get(rmsId)?.has(k) ?? false));
+
     // Raw materials in legal entity (active) — for fuzzy
     const { data: rmList } = await svc.from("raw_materials")
       .select("id, name, sku, category, base_unit, current_cost_price, price_updated_at, primary_supplier_id, package_size, package_unit, base_units_per_package")
@@ -145,7 +159,7 @@ Deno.serve(async (req) => {
         const usable = cost && !cost.needsInput && cost.confidenceLevel !== "low";
         const actual: number | null = usable ? cost!.pricePerBaseUnit : null;
         manualUpdate.price_per_base_unit = actual;
-        manualUpdate.base_quantity = cost && !cost.needsInput ? cost.baseQuantity : null;
+        manualUpdate.base_quantity = cost && !cost.needsInput && cost.confidence >= 0.85 ? cost.baseQuantity : null;
         manualUpdate.expected_price_per_base_unit = expected;
 
         const reviewReasons = new Set<string>();
@@ -299,7 +313,9 @@ Deno.serve(async (req) => {
 
       // STEG 3 — direkte treff på leverandørens eget varenummer (raw_material_suppliers.supplier_sku)
       if (!matchedRmId && skuN) {
-        const skuRows = rmsList.filter((r: AnyRec) => normalizeMatchKey(r.supplier_sku) === skuN);
+        const skuRows = rmsList.filter(
+          (r: AnyRec) => normalizeMatchKey(r.supplier_sku) === skuN && !isRejectedFor(r.id, skuN, descN),
+        );
         const skuRmIds = new Set(skuRows.map((r: AnyRec) => r.raw_material_id));
         if (skuRmIds.size === 1) {
           const rmsRow = skuRows[0];
@@ -336,12 +352,14 @@ Deno.serve(async (req) => {
           if (normalizeMatchKey(stripPackageTokens(a.alias_value)) !== descStripped) continue;
           const rmsRow = rmsById.get(a.raw_material_supplier_id);
           if (!rmsRow) continue;
+          if (isRejectedFor(rmsRow.id, skuN, descN)) continue;
           strippedRmIds.add(rmsRow.raw_material_id);
           strippedRms = rmsRow;
         }
         for (const r of rmsList) {
           if (!r.supplier_product_name) continue;
           if (normalizeMatchKey(stripPackageTokens(r.supplier_product_name)) !== descStripped) continue;
+          if (isRejectedFor(r.id, skuN, descN)) continue;
           strippedRmIds.add(r.raw_material_id);
           strippedRms = r;
         }
@@ -517,28 +535,7 @@ Deno.serve(async (req) => {
       // Lær av vellykket fuzzy-match: skriv pending alias (aldri degrader bekreftede)
       if (matchedRmId && (confidenceLabel === "auto_medium" || confidenceLabel === "auto_low")) {
         const learnRms = fuzzyMatchRmsRow ?? rmsList.find((r: AnyRec) => r.raw_material_id === matchedRmId);
-        if (learnRms) {
-          const nowIso = new Date().toISOString();
-          const aliasRows: AnyRec[] = [];
-          if (line.supplier_sku) aliasRows.push({
-            raw_material_supplier_id: learnRms.id, alias_type: "supplier_sku",
-            alias_value: line.supplier_sku, status: "pending",
-            first_seen_invoice_id: inv.id, match_count: 1, last_seen_at: nowIso,
-            confirmed_by: null, confirmed_at: null,
-          });
-          if (line.description) aliasRows.push({
-            raw_material_supplier_id: learnRms.id, alias_type: "product_name",
-            alias_value: line.description, status: "pending",
-            first_seen_invoice_id: inv.id, match_count: 1, last_seen_at: nowIso,
-            confirmed_by: null, confirmed_at: null,
-          });
-          for (const row of aliasRows) {
-            await svc.from("raw_material_supplier_aliases").upsert(row, {
-              onConflict: "alias_type,alias_value_normalized,raw_material_supplier_id",
-              ignoreDuplicates: true,
-            });
-          }
-        }
+        if (learnRms) await learnPendingAliases(svc, learnRms.id, line, inv.id);
       }
 
       await applyUpdate(svc, line.id, update);
@@ -560,7 +557,7 @@ Deno.serve(async (req) => {
         const invoiceLevelReview =
           inv.lines_sum_status === "mismatch" ||
           (inv.extraction_confidence != null && Number(inv.extraction_confidence) < 0.6) ||
-          (inv.is_credit_note === true && !inv.original_invoice_id);
+          (inv.is_credit_note === true && !String(inv.notes ?? "").trim());
 
         const newStatus = (needsReview && needsReview.length > 0) || invoiceLevelReview
           ? "needs_review"
@@ -612,70 +609,6 @@ async function upsertConfirmedSkuAlias(
 async function insertSuggestions(svc: any, rows: AnyRec[]) {
   if (!rows.length) return;
   await svc.from("invoice_line_match_suggestions").insert(rows);
-}
-
-async function syncRegisteredPrices(svc: any, inv: AnyRec, line: AnyRec, rm: AnyRec | undefined, rmsRow: AnyRec | undefined, actual: number | null, update: AnyRec, tolPct = 2) {
-  if (!rm || actual == null || !Number.isFinite(actual)) return;
-  // Registrerte priser skal aldri skrives fra et usikkert eller uegnet grunnlag.
-  if (actual <= 0) return;
-  if (inv.is_credit_note) return;                              // kreditnota er ikke en innkjøpspris
-  if (inv.currency && String(inv.currency).toUpperCase() !== "NOK") return;
-  // En eldre faktura skal ikke overskrive en nyere registrert pris.
-  const invDate = inv.invoice_date ? String(inv.invoice_date) : null;
-  const lastDate = rmsRow?.last_invoice_date ? String(rmsRow.last_invoice_date) : null;
-  if (invDate && lastDate && invDate < lastDate) return;
-  const rmPriceDate = rm.price_updated_at ? String(rm.price_updated_at).slice(0, 10) : null;
-  const staleForRm = !!(invDate && rmPriceDate && invDate < rmPriceDate);
-
-  const registered = rm.current_cost_price != null ? Number(rm.current_cost_price) : null;
-  const supplierRegistered = rmsRow?.agreed_price_per_base_unit != null ? Number(rmsRow.agreed_price_per_base_unit) : null;
-  // Både økning OG fall skal fanges: et prisfall på 96 % er signaturen til en pakningsfeil.
-  const deviation = (base: number | null): number | null =>
-    base != null && base !== 0 ? ((actual - base) / base) * 100 : null;
-  const devs = [deviation(registered), deviation(supplierRegistered)].filter(
-    (d): d is number => d != null && Math.abs(d) > tolPct,
-  );
-  if (devs.length > 0) {
-    const worst = devs.reduce((a, b) => (Math.abs(b) > Math.abs(a) ? b : a));
-    const reason = worst > 0 ? "price_increase" : "price_drop";
-    update.requires_review = true;
-    update.review_reason = update.review_reason
-      ? Array.from(new Set(`${update.review_reason},${reason}`.split(","))).join(",")
-      : reason;
-  }
-
-  // Avviket over kan i seg selv ha sendt linja til gjennomgang. Da skal ingen
-  // registrert pris skrives før et menneske har sagt ja.
-  if (update.requires_review) return;
-
-  const nowIso = new Date().toISOString();
-  if (rmsRow?.id) {
-    // Eksisterende kobling: rør kun fakturapris/-dato — aldri avtalepris eller brukerens sku/navn.
-    await svc.from("raw_material_suppliers").update({
-      last_invoice_price: actual,
-      last_invoice_date: inv.invoice_date ?? null,
-      updated_at: nowIso,
-    }).eq("id", rmsRow.id);
-  } else {
-    await svc.from("raw_material_suppliers").upsert({
-      raw_material_id: rm.id,
-      supplier_id: inv.supplier_id,
-      supplier_sku: line.supplier_sku,
-      supplier_product_name: line.description,
-      last_invoice_price: actual,
-      last_invoice_date: inv.invoice_date ?? null,
-      updated_at: nowIso,
-    }, { onConflict: "raw_material_id,supplier_id" });
-  }
-
-  if (!staleForRm && (!rm.primary_supplier_id || rm.primary_supplier_id === inv.supplier_id || registered == null)) {
-    await svc.from("raw_materials").update({
-      current_cost_price: actual,
-      price_source: "invoice",
-      price_updated_at: inv.invoice_date,
-      primary_supplier_id: rm.primary_supplier_id ?? inv.supplier_id,
-    }).eq("id", rm.id);
-  }
 }
 
 /**

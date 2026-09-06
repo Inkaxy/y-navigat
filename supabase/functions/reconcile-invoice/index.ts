@@ -59,6 +59,42 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Triggerne dekker bare auto_high/auto_low/manual. Inntil de utvides skriver vi
+    // prishistorikk for auto_medium her — idempotent per (faktura, råvare).
+    const mediumLines = lines.filter(
+      (l: any) =>
+        l.match_confidence === "auto_medium" && l.raw_material_id && l.price_per_base_unit != null,
+    );
+    let mediumHistoryInserted = 0;
+    if (mediumLines.length > 0) {
+      const rmIds = [...new Set(mediumLines.map((l: any) => l.raw_material_id))];
+      const { data: existing } = await svc
+        .from("raw_material_price_history")
+        .select("raw_material_id")
+        .eq("invoice_id", invoice_id)
+        .in("raw_material_id", rmIds);
+      const seen = new Set((existing ?? []).map((r: any) => r.raw_material_id));
+      const rows: any[] = [];
+      for (const l of mediumLines) {
+        if (seen.has(l.raw_material_id)) continue;
+        seen.add(l.raw_material_id);
+        rows.push({
+          raw_material_id: l.raw_material_id,
+          supplier_id: invoice.supplier_id,
+          price: l.price_per_base_unit,
+          effective_date: invoice.invoice_date,
+          source: "invoice",
+          invoice_id: invoice_id,
+          created_by: userId,
+        });
+      }
+      if (rows.length > 0) {
+        const { error: histErr } = await svc.from("raw_material_price_history").insert(rows);
+        if (histErr) console.error("reconcile-invoice: prishistorikk (auto_medium)", histErr);
+        else mediumHistoryInserted = rows.length;
+      }
+    }
+
 
     const { error: updErr } = await svc
       .from("invoices")
@@ -71,7 +107,7 @@ Deno.serve(async (req) => {
       if (error) console.error("refresh_purchase_stats", error);
     });
 
-    return json({ ok: true, skipped_no_base_price: skippedNoBasePrice });
+    return json({ ok: true, skipped_no_base_price: skippedNoBasePrice, medium_history_inserted: mediumHistoryInserted });
   } catch (e) {
     console.error("reconcile-invoice error", e);
     return json({ error: (e as Error).message }, 500);

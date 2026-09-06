@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { normalizeMatchKey } from "@/fakturaer/lib/matchNormalize";
 import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
 
 export interface AcceptMatchOptions {
@@ -198,64 +199,127 @@ export async function acceptMatch(opts: AcceptMatchOptions): Promise<{ lineIds: 
       first_seen_invoice_id: line.invoice_id,
     });
   }
-  for (const a of aliasInserts) {
-    const { error: aliasErr } = await supabase.from("raw_material_supplier_aliases").upsert(a, {
+  // Leverandørens koblinger og alias hentes ÉN gang; all sammenligning skjer i minnet
+  // på normalisert nøkkel (databasen normaliserer bare lower/trim).
+  const needsAliasWork = aliasInserts.length > 0 || rejectedRawMaterialIds.length > 0;
+  let supplierRmsRows: Array<{ id: string; raw_material_id: string }> = [];
+  let supplierAliases: Array<{
+    id: string;
+    raw_material_supplier_id: string;
+    alias_type: string;
+    alias_value: string;
+    alias_value_normalized: string | null;
+    status: string;
+  }> = [];
+
+  if (needsAliasWork && supplierId) {
+    const { data: rmsRows, error: rmsErr } = await supabase
+      .from("raw_material_suppliers")
+      .select("id, raw_material_id")
+      .eq("supplier_id", supplierId);
+    if (rmsErr) {
+      console.warn(`acceptMatch: kunne ikke hente leverandørens varekoblinger for alias-opprydning: ${rmsErr.message}`);
+    }
+    supplierRmsRows = rmsRows ?? [];
+    const allRmsIds = supplierRmsRows.map((r) => r.id);
+    if (allRmsIds.length > 0) {
+      const { data: aliasRows, error: aliasReadErr } = await supabase
+        .from("raw_material_supplier_aliases")
+        .select("id, raw_material_supplier_id, alias_type, alias_value, alias_value_normalized, status")
+        .in("raw_material_supplier_id", allRmsIds);
+      if (aliasReadErr) {
+        console.warn(`acceptMatch: kunne ikke hente leverandørens alias: ${aliasReadErr.message}`);
+      }
+      supplierAliases = aliasRows ?? [];
+    }
+  }
+
+  const keyOf = (a: { alias_value_normalized: string | null; alias_value: string }) =>
+    normalizeMatchKey(a.alias_value_normalized ?? a.alias_value);
+
+  // 2a) Bekreftede alias — én batch-upsert.
+  if (aliasInserts.length > 0) {
+    const { error: aliasErr } = await supabase.from("raw_material_supplier_aliases").upsert(aliasInserts, {
       onConflict: "alias_type,alias_value_normalized,raw_material_supplier_id",
     });
     if (aliasErr) {
-      const what = a.alias_type === "supplier_sku" ? "leverandør-SKU" : "produktnavn";
-      throw new Error(`Kunne ikke lagre alias (${what}: «${a.alias_value}»): ${aliasErr.message}`);
+      throw new Error(`Kunne ikke lagre alias (${aliasInserts.length} rader): ${aliasErr.message}`);
     }
   }
 
   // 2b) Pensjonér motstridende alias hos samme leverandør som peker på ANDRE varer.
-  if (aliasInserts.length > 0 && supplierId) {
-    const { data: supplierRms, error: supplierRmsErr } = await supabase
-      .from("raw_material_suppliers")
-      .select("id, raw_material_id")
-      .eq("supplier_id", supplierId);
-    if (supplierRmsErr) {
-      console.warn(
-        `acceptMatch: kunne ikke hente leverandørens øvrige varekoblinger for opprydning av alias: ${supplierRmsErr.message}`,
-      );
-    }
-    const otherRmsIds = (supplierRms ?? [])
-      .filter((r) => r.raw_material_id !== rawMaterialId)
-      .map((r) => r.id);
-    if (otherRmsIds.length > 0) {
-      for (const a of aliasInserts) {
-        const { error: supErr } = await supabase
-          .from("raw_material_supplier_aliases")
-          .update({ status: "superseded" })
-          .in("raw_material_supplier_id", otherRmsIds)
-          .eq("alias_type", a.alias_type)
-          .eq("alias_value", a.alias_value)
-          .eq("status", "confirmed");
-        if (supErr) {
-          console.warn(
-            `acceptMatch: kunne ikke pensjonere motstridende alias «${a.alias_value}» (${a.alias_type}) hos leverandøren: ${supErr.message}`,
-          );
-        }
+  if (aliasInserts.length > 0 && supplierRmsRows.length > 0) {
+    const otherRmsIds = new Set(
+      supplierRmsRows.filter((r) => r.raw_material_id !== rawMaterialId).map((r) => r.id),
+    );
+    const supersedeIds = supplierAliases
+      .filter(
+        (a) =>
+          a.status === "confirmed" &&
+          otherRmsIds.has(a.raw_material_supplier_id) &&
+          aliasInserts.some((ins) => ins.alias_type === a.alias_type && normalizeMatchKey(ins.alias_value) === keyOf(a)),
+      )
+      .map((a) => a.id);
+    if (supersedeIds.length > 0) {
+      const { error: supErr } = await supabase
+        .from("raw_material_supplier_aliases")
+        .update({ status: "superseded" })
+        .in("id", supersedeIds);
+      if (supErr) {
+        console.warn(`acceptMatch: kunne ikke pensjonere ${supersedeIds.length} motstridende alias: ${supErr.message}`);
       }
     }
   }
 
   // 2c) Lær av det brukeren valgte BORT: alias mot avviste varer merkes avvist.
-  if (rejectedRawMaterialIds.length > 0 && supplierId) {
-    const { data: rejRms, error: rejErr } = await supabase
-      .from("raw_material_suppliers")
-      .select("id")
-      .eq("supplier_id", supplierId)
-      .in("raw_material_id", rejectedRawMaterialIds);
-    if (rejErr) {
-      console.warn(`acceptMatch: kunne ikke hente koblinger for avviste varer: ${rejErr.message}`);
-    }
-    const rejIds = (rejRms ?? []).map((r) => r.id);
+  //     Finnes ikke aliaset fra før, settes en avvist rad inn — ellers ville et
+  //     fuzzy-forslag på en umatchet linje aldri kunne avvises.
+  if (rejectedRawMaterialIds.length > 0 && supplierRmsRows.length > 0) {
+    const rejSet = new Set(rejectedRawMaterialIds);
+    const rejIds = supplierRmsRows.filter((r) => rejSet.has(r.raw_material_id)).map((r) => r.id);
     if (rejIds.length > 0) {
       const values: Array<{ type: "supplier_sku" | "product_name"; value: string }> = [];
       if (line.supplier_sku) values.push({ type: "supplier_sku", value: line.supplier_sku });
       if (line.description) values.push({ type: "product_name", value: line.description });
-      for (const v of values) {
+
+      const existingIds: string[] = [];
+      const newRows: Array<{
+        raw_material_supplier_id: string;
+        alias_type: "supplier_sku" | "product_name";
+        alias_value: string;
+        status: "rejected";
+        rejected_by: string;
+        rejected_at: string;
+        rejected_reason: string;
+        first_seen_invoice_id: string;
+      }> = [];
+
+      for (const rmsRowId of rejIds) {
+        for (const v of values) {
+          const hit = supplierAliases.find(
+            (a) =>
+              a.raw_material_supplier_id === rmsRowId &&
+              a.alias_type === v.type &&
+              keyOf(a) === normalizeMatchKey(v.value),
+          );
+          if (hit) {
+            if (hit.status !== "rejected") existingIds.push(hit.id);
+          } else {
+            newRows.push({
+              raw_material_supplier_id: rmsRowId,
+              alias_type: v.type,
+              alias_value: v.value,
+              status: "rejected",
+              rejected_by: userId,
+              rejected_at: nowIso,
+              rejected_reason: "valgt annen råvare",
+              first_seen_invoice_id: line.invoice_id,
+            });
+          }
+        }
+      }
+
+      if (existingIds.length > 0) {
         const { error: rejUpdErr } = await supabase
           .from("raw_material_supplier_aliases")
           .update({
@@ -264,12 +328,14 @@ export async function acceptMatch(opts: AcceptMatchOptions): Promise<{ lineIds: 
             rejected_at: nowIso,
             rejected_reason: "valgt annen råvare",
           })
-          .in("raw_material_supplier_id", rejIds)
-          .eq("alias_type", v.type)
-          .eq("alias_value", v.value);
-        if (rejUpdErr) {
-          console.warn(`acceptMatch: kunne ikke avvise alias «${v.value}»: ${rejUpdErr.message}`);
-        }
+          .in("id", existingIds);
+        if (rejUpdErr) console.warn(`acceptMatch: kunne ikke avvise eksisterende alias: ${rejUpdErr.message}`);
+      }
+      if (newRows.length > 0) {
+        const { error: rejInsErr } = await supabase.from("raw_material_supplier_aliases").upsert(newRows, {
+          onConflict: "alias_type,alias_value_normalized,raw_material_supplier_id",
+        });
+        if (rejInsErr) console.warn(`acceptMatch: kunne ikke lagre avviste alias: ${rejInsErr.message}`);
       }
     }
   }
