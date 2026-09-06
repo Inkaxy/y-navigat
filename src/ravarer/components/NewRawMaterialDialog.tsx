@@ -12,12 +12,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { useCreateRawMaterial } from "@/ravarer/hooks/useRawMaterials";
 import { BASE_UNITS, PACKAGE_UNITS } from "@/ravarer/lib/constants";
 import { CategorySelectItems } from "@/ravarer/components/CategorySelectItems";
+import { Checkbox } from "@/components/ui/checkbox";
+import { categoryGroups } from "@/ravarer/lib/categories";
+import { ITEM_TYPES, defaultCategoryFor, type ItemType } from "@/ravarer/lib/itemTypes";
 import { useNavigate } from "react-router-dom";
 
 const schema = z.object({
   sku: z.string().trim().min(1, "Påkrevd"),
   name: z.string().trim().min(1, "Påkrevd"),
   category: z.string().optional(),
+  categories: z.array(z.string()).default([]),
+  item_type: z.enum(["ravare", "emballasje", "forbruksvare", "videresalg"]).default("ravare"),
   base_unit: z.string().min(1, "Velg enhet"),
   package_size: z.coerce.number().positive().optional().or(z.literal("").transform(() => undefined)),
   package_unit: z.string().optional(),
@@ -47,6 +52,8 @@ export function NewRawMaterialDialog({ open, onOpenChange, onCreated, initialNam
       sku: "",
       name: initialName ?? "",
       category: "",
+      categories: [],
+      item_type: "ravare",
       base_unit: "kg",
       package_unit: "",
       is_packaging: false,
@@ -66,6 +73,8 @@ export function NewRawMaterialDialog({ open, onOpenChange, onCreated, initialNam
       sku: v.sku,
       name: v.name,
       category: v.category || null,
+      categories: v.categories,
+      item_type: v.item_type,
       base_unit: v.base_unit,
       package_size: v.package_size ?? null,
       package_unit: v.package_unit || null,
@@ -108,6 +117,57 @@ export function NewRawMaterialDialog({ open, onOpenChange, onCreated, initialNam
                 </FormItem>
               )} />
             </div>
+            <FormField name="item_type" control={form.control} render={({ field }) => (
+              <FormItem>
+                <FormLabel>Varetype *</FormLabel>
+                <Select
+                  value={field.value}
+                  onValueChange={(v) => {
+                    field.onChange(v);
+                    const suggested = defaultCategoryFor(v as ItemType);
+                    if (suggested && !form.getValues("category")) form.setValue("category", suggested);
+                  }}
+                >
+                  <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                  <SelectContent>
+                    {ITEM_TYPES.map((t) => (
+                      <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField name="categories" control={form.control} render={({ field }) => (
+              <FormItem>
+                <FormLabel>Flere kategorier</FormLabel>
+                <div className="max-h-40 space-y-2 overflow-y-auto rounded-lg border p-3">
+                  {categoryGroups().map((g) => (
+                    <div key={g.label} className="space-y-1">
+                      <p className="text-xs font-medium text-ink-secondary">{g.label}</p>
+                      {g.items.map((c) => {
+                        const selected = (field.value ?? []).includes(c);
+                        return (
+                          <label key={c} className="flex items-center gap-2 text-sm">
+                            <Checkbox
+                              checked={selected}
+                              onCheckedChange={(v) =>
+                                field.onChange(
+                                  v === true
+                                    ? [...(field.value ?? []), c]
+                                    : (field.value ?? []).filter((x: string) => x !== c),
+                                )
+                              }
+                            />
+                            {c}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
+              </FormItem>
+            )} />
             <FormField name="name" control={form.control} render={({ field }) => (
               <FormItem>
                 <FormLabel>Navn *</FormLabel>
