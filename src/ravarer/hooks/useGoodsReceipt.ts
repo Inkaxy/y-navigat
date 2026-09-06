@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { toast } from "sonner";
 import { invalidateRawMaterial } from "@/ravarer/lib/invalidate";
+import { fetchAllRows } from "@/lib/supabasePaging";
 
 export interface ReceiptInvoiceRow {
   id: string;
@@ -80,26 +81,37 @@ export function useReceiptInvoices(filters: InvoiceFilters) {
       const ids = (invoices ?? []).map(i => i.id);
       if (ids.length === 0) return [];
 
-      const { data: lines, error: lineErr } = await supabase
-        .from("invoice_lines")
-        .select("id, invoice_id, base_quantity, raw_material_id, raw_materials(stock_tracking)")
-        .in("invoice_id", ids);
-      if (lineErr) throw lineErr;
+      // Fakturalinjer og bevegelser hentes komplett — tallene under er summer,
+      // og en enkelt .limit() ville stille kuttet perioden.
+      type CountLine = { id: string; invoice_id: string; raw_materials: { stock_tracking: boolean } | null };
+      const lines = await fetchAllRows<CountLine>((from, to) =>
+        supabase
+          .from("invoice_lines")
+          .select("id, invoice_id, base_quantity, raw_material_id, raw_materials(stock_tracking)")
+          .in("invoice_id", ids)
+          .order("id")
+          .range(from, to) as unknown as PromiseLike<{ data: CountLine[] | null; error: { message: string } | null }>,
+      );
 
-      const lineIds = (lines ?? []).map(l => l.id);
+      const lineIds = lines.map(l => l.id);
       const movedLineIds = new Set<string>();
-      if (lineIds.length > 0) {
-        const { data: movements } = await supabase
-          .from("stock_movements")
-          .select("source_id")
-          .eq("source_table", "invoice_lines")
-          .eq("movement_type", "purchase")
-          .in("source_id", lineIds);
-        (movements ?? []).forEach(m => m.source_id && movedLineIds.add(m.source_id));
+      for (let i = 0; i < lineIds.length; i += 500) {
+        const chunk = lineIds.slice(i, i + 500);
+        const movements = await fetchAllRows<{ source_id: string | null }>((from, to) =>
+          supabase
+            .from("stock_movements")
+            .select("source_id")
+            .eq("source_table", "invoice_lines")
+            .eq("movement_type", "purchase")
+            .in("source_id", chunk)
+            .order("source_id")
+            .range(from, to),
+        );
+        movements.forEach(m => m.source_id && movedLineIds.add(m.source_id));
       }
 
       return (invoices ?? []).map(inv => {
-        const mine = (lines ?? []).filter(l => l.invoice_id === inv.id);
+        const mine = lines.filter(l => l.invoice_id === inv.id);
         let received = 0;
         let missing = 0;
         let untracked = 0;
@@ -133,25 +145,31 @@ export function useReceiptLines(invoiceId: string | undefined) {
     queryKey: ["receipt-lines", invoiceId],
     enabled: !!invoiceId,
     queryFn: async (): Promise<ReceiptLine[]> => {
-      const { data, error } = await supabase
-        .from("invoice_lines")
-        .select(
-          "id, invoice_id, line_number, description, quantity, unit, base_quantity, total_amount, raw_material_id, raw_materials(id, name, base_unit, stock_tracking)",
-        )
-        .eq("invoice_id", invoiceId!)
-        .order("line_number");
-      if (error) throw error;
-      const rows = (data ?? []) as unknown as RawLine[];
+      const rows = await fetchAllRows<RawLine>((from, to) =>
+        supabase
+          .from("invoice_lines")
+          .select(
+            "id, invoice_id, line_number, description, quantity, unit, base_quantity, total_amount, raw_material_id, raw_materials(id, name, base_unit, stock_tracking)",
+          )
+          .eq("invoice_id", invoiceId!)
+          .order("line_number")
+          .range(from, to) as unknown as PromiseLike<{ data: RawLine[] | null; error: { message: string } | null }>,
+      );
 
       const receivedByLine = new Map<string, number>();
       if (rows.length > 0) {
-        const { data: movements } = await supabase
-          .from("stock_movements")
-          .select("source_id, quantity_base")
-          .eq("source_table", "invoice_lines")
-          .eq("movement_type", "purchase")
-          .in("source_id", rows.map(r => r.id));
-        (movements ?? []).forEach(m => {
+        // Feil her ville ellers vist «ikke mottatt» på linjer som faktisk er lagerført.
+        const movements = await fetchAllRows<{ source_id: string | null; quantity_base: number | null }>((from, to) =>
+          supabase
+            .from("stock_movements")
+            .select("source_id, quantity_base")
+            .eq("source_table", "invoice_lines")
+            .eq("movement_type", "purchase")
+            .in("source_id", rows.map(r => r.id))
+            .order("source_id")
+            .range(from, to),
+        );
+        movements.forEach(m => {
           if (!m.source_id) return;
           receivedByLine.set(m.source_id, (receivedByLine.get(m.source_id) ?? 0) + (Number(m.quantity_base) || 0));
         });

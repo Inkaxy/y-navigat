@@ -83,3 +83,10 @@ Endringer i edge-funksjonene `apply-datasheet-update`, `validate-rfq-access` og
   databasespørringer er blokkert i dette miljøet (`database_not_managed`).
 - Edge-funksjonene er endret i kode. Om de er deployet i miljøet er ikke bekreftet her.
 - E7 og F1–F6 er ikke erklært ferdig.
+
+## Runde D–F (avslutning)
+
+- **D Pakninger:** `src/ravarer/pages/Pakninger.tsx` skriver ikke lenger direkte til `raw_materials`. Bekreftelse går nå via `set_raw_material_package` (forhåndsvisning → lagring) med «Angre» i toasten. Ser forhåndsvisningen usikker ut (`ok=false`, ukjente enheter eller uteliggere), åpnes `SetPackageDialog` for full gjennomgang i stedet for blind lagring. URL og hurtigtaster er uendret.
+- **E Enheter:** `src/varer/lib/bakers.ts` har aliaser for `liter/l/dl/cl/stk` og `convertToGrams` som markerer ufullstendige omregninger (manglende tetthet eller stykkvekt) med forklaring — ingen stille nullvekt.
+- **F Varemottak/Varetelling:** `src/ravarer/pages/Varemottak.tsx` viser nå feil fra fakturaer, linjer og enheter samlet i `QueryState` med felles «Prøv igjen». `useGoodsReceipt` henter linjer og bevegelser komplett via `fetchAllRows`; `useStockCount` kaster ved `ok === false` eller ugyldig svar, og telleutkastet beholdes.
+- **Verifisering:** typecheck 0, `vitest run` 353/353, eslint rent på berørte filer, `npm run build` grønt.

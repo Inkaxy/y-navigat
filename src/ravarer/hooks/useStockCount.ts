@@ -28,17 +28,28 @@ export function useApplyRmStockCount() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: { lines: CountLineInput[]; note: string }): Promise<CountResult> => {
+      if (input.lines.length === 0) throw new Error("Ingen varer er talt opp");
       const { data, error } = await supabase.rpc("rm_stock_count_apply", {
         p_lines: input.lines as unknown as never,
         p_note: input.note,
       });
       if (error) throw error;
-      const res = (data ?? {}) as Partial<CountResult>;
+      if (!data || typeof data !== "object" || Array.isArray(data)) {
+        throw new Error("Tellingen ga et uventet svar fra serveren. Ingenting er bokført.");
+      }
+      const res = data as Partial<CountResult> & { error?: string };
+      // ok === false betyr at serveren avviste tellingen — det er en feil, ikke en suksess.
+      if (res.ok === false) {
+        throw new Error(res.error ?? "Serveren avviste tellingen. Ingenting er bokført.");
+      }
+      if (typeof res.adjusted !== "number" && typeof res.adjusted !== "string") {
+        throw new Error("Tellingen mangler svar på hvor mange varer som ble justert.");
+      }
       return {
-        ok: res.ok !== false,
+        ok: true,
         adjusted: Number(res.adjusted ?? 0),
         unchanged: Number(res.unchanged ?? 0),
-        rows: (res.rows ?? []) as CountResultRow[],
+        rows: Array.isArray(res.rows) ? (res.rows as CountResultRow[]) : [],
       };
     },
     onSuccess: res => {

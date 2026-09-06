@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { AlertTriangle, Check, Loader2, PackageCheck, PackagePlus, Truck } from "lucide-react";
+import { AlertTriangle, Check, PackageCheck, PackagePlus, Truck } from "lucide-react";
 
 import { RavarerHeaderBanner } from "@/ravarer/components/RavarerHeaderBanner";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
@@ -18,6 +18,7 @@ import { useSuppliers } from "@/ravarer/hooks/useSuppliers";
 import { useRawMaterials } from "@/ravarer/hooks/useRawMaterials";
 import { useRawMaterialUnits, useRawMaterialUnitsFor } from "@/ravarer/hooks/useRawMaterialUnits";
 import { useReceiptInvoices, useReceiptLines, useReceiptMovement, type ReceiptLine } from "@/ravarer/hooks/useGoodsReceipt";
+import { QueryState } from "@/components/common/QueryState";
 import { UnitAmountRows, emptyRow, rowsToBase, type UnitAmountRow } from "@/ravarer/components/stock/UnitAmountRows";
 import { formatDate, formatNok, formatNumber } from "@/ravarer/lib/constants";
 import { osloDateISOPlusDays, osloTodayISO } from "@/lib/osloDate";
@@ -34,11 +35,13 @@ export default function Varemottak() {
   const [manualOpen, setManualOpen] = useState(false);
 
   const { data: suppliers = [] } = useSuppliers();
-  const { data: invoices = [], isLoading } = useReceiptInvoices({
+  const invoicesQuery = useReceiptInvoices({
     fromDate,
     toDate,
     supplierId: supplierId === "all" ? null : supplierId,
   });
+  const invoices = useMemo(() => invoicesQuery.data ?? [], [invoicesQuery.data]);
+  const isLoading = invoicesQuery.isLoading;
 
   const totals = useMemo(
     () => ({
@@ -105,12 +108,18 @@ export default function Varemottak() {
       </Card>
 
       <Card className="overflow-hidden">
-        {isLoading ? (
-          <div className="flex items-center justify-center py-16 text-ink-secondary">
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Laster fakturaer…
+        {isLoading || invoicesQuery.isError || invoices.length === 0 ? (
+          <div className="p-6">
+            <QueryState
+              scope="ravarer:varemottak"
+              isLoading={isLoading}
+              isError={invoicesQuery.isError}
+              error={invoicesQuery.error}
+              isEmpty={invoices.length === 0}
+              onRetry={() => void invoicesQuery.refetch()}
+              emptyTitle="Ingen fakturaer i perioden."
+            />
           </div>
-        ) : invoices.length === 0 ? (
-          <p className="py-16 text-center text-sm text-ink-secondary">Ingen fakturaer i perioden.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -185,8 +194,16 @@ function InvoiceReceiptDialog({
   onClose: () => void;
   canWrite: boolean;
 }) {
-  const { data: lines = [], isLoading } = useReceiptLines(invoiceId ?? undefined);
+  const linesQuery = useReceiptLines(invoiceId ?? undefined);
+  const lines = useMemo(() => linesQuery.data ?? [], [linesQuery.data]);
   const unitsQuery = useRawMaterialUnitsFor(lines.map(l => l.raw_material_id).filter((x): x is string => !!x));
+  // Feil på linjer og enheter samles ett sted, med felles «Prøv igjen».
+  const loadError = linesQuery.error ?? unitsQuery.error;
+  const isLoading = linesQuery.isLoading || unitsQuery.isLoading;
+  const retryAll = () => {
+    void linesQuery.refetch();
+    void unitsQuery.refetch();
+  };
   const [deviationLine, setDeviationLine] = useState<ReceiptLine | null>(null);
 
   const purchaseUnitText = (line: ReceiptLine) => {
@@ -205,10 +222,14 @@ function InvoiceReceiptDialog({
           <DialogHeader>
             <DialogTitle>Mottak — faktura {invoiceNumber}</DialogTitle>
           </DialogHeader>
-          {isLoading ? (
-            <div className="flex items-center justify-center py-10 text-ink-secondary">
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Laster linjer…
-            </div>
+          {isLoading || loadError ? (
+            <QueryState
+              scope="ravarer:varemottak-linjer"
+              isLoading={isLoading}
+              isError={!!loadError}
+              error={loadError}
+              onRetry={retryAll}
+            />
           ) : (
             <div className="max-h-[65vh] overflow-auto">
               <table className="w-full text-sm">

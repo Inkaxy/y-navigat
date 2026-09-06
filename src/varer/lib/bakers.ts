@@ -87,29 +87,95 @@ export const BREAD_DEFAULT_STEPS: { step_type: StepType; title: string }[] = [
 
 // ===== Enheter =====
 
-/** Konverterer en linjemengde til gram. `stk` gir 0 (ukjent vekt). */
-export function toGrams(quantity: number | string, unit: string): number {
-  const q = Number(quantity) || 0;
-  switch (unit) {
-    case "kg":
-    case "liter":
-      return q * 1000;
-    case "g":
-    case "ml":
-      return q;
-    default:
-      return 0;
-  }
+/** Kanoniske enheter oppskriftslinjer kan bruke. */
+export type RecipeUnit = "g" | "kg" | "ml" | "cl" | "dl" | "l" | "stk";
+
+const RECIPE_UNIT_ALIASES: Record<string, RecipeUnit> = {
+  g: "g", gr: "g", gram: "g", grm: "g",
+  kg: "kg", kilo: "kg", kilogram: "kg",
+  ml: "ml", milliliter: "ml",
+  cl: "cl", centiliter: "cl",
+  dl: "dl", desiliter: "dl", deciliter: "dl",
+  l: "l", lt: "l", ltr: "l", liter: "l", litre: "l",
+  stk: "stk", st: "stk", stykk: "stk", pcs: "stk", pc: "stk",
+};
+
+/** Normaliserer en enhetstekst. Returnerer null for ukjente enheter. */
+export function normalizeRecipeUnit(unit: string | null | undefined): RecipeUnit | null {
+  if (!unit) return null;
+  const k = String(unit).trim().toLowerCase().replace(/\.$/, "");
+  return RECIPE_UNIT_ALIASES[k] ?? null;
 }
 
-export function fromGrams(grams: number, unit: string): number {
-  switch (unit) {
-    case "kg":
-    case "liter":
-      return grams / 1000;
-    default:
-      return grams;
+const ML_PER_UNIT: Record<string, number> = { ml: 1, cl: 10, dl: 100, l: 1000 };
+
+export interface GramsResult {
+  grams: number;
+  /** Usann når vekten er anslått eller ukjent — da er beregningen ufullstendig. */
+  exact: boolean;
+  /** Forklaring som kan vises i grensesnittet når `exact` er usann. */
+  reason?: string;
+}
+
+export interface ConvertOptions {
+  /** Tetthet i g/ml, når den er kjent for råvaren. */
+  densityGPerMl?: number | null;
+  /** Vekt per stykk i gram, når den er kjent. */
+  pieceWeightG?: number | null;
+}
+
+/**
+ * Regner en mengde om til gram.
+ * Volum uten kjent tetthet og «stk» uten stykkvekt gir aldri en stille nullvekt —
+ * resultatet merkes som ufullstendig med en forklaring.
+ */
+export function convertToGrams(
+  quantity: number | string,
+  unit: string,
+  opts: ConvertOptions = {},
+): GramsResult {
+  const q = Number(quantity) || 0;
+  const u = normalizeRecipeUnit(unit);
+  if (!u) return { grams: 0, exact: false, reason: `Ukjent enhet «${unit}»` };
+  if (u === "g") return { grams: q, exact: true };
+  if (u === "kg") return { grams: q * 1000, exact: true };
+  if (u === "stk") {
+    const w = Number(opts.pieceWeightG) || 0;
+    if (w > 0) return { grams: q * w, exact: true };
+    return { grams: 0, exact: false, reason: "Mangler vekt per stykk" };
   }
+  const ml = q * ML_PER_UNIT[u];
+  const d = Number(opts.densityGPerMl) || 0;
+  if (d > 0) return { grams: ml * d, exact: true };
+  // Vi regner videre med vann-tetthet så beregningen ikke kollapser til null,
+  // men markerer den som anslått.
+  return { grams: ml, exact: false, reason: "Tetthet mangler — regnet som vann (1 g/ml)" };
+}
+
+/** Konverterer en linjemengde til gram. Ufullstendige omregninger fanges av `convertToGrams`. */
+export function toGrams(quantity: number | string, unit: string, opts: ConvertOptions = {}): number {
+  return convertToGrams(quantity, unit, opts).grams;
+}
+
+export function fromGrams(grams: number, unit: string, opts: ConvertOptions = {}): number {
+  const u = normalizeRecipeUnit(unit);
+  if (!u) return grams;
+  if (u === "kg") return grams / 1000;
+  if (u === "g") return grams;
+  if (u === "stk") {
+    const w = Number(opts.pieceWeightG) || 0;
+    return w > 0 ? grams / w : 0;
+  }
+  const d = Number(opts.densityGPerMl) || 1;
+  return grams / d / ML_PER_UNIT[u];
+}
+
+/** Omregning for en oppskriftslinje, med råvarens tetthet/stykkvekt når den finnes. */
+export function lineToGrams(line: BakersLine): GramsResult {
+  return convertToGrams(line.quantity, line.unit, {
+    densityGPerMl: line._rm?.density_g_per_ml ?? null,
+    pieceWeightG: line._rm?.weight_per_piece_g ?? null,
+  });
 }
 
 // ===== Klassifisering =====
@@ -124,6 +190,10 @@ export interface BakersRawMaterial {
   is_composite?: boolean | null;
   /** Satt når råvaren er en grunnoppskrift/halvfabrikat produsert av en oppskrift. */
   produced_by_recipe_id?: string | null;
+  /** Tetthet i g/ml, når den er registrert. Brukes for volumenheter. */
+  density_g_per_ml?: number | null;
+  /** Vekt per stykk i gram, når den er registrert. Brukes for «stk». */
+  weight_per_piece_g?: number | null;
 }
 
 
@@ -189,6 +259,9 @@ export interface BakersTotals {
   leavenPct: number;
   unitCount: number | null;
   doughPerUnitG: number | null;
+  /** Linjer som ikke kunne regnes om nøyaktig — beregningen er da ufullstendig. */
+  warnings: string[];
+  incomplete: boolean;
 }
 
 export function computeTotals(lines: BakersLine[], unitWeightGrams?: number | null): BakersTotals {
@@ -198,8 +271,13 @@ export function computeTotals(lines: BakersLine[], unitWeightGrams?: number | nu
   let saltG = 0;
   let leavenG = 0;
 
+  const warnings: string[] = [];
   for (const l of lines) {
-    const g = toGrams(l.quantity, l.unit);
+    const conv = lineToGrams(l);
+    const g = conv.grams;
+    if (!conv.exact) {
+      warnings.push(`${l.ingredient_name ?? l._rm?.name ?? "Ukjent råvare"}: ${conv.reason ?? "ufullstendig omregning"}`);
+    }
     totalDoughG += g;
     if (isFlourLine(l)) totalFlourG += g;
     totalWaterG += (g * waterPctForLine(l)) / 100;
@@ -219,6 +297,8 @@ export function computeTotals(lines: BakersLine[], unitWeightGrams?: number | nu
     leavenPct: pct(leavenG),
     unitCount: uw > 0 ? Math.floor(totalDoughG / uw) : null,
     doughPerUnitG: uw > 0 ? uw : null,
+    warnings,
+    incomplete: warnings.length > 0,
   };
 }
 
@@ -228,7 +308,7 @@ export function computePartSummary(partLines: BakersLine[], totalFlourG: number)
   let waterG = 0;
   let totalG = 0;
   for (const l of partLines) {
-    const g = toGrams(l.quantity, l.unit);
+    const g = lineToGrams(l).grams;
     totalG += g;
     if (isFlourLine(l)) flourG += g;
     waterG += (g * waterPctForLine(l)) / 100;
@@ -245,7 +325,7 @@ export function computePartSummary(partLines: BakersLine[], totalFlourG: number)
 /** Bakerprosent for én linje gitt samlet melvekt. */
 export function bakersPercentFor(line: BakersLine, totalFlourG: number): number {
   if (totalFlourG <= 0) return 0;
-  return (toGrams(line.quantity, line.unit) / totalFlourG) * 100;
+  return (lineToGrams(line).grams / totalFlourG) * 100;
 }
 
 /** Gram fra bakerprosent. */
@@ -329,7 +409,7 @@ export interface ScaledLine extends BakersLine {
  */
 export function scaleLines(lines: BakersLine[], factor: number, baseFlourG: number): ScaledLine[] {
   return lines.map((l) => {
-    const base = toGrams(l.quantity, l.unit);
+    const base = lineToGrams(l).grams;
     const exactGrams = base * factor;
     return {
       ...l,
@@ -402,7 +482,7 @@ export function weighingOrder<T extends BakersLine>(lines: T[]): T[] {
   return [...lines].sort((a, b) => {
     const d = rank(a) - rank(b);
     if (d !== 0) return d;
-    return toGrams(b.quantity, b.unit) - toGrams(a.quantity, a.unit);
+    return lineToGrams(b).grams - lineToGrams(a).grams;
   });
 }
 
