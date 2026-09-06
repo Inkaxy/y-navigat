@@ -4,16 +4,34 @@
  * testes direkte (se src/test/rawMaterialViews.test.ts).
  */
 
-/** Små bokstaver, uten diakritika, komprimerte mellomrom. */
+/**
+ * Små bokstaver, uten aksenter, komprimerte mellomrom.
+ * Norske bokstaver (æ, ø, å) beholdes — de er egne bokstaver, ikke aksenter.
+ */
+const NORDIC_PLACEHOLDER: Record<string, string> = {
+  "æ": "\uE000",
+  "ø": "\uE001",
+  "å": "\uE002",
+  "Æ": "\uE000",
+  "Ø": "\uE001",
+  "Å": "\uE002",
+};
+
 export function normalizeSearch(value: string | null | undefined): string {
   if (!value) return "";
   return value
+    .normalize("NFC")
+    .replace(/[æøåÆØÅ]/g, (m) => NORDIC_PLACEHOLDER[m])
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[\uE000\uE001\uE002]/g, (m) =>
+      m === "\uE000" ? "æ" : m === "\uE001" ? "ø" : "å",
+    )
     .toLowerCase()
     .replace(/\s+/g, " ")
     .trim();
 }
+
 
 /** Deler søket i ord — alle ord må finnes (AND). */
 export function searchTokens(query: string): string[] {
