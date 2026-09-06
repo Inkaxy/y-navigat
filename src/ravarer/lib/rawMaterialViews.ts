@@ -262,14 +262,18 @@ export function filterAndSortItems(
   tolerance = DEFAULT_DEVIATION_TOLERANCE,
 ): RawMaterialListItem[] {
   const needle = normalizeSearch(query.q);
+  // Visningen «Inaktive» overstyrer statusfilteret — ellers ville standard
+  // «Aktive» alltid gitt null treff.
+  const ignoreStatus = query.view === "inactive";
   const base = items.filter((i) => {
-    if (query.status === "active" && !i.isActive) return false;
-    if (query.status === "inactive" && i.isActive) return false;
+    if (!ignoreStatus && query.status === "active" && !i.isActive) return false;
+    if (!ignoreStatus && query.status === "inactive" && i.isActive) return false;
     if (query.type !== "all" && i.itemType !== query.type) return false;
     if (query.kat !== "all" && !i.categories.includes(query.kat)) return false;
     if (needle && !matchesSearch(i.searchText, query.q)) return false;
     return true;
   });
+
 
   const withAlias =
     needle.length === 0
