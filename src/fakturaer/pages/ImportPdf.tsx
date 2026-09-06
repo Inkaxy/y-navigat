@@ -328,19 +328,22 @@ export default function ImportPdfPage({ embedded = false }: { embedded?: boolean
       setSavedIds(newSavedIds);
       const hasMore = queueIndex < queue.length - 1;
 
+      // Auto-match rett etter import — samme kall som ved manuell registrering.
+      if (lines.length > 0) await runAutoMatchAfterImport(invoice.id);
+
       if (hasMore) {
         toast.success(`Faktura ${queueIndex + 1} av ${queue.length} lagret — neste fil`);
         resetFormForNext();
         setQueueIndex(queueIndex + 1);
       } else if (queue.length > 1) {
-        toast.success(`Alle ${queue.length} fakturaer lagret`);
-        navigate("/ravarer/fakturaer");
+        toast.success(`Alle ${queue.length} fakturaer lagret og matchet`);
+        navigate("/ravarer/fakturaer/til-behandling");
       } else if (lines.length === 0) {
         toast.success("Faktura opprettet — registrer linjer");
         navigate(`/ravarer/fakturaer/${invoice.id}/registrer-linjer`);
       } else {
-        toast.success("Faktura opprettet");
-        navigate(`/ravarer/fakturaer/${invoice.id}`);
+        toast.success("Faktura opprettet og matchet");
+        navigate(`/ravarer/fakturaer/til-behandling?faktura=${invoice.id}`);
       }
     } catch (e: any) {
       toast.error(`Opplasting feilet: ${e?.message ?? e}`);
