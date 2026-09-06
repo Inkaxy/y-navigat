@@ -249,8 +249,8 @@ export default function InvoiceDetailPage() {
                     await unflagInvoice(data.id);
                     invalidateInvoice(qc, data.id);
                     toast.success("Flagget er fjernet — fakturaen er tilbake til gjennomgang");
-                  } catch (e) {
-                    toast.error(e instanceof Error ? e.message : "Kunne ikke fjerne flagget");
+                  } catch (e: unknown) {
+                    showError("faktura-fjern-flagg", e, "Kunne ikke fjerne flagget");
                   } finally {
                     setUnflagging(false);
                   }
