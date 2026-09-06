@@ -87,6 +87,32 @@ Deno.serve(async (req) => {
     });
     if (errors.length > 0) return json({ error: errors[0], errors }, 400);
 
+    // Råvarene og leverandørene må tilhøre SAMME selskap som forhandlingen før
+    // vi skriver med service-role. Ellers kan en gyldig forhandling brukes til
+    // å endre avtaler i et annet selskap.
+    const rmIds = [...new Set(prepared.map((o) => o.raw_material_id).filter((v): v is string => !!v))];
+    const supIds = [...new Set(prepared.map((o) => o.supplier_id).filter((v): v is string => !!v))];
+    if (rmIds.length > 0) {
+      const { data: rms, error: rmErr } = await admin
+        .from("raw_materials")
+        .select("id, legal_entity_id")
+        .in("id", rmIds);
+      if (rmErr) return json({ error: "Kunne ikke kontrollere råvarene" }, 500);
+      const okIds = new Set((rms ?? []).filter((r) => r.legal_entity_id === neg.legal_entity_id).map((r) => r.id));
+      const bad = rmIds.filter((id) => !okIds.has(id));
+      if (bad.length > 0) return json({ error: "En eller flere råvarer hører til et annet selskap.", failures: bad }, 400);
+    }
+    if (supIds.length > 0) {
+      const { data: sups, error: supErr } = await admin
+        .from("suppliers")
+        .select("id, legal_entity_id")
+        .in("id", supIds);
+      if (supErr) return json({ error: "Kunne ikke kontrollere leverandørene" }, 500);
+      const okIds = new Set((sups ?? []).filter((r) => r.legal_entity_id === neg.legal_entity_id).map((r) => r.id));
+      const bad = supIds.filter((id) => !okIds.has(id));
+      if (bad.length > 0) return json({ error: "En eller flere leverandører hører til et annet selskap.", failures: bad }, 400);
+    }
+
     const failures: string[] = [];
 
     for (const o of prepared as PreparedOutcome[]) {
@@ -115,7 +141,7 @@ Deno.serve(async (req) => {
       // Les eksisterende avtale, slik at tomme felt ikke sletter bekreftet pakning.
       const { data: existing, error: exErr } = await admin
         .from("raw_material_suppliers")
-        .select("package_size, package_unit, package_confirmed_at, package_confirmed_by")
+        .select("package_size, package_unit, package_confirmed_at, package_confirmed_by, is_primary")
         .eq("raw_material_id", o.raw_material_id)
         .eq("supplier_id", o.supplier_id)
         .maybeSingle();
@@ -131,8 +157,11 @@ Deno.serve(async (req) => {
         agreed_price: o.agreed_price,
         agreed_price_per_base_unit: o.agreed_price_per_base_unit,
         agreement_valid_from: today(),
-        is_primary: o.set_as_primary,
       };
+      // set_as_primary = false skal ALDRI frata en eksisterende primærkobling
+      // statusen. Bare nye rader får en eksplisitt verdi.
+      if (o.set_as_primary) row.is_primary = true;
+      else if (!existing) row.is_primary = false;
       if (keepPackage) {
         if (existing?.package_size != null) row.package_size = existing.package_size;
         if (existing?.package_unit != null) row.package_unit = existing.package_unit;

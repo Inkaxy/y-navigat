@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Check, CheckCircle2, Loader2, Pencil, SkipForward } from "lucide-react";
 import { toast } from "sonner";
-import { invalidateRawMaterial } from "@/ravarer/lib/invalidate";
+import { computeBaseUnitsPerPackage } from "@/ravarer/lib/packageMath";
 
 import { RavarerHeaderBanner } from "@/ravarer/components/RavarerHeaderBanner";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
@@ -22,12 +22,7 @@ import { useAllRawMaterialPurchaseStats } from "@/ravarer/hooks/usePurchaseStats
 import { formatDate, formatNumber, BASE_UNITS, PACKAGE_UNITS } from "@/ravarer/lib/constants";
 import { ItemTypeBadge } from "@/ravarer/components/ItemTypeBadge";
 import { SetPackageDialog } from "@/ravarer/components/packages/SetPackageDialog";
-import {
-  usePreviewPackage,
-  useApplyPackage,
-  useUndoRecalc,
-  type PackageWorklistRow,
-} from "@/ravarer/hooks/usePackageSizes";
+import { usePreviewPackage, type PackageWorklistRow } from "@/ravarer/hooks/usePackageSizes";
 
 const UNIT_OPTIONS = Array.from(new Set<string>([...BASE_UNITS, ...PACKAGE_UNITS]));
 
@@ -87,11 +82,9 @@ interface EditValues {
 
 export default function PakningerPage() {
   const { canWrite } = useRavarer();
-  const qc = useQueryClient();
   const previewPackage = usePreviewPackage();
-  const applyPackage = useApplyPackage();
-  const undoRecalc = useUndoRecalc();
   const [dialogRow, setDialogRow] = useState<PackageWorklistRow | null>(null);
+  const [pendingSuggestion, setPendingSuggestion] = useState<{ size: number | null; unit: string | null } | null>(null);
   const { data: rows = [], isLoading } = useRawMaterials();
   const { data: suppliers = [] } = useSuppliers();
   const { data: statsMap } = useAllRawMaterialPurchaseStats();
@@ -138,6 +131,8 @@ export default function PakningerPage() {
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key !== "Enter") return;
+      // Er dialogen åpen, eier den tastaturet — Enter bak den skal ikke starte noe nytt.
+      if (dialogRow) return;
       const el = e.target as HTMLElement | null;
       if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable)) return;
       const row = withSuggestion.find((r) => r.id === selectedId) ?? withSuggestion[0];
@@ -154,7 +149,7 @@ export default function PakningerPage() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [withSuggestion, selectedId, suggestions, canWrite, savingId]);
+  }, [withSuggestion, selectedId, suggestions, canWrite, savingId, dialogRow]);
 
   /** Bygger raden pakningsdialogen trenger, slik at full gjennomgang kan tas der. */
   function toWorklistRow(row: RawMaterialRow): PackageWorklistRow {
@@ -187,48 +182,47 @@ export default function PakningerPage() {
   }
 
   /**
-   * Bekreftelse går gjennom samme RPC som pakningsstørrelser: først en
-   * forhåndsvisning, deretter lagring med angremulighet. Ser forhåndsvisningen
-   * usikker ut, sendes varen til den fulle dialogen i stedet for å lagre blindt.
+   * «Bekreft» lagrer aldri av seg selv. Forslaget regnes om til råvarens
+   * baseenhet (500 g på en kg-vare = 0,5 kg), forhåndsvises via RPC-en, og
+   * åpnes så i pakningsdialogen der bruker ser før/etter og bekrefter selv.
    */
   async function confirm(row: RawMaterialRow, values: EditValues) {
-    const size = Number(values.size.replace(",", "."));
-    const count = values.count.trim() ? Number(values.count.replace(",", ".")) : 1;
-    if (!Number.isFinite(size) || size <= 0) {
-      toast.error("Ugyldig pakningsstørrelse");
+    const math = computeBaseUnitsPerPackage({
+      size: values.size,
+      unit: values.unit,
+      count: values.count,
+      baseUnit: row.base_unit,
+    });
+    if (!math.ok) {
+      // Ingen skriving og ingen gjetting: varen sendes til manuell gjennomgang.
+      toast.error(math.error);
+      setPendingSuggestion({ size: null, unit: values.unit || null });
+      setDialogRow(toWorklistRow(row));
       return;
     }
-    const basePerPackage = size * (Number.isFinite(count) ? count : 1);
+
     setSavingId(row.id);
     try {
-      const args = {
+      const preview = await previewPackage.mutateAsync({
         p_raw_material_id: row.id,
-        p_base_units_per_package: basePerPackage,
+        p_base_units_per_package: math.baseUnits,
         p_package_unit: values.unit || null,
         p_reason: "Bekreftet i Pakninger",
-      };
-      const preview = await previewPackage.mutateAsync(args);
-      if (!preview.ok || preview.lines_outlier > 0 || preview.lines_unknown > 0) {
-        setDialogRow(toWorklistRow(row));
-        toast.info(`${row.name} trenger en gjennomgang før pakningen kan bekreftes`);
-        return;
-      }
-      const res = await applyPackage.mutateAsync(args);
-      invalidateRawMaterial(qc, row.id);
-      toast.success(`Pakning bekreftet for ${row.name}`, {
-        action: res.recalc_id
-          ? {
-              label: "Angre",
-              onClick: () => undoRecalc.mutate({ recalcId: res.recalc_id as string, rawMaterialId: row.id }),
-            }
-          : undefined,
       });
+      if (!preview.ok) {
+        toast.error(`Forhåndsvisningen for ${row.name} kunne ikke beregnes`);
+      } else if (preview.lines_outlier > 0 || preview.lines_unknown > 0) {
+        toast.info(`${row.name} trenger en gjennomgang før pakningen kan bekreftes`);
+      }
+      setPendingSuggestion({ size: math.baseUnits, unit: values.unit || null });
+      setDialogRow(toWorklistRow(row));
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Kunne ikke lagre pakning");
+      toast.error(e instanceof Error ? e.message : "Kunne ikke forhåndsvise pakning");
     } finally {
       setSavingId(null);
     }
   }
+
 
   const total = activeRows.length;
   const pct = total > 0 ? Math.round((confirmedCount / total) * 100) : 0;
@@ -297,7 +291,17 @@ export default function PakningerPage() {
         </>
       )}
 
-      <SetPackageDialog row={dialogRow} open={!!dialogRow} onOpenChange={(v) => !v && setDialogRow(null)} />
+      <SetPackageDialog
+        row={dialogRow}
+        open={!!dialogRow}
+        suggestion={pendingSuggestion}
+        onOpenChange={(v) => {
+          if (!v) {
+            setDialogRow(null);
+            setPendingSuggestion(null);
+          }
+        }}
+      />
     </div>
   );
 }

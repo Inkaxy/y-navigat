@@ -254,7 +254,12 @@ function SortableLine({
     onChange({
       bakers_percent: value === "" ? null : pct,
       entry_mode: "percent",
-      quantity: totalFlourG > 0 ? Number(fromGrams(grams, line.unit).toFixed(2)) : line.quantity,
+      // Er omregningen ukjent (volum uten tetthet, stk uten stykkvekt), beholdes
+      // mengden slik brukeren skrev den — vi finner ikke på et tall.
+      quantity:
+        totalFlourG > 0 && Number.isFinite(fromGrams(grams, line.unit))
+          ? Number(fromGrams(grams, line.unit).toFixed(2))
+          : line.quantity,
     });
   }
 

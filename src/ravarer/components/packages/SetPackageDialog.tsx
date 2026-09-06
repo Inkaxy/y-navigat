@@ -105,6 +105,11 @@ export function SetPackageDialog({ row, open, onOpenChange, suggestion }: Props)
   const doApply = async () => {
     if (!row || !validUnits) return;
     const res = await applyMut.mutateAsync(baseArgs());
+    // Ingen suksessmelding uten at serveren faktisk bekrefter lagringen.
+    if (!res?.ok) {
+      toast.error("Pakningen ble ikke lagret. Prøv igjen eller kontroller tallene.");
+      return;
+    }
     const before = formatNumber(res.cost_before, 3);
     const after = formatNumber(res.cost_after, 3);
     toast.success(`Kostpris oppdatert fra ${before} til ${after} kr/${res.base_unit ?? baseUnit}`, {

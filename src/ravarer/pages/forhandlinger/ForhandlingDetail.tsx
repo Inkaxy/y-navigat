@@ -456,7 +456,8 @@ function ConcludeDialog({
           winner_recipient_id: p?.winner_recipient_id ?? null,
           winner_response_id: winnerResp?.id ?? null,
           agreed_price: winnerResp?.offered_price ?? null,
-          agreed_price_unit: winnerResp?.offered_price_unit ?? null,
+          // Tilbudsprisen gjelder pakningen; det finnes ingen egen prisenhet på tilbudet.
+          agreed_price_unit: null,
           agreed_package_size: winnerResp?.offered_package_size ?? null,
           agreed_package_unit: winnerResp?.offered_package_unit ?? null,
           set_as_primary: p?.set_as_primary ?? false,

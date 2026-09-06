@@ -118,9 +118,12 @@ export interface GramsResult {
 }
 
 export interface ConvertOptions {
-  /** Tetthet i g/ml, når den er kjent for råvaren. */
+  /**
+   * Tetthet i g/ml. Databasen har ingen tetthetskolonne på råvarer, så denne
+   * settes bare når vi faktisk vet den (rent vann) eller kalleren oppgir den.
+   */
   densityGPerMl?: number | null;
-  /** Vekt per stykk i gram, når den er kjent. */
+  /** Vekt per stykk i gram — `raw_materials.unit_weight_grams`. */
   pieceWeightG?: number | null;
 }
 
@@ -147,34 +150,52 @@ export function convertToGrams(
   const ml = q * ML_PER_UNIT[u];
   const d = Number(opts.densityGPerMl) || 0;
   if (d > 0) return { grams: ml * d, exact: true };
-  // Vi regner videre med vann-tetthet så beregningen ikke kollapser til null,
-  // men markerer den som anslått.
-  return { grams: ml, exact: false, reason: "Tetthet mangler — regnet som vann (1 g/ml)" };
+  // Ingen kjent tetthet: vi antar IKKE vann. Vekten er ukjent, og beregningen
+  // merkes som ufullstendig i stedet for å levere et oppdiktet tall.
+  return { grams: 0, exact: false, reason: `Ukjent tetthet for ${u} — vekten kan ikke beregnes` };
 }
 
-/** Konverterer en linjemengde til gram. Ufullstendige omregninger fanges av `convertToGrams`. */
+/**
+ * Konverterer en linjemengde til gram og mister `exact`-flagget. Brukes bare
+ * der en ukjent vekt kan behandles som 0 (kostnadssummer, prosentfelt).
+ * Skal vekten VISES eller brukes som produksjonsvekt, bruk `convertToGrams`
+ * eller `computeTotals`, som beholder usikkerheten.
+ */
 export function toGrams(quantity: number | string, unit: string, opts: ConvertOptions = {}): number {
   return convertToGrams(quantity, unit, opts).grams;
 }
 
+/**
+ * Motsatt vei: gram → oppgitt enhet. Returnerer NaN når omregningen er ukjent
+ * (volum uten tetthet, «stk» uten stykkvekt), slik at kalleren må ta stilling
+ * til det i stedet for å få et tall som ser riktig ut.
+ */
 export function fromGrams(grams: number, unit: string, opts: ConvertOptions = {}): number {
   const u = normalizeRecipeUnit(unit);
-  if (!u) return grams;
+  if (!u) return NaN;
   if (u === "kg") return grams / 1000;
   if (u === "g") return grams;
   if (u === "stk") {
     const w = Number(opts.pieceWeightG) || 0;
-    return w > 0 ? grams / w : 0;
+    return w > 0 ? grams / w : NaN;
   }
-  const d = Number(opts.densityGPerMl) || 1;
+  const d = Number(opts.densityGPerMl) || 0;
+  if (d <= 0) return NaN;
   return grams / d / ML_PER_UNIT[u];
 }
 
-/** Omregning for en oppskriftslinje, med råvarens tetthet/stykkvekt når den finnes. */
+/**
+ * Omregning for en oppskriftslinje. Stykkvekt hentes fra den faktiske kolonnen
+ * `raw_materials.unit_weight_grams`. Tetthet finnes ikke som kolonne, så den
+ * settes kun for rent vann (100 % vanninnhold) — alle andre væsker uten
+ * oppgitt tetthet blir ufullstendige.
+ */
 export function lineToGrams(line: BakersLine): GramsResult {
+  const waterPct = Number(line._rm?.water_content_pct ?? 0);
+  const isPureWater = waterPct === 100 || /\bvann\b|water/i.test(line._rm?.name ?? line.ingredient_name ?? "");
   return convertToGrams(line.quantity, line.unit, {
-    densityGPerMl: line._rm?.density_g_per_ml ?? null,
-    pieceWeightG: line._rm?.weight_per_piece_g ?? null,
+    densityGPerMl: isPureWater ? 1 : null,
+    pieceWeightG: line._rm?.unit_weight_grams ?? null,
   });
 }
 
@@ -190,10 +211,8 @@ export interface BakersRawMaterial {
   is_composite?: boolean | null;
   /** Satt når råvaren er en grunnoppskrift/halvfabrikat produsert av en oppskrift. */
   produced_by_recipe_id?: string | null;
-  /** Tetthet i g/ml, når den er registrert. Brukes for volumenheter. */
-  density_g_per_ml?: number | null;
-  /** Vekt per stykk i gram, når den er registrert. Brukes for «stk». */
-  weight_per_piece_g?: number | null;
+  /** Vekt per stykk i gram — `raw_materials.unit_weight_grams`. Brukes for «stk». */
+  unit_weight_grams?: number | null;
 }
 
 
@@ -295,7 +314,8 @@ export function computeTotals(lines: BakersLine[], unitWeightGrams?: number | nu
     hydrationPct: pct(totalWaterG),
     saltPct: pct(saltG),
     leavenPct: pct(leavenG),
-    unitCount: uw > 0 ? Math.floor(totalDoughG / uw) : null,
+    // Er deigvekten ufullstendig, er antall emner ikke et bekreftet tall.
+    unitCount: uw > 0 && warnings.length === 0 ? Math.floor(totalDoughG / uw) : null,
     doughPerUnitG: uw > 0 ? uw : null,
     warnings,
     incomplete: warnings.length > 0,
