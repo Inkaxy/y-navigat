@@ -79,6 +79,9 @@ export interface RawMaterialListItem {
   supplierId: string | null;
   supplierName: string | null;
   supplierSku: string | null;
+  /** raw_material_suppliers.id for primærkoblingen — mål for avtaleprisredigering. */
+  primaryLinkId: string | null;
+
   /** Treff i søket som kom fra leverandørnummer/alias (vises som chip). */
   matchedAlias: string | null;
   lastInvoicePrice: number | null;
