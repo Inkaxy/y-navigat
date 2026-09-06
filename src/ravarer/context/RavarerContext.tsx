@@ -1,11 +1,10 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { useQuery } from "@tanstack/react-query";
 import type { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
-import { APP_CODE } from "@/ravarer/lib/constants";
 import { useSelection } from "@/providers/SelectionProvider";
+import { useRavarerAccessLevel, type AccessLevel } from "@/ravarer/hooks/useRavarerAccessLevel";
 
-export type AccessLevel = "none" | "read" | "write" | "approve" | "admin";
+export type { AccessLevel };
 
 interface RavarerContextValue {
   loading: boolean;
@@ -35,15 +34,7 @@ export function RavarerProvider({ children }: { children: ReactNode }) {
     return () => sub.subscription.unsubscribe();
   }, []);
 
-  const accessQuery = useQuery({
-    queryKey: ["ravarer-access-level", session?.user.id],
-    enabled: !!session?.user.id,
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("app_access_level", { p_app_code: APP_CODE });
-      if (error) throw error;
-      return (data as AccessLevel) ?? "none";
-    },
-  });
+  const accessQuery = useRavarerAccessLevel(!!session?.user.id);
 
   const accessLevel: AccessLevel = accessQuery.data ?? "none";
   const canRead = accessLevel !== "none";
@@ -51,6 +42,7 @@ export function RavarerProvider({ children }: { children: ReactNode }) {
   const canDelete = accessLevel === "admin";
 
   const loading = authLoading || (!!session && accessQuery.isLoading);
+
 
   return (
     <Ctx.Provider
