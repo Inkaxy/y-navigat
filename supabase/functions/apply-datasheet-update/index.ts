@@ -1,5 +1,11 @@
 // Anvender et bekreftet datablad: oppdaterer råvare-felter, logger changelog, flagger berørte produkter
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { diffAllergens } from "../_shared/allergen-diff.ts";
+
+const NUTRITION_FIELDS = [
+  "energy_kj", "energy_kcal", "fat_g", "saturated_fat_g",
+  "carbs_g", "sugars_g", "fiber_g", "protein_g", "salt_g",
+] as const;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -50,17 +56,45 @@ Deno.serve(async (req) => {
     // Næring
     if (accepts.has("nutrition") && ext.nutrition) {
       const { data: oldNut } = await service.from("raw_material_nutrition").select("*").eq("raw_material_id", rm.id).maybeSingle();
-      const newNut = {
+      const nutritionValues: Record<string, unknown> = {};
+      for (const f of NUTRITION_FIELDS) {
+        if (ext.nutrition[f] != null) nutritionValues[f] = ext.nutrition[f];
+      }
+      const eNumbers = Array.isArray(ext.e_numbers)
+        ? ext.e_numbers.map((e: unknown) => String(e).trim()).filter(Boolean)
+        : null;
+      const newNut: Record<string, unknown> = {
         raw_material_id: rm.id,
-        ...ext.nutrition,
-        source: "leverandør_db",
+        ...nutritionValues,
+        // Kanonisk kilde-vokabular: 'datablad' (tidligere 'leverandør_db').
+        source: "datablad",
         source_document_url: ds.file_path,
         verified_at: new Date().toISOString(),
         verified_by: userId,
       };
-      await service.from("raw_material_nutrition").upsert(newNut);
+      if (eNumbers && eNumbers.length > 0) newNut.e_numbers = eNumbers;
+      if (ext.country_of_origin) newNut.country_of_origin = String(ext.country_of_origin).trim();
+      await service.from("raw_material_nutrition").upsert(newNut, { onConflict: "raw_material_id" });
+
+      if (eNumbers && eNumbers.length > 0 && JSON.stringify(oldNut?.e_numbers ?? null) !== JSON.stringify(eNumbers)) {
+        changelogRows.push({
+          raw_material_id: rm.id, legal_entity_id: rm.legal_entity_id, datasheet_id: ds.id,
+          change_type: "composition_changed", field: "e_numbers",
+          old_value: oldNut?.e_numbers ?? null, new_value: eNumbers,
+          severity: "low", created_by: userId,
+        });
+      }
+      if (ext.country_of_origin && oldNut?.country_of_origin !== ext.country_of_origin) {
+        changelogRows.push({
+          raw_material_id: rm.id, legal_entity_id: rm.legal_entity_id, datasheet_id: ds.id,
+          change_type: "composition_changed", field: "country_of_origin",
+          old_value: oldNut?.country_of_origin ?? null, new_value: ext.country_of_origin,
+          severity: "low", created_by: userId,
+        });
+      }
+
       // Diff
-      const fields = ["energy_kj","energy_kcal","fat_g","saturated_fat_g","carbs_g","sugars_g","fiber_g","protein_g","salt_g"];
+      const fields = [...NUTRITION_FIELDS];
       for (const f of fields) {
         const oldV = oldNut?.[f] ?? null;
         const newV = ext.nutrition[f] ?? null;
@@ -75,21 +109,50 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Allergener
+    // Allergener — valider mot enum, og legg til / endre / fjern.
     if (accepts.has("allergens") && Array.isArray(ext.allergens)) {
       const { data: oldAll } = await service.from("raw_material_allergens").select("allergen, presence").eq("raw_material_id", rm.id);
-      const oldMap = new Map((oldAll ?? []).map((a: any) => [a.allergen, a.presence]));
-      for (const a of ext.allergens) {
-        await service.from("raw_material_allergens").upsert({
+      const diff = diffAllergens((oldAll ?? []) as { allergen: string; presence: string }[], ext.allergens);
+
+      for (const a of [...diff.added, ...diff.changed.map((c) => ({ allergen: c.allergen, presence: c.to }))]) {
+        const { error: aErr } = await service.from("raw_material_allergens").upsert({
           raw_material_id: rm.id, allergen: a.allergen, presence: a.presence,
         }, { onConflict: "raw_material_id,allergen" });
-        if (!oldMap.has(a.allergen)) {
-          changelogRows.push({
-            raw_material_id: rm.id, legal_entity_id: rm.legal_entity_id, datasheet_id: ds.id,
-            change_type: "allergen_added", field: a.allergen, old_value: null, new_value: a.presence,
-            severity: a.presence === "contains" ? "high" : "medium", created_by: userId,
-          });
+        if (aErr) {
+          console.error("allergen upsert", a.allergen, aErr.message);
+          diff.rejected.push(`${a.allergen} (${aErr.message})`);
         }
+      }
+      for (const a of diff.added) {
+        changelogRows.push({
+          raw_material_id: rm.id, legal_entity_id: rm.legal_entity_id, datasheet_id: ds.id,
+          change_type: "allergen_added", field: a.allergen, old_value: null, new_value: a.presence,
+          severity: a.presence === "contains" ? "high" : "medium", created_by: userId,
+        });
+      }
+      for (const c of diff.changed) {
+        changelogRows.push({
+          raw_material_id: rm.id, legal_entity_id: rm.legal_entity_id, datasheet_id: ds.id,
+          change_type: "allergen_added", field: c.allergen, old_value: c.from, new_value: c.to,
+          severity: c.to === "contains" ? "high" : "medium", created_by: userId,
+        });
+      }
+      for (const r of diff.removed) {
+        await service.from("raw_material_allergens")
+          .delete().eq("raw_material_id", rm.id).eq("allergen", r.allergen);
+        changelogRows.push({
+          raw_material_id: rm.id, legal_entity_id: rm.legal_entity_id, datasheet_id: ds.id,
+          change_type: "allergen_removed", field: r.allergen, old_value: r.presence, new_value: null,
+          severity: "high", created_by: userId,
+        });
+      }
+      if (diff.rejected.length > 0) {
+        changelogRows.push({
+          raw_material_id: rm.id, legal_entity_id: rm.legal_entity_id, datasheet_id: ds.id,
+          change_type: "composition_changed", field: "allergens_forkastet",
+          old_value: null, new_value: diff.rejected,
+          severity: "medium", created_by: userId,
+        });
       }
     }
 
@@ -99,7 +162,7 @@ Deno.serve(async (req) => {
       if (oldNut?.ingredient_declaration !== ext.ingredient_declaration) {
         await service.from("raw_material_nutrition").upsert({
           raw_material_id: rm.id, ingredient_declaration: ext.ingredient_declaration,
-        });
+        }, { onConflict: "raw_material_id" });
         changelogRows.push({
           raw_material_id: rm.id, legal_entity_id: rm.legal_entity_id, datasheet_id: ds.id,
           change_type: "composition_changed", field: "ingredient_declaration",
@@ -122,7 +185,18 @@ Deno.serve(async (req) => {
         needs_review: true,
       }));
       await service.from("raw_material_components").insert(rows);
-      await service.from("raw_materials").update({ is_composite: true }).eq("id", rm.id);
+      // is_composite settes IKKE når komponentene bare er tekst uten kobling til egne
+      // råvarer — da ville deklarasjonen mistet råvarens egen næring og allergener.
+      // Komponentene lagres som forslag til gjennomgang, og teksten beholdes i
+      // ingredient_declaration.
+      if (!ext.ingredient_declaration) {
+        const declaration = rows
+          .map((r: any) => (r.is_explicit_percentage ? `${r.primary_ingredient_name} (${r.percentage} %)` : r.primary_ingredient_name))
+          .join(", ");
+        await service.from("raw_material_nutrition").upsert({
+          raw_material_id: rm.id, ingredient_declaration: declaration,
+        }, { onConflict: "raw_material_id" });
+      }
       changelogRows.push({
         raw_material_id: rm.id, legal_entity_id: rm.legal_entity_id, datasheet_id: ds.id,
         change_type: "composition_changed", field: "components",

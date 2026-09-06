@@ -79,8 +79,8 @@ export function LinkRawMaterialDialog({ open, onOpenChange, foodId, foodName, in
       setLinkedNow((prev) => (prev.includes(rawMaterialId) ? prev : [...prev, rawMaterialId]));
       onLinked?.(rawMaterialId);
       // Dialogen holdes åpen slik at flere råvarer kan kobles til samme matvare.
-    } catch (e: any) {
-      toast.error(e?.message ?? "Kunne ikke hente næringsverdier");
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Kunne ikke hente næringsverdier");
     }
   };
 
@@ -93,14 +93,14 @@ export function LinkRawMaterialDialog({ open, onOpenChange, foodId, foodName, in
         .eq("raw_material_id", rawMaterialId)
         .maybeSingle();
       if (error) throw error;
-      const existingFoodId = (data as any)?.matvaretabellen_food_id ?? null;
+      const existingFoodId = data?.matvaretabellen_food_id ?? null;
       if (data && existingFoodId !== foodId) {
-        setPending({ id: rawMaterialId, name, source: (data as any).source || "ukjent" });
+        setPending({ id: rawMaterialId, name, source: data.source || "ukjent" });
         return;
       }
       await link(rawMaterialId);
-    } catch (e: any) {
-      toast.error(e?.message ?? "Kunne ikke sjekke eksisterende næringsdata");
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Kunne ikke sjekke eksisterende næringsdata");
     } finally {
       setCheckingId(null);
     }

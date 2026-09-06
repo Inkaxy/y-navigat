@@ -29,6 +29,24 @@ Deno.serve(async (req) => {
       .select("id, name, sku, primary_supplier_id, suppliers:primary_supplier_id(name)")
       .eq("legal_entity_id", ds.legal_entity_id);
 
+    // Bekreftede leverandøraliaser gir et sterkt signal: samme artikkelnummer eller
+    // navn er allerede sett på en faktura og knyttet til en råvare.
+    const { data: aliasRows } = await service
+      .from("raw_material_supplier_aliases")
+      .select("alias_value, alias_value_normalized, status, raw_material_suppliers!inner(raw_material_id, raw_materials!inner(legal_entity_id))")
+      .eq("status", "confirmed")
+      .eq("raw_material_suppliers.raw_materials.legal_entity_id", ds.legal_entity_id);
+    const aliasByRm = new Map<string, string[]>();
+    for (const a of (aliasRows ?? []) as any[]) {
+      const rmId = a.raw_material_suppliers?.raw_material_id;
+      if (!rmId) continue;
+      const value = normalizeAlias(a.alias_value_normalized ?? a.alias_value ?? "");
+      if (!value) continue;
+      const list = aliasByRm.get(rmId) ?? [];
+      if (!list.includes(value)) list.push(value);
+      aliasByRm.set(rmId, list);
+    }
+
     const ext = ds.ai_extracted ?? {};
     const targetName = (ext.name ?? "").toLowerCase();
     const targetSku = (ext.sku ?? "").toLowerCase();
@@ -45,6 +63,13 @@ Deno.serve(async (req) => {
         score += overlap * 0.4;
       }
       if (targetSupplier && sup && sup.includes(targetSupplier)) score += 0.2;
+      const aliases = aliasByRm.get(r.id) ?? [];
+      if (aliases.length > 0) {
+        const skuKey = normalizeAlias(targetSku);
+        const nameKey = normalizeAlias(targetName);
+        if (skuKey && aliases.includes(skuKey)) score += 0.6;
+        else if (nameKey && aliases.includes(nameKey)) score += 0.4;
+      }
       return { id: r.id, name: r.name, sku: r.sku, supplier: r.suppliers?.name, score: Math.min(1, score) };
     }).filter(c => c.score > 0.2).sort((a, b) => b.score - a.score).slice(0, 5);
 
@@ -54,6 +79,10 @@ Deno.serve(async (req) => {
     return json({ error: "internal_error" }, 500);
   }
 });
+
+function normalizeAlias(value: string): string {
+  return (value ?? "").toLowerCase().replace(/[^a-z0-9æøå]+/g, " ").trim();
+}
 
 function wordOverlap(a: string, b: string): number {
   const aw = new Set(a.split(/\s+/).filter(w => w.length > 2));

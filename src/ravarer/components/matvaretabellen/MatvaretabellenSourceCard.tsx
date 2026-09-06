@@ -19,25 +19,29 @@ import {
 } from "@/ravarer/hooks/useMatvaretabellen";
 import { FoodPickerDialog } from "./FoodPickerDialog";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
+import { Badge } from "@/components/ui/badge";
+import { normalizeNutritionSource } from "@/ravarer/lib/nutritionSource";
 
 interface Props {
   rawMaterialId: string;
-  rawMaterialName: string;
   /** raw_material_nutrition.source */
   source: string | null;
   /** raw_material_nutrition.matvaretabellen_food_id */
   foodId: string | null;
 }
 
-export function MatvaretabellenSourceCard({ rawMaterialId, rawMaterialName, source, foodId }: Props) {
+export function MatvaretabellenSourceCard({ rawMaterialId, source, foodId }: Props) {
   const { canWrite } = useRavarer();
-  const linked = source === "matvaretabellen" && !!foodId;
+  // Koblingen består selv om noen har rettet et tall manuelt — da er kilden «manuell».
+  const linked = !!foodId;
+  const manualOverride = linked && normalizeNutritionSource(source) !== "matvaretabellen";
   const { data: food } = useMatvaretabellenFood(linked ? foodId : null);
   const apply = useApplyMatvaretabellen();
   const unlink = useUnlinkMatvaretabellen();
 
   const [findOpen, setFindOpen] = useState(false);
   const [confirmUnlink, setConfirmUnlink] = useState(false);
+  const [confirmRefresh, setConfirmRefresh] = useState(false);
 
   if (!linked) {
     return (
@@ -57,7 +61,6 @@ export function MatvaretabellenSourceCard({ rawMaterialId, rawMaterialName, sour
             open={findOpen}
             onOpenChange={setFindOpen}
             rawMaterialId={rawMaterialId}
-            initialQuery={rawMaterialName}
           />
         )}
       </>
@@ -66,9 +69,18 @@ export function MatvaretabellenSourceCard({ rawMaterialId, rawMaterialName, sour
 
   return (
     <>
-      <Card className="flex flex-wrap items-center justify-between gap-3 border-success/30 bg-success/5 p-4">
+      <Card
+        className={`flex flex-wrap items-center justify-between gap-3 p-4 ${
+          manualOverride ? "border-warning/30 bg-warning/5" : "border-success/30 bg-success/5"
+        }`}
+      >
         <div className="text-sm">
-          <span className="font-medium">Kilde: Matvaretabellen</span>
+          <span className="font-medium">Kilde: {manualOverride ? "Manuell" : "Matvaretabellen"}</span>
+          {manualOverride && (
+            <Badge variant="outline" className="ml-2">
+              Manuelt overstyrt
+            </Badge>
+          )}
           {food?.food_name ? <span> — {food.food_name}</span> : null}
           {food?.uri && (
             <a
@@ -87,7 +99,7 @@ export function MatvaretabellenSourceCard({ rawMaterialId, rawMaterialName, sour
               variant="outline"
               size="sm"
               disabled={apply.isPending}
-              onClick={() => apply.mutate({ rawMaterialId, foodId: foodId! })}
+              onClick={() => (manualOverride ? setConfirmRefresh(true) : apply.mutate({ rawMaterialId, foodId: foodId! }))}
             >
               {apply.isPending ? (
                 <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
@@ -102,6 +114,24 @@ export function MatvaretabellenSourceCard({ rawMaterialId, rawMaterialName, sour
           </div>
         )}
       </Card>
+
+      <AlertDialog open={confirmRefresh} onOpenChange={setConfirmRefresh}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Overskrive manuelle verdier?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Næringsverdiene er rettet manuelt etter at råvaren ble koblet. Henter du på nytt, erstattes de med
+              tallene fra Matvaretabellen.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Behold mine verdier</AlertDialogCancel>
+            <AlertDialogAction onClick={() => apply.mutate({ rawMaterialId, foodId: foodId! })}>
+              Hent på nytt
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={confirmUnlink} onOpenChange={setConfirmUnlink}>
         <AlertDialogContent>

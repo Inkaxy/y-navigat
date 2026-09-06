@@ -13,6 +13,25 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { formatDate } from "@/ravarer/lib/constants";
 import { invalidateRawMaterial } from "@/ravarer/lib/invalidate";
+import { useAllergens, useNutrition } from "@/ravarer/hooks/useNutrition";
+import { useRawMaterial } from "@/ravarer/hooks/useRawMaterials";
+import { ALLERGENS, formatNumber } from "@/ravarer/lib/constants";
+import { diffAllergens, normalizeAllergenCode } from "@/ravarer/lib/allergenDiff";
+import { NUTRITION_NUMBER_FIELDS } from "@/ravarer/lib/nutritionSource";
+
+const NUTRITION_LABELS: Record<string, string> = {
+  energy_kj: "Energi (kJ)",
+  energy_kcal: "Energi (kcal)",
+  fat_g: "Fett",
+  saturated_fat_g: "— mettet",
+  carbs_g: "Karbohydrater",
+  sugars_g: "— sukkerarter",
+  fiber_g: "Fiber",
+  protein_g: "Protein",
+  salt_g: "Salt",
+};
+
+const ALLERGEN_LABEL_BY_CODE: Record<string, string> = Object.fromEntries(ALLERGENS.map((a) => [a.value, a.label]));
 
 interface Props { rawMaterialId: string }
 
@@ -30,6 +49,9 @@ export function DatasheetSection({ rawMaterialId }: Props) {
   const qc = useQueryClient();
   const { data: datasheets = [] } = useDatasheets(rawMaterialId);
   const { data: changelog = [] } = useChangelog({ rawMaterialId });
+  const { data: currentNutrition } = useNutrition(rawMaterialId);
+  const { data: currentAllergens = [] } = useAllergens(rawMaterialId);
+  const { data: rm } = useRawMaterial(rawMaterialId);
   const [uploading, setUploading] = useState(false);
   const [extracting, setExtracting] = useState(false);
   const [extracted, setExtracted] = useState<any | null>(null);
@@ -60,7 +82,7 @@ export function DatasheetSection({ rawMaterialId }: Props) {
       if (data.extracted.nutrition) auto.add("nutrition");
       if (data.extracted.allergens?.length) auto.add("allergens");
       if (data.extracted.ingredient_declaration) auto.add("ingredient_declaration");
-      if (data.extracted.composite_components?.length) auto.add("composite");
+      // «composite» velges bevisst ikke automatisk — komponentene må sees over først.
       if (data.extracted.grain_classification_hint) auto.add("grain");
       if (data.extracted.package_size_value) auto.add("package");
       setAccepted(auto);
@@ -141,13 +163,64 @@ export function DatasheetSection({ rawMaterialId }: Props) {
           </div>
           <div className="space-y-2">
             {Object.entries(FIELD_LABELS).filter(([k]) => isFieldPresent(extracted, k)).map(([k, label]) => (
-              <label key={k} className="flex items-start gap-2 rounded-lg bg-surface-raised p-3 cursor-pointer hover:bg-muted/50">
-                <Checkbox checked={accepted.has(k)} onCheckedChange={() => toggle(k)} />
-                <div className="flex-1 text-sm">
-                  <div className="font-medium">{label}</div>
-                  <div className="text-xs text-ink-secondary mt-0.5">{summary(extracted, k)}</div>
-                </div>
-              </label>
+              <div key={k} className="rounded-lg bg-surface-raised p-3">
+                <label className="flex items-start gap-2 cursor-pointer">
+                  <Checkbox checked={accepted.has(k)} onCheckedChange={() => toggle(k)} />
+                  <div className="flex-1 text-sm">
+                    <div className="font-medium">{label}</div>
+                    <div className="text-xs text-ink-secondary mt-0.5">{summary(extracted, k)}</div>
+                  </div>
+                </label>
+                {k === "nutrition" && (
+                  <table className="mt-2 w-full text-xs">
+                    <thead>
+                      <tr className="text-ink-secondary">
+                        <th className="py-1 text-left font-medium">Felt</th>
+                        <th className="py-1 text-right font-medium">I dag</th>
+                        <th className="py-1 text-right font-medium">Fra datablad</th>
+                        <th className="py-1 text-right font-medium">Endring</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {NUTRITION_NUMBER_FIELDS.filter((f) => extracted.nutrition?.[f] != null).map((f) => {
+                        const oldV = (currentNutrition?.[f] ?? null) as number | null;
+                        const newV = Number(extracted.nutrition[f]);
+                        return (
+                          <tr key={f} className="border-t border-line-subtle/60">
+                            <td className="py-1">{NUTRITION_LABELS[f] ?? f}</td>
+                            <td className="py-1 text-right tabular-nums">{oldV == null ? "—" : formatNumber(oldV, 1)}</td>
+                            <td className="py-1 text-right tabular-nums font-medium">{formatNumber(newV, 1)}</td>
+                            <td className="py-1 text-right tabular-nums">{changePct(oldV, newV)}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
+                {k === "allergens" && (
+                  <AllergenPreview current={currentAllergens} incoming={extracted.allergens ?? []} />
+                )}
+                {k === "ingredient_declaration" && (
+                  <BeforeAfter
+                    before={currentNutrition?.ingredient_declaration ?? null}
+                    after={extracted.ingredient_declaration}
+                  />
+                )}
+                {k === "grain" && (
+                  <BeforeAfter before={rm?.grain_classification ?? null} after={extracted.grain_classification_hint} />
+                )}
+                {k === "package" && (
+                  <BeforeAfter
+                    before={rm?.package_size != null ? `${rm.package_size} ${rm.package_unit ?? ""}`.trim() : null}
+                    after={`${extracted.package_size_value} ${extracted.package_size_unit ?? ""}`.trim()}
+                  />
+                )}
+                {k === "composite" && (
+                  <p className="mt-2 text-xs text-ink-secondary">
+                    Komponentene lagres som forslag til gjennomgang. Råvarens egen næring og allergener beholdes.
+                  </p>
+                )}
+              </div>
             ))}
           </div>
           <div className="flex justify-end gap-2 pt-2">
@@ -192,6 +265,58 @@ export function DatasheetSection({ rawMaterialId }: Props) {
         </DialogContent>
       </Dialog>
     </Card>
+  );
+}
+
+function changePct(oldV: number | null, newV: number): string {
+  if (oldV == null || oldV === 0) return oldV == null ? "ny" : "—";
+  const pct = ((newV - oldV) / Math.abs(oldV)) * 100;
+  const sign = pct > 0 ? "+" : "";
+  return `${sign}${formatNumber(pct, 1)} %`;
+}
+
+function BeforeAfter({ before, after }: { before: string | null; after: string | null | undefined }) {
+  return (
+    <div className="mt-2 grid gap-2 text-xs md:grid-cols-2">
+      <div>
+        <div className="text-ink-secondary">I dag</div>
+        <div className="rounded bg-muted px-2 py-1">{before || "—"}</div>
+      </div>
+      <div>
+        <div className="text-ink-secondary">Fra datablad</div>
+        <div className="rounded bg-muted px-2 py-1 font-medium">{after || "—"}</div>
+      </div>
+    </div>
+  );
+}
+
+function AllergenPreview({
+  current,
+  incoming,
+}: {
+  current: { allergen: string; presence: string }[];
+  incoming: { allergen?: unknown; presence?: unknown }[];
+}) {
+  const diff = diffAllergens(current, incoming);
+  const name = (code: string) => ALLERGEN_LABEL_BY_CODE[normalizeAllergenCode(code) ?? code] ?? code;
+  if (diff.added.length === 0 && diff.changed.length === 0 && diff.removed.length === 0 && diff.rejected.length === 0) {
+    return <p className="mt-2 text-xs text-ink-secondary">Ingen endring i allergener.</p>;
+  }
+  return (
+    <ul className="mt-2 space-y-1 text-xs">
+      {diff.added.map((a) => (
+        <li key={`a-${a.allergen}`} className="text-success">+ {name(a.allergen)} ({a.presence === "contains" ? "inneholder" : "kan inneholde spor"})</li>
+      ))}
+      {diff.changed.map((c) => (
+        <li key={`c-${c.allergen}`}>{name(c.allergen)}: {c.from} → {c.to}</li>
+      ))}
+      {diff.removed.map((r) => (
+        <li key={`r-${r.allergen}`} className="text-destructive">− {name(r.allergen)} fjernes</li>
+      ))}
+      {diff.rejected.length > 0 && (
+        <li className="text-warning">Forkastet (ukjent kode): {diff.rejected.join(", ")}</li>
+      )}
+    </ul>
   );
 }
 

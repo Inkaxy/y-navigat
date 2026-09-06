@@ -3,16 +3,8 @@
 // Håndterer: gram-konvertering, svinn, rekursiv dekomponering av sammensatte råvarer,
 // aggregering, QUID, allergener, næring og Brødskala'n.
 
-export const ALLERGEN_LABEL: Record<string, string> = {
-  gluten_wheat: "hvete", gluten_rye: "rug", gluten_barley: "bygg", gluten_oats: "havre", gluten_spelt: "spelt",
-  crustaceans: "krepsdyr", fish: "fisk", molluscs: "bløtdyr",
-  eggs: "egg", milk: "melk",
-  peanuts: "peanøtter", nuts_almond: "mandler", nuts_hazelnut: "hasselnøtter", nuts_walnut: "valnøtter",
-  nuts_cashew: "cashewnøtter", nuts_pecan: "pekannøtter", nuts_brazil: "paranøtter",
-  nuts_pistachio: "pistasjenøtter", nuts_macadamia: "macadamianøtter",
-  soybeans: "soya", celery: "selleri", mustard: "sennep", sesame: "sesamfrø",
-  sulphites: "svoveldioksid og sulfitt", lupin: "lupin",
-};
+export { ALLERGEN_LABEL, highlightAllergens } from "./allergen-labels.ts";
+import { ALLERGEN_LABEL, highlightAllergens } from "./allergen-labels.ts";
 
 export const NUT_FIELDS = [
   "energy_kj", "energy_kcal", "fat_g", "saturated_fat_g", "carbs_g", "sugars_g", "fiber_g", "protein_g", "salt_g",
@@ -269,7 +261,11 @@ export async function computeDeclarationCore(service: any, topLines: TopLine[]):
     waterOverride: number | null | undefined,
   ): FlatLine[] {
     const rm = rmId ? rmMap.get(rmId) ?? null : null;
-    const isComposite = rm?.is_composite && depth < 3;
+    // Sammensatt bare når komponentene faktisk peker på egne råvarer. Er de bare
+    // tekst fra et datablad, bruker vi forelderens egen nærings- og allergenrad.
+    const ownComponents = rmId ? componentsByParent.get(rmId) ?? [] : [];
+    const hasLinkedComponents = ownComponents.some((c) => !!c.component_raw_material_id);
+    const isComposite = !!rm?.is_composite && depth < 3 && hasLinkedComponents;
     if (!isComposite) {
       const allergens = rmId ? (allergensByRm.get(rmId) ?? []).filter((a) => a.presence === "contains").map((a) => a.allergen) : [];
       const may = rmId ? (allergensByRm.get(rmId) ?? []).filter((a) => a.presence === "may_contain").map((a) => a.allergen) : [];
@@ -414,12 +410,8 @@ export async function computeDeclarationCore(service: any, topLines: TopLine[]):
 
   function renderItem(a: Agg, includeQuid: boolean): string {
     if (a.custom_text) return escapeHtml(a.custom_text);
-    let display = escapeHtml(a.name);
-    for (const al of a.allergens) {
-      const label = ALLERGEN_LABEL[al]; if (!label) continue;
-      const re = new RegExp(`(${label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "i");
-      if (re.test(display)) { display = display.replace(re, "<strong>$1</strong>"); break; }
-    }
+    // Alle allergener uthevet; de som ikke står i navnet legges til i parentes.
+    let display = highlightAllergens(escapeHtml(a.name), a.allergens);
     if (includeQuid && a.is_quid) {
       const pct = Math.round((a.effective_grams / totalInputGrams) * 1000) / 10;
       // QUID vises i parentes med norsk desimalkomma: «(12,5 %)».
