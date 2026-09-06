@@ -174,8 +174,8 @@ export function BulkImportRawMaterialsDrawer({ open, onOpenChange, invoiceId, le
         }
         return next;
       });
-    } catch (e: any) {
-      toast.error(`AI-forslag feilet: ${e.message ?? e}`);
+    } catch (e: unknown) {
+      toast.error(`AI-forslag feilet: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setLoadingSuggestions(false);
     }
@@ -256,7 +256,7 @@ export function BulkImportRawMaterialsDrawer({ open, onOpenChange, invoiceId, le
         body: { invoice_id: invoiceId, items },
       });
       if (error) throw error;
-      return data as { created: any[]; skipped: Array<{ line_id: string; reason: string }> };
+      return data as { created: Array<{ id: string }>; skipped: Array<{ line_id: string; reason: string }> };
     },
     onSuccess: (res) => {
       const created = res.created?.length ?? 0;
@@ -278,7 +278,7 @@ export function BulkImportRawMaterialsDrawer({ open, onOpenChange, invoiceId, le
       onComplete?.();
       if (skippedRows.length === 0) onOpenChange(false);
     },
-    onError: (e: any) => toast.error(`Import feilet: ${e.message ?? e}`),
+    onError: (e: unknown) => toast.error(`Import feilet: ${e instanceof Error ? e.message : String(e)}`),
   });
 
   const skippedByLine = useMemo(() => {
