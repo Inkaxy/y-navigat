@@ -218,15 +218,7 @@ export function SubAppNav() {
 function RavarerNav() {
   const { data: reviewCount = 0 } = useReviewCount();
   const { data: hasInvoiceAccess = false } = useInvoiceAccess();
-  const { data: accessLevel = "none" } = useQuery({
-    queryKey: ["ravarer-access-level-nav"],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("app_access_level", { p_app_code: "ravarer" });
-      if (error) throw error;
-      return (data as string) ?? "none";
-    },
-    staleTime: 60_000,
-  });
+  const { data: accessLevel = "none" } = useRavarerAccessLevel();
   const { data: changelogCount = 0 } = useQuery({
     queryKey: ["raw-material-changelog-count"],
     queryFn: async () => {
@@ -241,36 +233,12 @@ function RavarerNav() {
   });
   const canManage = accessLevel === "admin" || accessLevel === "approve";
 
+  // Sju toppnivåpunkter. Alle ruter fra den gamle menyen finnes fortsatt —
+  // de er bare gruppert. Aktiv-markering skjer på eksplisitte `matches`,
+  // fordi flere ruter ikke deler prefiks med nedtrekket sitt.
   const items: NavItem[] = [
     { kind: "link", to: "/ravarer/vareliste", label: "Vareliste", icon: Boxes },
-    { kind: "link", to: "/ravarer/pakninger", label: "Pakninger", icon: Package },
-    { kind: "link", to: "/ravarer/pakningsstorrelser", label: "Pakningsstørrelser", icon: Package },
-    { kind: "link", to: "/ravarer/lager", label: "Lager", icon: Warehouse },
-    { kind: "link", to: "/ravarer/varemottak", label: "Varemottak", icon: Package },
-    { kind: "link", to: "/ravarer/varetelling", label: "Varetelling", icon: ClipboardCheck },
-    { kind: "link", to: "/ravarer/matvaretabellen", label: "Matvaretabellen", icon: Database },
-    { kind: "link", to: "/ravarer/deklarasjonsnavn", label: "Deklarasjonsnavn", icon: Database },
-
-    { kind: "link", to: "/ravarer/leverandorer", label: "Leverandører", icon: Building2 },
-    { kind: "link", to: "/ravarer/avtaler", label: "Avtaler", icon: FileText },
-    { kind: "dropdown", label: "Datablad", icon: Database, basePath: "/ravarer/datablad", links: [
-      { to: "/ravarer/datablad-endringer", label: "Endringer", badge: changelogCount },
-      { to: "/ravarer/datablad-bulk", label: "Bulk-opplasting" },
-    ] },
   ];
-
-  if (hasInvoiceAccess) {
-    items.push({
-      kind: "dropdown",
-      label: "Forhandlinger",
-      icon: HandCoins,
-      basePath: "/ravarer/forhandlinger",
-      links: [
-        { to: "/ravarer/forhandlinger", label: "Aktive forhandlinger" },
-        { to: "/ravarer/forhandlinger/ny", label: "Ny forhandling" },
-      ],
-    });
-  }
 
   if (hasInvoiceAccess) {
     items.push({
@@ -278,9 +246,11 @@ function RavarerNav() {
       label: "Fakturaer",
       icon: Receipt,
       basePath: "/ravarer/fakturaer",
+      matches: ["/ravarer/fakturaer"],
+      badge: reviewCount,
       links: [
-        { to: "/ravarer/fakturaer", label: "Alle fakturaer" },
         { to: "/ravarer/fakturaer/til-behandling", label: "Til behandling", badge: reviewCount },
+        { to: "/ravarer/fakturaer", label: "Alle fakturaer" },
         { to: "/ravarer/fakturaer?status=ready", label: "Klar for prismatch" },
         { to: "/ravarer/fakturaer/import", label: "Importer manuelt" },
         { to: "/ravarer/fakturaer/reberegn-kostpriser", label: "Reberegn kostpriser" },
@@ -288,12 +258,68 @@ function RavarerNav() {
     });
   }
 
+  items.push({
+    kind: "dropdown",
+    label: "Leverandører",
+    icon: Building2,
+    basePath: "/ravarer/leverandorer",
+    matches: ["/ravarer/leverandorer", "/ravarer/avtaler", "/ravarer/forhandlinger"],
+    links: [
+      { to: "/ravarer/leverandorer", label: "Leverandører" },
+      { to: "/ravarer/avtaler", label: "Avtaler" },
+      ...(hasInvoiceAccess
+        ? [
+            { to: "/ravarer/forhandlinger", label: "Aktive forhandlinger" },
+            { to: "/ravarer/forhandlinger/ny", label: "Ny forhandling" },
+          ]
+        : []),
+    ],
+  });
+
+  items.push({
+    kind: "dropdown",
+    label: "Datakvalitet",
+    icon: FileText,
+    basePath: "/ravarer/pakninger",
+    matches: [
+      "/ravarer/pakninger",
+      "/ravarer/pakningsstorrelser",
+      "/ravarer/matvaretabellen",
+      "/ravarer/deklarasjonsnavn",
+      "/ravarer/datablad-endringer",
+      "/ravarer/datablad-bulk",
+    ],
+    badge: changelogCount,
+    links: [
+      { to: "/ravarer/pakninger", label: "Pakninger" },
+      { to: "/ravarer/pakningsstorrelser", label: "Pakningsstørrelser" },
+      { to: "/ravarer/matvaretabellen", label: "Matvaretabellen" },
+      { to: "/ravarer/deklarasjonsnavn", label: "Deklarasjonsnavn" },
+      { to: "/ravarer/datablad-endringer", label: "Datablad-endringer", badge: changelogCount },
+      { to: "/ravarer/datablad-bulk", label: "Bulk-opplasting" },
+    ],
+  });
+
+  items.push({
+    kind: "dropdown",
+    label: "Lager",
+    icon: Warehouse,
+    basePath: "/ravarer/lager",
+    matches: ["/ravarer/lager", "/ravarer/varemottak", "/ravarer/varetelling"],
+    links: [
+      { to: "/ravarer/lager", label: "Lager" },
+      { to: "/ravarer/varemottak", label: "Varemottak" },
+      { to: "/ravarer/varetelling", label: "Varetelling" },
+    ],
+  });
+
   if (canManage) {
     items.push({
       kind: "dropdown",
       label: "Innstillinger",
       icon: Settings,
       basePath: "/ravarer/innstillinger",
+      matches: ["/ravarer/innstillinger"],
       links: [
         { to: "/ravarer/innstillinger/match-toleranser", label: "Match-toleranser" },
         { to: "/ravarer/innstillinger/tripletex", label: "Tripletex-tilkobling" },
@@ -302,6 +328,7 @@ function RavarerNav() {
       ],
     });
   }
+
 
   return <NavBar appSlug="ravarer" items={items} />;
 }
