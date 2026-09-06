@@ -23,7 +23,6 @@ import { toast } from "sonner";
 import { RavarerHeaderBanner } from "@/ravarer/components/RavarerHeaderBanner";
 import { useMatchTolerances, FALLBACK_TOLERANCE_PCT } from "@/fakturaer/hooks/useMatchTolerances";
 import { QueryState } from "@/components/common/QueryState";
-import { userError } from "@/lib/userError";
 
 interface ToleranceRow {
   id: string;
@@ -96,7 +95,7 @@ export default function MatchToleranserPage() {
       invalidate();
       toast.success("Innstillinger lagret");
     },
-    onError: (e) => toast.error(userError(e, "Kunne ikke lagre innstillingene")),
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Kunne ikke lagre innstillingene"),
   });
 
   const upsert = useMutation({
@@ -122,7 +121,7 @@ export default function MatchToleranserPage() {
       setNewCat("");
       setNewPct("5");
     },
-    onError: (e) => toast.error(userError(e, "Kunne ikke lagre toleransen")),
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Kunne ikke lagre toleransen"),
   });
 
   const del = useMutation({
@@ -135,7 +134,7 @@ export default function MatchToleranserPage() {
       setDeleteRow(null);
       toast.success("Kategorien er fjernet");
     },
-    onError: (e) => toast.error(userError(e, "Kunne ikke slette kategorien")),
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Kunne ikke slette kategorien"),
   });
 
   const s = tolerances.settings;
