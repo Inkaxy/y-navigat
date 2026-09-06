@@ -353,12 +353,25 @@ export default function VarelistePage() {
   // Hurtigtaster: «/» søk, ↑/↓ markering, Enter åpner, «e» kostpris, «n» ny, Esc.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement | null;
-      const typing =
-        !!target &&
-        (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
+      // Snarveier skal aldri kapre nettleserens egne kombinasjoner.
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      // Ingen snarveier mens en dialog, ark eller meny er åpen.
+      if (document.querySelector('[role="dialog"], [role="alertdialog"], [role="listbox"]')) return;
 
-      if (e.key === "/" && !typing) {
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName ?? "";
+      const inControl =
+        !!target &&
+        (tag === "INPUT" ||
+          tag === "TEXTAREA" ||
+          tag === "SELECT" ||
+          tag === "BUTTON" ||
+          target.isContentEditable ||
+          !!target.closest('[role="combobox"], [role="menu"], [contenteditable="true"]'));
+      const typing =
+        !!target && (tag === "INPUT" || tag === "TEXTAREA" || target.isContentEditable);
+
+      if (e.key === "/" && !inControl) {
         e.preventDefault();
         searchRef.current?.focus();
         return;
@@ -371,7 +384,7 @@ export default function VarelistePage() {
         setEditing(null);
         return;
       }
-      if (typing) return;
+      if (inControl) return;
 
       if (e.key === "n") {
         if (canWrite) {
@@ -390,7 +403,7 @@ export default function VarelistePage() {
         setFocusedId(filtered[Math.max(idx - 1, 0)]?.id ?? filtered[0].id);
       } else if (e.key === "Enter" && focusedId) {
         e.preventDefault();
-        window.location.assign(`/ravarer/vareliste/${focusedId}${listSearch ? `?${listSearch}` : ""}`);
+        navigate(`/ravarer/vareliste/${focusedId}${listSearch ? `?${listSearch}` : ""}`);
       } else if (e.key === "e" && focusedId && canWrite) {
         e.preventDefault();
         setEditing({ id: focusedId, field: "cost" });
@@ -398,12 +411,26 @@ export default function VarelistePage() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [filtered, focusedId, canWrite, setParam]);
+  }, [filtered, focusedId, canWrite, setParam, navigate, listSearch]);
+
+  const startEdit = useCallback((id: string, field: InlineField) => setEditing({ id, field }), []);
+  const cancelEdit = useCallback(() => setEditing(null), []);
+
+  /** Bulk «Bekreft pakning»: bare varer som faktisk står i pakningskøen. */
+  const startPackageQueue = useCallback(() => {
+    const ids = Array.from(selected).filter((id) => packageWorklist.some((r) => r.id === id));
+    if (ids.length === 0) {
+      toast.info("Ingen av de valgte varene mangler bekreftet pakning.");
+      return;
+    }
+    setPackageQueue(ids);
+  }, [selected, packageWorklist]);
 
   const packageRow = useMemo(
     () => packageWorklist.find((r) => r.id === packageQueue[0]) ?? null,
     [packageWorklist, packageQueue],
   );
+
 
   const filterControls = (
     <>
