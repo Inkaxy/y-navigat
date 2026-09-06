@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { FakturaerHeaderBanner } from "@/fakturaer/components/FakturaerHeaderBanner";
 import { useFakturaer } from "@/fakturaer/context/FakturaerContext";
 import { useSelection } from "@/providers/SelectionProvider";
+import { runAutoMatchAfterImport } from "@/fakturaer/lib/queueActions";
 
 export default function ImportEhfPage({ embedded = false }: { embedded?: boolean } = {}) {
   const navigate = useNavigate();
