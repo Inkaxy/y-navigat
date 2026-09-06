@@ -100,6 +100,11 @@ export function DatasheetSection({ rawMaterialId }: Props) {
       if (data.extracted.grain_classification_hint) auto.add("grain");
       if (data.extracted.package_size_value) auto.add("package");
       setAccepted(auto);
+      // Alle næringsfelt med verdi er valgt som utgangspunkt; brukeren kan skru av enkeltfelt.
+      setAcceptedNutrition(
+        new Set(NUTRITION_NUMBER_FIELDS.filter((f) => data.extracted.nutrition?.[f] != null)),
+      );
+      setAllowRemovals(false);
     } catch (e: any) {
       toast.error(e.message ?? "Opplasting feilet");
     } finally {
@@ -141,15 +146,15 @@ export function DatasheetSection({ rawMaterialId }: Props) {
       setDatasheetId(null);
       setAllowRemovals(false);
       invalidateRawMaterial(qc, rawMaterialId);
-    } catch (e: any) {
-      toast.error(e.message);
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Kunne ikke anvende databladet");
     }
   };
 
   const toggleNutritionField = (f: string) => {
     setAcceptedNutrition((prev) => {
       const n = new Set(prev);
-      n.has(f) ? n.delete(f) : n.add(f);
+      if (n.has(f)) n.delete(f); else n.add(f);
       return n;
     });
   };
