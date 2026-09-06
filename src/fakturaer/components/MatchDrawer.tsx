@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, ExternalLink, Search, Plus } from "lucide-react";
 import { toast } from "sonner";
+import { showError } from "@/lib/userError";
 import { invalidateInvoice, invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 import { formatNok, formatDate } from "@/fakturaer/lib/constants";
 import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
@@ -186,13 +187,14 @@ export function MatchDrawer({ open, onOpenChange, line, onAcceptedNext }: Props)
     },
   });
 
-  const linkExists = useMemo(() => existingRms?.find((r: any) => r.supplier_id === supplierId), [existingRms, supplierId]);
-  const anyPrimary = useMemo(() => existingRms?.some((r: any) => r.is_primary), [existingRms]);
+  const linkExists = useMemo(() => existingRms?.find((r) => r.supplier_id === supplierId), [existingRms, supplierId]);
+  const anyPrimary = useMemo(() => existingRms?.some((r) => r.is_primary), [existingRms]);
 
   // Når koblingen finnes fra før: forhåndsutfyll avtaleprisen slik at brukeren ser den.
   useEffect(() => {
-    const existing = linkExists as any;
-    if (existing?.agreed_price_per_base_unit != null) setAgreedPrice(String(existing.agreed_price_per_base_unit));
+    if (linkExists?.agreed_price_per_base_unit != null) {
+      setAgreedPrice(String(linkExists.agreed_price_per_base_unit));
+    }
   }, [linkExists]);
 
   const suggestions = line?.suggestions ?? [];
@@ -257,8 +259,8 @@ export function MatchDrawer({ open, onOpenChange, line, onAcceptedNext }: Props)
       } else {
         onOpenChange(false);
       }
-    } catch (e: any) {
-      toast.error(e.message ?? "Kunne ikke matche");
+    } catch (e: unknown) {
+      showError("faktura-match", e, "Kunne ikke matche linjen");
     } finally {
       setBusy(false);
     }
