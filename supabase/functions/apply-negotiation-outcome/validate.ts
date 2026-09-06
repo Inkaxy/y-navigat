@@ -188,7 +188,17 @@ export function validateOutcomes(args: {
 
     const applyToSupplier = !!raw?.apply_to_supplier;
     let perBase: number | null = null;
-    if (applyToSupplier && price != null) {
+    if (applyToSupplier) {
+      // Skal avtalen skrives, må prisen være reell. Uten dette ville «abc», NaN
+      // eller en manglende pris blitt lagret som en tom avtale (pris = null).
+      if (raw?.agreed_price === null || raw?.agreed_price === undefined || raw?.agreed_price === "") {
+        errors.push("Avtalt pris mangler, men leverandøravtalen skal oppdateres.");
+        continue;
+      }
+      if (price == null || !Number.isFinite(price) || price < 0) {
+        errors.push("Avtalt pris må være et gyldig tall som ikke er negativt.");
+        continue;
+      }
       if (!supplierId) {
         errors.push("Kan ikke oppdatere leverandøravtalen uten en valgt leverandør.");
         continue;

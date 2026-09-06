@@ -119,7 +119,7 @@ export default function Recipes() {
     queryFn: async () => {
       const { data } = await supabase
         .from("raw_materials")
-        .select("id, name, category, grain_classification, water_content_pct, current_cost_price")
+        .select("id, name, category, grain_classification, water_content_pct, unit_weight_grams, current_cost_price")
         .limit(2000);
       const map: Record<string, BakersRawMaterial> = {};
       for (const r of (data ?? []) as unknown as BakersRawMaterial[]) map[r.id] = r;

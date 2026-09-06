@@ -27,8 +27,14 @@ export interface Blocker {
   line_ids?: string[];
 }
 
-/** Statuser en faktura kan bekreftes fra. */
-export const RECONCILABLE_STATUSES = ["ready", "matched", "review", "imported"];
+/**
+ * Statuser en faktura kan bekreftes fra. Speiler den faktiske arbeidsflyten i
+ * `src/fakturaer/lib/statusGuards.ts`: alt som ikke er `reconciled` eller
+ * `flagged` er åpent — inkludert `needs_review`, som er statusen en faktura får
+ * mens linjer venter på gjennomgang. Selve gjennomgangen kontrolleres av
+ * linjekravene under, ikke av statusen.
+ */
+export const RECONCILABLE_STATUSES = ["imported", "needs_review", "ready", "matched", "review"];
 /** Valutaen prishistorikken er ført i. */
 export const HISTORY_CURRENCY = "NOK";
 
@@ -104,6 +110,24 @@ export function validateReconcile(invoice: ReconcileInvoice, lines: ReconcileLin
     });
   }
 
+  // Prisgrunnlaget må være et reelt tall. Uten dette ville linjer med null,
+  // NaN, Infinity eller negativ basepris blitt avstemt uten prishistorikk.
+  const badPrice = relevant.filter((l) => {
+    if (!l.raw_material_id) return false;
+    if (l.price_per_base_unit == null) return true;
+    const v = Number(l.price_per_base_unit);
+    return !Number.isFinite(v) || v < 0;
+  });
+  if (badPrice.length > 0) {
+    blockers.push({
+      code: "invalid_base_price",
+      message:
+        `${badPrice.length} linjer mangler en gyldig pris per baseenhet. ` +
+        "Sett pakning eller enhet på linjene, slik at prishistorikken blir riktig.",
+      line_ids: badPrice.map((l) => l.id),
+    });
+  }
+
   // Prishistorikken har én rad per (faktura, råvare) — både triggerne og denne
   // funksjonen. Flere linjer på samme råvare med ulik pris kan derfor ikke
   // føres riktig, og vi lar heller brukeren rydde enn å miste en linje.
@@ -122,8 +146,9 @@ export function validateReconcile(invoice: ReconcileInvoice, lines: ReconcileLin
     blockers.push({
       code: "duplicate_raw_material_prices",
       message:
-        "Samme råvare står på flere linjer med ulik enhetspris. Prishistorikken lagrer én pris per faktura og råvare — " +
-        "slå sammen linjene eller merk den som ikke skal telle.",
+        "Samme råvare står på flere linjer med ulik enhetspris. Prishistorikken lagrer i dag én pris per " +
+        "faktura og råvare, så begge kjøpene kan ikke føres riktig. Fakturalinjene skal stå som de er — " +
+        "riktig linjehistorikk krever at prishistorikken utvides med fakturalinje-ID og flere kjøpshendelser (F2).",
       line_ids: conflicting,
     });
   }

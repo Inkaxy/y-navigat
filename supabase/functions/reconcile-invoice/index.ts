@@ -76,8 +76,9 @@ Deno.serve(async (req) => {
     //
     // MERK: SELECT-før-INSERT under er IKKE atomisk idempotens. To samtidige kall
     // kan begge se «finnes ikke» og skrive hver sin rad. En unik indeks på
-    // (invoice_id, raw_material_id) i raw_material_price_history er det eneste som
-    // løser dette skikkelig, og krever migrasjon (F2) — se dokumentasjonen.
+    // (invoice_id, raw_material_id) ville bare skjult problemet: F2 krever at
+    // historikken får fakturalinje-ID og tåler flere kjøpshendelser per faktura
+    // og råvare. Begge deler krever migrasjon — se dokumentasjonen.
     const mediumLines = mediumHistoryLines(lines);
     let mediumHistoryInserted = 0;
     if (mediumLines.length > 0) {

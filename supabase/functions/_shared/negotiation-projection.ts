@@ -75,15 +75,18 @@ export function projectLiveItems(rows: Row[] | null | undefined) {
   }));
 }
 
-/** Leverandørens egne svar — bare det portalen selv har sendt inn. */
+/**
+ * Leverandørens egne svar — bare det portalen selv har sendt inn.
+ * MERK: `negotiation_responses` har ingen prisenhet-kolonne. Tilbudsprisen
+ * gjelder pakningen (`offered_package_size`/`offered_package_unit`).
+ */
 export const RFQ_RESPONSE_SELECT =
-  "negotiation_item_id, offered_price, offered_price_unit, offered_package_size, offered_package_unit, contract_length_months, min_order_volume, min_order_unit, payment_terms, delivery_terms, notes, datasheet_url, status";
+  "negotiation_item_id, offered_price, offered_package_size, offered_package_unit, contract_length_months, min_order_volume, min_order_unit, payment_terms, delivery_terms, notes, datasheet_url, status";
 
 export function projectRfqResponses(rows: Row[] | null | undefined) {
   return (rows ?? []).map((r) => ({
     negotiation_item_id: str(r.negotiation_item_id),
     offered_price: num(r.offered_price),
-    offered_price_unit: str(r.offered_price_unit),
     offered_package_size: num(r.offered_package_size),
     offered_package_unit: str(r.offered_package_unit),
     contract_length_months: num(r.contract_length_months),

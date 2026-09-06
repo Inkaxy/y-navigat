@@ -101,3 +101,53 @@ Endringer i edge-funksjonene `apply-datasheet-update`, `validate-rfq-access` og
 6. **Projeksjon** — `projectRfqItems`/`projectLiveItems`/`projectRfqResponses` er uendret og fortsatt dekket av Deno-testen. Kontrollen gjelder KODEN; det finnes fortsatt ingen bekreftet live-DB-kjøring eller edge-deploy av disse funksjonene.
 
 **Gjenstående begrensninger:** `apply-datasheet-update` er fortsatt ikke transaksjonell (krever ny RPC/migrasjon). A–F-runden (avstemming, forhandlingsutfall, pakninger, bakers-enheter, lager) er ikke del av denne runden.
+
+## Etterkontroll av A–F (etter d9981eeb)
+
+1. **Pakningsstørrelse regnet feil ved blandede enheter** — `src/ravarer/lib/packageMath.ts` (ny)
+   `computeBaseUnitsPerPackage` normaliserer enheten og regner om til råvarens baseenhet
+   (500 g på kg-vare = 0,5 kg, 6 × 500 g = 3 kg). Masse mot volum, ukjent enhet, antall ≤ 0
+   og ugyldige tall avvises med melding i stedet for stille fallback til 1.
+   `src/ravarer/pages/Pakninger.tsx` bruker funksjonen, forhåndsviser via RPC og lar
+   `SetPackageDialog` gjøre selve skrivingen (ingen direkte `.update()` igjen).
+   Enter lukker dialogen før ny lagring kan starte; suksessmelding vises bare når `res.ok`.
+
+2. **Volum og stykk ga 0 gram** — `src/varer/lib/bakers.ts`
+   `convertToGrams` antar ikke lenger vann for ukjent væske; volum uten tetthet og stk uten
+   stykkvekt gir `exact: false` med forklaring. `lineToGrams` bruker `unit_weight_grams` som
+   stykkvekt og 1 g/ml kun for rent vann. `fromGrams` gir `NaN` ved ukjent omregning.
+   `computeTotals` setter `unitCount = null` og `incomplete = true` når noe mangler;
+   `RecipeStatsBar` viser «Minst … g» og et varsel med årsakene, og `RecipePartCard`
+   beholder brukerens tall i stedet for å skrive `NaN`.
+   Spørringene i `Recipes.tsx`, `RecipeDetail.tsx` og `RecipeSummaryCard.tsx` henter
+   `unit_weight_grams`.
+
+3. **Statusvakt ved bekreftelse** — `supabase/functions/reconcile-invoice/validate.ts`
+   `needs_review` er igjen bekreftbar; `reconciled`/`flagged` er sperret. Ny blocker
+   `invalid_base_price`. Meldingen ved flere priser på samme råvare forklarer F2-kravet og
+   ber ikke om å endre fakturalinjene.
+
+4. **Prisenhet i forhandlingssvar** — `supabase/functions/_shared/negotiation-projection.ts`
+   `offered_price_unit` er fjernet (prisen gjelder pakningen); `ForhandlingDetail.tsx` setter
+   `agreed_price_unit: null`.
+
+5. **Tomme avtaler** — `supabase/functions/apply-negotiation-outcome/`
+   `apply_to_supplier` krever endelig, ikke-negativ pris og valgt leverandør; alle ID-er
+   kontrolleres mot forhandlingen før første skriving; `is_primary` skrives kun eksplisitt.
+
+6. **Regresjonstester** (manglet helt i A–F)
+   - `src/test/packageMath.test.ts` (9)
+   - `src/test/bakersUnits.test.ts` (11)
+   - `supabase/functions/reconcile-invoice/validate_test.ts` (7)
+   - `supabase/functions/apply-negotiation-outcome/validate_test.ts` (6)
+
+### Verifisering
+`npm run typecheck` (tsc) exit 0 · `npx vitest run` 396 tester / 42 filer, exit 0 ·
+Deno-tester 17 passed, exit 0 · `npm run build` exit 0 ·
+`npx eslint` rent på nye/berørte filer (gjenstående `any`-feil i `ForhandlingDetail.tsx` og
+`RecipePartCard.tsx` er forhåndseksisterende og utenfor denne rundens omfang).
+
+### Kjente begrensninger
+- Ingen live database- eller edge-utrullingsbekreftelse i dette miljøet.
+- Databladoppdateringen er fortsatt ikke transaksjonell (krever databaseendring).
+- Flere kjøpshendelser per råvare på samme faktura krever F2 (fakturalinje-ID i historikken).
