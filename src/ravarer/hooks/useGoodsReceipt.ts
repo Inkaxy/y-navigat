@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { toast } from "sonner";
+import { invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 
 export interface ReceiptInvoiceRow {
   id: string;
@@ -205,12 +206,7 @@ export function useReceiptMovement() {
       if (error) throw error;
     },
     onSuccess: (_d, vars) => {
-      qc.invalidateQueries({ queryKey: ["receipt-invoices"] });
-      qc.invalidateQueries({ queryKey: ["receipt-lines"] });
-      qc.invalidateQueries({ queryKey: ["raw-material-stock-status"] });
-      qc.invalidateQueries({ queryKey: ["stock-items"] });
-      qc.invalidateQueries({ queryKey: ["stock-movements", vars.raw_material_id] });
-      qc.invalidateQueries({ queryKey: ["raw_materials"] });
+      invalidateRawMaterial(qc, vars.raw_material_id);
       toast.success("Bevegelse registrert");
     },
     onError: (e: unknown) => toast.error(`Kunne ikke registrere: ${e instanceof Error ? e.message : String(e)}`),

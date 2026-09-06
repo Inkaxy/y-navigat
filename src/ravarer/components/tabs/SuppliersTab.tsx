@@ -221,6 +221,7 @@ export function SuppliersTab({ rm }: Props) {
 
       <NewSupplierDialog open={supplierOpen} onOpenChange={setSupplierOpen} />
       <RmSupplierDialog
+        key={linkOpen.existingId ?? "new"}
         open={linkOpen.open}
         onOpenChange={(v: boolean) => setLinkOpen({ open: v })}
         rawMaterialId={rm.id}

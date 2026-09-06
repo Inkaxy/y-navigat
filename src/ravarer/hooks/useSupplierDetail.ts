@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { supplierSpendExclVat } from "@/ravarer/lib/purchaseTotals";
 import type { SupplierRow } from "@/ravarer/hooks/useSuppliers";
 import { osloDateISOPlusDays } from "@/lib/osloDate";
 
@@ -96,11 +97,11 @@ export function useSupplierSpend(supplierId: string | undefined) {
       const since = osloDateISOPlusDays(-365);
       const { data, error } = await supabase
         .from("invoices")
-        .select("total_amount")
+        .select("total_amount, total_vat, is_credit_note")
         .eq("supplier_id", supplierId!)
         .gte("invoice_date", since);
       if (error) throw error;
-      return (data ?? []).reduce((sum, r) => sum + Number(r.total_amount ?? 0), 0);
+      return supplierSpendExclVat(data ?? []);
     },
   });
 }

@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 
 export interface CountLineInput {
   raw_material_id: string;
@@ -41,10 +42,7 @@ export function useApplyRmStockCount() {
       };
     },
     onSuccess: res => {
-      qc.invalidateQueries({ queryKey: ["raw-material-stock-status"] });
-      qc.invalidateQueries({ queryKey: ["resale-stock-status"] });
-      qc.invalidateQueries({ queryKey: ["stock-items"] });
-      qc.invalidateQueries({ queryKey: ["raw_materials"] });
+      invalidateRawMaterial(qc);
       toast.success(`Telling bokført — ${res.adjusted} justert, ${res.unchanged} uendret`);
     },
     onError: (e: unknown) => toast.error(`Kunne ikke bokføre telling: ${e instanceof Error ? e.message : String(e)}`),

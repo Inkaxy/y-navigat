@@ -91,6 +91,7 @@ export default function FakturaerReviewQueuePage() {
   });
   const lines = reviewData?.rows ?? [];
   const totalCount = reviewData?.totalCount ?? lines.length;
+  const hiddenCount = reviewData?.hiddenCount ?? 0;
 
   const counts = useMemo(() => {
     const c = {} as Record<ReviewReason, number>;
@@ -316,7 +317,7 @@ export default function FakturaerReviewQueuePage() {
             </PopoverContent>
           </Popover>
 
-          <span className="text-sm text-ink-secondary">Totalt {lines.length}{totalCount > lines.length ? ` av ${totalCount}` : ""} linjer til behandling</span>
+          <span className="text-sm text-ink-secondary">Totalt {lines.length}{totalCount > lines.length ? ` av ${totalCount}` : ""} linjer til behandling{hiddenCount > 0 ? ` · ${hiddenCount} skjult fra flaggede eller avstemte fakturaer` : ""}</span>
         </div>
       </Card>
 

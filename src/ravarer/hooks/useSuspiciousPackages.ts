@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { toast } from "sonner";
+import { invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 import {
   isPackageUnit,
   normalizeUnit,
@@ -131,9 +132,7 @@ export function useConfirmSuspiciousPackage() {
       if (error) throw error;
     },
     onSuccess: (_d, vars) => {
-      qc.invalidateQueries({ queryKey: ["suspicious_packages"] });
-      qc.invalidateQueries({ queryKey: ["raw_material_package_worklist"] });
-      qc.invalidateQueries({ queryKey: ["raw_material_suppliers", vars.rawMaterialId] });
+      invalidateRawMaterial(qc, vars.rawMaterialId);
       toast.success("Pakningen er bekreftet");
     },
     onError: (e: any) => toast.error(`Kunne ikke bekrefte: ${e.message ?? e}`),

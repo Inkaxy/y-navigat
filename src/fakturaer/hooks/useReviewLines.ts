@@ -38,6 +38,7 @@ export interface ReviewLineRow {
     invoice_date: string;
     legal_entity_id: string;
     supplier_id: string;
+    status: string | null;
     source: string | null;
     source_document_url: string | null;
     total_amount: number | null;
@@ -60,6 +61,9 @@ export interface ReviewLineRow {
   matched_raw_material?: { name: string; sku: string | null; category: string | null; item_type?: string | null } | null;
 }
 
+/** Fakturastatuser som ikke skal kunne behandles fra køen. */
+export const HIDDEN_INVOICE_STATUSES = ["flagged", "reconciled"];
+
 interface Filters {
   legalEntityId?: string | null;
   supplierId?: string | null;
@@ -76,7 +80,7 @@ export function useReviewLines(filters: Filters) {
            package_size, package_unit, count_per_package, base_quantity,
            match_confidence, raw_material_id, price_per_base_unit, expected_price_per_base_unit, price_variance_pct,
            variance_status, review_reason, requires_review,
-           invoice:invoices!inner(id, invoice_number, invoice_date, legal_entity_id, supplier_id, source, source_document_url,
+           invoice:invoices!inner(id, invoice_number, invoice_date, legal_entity_id, supplier_id, status, source, source_document_url,
              total_amount, total_vat, lines_sum_status, lines_sum_excl_vat, lines_sum_variance_pct, extraction_confidence,
              supplier:suppliers(name, contact_email),
              legal_entity:legal_entities(legal_name, short_code)),
@@ -96,10 +100,14 @@ export function useReviewLines(filters: Filters) {
       if (filters.supplierId) q = q.eq("invoice.supplier_id", filters.supplierId);
       const { data, error, count } = await q;
       if (error) throw error;
-      const rows = (data ?? []) as any[];
+      const all = (data ?? []) as unknown as ReviewLineRow[];
       // Sort suggestions by rank
-      rows.forEach((r) => r.suggestions?.sort((a: any, b: any) => a.rank - b.rank));
-      return { rows: rows as ReviewLineRow[], totalCount: count ?? rows.length };
+      all.forEach((r) => r.suggestions?.sort((a, b) => a.rank - b.rank));
+      // Flaggede og avstemte fakturaer hører ikke hjemme i køen: å «løse» en
+      // linje der ville kjørt match på nytt og satt fakturaen tilbake til ready.
+      const rows = all.filter((r) => !HIDDEN_INVOICE_STATUSES.includes(r.invoice?.status ?? ""));
+      const hiddenCount = all.length - rows.length;
+      return { rows, totalCount: count ?? all.length, hiddenCount };
     },
     refetchInterval: 30000,
   });

@@ -12,6 +12,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Check, CheckCircle2, Loader2, Pencil, SkipForward } from "lucide-react";
 import { toast } from "sonner";
+import { invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 
 import { RavarerHeaderBanner } from "@/ravarer/components/RavarerHeaderBanner";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
@@ -129,7 +130,7 @@ export default function PakningerPage() {
       const el = e.target as HTMLElement | null;
       if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable)) return;
       const row = withSuggestion.find((r) => r.id === selectedId) ?? withSuggestion[0];
-      if (!row || !canWrite) return;
+      if (!row || !canWrite || savingId) return;
       const sug = suggestions?.get(row.id);
       if (!sug) return;
       e.preventDefault();
@@ -142,7 +143,7 @@ export default function PakningerPage() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [withSuggestion, selectedId, suggestions, canWrite]);
+  }, [withSuggestion, selectedId, suggestions, canWrite, savingId]);
 
   async function confirm(row: RawMaterialRow, values: EditValues) {
     const size = Number(values.size.replace(",", "."));
@@ -165,7 +166,7 @@ export default function PakningerPage() {
         .eq("id", row.id);
       if (error) throw error;
       toast.success(`Pakning bekreftet for ${row.name}`);
-      await qc.invalidateQueries({ queryKey: ["raw_materials"] });
+      invalidateRawMaterial(qc, row.id);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Kunne ikke lagre pakning");
     } finally {

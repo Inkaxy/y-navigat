@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { fetchAllRows } from "@/lib/supabasePaging";
 import { toast } from "sonner";
+import { invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 import type { MovementType } from "@/ravarer/lib/stock";
 import { osloDateISOPlusDays } from "@/lib/osloDate";
 
@@ -185,13 +186,7 @@ export function useCreateStockMovement() {
       return data;
     },
     onSuccess: (_d, vars) => {
-      qc.invalidateQueries({ queryKey: ["stock-items"] });
-      qc.invalidateQueries({ queryKey: ["resale-stock-status"] });
-      qc.invalidateQueries({ queryKey: ["raw-material-stock-status"] });
-      qc.invalidateQueries({ queryKey: ["stock-movements", vars.raw_material_id] });
-      qc.invalidateQueries({ queryKey: ["stock-has-movements", vars.raw_material_id] });
-      qc.invalidateQueries({ queryKey: ["raw_materials"] });
-      qc.invalidateQueries({ queryKey: ["raw_material", vars.raw_material_id] });
+      invalidateRawMaterial(qc, vars.raw_material_id);
       toast.success("Bevegelse registrert");
     },
     onError: (e: any) => toast.error(`Kunne ikke registrere: ${e.message ?? e}`),
@@ -277,8 +272,7 @@ export function useLinkProduct() {
       if (error) throw error;
     },
     onSuccess: (_d, vars) => {
-      qc.invalidateQueries({ queryKey: ["raw-material-products", vars.raw_material_id] });
-      qc.invalidateQueries({ queryKey: ["stock-items"] });
+      invalidateRawMaterial(qc, vars.raw_material_id);
       toast.success("Vare koblet");
     },
     onError: (e: any) => toast.error(`Kunne ikke koble: ${e.message ?? e}`),
@@ -309,8 +303,7 @@ export function useDeleteProductLink() {
       if (error) throw error;
     },
     onSuccess: (_d, vars) => {
-      qc.invalidateQueries({ queryKey: ["raw-material-products", vars.raw_material_id] });
-      qc.invalidateQueries({ queryKey: ["stock-items"] });
+      invalidateRawMaterial(qc, vars.raw_material_id);
       toast.success("Kobling fjernet");
     },
     onError: (e: any) => toast.error(`Kunne ikke fjerne: ${e.message ?? e}`),
