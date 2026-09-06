@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeBaseUnitsPerPackage } from "@/ravarer/lib/packageMath";
+import { computeBaseUnitsPerPackage, resolvePackageFill } from "@/ravarer/lib/packageMath";
 
 describe("computeBaseUnitsPerPackage", () => {
   it("regner 500 g på en kg-råvare til 0,5 kg", () => {
@@ -54,5 +54,44 @@ describe("computeBaseUnitsPerPackage", () => {
     const r = computeBaseUnitsPerPackage({ size: "1,5", unit: "kg", count: "2", baseUnit: "kg" });
     expect(r.ok).toBe(true);
     if (r.ok) expect(r.baseUnits).toBeCloseTo(3, 9);
+  });
+});
+
+describe("resolvePackageFill — forslag fra datablad", () => {
+  it("500 g fra datablad på kg-råvare fylles ut som 0,5", () => {
+    const f = resolvePackageFill({ size: 500, contentUnit: "g" }, "kg");
+    expect(f.kind).toBe("converted");
+    if (f.kind === "converted") expect(f.units).toBeCloseTo(0.5, 9);
+  });
+
+  it("500 ml fra datablad på liter-råvare fylles ut som 0,5", () => {
+    const f = resolvePackageFill({ size: 500, contentUnit: "ml" }, "l");
+    expect(f.kind).toBe("converted");
+    if (f.kind === "converted") expect(f.units).toBeCloseTo(0.5, 9);
+  });
+
+  it("6 × 500 g på kg-råvare blir 3", () => {
+    const f = resolvePackageFill({ size: 500, contentUnit: "g", count: 6 }, "kg");
+    expect(f.kind).toBe("converted");
+    if (f.kind === "converted") expect(f.units).toBeCloseTo(3, 9);
+  });
+
+  it("ukjent enhet gir ingen forhåndsgodkjent faktor", () => {
+    const f = resolvePackageFill({ size: 500, contentUnit: "kolli" }, "kg");
+    expect(f.kind).toBe("unconvertible");
+  });
+
+  it("masse mot volum gir ingen forhåndsgodkjent faktor", () => {
+    const f = resolvePackageFill({ size: 500, contentUnit: "g" }, "l");
+    expect(f.kind).toBe("unconvertible");
+  });
+
+  it("manglende størrelse fyller ingenting ut", () => {
+    const f = resolvePackageFill({ size: null, contentUnit: "g" }, "kg");
+    expect(f.kind).toBe("unconvertible");
+  });
+
+  it("ingen forslag gir ingen utfylling", () => {
+    expect(resolvePackageFill(null, "kg").kind).toBe("none");
   });
 });

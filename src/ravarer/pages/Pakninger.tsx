@@ -12,7 +12,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Check, CheckCircle2, Loader2, Pencil, SkipForward } from "lucide-react";
 import { toast } from "sonner";
-import { computeBaseUnitsPerPackage } from "@/ravarer/lib/packageMath";
+import { computeBaseUnitsPerPackage, type PackageFillSuggestion } from "@/ravarer/lib/packageMath";
 
 import { RavarerHeaderBanner } from "@/ravarer/components/RavarerHeaderBanner";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
@@ -84,7 +84,7 @@ export default function PakningerPage() {
   const { canWrite } = useRavarer();
   const previewPackage = usePreviewPackage();
   const [dialogRow, setDialogRow] = useState<PackageWorklistRow | null>(null);
-  const [pendingSuggestion, setPendingSuggestion] = useState<{ size: number | null; unit: string | null } | null>(null);
+  const [pendingSuggestion, setPendingSuggestion] = useState<PackageFillSuggestion | null>(null);
   const { data: rows = [], isLoading } = useRawMaterials();
   const { data: suppliers = [] } = useSuppliers();
   const { data: statsMap } = useAllRawMaterialPurchaseStats();
@@ -196,7 +196,7 @@ export default function PakningerPage() {
     if (!math.ok) {
       // Ingen skriving og ingen gjetting: varen sendes til manuell gjennomgang.
       toast.error(math.error);
-      setPendingSuggestion({ size: null, unit: values.unit || null });
+      setPendingSuggestion({ size: null, contentUnit: values.unit || null });
       setDialogRow(toWorklistRow(row));
       return;
     }
@@ -214,7 +214,9 @@ export default function PakningerPage() {
       } else if (preview.lines_outlier > 0 || preview.lines_unknown > 0) {
         toast.info(`${row.name} trenger en gjennomgang før pakningen kan bekreftes`);
       }
-      setPendingSuggestion({ size: math.baseUnits, unit: values.unit || null });
+      // Dialogen får forslaget i INNHOLDSENHET og regner om selv — ellers ville
+      // 0,5 kg blitt tolket som 0,5 g på nytt.
+      setPendingSuggestion({ size: math.size, contentUnit: values.unit || null, count: math.count });
       setDialogRow(toWorklistRow(row));
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Kunne ikke forhåndsvise pakning");
