@@ -409,7 +409,7 @@ export interface ScaledLine extends BakersLine {
  */
 export function scaleLines(lines: BakersLine[], factor: number, baseFlourG: number): ScaledLine[] {
   return lines.map((l) => {
-    const base = toGrams(l.quantity, l.unit);
+    const base = lineToGrams(l).grams;
     const exactGrams = base * factor;
     return {
       ...l,
@@ -482,7 +482,7 @@ export function weighingOrder<T extends BakersLine>(lines: T[]): T[] {
   return [...lines].sort((a, b) => {
     const d = rank(a) - rank(b);
     if (d !== 0) return d;
-    return toGrams(b.quantity, b.unit) - toGrams(a.quantity, a.unit);
+    return lineToGrams(b).grams - lineToGrams(a).grams;
   });
 }
 
