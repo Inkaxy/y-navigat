@@ -82,6 +82,8 @@ export function useCreateRawMaterial() {
           name: input.name,
           description: input.description ?? null,
           category: input.category ?? null,
+          categories: input.categories ?? [],
+          item_type: input.item_type ?? "ravare",
           is_packaging: input.is_packaging ?? false,
           base_unit: input.base_unit,
           package_size: input.package_size ?? null,
