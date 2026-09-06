@@ -71,7 +71,7 @@ Deno.serve(async (req) => {
       if (error) console.error("refresh_purchase_stats", error);
     });
 
-    return json({ ok: true, history_rows: historyRows.length, skipped_no_base_price: skippedNoBasePrice });
+    return json({ ok: true, skipped_no_base_price: skippedNoBasePrice });
   } catch (e) {
     console.error("reconcile-invoice error", e);
     return json({ error: (e as Error).message }, 500);
