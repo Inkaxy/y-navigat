@@ -5,6 +5,7 @@ import { InvoiceDocumentButton } from "@/fakturaer/components/InvoiceDocumentBut
 import { useInvoiceDocumentUrl } from "@/fakturaer/hooks/useInvoiceDocument";
 import { formatNok, formatDate } from "@/fakturaer/lib/constants";
 import { cn } from "@/lib/utils";
+import { FALLBACK_TOLERANCE_PCT } from "@/fakturaer/hooks/useMatchTolerances";
 
 export interface DocPanelInvoice {
   invoice_number: string;
@@ -40,6 +41,8 @@ interface Props {
   line?: DocPanelLine | null;
   onClose: () => void;
   className?: string;
+  /** Prisavvik-toleranse i prosent — hentes fra `useMatchTolerances`. */
+  tolerancePct?: number;
 }
 
 function num(v: number | null | undefined): number | null {
@@ -48,7 +51,7 @@ function num(v: number | null | undefined): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-export function InvoiceDocumentPanel({ invoice, line, onClose, className }: Props) {
+export function InvoiceDocumentPanel({ invoice, line, onClose, className, tolerancePct = FALLBACK_TOLERANCE_PCT }: Props) {
   const path = invoice?.source_document_url ?? null;
   const { url, isLoading, error, refetch } = useInvoiceDocumentUrl(path);
 
@@ -63,9 +66,9 @@ export function InvoiceDocumentPanel({ invoice, line, onClose, className }: Prop
   const varianceTone =
     variance == null
       ? "text-ink-primary"
-      : Math.abs(variance) <= 2
+      : Math.abs(variance) <= tolerancePct
         ? "text-success"
-        : Math.abs(variance) <= 10
+        : Math.abs(variance) <= tolerancePct * 2
           ? "text-warning"
           : "text-destructive";
 
