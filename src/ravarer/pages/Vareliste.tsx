@@ -45,10 +45,7 @@ import { categoryOptions } from "@/ravarer/lib/categories";
 import {
   BUILTIN_VIEWS,
   DEFAULT_DEVIATION_TOLERANCE,
-  applyView,
-  matchesSearch,
-  normalizeSearch,
-  sortItems,
+  filterAndSortItems,
   type ListSortKey,
   type RawMaterialListItem,
 } from "@/ravarer/lib/rawMaterialViews";
@@ -145,32 +142,18 @@ export default function VarelistePage() {
     [existingCategories],
   );
 
-  const filtered = useMemo(() => {
-    const needle = normalizeSearch(q);
-    const base = items.filter((i) => {
-      if (status === "active" && !i.isActive) return false;
-      if (status === "inactive" && i.isActive) return false;
-      if (type !== "all" && i.itemType !== type) return false;
-      if (kat !== "all" && !i.categories.includes(kat)) return false;
-      if (needle && !matchesSearch(i.searchText, q)) return false;
-      return true;
-    });
+  const listQuery = useMemo(
+    () => ({ q, kat, type, status, view, sortKey: sort.key, sortDir: sort.dir }),
+    [q, kat, type, status, view, sort.key, sort.dir],
+  );
 
-    const withAlias =
-      needle.length === 0
-        ? base
-        : base.map((i) => {
-            const inName = normalizeSearch(`${i.name} ${i.sku}`).includes(needle);
-            if (inName) return i;
-            const hit =
-              [i.supplierSku, ...i.aliases].find(
-                (v) => v && normalizeSearch(v).includes(needle),
-              ) ?? null;
-            return hit ? { ...i, matchedAlias: hit } : i;
-          });
+  const filtered = useMemo(
+    () => filterAndSortItems(items, listQuery, DEFAULT_DEVIATION_TOLERANCE),
+    [items, listQuery],
+  );
 
-    return sortItems(applyView(withAlias, view, DEFAULT_DEVIATION_TOLERANCE), sort.key, sort.dir);
-  }, [items, q, kat, type, status, view, sort.key, sort.dir]);
+  /** Filtrene følger med til detaljen, slik at «Tilbake» og «forrige/neste» beholder dem. */
+  const listSearch = params.toString();
 
   const hiddenColumns = hiddenColumnsPref.value;
   const visibleColumns = useMemo(
@@ -371,7 +354,7 @@ export default function VarelistePage() {
         setFocusedId(filtered[Math.max(idx - 1, 0)]?.id ?? filtered[0].id);
       } else if (e.key === "Enter" && focusedId) {
         e.preventDefault();
-        window.location.assign(`/ravarer/vareliste/${focusedId}`);
+        window.location.assign(`/ravarer/vareliste/${focusedId}${listSearch ? `?${listSearch}` : ""}`);
       } else if (e.key === "e" && focusedId && canWrite) {
         e.preventDefault();
         setEditing({ id: focusedId, field: "cost" });
@@ -600,6 +583,7 @@ export default function VarelistePage() {
                       onCommitPrice={commitPrice}
                       onCommitCategory={commitCategory}
                       onFocusRow={setFocusedId}
+                      listSearch={listSearch}
                     />
                   ))}
                 </tbody>
@@ -610,7 +594,7 @@ export default function VarelistePage() {
             <ul className="divide-y divide-border md:hidden">
               {filtered.map((item) => (
                 <li key={item.id} className="p-3">
-                  <a href={`/ravarer/vareliste/${item.id}`} className="block">
+                  <a href={`/ravarer/vareliste/${item.id}${listSearch ? `?${listSearch}` : ""}`} className="block">
                     <p className="font-medium">{item.name}</p>
                     <p className="text-xs text-muted-foreground">
                       {item.supplierName ?? "Uten leverandør"} · {formatNok(item.costPrice)} /{" "}

@@ -32,6 +32,10 @@ export interface RawMaterialRow {
   min_stock: number | null;
   is_active: boolean;
   primary_supplier_id: string | null;
+  grain_classification: string | null;
+  cereal_type: string | null;
+  water_content_pct: number | null;
+  unit_weight_grams: number | null;
   created_at: string;
   updated_at: string;
 }
