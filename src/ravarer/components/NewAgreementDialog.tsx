@@ -14,6 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Check, ChevronsUpDown, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 import { osloTodayISO } from "@/lib/osloDate";
 
 interface Props {
@@ -132,9 +133,7 @@ export function NewAgreementDialog({ open, onOpenChange, defaultRawMaterialId, d
       }
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["agreements"] });
-      qc.invalidateQueries({ queryKey: ["raw-material-suppliers"] });
-      qc.invalidateQueries({ queryKey: ["raw-materials"] });
+      invalidateRawMaterial(qc, rawMaterialId);
       toast.success("Avtale lagret");
       onOpenChange(false);
     },

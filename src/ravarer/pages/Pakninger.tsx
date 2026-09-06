@@ -12,6 +12,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Check, CheckCircle2, Loader2, Pencil, SkipForward } from "lucide-react";
 import { toast } from "sonner";
+import { invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 
 import { RavarerHeaderBanner } from "@/ravarer/components/RavarerHeaderBanner";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
@@ -165,7 +166,7 @@ export default function PakningerPage() {
         .eq("id", row.id);
       if (error) throw error;
       toast.success(`Pakning bekreftet for ${row.name}`);
-      await qc.invalidateQueries({ queryKey: ["raw_materials"] });
+      invalidateRawMaterial(qc, row.id);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Kunne ikke lagre pakning");
     } finally {

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2, CheckCircle2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { invalidateInvoice } from "@/ravarer/lib/invalidate";
 import { useQueryClient } from "@tanstack/react-query";
 
 interface Props {
@@ -27,8 +28,7 @@ export function ConfirmReconcileDialog({ open, onOpenChange, invoiceId, invoiceN
       if (error) throw error;
       if ((data as any)?.error) throw new Error((data as any).error);
       toast.success("Prismatch bekreftet – prishistorikk oppdatert");
-      qc.invalidateQueries({ queryKey: ["invoice", invoiceId] });
-      qc.invalidateQueries({ queryKey: ["fakturaer-invoices"] });
+      invalidateInvoice(qc, invoiceId);
       onOpenChange(false);
     } catch (e: any) {
       toast.error(e.message ?? "Kunne ikke bekrefte prismatch");

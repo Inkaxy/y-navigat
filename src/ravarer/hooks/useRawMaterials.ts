@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { toast } from "sonner";
+import { invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 
 export interface RawMaterialRow {
   id: string;
@@ -97,8 +98,8 @@ export function useCreateRawMaterial() {
       if (error) throw error;
       return data as RawMaterialRow;
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["raw_materials"] });
+    onSuccess: (data) => {
+      invalidateRawMaterial(qc, data.id);
       toast.success("Råvare opprettet");
     },
     onError: (e: any) => toast.error(`Kunne ikke opprette: ${e.message ?? e}`),
@@ -119,8 +120,7 @@ export function useUpdateRawMaterial() {
       return data as RawMaterialRow;
     },
     onSuccess: (data) => {
-      qc.invalidateQueries({ queryKey: ["raw_materials"] });
-      qc.invalidateQueries({ queryKey: ["raw_material", data.id] });
+      invalidateRawMaterial(qc, data.id);
       toast.success("Lagret");
     },
     onError: (e: any) => toast.error(`Kunne ikke lagre: ${e.message ?? e}`),
@@ -136,8 +136,7 @@ export function useRenameRawMaterial() {
       return data as RawMaterialRow;
     },
     onSuccess: (data) => {
-      qc.invalidateQueries({ queryKey: ["raw_materials"] });
-      qc.invalidateQueries({ queryKey: ["raw_material", data.id] });
+      invalidateRawMaterial(qc, data.id);
       toast.success("Navn oppdatert");
     },
     onError: (e: any) => toast.error(`Kunne ikke endre navn: ${e.message ?? e}`),
@@ -152,7 +151,7 @@ export function useDeleteRawMaterial() {
       if (error) throw error;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["raw_materials"] });
+      invalidateRawMaterial(qc);
       toast.success("Slettet");
     },
     onError: (e: any) => toast.error(`Kunne ikke slette: ${e.message ?? e}`),

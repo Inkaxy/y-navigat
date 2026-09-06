@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { toast } from "sonner";
+import { invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 
 export type PackageStatus =
   | "mangler_pakning"
@@ -129,10 +130,7 @@ export function usePreviewPackage() {
 export function useInvalidatePackageQueries() {
   const qc = useQueryClient();
   return (rawMaterialId?: string) => {
-    qc.invalidateQueries({ queryKey: ["raw_material_package_worklist"] });
-    qc.invalidateQueries({ queryKey: ["raw_materials"] });
-    qc.invalidateQueries({ queryKey: ["raw_material_cost_recalcs"] });
-    if (rawMaterialId) qc.invalidateQueries({ queryKey: ["raw_material", rawMaterialId] });
+    invalidateRawMaterial(qc, rawMaterialId);
   };
 }
 

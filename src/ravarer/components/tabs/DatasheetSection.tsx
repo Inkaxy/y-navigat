@@ -12,6 +12,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { formatDate } from "@/ravarer/lib/constants";
+import { invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 
 interface Props { rawMaterialId: string }
 
@@ -82,11 +83,7 @@ export function DatasheetSection({ rawMaterialId }: Props) {
       toast.success(`Lagret ${data.changes_logged} endringer · ${data.affected_products} produkter flagget`);
       setExtracted(null);
       setDatasheetId(null);
-      qc.invalidateQueries({ queryKey: ["raw-material-nutrition"] });
-      qc.invalidateQueries({ queryKey: ["raw-material-allergens"] });
-      qc.invalidateQueries({ queryKey: ["raw-material-datasheets"] });
-      qc.invalidateQueries({ queryKey: ["raw-material-changelog"] });
-      qc.invalidateQueries({ queryKey: ["raw-material", rawMaterialId] });
+      invalidateRawMaterial(qc, rawMaterialId);
     } catch (e: any) {
       toast.error(e.message);
     }

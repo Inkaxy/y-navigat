@@ -7,6 +7,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { invalidateInvoice } from "@/ravarer/lib/invalidate";
 import { useQueryClient } from "@tanstack/react-query";
 
 interface Props {
@@ -43,8 +44,7 @@ export function FlagInvoiceDialog({ open, onOpenChange, invoiceId }: Props) {
         .eq("id", invoiceId);
       if (error) throw error;
       toast.success("Faktura flagget for oppfølging");
-      qc.invalidateQueries({ queryKey: ["invoice", invoiceId] });
-      qc.invalidateQueries({ queryKey: ["fakturaer-invoices"] });
+      invalidateInvoice(qc, invoiceId);
       onOpenChange(false);
       setReason("");
     } catch (e: any) {

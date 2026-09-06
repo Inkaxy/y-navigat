@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, ExternalLink, Search, Plus } from "lucide-react";
 import { toast } from "sonner";
+import { invalidateInvoice, invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 import { formatNok, formatDate } from "@/fakturaer/lib/constants";
 import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
 import { CANONICAL_BASE_UNITS, CANONICAL_PACKAGE_UNITS, deriveLinePackage, parseDecimal, resolveLineCost } from "@/fakturaer/lib/units";
@@ -173,8 +174,8 @@ export function MatchDrawer({ open, onOpenChange, line }: Props) {
 
 
       toast.success(applyToAll ? `Matchet ${lineIds.length} linjer` : "Linje matchet");
-      qc.invalidateQueries({ queryKey: ["fakturaer-review-lines"] });
-      qc.invalidateQueries({ queryKey: ["fakturaer-review-count"] });
+      invalidateInvoice(qc, line.invoice_id);
+      invalidateRawMaterial(qc, selectedRmId);
       onOpenChange(false);
     } catch (e: any) {
       toast.error(e.message ?? "Kunne ikke matche");
