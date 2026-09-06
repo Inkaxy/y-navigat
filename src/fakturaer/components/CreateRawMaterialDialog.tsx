@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { invalidateInvoice, invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 import { showError } from "@/lib/userError";
 import { AlertTriangle, Loader2 } from "lucide-react";
 import { formatNok } from "@/fakturaer/lib/constants";
@@ -154,12 +155,9 @@ export function CreateRawMaterialDialog({ open, onOpenChange, line, onCreated }:
       });
 
       toast.success(`Råvare «${name}» opprettet`, { description: "Husk å fylle inn næringsinnhold senere." });
-      qc.invalidateQueries({ queryKey: ["fakturaer-review-lines"] });
-      qc.invalidateQueries({ queryKey: ["fakturaer-review-count"] });
-      // Ny kategori skal dukke opp i velgeren og i innstillinger med én gang
-      qc.invalidateQueries({ queryKey: ["rm-categories"] });
-      qc.invalidateQueries({ queryKey: ["raw-material-categories"] });
-      qc.invalidateQueries({ queryKey: ["raw-materials"] });
+      // Felles invalidering — ny kategori, vareliste, kø og fakturaen.
+      invalidateRawMaterial(qc, rawMaterialId);
+      invalidateInvoice(qc, line.invoice_id);
       onCreated?.(rawMaterialId);
       onOpenChange(false);
     } catch (e: unknown) {

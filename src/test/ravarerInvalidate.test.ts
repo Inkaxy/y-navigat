@@ -33,6 +33,18 @@ describe("invalidateRawMaterial", () => {
     expect(flat).toContain("declaration-worklist");
     expect(flat).toContain("raw_material_package_worklist");
     expect(flat).toContain("raw-material-stock-status");
+    expect(flat).toContain("rm-search");
+    expect(flat).toContain("rm-categories");
+    expect(flat).toContain("rm-purchase-stats-365");
+    expect(flat).toContain("rm-unit-suggestions");
+    expect(flat).toContain("resale-margins");
+    expect(flat).toContain("resale-reorder");
+    expect(flat).toContain("product-stock-links");
+    expect(flat).toContain("stock-missing-base-quantity");
+    expect(flat).toContain("raw-material-units-bulk");
+    expect(flat).toContain("raw-material-nutrition");
+    expect(flat).toContain("rm-detail|rm-1");
+    expect(flat).toContain("rms-link|rm-1");
     expect(calls).toHaveLength(rawMaterialQueryKeys("rm-1").length);
   });
 
@@ -55,6 +67,8 @@ describe("invalidateInvoice", () => {
     expect(flat).toContain("fakturaer-review-count");
     expect(flat).toContain("fakturaer-inbox");
     expect(flat).toContain("invoice-supplier-links");
+    expect(flat).toContain("supplier-invoices");
+    expect(flat).toContain("supplier-aliases");
     expect(calls).toHaveLength(invoiceQueryKeys("inv-1").length);
   });
 });

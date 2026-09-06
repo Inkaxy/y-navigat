@@ -15,7 +15,7 @@ import { useQueryClient } from "@tanstack/react-query";
 
 import { FakturaerHeaderBanner } from "@/fakturaer/components/FakturaerHeaderBanner";
 import { QueryState } from "@/components/common/QueryState";
-import { useReviewLines, type ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
+import { useReviewLines, useReviewLineCounts, type ReviewLineRow, type ReviewLineCountRow } from "@/fakturaer/hooks/useReviewLines";
 import { useFakturaerLegalEntities } from "@/fakturaer/hooks/useFakturaerLegalEntities";
 import { useSuppliersFor } from "@/fakturaer/hooks/useSuppliersFor";
 import { useInboxInvoices } from "@/fakturaer/hooks/useInboxInvoices";
@@ -77,7 +77,7 @@ const LS_OPEN = "nbhub.faktura.docpanel.open";
 const LS_SIZE = "nbhub.faktura.docpanel.size";
 
 /** Hører linjen hjemme under fanen? review_reason kan inneholde flere årsaker. */
-export function matchesTab(line: ReviewLineRow, tab: TabValue): boolean {
+export function matchesTab(line: ReviewLineCountRow | ReviewLineRow, tab: TabValue): boolean {
   if (tab === "all") return true;
   if (tab === "no_baseline") return line.variance_status === "no_baseline" && !!line.raw_material_id;
   const reasons = reasonsOf(line);
@@ -123,11 +123,8 @@ export default function FakturaerInboxPage() {
     () => (legalEntityId !== "all" ? [legalEntityId] : entities.map((e) => e.id)),
     [legalEntityId, entities],
   );
+  // Toleransen slås opp per linje, mot linjens EGET selskap.
   const toleranceForEntity = useMatchTolerancesByEntity(toleranceEntityIds);
-  const toleranceFor = useCallback(
-    (category?: string | null) => toleranceForEntity(toleranceEntityIds[0] ?? null, category),
-    [toleranceForEntity, toleranceEntityIds],
-  );
 
   const filters = useMemo(
     () => ({
@@ -166,14 +163,17 @@ export default function FakturaerInboxPage() {
     return scoped.filter((l) => matchesTab(l, tab));
   }, [lines, expandedId, tab]);
 
+  // Tellerne skal gjelde HELE køen, ikke bare de linjene som er hentet inn.
+  const countsQuery = useReviewLineCounts({ ...filters, invoiceId: expandedId, onlyReady });
+  const countRows = useMemo(() => countsQuery.data ?? [], [countsQuery.data]);
+
   const counts = useMemo(() => {
-    const scoped = expandedId ? lines.filter((l) => l.invoice_id === expandedId) : lines;
     const c = {} as Record<TabValue, number>;
     TABS.forEach((t) => {
-      c[t.value] = scoped.filter((l) => matchesTab(l, t.value)).length;
+      c[t.value] = countRows.filter((l) => matchesTab(l, t.value)).length;
     });
     return c;
-  }, [lines, expandedId]);
+  }, [countRows]);
 
   // Kø-tilstand (aktiv linje + angre)
   const [queue, dispatch] = useReducer(queueReducer, emptyQueueState);
@@ -386,16 +386,14 @@ export default function FakturaerInboxPage() {
       } else {
         // Kilden bestemmer hvem som kan hente linjene: Tripletex-import eller
         // uttrekk fra PDF-en. Det finnes ingen felles «hent linjer»-funksjon.
+        // Bare Tripletex kan hente linjer automatisk. Andre kilder må
+        // registrere linjene manuelt — knappen vises ikke for dem.
         const inv = invoices.find((i) => i.id === id);
-        if (inv?.source === "tripletex") {
-          const { error } = await supabase.functions.invoke("tripletex-import-invoice-lines", {
-            body: { legal_entity_id: inv.legal_entity_id, invoice_id: id, limit: 1 },
-          });
-          if (error) throw new Error(error.message);
-        } else {
-          const { error } = await supabase.functions.invoke("extract-invoice-from-pdf", { body: { invoice_id: id } });
-          if (error) throw new Error(error.message);
-        }
+        if (inv?.source !== "tripletex") throw new Error("Linjer kan bare hentes for Tripletex-fakturaer");
+        const { error } = await supabase.functions.invoke("tripletex-import-invoice-lines", {
+          body: { legal_entity_id: inv.legal_entity_id, invoice_id: id, limit: 1 },
+        });
+        if (error) throw new Error(error.message);
         toast.success("Linjer hentet");
       }
       refresh(id);
@@ -532,7 +530,7 @@ export default function FakturaerInboxPage() {
           <QueueTable
             lines={visibleLines}
             links={links}
-            toleranceFor={toleranceFor}
+            toleranceFor={toleranceForEntity}
             activeLineId={queue.activeId}
             selected={selected}
             onToggleSelect={(id, v) => setSelected((s) => ({ ...s, [id]: v }))}
@@ -594,7 +592,7 @@ export default function FakturaerInboxPage() {
         price_variance_pct: docLine.price_variance_pct,
         matched_name: docLine.matched_raw_material?.name ?? null,
       }}
-      tolerancePct={toleranceFor(docLine.matched_raw_material?.category ?? null)}
+      tolerancePct={toleranceForEntity(docLine.invoice.legal_entity_id, docLine.matched_raw_material?.category ?? null)}
       onClose={() => setDocOpen(false)}
       className="h-full"
     />
@@ -703,7 +701,7 @@ export default function FakturaerInboxPage() {
           )}
 
           <span className="ml-auto text-sm text-ink-secondary">
-            {invoices.length} fakturaer · {lines.length} linjer til behandling
+            {invoices.length} fakturaer · {countRows.length} linjer til behandling
           </span>
         </div>
 
@@ -741,6 +739,7 @@ export default function FakturaerInboxPage() {
                 busyAction={busyInvoice?.id === inv.id ? busyInvoice.action : null}
                 onToggle={() => setExpandedId((cur) => (cur === inv.id ? null : inv.id))}
                 onFetchLines={() => void invoiceAction(inv.id, "fetch")}
+                onRegisterLines={() => navigate(`/ravarer/fakturaer/${inv.id}/registrer-linjer`)}
                 onRunMatch={() => void invoiceAction(inv.id, "match")}
                 onUnflag={() => void invoiceAction(inv.id, "unflag")}
                 onLinkCreditNote={() => setCreditNoteId(inv.id)}

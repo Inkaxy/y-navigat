@@ -9,6 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, Sparkles, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
+import { invalidateInvoice, invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 import { CANONICAL_BASE_UNITS, CANONICAL_PACKAGE_UNITS, deriveLinePackage, parseDecimal, resolveLineCost } from "@/fakturaer/lib/units";
 
 export interface BulkLine {
@@ -173,8 +174,8 @@ export function BulkImportRawMaterialsDrawer({ open, onOpenChange, invoiceId, le
         }
         return next;
       });
-    } catch (e: any) {
-      toast.error(`AI-forslag feilet: ${e.message ?? e}`);
+    } catch (e: unknown) {
+      toast.error(`AI-forslag feilet: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setLoadingSuggestions(false);
     }
@@ -255,7 +256,7 @@ export function BulkImportRawMaterialsDrawer({ open, onOpenChange, invoiceId, le
         body: { invoice_id: invoiceId, items },
       });
       if (error) throw error;
-      return data as { created: any[]; skipped: Array<{ line_id: string; reason: string }> };
+      return data as { created: Array<{ id: string }>; skipped: Array<{ line_id: string; reason: string }> };
     },
     onSuccess: (res) => {
       const created = res.created?.length ?? 0;
@@ -267,14 +268,8 @@ export function BulkImportRawMaterialsDrawer({ open, onOpenChange, invoiceId, le
       }
       // Samme invalidering som enkeltopprettelse (CreateRawMaterialDialog/MatchDrawer),
       // slik at vareliste, behandlingskø og fakturaen viser fersk tilstand.
-      qc.invalidateQueries({ queryKey: ["fakturaer-review-lines"] });
-      qc.invalidateQueries({ queryKey: ["fakturaer-review-count"] });
-      qc.invalidateQueries({ queryKey: ["rm-categories"] });
-      qc.invalidateQueries({ queryKey: ["raw-material-categories"] });
-      qc.invalidateQueries({ queryKey: ["raw-materials"] });
-      qc.invalidateQueries({ queryKey: ["invoice", invoiceId] });
-      qc.invalidateQueries({ queryKey: ["invoice-lines", invoiceId] });
-      qc.invalidateQueries({ queryKey: ["fakturaer-invoices"] });
+      invalidateRawMaterial(qc);
+      invalidateInvoice(qc, invoiceId);
 
       setSkipped(skippedRows);
       if (skippedRows.length > 0) {
@@ -283,7 +278,7 @@ export function BulkImportRawMaterialsDrawer({ open, onOpenChange, invoiceId, le
       onComplete?.();
       if (skippedRows.length === 0) onOpenChange(false);
     },
-    onError: (e: any) => toast.error(`Import feilet: ${e.message ?? e}`),
+    onError: (e: unknown) => toast.error(`Import feilet: ${e instanceof Error ? e.message : String(e)}`),
   });
 
   const skippedByLine = useMemo(() => {

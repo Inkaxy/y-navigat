@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { packageBaseUnits } from "@/fakturaer/components/BulkCreateRawMaterialsDialog";
 import {
   emptyQueueState,
   peekUndo,
@@ -105,6 +106,7 @@ describe("statusvern", () => {
   it("linjer kan ikke erstattes når fakturaen har matcher eller er avstemt", () => {
     expect(canReplaceInvoiceLines({ status: "needs_review", matchedLineCount: 3 }).allowed).toBe(false);
     expect(canReplaceInvoiceLines({ status: "reconciled", matchedLineCount: 0 }).allowed).toBe(false);
+    expect(canReplaceInvoiceLines({ status: "flagged", matchedLineCount: 0 }).allowed).toBe(false);
     const ok = canReplaceInvoiceLines({ status: "imported", matchedLineCount: 0 });
     expect(ok.allowed).toBe(true);
     expect(ok.requiresConfirm).toBe(true);
@@ -135,5 +137,19 @@ describe("creditNoteOriginalRef", () => {
   it("gir null når koblingen mangler", () => {
     expect(creditNoteOriginalRef(null)).toBeNull();
     expect(creditNoteOriginalRef("Retur av varer")).toBeNull();
+  });
+});
+
+describe("packageBaseUnits (masse-opprettelse)", () => {
+  it("regner om pakningsenheten til basisenheten", () => {
+    expect(packageBaseUnits(500, "g", "kg")).toBe(0.5);
+    expect(packageBaseUnits(25, "kg", "kg")).toBe(25);
+    expect(packageBaseUnits(500, "ml", "l")).toBe(0.5);
+  });
+
+  it("gir null når enhetene ikke kan regnes om", () => {
+    expect(packageBaseUnits(10, "stk", "kg")).toBeNull();
+    expect(packageBaseUnits(null, "g", "kg")).toBeNull();
+    expect(packageBaseUnits(0, "g", "kg")).toBeNull();
   });
 });

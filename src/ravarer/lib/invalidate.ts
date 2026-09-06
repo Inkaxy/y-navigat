@@ -58,6 +58,16 @@ const RAW_MATERIAL_GLOBAL_KEYS: readonly string[] = [
   "raw-material-products",
   "receipt-invoices",
   "receipt-lines",
+  "rm-search",
+  "rm-categories",
+  "rm-purchase-stats-365",
+  "rm-unit-suggestions",
+  "resale-margins",
+  "resale-reorder",
+  "product-stock-links",
+  "stock-missing-base-quantity",
+  "raw-material-units-bulk",
+  "raw-material-nutrition",
 ];
 
 /** Nøkler som tar råvare-id som andre ledd. */
@@ -68,6 +78,8 @@ const RAW_MATERIAL_SCOPED_KEYS: readonly string[] = [
   "raw_material_nutrition",
   "raw_material_allergens",
   "raw-material-units",
+  "rm-detail",
+  "rms-link",
 ];
 
 const INVOICE_GLOBAL_KEYS: readonly string[] = [
@@ -76,6 +88,8 @@ const INVOICE_GLOBAL_KEYS: readonly string[] = [
   "fakturaer-review-count",
   "fakturaer-inbox",
   "invoice-supplier-links",
+  "supplier-invoices",
+  "supplier-aliases",
 ];
 
 const INVOICE_SCOPED_KEYS: readonly string[] = [

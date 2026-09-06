@@ -2,7 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { CheckCircle2, ChevronDown, ChevronRight, ExternalLink, Flag, Link2, Loader2, RefreshCw } from "lucide-react";
+import { CheckCircle2, ChevronDown, ChevronRight, ExternalLink, Flag, Link2, ListPlus, Loader2, RefreshCw } from "lucide-react";
 import { InvoiceStatusBadge } from "@/fakturaer/components/InvoiceStatusBadge";
 import { formatDate, formatNok } from "@/fakturaer/lib/constants";
 import { INBOX_ISSUE_LABELS } from "@/fakturaer/lib/inbox";
@@ -18,6 +18,7 @@ interface Props {
   busyAction: string | null;
   onToggle: () => void;
   onFetchLines: () => void;
+  onRegisterLines: () => void;
   onRunMatch: () => void;
   onReconcile: () => void;
   onUnflag: () => void;
@@ -34,6 +35,7 @@ export function InboxInvoiceCard({
   busyAction,
   onToggle,
   onFetchLines,
+  onRegisterLines,
   onRunMatch,
   onReconcile,
   onUnflag,
@@ -42,10 +44,14 @@ export function InboxInvoiceCard({
 }: Props) {
   const a = invoice.assessment;
   const status = invoice.status;
+  const linesMissing =
+    invoice.line_count === 0 || ["pending", "failed"].includes(invoice.line_extraction_status ?? "");
+  // Bare Tripletex-fakturaer kan hente linjer automatisk. For PDF, EHF og
+  // manuelle fakturaer finnes det ingen henting — der registreres linjene selv.
   const showFetchLines =
-    canWrite &&
-    canDoInvoiceAction(status, "fetch_lines") &&
-    (invoice.line_count === 0 || ["pending", "failed"].includes(invoice.line_extraction_status ?? ""));
+    canWrite && canDoInvoiceAction(status, "fetch_lines") && linesMissing && invoice.source === "tripletex";
+  const showRegisterLines =
+    canWrite && canDoInvoiceAction(status, "fetch_lines") && linesMissing && invoice.source !== "tripletex";
   const matchBlocked = invoiceActionBlockedReason(status, "match");
   const reconcileTooltip = a.reconcileBlockedReason ?? "Bekreft at alle linjer er korrekt matchet og priset";
 
@@ -91,6 +97,12 @@ export function InboxInvoiceCard({
             <Button size="sm" variant="outline" onClick={onFetchLines} disabled={busyAction === "fetch"} className="gap-1.5">
               {busyAction === "fetch" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
               Hent linjer
+            </Button>
+          )}
+
+          {showRegisterLines && (
+            <Button size="sm" variant="outline" onClick={onRegisterLines} className="gap-1.5">
+              <ListPlus className="h-3.5 w-3.5" /> Registrer linjer
             </Button>
           )}
 

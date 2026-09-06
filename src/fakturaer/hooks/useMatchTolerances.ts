@@ -130,15 +130,13 @@ export function useMatchTolerancesByEntity(
     })),
   });
 
-  const map = useMemo(() => {
-    const out: Record<string, { defaultPct: number; byCategory: Record<string, number> }> = {};
-    ids.forEach((id, i) => {
-      const d = results[i]?.data;
-      if (d) out[id] = { defaultPct: d.defaultPct, byCategory: d.byCategory };
-    });
-    return out;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ids, results.map((r) => (r.data ? 1 : 0)).join("")]);
+  // Oppslaget er billig og avhenger av alle resultatene — ingen memo trengs,
+  // og da slipper vi en avhengighetsliste som lint ikke kan verifisere.
+  const map: Record<string, { defaultPct: number; byCategory: Record<string, number> }> = {};
+  ids.forEach((id, i) => {
+    const d = results[i]?.data;
+    if (d) map[id] = { defaultPct: d.defaultPct, byCategory: d.byCategory };
+  });
 
   return (legalEntityId, category) => {
     const entry = legalEntityId ? map[legalEntityId] : undefined;
