@@ -21,6 +21,13 @@ import { useSuppliers } from "@/ravarer/hooks/useSuppliers";
 import { useAllRawMaterialPurchaseStats } from "@/ravarer/hooks/usePurchaseStats";
 import { formatDate, formatNumber, BASE_UNITS, PACKAGE_UNITS } from "@/ravarer/lib/constants";
 import { ItemTypeBadge } from "@/ravarer/components/ItemTypeBadge";
+import { SetPackageDialog } from "@/ravarer/components/packages/SetPackageDialog";
+import {
+  usePreviewPackage,
+  useApplyPackage,
+  useUndoRecalc,
+  type PackageWorklistRow,
+} from "@/ravarer/hooks/usePackageSizes";
 
 const UNIT_OPTIONS = Array.from(new Set<string>([...BASE_UNITS, ...PACKAGE_UNITS]));
 
@@ -79,8 +86,12 @@ interface EditValues {
 }
 
 export default function PakningerPage() {
-  const { canWrite, user } = useRavarer();
+  const { canWrite } = useRavarer();
   const qc = useQueryClient();
+  const previewPackage = usePreviewPackage();
+  const applyPackage = useApplyPackage();
+  const undoRecalc = useUndoRecalc();
+  const [dialogRow, setDialogRow] = useState<PackageWorklistRow | null>(null);
   const { data: rows = [], isLoading } = useRawMaterials();
   const { data: suppliers = [] } = useSuppliers();
   const { data: statsMap } = useAllRawMaterialPurchaseStats();
@@ -145,6 +156,41 @@ export default function PakningerPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [withSuggestion, selectedId, suggestions, canWrite, savingId]);
 
+  /** Bygger raden pakningsdialogen trenger, slik at full gjennomgang kan tas der. */
+  function toWorklistRow(row: RawMaterialRow): PackageWorklistRow {
+    return {
+      id: row.id,
+      legal_entity_id: null,
+      name: row.name,
+      base_unit: row.base_unit,
+      category: row.category ?? null,
+      current_cost_price: row.current_cost_price ?? null,
+      pakningsfaktor: null,
+      faktor_kilde: null,
+      bekreftet_dato: row.package_confirmed_at ?? null,
+      antall_fakturalinjer: null,
+      antall_leverandorer: null,
+      enheter_i_bruk: null,
+      linjer_uten_pris: null,
+      kjopt_kr_totalt: null,
+      siste_faktura: null,
+      pris_spredning: null,
+      implisert_mengde: null,
+      referansepris: null,
+      referansekilde: null,
+      referansedato: null,
+      referanse_faktor: null,
+      foreslatt_fra_navn: null,
+      foreslatt_fra_referanse: null,
+      status: null,
+    };
+  }
+
+  /**
+   * Bekreftelse går gjennom samme RPC som pakningsstørrelser: først en
+   * forhåndsvisning, deretter lagring med angremulighet. Ser forhåndsvisningen
+   * usikker ut, sendes varen til den fulle dialogen i stedet for å lagre blindt.
+   */
   async function confirm(row: RawMaterialRow, values: EditValues) {
     const size = Number(values.size.replace(",", "."));
     const count = values.count.trim() ? Number(values.count.replace(",", ".")) : 1;
@@ -152,21 +198,31 @@ export default function PakningerPage() {
       toast.error("Ugyldig pakningsstørrelse");
       return;
     }
+    const basePerPackage = size * (Number.isFinite(count) ? count : 1);
     setSavingId(row.id);
     try {
-      const { error } = await supabase
-        .from("raw_materials")
-        .update({
-          package_size: size,
-          package_unit: values.unit || null,
-          base_units_per_package: size * (Number.isFinite(count) ? count : 1),
-          package_confirmed_at: new Date().toISOString(),
-          package_confirmed_by: user?.id ?? null,
-        })
-        .eq("id", row.id);
-      if (error) throw error;
-      toast.success(`Pakning bekreftet for ${row.name}`);
+      const args = {
+        p_raw_material_id: row.id,
+        p_base_units_per_package: basePerPackage,
+        p_package_unit: values.unit || null,
+        p_reason: "Bekreftet i Pakninger",
+      };
+      const preview = await previewPackage.mutateAsync(args);
+      if (!preview.ok || preview.lines_outlier > 0 || preview.lines_unknown > 0) {
+        setDialogRow(toWorklistRow(row));
+        toast.info(`${row.name} trenger en gjennomgang før pakningen kan bekreftes`);
+        return;
+      }
+      const res = await applyPackage.mutateAsync(args);
       invalidateRawMaterial(qc, row.id);
+      toast.success(`Pakning bekreftet for ${row.name}`, {
+        action: res.recalc_id
+          ? {
+              label: "Angre",
+              onClick: () => undoRecalc.mutate({ recalcId: res.recalc_id as string, rawMaterialId: row.id }),
+            }
+          : undefined,
+      });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Kunne ikke lagre pakning");
     } finally {
