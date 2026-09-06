@@ -100,14 +100,14 @@ export function useReviewLines(filters: Filters) {
       if (filters.supplierId) q = q.eq("invoice.supplier_id", filters.supplierId);
       const { data, error, count } = await q;
       if (error) throw error;
-      const all = (data ?? []) as any[];
+      const all = (data ?? []) as unknown as ReviewLineRow[];
       // Sort suggestions by rank
-      all.forEach((r) => r.suggestions?.sort((a: any, b: any) => a.rank - b.rank));
+      all.forEach((r) => r.suggestions?.sort((a, b) => a.rank - b.rank));
       // Flaggede og avstemte fakturaer hører ikke hjemme i køen: å «løse» en
       // linje der ville kjørt match på nytt og satt fakturaen tilbake til ready.
       const rows = all.filter((r) => !HIDDEN_INVOICE_STATUSES.includes(r.invoice?.status ?? ""));
       const hiddenCount = all.length - rows.length;
-      return { rows: rows as ReviewLineRow[], totalCount: count ?? all.length, hiddenCount };
+      return { rows, totalCount: count ?? all.length, hiddenCount };
     },
     refetchInterval: 30000,
   });

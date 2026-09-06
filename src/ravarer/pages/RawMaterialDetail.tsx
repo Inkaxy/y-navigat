@@ -4,7 +4,6 @@ import { useGuardedNavigate } from "@/providers/UnsavedGuardProvider";
 import { QueryState } from "@/components/common/QueryState";
 import { useRawMaterial, useRenameRawMaterial } from "@/ravarer/hooks/useRawMaterials";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ArrowLeft, Loader2, Pencil, Check, X } from "lucide-react";
