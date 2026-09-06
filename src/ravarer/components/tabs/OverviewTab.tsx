@@ -168,7 +168,7 @@ export function OverviewTab({ rm }: Props) {
             <div className="mt-2 rounded-lg border border-warning/50 bg-warning/10 p-3 text-xs">
               Endring her oppdaterer ikke prisene.{" "}
               <Link to="/ravarer/pakninger" className="underline">
-                Bruk Pakningsstørrelser-siden
+                Bruk Pakninger-siden
               </Link>{" "}
               for å regne om.
             </div>

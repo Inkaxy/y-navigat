@@ -135,7 +135,7 @@ export default function Deklarasjonsnavn() {
                 <div className="min-w-0 flex-1 truncate text-sm font-medium">{r.name}</div>
                 <Badge variant="outline">Sammensatt — deklareres via komponentene</Badge>
                 <Button asChild size="sm" variant="outline">
-                  <Link to={`/ravarer/vareliste/${r.raw_material_id}?tab=komponenter`}>Rediger komponenter</Link>
+                  <Link to={`/ravarer/vareliste/${r.raw_material_id}`}>Åpne råvaren</Link>
                 </Button>
               </div>
             ))}
