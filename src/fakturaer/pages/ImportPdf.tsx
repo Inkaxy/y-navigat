@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ArrowLeft, Upload, Loader2, Sparkles, CheckCircle2, AlertCircle, AlertTriangle, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { showError } from "@/lib/userError";
 import { supabase } from "@/integrations/supabase/client";
 import { FakturaerHeaderBanner } from "@/fakturaer/components/FakturaerHeaderBanner";
 import { useFakturaer } from "@/fakturaer/context/FakturaerContext";
@@ -17,6 +18,7 @@ import { useSuppliersFor } from "@/fakturaer/hooks/useSuppliersFor";
 import { todayIso } from "@/fakturaer/lib/constants";
 import { computeLinesSum } from "@/fakturaer/lib/linesSum";
 import { cn } from "@/lib/utils";
+import { runAutoMatchAfterImport } from "@/fakturaer/lib/queueActions";
 
 interface ExtractedLine {
   description: string | null;
@@ -177,8 +179,8 @@ export default function ImportPdfPage({ embedded = false }: { embedded?: boolean
       // Local preview URL
       const url = URL.createObjectURL(file);
       setPdfPreviewUrl(url);
-    } catch (err: any) {
-      toast.error(`PDF-lesing feilet: ${err?.message ?? err}`);
+    } catch (err: unknown) {
+      showError("pdf-lesing", err, "Kunne ikke lese PDF-en");
     } finally {
       setParsing(false);
     }
@@ -327,22 +329,25 @@ export default function ImportPdfPage({ embedded = false }: { embedded?: boolean
       setSavedIds(newSavedIds);
       const hasMore = queueIndex < queue.length - 1;
 
+      // Auto-match rett etter import — samme kall som ved manuell registrering.
+      if (lines.length > 0) await runAutoMatchAfterImport(invoice.id);
+
       if (hasMore) {
         toast.success(`Faktura ${queueIndex + 1} av ${queue.length} lagret — neste fil`);
         resetFormForNext();
         setQueueIndex(queueIndex + 1);
       } else if (queue.length > 1) {
-        toast.success(`Alle ${queue.length} fakturaer lagret`);
-        navigate("/ravarer/fakturaer");
+        toast.success(`Alle ${queue.length} fakturaer lagret og matchet`);
+        navigate("/ravarer/fakturaer/til-behandling");
       } else if (lines.length === 0) {
         toast.success("Faktura opprettet — registrer linjer");
         navigate(`/ravarer/fakturaer/${invoice.id}/registrer-linjer`);
       } else {
-        toast.success("Faktura opprettet");
-        navigate(`/ravarer/fakturaer/${invoice.id}`);
+        toast.success("Faktura opprettet og matchet");
+        navigate(`/ravarer/fakturaer/til-behandling?faktura=${invoice.id}`);
       }
-    } catch (e: any) {
-      toast.error(`Opplasting feilet: ${e?.message ?? e}`);
+    } catch (e: unknown) {
+      showError("pdf-import", e, "Opplastingen feilet");
     } finally {
       setBusy(false);
     }

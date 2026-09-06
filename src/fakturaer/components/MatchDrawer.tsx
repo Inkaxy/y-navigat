@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, ExternalLink, Search, Plus } from "lucide-react";
 import { toast } from "sonner";
+import { showError } from "@/lib/userError";
 import { invalidateInvoice, invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 import { formatNok, formatDate } from "@/fakturaer/lib/constants";
 import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
@@ -23,6 +24,23 @@ interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   line: ReviewLineRow | null;
+  /**
+   * Kalles etter «Godta og neste». Skuffen holdes åpen slik at brukeren kan
+   * jobbe seg gjennom køen uten å lukke og åpne på nytt.
+   */
+  onAcceptedNext?: () => void;
+}
+
+/** Leverandørkoblingen bak et forslag — pris, pakning og SKU hos leverandøren. */
+interface LinkInfo {
+  raw_material_id: string;
+  supplier_sku: string | null;
+  supplier_product_name: string | null;
+  package_size: number | null;
+  package_unit: string | null;
+  agreed_price_per_base_unit: number | null;
+  last_invoice_price: number | null;
+  last_invoice_date: string | null;
 }
 
 interface RmRow {
@@ -36,7 +54,7 @@ interface RmRow {
   item_type?: string | null;
 }
 
-export function MatchDrawer({ open, onOpenChange, line }: Props) {
+export function MatchDrawer({ open, onOpenChange, line, onAcceptedNext }: Props) {
   const qc = useQueryClient();
   const [selectedRmId, setSelectedRmId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -71,19 +89,75 @@ export function MatchDrawer({ open, onOpenChange, line }: Props) {
   const legalEntityId = line?.invoice.legal_entity_id;
   const supplierId = line?.invoice.supplier_id;
 
+  /**
+   * Søk treffer navn og SKU på varen, men også leverandørens eget varenummer
+   * og registrerte alias — det er ofte det eneste som står på fakturaen.
+   */
   const { data: rmResults = [], isLoading: searching } = useQuery({
     queryKey: ["rm-search", legalEntityId, search],
     enabled: !!legalEntityId && search.length > 1,
     queryFn: async () => {
+      const term = `%${search}%`;
+
+      const [bySupplier, byAlias] = await Promise.all([
+        supabase
+          .from("raw_material_suppliers")
+          .select("raw_material_id")
+          .or(`supplier_sku.ilike.${term},supplier_product_name.ilike.${term}`)
+          .limit(50),
+        supabase
+          .from("raw_material_supplier_aliases")
+          .select("alias_value, raw_material_suppliers!inner(raw_material_id)")
+          .ilike("alias_value", term)
+          .limit(50),
+      ]);
+      if (bySupplier.error) throw bySupplier.error;
+      if (byAlias.error) throw byAlias.error;
+
+      const extraIds = [
+        ...(bySupplier.data ?? []).map((r) => r.raw_material_id),
+        ...((byAlias.data ?? []) as unknown as Array<{ raw_material_suppliers: { raw_material_id: string } | null }>).map(
+          (r) => r.raw_material_suppliers?.raw_material_id,
+        ),
+      ].filter((id): id is string => !!id);
+
+      const filter = extraIds.length
+        ? `name.ilike.${term},sku.ilike.${term},id.in.(${[...new Set(extraIds)].join(",")})`
+        : `name.ilike.${term},sku.ilike.${term}`;
+
       const { data, error } = await supabase
         .from("raw_materials")
         .select("id, name, sku, category, current_cost_price, base_unit, primary_supplier_id, item_type")
         .eq("legal_entity_id", legalEntityId!)
         .eq("is_active", true)
-        .or(`name.ilike.%${search}%,sku.ilike.%${search}%`)
+        .or(filter)
         .limit(20);
       if (error) throw error;
       return (data ?? []) as RmRow[];
+    },
+  });
+
+  /** Leverandørkoblingene for varene som foreslås — vises rett i forslagsraden. */
+  const suggestionIds = useMemo(
+    () => (line?.suggestions ?? []).map((s) => s.raw_material_id),
+    [line?.suggestions],
+  );
+  const { data: suggestionLinks } = useQuery({
+    queryKey: ["rm-suggestion-links", supplierId, suggestionIds],
+    enabled: !!supplierId && suggestionIds.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("raw_material_suppliers")
+        .select(
+          `raw_material_id, supplier_sku, supplier_product_name, package_size, package_unit,
+           agreed_price_per_base_unit, last_invoice_price, last_invoice_date`,
+        )
+        .eq("supplier_id", supplierId!)
+        .in("raw_material_id", suggestionIds);
+      if (error) throw error;
+      const map = new Map<string, LinkInfo>();
+      ((data ?? []) as LinkInfo[]).forEach((r) => map.set(r.raw_material_id, r));
+      return map;
     },
   });
 
@@ -113,13 +187,14 @@ export function MatchDrawer({ open, onOpenChange, line }: Props) {
     },
   });
 
-  const linkExists = useMemo(() => existingRms?.find((r: any) => r.supplier_id === supplierId), [existingRms, supplierId]);
-  const anyPrimary = useMemo(() => existingRms?.some((r: any) => r.is_primary), [existingRms]);
+  const linkExists = useMemo(() => existingRms?.find((r) => r.supplier_id === supplierId), [existingRms, supplierId]);
+  const anyPrimary = useMemo(() => existingRms?.some((r) => r.is_primary), [existingRms]);
 
   // Når koblingen finnes fra før: forhåndsutfyll avtaleprisen slik at brukeren ser den.
   useEffect(() => {
-    const existing = linkExists as any;
-    if (existing?.agreed_price_per_base_unit != null) setAgreedPrice(String(existing.agreed_price_per_base_unit));
+    if (linkExists?.agreed_price_per_base_unit != null) {
+      setAgreedPrice(String(linkExists.agreed_price_per_base_unit));
+    }
   }, [linkExists]);
 
   const suggestions = line?.suggestions ?? [];
@@ -146,7 +221,7 @@ export function MatchDrawer({ open, onOpenChange, line }: Props) {
 
   const linePricePerBaseUnit = cost && !cost.needsInput ? cost.pricePerBaseUnit : null;
 
-  async function performMatch(applyToAll: boolean) {
+  async function performMatch(applyToAll: boolean, keepOpen = false) {
     if (!line || !selectedRmId) return;
     setBusy(true);
     try {
@@ -176,9 +251,16 @@ export function MatchDrawer({ open, onOpenChange, line }: Props) {
       toast.success(applyToAll ? `Matchet ${lineIds.length} linjer` : "Linje matchet");
       invalidateInvoice(qc, line.invoice_id);
       invalidateRawMaterial(qc, selectedRmId);
-      onOpenChange(false);
-    } catch (e: any) {
-      toast.error(e.message ?? "Kunne ikke matche");
+      if (keepOpen && onAcceptedNext) {
+        // Skuffen blir stående — neste linje lastes inn av kalleren.
+        setSelectedRmId(null);
+        setSearch("");
+        onAcceptedNext();
+      } else {
+        onOpenChange(false);
+      }
+    } catch (e: unknown) {
+      showError("faktura-match", e, "Kunne ikke matche linjen");
     } finally {
       setBusy(false);
     }
@@ -224,24 +306,44 @@ export function MatchDrawer({ open, onOpenChange, line }: Props) {
               <div>
                 <h4 className="mb-2 text-sm font-semibold">Foreslåtte matcher</h4>
                 <RadioGroup value={selectedRmId ?? ""} onValueChange={(v) => setSelectedRmId(v)} className="space-y-2">
-                  {suggestions.map((s) => (
-                    <label key={s.raw_material_id}
-                      className="flex cursor-pointer items-start gap-3 rounded-lg border border-line-subtle p-3 hover:bg-muted/30">
-                      <RadioGroupItem value={s.raw_material_id} className="mt-1" />
-                      <div className="flex-1">
-                        <div className="flex items-center gap-1.5 font-medium">
-                          {s.raw_material?.name ?? "Ukjent"}
-                          <ItemTypeBadge itemType={(s.raw_material as any)?.item_type} />
+                  {suggestions.map((s) => {
+                    const link = suggestionLinks?.get(s.raw_material_id) ?? null;
+                    return (
+                      <label key={s.raw_material_id}
+                        className="flex cursor-pointer items-start gap-3 rounded-lg border border-line-subtle p-3 hover:bg-muted/30">
+                        <RadioGroupItem value={s.raw_material_id} className="mt-1" />
+                        <div className="flex-1">
+                          <div className="flex items-center gap-1.5 font-medium">
+                            {s.raw_material?.name ?? "Ukjent"}
+                            <ItemTypeBadge itemType={s.raw_material?.item_type} />
+                          </div>
+                          <div className="mt-0.5 grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs text-ink-secondary sm:grid-cols-4">
+                            <span>
+                              Lev-SKU:{" "}
+                              <span className="font-mono">{link?.supplier_sku ?? "—"}</span>
+                            </span>
+                            <span>
+                              Siste pris: {link?.last_invoice_price != null ? formatNok(link.last_invoice_price) : "—"}
+                              {link?.last_invoice_date ? ` (${formatDate(link.last_invoice_date)})` : ""}
+                            </span>
+                            <span>
+                              Avtalepris:{" "}
+                              {link?.agreed_price_per_base_unit != null
+                                ? `${formatNok(link.agreed_price_per_base_unit)} / ${s.raw_material?.base_unit ?? "enhet"}`
+                                : "—"}
+                            </span>
+                            <span>
+                              Pakning:{" "}
+                              {link?.package_size != null ? `${link.package_size} ${link.package_unit ?? ""}`.trim() : "—"}
+                            </span>
+                          </div>
+                          <div className="mt-1 text-xs text-ink-secondary">
+                            {s.match_reason} • {Math.round(s.confidence * 100)}%
+                          </div>
                         </div>
-                        <div className="text-xs text-ink-secondary">
-                          {s.raw_material?.category ?? "—"} • Kostpris {formatNok(s.raw_material?.current_cost_price)}
-                        </div>
-                        <div className="mt-1 text-xs text-ink-secondary">
-                          {s.match_reason} • {Math.round(s.confidence * 100)}%
-                        </div>
-                      </div>
-                    </label>
-                  ))}
+                      </label>
+                    );
+                  })}
                 </RadioGroup>
               </div>
             )}
@@ -357,6 +459,11 @@ export function MatchDrawer({ open, onOpenChange, line }: Props) {
               <Button onClick={() => performMatch(false)} disabled={!selectedRmId || busy}>
                 {busy && <Loader2 className="h-4 w-4 animate-spin" />} Bekreft match
               </Button>
+              {onAcceptedNext && (
+                <Button variant="outline" onClick={() => performMatch(false, true)} disabled={!selectedRmId || busy}>
+                  Godta og neste
+                </Button>
+              )}
               <Button variant="outline" onClick={() => performMatch(true)} disabled={!selectedRmId || busy}>
                 Bekreft og bruk på alle like linjer
               </Button>

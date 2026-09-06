@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
@@ -12,6 +12,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { InvoiceDocumentPanel } from "@/fakturaer/components/InvoiceDocumentPanel";
 import { InvoiceDocumentButton } from "@/fakturaer/components/InvoiceDocumentButton";
 import { toast } from "sonner";
+import { showError } from "@/lib/userError";
 import { supabase } from "@/integrations/supabase/client";
 import { FakturaerHeaderBanner } from "@/fakturaer/components/FakturaerHeaderBanner";
 import { InvoiceStatusBadge } from "@/fakturaer/components/InvoiceStatusBadge";
@@ -24,6 +25,9 @@ import { useFakturaer } from "@/fakturaer/context/FakturaerContext";
 import { formatNok, formatDate, INVOICE_SOURCES } from "@/fakturaer/lib/constants";
 import { formatVariancePct, recheckInvoiceLinesSum } from "@/fakturaer/lib/linesSum";
 import { LinesSumMismatchAlert } from "@/fakturaer/components/LinesSumMismatchAlert";
+import { useMatchTolerances } from "@/fakturaer/hooks/useMatchTolerances";
+import { unflagInvoice } from "@/fakturaer/lib/queueActions";
+import { invalidateInvoice } from "@/ravarer/lib/invalidate";
 
 export default function InvoiceDetailPage() {
   const { id } = useParams();
@@ -39,6 +43,7 @@ export default function InvoiceDetailPage() {
   const [fetchingLines, setFetchingLines] = useState(false);
   const [docOpen, setDocOpen] = useState(false);
   const isMobile = useIsMobile();
+  const [unflagging, setUnflagging] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["invoice", id],
@@ -50,9 +55,11 @@ export default function InvoiceDetailPage() {
         .eq("id", id!)
         .single();
       if (error) throw error;
-      return data as any;
+      return data;
     },
   });
+
+  const tolerances = useMatchTolerances(data?.legal_entity_id ?? null);
 
   // Suggestions for currently-opened match line
   const { data: matchLineSuggestions } = useQuery({
@@ -81,8 +88,9 @@ export default function InvoiceDetailPage() {
     return <Card className="p-8 text-center">Faktura ikke funnet.</Card>;
   }
 
+  const defaultTolerancePct = tolerances.defaultPct;
   const sourceMeta = INVOICE_SOURCES.find((s) => s.value === data.source);
-  const lines = (data.invoice_lines ?? []) as any[];
+  const lines = data.invoice_lines ?? [];
   const reviewLineCount = lines.filter((l) => l.requires_review).length;
   const isFinal = ["reconciled", "flagged"].includes(data.status);
   const sumMismatch = data.lines_sum_status === "mismatch";
@@ -136,11 +144,12 @@ export default function InvoiceDetailPage() {
           legal_entity: data.legal_entities ? { legal_name: data.legal_entities.legal_name, short_code: null } : null,
         },
 
-        suggestions: (matchLineSuggestions ?? []) as any,
+        suggestions: (matchLineSuggestions ?? []) as ReviewLineRow["suggestions"],
       }
     : null;
 
   async function rerunAutoMatch() {
+    if (!data) return;
     setRematching(true);
     try {
       // Reset manual lines so the pipeline will re-evaluate them
@@ -154,25 +163,26 @@ export default function InvoiceDetailPage() {
       if (error) throw error;
       toast.success("Auto-match kjørt på nytt");
       qc.invalidateQueries({ queryKey: ["invoice", id] });
-    } catch (e: any) {
-      toast.error(e.message ?? "Kunne ikke kjøre auto-match");
+    } catch (e: unknown) {
+      showError("faktura-automatch", e, "Kunne ikke kjøre auto-match");
     } finally {
       setRematching(false);
     }
   }
 
   async function fetchLinesFromPdf() {
+    if (!data) return;
     setFetchingLines(true);
     try {
       const { data: res, error } = await supabase.functions.invoke("tripletex-import-invoice-lines", {
         body: { legal_entity_id: data.legal_entity_id, invoice_id: data.id, limit: 1 },
       });
       if (error) throw error;
-      if ((res as any)?.feilet > 0) toast.error("Kunne ikke hente linjer fra PDF");
+      if (Number((res as { feilet?: number } | null)?.feilet ?? 0) > 0) toast.error("Kunne ikke hente linjer fra PDF");
       else toast.success("Linjer hentet fra PDF");
       qc.invalidateQueries({ queryKey: ["invoice", id] });
-    } catch (e: any) {
-      toast.error(e.message ?? "Kunne ikke hente linjer");
+    } catch (e: unknown) {
+      showError("faktura-hent-linjer", e, "Kunne ikke hente linjer");
     } finally {
       setFetchingLines(false);
     }
@@ -229,12 +239,41 @@ export default function InvoiceDetailPage() {
                 <Flag className="h-4 w-4" /> Flagg for oppfølging
               </Button>
             )}
+            {data.status === "flagged" && canWrite && (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={unflagging}
+                className="gap-1.5"
+                onClick={async () => {
+                  setUnflagging(true);
+                  try {
+                    await unflagInvoice(data.id);
+                    invalidateInvoice(qc, data.id);
+                    toast.success("Flagget er fjernet — fakturaen er tilbake til gjennomgang");
+                  } catch (e: unknown) {
+                    showError("faktura-fjern-flagg", e, "Kunne ikke fjerne flagget");
+                  } finally {
+                    setUnflagging(false);
+                  }
+                }}
+              >
+                {unflagging ? <Loader2 className="h-4 w-4 animate-spin" /> : <Flag className="h-4 w-4" />}
+                Fjern flagg
+              </Button>
+            )}
             {!isFinal && canReconcile && (
               <Button
                 size="sm"
                 onClick={() => setConfirmOpen(true)}
                 disabled={reviewLineCount > 0 || sumMismatch}
-                title={sumMismatch ? "Varelinjene stemmer ikke med fakturabeløpet" : undefined}
+                title={
+                  sumMismatch
+                    ? "Varelinjene stemmer ikke med fakturabeløpet"
+                    : reviewLineCount > 0
+                      ? `${reviewLineCount} linje(r) må behandles først`
+                      : undefined
+                }
                 className="gap-1.5"
               >
                 <CheckCircle2 className="h-4 w-4" /> Bekreft prismatch
@@ -462,6 +501,7 @@ export default function InvoiceDetailPage() {
             lines_sum_variance_pct: data.lines_sum_variance_pct,
             extraction_confidence: data.extraction_confidence,
           }}
+          tolerancePct={defaultTolerancePct}
           onClose={() => setDocOpen(false)}
           className="h-full"
         />
@@ -497,9 +537,6 @@ export default function InvoiceDetailPage() {
         line={matchLineRow}
       />
 
-      <p className="text-center text-xs text-ink-secondary">
-        Avstemming og prisavviks-håndtering kommer i neste pulje. Faktura-lifecycle eies av Tripletex.
-      </p>
     </div>
   );
 }

@@ -7,10 +7,23 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ArrowLeft, Plus, Trash2, Save, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { showError } from "@/lib/userError";
 import { supabase } from "@/integrations/supabase/client";
 import { FakturaerHeaderBanner } from "@/fakturaer/components/FakturaerHeaderBanner";
 import { useFakturaer } from "@/fakturaer/context/FakturaerContext";
 import { computeLinesSum } from "@/fakturaer/lib/linesSum";
+import { canReplaceInvoiceLines } from "@/fakturaer/lib/statusGuards";
+import { invalidateInvoice } from "@/ravarer/lib/invalidate";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface Line {
   id?: string;
@@ -34,6 +47,7 @@ export default function RegistrerLinjerPage() {
   const [lines, setLines] = useState<Line[]>([]);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const invoiceQ = useQuery({
     queryKey: ["invoice-for-lines", id],
@@ -41,7 +55,7 @@ export default function RegistrerLinjerPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("invoices")
-        .select("id, invoice_number, source, lines_source, source_document_url, total_amount, total_vat, supplier:suppliers(name), legal_entity:legal_entities(legal_name)")
+        .select("id, invoice_number, status, source, lines_source, source_document_url, total_amount, total_vat, supplier:suppliers(name), legal_entity:legal_entities(legal_name)")
         .eq("id", id!)
         .single();
       if (error) throw error;
@@ -55,12 +69,18 @@ export default function RegistrerLinjerPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("invoice_lines")
-        .select("id, description, supplier_sku, quantity, unit, unit_price, total_amount, vat_rate, package_size, package_unit, count_per_package, line_number")
+        .select("id, description, supplier_sku, quantity, unit, unit_price, total_amount, vat_rate, package_size, package_unit, count_per_package, line_number, raw_material_id")
         .eq("invoice_id", id!)
         .order("line_number");
       if (error) throw error;
       return data;
     },
+  });
+
+  const matchedLineCount = (linesQ.data ?? []).filter((l) => l.raw_material_id).length;
+  const replaceCheck = canReplaceInvoiceLines({
+    status: invoiceQ.data?.status ?? "imported",
+    matchedLineCount,
   });
 
   useEffect(() => {
@@ -101,10 +121,24 @@ export default function RegistrerLinjerPage() {
   }]);
   const remove = (i: number) => setLines((prev) => prev.filter((_, idx) => idx !== i));
 
+  /** Sperrer eller ber om bekreftelse før linjene erstattes. */
+  const requestSave = () => {
+    if (!replaceCheck.allowed) {
+      toast.error(replaceCheck.reason ?? "Linjene kan ikke erstattes");
+      return;
+    }
+    if (replaceCheck.requiresConfirm) {
+      setConfirmOpen(true);
+      return;
+    }
+    void save();
+  };
+
   const save = async () => {
     if (!id) return;
     if (lines.length === 0) { toast.error("Legg til minst én linje"); return; }
     if (lines.some((l) => !l.description.trim())) { toast.error("Alle linjer må ha beskrivelse"); return; }
+    setConfirmOpen(false);
     setBusy(true);
     try {
       // Replace strategy: atomic delete + insert via RPC
@@ -115,7 +149,7 @@ export default function RegistrerLinjerPage() {
         package_size: l.package_size, package_unit: l.package_unit,
         count_per_package: l.count_per_package,
       }));
-      const { error: replaceErr } = await (supabase as any).rpc("replace_child_rows", {
+      const { error: replaceErr } = await supabase.rpc("replace_child_rows", {
         p_table: "invoice_lines",
         p_parent_column: "invoice_id",
         p_parent_id: id,
@@ -123,7 +157,7 @@ export default function RegistrerLinjerPage() {
       });
       if (replaceErr) throw replaceErr;
 
-      const header = invoiceQ.data as any;
+      const header = invoiceQ.data;
       const sumCheck = computeLinesSum({
         lineTotals: lines.map((l) => l.total_amount),
         totalAmount: header?.total_amount ?? null,
@@ -133,7 +167,7 @@ export default function RegistrerLinjerPage() {
       const { error: invErr } = await supabase
         .from("invoices")
         .update({
-          lines_source: "manual_entry",
+          lines_source: "manual",
           status: "imported",
           lines_sum_excl_vat: sumCheck.lines_sum_excl_vat,
           lines_sum_variance_pct: sumCheck.lines_sum_variance_pct,
@@ -149,10 +183,10 @@ export default function RegistrerLinjerPage() {
       try { await supabase.functions.invoke("match-invoice-lines", { body: { invoice_id: id } }); } catch { /* ignore */ }
 
       toast.success("Linjer lagret");
-      qc.invalidateQueries({ queryKey: ["invoice-lines", id] });
-      navigate(`/ravarer/fakturaer/${id}`);
-    } catch (e: any) {
-      toast.error(`Lagring feilet: ${e?.message ?? e}`);
+      invalidateInvoice(qc, id);
+      navigate(`/ravarer/fakturaer/til-behandling?faktura=${id}`);
+    } catch (e: unknown) {
+      showError("registrer-linjer", e, "Kunne ikke lagre linjene");
     } finally {
       setBusy(false);
     }
@@ -181,7 +215,7 @@ export default function RegistrerLinjerPage() {
 
       <FakturaerHeaderBanner
         title="Registrer linjer"
-        subtitle={`${(inv.supplier as any)?.name ?? "Ukjent leverandør"} · Faktura ${inv.invoice_number}`}
+        subtitle={`${inv.supplier?.name ?? "Ukjent leverandør"} · Faktura ${inv.invoice_number}`}
       />
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
@@ -247,15 +281,37 @@ export default function RegistrerLinjerPage() {
             )}
           </div>
 
+          {!replaceCheck.allowed && (
+            <p className="rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-warning">
+              {replaceCheck.reason}
+            </p>
+          )}
+
           <div className="flex justify-end gap-2 border-t border-border pt-3">
             <Button variant="outline" onClick={() => navigate(`/ravarer/fakturaer/${id}`)} disabled={busy}>Avbryt</Button>
-            <Button onClick={save} disabled={busy} className="gap-2">
+            <Button onClick={requestSave} disabled={busy || !replaceCheck.allowed} className="gap-2">
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
               Lagre linjer
             </Button>
           </div>
         </Card>
       </div>
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Erstatte alle linjer?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {replaceCheck.reason ??
+                "Alle eksisterende linjer på fakturaen slettes og erstattes med det du har registrert her."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Avbryt</AlertDialogCancel>
+            <AlertDialogAction onClick={() => void save()}>Erstatt linjene</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

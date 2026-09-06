@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -27,6 +27,7 @@ import { useInvoices, useInvoiceSuppliers, type InvoiceSortKey, type SortDir } f
 import { useFakturaerLegalEntities } from "@/fakturaer/hooks/useFakturaerLegalEntities";
 import { formatNok, formatDate, INVOICE_STATUSES, INVOICE_SOURCES } from "@/fakturaer/lib/constants";
 import { useFakturaer } from "@/fakturaer/context/FakturaerContext";
+import { useReviewCount } from "@/fakturaer/hooks/useReviewCount";
 import { TripletexStatusCard } from "@/ravarer/components/TripletexStatusCard";
 import { cn } from "@/lib/utils";
 
@@ -94,7 +95,8 @@ export default function FakturaerListPage() {
     onlyMismatch ||
     search.trim().length > 0;
 
-  const totalReview = useMemo(() => rows.reduce((sum, r) => sum + r.review_count, 0), [rows]);
+  // Banneret skal telle HELE køen, ikke bare gjeldende side.
+  const { data: totalReview = 0 } = useReviewCount();
   const selectedSupplier = suppliers.find((s) => s.id === supplierId);
 
   function resetFilters() {

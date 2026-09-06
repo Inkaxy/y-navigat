@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { showError } from "@/lib/userError";
 import { AlertTriangle, Loader2 } from "lucide-react";
 import { formatNok } from "@/fakturaer/lib/constants";
 import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
@@ -135,7 +136,15 @@ export function CreateRawMaterialDialog({ open, onOpenChange, line, onCreated }:
       if (rmsErr) throw rmsErr;
 
       // 3) Aliases
-      const aliases: any[] = [];
+      const aliases: Array<{
+        raw_material_supplier_id: string;
+        alias_type: "supplier_sku" | "product_name";
+        alias_value: string;
+        status: "confirmed";
+        confirmed_by?: string;
+        confirmed_at: string;
+        first_seen_invoice_id: string;
+      }> = [];
       if (line.supplier_sku) aliases.push({
         raw_material_supplier_id: rms.id, alias_type: "supplier_sku",
         alias_value: line.supplier_sku, status: "confirmed",
@@ -173,8 +182,8 @@ export function CreateRawMaterialDialog({ open, onOpenChange, line, onCreated }:
       qc.invalidateQueries({ queryKey: ["raw-materials"] });
       onCreated?.(rm.id);
       onOpenChange(false);
-    } catch (e: any) {
-      toast.error(e.message ?? "Kunne ikke opprette");
+    } catch (e: unknown) {
+      showError("opprett-raavare", e, "Kunne ikke opprette råvaren");
     } finally { setBusy(false); }
   }
 
