@@ -40,6 +40,8 @@ export default function Varemottak() {
     toDate,
     supplierId: supplierId === "all" ? null : supplierId,
   });
+  const invoices = useMemo(() => invoicesQuery.data ?? [], [invoicesQuery.data]);
+  const isLoading = invoicesQuery.isLoading;
 
   const totals = useMemo(
     () => ({
@@ -106,12 +108,18 @@ export default function Varemottak() {
       </Card>
 
       <Card className="overflow-hidden">
-        {isLoading ? (
-          <div className="flex items-center justify-center py-16 text-ink-secondary">
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Laster fakturaer…
+        {isLoading || invoicesQuery.isError || invoices.length === 0 ? (
+          <div className="p-6">
+            <QueryState
+              scope="ravarer:varemottak"
+              isLoading={isLoading}
+              isError={invoicesQuery.isError}
+              error={invoicesQuery.error}
+              isEmpty={invoices.length === 0}
+              onRetry={() => void invoicesQuery.refetch()}
+              emptyTitle="Ingen fakturaer i perioden."
+            />
           </div>
-        ) : invoices.length === 0 ? (
-          <p className="py-16 text-center text-sm text-ink-secondary">Ingen fakturaer i perioden.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -186,8 +194,16 @@ function InvoiceReceiptDialog({
   onClose: () => void;
   canWrite: boolean;
 }) {
-  const { data: lines = [], isLoading } = useReceiptLines(invoiceId ?? undefined);
+  const linesQuery = useReceiptLines(invoiceId ?? undefined);
+  const lines = useMemo(() => linesQuery.data ?? [], [linesQuery.data]);
   const unitsQuery = useRawMaterialUnitsFor(lines.map(l => l.raw_material_id).filter((x): x is string => !!x));
+  // Feil på linjer og enheter samles ett sted, med felles «Prøv igjen».
+  const loadError = linesQuery.error ?? unitsQuery.error;
+  const isLoading = linesQuery.isLoading || unitsQuery.isLoading;
+  const retryAll = () => {
+    void linesQuery.refetch();
+    void unitsQuery.refetch();
+  };
   const [deviationLine, setDeviationLine] = useState<ReceiptLine | null>(null);
 
   const purchaseUnitText = (line: ReceiptLine) => {
@@ -206,10 +222,14 @@ function InvoiceReceiptDialog({
           <DialogHeader>
             <DialogTitle>Mottak — faktura {invoiceNumber}</DialogTitle>
           </DialogHeader>
-          {isLoading ? (
-            <div className="flex items-center justify-center py-10 text-ink-secondary">
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Laster linjer…
-            </div>
+          {isLoading || loadError ? (
+            <QueryState
+              scope="ravarer:varemottak-linjer"
+              isLoading={isLoading}
+              isError={!!loadError}
+              error={loadError}
+              onRetry={retryAll}
+            />
           ) : (
             <div className="max-h-[65vh] overflow-auto">
               <table className="w-full text-sm">
