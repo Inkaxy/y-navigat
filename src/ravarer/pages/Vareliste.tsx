@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { ArrowUpDown, Columns3, Loader2, Package, Search, SlidersHorizontal } from "lucide-react";
+import { ArrowUpDown, Columns3, Loader2, Package, Search, SlidersHorizontal, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { QueryState } from "@/components/common/QueryState";
@@ -35,7 +35,7 @@ import { SetPackageDialog } from "@/ravarer/components/packages/SetPackageDialog
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { useVarelisteItems } from "@/ravarer/hooks/useVarelisteItems";
 import { useUpdateRawMaterial } from "@/ravarer/hooks/useRawMaterials";
-import { useAddPriceHistory } from "@/ravarer/hooks/useRmSuppliers";
+import { useAddPriceHistory, useUpsertRmSupplier } from "@/ravarer/hooks/useRmSuppliers";
 import { usePackageWorklist } from "@/ravarer/hooks/usePackageSizes";
 import { useBulkUpdateRawMaterials, type BulkPatch } from "@/ravarer/hooks/useBulkUpdateRawMaterials";
 import { useUiPreference } from "@/hooks/useUiPreference";
@@ -49,7 +49,9 @@ import {
   type ListSortKey,
   type RawMaterialListItem,
 } from "@/ravarer/lib/rawMaterialViews";
-import { LIST_COLUMNS, isColumnVisible } from "@/ravarer/lib/varelisteColumns";
+import { LIST_COLUMNS, DEFAULT_HIDDEN_COLUMNS, isColumnVisible } from "@/ravarer/lib/varelisteColumns";
+import { useMatchTolerances } from "@/fakturaer/hooks/useMatchTolerances";
+import { SaveViewDialog } from "@/ravarer/components/vareliste/SaveViewDialog";
 
 interface SavedView {
   id: string;
@@ -81,20 +83,27 @@ function parseSort(value: string | null): { key: ListSortKey; dir: "asc" | "desc
   return { key, dir: rawDir === "desc" ? "desc" : "asc" };
 }
 
+/** Stabile referanser — ellers får useUiPreference ny fallback hver render. */
+const EMPTY_HIDDEN: string[] = DEFAULT_HIDDEN_COLUMNS;
+const EMPTY_VIEWS: SavedView[] = [];
+
 function csvCell(value: string): string {
   return /[";\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
 }
 
 export default function VarelistePage() {
-  const { canWrite } = useRavarer();
+  const { canWrite, legalEntityId } = useRavarer();
   const qc = useQueryClient();
   const [params, setParams] = useSearchParams();
+  const navigate = useNavigate();
 
   const { items, suppliers, isLoading, isError, error, refetch } = useVarelisteItems();
   const updateMut = useUpdateRawMaterial();
   const addPrice = useAddPriceHistory();
+  const upsertLink = useUpsertRmSupplier();
   const bulkMut = useBulkUpdateRawMaterials();
   const { data: packageWorklist = [] } = usePackageWorklist();
+  const tolerances = useMatchTolerances(legalEntityId);
 
   const [newOpen, setNewOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -102,10 +111,11 @@ export default function VarelistePage() {
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const [editing, setEditing] = useState<{ id: string; field: InlineField } | null>(null);
   const [packageQueue, setPackageQueue] = useState<string[]>([]);
+  const [saveViewOpen, setSaveViewOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
 
-  const hiddenColumnsPref = useUiPreference<string[]>("ravarer:vareliste:columns", []);
-  const savedViewsPref = useUiPreference<SavedView[]>("ravarer:vareliste:views", []);
+  const hiddenColumnsPref = useUiPreference<string[]>("ravarer:vareliste:columns", EMPTY_HIDDEN);
+  const savedViewsPref = useUiPreference<SavedView[]>("ravarer:vareliste:views", EMPTY_VIEWS);
 
   const q = params.get("q") ?? "";
   const kat = params.get("kat") ?? "all";
@@ -147,9 +157,11 @@ export default function VarelistePage() {
     [q, kat, type, status, view, sort.key, sort.dir],
   );
 
+  const tolerance = tolerances.defaultPct ?? DEFAULT_DEVIATION_TOLERANCE;
+
   const filtered = useMemo(
-    () => filterAndSortItems(items, listQuery, DEFAULT_DEVIATION_TOLERANCE),
-    [items, listQuery],
+    () => filterAndSortItems(items, listQuery, tolerance),
+    [items, listQuery, tolerance],
   );
 
   /** Filtrene følger med til detaljen, slik at «Tilbake» og «forrige/neste» beholder dem. */
@@ -185,7 +197,18 @@ export default function VarelistePage() {
       setEditing(null);
       if (field === "agreed") {
         if (value === item.agreedPrice) return;
-        updateMut.mutate({ id: item.id, agreed_price: value });
+        // Avtaleprisen hører til leverandørkoblingen når den finnes;
+        // kun råvarer uten kobling faller tilbake til raw_materials.
+        if (item.primaryLinkId && item.supplierId) {
+          upsertLink.mutate({
+            id: item.primaryLinkId,
+            raw_material_id: item.id,
+            supplier_id: item.supplierId,
+            agreed_price_per_base_unit: value,
+          });
+        } else {
+          updateMut.mutate({ id: item.id, agreed_price: value });
+        }
         return;
       }
       if (value === item.costPrice) return;
@@ -199,7 +222,7 @@ export default function VarelistePage() {
         set_as_current: true,
       });
     },
-    [addPrice, updateMut],
+    [addPrice, updateMut, upsertLink],
   );
 
   const commitCategory = useCallback(
@@ -260,6 +283,9 @@ export default function VarelistePage() {
           case "last_invoice":
             cells.push(formatDate(i.lastInvoiceDate));
             break;
+          case "stock":
+            cells.push(i.stockTracking ? formatNumber(i.currentStock, 0) : "");
+            break;
           case "status":
             cells.push(
               [
@@ -291,9 +317,8 @@ export default function VarelistePage() {
     toast.success(`${rows.length} rader eksportert`);
   }, [filtered, selected, visibleColumns]);
 
-  const saveCurrentView = useCallback(() => {
-    const name = window.prompt("Navn på visningen");
-    if (!name?.trim()) return;
+  const saveCurrentView = useCallback(
+    (name: string) => {
     const next: SavedView = {
       id: `${Date.now()}`,
       name: name.trim(),
@@ -303,9 +328,20 @@ export default function VarelistePage() {
       status,
       sort: `${sort.key}:${sort.dir}`,
     };
-    savedViewsPref.setValue([...savedViewsPref.value, next]);
-    toast.success("Visning lagret");
-  }, [q, kat, type, status, sort.key, sort.dir, savedViewsPref]);
+      savedViewsPref.setValue([...savedViewsPref.value, next]);
+      setSaveViewOpen(false);
+      toast.success("Visning lagret");
+    },
+    [q, kat, type, status, sort.key, sort.dir, savedViewsPref],
+  );
+
+  const deleteSavedView = useCallback(
+    (id: string) => {
+      savedViewsPref.setValue(savedViewsPref.value.filter((x) => x.id !== id));
+      toast.success("Visning slettet");
+    },
+    [savedViewsPref],
+  );
 
   const applySavedView = useCallback(
     (v: SavedView) => {
@@ -575,7 +611,7 @@ export default function VarelistePage() {
                       selected={selected.has(item.id)}
                       focused={focusedId === item.id}
                       canWrite={canWrite}
-                      tolerance={DEFAULT_DEVIATION_TOLERANCE}
+                      tolerance={tolerance}
                       editing={editing?.id === item.id ? editing.field : null}
                       onToggleSelect={toggleSelect}
                       onStartEdit={(id, field) => setEditing({ id, field })}
@@ -602,7 +638,7 @@ export default function VarelistePage() {
                     </p>
                     <div className="mt-1 flex flex-wrap gap-1">
                       {item.deviation != null &&
-                        Math.abs(item.deviation) > DEFAULT_DEVIATION_TOLERANCE && (
+                        Math.abs(item.deviation) > tolerance && (
                           <Badge variant="outline" className="border-destructive/40 text-destructive">
                             Avvik {formatNumber(item.deviation, 1)} %
                           </Badge>
