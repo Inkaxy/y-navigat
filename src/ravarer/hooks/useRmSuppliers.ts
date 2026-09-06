@@ -137,8 +137,10 @@ export function useAddPriceHistory() {
       notes?: string | null;
       set_as_current: boolean;
     }) => {
+      const { data: auth } = await supabase.auth.getUser();
       const { error: histErr } = await supabase.from("raw_material_price_history").insert({
         raw_material_id: input.raw_material_id,
+        created_by: auth.user?.id ?? null,
         supplier_id: input.supplier_id,
         price: input.price,
         effective_date: input.effective_date,

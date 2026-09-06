@@ -13,6 +13,8 @@ import { useRavarer } from "@/ravarer/context/RavarerContext";
  */
 
 export interface SupplierLinkIndexRow {
+  /** id på raw_material_suppliers-raden — trengs for å skrive avtalepris. */
+  id: string;
   supplierId: string;
   supplierSku: string | null;
   supplierProductName: string | null;
@@ -22,6 +24,7 @@ export interface SupplierLinkIndexRow {
   isPrimary: boolean;
   aliases: string[];
 }
+
 
 export interface RawMaterialSearchIndex {
   /** Alle leverandørkoblinger per råvare, primær først. */
