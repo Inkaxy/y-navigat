@@ -11,6 +11,18 @@ import { supabase } from "@/integrations/supabase/client";
 import { FakturaerHeaderBanner } from "@/fakturaer/components/FakturaerHeaderBanner";
 import { useFakturaer } from "@/fakturaer/context/FakturaerContext";
 import { computeLinesSum } from "@/fakturaer/lib/linesSum";
+import { canReplaceInvoiceLines } from "@/fakturaer/lib/statusGuards";
+import { invalidateInvoice } from "@/ravarer/lib/invalidate";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface Line {
   id?: string;
