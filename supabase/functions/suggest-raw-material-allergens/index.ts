@@ -1,5 +1,8 @@
 // Forslag til allergener basert på råvarenavn
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { ALLERGEN_CODES, normalizeAllergenCode, normalizeAllergenPresence } from "../_shared/allergen-diff.ts";
+
+const AI_MODEL = "google/gemini-3-flash-preview";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -7,10 +10,8 @@ const corsHeaders = {
 };
 
 const SYSTEM = `Du foreslår sannsynlige allergener for en bakeri-råvare basert på navn.
-Returner kun klare, sannsynlige allergener. Bruk kanoniske koder:
-gluten_wheat, gluten_rye, gluten_barley, gluten_oats, milk, egg, fish, crustaceans, molluscs,
-peanuts, nuts_almond, nuts_hazelnut, nuts_walnut, nuts_cashew, nuts_pecan, nuts_brazil,
-nuts_pistachio, nuts_macadamia, soy, celery, mustard, sesame, lupin, sulphites.
+Returner kun klare, sannsynlige allergener. Bruk KUN disse kodene, ordrett:
+${ALLERGEN_CODES.join(", ")}.
 Bare returner allergener du er rimelig sikker på (>0.6 confidence).`;
 
 Deno.serve(async (req) => {
@@ -37,7 +38,7 @@ Deno.serve(async (req) => {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: AI_MODEL,
         messages: [
           { role: "system", content: SYSTEM },
           { role: "user", content: `Råvarenavn: "${name}"` },
@@ -54,7 +55,7 @@ Deno.serve(async (req) => {
                   items: {
                     type: "object",
                     properties: {
-                      allergen: { type: "string" },
+                      allergen: { type: "string", enum: [...ALLERGEN_CODES] },
                       presence: { type: "string", enum: ["contains", "may_contain"] },
                       confidence: { type: "number" },
                     },
@@ -80,11 +81,27 @@ Deno.serve(async (req) => {
     const tc = aiData.choices?.[0]?.message?.tool_calls?.[0];
     if (!tc) return json({ suggestions: [] });
     const args = JSON.parse(tc.function.arguments);
+    // Valider mot enum-listen — koder AI finner på forkastes framfor å feile stille i basen.
+    const rejected: string[] = [];
+    const suggestions: { allergen: string; presence: string; confidence: number }[] = [];
+    for (const raw of Array.isArray(args?.suggestions) ? args.suggestions : []) {
+      const code = normalizeAllergenCode(raw?.allergen);
+      if (!code) {
+        const label = typeof raw?.allergen === "string" ? raw.allergen : String(raw?.allergen ?? "");
+        if (label && !rejected.includes(label)) rejected.push(label);
+        continue;
+      }
+      suggestions.push({
+        allergen: code,
+        presence: normalizeAllergenPresence(raw?.presence) ?? "contains",
+        confidence: Number(raw?.confidence ?? 0),
+      });
+    }
 
     const service = createClient(supaUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     const { data: pos } = await service.from("user_positions").select("legal_entity_id").eq("user_id", userRes.user.id).limit(1).maybeSingle();
     await service.from("ai_usage_log").insert({
-      provider: "lovable", model: "google/gemini-3-flash-preview",
+      provider: "lovable", model: AI_MODEL,
       purpose: "allergen_suggest",
       input_tokens: aiData.usage?.prompt_tokens ?? 0,
       output_tokens: aiData.usage?.completion_tokens ?? 0,
@@ -92,7 +109,7 @@ Deno.serve(async (req) => {
       success: true,
     });
 
-    return json(args);
+    return json({ suggestions, rejected });
   } catch (e) {
     console.error(e);
     return json({ error: (e as Error).message }, 500);

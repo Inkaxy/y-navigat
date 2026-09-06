@@ -181,6 +181,7 @@ const RavarerPakningsstorrelser = lazy(() => import("@/ravarer/pages/PackageSize
 const RavarerReberegnKostpriser = lazy(() => import("@/ravarer/pages/ReberegnKostpriser"));
 const RavarerPakninger = lazy(() => import("@/ravarer/pages/Pakninger"));
 const RavarerMatvaretabellen = lazy(() => import("@/ravarer/pages/Matvaretabellen"));
+const RavarerKobleMatvaretabellen = lazy(() => import("@/ravarer/pages/KobleMatvaretabellen"));
 
 const FakturaerList = lazy(() => import("@/fakturaer/pages/FakturaerList"));
 const FakturaerNew = lazy(() => import("@/fakturaer/pages/NewInvoice"));
@@ -402,6 +403,7 @@ const App = () => (
               <Route path="/ravarer/pakninger" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><RavarerPakninger /></RavarerProvider></AppAccessGuard></Shell>} />
               <Route path="/ravarer/deklarasjonsnavn" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><RavarerDeklarasjonsnavn /></RavarerProvider></AppAccessGuard></Shell>} />
               <Route path="/ravarer/matvaretabellen" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><RavarerMatvaretabellen /></RavarerProvider></AppAccessGuard></Shell>} />
+              <Route path="/ravarer/koble-matvaretabellen" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><RavarerKobleMatvaretabellen /></RavarerProvider></AppAccessGuard></Shell>} />
               <Route path="/ravarer/pakningsstorrelser" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><RavarerPakningsstorrelser /></RavarerProvider></AppAccessGuard></Shell>} />
               <Route path="/ravarer/fakturaer/reberegn-kostpriser" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><InvoiceAccessGuard><RavarerReberegnKostpriser /></InvoiceAccessGuard></RavarerProvider></AppAccessGuard></Shell>} />
 

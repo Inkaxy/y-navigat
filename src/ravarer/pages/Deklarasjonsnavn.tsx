@@ -52,18 +52,20 @@ export default function Deklarasjonsnavn() {
   async function saveAll() {
     setSavingAll(true);
     let ok = 0;
+    let failed = 0;
     for (const r of simple) {
       const v = (values[r.raw_material_id] ?? "").trim();
       if (!v) continue;
       try {
-        await save.mutateAsync({ rawMaterialId: r.raw_material_id, declarationName: v });
+        await save.mutateAsync({ rawMaterialId: r.raw_material_id, declarationName: v, silent: true });
         ok++;
       } catch {
-        /* fortsetter */
+        failed++;
       }
     }
     setSavingAll(false);
-    toast.success(`${ok} deklarasjonsnavn lagret`);
+    if (failed === 0) toast.success(`${ok} deklarasjonsnavn lagret`);
+    else toast.warning(`${ok} lagret, ${failed} feilet`);
   }
 
   return (

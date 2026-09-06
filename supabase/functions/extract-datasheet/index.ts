@@ -1,5 +1,9 @@
 // Ekstraherer strukturerte felter fra et datablad (PDF/bilde) via Lovable AI
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { ALLERGEN_CODES } from "../_shared/allergen-diff.ts";
+
+/** Modellen som faktisk kalles — logges uendret i raw_material_datasheets.ai_model. */
+const AI_MODEL = "google/gemini-2.5-flash";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -15,7 +19,7 @@ Felter å hente:
 - package_size_value, package_size_unit: pakningsstørrelse (f.eks. 25, "kg")
 - nutrition pr 100g: energy_kj, energy_kcal, fat_g, saturated_fat_g, carbs_g, sugars_g, fiber_g, protein_g, salt_g
 - ingredient_declaration: full ingrediensliste som tekst
-- allergens: array av { allergen: kanonisk_kode, presence: "contains"|"may_contain" }. Bruk kodene: gluten_wheat, gluten_rye, gluten_barley, gluten_oats, milk, egg, fish, crustaceans, molluscs, peanuts, nuts_almond, nuts_hazelnut, nuts_walnut, nuts_cashew, nuts_pecan, nuts_brazil, nuts_pistachio, nuts_macadamia, soy, celery, mustard, sesame, lupin, sulphites
+- allergens: array av { allergen: kanonisk_kode, presence: "contains"|"may_contain" }. Bruk KUN disse kodene, ordrett: ${ALLERGEN_CODES.join(", ")}
 - composite_components: hvis råvaren er sammensatt, array av { name, percentage|null }
 - grain_classification_hint: ett av sifted_flour|whole_grain_flour|whole_grains|wheat_bran|rye_bran|oat_bran|gluten_free_grain|other_flour|not_grain
 - country_of_origin: ISO-kode hvis oppgitt
@@ -95,7 +99,7 @@ Deno.serve(async (req) => {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: AI_MODEL,
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: userContent },
@@ -129,7 +133,7 @@ Deno.serve(async (req) => {
                   items: {
                     type: "object",
                     properties: {
-                      allergen: { type: "string" },
+                      allergen: { type: "string", enum: [...ALLERGEN_CODES] },
                       presence: { type: "string", enum: ["contains", "may_contain"] },
                     },
                     required: ["allergen", "presence"],
@@ -186,7 +190,7 @@ Deno.serve(async (req) => {
       package_size_value: extracted.package_size_value ?? null,
       package_size_unit: extracted.package_size_unit ?? null,
       ai_extracted: extracted,
-      ai_model: "google/gemini-3-flash-preview",
+      ai_model: AI_MODEL,
       ai_confidence: extracted.confidence ?? null,
       raw_ai_response: aiData,
       uploaded_by: userRes.user.id,
@@ -199,7 +203,7 @@ Deno.serve(async (req) => {
     // Logg AI-bruk
     await service.from("ai_usage_log").insert({
       provider: "lovable",
-      model: "google/gemini-3-flash-preview",
+      model: AI_MODEL,
       purpose: "datasheet_extract",
       input_tokens: usage.prompt_tokens ?? 0,
       output_tokens: usage.completion_tokens ?? 0,

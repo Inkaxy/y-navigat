@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -7,6 +7,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { CreateRawMaterialFromDatasheetDialog, type DatasheetExtract } from "@/ravarer/components/CreateRawMaterialFromDatasheetDialog";
+import { useDeleteDatasheets, useOrphanDatasheets } from "@/ravarer/hooks/useDatasheets";
+import { formatDate } from "@/ravarer/lib/constants";
 
 interface FileRow {
   file: File;
@@ -26,6 +28,12 @@ export default function DatabladBulk() {
   const [rows, setRows] = useState<FileRow[]>([]);
   const [batchId, setBatchId] = useState<string | null>(null);
   const [createDialogIdx, setCreateDialogIdx] = useState<number | null>(null);
+  const { data: orphans = [] } = useOrphanDatasheets(legalEntityId ?? undefined);
+  const deleteDatasheets = useDeleteDatasheets();
+  const [applyingAll, setApplyingAll] = useState(false);
+  const [applyProgress, setApplyProgress] = useState({ done: 0, total: 0 });
+  const rowsRef = useRef<FileRow[]>([]);
+  rowsRef.current = rows;
 
   const onPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []).slice(0, 100);
@@ -41,7 +49,26 @@ export default function DatabladBulk() {
 
     for (let i = 0; i < newRows.length; i++) {
       await processRow(i, newRows[i], batch?.id);
+      await syncBatch(batch?.id ?? null);
     }
+    await syncBatch(batch?.id ?? null, "completed");
+  };
+
+  /** Holder datasheet_upload_batches i takt med hva som faktisk er behandlet. */
+  const syncBatch = async (id: string | null, status?: "completed") => {
+    if (!id) return;
+    const current = rowsRef.current;
+    const failed = current.filter((r) => r.status === "error").length;
+    const processed = current.filter((r) => r.status === "ready" || r.applied).length;
+    await supabase
+      .from("datasheet_upload_batches")
+      .update({
+        processed,
+        failed,
+        status: status ?? "processing",
+        ...(status === "completed" ? { completed_at: new Date().toISOString() } : {}),
+      })
+      .eq("id", id);
   };
 
   const updateRow = (i: number, patch: Partial<FileRow>) => {
@@ -93,9 +120,9 @@ export default function DatabladBulk() {
         selectedRm: match?.candidates?.[0]?.score >= 0.7 ? match.candidates[0].id : undefined,
         error: undefined,
       });
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error(`[DatabladBulk] ${row.file.name}:`, e);
-      updateRow(i, { status: "error", error: e.message ?? String(e) });
+      updateRow(i, { status: "error", error: e instanceof Error ? e.message : String(e) });
     }
   };
 
@@ -105,33 +132,64 @@ export default function DatabladBulk() {
     processRow(i, r, batchId ?? undefined);
   };
 
-  const applyRow = async (i: number) => {
-    const r = rows[i];
-    if (!r.datasheet_id || !r.selectedRm) return;
+  const applyRow = async (i: number, silent = false): Promise<boolean> => {
+    const r = rowsRef.current[i] ?? rows[i];
+    if (!r?.datasheet_id || !r.selectedRm) return false;
     try {
       const { data, error } = await supabase.functions.invoke("apply-datasheet-update", {
         body: {
           datasheet_id: r.datasheet_id,
           raw_material_id: r.selectedRm,
-          accepted_fields: ["nutrition", "allergens", "ingredient_declaration", "composite", "grain", "package"],
+          // «composite» er bevisst IKKE med som standard: AI-komponenter er ren tekst,
+          // og ville ellers overstyrt råvarens egen næring og allergener.
+          accepted_fields: ["nutrition", "allergens", "ingredient_declaration", "grain", "package"],
         },
       });
       if (error) throw new Error(error.message);
       if (!data) throw new Error("Ingen respons fra apply-datasheet-update");
       if (data.error) throw new Error(data.error);
       updateRow(i, { applied: true });
-      toast.success(`${r.file.name}: ${data.changes_logged} endringer logget`);
-    } catch (e: any) {
-      toast.error(e.message);
+      if (!silent) toast.success(`${r.file.name}: ${data.changes_logged} endringer logget`);
+      return true;
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (!silent) toast.error(msg);
+      else updateRow(i, { error: msg });
+      return false;
     }
   };
 
-  const applyAllHigh = () => {
-    rows.forEach((r, i) => {
-      if (r.status === "ready" && !r.applied && r.candidates?.[0]?.score && r.candidates[0].score >= 0.7) {
-        applyRow(i);
-      }
-    });
+  /** Knytter databladet til råvaren med én gang et treff velges. */
+  const selectRm = async (i: number, rawMaterialId: string) => {
+    updateRow(i, { selectedRm: rawMaterialId });
+    const dsId = rowsRef.current[i]?.datasheet_id;
+    if (dsId) {
+      await supabase.from("raw_material_datasheets").update({ raw_material_id: rawMaterialId }).eq("id", dsId);
+    }
+  };
+
+  const applyAllHigh = async () => {
+    const targets = rows
+      .map((r, i) => ({ r, i }))
+      .filter(({ r }) => r.status === "ready" && !r.applied && (r.candidates?.[0]?.score ?? 0) >= 0.7);
+    if (targets.length === 0) {
+      toast.info("Ingen datablad med høy nok tillit å bekrefte.");
+      return;
+    }
+    setApplyingAll(true);
+    setApplyProgress({ done: 0, total: targets.length });
+    let ok = 0;
+    for (let n = 0; n < targets.length; n++) {
+      const { i, r } = targets[n];
+      if (!r.selectedRm && r.candidates?.[0]?.id) await selectRm(i, r.candidates[0].id);
+      const done = await applyRow(i, true);
+      if (done) ok++;
+      setApplyProgress({ done: n + 1, total: targets.length });
+    }
+    setApplyingAll(false);
+    await syncBatch(batchId, "completed");
+    if (ok === targets.length) toast.success(`${ok} datablad anvendt`);
+    else toast.warning(`${ok} av ${targets.length} datablad anvendt — resten står igjen med feilmelding`);
   };
 
   return (
@@ -154,7 +212,11 @@ export default function DatabladBulk() {
       {rows.length > 0 && (
         <>
           <div className="flex justify-end">
-            <Button variant="outline" size="sm" onClick={applyAllHigh}>Bekreft alle høy-konfidens</Button>
+            <Button variant="outline" size="sm" onClick={applyAllHigh} disabled={applyingAll}>
+              {applyingAll
+                ? <><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> Bekrefter {applyProgress.done} av {applyProgress.total}…</>
+                : "Bekreft alle høy-konfidens"}
+            </Button>
           </div>
           <Card className="divide-y divide-line-subtle">
             {rows.map((r, i) => (
@@ -202,6 +264,51 @@ export default function DatabladBulk() {
         </>
       )}
 
+      {orphans.length > 0 && (
+        <Card className="p-5 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="text-base font-semibold">Rydd opp</h2>
+              <p className="text-sm text-ink-secondary">
+                {orphans.length} datablad er aldri knyttet til en råvare. Slett dem, eller last dem opp på nytt fra
+                råvarekortet.
+              </p>
+            </div>
+            {canWrite && (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={deleteDatasheets.isPending}
+                onClick={() => deleteDatasheets.mutate(orphans.map((o) => o.id))}
+              >
+                Slett alle ({orphans.length})
+              </Button>
+            )}
+          </div>
+          <div className="max-h-64 overflow-y-auto divide-y divide-line-subtle rounded-lg border border-line-subtle">
+            {orphans.map((o) => (
+              <div key={o.id} className="flex items-center gap-3 px-3 py-2 text-sm">
+                <FileText className="h-3.5 w-3.5 shrink-0 text-ink-secondary" />
+                <span className="min-w-0 flex-1 truncate">{o.file_name}</span>
+                <span className="shrink-0 text-xs text-ink-secondary">{o.supplier_name ?? "—"}</span>
+                <span className="shrink-0 text-xs text-ink-secondary">{formatDate(o.uploaded_at)}</span>
+                {canWrite && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    aria-label={`Slett ${o.file_name}`}
+                    disabled={deleteDatasheets.isPending}
+                    onClick={() => deleteDatasheets.mutate([o.id])}
+                  >
+                    Slett
+                  </Button>
+                )}
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
       {createDialogIdx !== null && rows[createDialogIdx]?.datasheet_id && (
         <CreateRawMaterialFromDatasheetDialog
           open={createDialogIdx !== null}
@@ -211,9 +318,9 @@ export default function DatabladBulk() {
           extracted={rows[createDialogIdx].extracted ?? {}}
           onCreated={(rmId) => {
             const idx = createDialogIdx;
-            updateRow(idx, { selectedRm: rmId, candidates: [{ id: rmId, name: rows[idx].extracted?.name ?? "Ny råvare", sku: rows[idx].extracted?.sku ?? "", score: 1 }] });
+            updateRow(idx, { candidates: [{ id: rmId, name: rows[idx].extracted?.name ?? "Ny råvare", sku: rows[idx].extracted?.sku ?? "", score: 1 }] });
             // Auto-anvend datablad-felter på den nye råvaren
-            setTimeout(() => applyRow(idx), 100);
+            void selectRm(idx, rmId).then(() => applyRow(idx));
           }}
         />
       )}

@@ -26,6 +26,9 @@ import {
 } from "@/ravarer/hooks/useMatvaretabellen";
 import { formatDate, formatNumber } from "@/ravarer/lib/constants";
 import { useDebouncedValue } from "@/ordre/hooks/useDebouncedValue";
+import { rankBySearch } from "@/lib/textSimilarity";
+import { useNutritionCoverage } from "@/ravarer/hooks/useNutritionCoverage";
+import { Link } from "react-router-dom";
 
 const PAGE_SIZE = 50;
 
@@ -38,6 +41,7 @@ export default function Matvaretabellen() {
   const { data: links, isLoading: linksLoading, isError: linksError, error: linksErrorObj } = useMatvaretabellenLinks();
   const sync = useSyncMatvaretabellen();
   const apply = useApplyMatvaretabellen();
+  const coverage = useNutritionCoverage();
 
   const [q, setQ] = useState("");
   const debounced = useDebouncedValue(q, 250);
@@ -62,13 +66,11 @@ export default function Matvaretabellen() {
   }, [foods]);
 
   const filtered = useMemo(() => {
-    const needle = debounced.trim().toLowerCase();
-    return foods.filter((f) => {
-      if (group !== "all" && f.food_group_name !== group) return false;
-      if (!needle) return true;
-      if (f.food_name.toLowerCase().includes(needle)) return true;
-      return (f.search_keywords ?? []).some((k) => k.toLowerCase().includes(needle));
-    });
+    const inGroup = group === "all" ? foods : foods.filter((f) => f.food_group_name === group);
+    const needle = debounced.trim();
+    if (!needle) return inGroup;
+    // Rangert søk uten diakritika: «creme» treffer «crème».
+    return rankBySearch(inGroup, needle, (f) => [f.food_name, ...(f.search_keywords ?? [])]);
   }, [foods, debounced, group]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
@@ -131,6 +133,24 @@ export default function Matvaretabellen() {
             )}
           </div>
         </div>
+      </Card>
+
+      <Card className="flex flex-wrap items-center justify-between gap-4 p-4">
+        <div>
+          <div className="text-sm text-ink-secondary">Dekning næringsdata</div>
+          <div className="text-xl font-semibold tabular-nums">
+            {coverage.data && coverage.data.total > 0
+              ? `${Math.round((coverage.data.withNutrition / coverage.data.total) * 100)} %`
+              : "—"}
+          </div>
+          <div className="text-xs text-ink-secondary">
+            {coverage.data?.withNutrition ?? 0} av {coverage.data?.total ?? 0} matråvarer har næringsdata ·{" "}
+            {coverage.data?.missing.length ?? 0} mangler
+          </div>
+        </div>
+        <Button asChild variant="outline">
+          <Link to="/ravarer/koble-matvaretabellen">Koble råvarer</Link>
+        </Button>
       </Card>
 
       {linksError && (

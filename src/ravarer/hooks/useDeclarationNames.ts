@@ -50,7 +50,7 @@ export function useDeclarationWorklist(legalEntityId: string | undefined) {
 export function useSaveDeclarationName() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { rawMaterialId: string; declarationName: string }) => {
+    mutationFn: async (input: { rawMaterialId: string; declarationName: string; silent?: boolean }) => {
       const value = input.declarationName.trim().toLowerCase();
       if (!value) throw new Error("Deklarasjonsnavnet kan ikke være tomt");
       const { error } = await supabase
@@ -64,7 +64,8 @@ export function useSaveDeclarationName() {
       qc.invalidateQueries({ queryKey: ["declaration-worklist"] });
       qc.invalidateQueries({ queryKey: ["raw_materials"] });
       qc.invalidateQueries({ queryKey: ["raw_material", res.rawMaterialId] });
-      toast.success(`Deklarasjonsnavn lagret: «${res.value}»`);
+      // `silent` brukes av «Lagre alle utfylte», som gir én oppsummering til slutt.
+      if (!res.silent) toast.success(`Deklarasjonsnavn lagret: «${res.value}»`);
     },
     onError: (e: any) => toast.error(`Kunne ikke lagre: ${e.message ?? e}`),
   });

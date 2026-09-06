@@ -9,7 +9,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useNutrition, useUpsertNutrition, useAllergens, useSetAllergen, type NutritionRow } from "@/ravarer/hooks/useNutrition";
 import { ALLERGENS, ALLERGEN_PRESENCE, COUNTRY_OPTIONS, calcEnergyKj, kjToKcal, formatNumber } from "@/ravarer/lib/constants";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
-import { Sparkles, AlertTriangle } from "lucide-react";
+import { Sparkles, AlertTriangle, Loader2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import {
+  NUTRITION_SOURCES,
+  changedNutritionFields,
+  energyMismatch,
+  kcalFromKj,
+  normalizeNutritionSource,
+  nutritionSourceLabel,
+  resolveSourceOnSave,
+} from "@/ravarer/lib/nutritionSource";
+import { normalizeAllergenCode, normalizeAllergenPresence } from "@/ravarer/lib/allergenDiff";
 import { cn } from "@/lib/utils";
 import { DatasheetSection } from "./DatasheetSection";
 import { MatvaretabellenSourceCard } from "@/ravarer/components/matvaretabellen/MatvaretabellenSourceCard";
@@ -35,7 +48,7 @@ const empty: NutritionRow = {
 };
 
 export function NutritionTab({ rawMaterialId, registerSave }: Props) {
-  const { canWrite } = useRavarer();
+  const { canWrite, user } = useRavarer();
   const { data: existing } = useNutrition(rawMaterialId);
   const { data: rm } = useRawMaterial(rawMaterialId);
   const upsert = useUpsertNutrition();
@@ -59,13 +72,57 @@ export function NutritionTab({ rawMaterialId, registerSave }: Props) {
     setDraft(d => ({ ...d, energy_kj: kj, energy_kcal: kjToKcal(kj) }));
   };
 
+  const energyWarning = energyMismatch(draft.energy_kj, draft.energy_kcal).mismatch;
+  const overriddenFields = useMemo(() => changedNutritionFields(existing, draft), [existing, draft]);
+  const sourceOnSave = resolveSourceOnSave({
+    draftSource: draft.source,
+    existingSource: existing?.source ?? null,
+    changedFields: overriddenFields,
+  });
+  const becomesManual = sourceOnSave !== normalizeNutritionSource(existing?.source ?? null) && sourceOnSave === "manuell";
+
+  const [suggesting, setSuggesting] = useState(false);
+  const suggestAllergens = async () => {
+    setSuggesting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("suggest-raw-material-allergens", {
+        body: { name: rm?.declaration_name?.trim() || rm?.name || "" },
+      });
+      if (error) throw new Error(error.message);
+      if (data?.error) throw new Error(String(data.error));
+      const list = Array.isArray(data?.suggestions) ? data.suggestions : [];
+      let added = 0;
+      for (const sug of list) {
+        const code = normalizeAllergenCode(sug?.allergen);
+        const presence = normalizeAllergenPresence(sug?.presence);
+        if (!code || !presence || presence === "free_from") continue;
+        if (allergens.some((a) => a.allergen === code)) continue;
+        await setAllergen.mutateAsync({ raw_material_id: rawMaterialId, allergen: code, presence });
+        added++;
+      }
+      const rejected = Array.isArray(data?.rejected) ? data.rejected.length : 0;
+      if (added === 0) toast.info("Ingen nye allergener å foreslå.");
+      else toast.success(`${added} allergener lagt til fra forslag${rejected > 0 ? ` · ${rejected} forkastet` : ""}`);
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Kunne ikke hente forslag");
+    } finally {
+      setSuggesting(false);
+    }
+  };
+
   const presenceFor = (a: string) => allergens.find(x => x.allergen === a)?.presence ?? null;
 
   const guard = useUnsavedChangesGuard(dirty && canWrite);
 
   const save = () => {
     if (!canWrite || !dirty || upsert.isPending) return;
-    upsert.mutate({ ...draft, raw_material_id: rawMaterialId });
+    // Redigerer noen tallene fra Matvaretabellen eller et datablad, er kilden ikke lenger den.
+    upsert.mutate({
+      ...draft,
+      source: sourceOnSave,
+      raw_material_id: rawMaterialId,
+      ...(becomesManual ? { verified_at: new Date().toISOString(), verified_by: user?.id ?? null } : {}),
+    });
   };
   const saveRef = useRef(save);
   saveRef.current = save;
@@ -85,13 +142,16 @@ export function NutritionTab({ rawMaterialId, registerSave }: Props) {
       <DatasheetSection rawMaterialId={rawMaterialId} />
       <MatvaretabellenSourceCard
         rawMaterialId={rawMaterialId}
-        rawMaterialName={rm?.name ?? ""}
         source={existing?.source ?? null}
         foodId={existing?.matvaretabellen_food_id ?? null}
       />
       <Card className="p-5 space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-base font-semibold">Næringsinnhold pr 100 g</h3>
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-base font-semibold">Næringsinnhold pr 100 g</h3>
+            <Badge variant="secondary">Kilde: {nutritionSourceLabel(sourceOnSave)}</Badge>
+            {becomesManual && <Badge variant="outline">Manuelt overstyrt ved lagring</Badge>}
+          </div>
           {canWrite && (
             <Button variant="outline" size="sm" onClick={autoEnergy}>
               <Sparkles className="mr-1.5 h-3.5 w-3.5" /> Auto-beregn energi
@@ -111,6 +171,24 @@ export function NutritionTab({ rawMaterialId, registerSave }: Props) {
           <NumField label="Protein (g)" value={draft.protein_g} onChange={setNum("protein_g")} disabled={!canWrite} />
           <NumField label="Salt (g)" value={draft.salt_g} onChange={setNum("salt_g")} disabled={!canWrite} />
         </div>
+        {energyWarning && (
+          <div className="flex flex-wrap items-center gap-3 rounded-lg border border-warning/30 bg-warning/10 p-3 text-sm text-warning">
+            <AlertTriangle className="h-4 w-4" />
+            <span>
+              kJ og kcal henger ikke sammen: {formatNumber(draft.energy_kcal ?? 0, 0)} kcal mot forventet{" "}
+              {formatNumber(kcalFromKj(draft.energy_kj) ?? 0, 0)} kcal.
+            </span>
+            {canWrite && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setDraft((d) => ({ ...d, energy_kcal: kcalFromKj(d.energy_kj) }))}
+              >
+                Beregn kcal fra kJ
+              </Button>
+            )}
+          </div>
+        )}
         {macroSum > 100 && (
           <div className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/10 p-3 text-sm text-warning">
             <AlertTriangle className="mt-0.5 h-4 w-4" />
@@ -143,13 +221,14 @@ export function NutritionTab({ rawMaterialId, registerSave }: Props) {
           </div>
           <div>
             <Label>Kilde</Label>
-            <Select value={draft.source ?? ""} onValueChange={v => setDraft(d => ({ ...d, source: v || null }))} disabled={!canWrite}>
+            <Select value={normalizeNutritionSource(draft.source) ?? ""} onValueChange={v => setDraft(d => ({ ...d, source: v || null }))} disabled={!canWrite}>
               <SelectTrigger><SelectValue placeholder="Velg" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="leverandør_db">Leverandør database</SelectItem>
-                <SelectItem value="manuell">Manuell registrering</SelectItem>
-                <SelectItem value="matvaretabellen">Matvaretabellen</SelectItem>
-                <SelectItem value="analyse">Laboratorieanalyse</SelectItem>
+                {NUTRITION_SOURCES.map((src) => (
+                  <SelectItem key={src} value={src}>
+                    {nutritionSourceLabel(src)}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -177,7 +256,15 @@ export function NutritionTab({ rawMaterialId, registerSave }: Props) {
       )}
 
       <Card className="p-5 space-y-4">
-        <h3 className="text-base font-semibold">Allergener</h3>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-base font-semibold">Allergener</h3>
+          {canWrite && (
+            <Button variant="outline" size="sm" onClick={suggestAllergens} disabled={suggesting}>
+              {suggesting ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-1.5 h-3.5 w-3.5" />}
+              Foreslå allergener
+            </Button>
+          )}
+        </div>
         <div className="space-y-4">
           {Object.entries(grouped).map(([group, items]) => (
             <div key={group}>
