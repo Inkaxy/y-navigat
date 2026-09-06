@@ -309,6 +309,7 @@ export default function ForhandlingDetail() {
         recipients={recipients}
         bestByItem={bestByItem}
         rmName={rmName}
+        rmBaseUnit={rmBaseUnit}
         supName={supName}
         negotiationId={id}
         onSuccess={() => {
@@ -426,7 +427,7 @@ function LiveConfirmationStatus({ neg, items, recipients, rmName, supName, activ
 }
 
 function ConcludeDialog({
-  open, onOpenChange, items, responses, recipients, bestByItem, rmName, supName, negotiationId, onSuccess,
+  open, onOpenChange, items, responses, recipients, bestByItem, rmName, rmBaseUnit, supName, negotiationId, onSuccess,
 }: any) {
   const [picks, setPicks] = useState<Record<string, { winner_recipient_id: string | null; set_as_primary: boolean; apply_to_supplier: boolean }>>({});
 
@@ -456,8 +457,10 @@ function ConcludeDialog({
           winner_recipient_id: p?.winner_recipient_id ?? null,
           winner_response_id: winnerResp?.id ?? null,
           agreed_price: winnerResp?.offered_price ?? null,
-          // Tilbudsprisen gjelder pakningen; det finnes ingen egen prisenhet på tilbudet.
-          agreed_price_unit: null,
+          // Leverandørportalen ber om «Pris pr {baseenhet}» — RFQ-tilbud er ALLTID
+          // per grunnenhet. Vi sender varens baseenhet slik at prisen ikke deles på
+          // pakningsstørrelsen en gang til.
+          agreed_price_unit: rmBaseUnit?.(it.raw_material_id) ?? null,
           agreed_package_size: winnerResp?.offered_package_size ?? null,
           agreed_package_unit: winnerResp?.offered_package_unit ?? null,
           set_as_primary: p?.set_as_primary ?? false,

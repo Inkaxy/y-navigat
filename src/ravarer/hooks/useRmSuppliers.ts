@@ -44,11 +44,12 @@ export interface PriceHistoryRow {
   invoices?: { invoice_number: string | null; is_credit_note: boolean | null } | null;
 }
 
-export function useRawMaterialSuppliers(rawMaterialId: string | undefined) {
-  return useQuery({
-    queryKey: ["raw_material_suppliers", rawMaterialId],
+/** Delt kontrakt for ["raw_material_suppliers", id] — komplette koblingsrader. */
+export function rmSuppliersQueryOptions(rawMaterialId: string | undefined) {
+  return {
+    queryKey: ["raw_material_suppliers", rawMaterialId] as const,
     enabled: !!rawMaterialId,
-    queryFn: async () => {
+    queryFn: async (): Promise<RmSupplierRow[]> => {
       const { data, error } = await supabase
         .from("raw_material_suppliers")
         .select("*")
@@ -57,7 +58,11 @@ export function useRawMaterialSuppliers(rawMaterialId: string | undefined) {
       if (error) throw error;
       return (data ?? []) as RmSupplierRow[];
     },
-  });
+  };
+}
+
+export function useRawMaterialSuppliers(rawMaterialId: string | undefined) {
+  return useQuery(rmSuppliersQueryOptions(rawMaterialId));
 }
 
 export function useUpsertRmSupplier() {

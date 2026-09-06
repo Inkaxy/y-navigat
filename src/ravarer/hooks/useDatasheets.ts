@@ -109,18 +109,33 @@ export function useDeleteDatasheets() {
   });
 }
 
-export function useDatasheets(rawMaterialId: string | undefined) {
-  return useQuery({
-    queryKey: ["raw-material-datasheets", rawMaterialId],
+export interface DatasheetListRow {
+  id: string;
+  raw_material_id: string;
+  is_current: boolean | null;
+  uploaded_at: string | null;
+  file_name: string | null;
+  file_path: string | null;
+  [key: string]: unknown;
+}
+
+/** Delt kontrakt for ["raw-material-datasheets", id] — hele listen, nyeste først. */
+export function datasheetsQueryOptions(rawMaterialId: string | undefined) {
+  return {
+    queryKey: ["raw-material-datasheets", rawMaterialId] as const,
     enabled: !!rawMaterialId,
-    queryFn: async () => {
+    queryFn: async (): Promise<DatasheetListRow[]> => {
       const { data, error } = await supabase
         .from("raw_material_datasheets")
         .select("*")
         .eq("raw_material_id", rawMaterialId!)
         .order("uploaded_at", { ascending: false });
       if (error) throw error;
-      return data;
+      return (data ?? []) as unknown as DatasheetListRow[];
     },
-  });
+  };
+}
+
+export function useDatasheets(rawMaterialId: string | undefined) {
+  return useQuery(datasheetsQueryOptions(rawMaterialId));
 }
