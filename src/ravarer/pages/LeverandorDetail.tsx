@@ -231,7 +231,7 @@ export default function LeverandorDetailPage() {
         <Kpi label="Fakturaer" value={String(supplier.invoice_count ?? invoiceTotal ?? 0)} />
         <Kpi label="Siste faktura" value={formatDate(supplier.last_invoice_date)} />
         <Kpi label="Varer koblet" value={String(items.length)} />
-        <Kpi label="Kjøpt siste 12 mnd" value={formatNok(spend ?? 0)} hint="Sum fakturabeløp" />
+        <Kpi label="Kjøpt siste 12 mnd (eks. mva)" value={formatNok(spend ?? 0)} hint="Fakturabeløp eks. mva, kreditnotaer trukket fra" />
       </div>
 
       <Tabs defaultValue="varer">
