@@ -36,6 +36,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { invalidateInvoice, invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 import {
   acceptTopSuggestion,
+  rematchLines,
   markNotApplicable,
   restoreLine,
   runAutoMatch,
@@ -296,14 +297,18 @@ export default function FakturaerInboxPage() {
       setBulkBusy(true);
       let ok = 0;
       const failures: string[] = [];
+      const accepted: Array<{ invoice_id: string; id: string }> = [];
       for (const line of candidates) {
         try {
-          await acceptTopSuggestion(line);
+          await acceptTopSuggestion(line, { skipRematch: true });
+          accepted.push({ invoice_id: line.invoice_id, id: line.id });
           ok++;
         } catch (e) {
           failures.push(e instanceof Error ? e.message : "ukjent feil");
         }
       }
+      // Én kjøring av matchemotoren for hele bunken, ikke én per linje.
+      if (accepted.length > 0) await rematchLines(accepted);
       setBulkBusy(false);
       refresh();
       if (failures.length === 0) toast.success(`${ok} linjer godtatt`);
@@ -323,14 +328,18 @@ export default function FakturaerInboxPage() {
     setBulkBusy(true);
     let ok = 0;
     let failed = 0;
+    const accepted: Array<{ invoice_id: string; id: string }> = [];
     for (const line of candidates) {
       try {
-        await acceptTopSuggestion(line);
+        await acceptTopSuggestion(line, { skipRematch: true });
+        accepted.push({ invoice_id: line.invoice_id, id: line.id });
         ok++;
       } catch {
         failed++;
       }
     }
+    // Én kjøring av matchemotoren for hele bunken, ikke én per linje.
+    if (accepted.length > 0) await rematchLines(accepted);
     setBulkBusy(false);
     setSelected({});
     refresh();

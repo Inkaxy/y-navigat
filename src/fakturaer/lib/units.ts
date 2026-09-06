@@ -137,7 +137,9 @@ function parseSizeToken(raw: string, unitRaw: string): number | null {
   }
   const u = normalizeUnit(unitRaw);
   // Norsk tusenskille: nøyaktig tre siffer etter punktum, ingen komma, masse-enhet.
-  if (/^\d{1,3}\.\d{3}$/.test(raw.trim()) && (u === "kg" || u === "g")) {
+  // «0.500 kg» er et desimaltall (et halvt kilo), ikke 500 — tall som starter med
+  // «0.» unntas derfor.
+  if (/^\d{1,3}\.\d{3}$/.test(raw.trim()) && !/^0\./.test(raw.trim()) && (u === "kg" || u === "g")) {
     return Number(raw.trim().replace(".", ""));
   }
   return toNumber(raw);

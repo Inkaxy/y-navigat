@@ -17,6 +17,11 @@ export interface CreateRawMaterialInput {
   /** Kostpris per baseenhet, eller null når den ikke kan regnes ut. */
   pricePerBaseUnit: number | null;
   baseQuantity: number | null;
+  /**
+   * Sant kun når et menneske uttrykkelig har krysset av for at pakningen stemmer.
+   * En pakning tolket fra fakturateksten er et forslag, ikke en bekreftelse.
+   */
+  confirmPackage?: boolean;
 }
 
 /**
@@ -66,7 +71,9 @@ export async function createRawMaterialFromLine(input: CreateRawMaterialInput): 
       package_size: input.packageSize,
       package_unit: input.packageUnit,
       base_units_per_package: input.baseUnitsPerPackage,
-      ...(input.packageSize != null ? { package_confirmed_at: nowIso, package_confirmed_by: user?.id ?? null } : {}),
+      ...(input.confirmPackage && input.packageSize != null
+        ? { package_confirmed_at: nowIso, package_confirmed_by: user?.id ?? null }
+        : {}),
       last_invoice_price: input.pricePerBaseUnit,
       last_invoice_date: line.invoice.invoice_date,
     })
