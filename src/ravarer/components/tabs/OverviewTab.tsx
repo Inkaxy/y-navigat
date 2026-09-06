@@ -18,20 +18,39 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  BASE_UNITS,
-  PACKAGE_UNITS,
-  formatNok,
-  formatDate,
-} from "@/ravarer/lib/constants";
+import { BASE_UNITS, formatDate } from "@/ravarer/lib/constants";
 import { CategorySelectItems } from "@/ravarer/components/CategorySelectItems";
 import { categoryOptions } from "@/ravarer/lib/categories";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { RecalcHistory } from "@/ravarer/components/packages/RecalcHistory";
+import { SetPackageDialog } from "@/ravarer/components/packages/SetPackageDialog";
+import {
+  usePackageWorklist,
+  type PackageWorklistRow,
+} from "@/ravarer/hooks/usePackageSizes";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 import { UnsavedChangesDialog } from "@/components/common/UnsavedChangesDialog";
 
 /** Felt som redigeres i denne fanen. Lager styres i lagerkortet. */
+const GRAIN_CLASSIFICATIONS = [
+  { value: "sifted_flour", label: "Siktet mel" },
+  { value: "whole_grain_flour", label: "Sammalt mel" },
+  { value: "whole_grains", label: "Hele korn" },
+  { value: "wheat_bran", label: "Kli" },
+  { value: "other_flour", label: "Annet mel" },
+  { value: "not_grain", label: "Ikke korn" },
+] as const;
+
+const CEREAL_TYPES = [
+  "hvete",
+  "rug",
+  "havre",
+  "spelt",
+  "bygg",
+  "mais",
+  "ris",
+] as const;
+
 const EDITABLE_FIELDS = [
   "sku",
   "name",
@@ -40,14 +59,15 @@ const EDITABLE_FIELDS = [
   "category",
   "categories",
   "base_unit",
-  "package_size",
-  "package_unit",
-  "base_units_per_package",
   "current_cost_price",
   "agreed_price",
   "is_active",
   "is_packaging",
   "primary_supplier_id",
+  "grain_classification",
+  "cereal_type",
+  "water_content_pct",
+  "unit_weight_grams",
 ] as const satisfies readonly (keyof RawMaterialRow)[];
 
 type EditableField = (typeof EDITABLE_FIELDS)[number];
@@ -67,9 +87,11 @@ function changedFields(
 
 interface Props {
   rm: RawMaterialRow;
+  /** Lar siden lagre fanen med ⌘S. */
+  registerSave?: (save: () => void) => void;
 }
 
-export function OverviewTab({ rm }: Props) {
+export function OverviewTab({ rm, registerSave }: Props) {
   const { canWrite } = useRavarer();
   const update = useUpdateRawMaterial();
   const { data: suppliers = [] } = useSuppliers();
@@ -87,6 +109,34 @@ export function OverviewTab({ rm }: Props) {
   }, [rm.updated_at, rm.id]);
 
   const guard = useUnsavedChangesGuard(dirty);
+  const [packageOpen, setPackageOpen] = useState(false);
+  const { data: packageWorklist = [] } = usePackageWorklist();
+  const packageRow = useMemo<PackageWorklistRow>(() => {
+    const found = packageWorklist.find((r) => r.id === rm.id);
+    if (found) return found;
+    return {
+      id: rm.id,
+      legal_entity_id: rm.legal_entity_id,
+      name: rm.name,
+      base_unit: rm.base_unit,
+      category: rm.category,
+      current_cost_price: rm.current_cost_price,
+      pakningsfaktor: rm.base_units_per_package,
+      faktor_kilde: rm.package_confirmed_at ? "bekreftet" : null,
+      bekreftet_dato: rm.package_confirmed_at,
+      antall_fakturalinjer: null,
+      antall_leverandorer: null,
+      enheter_i_bruk: null,
+      linjer_uten_pris: null,
+      kjopt_kr_totalt: null,
+      siste_faktura: null,
+      pris_spredning: null,
+      implisert_mengde: null,
+      referansepris: null,
+      referansekilde: null,
+      referansedato: null,
+    } as PackageWorklistRow;
+  }, [packageWorklist, rm]);
 
   const save = async () => {
     if (!dirty) return;
@@ -102,6 +152,12 @@ export function OverviewTab({ rm }: Props) {
         : {}),
     });
   };
+
+  const saveRef = useRef(save);
+  saveRef.current = save;
+  useEffect(() => {
+    registerSave?.(() => void saveRef.current());
+  }, [registerSave]);
 
   const cats = draft.categories ?? [];
   const toggleCat = (c: string) =>
@@ -121,7 +177,7 @@ export function OverviewTab({ rm }: Props) {
     <div className="space-y-5">
       <Card className="p-5 space-y-4">
         <h3 className="text-base font-semibold">Grunndata</h3>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <Label>SKU *</Label>
             <Input
@@ -218,7 +274,7 @@ export function OverviewTab({ rm }: Props) {
             rows={2}
           />
         </div>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <Label>Basisenhet *</Label>
             <Select
@@ -238,71 +294,43 @@ export function OverviewTab({ rm }: Props) {
               </SelectContent>
             </Select>
           </div>
-          <div>
-            <Label>Pakn. størrelse</Label>
-            <Input
-              type="number"
-              step="0.01"
-              value={draft.package_size ?? ""}
-              onChange={(e) =>
-                setDraft((d) => ({
-                  ...d,
-                  package_size:
-                    e.target.value === "" ? null : Number(e.target.value),
-                }))
-              }
-              disabled={!canWrite}
-            />
-          </div>
-          <div>
-            <Label>Pakn. enhet</Label>
-            <Select
-              value={draft.package_unit ?? ""}
-              onValueChange={(v) =>
-                setDraft((d) => ({ ...d, package_unit: v || null }))
-              }
-              disabled={!canWrite}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Velg" />
-              </SelectTrigger>
-              <SelectContent>
-                {PACKAGE_UNITS.map((u) => (
-                  <SelectItem key={u} value={u}>
-                    {u}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-        <div>
-          <Label>Antall {draft.base_unit} per pakning</Label>
-          <Input
-            type="number"
-            step="0.001"
-            value={draft.base_units_per_package ?? ""}
-            onChange={(e) =>
-              setDraft((d) => ({
-                ...d,
-                base_units_per_package:
-                  e.target.value === "" ? null : Number(e.target.value),
-              }))
-            }
-            disabled={!canWrite}
-          />
-          <p className="mt-1 text-xs text-ink-secondary">
-            Brukes til å regne om fakturapriser til pris per {draft.base_unit}.
-          </p>
-          {draft.base_units_per_package !== rm.base_units_per_package && (
-            <div className="mt-2 rounded-lg border border-warning/50 bg-warning/10 p-3 text-xs">
-              Endring her oppdaterer ikke prisene.{" "}
+          <div className="rounded-lg border p-3">
+            <Label className="text-sm">Pakning</Label>
+            <p className="mt-1 text-sm tabular-nums">
+              {rm.package_size
+                ? `${rm.package_size} ${rm.package_unit ?? ""}`
+                : "Pakningsstørrelse mangler"}
+              {rm.base_units_per_package != null && (
+                <span className="text-ink-secondary">
+                  {" "}
+                  · {rm.base_units_per_package} {rm.base_unit} per pakning
+                </span>
+              )}
+            </p>
+            <p className="mt-1 text-xs text-ink-secondary">
+              {rm.package_confirmed_at
+                ? `Bekreftet ${formatDate(rm.package_confirmed_at)}`
+                : "Ikke bekreftet"}
+            </p>
+            {canWrite && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-2"
+                onClick={() => setPackageOpen(true)}
+              >
+                Endre pakning
+              </Button>
+            )}
+            <p className="mt-2 text-xs text-ink-secondary">
+              Pakningen endres i dialogen, som viser forhåndsvisning av
+              omregnede priser og kan angres.{" "}
               <Link to="/ravarer/pakninger" className="underline">
-                Bruk Pakninger-siden
-              </Link>{" "}
-              for å regne om.
-            </div>
-          )}
+                Se alle pakninger
+              </Link>
+              .
+            </p>
+          </div>
         </div>
         <div className="flex items-center justify-between rounded-lg border p-3">
           <div>
@@ -335,8 +363,111 @@ export function OverviewTab({ rm }: Props) {
       </Card>
 
       <Card className="p-5 space-y-4">
+        <h3 className="text-base font-semibold">Bakerifelt</h3>
+        <p className="text-xs text-ink-secondary">
+          Brukes av bakerprosent, brødskala og deigberegninger i Varer.
+        </p>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <Label>Kornklassifisering</Label>
+            <Select
+              value={draft.grain_classification ?? "_none"}
+              onValueChange={(v) =>
+                setDraft((d) => ({
+                  ...d,
+                  grain_classification: v === "_none" ? null : v,
+                }))
+              }
+              disabled={!canWrite}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Ikke satt" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="_none">Ikke satt</SelectItem>
+                {GRAIN_CLASSIFICATIONS.map((g) => (
+                  <SelectItem key={g.value} value={g.value}>
+                    {g.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="mt-1 text-xs text-ink-secondary">
+              Alt annet enn «ikke korn» teller som mel i bakerprosenten.
+            </p>
+          </div>
+          <div>
+            <Label>Kornslag</Label>
+            <Select
+              value={draft.cereal_type ?? "_none"}
+              onValueChange={(v) =>
+                setDraft((d) => ({
+                  ...d,
+                  cereal_type: v === "_none" ? null : v,
+                }))
+              }
+              disabled={!canWrite}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Ikke satt" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="_none">Ikke satt</SelectItem>
+                {CEREAL_TYPES.map((c) => (
+                  <SelectItem key={c} value={c}>
+                    {c}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="mt-1 text-xs text-ink-secondary">
+              Styrer nøkkelhullsvurdering og kornandel.
+            </p>
+          </div>
+          <div>
+            <Label>Vanninnhold (%)</Label>
+            <Input
+              type="number"
+              step="0.1"
+              value={draft.water_content_pct ?? ""}
+              onChange={(e) =>
+                setDraft((d) => ({
+                  ...d,
+                  water_content_pct:
+                    e.target.value === "" ? null : Number(e.target.value),
+                }))
+              }
+              disabled={!canWrite}
+            />
+            <p className="mt-1 text-xs text-ink-secondary">
+              Andel vann i råvaren, f.eks. 100 for vann.
+            </p>
+          </div>
+          <div>
+            <Label>Vekt per stk (gram)</Label>
+            <Input
+              type="number"
+              step="1"
+              value={draft.unit_weight_grams ?? ""}
+              onChange={(e) =>
+                setDraft((d) => ({
+                  ...d,
+                  unit_weight_grams:
+                    e.target.value === "" ? null : Number(e.target.value),
+                }))
+              }
+              disabled={!canWrite}
+            />
+            <p className="mt-1 text-xs text-ink-secondary">
+              Brukes når råvaren måles i stk.
+            </p>
+          </div>
+        </div>
+      </Card>
+
+      <Card className="p-5 space-y-4">
         <h3 className="text-base font-semibold">Pris og leverandør</h3>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <Label>Gjeldende kostpris (kr/{draft.base_unit})</Label>
             <Input
@@ -421,6 +552,11 @@ export function OverviewTab({ rm }: Props) {
         </div>
       )}
 
+      <SetPackageDialog
+        row={packageRow}
+        open={packageOpen}
+        onOpenChange={setPackageOpen}
+      />
       <UnsavedChangesDialog {...guard.dialogProps} />
     </div>
   );

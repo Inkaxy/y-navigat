@@ -27,6 +27,8 @@ export interface VarelisteRowProps {
   onCommitPrice: (item: RawMaterialListItem, field: "cost" | "agreed", value: number, reason: string) => void;
   onCommitCategory: (item: RawMaterialListItem, value: string) => void;
   onFocusRow: (id: string) => void;
+  /** URL-parametrene fra listen, slik at detaljen kan gå videre/tilbake i samme rekkefølge. */
+  listSearch?: string;
 }
 
 function StatusChips({ item }: { item: RawMaterialListItem }) {
@@ -219,6 +221,7 @@ function RowInner({
   onCommitPrice,
   onCommitCategory,
   onFocusRow,
+  listSearch = "",
 }: VarelisteRowProps & { categoryOptions: readonly string[] }) {
   const show = (id: string) => isColumnVisible(id, hiddenColumns);
   const cell = "px-3 py-2 align-middle";
@@ -241,7 +244,7 @@ function RowInner({
 
       {show("sku") && (
         <td className={cn(cell, "font-mono text-xs text-muted-foreground")}>
-          <Link to={`/ravarer/vareliste/${item.id}`} className="hover:underline">
+          <Link to={`/ravarer/vareliste/${item.id}${listSearch ? `?${listSearch}` : ""}`} className="hover:underline">
             {item.sku}
           </Link>
         </td>
@@ -249,7 +252,7 @@ function RowInner({
 
       <td className={cell}>
         <Link
-          to={`/ravarer/vareliste/${item.id}`}
+          to={`/ravarer/vareliste/${item.id}${listSearch ? `?${listSearch}` : ""}`}
           className="block font-medium text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           {item.name}

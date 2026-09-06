@@ -203,3 +203,62 @@ export function sortItems(
   });
   return arr;
 }
+
+/** Filtrene som ligger i URL-en på varelisten. Deles med råvaredetaljen
+ *  slik at «forrige/neste» følger nøyaktig samme rekkefølge som listen. */
+export interface ListQuery {
+  q: string;
+  kat: string;
+  type: string;
+  status: string;
+  view: string;
+  sortKey: ListSortKey;
+  sortDir: "asc" | "desc";
+}
+
+const SORT_KEYS: ListSortKey[] = [
+  "sku", "name", "category", "supplier", "cost", "agreed",
+  "deviation", "package", "volume_12m", "last_invoice", "active",
+];
+
+export function parseListQuery(params: URLSearchParams): ListQuery {
+  const [rawKey, rawDir] = (params.get("sort") ?? "name:asc").split(":");
+  return {
+    q: params.get("q") ?? "",
+    kat: params.get("kat") ?? "all",
+    type: params.get("type") ?? "all",
+    status: params.get("status") ?? "active",
+    view: params.get("view") ?? "all",
+    sortKey: SORT_KEYS.includes(rawKey as ListSortKey) ? (rawKey as ListSortKey) : "name",
+    sortDir: rawDir === "desc" ? "desc" : "asc",
+  };
+}
+
+/** Full filtrering + sortering av varelisten, inkludert alias-treff-merking. */
+export function filterAndSortItems(
+  items: readonly RawMaterialListItem[],
+  query: ListQuery,
+  tolerance = DEFAULT_DEVIATION_TOLERANCE,
+): RawMaterialListItem[] {
+  const needle = normalizeSearch(query.q);
+  const base = items.filter((i) => {
+    if (query.status === "active" && !i.isActive) return false;
+    if (query.status === "inactive" && i.isActive) return false;
+    if (query.type !== "all" && i.itemType !== query.type) return false;
+    if (query.kat !== "all" && !i.categories.includes(query.kat)) return false;
+    if (needle && !matchesSearch(i.searchText, query.q)) return false;
+    return true;
+  });
+
+  const withAlias =
+    needle.length === 0
+      ? base
+      : base.map((i) => {
+          if (normalizeSearch(`${i.name} ${i.sku}`).includes(needle)) return i;
+          const hit =
+            [i.supplierSku, ...i.aliases].find((v) => v && normalizeSearch(v).includes(needle)) ?? null;
+          return hit ? { ...i, matchedAlias: hit } : i;
+        });
+
+  return sortItems(applyView(withAlias, query.view, tolerance), query.sortKey, query.sortDir);
+}

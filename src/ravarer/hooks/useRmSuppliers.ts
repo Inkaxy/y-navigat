@@ -36,7 +36,7 @@ export interface PriceHistoryRow {
   invoice_id: string | null;
   notes: string | null;
   created_at: string;
-  invoices?: { invoice_number: string | null } | null;
+  invoices?: { invoice_number: string | null; is_credit_note: boolean | null } | null;
 }
 
 export function useRawMaterialSuppliers(rawMaterialId: string | undefined) {
@@ -113,7 +113,7 @@ export function usePriceHistory(rawMaterialId: string | undefined) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("raw_material_price_history")
-        .select("*, invoices(invoice_number)")
+        .select("*, invoices(invoice_number, is_credit_note)")
         .eq("raw_material_id", rawMaterialId!)
         .order("effective_date", { ascending: false });
       if (error) throw error;
