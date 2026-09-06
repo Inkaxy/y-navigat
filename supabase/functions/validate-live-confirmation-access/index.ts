@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { LIVE_ITEM_SELECT, projectLiveItems } from "../_shared/negotiation-projection.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -82,7 +83,7 @@ Deno.serve(async (req) => {
     // Load only items relevant for confirmation
     const { data: items } = await admin
       .from("negotiation_items")
-      .select("*, raw_materials(name, base_unit)")
+      .select(LIVE_ITEM_SELECT)
       .eq("negotiation_id", row.negotiation_id)
       .in("live_status", ["tentatively_agreed", "confirmed", "unconfirmed_active"])
       .order("sort_order");
@@ -103,7 +104,7 @@ Deno.serve(async (req) => {
         confirmation_deadline: neg.live_confirmation_deadline,
         ended_at: neg.live_session_ended_at,
         supplier_name: supplier?.name ?? null,
-        items: items ?? [],
+        items: projectLiveItems(items),
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
