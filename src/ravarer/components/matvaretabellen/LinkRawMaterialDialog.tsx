@@ -63,7 +63,7 @@ export function LinkRawMaterialDialog({ open, onOpenChange, foodId, foodName, in
     }
   }, [open, initialQuery]);
 
-  const supplierMap = useMemo(() => new Map(suppliers.map((s: any) => [s.id, s.name])), [suppliers]);
+  const supplierMap = useMemo(() => new Map(suppliers.map((s: { id: string; name: string }) => [s.id, s.name])), [suppliers]);
 
   const visible = useMemo(() => {
     const needle = debounced.trim().toLowerCase();
