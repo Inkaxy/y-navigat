@@ -4,6 +4,11 @@ import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { toast } from "sonner";
 import { invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 
+
+function errText(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
+}
+
 export interface RawMaterialRow {
   id: string;
   legal_entity_id: string;
@@ -108,7 +113,7 @@ export function useCreateRawMaterial() {
       invalidateRawMaterial(qc, data.id);
       toast.success("Råvare opprettet");
     },
-    onError: (e: any) => toast.error(`Kunne ikke opprette: ${e.message ?? e}`),
+    onError: (e: unknown) => toast.error(`Kunne ikke opprette: ${errText(e)}`),
   });
 }
 
@@ -171,7 +176,7 @@ export function useRenameRawMaterial() {
       invalidateRawMaterial(qc, data.id);
       toast.success("Navn oppdatert");
     },
-    onError: (e: any) => toast.error(`Kunne ikke endre navn: ${e.message ?? e}`),
+    onError: (e: unknown) => toast.error(`Kunne ikke endre navn: ${errText(e)}`),
   });
 }
 
@@ -186,6 +191,6 @@ export function useDeleteRawMaterial() {
       invalidateRawMaterial(qc);
       toast.success("Slettet");
     },
-    onError: (e: any) => toast.error(`Kunne ikke slette: ${e.message ?? e}`),
+    onError: (e: unknown) => toast.error(`Kunne ikke slette: ${errText(e)}`),
   });
 }
