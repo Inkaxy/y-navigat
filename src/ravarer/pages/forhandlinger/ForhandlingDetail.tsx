@@ -168,7 +168,10 @@ export default function ForhandlingDetail() {
               negotiation_item_id: it.id,
               winner_recipient_id: rec?.id ?? null,
               winner_response_id: null,
-              agreed_price: it.live_agreed_price_per_base_unit ?? it.live_agreed_price,
+              // Send prisen slik den ble avtalt, sammen med enheten den gjelder for.
+              // Serveren regner om til pris per baseenhet — vi gjetter aldri her.
+              agreed_price: it.live_agreed_price,
+              agreed_price_unit: it.live_agreed_price_unit ?? null,
               agreed_package_size: it.live_agreed_package_size,
               agreed_package_unit: it.live_agreed_package_unit,
               set_as_primary: false,
@@ -453,6 +456,7 @@ function ConcludeDialog({
           winner_recipient_id: p?.winner_recipient_id ?? null,
           winner_response_id: winnerResp?.id ?? null,
           agreed_price: winnerResp?.offered_price ?? null,
+          agreed_price_unit: winnerResp?.offered_price_unit ?? null,
           agreed_package_size: winnerResp?.offered_package_size ?? null,
           agreed_package_unit: winnerResp?.offered_package_unit ?? null,
           set_as_primary: p?.set_as_primary ?? false,
