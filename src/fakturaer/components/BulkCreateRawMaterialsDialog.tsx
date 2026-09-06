@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -9,9 +10,19 @@ import { AlertTriangle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { showError } from "@/lib/userError";
 import { invalidateInvoice, invalidateRawMaterial } from "@/ravarer/lib/invalidate";
+import { CategorySelectItems } from "@/ravarer/components/CategorySelectItems";
 import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
 import { createRawMaterialFromLine } from "@/fakturaer/lib/createRawMaterial";
-import { CANONICAL_BASE_UNITS, deriveLinePackage, fmtNum, normalizeUnit, parseDecimal, resolveLineCost } from "@/fakturaer/lib/units";
+import {
+  CANONICAL_BASE_UNITS,
+  CANONICAL_PACKAGE_UNITS,
+  deriveLinePackage,
+  fmtNum,
+  normalizeUnit,
+  parseDecimal,
+  resolveLineCost,
+  toBaseFactor,
+} from "@/fakturaer/lib/units";
 import { formatNok } from "@/fakturaer/lib/constants";
 
 interface Props {
@@ -23,11 +34,15 @@ interface Props {
 
 interface Draft {
   lineId: string;
+  /** Radene brukeren faktisk vil opprette. */
+  include: boolean;
   name: string;
   sku: string;
   category: string;
   baseUnit: string;
   packageSize: string;
+  /** Enheten pakningsstørrelsen er oppgitt i — kan avvike fra basisenheten. */
+  packageUnit: string;
 }
 
 function suggestSku(line: ReviewLineRow): string {
@@ -56,19 +71,40 @@ function draftFor(line: ReviewLineRow): Draft {
     count_per_package: line.count_per_package,
     description: line.description,
   });
+  const baseUnit = inferBaseUnit(line.unit);
   return {
     lineId: line.id,
+    include: true,
     name: line.description ?? "",
     sku: suggestSku(line),
     category: "",
-    baseUnit: inferBaseUnit(line.unit),
+    baseUnit,
     packageSize: pkg ? String(pkg.size) : "",
+    // Pakningsenheten fra linjen skal ALDRI antas lik basisenheten: «500 G»
+    // på en kg-vare er 0,5 kg, ikke 500 kg.
+    packageUnit: pkg?.unit ?? baseUnit,
   };
 }
 
 /**
+ * Innhold per pakning i basisenheter. Returnerer null når enhetene ikke kan
+ * regnes om (f.eks. stk mot kg) — da skal ingen pakningsstørrelse lagres.
+ */
+export function packageBaseUnits(
+  size: number | null,
+  packageUnit: string | null | undefined,
+  baseUnit: string | null | undefined,
+): number | null {
+  if (size == null || !(size > 0)) return null;
+  const factor = toBaseFactor(packageUnit, baseUnit);
+  if (factor == null) return null;
+  return size * factor;
+}
+
+/**
  * Opprett flere varer på én gang fra valgte fakturalinjer. Hver linje får sin
- * egen rad som kan rettes før alt lagres — ingenting opprettes blindt.
+ * egen rad som kan rettes eller hakes bort før alt lagres — ingenting
+ * opprettes blindt.
  */
 export function BulkCreateRawMaterialsDialog({ open, onOpenChange, lines, onDone }: Props) {
   const qc = useQueryClient();
@@ -76,18 +112,22 @@ export function BulkCreateRawMaterialsDialog({ open, onOpenChange, lines, onDone
   const [sharedCategory, setSharedCategory] = useState("");
   const [busy, setBusy] = useState(false);
 
+  const lineIds = useMemo(() => lines.map((l) => l.id).join(","), [lines]);
+
   useEffect(() => {
     if (!open) return;
     setDrafts(lines.map(draftFor));
     setSharedCategory("");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, lines.map((l) => l.id).join(",")]);
+  }, [open, lineIds, lines]);
 
   function patch(lineId: string, p: Partial<Draft>) {
     setDrafts((d) => d.map((x) => (x.lineId === lineId ? { ...x, ...p } : x)));
   }
 
-  const missing = drafts.filter((d) => !d.name.trim() || !d.sku.trim() || !(d.category.trim() || sharedCategory.trim()));
+  const included = drafts.filter((d) => d.include);
+  const missing = included.filter(
+    (d) => !d.name.trim() || !d.sku.trim() || !(d.category.trim() || sharedCategory.trim()),
+  );
 
   async function submit() {
     setBusy(true);
@@ -95,10 +135,11 @@ export function BulkCreateRawMaterialsDialog({ open, onOpenChange, lines, onDone
     const failed: string[] = [];
     const invoiceIds = new Set<string>();
     try {
-      for (const d of drafts) {
+      for (const d of included) {
         const line = lines.find((l) => l.id === d.lineId);
         if (!line) continue;
         const size = parseDecimal(d.packageSize);
+        const perPackage = packageBaseUnits(size, d.packageUnit, d.baseUnit);
         const cost = resolveLineCost({
           quantity: line.quantity,
           unit: line.unit,
@@ -109,7 +150,8 @@ export function BulkCreateRawMaterialsDialog({ open, onOpenChange, lines, onDone
           countPerPackage: line.count_per_package,
           description: line.description,
           baseUnit: d.baseUnit,
-          supplierPackage: size && size > 0 ? { packageSize: size, packageUnit: d.baseUnit } : null,
+          supplierPackage:
+            size != null && size > 0 ? { packageSize: size, packageUnit: d.packageUnit } : null,
         });
         try {
           await createRawMaterialFromLine({
@@ -121,23 +163,30 @@ export function BulkCreateRawMaterialsDialog({ open, onOpenChange, lines, onDone
             itemType: "ravare",
             supplierSku: line.supplier_sku?.trim() || null,
             packageSize: size,
-            packageUnit: size != null ? d.baseUnit : null,
-            baseUnitsPerPackage: cost.needsInput ? null : cost.baseUnitsPerPackage ?? null,
+            packageUnit: size != null ? d.packageUnit : null,
+            baseUnitsPerPackage: cost.needsInput ? perPackage : cost.baseUnitsPerPackage ?? perPackage,
             pricePerBaseUnit: cost.needsInput ? null : Number(cost.pricePerBaseUnit.toFixed(4)),
             baseQuantity: cost.needsInput ? null : cost.baseQuantity,
           });
           invoiceIds.add(line.invoice_id);
           ok++;
-        } catch {
-          failed.push(d.name || "uten navn");
+        } catch (e) {
+          const why = e instanceof Error ? e.message : "ukjent feil";
+          failed.push(`${d.name || d.sku || "uten navn"} (${why})`);
         }
       }
       invoiceIds.forEach((id) => invalidateInvoice(qc, id));
       invalidateRawMaterial(qc);
-      if (failed.length === 0) toast.success(`${ok} varer opprettet`);
-      else toast.warning(`${ok} opprettet, ${failed.length} feilet: ${failed.slice(0, 3).join(", ")}`);
-      onDone?.();
-      onOpenChange(false);
+      if (failed.length === 0) {
+        toast.success(`${ok} varer opprettet`);
+        onDone?.();
+        onOpenChange(false);
+      } else {
+        // Radene som feilet blir stående, slik at brukeren kan rette og prøve igjen.
+        setDrafts((d) => d.map((x) => ({ ...x, include: failed.some((f) => f.startsWith(x.name)) })));
+        toast.warning(`${ok} opprettet. Feilet: ${failed.join(" · ")}`);
+        onDone?.();
+      }
     } catch (e: unknown) {
       showError("masse-opprett-raavarer", e, "Kunne ikke opprette varene");
     } finally {
@@ -147,9 +196,9 @@ export function BulkCreateRawMaterialsDialog({ open, onOpenChange, lines, onDone
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl">
+      <DialogContent className="max-w-5xl">
         <DialogHeader>
-          <DialogTitle>Opprett {drafts.length} nye varer</DialogTitle>
+          <DialogTitle>Opprett {included.length} nye varer</DialogTitle>
           <DialogDescription>
             Én rad per valgt fakturalinje. Rett navn, varenummer og pakning før du lagrer.
           </DialogDescription>
@@ -157,11 +206,14 @@ export function BulkCreateRawMaterialsDialog({ open, onOpenChange, lines, onDone
 
         <div className="flex items-end gap-2">
           <div className="flex-1">
-            <Input
-              value={sharedCategory}
-              onChange={(e) => setSharedCategory(e.target.value)}
-              placeholder="Felles kategori for alle radene…"
-            />
+            <Select value={sharedCategory} onValueChange={setSharedCategory}>
+              <SelectTrigger>
+                <SelectValue placeholder="Felles kategori for alle radene…" />
+              </SelectTrigger>
+              <SelectContent>
+                <CategorySelectItems existing={[sharedCategory]} />
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
@@ -169,19 +221,29 @@ export function BulkCreateRawMaterialsDialog({ open, onOpenChange, lines, onDone
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-9"><span className="sr-only">Ta med</span></TableHead>
                 <TableHead>Navn</TableHead>
                 <TableHead className="w-[150px]">Varenummer</TableHead>
-                <TableHead className="w-[140px]">Kategori</TableHead>
+                <TableHead className="w-[170px]">Kategori</TableHead>
                 <TableHead className="w-[90px]">Basisenhet</TableHead>
-                <TableHead className="w-[110px]">Pakning</TableHead>
+                <TableHead className="w-[170px]">Pakning</TableHead>
                 <TableHead className="w-[110px] text-right">Fakturabeløp</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {drafts.map((d) => {
                 const line = lines.find((l) => l.id === d.lineId);
+                const size = parseDecimal(d.packageSize);
+                const perPackage = packageBaseUnits(size, d.packageUnit, d.baseUnit);
                 return (
-                  <TableRow key={d.lineId}>
+                  <TableRow key={d.lineId} className={d.include ? undefined : "opacity-50"}>
+                    <TableCell>
+                      <Checkbox
+                        checked={d.include}
+                        onCheckedChange={(v) => patch(d.lineId, { include: !!v })}
+                        aria-label="Ta med linjen"
+                      />
+                    </TableCell>
                     <TableCell>
                       <Input value={d.name} onChange={(e) => patch(d.lineId, { name: e.target.value })} />
                     </TableCell>
@@ -189,11 +251,14 @@ export function BulkCreateRawMaterialsDialog({ open, onOpenChange, lines, onDone
                       <Input value={d.sku} onChange={(e) => patch(d.lineId, { sku: e.target.value })} />
                     </TableCell>
                     <TableCell>
-                      <Input
-                        value={d.category}
-                        onChange={(e) => patch(d.lineId, { category: e.target.value })}
-                        placeholder={sharedCategory || "Kategori"}
-                      />
+                      <Select value={d.category} onValueChange={(v) => patch(d.lineId, { category: v })}>
+                        <SelectTrigger>
+                          <SelectValue placeholder={sharedCategory || "Kategori"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <CategorySelectItems existing={[d.category]} />
+                        </SelectContent>
+                      </Select>
                     </TableCell>
                     <TableCell>
                       <Select value={d.baseUnit} onValueChange={(v) => patch(d.lineId, { baseUnit: v })}>
@@ -206,12 +271,30 @@ export function BulkCreateRawMaterialsDialog({ open, onOpenChange, lines, onDone
                       </Select>
                     </TableCell>
                     <TableCell>
-                      <Input
-                        type="number"
-                        value={d.packageSize}
-                        onChange={(e) => patch(d.lineId, { packageSize: e.target.value })}
-                        placeholder={`per ${d.baseUnit}`}
-                      />
+                      <div className="flex items-center gap-1.5">
+                        <Input
+                          type="number"
+                          className="w-[80px]"
+                          value={d.packageSize}
+                          onChange={(e) => patch(d.lineId, { packageSize: e.target.value })}
+                          aria-label="Pakningsstørrelse"
+                        />
+                        <Select value={d.packageUnit} onValueChange={(v) => patch(d.lineId, { packageUnit: v })}>
+                          <SelectTrigger className="w-[80px]" aria-label="Pakningsenhet"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {CANONICAL_PACKAGE_UNITS.map((u) => (
+                              <SelectItem key={u} value={u}>{u}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="mt-1 text-xs text-ink-secondary">
+                        {size != null && size > 0
+                          ? perPackage != null
+                            ? `= ${fmtNum(perPackage, 4)} ${d.baseUnit} per pakning`
+                            : `Kan ikke regne om ${d.packageUnit} til ${d.baseUnit}`
+                          : "Ingen pakning"}
+                      </div>
                     </TableCell>
                     <TableCell className="text-right text-sm">
                       {formatNok(line?.total_amount != null ? Number(line.total_amount) : null)}
@@ -237,8 +320,8 @@ export function BulkCreateRawMaterialsDialog({ open, onOpenChange, lines, onDone
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>
             Avbryt
           </Button>
-          <Button onClick={() => void submit()} disabled={busy || drafts.length === 0 || missing.length > 0}>
-            {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Opprett {drafts.length} varer
+          <Button onClick={() => void submit()} disabled={busy || included.length === 0 || missing.length > 0}>
+            {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Opprett {included.length} varer
           </Button>
         </DialogFooter>
       </DialogContent>
