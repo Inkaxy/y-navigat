@@ -16,8 +16,8 @@ interface Row {
   description: string | null;
   quantity: number | null;
   unit: string | null;
-  unit_price: number | null;
-  line_total: number | null;
+  price_per_base_unit: number | null;
+  total_amount: number | null;
   invoices: {
     invoice_number: string | null;
     invoice_date: string | null;
@@ -34,13 +34,21 @@ export function RecentInvoiceLinesCard({ rawMaterialId, baseUnit }: Props) {
       const { data, error } = await supabase
         .from("invoice_lines")
         .select(
-          "id, invoice_id, description, quantity, unit, unit_price, line_total, invoices(invoice_number, invoice_date, is_credit_note, supplier_id)",
+          "id, invoice_id, description, quantity, unit, price_per_base_unit, total_amount, invoices!inner(invoice_number, invoice_date, is_credit_note, supplier_id)",
         )
         .eq("raw_material_id", rawMaterialId)
-        .order("created_at", { ascending: false })
+        .order("invoice_date", {
+          referencedTable: "invoices",
+          ascending: false,
+        })
         .limit(5);
       if (error) throw error;
-      return (data ?? []) as unknown as Row[];
+      const rows = (data ?? []) as unknown as Row[];
+      return [...rows].sort((a, b) =>
+        (b.invoices?.invoice_date ?? "").localeCompare(
+          a.invoices?.invoice_date ?? "",
+        ),
+      );
     },
   });
 
@@ -80,7 +88,10 @@ export function RecentInvoiceLinesCard({ rawMaterialId, baseUnit }: Props) {
                       : "—"}
                   </td>
                   <td className="py-2">
-                    <Link to={`/faktura/${r.invoice_id}`} className="underline">
+                    <Link
+                      to={`/ravarer/fakturaer/${r.invoice_id}`}
+                      className="underline"
+                    >
                       {r.invoices?.invoice_number ?? "Uten nummer"}
                     </Link>
                     {r.invoices?.is_credit_note && (
@@ -96,14 +107,14 @@ export function RecentInvoiceLinesCard({ rawMaterialId, baseUnit }: Props) {
                     {r.quantity == null ? "—" : `${r.quantity} ${r.unit ?? ""}`}
                   </td>
                   <td className="py-2 text-right tabular-nums">
-                    {r.unit_price == null
+                    {r.price_per_base_unit == null
                       ? "—"
-                      : formatNok(Number(r.unit_price))}
+                      : formatNok(Number(r.price_per_base_unit))}
                   </td>
                   <td className="py-2 text-right tabular-nums">
-                    {r.line_total == null
+                    {r.total_amount == null
                       ? "—"
-                      : formatNok(Number(r.line_total))}
+                      : formatNok(Number(r.total_amount))}
                   </td>
                 </tr>
               ))}

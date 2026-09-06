@@ -26,6 +26,8 @@ interface Props {
   onPresetChange: (preset: PeriodPreset, range: DateRange) => void;
   onRangeChange: (range: DateRange) => void;
   onCompareChange: (compare: ComparePreset, customRange?: DateRange | null) => void;
+  /** Skjul «Sammenlign med» der sammenligning ikke gir mening (f.eks. pristidslinjen). */
+  showCompare?: boolean;
   className?: string;
 }
 
@@ -35,7 +37,7 @@ function fmt(d: string) {
 
 export function PeriodPicker({
   preset, range, compare, customCompare,
-  onPresetChange, onRangeChange, onCompareChange, className,
+  onPresetChange, onRangeChange, onCompareChange, showCompare = true, className,
 }: Props) {
   const [openStart, setOpenStart] = useState(false);
   const [openEnd, setOpenEnd] = useState(false);
@@ -76,22 +78,24 @@ export function PeriodPicker({
         />
       </div>
 
-      <div className="flex flex-col gap-1">
-        <Label className="text-xs text-ink-secondary">Sammenlign med</Label>
-        <Select
-          value={compare}
-          onValueChange={(v) => onCompareChange(v as ComparePreset, customCompare ?? null)}
-        >
-          <SelectTrigger className="h-9 w-[200px]"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            {COMPARE_LABELS.map((c) => (
-              <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      {showCompare && (
+        <div className="flex flex-col gap-1">
+          <Label className="text-xs text-ink-secondary">Sammenlign med</Label>
+          <Select
+            value={compare}
+            onValueChange={(v) => onCompareChange(v as ComparePreset, customCompare ?? null)}
+          >
+            <SelectTrigger className="h-9 w-[200px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {COMPARE_LABELS.map((c) => (
+                <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
-      {compare === "custom" && (
+      {showCompare && compare === "custom" && (
         <div className="flex items-end gap-2">
           <DateButton
             value={customCompare?.start || range.start}

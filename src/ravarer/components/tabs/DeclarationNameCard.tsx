@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { AlertTriangle, Loader2, Save, Sparkles, Table2 } from "lucide-react";
 import { toast } from "sonner";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
-import { useRawMaterial } from "@/ravarer/hooks/useRawMaterials";
+import { useRawMaterial, type RawMaterialRow } from "@/ravarer/hooks/useRawMaterials";
 import { suggestDeclarationName, useSaveDeclarationName } from "@/ravarer/hooks/useDeclarationNames";
 
 interface Props {
@@ -41,7 +41,8 @@ export function DeclarationNameCard({ rawMaterialId, foodId }: Props) {
   });
   const matvaretabellenName = food?.food_name ?? null;
 
-  const saved = (rm as any)?.declaration_name ?? "";
+  const material: RawMaterialRow | null = rm ?? null;
+  const saved = material?.declaration_name ?? "";
   useEffect(() => setValue(saved ?? ""), [saved, rawMaterialId]);
 
   const dirty = (value ?? "").trim() !== (saved ?? "").trim();

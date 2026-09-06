@@ -1,5 +1,4 @@
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +7,6 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Plus, Pencil, Trash2, Wand2 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import type { RawMaterialRow } from "@/ravarer/hooks/useRawMaterials";
 import {
@@ -17,6 +15,7 @@ import {
   useUpsertRawMaterialUnit,
   type RawMaterialUnitRow,
 } from "@/ravarer/hooks/useRawMaterialUnits";
+import { useRawMaterialSuppliers } from "@/ravarer/hooks/useRmSuppliers";
 import { formatNok, formatNumber } from "@/ravarer/lib/constants";
 
 interface Suggestion {
@@ -26,17 +25,8 @@ interface Suggestion {
 
 /** Bekreftede pakninger på leverandørkoblinger + pakningen på varen selv. */
 function useUnitSuggestions(rm: RawMaterialRow, existing: RawMaterialUnitRow[]): Suggestion[] {
-  const { data: links = [] } = useQuery({
-    queryKey: ["rm-unit-suggestions", rm.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("raw_material_suppliers")
-        .select("id, package_unit, base_units_per_package, package_confirmed_at")
-        .eq("raw_material_id", rm.id);
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
+  // Gjenbruk leverandørkoblingene som allerede er hentet for råvaren.
+  const { data: links = [] } = useRawMaterialSuppliers(rm.id);
 
   return useMemo(() => {
     const out: Suggestion[] = [];

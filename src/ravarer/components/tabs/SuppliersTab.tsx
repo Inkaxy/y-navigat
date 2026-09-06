@@ -46,6 +46,7 @@ import { PurchaseStatsCard } from "@/ravarer/components/PurchaseStatsCard";
 import { osloTodayISO } from "@/lib/osloDate";
 import type { RmSupplierRow } from "@/ravarer/hooks/useRmSuppliers";
 import { useRawMaterialUnits } from "@/ravarer/hooks/useRawMaterialUnits";
+import { perBaseUnitFromPackage } from "@/ravarer/lib/rawMaterialKpi";
 
 const BASE_UNIT_KEY = "__base";
 
@@ -65,7 +66,7 @@ export function SuppliersTab({ rm }: Props) {
   }>({ open: false });
   const [supplierOpen, setSupplierOpen] = useState(false);
   const [priceOpen, setPriceOpen] = useState(false);
-  const [priceUnitId] = useState<string>(BASE_UNIT_KEY);
+  const [priceUnitId, setPriceUnitId] = useState<string>(BASE_UNIT_KEY);
 
   const { data: units = [] } = useRawMaterialUnits(rm.id);
   const selectedUnit = units.find((u) => u.id === priceUnitId) ?? null;
@@ -114,8 +115,24 @@ export function SuppliersTab({ rm }: Props) {
     <div className="space-y-5">
       <PurchaseStatsCard rawMaterialId={rm.id} baseUnit={rm.base_unit} />
       <Card className="p-5 space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-base font-semibold">Leverandører</h3>
+          <div className="flex flex-wrap items-center gap-2">
+            <Select value={priceUnitId} onValueChange={setPriceUnitId}>
+              <SelectTrigger className="h-9 w-[200px]" aria-label="Prisenhet">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={BASE_UNIT_KEY}>
+                  Per {rm.base_unit} (grunnenhet)
+                </SelectItem>
+                {units.map((u) => (
+                  <SelectItem key={u.id} value={u.id}>
+                    Per {u.unit_label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           {canWrite && (
             <div className="flex gap-2">
               <Button
@@ -130,6 +147,7 @@ export function SuppliersTab({ rm }: Props) {
               </Button>
             </div>
           )}
+          </div>
         </div>
         {isLoading ? (
           <div className="flex justify-center p-6 text-ink-secondary">
@@ -147,7 +165,7 @@ export function SuppliersTab({ rm }: Props) {
                   <th className="pb-2">Leverandør</th>
                   <th className="pb-2">Leverandør-SKU</th>
                   <th className="pb-2">Pakning</th>
-                  <th className="pb-2 text-right">Avtalt pris</th>
+                  <th className="pb-2 text-right">Avtalt pris per pakning</th>
                   <th className="pb-2 text-right">
                     Avtalt pris per {unitLabel}
                   </th>
@@ -264,6 +282,7 @@ export function SuppliersTab({ rm }: Props) {
         open={linkOpen.open}
         onOpenChange={(v: boolean) => setLinkOpen({ open: v })}
         rawMaterialId={rm.id}
+        baseUnit={rm.base_unit}
         existing={links.find((l) => l.id === linkOpen.existingId) ?? null}
       />
       <AddPriceDialog
@@ -346,6 +365,7 @@ interface RmSupplierDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   rawMaterialId: string;
+  baseUnit: string;
   existing: RmSupplierRow | null;
 }
 
@@ -353,6 +373,7 @@ function RmSupplierDialog({
   open,
   onOpenChange,
   rawMaterialId,
+  baseUnit,
   existing,
 }: RmSupplierDialogProps) {
   const { data: suppliers = [] } = useSuppliers();
@@ -375,8 +396,17 @@ function RmSupplierDialog({
   const [agreedPrice, setAgreedPrice] = useState(
     existing?.agreed_price?.toString() ?? "",
   );
+  const [validFrom, setValidFrom] = useState(
+    existing?.agreement_valid_from ?? "",
+  );
   const [validTo, setValidTo] = useState(existing?.agreement_valid_to ?? "");
   const [isPrimary, setIsPrimary] = useState(existing?.is_primary ?? false);
+
+  /** Avtaleprisen skrives inn per pakning og lagres også om til per grunnenhet. */
+  const perBaseUnit = perBaseUnitFromPackage(
+    agreedPrice ? Number(agreedPrice) : null,
+    baseUnitsPerPackage ? Number(baseUnitsPerPackage) : null,
+  );
 
   const submit = async () => {
     if (!supplierId) return;
@@ -392,6 +422,8 @@ function RmSupplierDialog({
         : null,
       package_unit: packageUnit || null,
       agreed_price: agreedPrice ? Number(agreedPrice) : null,
+      agreed_price_per_base_unit: perBaseUnit,
+      agreement_valid_from: validFrom || null,
       agreement_valid_to: validTo || null,
       is_primary: isPrimary,
     });
@@ -476,14 +508,27 @@ function RmSupplierDialog({
               denne leverandøren.
             </p>
           </div>
+          <div>
+            <Label>Avtalt pris per pakning (kr)</Label>
+            <Input
+              type="number"
+              step="0.01"
+              value={agreedPrice}
+              onChange={(e) => setAgreedPrice(e.target.value)}
+            />
+            <p className="mt-1 text-xs text-ink-secondary">
+              {perBaseUnit == null
+                ? `Fyll inn antall baseenheter per pakning for å se prisen per ${baseUnit}.`
+                : `Tilsvarer ${formatNok(perBaseUnit)} per ${baseUnit}.`}
+            </p>
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label>Avtalt pris</Label>
+              <Label>Avtale gyldig fra</Label>
               <Input
-                type="number"
-                step="0.01"
-                value={agreedPrice}
-                onChange={(e) => setAgreedPrice(e.target.value)}
+                type="date"
+                value={validFrom}
+                onChange={(e) => setValidFrom(e.target.value)}
               />
             </div>
             <div>

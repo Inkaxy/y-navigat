@@ -7,6 +7,7 @@ import { useRavarer } from "@/ravarer/context/RavarerContext";
 import {
   useRawMaterialPurchaseStats,
   usePurchaseStatsForRange,
+  type PeriodStatsResponse,
 } from "@/ravarer/hooks/usePurchaseStats";
 import { formatNok, formatNumber } from "@/ravarer/lib/constants";
 import { PeriodPicker } from "./PeriodPicker";
@@ -107,7 +108,7 @@ export function PurchaseStatsCard({ rawMaterialId, baseUnit }: Props) {
   );
 }
 
-function StatsTable({ data, baseUnit }: { data: any; baseUnit: string }) {
+function StatsTable({ data, baseUnit }: { data: PeriodStatsResponse; baseUnit: string }) {
   const p = data.primary_period;
   const c = data.comparison_period;
   const d = data.delta;
@@ -181,6 +182,27 @@ function PctBadge({ pct }: { pct: number | null }) {
   );
 }
 
+/** «2026-03-01» / «2026-03» → «2026-03». */
+function monthKey(iso: string): string {
+  return iso.slice(0, 7);
+}
+
+/** Antall måneder fra a til b (begge ISO-datoer). */
+function monthsBetween(a: string, b: string): number {
+  const [ay, am] = monthKey(a).split("-").map(Number);
+  const [by, bm] = monthKey(b).split("-").map(Number);
+  return (by - ay) * 12 + (bm - am);
+}
+
+/** Forskyver en månedsnøkkel n måneder fram i tid. */
+function shiftMonth(iso: string, n: number): string {
+  const [y, m] = monthKey(iso).split("-").map(Number);
+  const total = y * 12 + (m - 1) + n;
+  const year = Math.floor(total / 12);
+  const month = (total % 12) + 1;
+  return `${year}-${String(month).padStart(2, "0")}`;
+}
+
 function MonthlyBreakdownDialog({
   open, onOpenChange, rawMaterialId, baseUnit, range, compare, customCompare,
 }: {
@@ -200,24 +222,37 @@ function MonthlyBreakdownDialog({
     granularity: "monthly",
   } : null);
 
-  const chartData = useMemo(() => {
-    if (!data) return [];
-    const map = new Map<string, { month: string; primary?: number; compare?: number }>();
-    for (const m of data.primary_period.monthly_breakdown) {
-      map.set(m.month, { month: format(parseISO(m.month), "MMM yy", { locale: nb }), primary: m.quantity });
-    }
-    if (data.comparison_period) {
-      // align comparison months by index
-      const primaryMonths = data.primary_period.monthly_breakdown.map((m) => m.month);
-      data.comparison_period.monthly_breakdown.forEach((m, i) => {
-        const key = primaryMonths[i] ?? m.month;
-        const cur = map.get(key) || { month: format(parseISO(key), "MMM yy", { locale: nb }) };
-        cur.compare = m.quantity;
-        map.set(key, cur);
+  /** Sammenligningsmåneder forskyves på måned, ikke på indeks. */
+  const monthOffset = useMemo(() => {
+    if (!data?.comparison_period) return 0;
+    return monthsBetween(data.comparison_period.start, data.primary_period.start);
+  }, [data]);
+
+  const compareByPrimaryMonth = useMemo(() => {
+    const map = new Map<string, { quantity: number; avg_price: number | null }>();
+    if (!data?.comparison_period) return map;
+    for (const m of data.comparison_period.monthly_breakdown) {
+      map.set(shiftMonth(m.month, monthOffset), {
+        quantity: m.quantity,
+        avg_price: m.avg_price,
       });
     }
-    return Array.from(map.values());
-  }, [data]);
+    return map;
+  }, [data, monthOffset]);
+
+  const chartData = useMemo(() => {
+    if (!data) return [];
+    return data.primary_period.monthly_breakdown.map((m) => {
+      const c = compareByPrimaryMonth.get(monthKey(m.month));
+      return {
+        month: format(parseISO(m.month), "MMM yy", { locale: nb }),
+        primary: m.quantity,
+        compare: c?.quantity,
+        avgPrice: m.avg_price ?? undefined,
+        compareAvgPrice: c?.avg_price ?? undefined,
+      };
+    });
+  }, [data, compareByPrimaryMonth]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -236,12 +271,27 @@ function MonthlyBreakdownDialog({
                 <LineChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="month" />
-                  <YAxis />
-                  <Tooltip formatter={(v: any) => `${formatNumber(Number(v), 0)} ${baseUnit}`} />
+                  <YAxis yAxisId="left" tickFormatter={(v: number) => formatNumber(v, 0)} />
+                  <YAxis
+                    yAxisId="right"
+                    orientation="right"
+                    tickFormatter={(v: number) => `${formatNumber(v, 2)} kr`}
+                  />
+                  <Tooltip
+                    formatter={(v: number | string, name: string) =>
+                      name.startsWith("Snittpris")
+                        ? `${formatNok(Number(v))}/${baseUnit}`
+                        : `${formatNumber(Number(v), 0)} ${baseUnit}`
+                    }
+                  />
                   <Legend />
-                  <Line type="monotone" dataKey="primary" name="Valgt periode" stroke="hsl(var(--primary))" strokeWidth={2} />
+                  <Line yAxisId="left" type="monotone" dataKey="primary" name="Mengde — valgt periode" stroke="hsl(var(--primary))" strokeWidth={2} />
                   {data.comparison_period && (
-                    <Line type="monotone" dataKey="compare" name="Sammenligning" stroke="hsl(var(--ink-tertiary))" strokeWidth={2} strokeDasharray="4 4" />
+                    <Line yAxisId="left" type="monotone" dataKey="compare" name="Mengde — sammenligning" stroke="hsl(var(--ink-tertiary))" strokeWidth={2} strokeDasharray="4 4" />
+                  )}
+                  <Line yAxisId="right" type="monotone" dataKey="avgPrice" name={`Snittpris per ${baseUnit}`} stroke="hsl(var(--warning))" strokeWidth={2} dot={false} />
+                  {data.comparison_period && (
+                    <Line yAxisId="right" type="monotone" dataKey="compareAvgPrice" name="Snittpris — sammenligning" stroke="hsl(var(--warning))" strokeOpacity={0.5} strokeWidth={2} strokeDasharray="2 3" dot={false} />
                   )}
                 </LineChart>
               </ResponsiveContainer>
@@ -254,12 +304,13 @@ function MonthlyBreakdownDialog({
                     <th className="p-2 text-left font-medium">Mnd</th>
                     <th className="p-2 text-right font-medium">Valgt</th>
                     <th className="p-2 text-right font-medium">Sammenlign</th>
+                    <th className="p-2 text-right font-medium">Snittpris</th>
                     <th className="p-2 text-right font-medium">Endring</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {data.primary_period.monthly_breakdown.map((m, i) => {
-                    const c = data.comparison_period?.monthly_breakdown[i];
+                  {data.primary_period.monthly_breakdown.map((m) => {
+                    const c = compareByPrimaryMonth.get(monthKey(m.month));
                     const pct = c && c.quantity > 0 ? (m.quantity - c.quantity) / c.quantity : null;
                     return (
                       <tr key={m.month} className="border-t border-line-subtle">
@@ -267,6 +318,9 @@ function MonthlyBreakdownDialog({
                         <td className="p-2 text-right tabular-nums">{formatNumber(m.quantity, 0)} {baseUnit}</td>
                         <td className="p-2 text-right tabular-nums text-ink-secondary">
                           {c ? `${formatNumber(c.quantity, 0)} ${baseUnit}` : "—"}
+                        </td>
+                        <td className="p-2 text-right tabular-nums text-ink-secondary">
+                          {m.avg_price == null ? "—" : `${formatNok(m.avg_price)}/${baseUnit}`}
                         </td>
                         <td className="p-2 text-right tabular-nums">
                           <PctBadge pct={pct} />
