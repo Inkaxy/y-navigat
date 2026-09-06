@@ -91,7 +91,8 @@ export function rawMaterialQueryKeys(id?: string): unknown[][] {
 /** Alle nøkler som `invalidateInvoice` treffer. */
 export function invoiceQueryKeys(invoiceId?: string): unknown[][] {
   const keys: unknown[][] = INVOICE_GLOBAL_KEYS.map((k) => [k]);
-  for (const k of INVOICE_SCOPED_KEYS) keys.push(invoiceId ? [k, invoiceId] : [k]);
+  for (const k of INVOICE_SCOPED_KEYS)
+    keys.push(invoiceId ? [k, invoiceId] : [k]);
   return keys;
 }
 

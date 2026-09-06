@@ -14,7 +14,9 @@ export function useRavarerAccessLevel(enabled = true) {
     enabled,
     staleTime: 5 * 60 * 1000,
     queryFn: async (): Promise<AccessLevel> => {
-      const { data, error } = await supabase.rpc("app_access_level", { p_app_code: APP_CODE });
+      const { data, error } = await supabase.rpc("app_access_level", {
+        p_app_code: APP_CODE,
+      });
       if (error) throw error;
       return (data as AccessLevel) ?? "none";
     },
