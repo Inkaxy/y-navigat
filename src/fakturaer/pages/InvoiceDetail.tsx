@@ -24,6 +24,9 @@ import { useFakturaer } from "@/fakturaer/context/FakturaerContext";
 import { formatNok, formatDate, INVOICE_SOURCES } from "@/fakturaer/lib/constants";
 import { formatVariancePct, recheckInvoiceLinesSum } from "@/fakturaer/lib/linesSum";
 import { LinesSumMismatchAlert } from "@/fakturaer/components/LinesSumMismatchAlert";
+import { useMatchTolerances } from "@/fakturaer/hooks/useMatchTolerances";
+import { unflagInvoice } from "@/fakturaer/lib/queueActions";
+import { invalidateInvoice } from "@/ravarer/lib/invalidate";
 
 export default function InvoiceDetailPage() {
   const { id } = useParams();
@@ -39,6 +42,7 @@ export default function InvoiceDetailPage() {
   const [fetchingLines, setFetchingLines] = useState(false);
   const [docOpen, setDocOpen] = useState(false);
   const isMobile = useIsMobile();
+  const [unflagging, setUnflagging] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["invoice", id],
@@ -53,6 +57,8 @@ export default function InvoiceDetailPage() {
       return data as any;
     },
   });
+
+  const tolerances = useMatchTolerances(data?.legal_entity_id ?? null);
 
   // Suggestions for currently-opened match line
   const { data: matchLineSuggestions } = useQuery({
@@ -81,6 +87,7 @@ export default function InvoiceDetailPage() {
     return <Card className="p-8 text-center">Faktura ikke funnet.</Card>;
   }
 
+  const defaultTolerancePct = tolerances.defaultPct;
   const sourceMeta = INVOICE_SOURCES.find((s) => s.value === data.source);
   const lines = (data.invoice_lines ?? []) as any[];
   const reviewLineCount = lines.filter((l) => l.requires_review).length;
