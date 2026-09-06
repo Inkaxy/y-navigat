@@ -71,7 +71,8 @@ function packageLabel(line: ReviewLineRow, link: SupplierLinkRow | null): { text
 interface Props {
   lines: ReviewLineRow[];
   links: SupplierLinkContext;
-  toleranceFor: (category?: string | null) => number;
+  /** Toleranse per linje — slås opp mot linjens eget selskap. */
+  toleranceFor: (legalEntityId: string | null, category?: string | null) => number;
   activeLineId: string | null;
   selected: Record<string, boolean>;
   onToggleSelect: (id: string, value: boolean) => void;
@@ -130,7 +131,7 @@ export function QueueTable({
             const link = links.forLine(l);
             const top = l.suggestions?.[0];
             const category = l.matched_raw_material?.category ?? top?.raw_material?.category ?? link?.raw_material?.category ?? null;
-            const tol = toleranceFor(category);
+            const tol = toleranceFor(l.invoice.legal_entity_id, category);
             const variance = l.price_variance_pct == null ? null : Number(l.price_variance_pct);
             const absVar = variance == null ? 0 : Math.abs(variance);
             const varColor =

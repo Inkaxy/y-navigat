@@ -123,11 +123,8 @@ export default function FakturaerInboxPage() {
     () => (legalEntityId !== "all" ? [legalEntityId] : entities.map((e) => e.id)),
     [legalEntityId, entities],
   );
+  // Toleransen slås opp per linje, mot linjens EGET selskap.
   const toleranceForEntity = useMatchTolerancesByEntity(toleranceEntityIds);
-  const toleranceFor = useCallback(
-    (category?: string | null) => toleranceForEntity(toleranceEntityIds[0] ?? null, category),
-    [toleranceForEntity, toleranceEntityIds],
-  );
 
   const filters = useMemo(
     () => ({
@@ -386,16 +383,14 @@ export default function FakturaerInboxPage() {
       } else {
         // Kilden bestemmer hvem som kan hente linjene: Tripletex-import eller
         // uttrekk fra PDF-en. Det finnes ingen felles «hent linjer»-funksjon.
+        // Bare Tripletex kan hente linjer automatisk. Andre kilder må
+        // registrere linjene manuelt — knappen vises ikke for dem.
         const inv = invoices.find((i) => i.id === id);
-        if (inv?.source === "tripletex") {
-          const { error } = await supabase.functions.invoke("tripletex-import-invoice-lines", {
-            body: { legal_entity_id: inv.legal_entity_id, invoice_id: id, limit: 1 },
-          });
-          if (error) throw new Error(error.message);
-        } else {
-          const { error } = await supabase.functions.invoke("extract-invoice-from-pdf", { body: { invoice_id: id } });
-          if (error) throw new Error(error.message);
-        }
+        if (inv?.source !== "tripletex") throw new Error("Linjer kan bare hentes for Tripletex-fakturaer");
+        const { error } = await supabase.functions.invoke("tripletex-import-invoice-lines", {
+          body: { legal_entity_id: inv.legal_entity_id, invoice_id: id, limit: 1 },
+        });
+        if (error) throw new Error(error.message);
         toast.success("Linjer hentet");
       }
       refresh(id);
@@ -532,7 +527,7 @@ export default function FakturaerInboxPage() {
           <QueueTable
             lines={visibleLines}
             links={links}
-            toleranceFor={toleranceFor}
+            toleranceFor={toleranceForEntity}
             activeLineId={queue.activeId}
             selected={selected}
             onToggleSelect={(id, v) => setSelected((s) => ({ ...s, [id]: v }))}
@@ -594,7 +589,7 @@ export default function FakturaerInboxPage() {
         price_variance_pct: docLine.price_variance_pct,
         matched_name: docLine.matched_raw_material?.name ?? null,
       }}
-      tolerancePct={toleranceFor(docLine.matched_raw_material?.category ?? null)}
+      tolerancePct={toleranceForEntity(docLine.invoice.legal_entity_id, docLine.matched_raw_material?.category ?? null)}
       onClose={() => setDocOpen(false)}
       className="h-full"
     />
@@ -741,6 +736,7 @@ export default function FakturaerInboxPage() {
                 busyAction={busyInvoice?.id === inv.id ? busyInvoice.action : null}
                 onToggle={() => setExpandedId((cur) => (cur === inv.id ? null : inv.id))}
                 onFetchLines={() => void invoiceAction(inv.id, "fetch")}
+                onRegisterLines={() => navigate(`/ravarer/fakturaer/${inv.id}/registrer-linjer`)}
                 onRunMatch={() => void invoiceAction(inv.id, "match")}
                 onUnflag={() => void invoiceAction(inv.id, "unflag")}
                 onLinkCreditNote={() => setCreditNoteId(inv.id)}
