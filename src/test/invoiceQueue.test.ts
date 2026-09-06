@@ -13,6 +13,7 @@ import {
   invoiceActionBlockedReason,
 } from "@/fakturaer/lib/statusGuards";
 import { resolveTolerance, FALLBACK_TOLERANCE_PCT } from "@/fakturaer/hooks/useMatchTolerances";
+import { creditNoteOriginalRef } from "@/fakturaer/lib/inbox";
 
 const snap: QueueLineSnapshot = {
   raw_material_id: null,
