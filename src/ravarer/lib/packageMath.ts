@@ -53,3 +53,69 @@ export function computeBaseUnitsPerPackage(input: PackageMathInput): PackageMath
 
   return { ok: true, baseUnits: size * count * factor, factor, size, count };
 }
+
+/**
+ * Kontrakten for et forhåndsutfylt pakningsforslag (datablad, navnegjetting …).
+ *
+ * MERK skillet: `contentUnit` er INNHOLDSENHETEN («g», «ml», «kg»), mens
+ * `packageType` er emballasjen («sekk», «eske»). De to må aldri blandes —
+ * pakningsnedtrekket i dialogen inneholder bare emballasjetyper.
+ */
+export interface PackageFillSuggestion {
+  /** Størrelse per sub-enhet i innholdsenheten, f.eks. 500 (g). */
+  size: number | null;
+  /** Innholdsenheten størrelsen er oppgitt i. */
+  contentUnit: string | null;
+  /** Antall sub-enheter per pakning. Tom verdi tolkes som 1. */
+  count?: number | null;
+  /** Emballasjetype, kun hvis den faktisk er kjent. */
+  packageType?: string | null;
+}
+
+export type PackageFill =
+  | { kind: "converted"; units: number; note: string }
+  /** Forslaget vises, men uten en godkjent omregning — feltet fylles ikke ut. */
+  | { kind: "unconvertible"; note: string }
+  | { kind: "none" };
+
+function fmt(n: number): string {
+  return new Intl.NumberFormat("nb-NO", { maximumFractionDigits: 3 }).format(n);
+}
+
+/**
+ * Regner et forslag om til ANTALL GRUNNENHETER, som er det pakningsdialogen
+ * lagrer. 500 g fra et datablad på en kg-råvare skal bli 0,5 — ikke 500.
+ */
+export function resolvePackageFill(
+  suggestion: PackageFillSuggestion | null | undefined,
+  baseUnit: string | null | undefined,
+): PackageFill {
+  if (!suggestion) return { kind: "none" };
+  if (suggestion.size == null || !Number.isFinite(suggestion.size)) {
+    return {
+      kind: "unconvertible",
+      note: "Forslaget mangler en pakningsstørrelse. Fyll inn antall selv.",
+    };
+  }
+  const math = computeBaseUnitsPerPackage({
+    size: suggestion.size,
+    unit: suggestion.contentUnit,
+    count: suggestion.count ?? 1,
+    baseUnit,
+  });
+  if (!math.ok) {
+    const shown = `${fmt(suggestion.size)} ${suggestion.contentUnit ?? ""}`.trim();
+    return {
+      kind: "unconvertible",
+      note: `${math.error} Forslaget «${shown}» må vurderes manuelt.`,
+    };
+  }
+  const units = Number(math.baseUnits.toFixed(6));
+  const from = `${fmt(math.size)} ${suggestion.contentUnit ?? ""}`.trim();
+  const times = math.count !== 1 ? ` × ${fmt(math.count)}` : "";
+  return {
+    kind: "converted",
+    units,
+    note: `Forslag: ${from}${times} = ${fmt(units)} ${baseUnit ?? ""}`.trim(),
+  };
+}

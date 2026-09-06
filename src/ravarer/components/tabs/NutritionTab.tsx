@@ -62,7 +62,7 @@ export function NutritionTab({ rawMaterialId, registerSave }: Props) {
   const { data: allergens = [] } = useAllergens(rawMaterialId);
   const setAllergen = useSetAllergen();
 
-  const { draft, setDraft, dirty, hydrated } = useNutritionDraft(
+  const { draft, setDraft, dirty, hydrated, markSaved } = useNutritionDraft(
     rawMaterialId,
     existing,
     nutritionQuery.isSuccess,
@@ -166,11 +166,17 @@ export function NutritionTab({ rawMaterialId, registerSave }: Props) {
   const save = () => {
     if (!canWrite || !dirty || !hydrated || upsert.isPending) return;
     // Redigerer noen tallene fra Matvaretabellen eller et datablad, er kilden ikke lenger den.
-    upsert.mutate({
+    const sentDraft = draft;
+    const submitted: NutritionRow = {
       ...draft,
       source: sourceOnSave,
       raw_material_id: rawMaterialId,
       ...(becomesManual ? { verified_at: new Date().toISOString(), verified_by: user?.id ?? null } : {}),
+    };
+    upsert.mutate(submitted, {
+      // Serverraden er fasit: den bekreftes eksplisitt slik at et nytt
+      // tidsstempel eller en ny kilde ikke etterlater skjemaet som «ulagret».
+      onSuccess: (saved) => markSaved(saved, sentDraft),
     });
   };
   const saveRef = useRef(save);

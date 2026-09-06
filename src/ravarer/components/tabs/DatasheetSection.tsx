@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Upload, FileText, Loader2, Sparkles, History, AlertCircle } from "lucide-react";
+import { Upload, FileText, Loader2, Sparkles, History } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useDatasheets } from "@/ravarer/hooks/useDatasheets";
@@ -20,6 +20,7 @@ import { diffAllergens, normalizeAllergenCode } from "@/ravarer/lib/allergenDiff
 import { NUTRITION_NUMBER_FIELDS } from "@/ravarer/lib/nutritionSource";
 import { SetPackageDialog } from "@/ravarer/components/packages/SetPackageDialog";
 import type { PackageWorklistRow } from "@/ravarer/hooks/usePackageSizes";
+import type { PackageFillSuggestion } from "@/ravarer/lib/packageMath";
 
 const NUTRITION_LABELS: Record<string, string> = {
   energy_kj: "Energi (kJ)",
@@ -64,7 +65,7 @@ export function DatasheetSection({ rawMaterialId }: Props) {
   /** Fjerning av allergener er en matsikkerhetsbeslutning — aldri forhåndsvalgt. */
   const [allowRemovals, setAllowRemovals] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [packageSuggestion, setPackageSuggestion] = useState<{ size: number | null; unit: string | null } | null>(null);
+  const [packageSuggestion, setPackageSuggestion] = useState<PackageFillSuggestion | null>(null);
   const [packageDialogOpen, setPackageDialogOpen] = useState(false);
 
   const allergenDiff = extracted?.allergens
@@ -141,7 +142,11 @@ export function DatasheetSection({ rawMaterialId }: Props) {
       }
       const pkg = data.follow_ups?.package_suggestion;
       // Pakningen er ikke lagret — den må bekreftes i pakningsdialogen.
-      setPackageSuggestion(pkg ? { size: pkg.suggested?.size ?? null, unit: pkg.suggested?.unit ?? null } : null);
+      // Databladets størrelse er i innholdsenhet (500 g) — pakningsdialogen
+      // regner den om til grunnenheter selv.
+      setPackageSuggestion(
+        pkg ? { size: pkg.suggested?.size ?? null, contentUnit: pkg.suggested?.unit ?? null } : null,
+      );
       setExtracted(null);
       setDatasheetId(null);
       setAllowRemovals(false);
@@ -179,7 +184,7 @@ export function DatasheetSection({ rawMaterialId }: Props) {
 
   const toggle = (k: string) => {
     const n = new Set(accepted);
-    n.has(k) ? n.delete(k) : n.add(k);
+    if (n.has(k)) n.delete(k); else n.add(k);
     setAccepted(n);
   };
 
@@ -332,7 +337,7 @@ export function DatasheetSection({ rawMaterialId }: Props) {
           <span>
             Databladet foreslår pakning{" "}
             <span className="font-medium">
-              {packageSuggestion.size ?? "—"} {packageSuggestion.unit ?? ""}
+              {packageSuggestion.size ?? "—"} {packageSuggestion.contentUnit ?? ""}
             </span>
             . Dette er <span className="font-medium">ikke lagret</span> — bekreft i pakningsdialogen.
           </span>

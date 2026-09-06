@@ -68,9 +68,9 @@ export function useUpsertNutrition() {
         .select()
         .single();
       if (error) throw error;
-      return data;
+      return data as NutritionRow;
     },
-    onSuccess: (data: { raw_material_id: string }) => {
+    onSuccess: (data: NutritionRow) => {
       qc.invalidateQueries({ queryKey: ["raw_material_nutrition", data.raw_material_id] });
       toast.success("Næringsinnhold lagret");
     },

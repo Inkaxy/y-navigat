@@ -202,3 +202,69 @@ full næring, 2121 matvarer, søk «331-7», og retur fra råvarekort bevarer fi
   Matvaretabellen. Feil variant (juice vs. sukkerlake) — krever manuell gjennomgang.
 - Databladoppdateringen er fortsatt ikke transaksjonell (krever databaseendring).
 - Flere kjøpshendelser per råvare på samme faktura krever F2.
+
+## Etterkontroll av 2f9d885b — to regressjoner
+
+### 1. Vellykket lagring sto igjen som «endret» (bekreftet, rettet)
+`useNutritionDraft` sammenlignet HELE serverraden med `JSON.stringify`, inkludert
+`updated_at`, `verified_at` og `source`. Ved lagring sender `NutritionTab`
+`source: sourceOnSave` (Matvaretabellen → «manuell»), så serversvaret avvek alltid
+fra utkastet: `userEdited` ble sann, baseline flyttet til den nye raden UTEN å
+oppdatere utkastet, og skjemaet ble stående «ulagret» med falsk lagrevakt.
+
+Rettet i `src/ravarer/hooks/useNutritionDraft.ts`:
+- `EDITABLE_NUTRITION_FIELDS` + `sameEditableNutrition` — «endret» måles bare på
+  feltene brukeren fyller ut. Servermetadata alene endrer ingenting.
+- `markSaved(saved, sentDraft)`: eksplisitt bekreftelse av den lagrede serverraden.
+  Felt der utkastet har endret seg SIDEN lagringen startet beholdes (fortsatt
+  dirty), resten tas fra serverraden. Gjelder bare hvis råvaren ikke er byttet.
+- `superseded`: et forsinket/utdatert spørringssvar med de gamle verdiene ruller
+  ikke lagringen tilbake.
+- `src`-referansen hindrer at en ny tom rad settes på hver render (uendelig løkke).
+- `NutritionTab.save()` kaller `markSaved` i `onSuccess`; `useUpsertNutrition`
+  returnerer nå en typet `NutritionRow`.
+
+Tester (`src/ravarer/hooks/__tests__/useNutritionDraft.test.ts`, 4 nye):
+Matvaretabellen→manuell ved tallendring + nytt `updated_at` blir ren etter lagring
+(også etter refetch); redigering under pågående lagring forblir dirty og bevares;
+bytte av råvare under lagring hydrerer ikke den gamle raden; servermetadata alene
+er ikke en brukerendring.
+
+### 2. Databladets pakningsforslag kunne bli 500 kg (bekreftet, rettet)
+Pakningsrettingen i 2f9d885b dekket bare `Pakninger.tsx`. `DatasheetSection` sendte
+`ext.package_size_value`/`package_size_unit` rått videre, og `SetPackageDialog` gjorde
+`setUnits(String(suggestion.size))` — der feltet er ANTALL GRUNNENHETER. 500 g fra et
+datablad ble forhåndsutfylt som 500 kg. I tillegg ble innholdsenheten («g») satt inn i
+pakningsnedtrekket, som bare har emballasjetyper.
+
+Rettet med én kontrakt i `src/ravarer/lib/packageMath.ts`:
+- `PackageFillSuggestion { size, contentUnit, count?, packageType? }` — innholdsenhet
+  og emballasjetype er eksplisitt adskilt.
+- `resolvePackageFill(suggestion, baseUnit)` → `converted` (omregnet via `toBaseFactor`,
+  med forklarende tekst «500 g = 0,5 kg»), `unconvertible` (forslaget vises, feltet
+  fylles IKKE ut, ingen godkjent faktor) eller `none`.
+- `SetPackageDialog` bruker funksjonen, fyller pakningsnedtrekket kun fra `packageType`
+  når den finnes i `PACKAGE_UNIT_OPTIONS`, og viser omregningen/advarselen ved feltet.
+- `DatasheetSection` og `Pakninger.tsx` sender begge forslaget i innholdsenhet;
+  Pakninger regner ikke lenger om to ganger.
+- Forhåndsvisning, eksplisitt bekreftelse og angre er uendret — dialogen skriver
+  fortsatt bare via RPC-ene, aldri automatisk.
+
+Tester (`src/test/packageMath.test.ts`, 7 nye): 500 g → 0,5 på kg-vare, 500 ml → 0,5 på
+l-vare, 6 × 500 g → 3, ukjent enhet og masse-mot-volum gir ingen forhåndsgodkjent faktor,
+manglende størrelse fyller ingenting, uten forslag skjer ingenting.
+
+### Opprydding
+`AlertCircle`-importen og et `no-unused-expressions`-uttrykk i `DatasheetSection.tsx` er
+fjernet. De 7 gjenværende `any`-feilene i samme fil er i databladets ekstraksjonsobjekt
+og er ikke rørt (utenfor denne runden).
+
+### Verifisering (faktiske statuskoder)
+- `npm run typecheck` (tsc) — exit 0
+- `npx vitest run` — exit 0, 43 filer / **411 tester** (var 400; 11 nye)
+- `npm run build` — exit 0
+- `npx eslint` på berørte filer — exit 0 unntatt de 7 forhåndseksisterende `any`-feilene
+  i `DatasheetSection.tsx`
+
+Fortsatt ikke verifisert: levende database, edge-utrulling. Databladoppdateringen er
+fortsatt ikke transaksjonell.

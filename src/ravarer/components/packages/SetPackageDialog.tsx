@@ -19,6 +19,7 @@ import {
   type PackageWorklistRow,
   type PackageRpcResult,
 } from "@/ravarer/hooks/usePackageSizes";
+import { resolvePackageFill, type PackageFillSuggestion } from "@/ravarer/lib/packageMath";
 
 const PACKAGE_UNIT_OPTIONS = ["sekk", "kartong", "pall", "palleboks", "konteiner", "spann", "pakke", "flaske", "boks", "eske", "stk", "bulk"];
 
@@ -31,8 +32,12 @@ interface Props {
   row: PackageWorklistRow | null;
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  /** Forhåndsutfylt forslag, f.eks. fra et datablad. Kan alltid overstyres. */
-  suggestion?: { size: number | null; unit: string | null } | null;
+  /**
+   * Forhåndsutfylt forslag, f.eks. fra et datablad. Størrelsen oppgis i
+   * INNHOLDSENHET (500 g) og regnes her om til grunnenheter (0,5 kg).
+   * Kan alltid overstyres, og lagres aldri av seg selv.
+   */
+  suggestion?: PackageFillSuggestion | null;
 }
 
 export function SetPackageDialog({ row, open, onOpenChange, suggestion }: Props) {
@@ -44,6 +49,7 @@ export function SetPackageDialog({ row, open, onOpenChange, suggestion }: Props)
   const [reason, setReason] = useState("");
   const [preview, setPreview] = useState<PackageRpcResult | null>(null);
   const [supplierOpen, setSupplierOpen] = useState(false);
+  const [fillNote, setFillNote] = useState<{ text: string; ok: boolean } | null>(null);
 
   const previewMut = usePreviewPackage();
   const applyMut = useApplyPackage();
@@ -66,14 +72,32 @@ export function SetPackageDialog({ row, open, onOpenChange, suggestion }: Props)
     setReason("");
     setPreview(null);
     setSupplierOpen(false);
+    setFillNote(null);
   };
 
   // Et forslag fylles inn når dialogen åpnes, men lagres aldri av seg selv.
   useEffect(() => {
-    if (!open || !suggestion) return;
-    if (suggestion.size != null) setUnits(String(suggestion.size));
-    if (suggestion.unit) setPackageUnit(suggestion.unit);
-  }, [open, suggestion]);
+    if (!open) return;
+    if (!suggestion) {
+      setFillNote(null);
+      return;
+    }
+    // Emballasjetype er noe annet enn innholdsenhet: bare en kjent
+    // emballasjetype får lov til å fylle pakningsnedtrekket.
+    if (suggestion.packageType && PACKAGE_UNIT_OPTIONS.includes(suggestion.packageType)) {
+      setPackageUnit(suggestion.packageType);
+    }
+    const fill = resolvePackageFill(suggestion, row?.base_unit ?? null);
+    if (fill.kind === "converted") {
+      setUnits(String(fill.units));
+      setFillNote({ text: fill.note, ok: true });
+    } else if (fill.kind === "unconvertible") {
+      // Ukjent omregning: ingen forhåndsgodkjent faktor, feltet står tomt.
+      setFillNote({ text: fill.note, ok: false });
+    } else {
+      setFillNote(null);
+    }
+  }, [open, suggestion, row?.base_unit]);
 
   const handleOpenChange = (v: boolean) => {
     if (!v) reset();
@@ -156,6 +180,17 @@ export function SetPackageDialog({ row, open, onOpenChange, suggestion }: Props)
                   placeholder={isBulk ? `Bulk — faktureres per ${baseUnit}` : undefined}
                   autoFocus
                 />
+                {fillNote && !isBulk && (
+                  <p
+                    className={
+                      fillNote.ok
+                        ? "mt-1 text-xs text-ink-secondary"
+                        : "mt-1 text-xs text-warning"
+                    }
+                  >
+                    {fillNote.text}
+                  </p>
+                )}
                 {isBulk && (
                   <p className="mt-1 text-xs text-ink-secondary">
                     Bulk har ingen fast mengde per levering. Prisen regnes direkte per {baseUnit} fra fakturaen.
