@@ -236,12 +236,41 @@ export default function InvoiceDetailPage() {
                 <Flag className="h-4 w-4" /> Flagg for oppfølging
               </Button>
             )}
+            {data.status === "flagged" && canWrite && (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={unflagging}
+                className="gap-1.5"
+                onClick={async () => {
+                  setUnflagging(true);
+                  try {
+                    await unflagInvoice(data.id);
+                    invalidateInvoice(qc, data.id);
+                    toast.success("Flagget er fjernet — fakturaen er tilbake til gjennomgang");
+                  } catch (e) {
+                    toast.error(e instanceof Error ? e.message : "Kunne ikke fjerne flagget");
+                  } finally {
+                    setUnflagging(false);
+                  }
+                }}
+              >
+                {unflagging ? <Loader2 className="h-4 w-4 animate-spin" /> : <Flag className="h-4 w-4" />}
+                Fjern flagg
+              </Button>
+            )}
             {!isFinal && canReconcile && (
               <Button
                 size="sm"
                 onClick={() => setConfirmOpen(true)}
                 disabled={reviewLineCount > 0 || sumMismatch}
-                title={sumMismatch ? "Varelinjene stemmer ikke med fakturabeløpet" : undefined}
+                title={
+                  sumMismatch
+                    ? "Varelinjene stemmer ikke med fakturabeløpet"
+                    : reviewLineCount > 0
+                      ? `${reviewLineCount} linje(r) må behandles først`
+                      : undefined
+                }
                 className="gap-1.5"
               >
                 <CheckCircle2 className="h-4 w-4" /> Bekreft prismatch
