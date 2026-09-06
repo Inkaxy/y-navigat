@@ -123,6 +123,7 @@ export default function InvoiceDetailPage() {
           invoice_date: data.invoice_date,
           legal_entity_id: data.legal_entity_id,
           supplier_id: data.supplier_id,
+          status: data.status,
           source: data.source,
           source_document_url: data.source_document_url,
           total_amount: data.total_amount ?? null,
