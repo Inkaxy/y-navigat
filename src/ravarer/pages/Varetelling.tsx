@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,11 +16,20 @@ import { useRawMaterialUnitsFor, type RawMaterialUnitRow } from "@/ravarer/hooks
 import { useApplyRmStockCount, type CountResult } from "@/ravarer/hooks/useStockCount";
 import { UnitAmountRows, emptyRow, rowsToBase, type UnitAmountRow } from "@/ravarer/components/stock/UnitAmountRows";
 import { formatNok, formatNumber } from "@/ravarer/lib/constants";
+import { QueryState } from "@/components/common/QueryState";
 
 export default function Varetelling() {
   const { canWrite } = useRavarer();
-  const { data: rows = [], isLoading } = useAllStockStatus();
+  const stockQuery = useAllStockStatus();
+  const rows = useMemo(() => stockQuery.data ?? [], [stockQuery.data]);
   const unitsQuery = useRawMaterialUnitsFor(rows.map(r => r.raw_material_id));
+  // Feil fra begge kildene samles ett sted, med felles «Prøv igjen».
+  const loadError = stockQuery.error ?? unitsQuery.error;
+  const isLoading = stockQuery.isLoading || unitsQuery.isLoading;
+  const retryAll = () => {
+    void stockQuery.refetch();
+    void unitsQuery.refetch();
+  };
   const apply = useApplyRmStockCount();
 
   const [q, setQ] = useState("");
@@ -63,15 +72,33 @@ export default function Varetelling() {
     return sum + (counted - r.current_stock) * (r.current_cost_price ?? 0);
   }, 0);
 
+  // Lagrevakt: et påbegynt telleutkast skal ikke forsvinne ved en refresh.
+  const hasDraft = Object.keys(entries).length > 0;
+  useEffect(() => {
+    if (!hasDraft) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [hasDraft]);
+
   const submit = async () => {
+    if (apply.isPending) return;
     const lines = filled
       .map(r => ({ raw_material_id: r.raw_material_id, counted_base: countedBase(r) as number }))
       .filter(l => Number.isFinite(l.counted_base));
     if (lines.length === 0) return;
-    const res = await apply.mutateAsync({ lines, note: note.trim() || "Varetelling" });
-    setResult(res);
-    setEntries({});
-    setNote("");
+    try {
+      const res = await apply.mutateAsync({ lines, note: note.trim() || "Varetelling" });
+      setResult(res);
+      // Utkastet tømmes kun når tellingen faktisk ble bokført.
+      setEntries({});
+      setNote("");
+    } catch {
+      // Feilmeldingen vises av mutasjonen; utkastet beholdes slik det var.
+    }
   };
 
   const countUnitText = (r: AllStockRow) => {
@@ -125,12 +152,17 @@ export default function Varetelling() {
         </div>
       </Card>
 
-      {isLoading ? (
-        <Card className="flex items-center justify-center py-16 text-ink-secondary">
-          <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Laster lagerførte varer…
+      {isLoading || loadError || visible.length === 0 ? (
+        <Card className="p-6">
+          <QueryState
+            isLoading={isLoading}
+            error={loadError}
+            isEmpty={visible.length === 0}
+            onRetry={retryAll}
+            loadingText="Laster lagerførte varer…"
+            emptyText="Ingen lagerførte varer i utvalget."
+          />
         </Card>
-      ) : visible.length === 0 ? (
-        <Card className="py-16 text-center text-sm text-ink-secondary">Ingen lagerførte varer i utvalget.</Card>
       ) : (
         <div className="space-y-3">
           {visible.map(r => {
