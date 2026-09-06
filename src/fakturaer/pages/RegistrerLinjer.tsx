@@ -41,7 +41,7 @@ export default function RegistrerLinjerPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("invoices")
-        .select("id, invoice_number, source, lines_source, source_document_url, total_amount, total_vat, supplier:suppliers(name), legal_entity:legal_entities(legal_name)")
+        .select("id, invoice_number, status, source, lines_source, source_document_url, total_amount, total_vat, supplier:suppliers(name), legal_entity:legal_entities(legal_name)")
         .eq("id", id!)
         .single();
       if (error) throw error;
@@ -55,12 +55,18 @@ export default function RegistrerLinjerPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("invoice_lines")
-        .select("id, description, supplier_sku, quantity, unit, unit_price, total_amount, vat_rate, package_size, package_unit, count_per_package, line_number")
+        .select("id, description, supplier_sku, quantity, unit, unit_price, total_amount, vat_rate, package_size, package_unit, count_per_package, line_number, raw_material_id")
         .eq("invoice_id", id!)
         .order("line_number");
       if (error) throw error;
       return data;
     },
+  });
+
+  const matchedLineCount = (linesQ.data ?? []).filter((l) => l.raw_material_id).length;
+  const replaceCheck = canReplaceInvoiceLines({
+    status: invoiceQ.data?.status ?? "imported",
+    matchedLineCount,
   });
 
   useEffect(() => {
