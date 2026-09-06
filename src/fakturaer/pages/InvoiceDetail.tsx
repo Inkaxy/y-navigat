@@ -149,6 +149,7 @@ export default function InvoiceDetailPage() {
     : null;
 
   async function rerunAutoMatch() {
+    if (!data) return;
     setRematching(true);
     try {
       // Reset manual lines so the pipeline will re-evaluate them
@@ -170,6 +171,7 @@ export default function InvoiceDetailPage() {
   }
 
   async function fetchLinesFromPdf() {
+    if (!data) return;
     setFetchingLines(true);
     try {
       const { data: res, error } = await supabase.functions.invoke("tripletex-import-invoice-lines", {
