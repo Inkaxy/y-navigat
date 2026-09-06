@@ -296,6 +296,8 @@ export default function PakningerPage() {
           )}
         </>
       )}
+
+      <SetPackageDialog row={dialogRow} open={!!dialogRow} onOpenChange={(v) => !v && setDialogRow(null)} />
     </div>
   );
 }
