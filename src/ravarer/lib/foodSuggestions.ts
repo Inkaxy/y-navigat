@@ -116,24 +116,83 @@ export const AMBIGUITY_MARGIN = 0.08;
 /** Laveste tekstlikhet som kan kobles automatisk. */
 export const AUTO_LINK_MIN_CONFIDENCE = 0.8;
 
-const VARIANT_PATTERNS: { label: string; re: RegExp }[] = [
-  { label: "fettinnhold", re: /(\d+([.,]\d+)?\s*%)/ },
-  { label: "fettinnhold", re: /\b(hel|helmelk|lett|lettmelk|ekstra lett|skummet|mager|fet|halvfet|full fat)\b/ },
-  { label: "tilberedning", re: /\b(ra|raa|kokt|ukokt|stekt|torket|torka|ristet|hermetisk|frossen|fersk|bakt|grillet|pasteurisert)\b/ },
-  { label: "salting", re: /\b(saltet|usaltet|lettsaltet|uten salt|med salt)\b/ },
-  { label: "gluten", re: /\b(glutenfri|glutenfritt|uten gluten)\b/ },
-  { label: "sukker", re: /\b(sukret|usukret|uten sukker|sukkerfri)\b/ },
+/**
+ * Variantegenskaper med VERDI. Det holder ikke å vite at både råvaren og
+ * forslaget nevner «salting» — «usaltet» og «saltet» er motsatte varer.
+ */
+const VARIANT_WORDS: { label: string; value: string; words: string[] }[] = [
+  { label: "fettinnhold", value: "hel", words: ["hel", "helmelk", "full fat", "fet"] },
+  { label: "fettinnhold", value: "lett", words: ["lett", "lettmelk"] },
+  { label: "fettinnhold", value: "ekstra lett", words: ["ekstra lett"] },
+  { label: "fettinnhold", value: "skummet", words: ["skummet", "mager"] },
+  { label: "fettinnhold", value: "halvfet", words: ["halvfet"] },
+  { label: "tilberedning", value: "ra", words: ["ra", "raa", "ukokt"] },
+  { label: "tilberedning", value: "kokt", words: ["kokt"] },
+  { label: "tilberedning", value: "stekt", words: ["stekt", "grillet", "bakt", "ristet"] },
+  { label: "tilberedning", value: "torket", words: ["torket", "torka"] },
+  { label: "tilberedning", value: "hermetisk", words: ["hermetisk"] },
+  { label: "tilberedning", value: "frossen", words: ["frossen"] },
+  { label: "tilberedning", value: "fersk", words: ["fersk"] },
+  { label: "tilberedning", value: "pasteurisert", words: ["pasteurisert"] },
+  { label: "salting", value: "saltet", words: ["saltet", "med salt"] },
+  { label: "salting", value: "usaltet", words: ["usaltet", "uten salt"] },
+  { label: "salting", value: "lettsaltet", words: ["lettsaltet"] },
+  { label: "gluten", value: "glutenfri", words: ["glutenfri", "glutenfritt", "uten gluten"] },
+  { label: "sukker", value: "sukret", words: ["sukret"] },
+  { label: "sukker", value: "usukret", words: ["usukret", "uten sukker", "sukkerfri"] },
 ];
 
-/** Hvilke variantegenskaper en tekst omtaler. */
-export function variantMarkers(text: string | null | undefined): string[] {
+const PERCENT_RE = /(\d+(?:[.,]\d+)?)\s*%/g;
+
+function escapeRe(w: string): string {
+  return w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Variantegenskaper som `label` → verdier. «Melk 0,5 %» gir
+ * `fettinnhold → {"0.5 %"}`, «Smør, saltet» gir `salting → {"saltet"}`.
+ */
+export function variantAttributes(text: string | null | undefined): Map<string, Set<string>> {
+  const out = new Map<string, Set<string>>();
+  const raw = (text ?? "").toLowerCase();
   const n = normalizeForSearch(text ?? "");
-  if (!n) return [];
-  const out: string[] = [];
-  for (const p of VARIANT_PATTERNS) {
-    if (p.re.test(n) && !out.includes(p.label)) out.push(p.label);
+  if (!n) return out;
+
+  const add = (label: string, value: string) => {
+    const set = out.get(label) ?? new Set<string>();
+    set.add(value);
+    out.set(label, set);
+  };
+
+  // Prosent leses fra råteksten — normaliseringen fjerner både «,» og «%».
+  for (const m of raw.matchAll(PERCENT_RE)) {
+    add("fettinnhold", `${Number(m[1].replace(",", "."))} %`);
+  }
+  for (const entry of VARIANT_WORDS) {
+    for (const w of entry.words) {
+      if (new RegExp(`\\b${escapeRe(w)}\\b`).test(n)) {
+        add(entry.label, entry.value);
+        break;
+      }
+    }
   }
   return out;
+}
+
+/** Hvilke variantegenskaper en tekst omtaler (uten verdiene). */
+export function variantMarkers(text: string | null | undefined): string[] {
+  return [...variantAttributes(text).keys()];
+}
+
+function sameValues(a: Set<string> | undefined, b: Set<string> | undefined): boolean {
+  const av = [...(a ?? [])].sort();
+  const bv = [...(b ?? [])].sort();
+  return av.length === bv.length && av.every((v, i) => v === bv[i]);
+}
+
+function describe(set: Set<string> | undefined): string {
+  const v = [...(set ?? [])];
+  return v.length > 0 ? v.join("/") : "ikke oppgitt";
 }
 
 export interface SuggestionSafety {
@@ -162,14 +221,19 @@ export function assessSuggestions(
     };
   }
 
+  // Varianter må stemme BEGGE veier, og på verdi — ikke bare på kategori.
+  // «Smør usaltet» mot «Smør, saltet» nevner begge salting, men er ulike varer.
   const rmText = [rm.declaration_name ?? "", rm.name].join(" ");
-  const asked = variantMarkers(rmText);
-  const offered = variantMarkers(top.food_name);
-  const unmatched = offered.filter((m) => !asked.includes(m));
-  if (unmatched.length > 0) {
+  const asked = variantAttributes(rmText);
+  const offered = variantAttributes(top.food_name);
+  const labels = new Set([...asked.keys(), ...offered.keys()]);
+  for (const label of labels) {
+    const a = asked.get(label);
+    const o = offered.get(label);
+    if (sameValues(a, o)) continue;
     return {
       autoLinkAllowed: false,
-      reason: `«${top.food_name}» er en variant (${unmatched.join(", ")}) — velg selv`,
+      reason: `${label} stemmer ikke (råvare: ${describe(a)} · forslag: ${describe(o)}) — velg selv`,
     };
   }
 

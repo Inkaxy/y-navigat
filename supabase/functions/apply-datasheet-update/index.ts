@@ -17,6 +17,12 @@
 // bør ta over skrivingene når det åpnes for nye databaseobjekter.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { diffAllergens } from "../_shared/allergen-diff.ts";
+import {
+  mayRemoveAllergens,
+  preservedComponentNames,
+  replaceableComponentIds,
+  shouldWriteAppliedStatus,
+} from "../_shared/datasheet-apply-rules.ts";
 
 const NUTRITION_FIELDS = [
   "energy_kj", "energy_kcal", "fat_g", "saturated_fat_g",
@@ -162,8 +168,7 @@ Deno.serve(async (req) => {
         const diff = diffAllergens((oldAll ?? []) as { allergen: string; presence: string }[], ext.allergens);
         // Er noe i AI-forslaget ugyldig, kan vi ikke stole på at listen er
         // komplett — da fjernes ingenting, uansett hva brukeren huket av.
-        const extractionTrusted = diff.rejected.length === 0;
-        const mayRemove = accepts.has("allergen_removals") && extractionTrusted;
+        const mayRemove = mayRemoveAllergens(accepts, diff.rejected.length);
 
         for (const a of [...diff.added, ...diff.changed.map((c) => ({ allergen: c.allergen, presence: c.to }))]) {
           const { error: aErr } = await service.from("raw_material_allergens").upsert({
@@ -241,25 +246,27 @@ Deno.serve(async (req) => {
       // kobling erstattes.
       const { data: existingComps, error: compReadErr } = await service
         .from("raw_material_components")
-        .select("id, component_raw_material_id, primary_ingredient_name, sort_order")
+        .select("id, component_raw_material_id, primary_ingredient_name, sort_order, suggested_by_ai")
         .eq("parent_raw_material_id", rm.id);
       if (compReadErr) {
         failures.push(`komponenter (lesing): ${compReadErr.message}`);
       } else {
-        const linked = (existingComps ?? []).filter((c) => !!c.component_raw_material_id);
-        const replaceableIds = (existingComps ?? []).filter((c) => !c.component_raw_material_id).map((c) => c.id);
+        const existingComponents = existingComps ?? [];
+        const replaceableIds = replaceableComponentIds(existingComponents);
         let compsOk = true;
         if (replaceableIds.length > 0) {
           const { error: delErr } = await service.from("raw_material_components").delete().in("id", replaceableIds);
           if (delErr) { failures.push(`komponenter (opprydding): ${delErr.message}`); compsOk = false; }
         }
-        const linkedNames = new Set(
-          linked.map((c) => String(c.primary_ingredient_name ?? "").trim().toLowerCase()).filter(Boolean),
-        );
-        const offset = linked.length;
+        // Koblede rader og manuelle tekstkomponenter er menneskers arbeid og beholdes.
+        const keepNames = preservedComponentNames(existingComponents);
+        const offset = existingComponents.length - replaceableIds.length;
         // deno-lint-ignore no-explicit-any
         const rows = (ext.composite_components as any[])
-          .filter((c) => !linkedNames.has(String(c?.name ?? "").trim().toLowerCase()))
+          .filter((c) => {
+            const key = String(c?.name ?? "").trim().toLowerCase();
+            return !keepNames.has(key);
+          })
           .map((c, i) => ({
             parent_raw_material_id: rm.id,
             primary_ingredient_name: c.name,
@@ -360,12 +367,18 @@ Deno.serve(async (req) => {
     if (failures.length === 0) {
       const { error: unsetErr } = await service.from("raw_material_datasheets").update({ is_current: false })
         .eq("raw_material_id", rm.id).eq("is_current", true);
-      if (unsetErr) failures.push(`datablad (nullstille gjeldende): ${unsetErr.message}`);
-      const { error: statusErr } = await service.from("raw_material_datasheets").update({
-        status: "applied", is_current: true, raw_material_id: rm.id,
-      }).eq("id", ds.id);
-      if (statusErr) failures.push(`datablad (status): ${statusErr.message}`);
-      applied = failures.length === 0;
+      if (unsetErr) {
+        // Klarer vi ikke å nullstille forrige gjeldende datablad, skal vi heller ikke
+        // markere dette som anvendt — ellers ville to datablad stått som gjeldende.
+        failures.push(`datablad (nullstille gjeldende): ${unsetErr.message}`);
+      }
+      if (shouldWriteAppliedStatus(0, !!unsetErr)) {
+        const { error: statusErr } = await service.from("raw_material_datasheets").update({
+          status: "applied", is_current: true, raw_material_id: rm.id,
+        }).eq("id", ds.id);
+        if (statusErr) failures.push(`datablad (status): ${statusErr.message}`);
+        applied = failures.length === 0;
+      }
     }
 
     return json({
