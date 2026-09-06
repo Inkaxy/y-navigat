@@ -18,6 +18,7 @@ import { useSuppliers } from "@/ravarer/hooks/useSuppliers";
 import { useRawMaterials } from "@/ravarer/hooks/useRawMaterials";
 import { useRawMaterialUnits, useRawMaterialUnitsFor } from "@/ravarer/hooks/useRawMaterialUnits";
 import { useReceiptInvoices, useReceiptLines, useReceiptMovement, type ReceiptLine } from "@/ravarer/hooks/useGoodsReceipt";
+import { QueryState } from "@/components/common/QueryState";
 import { UnitAmountRows, emptyRow, rowsToBase, type UnitAmountRow } from "@/ravarer/components/stock/UnitAmountRows";
 import { formatDate, formatNok, formatNumber } from "@/ravarer/lib/constants";
 import { osloDateISOPlusDays, osloTodayISO } from "@/lib/osloDate";
@@ -34,7 +35,7 @@ export default function Varemottak() {
   const [manualOpen, setManualOpen] = useState(false);
 
   const { data: suppliers = [] } = useSuppliers();
-  const { data: invoices = [], isLoading } = useReceiptInvoices({
+  const invoicesQuery = useReceiptInvoices({
     fromDate,
     toDate,
     supplierId: supplierId === "all" ? null : supplierId,
