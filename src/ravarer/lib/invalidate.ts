@@ -74,6 +74,8 @@ const INVOICE_GLOBAL_KEYS: readonly string[] = [
   "fakturaer",
   "fakturaer-review-lines",
   "fakturaer-review-count",
+  "fakturaer-inbox",
+  "invoice-supplier-links",
 ];
 
 const INVOICE_SCOPED_KEYS: readonly string[] = [

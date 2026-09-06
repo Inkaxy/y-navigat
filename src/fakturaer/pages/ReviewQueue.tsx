@@ -20,10 +20,12 @@ import { useFakturaerLegalEntities } from "@/fakturaer/hooks/useFakturaerLegalEn
 import { useSuppliersFor } from "@/fakturaer/hooks/useSuppliersFor";
 import { useInboxInvoices } from "@/fakturaer/hooks/useInboxInvoices";
 import { useSupplierLinkContext } from "@/fakturaer/hooks/useSupplierLinkContext";
-import { useMatchTolerances } from "@/fakturaer/hooks/useMatchTolerances";
+import { useMatchTolerancesByEntity } from "@/fakturaer/hooks/useMatchTolerances";
 import { useFakturaer } from "@/fakturaer/context/FakturaerContext";
 import { MatchDrawer } from "@/fakturaer/components/MatchDrawer";
 import { CreateRawMaterialDialog } from "@/fakturaer/components/CreateRawMaterialDialog";
+import { BulkCreateRawMaterialsDialog } from "@/fakturaer/components/BulkCreateRawMaterialsDialog";
+import { LinkCreditNoteDialog } from "@/fakturaer/components/LinkCreditNoteDialog";
 import { NotARawMaterialDialog } from "@/fakturaer/components/NotARawMaterialDialog";
 import { SkuConflictDialog } from "@/fakturaer/components/SkuConflictDialog";
 import { ConfirmReconcileDialog } from "@/fakturaer/components/ConfirmReconcileDialog";
@@ -91,7 +93,10 @@ function shouldIgnoreShortcut(e: KeyboardEvent): boolean {
   const el = e.target as HTMLElement | null;
   if (!el) return false;
   if (el.isContentEditable) return true;
-  if (["INPUT", "TEXTAREA", "SELECT", "BUTTON"].includes(el.tagName)) return true;
+  if (["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName)) return true;
+  // En knapp med fokus skal bare svelge Enter og mellomrom — den er knappens
+  // egen aktivering. Alle andre hurtigtaster skal fortsatt virke.
+  if (el.closest("button") && (e.key === "Enter" || e.key === " ")) return true;
   if (el.closest('[role="combobox"], [role="dialog"], [role="menu"], [role="listbox"]')) return true;
   return false;
 }
@@ -112,8 +117,16 @@ export default function FakturaerInboxPage() {
 
   const { data: suppliers = [] } = useSuppliersFor(legalEntityId === "all" ? null : legalEntityId);
 
-  const toleranceEntityId = legalEntityId !== "all" ? legalEntityId : entities.length === 1 ? entities[0].id : null;
-  const { toleranceFor } = useMatchTolerances(toleranceEntityId);
+  // Hver faktura vurderes mot sitt eget selskaps toleranser.
+  const toleranceEntityIds = useMemo(
+    () => (legalEntityId !== "all" ? [legalEntityId] : entities.map((e) => e.id)),
+    [legalEntityId, entities],
+  );
+  const toleranceForEntity = useMatchTolerancesByEntity(toleranceEntityIds);
+  const toleranceFor = useCallback(
+    (category?: string | null) => toleranceForEntity(toleranceEntityIds[0] ?? null, category),
+    [toleranceForEntity, toleranceEntityIds],
+  );
 
   const filters = useMemo(
     () => ({
@@ -123,20 +136,29 @@ export default function FakturaerInboxPage() {
     [legalEntityId, supplierId],
   );
 
-  const invoicesQuery = useInboxInvoices({ ...filters, onlyReady }, toleranceFor);
+  const invoicesQuery = useInboxInvoices({ ...filters, onlyReady }, toleranceForEntity);
   const invoices = useMemo(() => invoicesQuery.data ?? [], [invoicesQuery.data]);
 
-  const linesQuery = useReviewLines(filters);
-  const lines = useMemo(() => linesQuery.data?.rows ?? [], [linesQuery.data]);
-
-  const links = useSupplierLinkContext(invoices.map((i) => i.supplier_id));
-
   // Ekspandert faktura — innboksen viser linjene for én faktura om gangen.
+  const [lineLimit, setLineLimit] = useState(200);
   const [expandedId, setExpandedId] = useState<string | null>(searchParams.get("faktura"));
   useEffect(() => {
     const wanted = searchParams.get("faktura");
     if (wanted) setExpandedId(wanted);
   }, [searchParams]);
+
+  // Når et fakturakort er åpent henter vi bare den fakturaens linjer.
+  // Listen over «alle linjer» har et tak slik at spørringen holder seg rask.
+  const linesQuery = useReviewLines({
+    ...filters,
+    invoiceId: expandedId,
+    onlyReady,
+    limit: expandedId ? null : lineLimit,
+  });
+  const lines = useMemo(() => linesQuery.data?.rows ?? [], [linesQuery.data]);
+  const hasMoreLines = !expandedId && !!linesQuery.data?.hasMore;
+
+  const links = useSupplierLinkContext(invoices.map((i) => i.supplier_id));
 
   const visibleLines = useMemo(() => {
     const scoped = expandedId ? lines.filter((l) => l.invoice_id === expandedId) : lines;
@@ -173,8 +195,11 @@ export default function FakturaerInboxPage() {
   const [notRmOpen, setNotRmOpen] = useState(false);
   const [conflictOpen, setConflictOpen] = useState(false);
   const [reconcileId, setReconcileId] = useState<string | null>(null);
+  const [bulkCreateOpen, setBulkCreateOpen] = useState(false);
+  const [creditNoteId, setCreditNoteId] = useState<string | null>(null);
   const [busyInvoice, setBusyInvoice] = useState<{ id: string; action: string } | null>(null);
-  const anyDialogOpen = matchOpen || createOpen || notRmOpen || conflictOpen || !!reconcileId;
+  const anyDialogOpen =
+    matchOpen || createOpen || notRmOpen || conflictOpen || !!reconcileId || bulkCreateOpen || !!creditNoteId;
 
   // Dokumentpanel
   const [docOpen, setDocOpen] = useState<boolean>(() => localStorage.getItem(LS_OPEN) === "1");
@@ -334,11 +359,9 @@ export default function FakturaerInboxPage() {
   }
 
   function bulkCreate() {
-    const first = selectedLines[0];
-    if (!first) return;
-    // Opprettelse krever felt per linje — vi åpner dialogen for den første og
-    // holder resten valgt slik at brukeren kan gå videre.
-    openDialog("create", first);
+    if (selectedLines.length === 0) return;
+    // Én dialog med én rad per valgt linje — alt opprettes i samme operasjon.
+    setBulkCreateOpen(true);
   }
 
   // --- Fakturahandlinger ---------------------------------------------------
@@ -352,8 +375,18 @@ export default function FakturaerInboxPage() {
         await unflagInvoice(id);
         toast.success("Flagget er fjernet");
       } else {
-        const { error } = await supabase.functions.invoke("extract-invoice-lines", { body: { invoice_id: id } });
-        if (error) throw new Error(error.message);
+        // Kilden bestemmer hvem som kan hente linjene: Tripletex-import eller
+        // uttrekk fra PDF-en. Det finnes ingen felles «hent linjer»-funksjon.
+        const inv = invoices.find((i) => i.id === id);
+        if (inv?.source === "tripletex") {
+          const { error } = await supabase.functions.invoke("tripletex-import-invoice-lines", {
+            body: { legal_entity_id: inv.legal_entity_id, invoice_id: id, limit: 1 },
+          });
+          if (error) throw new Error(error.message);
+        } else {
+          const { error } = await supabase.functions.invoke("extract-invoice-from-pdf", { body: { invoice_id: id } });
+          if (error) throw new Error(error.message);
+        }
         toast.success("Linjer hentet");
       }
       refresh(id);
@@ -512,6 +545,14 @@ export default function FakturaerInboxPage() {
           />
         </QueryState>
       </Card>
+
+      {hasMoreLines && (
+        <div className="flex justify-center">
+          <Button variant="outline" size="sm" onClick={() => setLineLimit((n) => n + 200)}>
+            Vis flere linjer
+          </Button>
+        </div>
+      )}
     </div>
   );
 
@@ -693,6 +734,7 @@ export default function FakturaerInboxPage() {
                 onFetchLines={() => void invoiceAction(inv.id, "fetch")}
                 onRunMatch={() => void invoiceAction(inv.id, "match")}
                 onUnflag={() => void invoiceAction(inv.id, "unflag")}
+                onLinkCreditNote={() => setCreditNoteId(inv.id)}
                 onReconcile={() => setReconcileId(inv.id)}
                 onOpen={() => navigate(`/ravarer/fakturaer/${inv.id}`)}
               />
@@ -746,13 +788,39 @@ export default function FakturaerInboxPage() {
         line={dialogLine}
         onAcceptedNext={() => {
           if (dialogLine) dispatch({ type: "resolved", id: dialogLine.id, snapshot: snapshotOf(dialogLine), label: dialogLine.description ?? "linjen" });
-          const nextId = queue.ids.find((id) => id !== dialogLine?.id);
+          // Neste linje i køen — ikke tilbake til den første.
+          const idx = dialogLine ? queue.ids.indexOf(dialogLine.id) : -1;
+          const nextId = queue.ids.slice(idx + 1).find((id) => id !== dialogLine?.id) ?? undefined;
           const next = visibleLines.find((l) => l.id === nextId) ?? null;
           setDialogLine(next);
           if (!next) setMatchOpen(false);
         }}
       />
       <CreateRawMaterialDialog open={createOpen} onOpenChange={setCreateOpen} line={dialogLine} />
+      <BulkCreateRawMaterialsDialog
+        open={bulkCreateOpen}
+        onOpenChange={setBulkCreateOpen}
+        lines={selectedLines}
+        onDone={() => setSelected({})}
+      />
+      <LinkCreditNoteDialog
+        open={!!creditNoteId}
+        onOpenChange={(v) => {
+          if (!v) setCreditNoteId(null);
+        }}
+        creditNote={(() => {
+          const inv = invoices.find((i) => i.id === creditNoteId);
+          return inv
+            ? {
+                id: inv.id,
+                invoice_number: inv.invoice_number,
+                supplier_id: inv.supplier_id,
+                legal_entity_id: inv.legal_entity_id,
+                notes: inv.notes,
+              }
+            : null;
+        })()}
+      />
       <NotARawMaterialDialog open={notRmOpen} onOpenChange={setNotRmOpen} line={dialogLine} />
       <SkuConflictDialog
         open={conflictOpen}

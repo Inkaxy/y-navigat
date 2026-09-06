@@ -70,6 +70,9 @@ export function canReplaceInvoiceLines(input: {
   if (input.status === "reconciled") {
     return { allowed: false, requiresConfirm: false, reason: "Fakturaen er avstemt og kan ikke endres." };
   }
+  if (input.status === "flagged") {
+    return { allowed: false, requiresConfirm: false, reason: "Fakturaen er flagget. Fjern flagget først." };
+  }
   if (input.matchedLineCount > 0) {
     return {
       allowed: false,

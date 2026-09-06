@@ -14,7 +14,8 @@ import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
 import { ITEM_TYPES, defaultCategoryFor, type ItemType } from "@/ravarer/lib/itemTypes";
 import { CategorySelectItems, NEW_CATEGORY_VALUE } from "@/ravarer/components/CategorySelectItems";
 import { InvoiceDocumentButton } from "@/fakturaer/components/InvoiceDocumentButton";
-import { CANONICAL_BASE_UNITS, CANONICAL_PACKAGE_UNITS, fmtNum, normalizeUnit, parseDecimal, resolveLineCost } from "@/fakturaer/lib/units";
+import { createRawMaterialFromLine } from "@/fakturaer/lib/createRawMaterial";
+import { CANONICAL_BASE_UNITS, CANONICAL_PACKAGE_UNITS, deriveLinePackage, fmtNum, normalizeUnit, parseDecimal, resolveLineCost } from "@/fakturaer/lib/units";
 
 interface Props {
   open: boolean;
@@ -22,6 +23,21 @@ interface Props {
   line: ReviewLineRow | null;
   /** Kalles når råvaren faktisk ble opprettet (ikke ved avbryt). */
   onCreated?: (rawMaterialId: string) => void;
+}
+
+/**
+ * Forslag til varenummer: leverandørens eget nummer når det finnes, ellers
+ * en lesbar variant av navnet. Alltid redigerbart — aldri tilfeldig.
+ */
+function suggestSku(supplierSku: string | null | undefined, description: string | null | undefined): string {
+  const fromSupplier = supplierSku?.trim();
+  if (fromSupplier) return fromSupplier.toUpperCase();
+  return (description ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-ZÆØÅ0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 32);
 }
 
 /** Basisenhet utledet av fakturaenheten — kun et forslag brukeren kan overstyre. */
@@ -43,16 +59,27 @@ export function CreateRawMaterialDialog({ open, onOpenChange, line, onCreated }:
   const [packageUnit, setPackageUnit] = useState<string>("");
   const [busy, setBusy] = useState(false);
   const [itemType, setItemType] = useState<ItemType>("ravare");
+  const [sku, setSku] = useState("");
+  const [supplierSku, setSupplierSku] = useState("");
 
   useEffect(() => {
     if (!line || !open) return;
     setItemType("ravare");
     setName(line.description ?? "");
     setBaseUnit(inferBaseUnit(line.unit));
+    setSupplierSku(line.supplier_sku ?? "");
+    setSku(suggestSku(line.supplier_sku, line.description));
     // NB: line.quantity er ANTALL pakninger på fakturaen — ikke pakningsstørrelsen.
-    // Pakningsstørrelsen må fylles inn manuelt (f.eks. 25 kg pr sekk).
-    setPackageSize("");
-    setPackageUnit(normalizeUnit(line.unit) ?? "");
+    // Pakningen tolkes fra linjens egne felter eller varenavnet; står det
+    // ingenting der, må brukeren fylle den inn selv.
+    const pkg = deriveLinePackage({
+      package_size: line.package_size,
+      package_unit: line.package_unit,
+      count_per_package: line.count_per_package,
+      description: line.description,
+    });
+    setPackageSize(pkg ? String(pkg.size) : "");
+    setPackageUnit(pkg?.unit ?? normalizeUnit(line.unit) ?? "");
     setCategory("");
     setNewCategory(false);
   }, [line, open]);
@@ -96,6 +123,7 @@ export function CreateRawMaterialDialog({ open, onOpenChange, line, onCreated }:
   // Alt som mangler — pakning, beløp eller basisenhet — skal sperre opprettelsen.
   const blockedByInput = !!cost?.needsInput;
   const parsedPackageSize = parseDecimal(packageSize);
+  const canSubmit = !!name.trim() && !!category.trim() && !!sku.trim() && !blockedByInput;
 
   useEffect(() => {
     if (needsPackage) sizeInputRef.current?.focus();
@@ -103,75 +131,23 @@ export function CreateRawMaterialDialog({ open, onOpenChange, line, onCreated }:
 
   async function submit() {
     if (!line || !name.trim() || !category.trim()) { toast.error("Navn og kategori er påkrevd"); return; }
+    if (!sku.trim()) { toast.error("Varenummer er påkrevd"); return; }
     setBusy(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      const nowIso = new Date().toISOString();
-
-      // 1) Raw material
-      const skuGen = (line.supplier_sku?.trim() || name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 32)) + "-" + Math.random().toString(36).slice(2, 6);
-      const { data: rm, error: rmErr } = await supabase.from("raw_materials").insert({
-        legal_entity_id: line.invoice.legal_entity_id,
-        sku: skuGen,
-        name: name.trim(), category: category.trim(), base_unit: baseUnit,
-        item_type: itemType,
-        package_size: parsedPackageSize,
-        package_unit: packageUnit || null,
-        current_cost_price: pricePerBase, price_source: "invoice", price_updated_at: nowIso,
-        base_units_per_package: cost?.baseUnitsPerPackage ?? null,
-        primary_supplier_id: line.invoice.supplier_id, is_active: true, created_by: user?.id,
-      } as never).select().single();
-      if (rmErr) throw rmErr;
-
-      // 2) raw_material_suppliers
-      const { data: rms, error: rmsErr } = await supabase.from("raw_material_suppliers").insert({
-        raw_material_id: rm.id, supplier_id: line.invoice.supplier_id, is_primary: true,
-        supplier_sku: line.supplier_sku, supplier_product_name: line.description,
-        // Avtaleprisen er forbeholdt framforhandlede priser — dialogen rører den ikke.
-        package_size: parsedPackageSize, package_unit: packageUnit || null,
-        base_units_per_package: cost?.baseUnitsPerPackage ?? null,
-        ...(parsedPackageSize != null ? { package_confirmed_at: nowIso, package_confirmed_by: user?.id ?? null } : {}),
-        last_invoice_price: pricePerBase, last_invoice_date: line.invoice.invoice_date,
-      }).select().single();
-      if (rmsErr) throw rmsErr;
-
-      // 3) Aliases
-      const aliases: Array<{
-        raw_material_supplier_id: string;
-        alias_type: "supplier_sku" | "product_name";
-        alias_value: string;
-        status: "confirmed";
-        confirmed_by?: string;
-        confirmed_at: string;
-        first_seen_invoice_id: string;
-      }> = [];
-      if (line.supplier_sku) aliases.push({
-        raw_material_supplier_id: rms.id, alias_type: "supplier_sku",
-        alias_value: line.supplier_sku, status: "confirmed",
-        confirmed_by: user?.id, confirmed_at: nowIso, first_seen_invoice_id: line.invoice_id,
+      const rawMaterialId = await createRawMaterialFromLine({
+        line,
+        name,
+        sku,
+        category,
+        baseUnit,
+        itemType,
+        supplierSku: supplierSku.trim() || null,
+        packageSize: parsedPackageSize,
+        packageUnit: packageUnit || null,
+        baseUnitsPerPackage: cost?.baseUnitsPerPackage ?? null,
+        pricePerBaseUnit: pricePerBase,
+        baseQuantity: cost?.baseQuantity ?? null,
       });
-      if (line.description) aliases.push({
-        raw_material_supplier_id: rms.id, alias_type: "product_name",
-        alias_value: line.description, status: "confirmed",
-        confirmed_by: user?.id, confirmed_at: nowIso, first_seen_invoice_id: line.invoice_id,
-      });
-      if (aliases.length) await supabase.from("raw_material_supplier_aliases").insert(aliases);
-
-      // 4) Prishistorikk — kun når vi faktisk har en pris per baseenhet.
-      if (pricePerBase != null) {
-        await supabase.from("raw_material_price_history").insert({
-          raw_material_id: rm.id, supplier_id: line.invoice.supplier_id, price: pricePerBase,
-          effective_date: line.invoice.invoice_date, source: "invoice", invoice_id: line.invoice_id, created_by: user?.id,
-        });
-      }
-
-      // 5) Match line
-      await supabase.from("invoice_lines").update({
-        raw_material_id: rm.id, match_confidence: "manual", requires_review: false,
-        review_reason: null, resolved_by: user?.id, resolved_at: nowIso,
-        // Dialogen setter ALDRI sin egen beregning som fasit for avviksovervåkingen.
-        price_per_base_unit: pricePerBase, base_quantity: cost?.baseQuantity ?? null,
-      }).eq("id", line.id);
 
       toast.success(`Råvare «${name}» opprettet`, { description: "Husk å fylle inn næringsinnhold senere." });
       qc.invalidateQueries({ queryKey: ["fakturaer-review-lines"] });
@@ -180,7 +156,7 @@ export function CreateRawMaterialDialog({ open, onOpenChange, line, onCreated }:
       qc.invalidateQueries({ queryKey: ["rm-categories"] });
       qc.invalidateQueries({ queryKey: ["raw-material-categories"] });
       qc.invalidateQueries({ queryKey: ["raw-materials"] });
-      onCreated?.(rm.id);
+      onCreated?.(rawMaterialId);
       onOpenChange(false);
     } catch (e: unknown) {
       showError("opprett-raavare", e, "Kunne ikke opprette råvaren");
@@ -223,6 +199,14 @@ export function CreateRawMaterialDialog({ open, onOpenChange, line, onCreated }:
             </div>
           </Field>
           <Field label="Navn"><Input value={name} onChange={(e) => setName(e.target.value)} /></Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Varenummer">
+              <Input value={sku} onChange={(e) => setSku(e.target.value)} placeholder="F.eks. HVETEMEL-25" />
+            </Field>
+            <Field label="Leverandørens varenummer">
+              <Input value={supplierSku} onChange={(e) => setSupplierSku(e.target.value)} placeholder="Står på fakturaen" />
+            </Field>
+          </div>
           <Field label="Kategori">
             {newCategory ? (
               <div className="flex gap-2">
@@ -355,7 +339,7 @@ export function CreateRawMaterialDialog({ open, onOpenChange, line, onCreated }:
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Avbryt</Button>
-          <Button onClick={submit} disabled={busy || blockedByInput}>{busy && <Loader2 className="h-4 w-4 animate-spin" />} Opprett</Button>
+          <Button onClick={submit} disabled={busy || !canSubmit}>{busy && <Loader2 className="h-4 w-4 animate-spin" />} Opprett</Button>
         </DialogFooter>
 
       </DialogContent>

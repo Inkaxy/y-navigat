@@ -53,6 +53,8 @@ describe("invalidateInvoice", () => {
     expect(flat).toContain("invoice-lines|inv-1");
     expect(flat).toContain("fakturaer-review-lines");
     expect(flat).toContain("fakturaer-review-count");
+    expect(flat).toContain("fakturaer-inbox");
+    expect(flat).toContain("invoice-supplier-links");
     expect(calls).toHaveLength(invoiceQueryKeys("inv-1").length);
   });
 });

@@ -87,9 +87,16 @@ export default function MatchToleranserPage() {
 
   const saveSettings = useMutation({
     mutationFn: async (patch: Record<string, number | boolean | null>) => {
-      const { error } = await supabase
-        .from("invoice_match_settings")
-        .upsert({ legal_entity_id: legalEntityId, ...patch }, { onConflict: "legal_entity_id" });
+      const { data: auth } = await supabase.auth.getUser();
+      const { error } = await supabase.from("invoice_match_settings").upsert(
+        {
+          legal_entity_id: legalEntityId,
+          ...patch,
+          updated_at: new Date().toISOString(),
+          updated_by: auth.user?.id ?? null,
+        },
+        { onConflict: "legal_entity_id" },
+      );
       if (error) throw error;
     },
     onSuccess: () => {
