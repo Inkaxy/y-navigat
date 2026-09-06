@@ -280,15 +280,37 @@ export default function RegistrerLinjerPage() {
             )}
           </div>
 
+          {!replaceCheck.allowed && (
+            <p className="rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-warning">
+              {replaceCheck.reason}
+            </p>
+          )}
+
           <div className="flex justify-end gap-2 border-t border-border pt-3">
             <Button variant="outline" onClick={() => navigate(`/ravarer/fakturaer/${id}`)} disabled={busy}>Avbryt</Button>
-            <Button onClick={save} disabled={busy} className="gap-2">
+            <Button onClick={requestSave} disabled={busy || !replaceCheck.allowed} className="gap-2">
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
               Lagre linjer
             </Button>
           </div>
         </Card>
       </div>
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Erstatte alle linjer?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {replaceCheck.reason ??
+                "Alle eksisterende linjer på fakturaen slettes og erstattes med det du har registrert her."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Avbryt</AlertDialogCancel>
+            <AlertDialogAction onClick={() => void save()}>Erstatt linjene</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
