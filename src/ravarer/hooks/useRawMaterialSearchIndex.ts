@@ -100,6 +100,7 @@ export function useRawMaterialSearchIndex() {
       const linksByRawMaterial = new Map<string, SupplierLinkIndexRow[]>();
       for (const l of links) {
         const row: SupplierLinkIndexRow = {
+          id: l.id,
           supplierId: l.supplier_id,
           supplierSku: l.supplier_sku,
           supplierProductName: l.supplier_product_name,
