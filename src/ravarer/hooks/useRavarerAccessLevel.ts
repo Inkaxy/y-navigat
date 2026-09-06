@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { APP_CODE } from "@/ravarer/lib/constants";
 
@@ -12,7 +12,7 @@ export type AccessLevel = "none" | "read" | "write" | "approve" | "admin";
 export function useRavarerAccessLevel(enabled = true) {
   // Nøkkelen må inneholde brukeren: uten den ville neste innlogging arve
   // forrige brukers tilgangsnivå fra cachen.
-  const { data: user } = useCurrentUser();
+  const { user } = useAuth();
   return useQuery({
     queryKey: ["ravarer-access-level", user?.id ?? null],
     enabled,
