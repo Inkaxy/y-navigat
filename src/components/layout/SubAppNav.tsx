@@ -79,6 +79,8 @@ interface DropdownItem {
   label: string;
   icon: LucideIcon;
   basePath: string;
+  /** Eksplisitte ruter som gjør nedtrekket aktivt (basePath-prefiks er ikke nok). */
+  matches?: string[];
   links: DropdownLink[];
 }
 type NavItem = SimpleItem | DropdownItem;
@@ -393,8 +395,10 @@ function NavBar({ appSlug, items }: { appSlug: string; items: NavItem[] }) {
     }
     return pathname === path || pathname.startsWith(path + "/");
   };
-  const isDropdownActive = (basePath: string) =>
-    pathname === basePath || pathname.startsWith(basePath + "/");
+  const isDropdownActive = (item: DropdownItem) => {
+    const paths = item.matches ?? [item.basePath];
+    return paths.some((p) => pathname === p || pathname.startsWith(p + "/"));
+  };
 
   const itemClass = (active: boolean) =>
     cn(
@@ -452,7 +456,7 @@ function NavBar({ appSlug, items }: { appSlug: string; items: NavItem[] }) {
               </li>
             );
           }
-          const active = isDropdownActive(item.basePath);
+          const active = isDropdownActive(item);
           return (
             <li key={item.label} className="shrink-0">
               <DropdownMenu>
@@ -492,14 +496,14 @@ function MobileSubNav({
   items: NavItem[];
   color: string;
   isLinkActive: (to: string) => boolean;
-  isDropdownActive: (basePath: string) => boolean;
+  isDropdownActive: (item: DropdownItem) => boolean;
 }) {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
 
   let current: { label: string; icon: LucideIcon } | null = null;
   for (const item of items) {
-    if (item.kind === "link" ? isLinkActive(item.to) : isDropdownActive(item.basePath)) {
+    if (item.kind === "link" ? isLinkActive(item.to) : isDropdownActive(item)) {
       current = { label: item.label, icon: item.icon };
       break;
     }
