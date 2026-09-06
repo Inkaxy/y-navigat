@@ -549,23 +549,37 @@ export default function VarelistePage() {
               </Button>
             ))}
             {savedViewsPref.value.map((v) => (
-              <Button
+              <span
                 key={v.id}
-                size="sm"
-                variant="outline"
-                className="h-7 rounded-full px-3 text-xs"
-                onClick={() => applySavedView(v)}
-                onDoubleClick={() =>
-                  savedViewsPref.setValue(savedViewsPref.value.filter((x) => x.id !== v.id))
-                }
-                title="Klikk for å bruke, dobbeltklikk for å slette"
+                className="inline-flex h-7 items-center gap-0.5 rounded-full border border-border pl-3 pr-1 text-xs"
               >
-                {v.name}
-              </Button>
+                <button
+                  type="button"
+                  className="hover:underline"
+                  onClick={() => applySavedView(v)}
+                >
+                  {v.name}
+                </button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-5 w-5 rounded-full"
+                  aria-label={`Slett visningen ${v.name}`}
+                  onClick={() => deleteSavedView(v.id)}
+                >
+                  <X className="h-3 w-3" aria-hidden="true" />
+                </Button>
+              </span>
             ))}
-            <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={saveCurrentView}>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 px-2 text-xs"
+              onClick={() => setSaveViewOpen(true)}
+            >
               Lagre visning
             </Button>
+
           </div>
 
           <p className="mt-2 text-xs text-muted-foreground">
