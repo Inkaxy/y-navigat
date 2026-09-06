@@ -46,6 +46,7 @@ export default function RegistrerLinjerPage() {
   const [lines, setLines] = useState<Line[]>([]);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const invoiceQ = useQuery({
     queryKey: ["invoice-for-lines", id],
@@ -165,7 +166,7 @@ export default function RegistrerLinjerPage() {
       const { error: invErr } = await supabase
         .from("invoices")
         .update({
-          lines_source: "manual_entry",
+          lines_source: "manual",
           status: "imported",
           lines_sum_excl_vat: sumCheck.lines_sum_excl_vat,
           lines_sum_variance_pct: sumCheck.lines_sum_variance_pct,
@@ -181,8 +182,8 @@ export default function RegistrerLinjerPage() {
       try { await supabase.functions.invoke("match-invoice-lines", { body: { invoice_id: id } }); } catch { /* ignore */ }
 
       toast.success("Linjer lagret");
-      qc.invalidateQueries({ queryKey: ["invoice-lines", id] });
-      navigate(`/ravarer/fakturaer/${id}`);
+      invalidateInvoice(qc, id);
+      navigate(`/ravarer/fakturaer/til-behandling?faktura=${id}`);
     } catch (e: any) {
       toast.error(`Lagring feilet: ${e?.message ?? e}`);
     } finally {
