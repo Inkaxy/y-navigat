@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useUpdateRawMaterial, type RawMaterialRow } from "@/ravarer/hooks/useRawMaterials";
 import { useSuppliers } from "@/ravarer/hooks/useSuppliers";
@@ -14,6 +14,39 @@ import { CategorySelectItems } from "@/ravarer/components/CategorySelectItems";
 import { categoryOptions } from "@/ravarer/lib/categories";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { RecalcHistory } from "@/ravarer/components/packages/RecalcHistory";
+import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
+import { UnsavedChangesDialog } from "@/components/common/UnsavedChangesDialog";
+
+/** Felt som redigeres i denne fanen. Lager styres i lagerkortet. */
+const EDITABLE_FIELDS = [
+  "sku",
+  "name",
+  "declaration_name",
+  "description",
+  "category",
+  "categories",
+  "base_unit",
+  "package_size",
+  "package_unit",
+  "base_units_per_package",
+  "current_cost_price",
+  "agreed_price",
+  "is_active",
+  "is_packaging",
+  "primary_supplier_id",
+] as const satisfies readonly (keyof RawMaterialRow)[];
+
+type EditableField = (typeof EDITABLE_FIELDS)[number];
+
+function changedFields(draft: RawMaterialRow, rm: RawMaterialRow): Partial<RawMaterialRow> {
+  const patch: Partial<RawMaterialRow> = {};
+  for (const key of EDITABLE_FIELDS) {
+    if (JSON.stringify(draft[key]) !== JSON.stringify(rm[key])) {
+      (patch as Record<EditableField, unknown>)[key] = draft[key];
+    }
+  }
+  return patch;
+}
 
 interface Props {
   rm: RawMaterialRow;
@@ -24,28 +57,28 @@ export function OverviewTab({ rm }: Props) {
   const update = useUpdateRawMaterial();
   const { data: suppliers = [] } = useSuppliers();
   const [draft, setDraft] = useState<RawMaterialRow>(rm);
-  const dirty = JSON.stringify(draft) !== JSON.stringify(rm);
+  const patch = useMemo(() => changedFields(draft, rm), [draft, rm]);
+  const dirty = Object.keys(patch).length > 0;
+
+  // Resynk når råvaren er oppdatert et annet sted (f.eks. telling eller
+  // pakningsomregning) — men aldri oppå ulagret arbeid.
+  const dirtyRef = useRef(dirty);
+  dirtyRef.current = dirty;
+  useEffect(() => {
+    if (!dirtyRef.current) setDraft(rm);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rm.updated_at, rm.id]);
+
+  const guard = useUnsavedChangesGuard(dirty);
 
   const save = async () => {
+    if (!dirty) return;
     await update.mutateAsync({
       id: rm.id,
-      sku: draft.sku,
-      name: draft.name,
-      declaration_name: draft.declaration_name?.trim() ? draft.declaration_name.trim() : null,
-      description: draft.description,
-      category: draft.category,
-      categories: draft.categories ?? [],
-      base_unit: draft.base_unit,
-      package_size: draft.package_size,
-      package_unit: draft.package_unit,
-      base_units_per_package: draft.base_units_per_package,
-      current_cost_price: draft.current_cost_price,
-      agreed_price: draft.agreed_price,
-      current_stock: draft.current_stock,
-      min_stock: draft.min_stock,
-      is_active: draft.is_active,
-      is_packaging: draft.is_packaging,
-      primary_supplier_id: draft.primary_supplier_id,
+      ...patch,
+      ...(patch.declaration_name !== undefined
+        ? { declaration_name: draft.declaration_name?.trim() ? draft.declaration_name.trim() : null }
+        : {}),
     });
   };
 
@@ -215,20 +248,6 @@ export function OverviewTab({ rm }: Props) {
         </div>
       </Card>
 
-      <Card className="p-5 space-y-4">
-        <h3 className="text-base font-semibold">Lager</h3>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <Label>Beholdning ({draft.base_unit})</Label>
-            <Input type="number" step="0.01" value={draft.current_stock} onChange={e => setDraft(d => ({ ...d, current_stock: Number(e.target.value || 0) }))} disabled={!canWrite} />
-          </div>
-          <div>
-            <Label>Min. beholdning</Label>
-            <Input type="number" step="0.01" value={draft.min_stock ?? ""} onChange={e => setDraft(d => ({ ...d, min_stock: e.target.value === "" ? null : Number(e.target.value) }))} disabled={!canWrite} />
-          </div>
-        </div>
-      </Card>
-
       <Card className="p-5 space-y-3">
         <h3 className="text-base font-semibold">Omregninger av kostpris</h3>
         <RecalcHistory rawMaterialId={rm.id} baseUnit={rm.base_unit} />
@@ -242,6 +261,8 @@ export function OverviewTab({ rm }: Props) {
           <Button disabled={!dirty || update.isPending} onClick={save}>Lagre endringer</Button>
         </div>
       )}
+
+      <UnsavedChangesDialog {...guard.dialogProps} />
     </div>
   );
 }

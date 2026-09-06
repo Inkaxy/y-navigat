@@ -1,5 +1,7 @@
 import { useState } from "react";
-import { useParams, useNavigate, useSearchParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
+import { useGuardedNavigate } from "@/providers/UnsavedGuardProvider";
+import { QueryState } from "@/components/common/QueryState";
 import { useRawMaterial, useRenameRawMaterial } from "@/ravarer/hooks/useRawMaterials";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
@@ -17,16 +19,31 @@ import { StockTrackingCard } from "@/ravarer/components/stock/StockTrackingCard"
 
 export default function RawMaterialDetail() {
   const { id } = useParams();
-  const navigate = useNavigate();
+  const navigate = useGuardedNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const tabFromUrl = searchParams.get("tab") ?? "overview";
-  const { data: rm, isLoading } = useRawMaterial(id);
+  const { data: rm, isLoading, isError, error, refetch } = useRawMaterial(id);
   const rename = useRenameRawMaterial();
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
 
-  if (isLoading) return <div className="flex justify-center p-12"><Loader2 className="h-5 w-5 animate-spin" /></div>;
-  if (!rm) return <Card className="p-8 text-center text-ink-secondary">Råvaren ble ikke funnet.</Card>;
+  if (isLoading || isError || !rm) {
+    return (
+      <QueryState
+        isLoading={isLoading}
+        isError={isError}
+        error={error}
+        onRetry={() => void refetch()}
+        scope="Råvaren"
+        isEmpty={!rm}
+        emptyTitle="Råvaren ble ikke funnet"
+        emptyDescription="Den kan være slettet, eller lenken kan være feil."
+        loadingFallback={<div className="flex justify-center p-12"><Loader2 className="h-5 w-5 animate-spin" /></div>}
+      >
+        {null}
+      </QueryState>
+    );
+  }
 
   const startEdit = () => { setNameDraft(rm.name); setEditingName(true); };
   const saveName = async () => {
