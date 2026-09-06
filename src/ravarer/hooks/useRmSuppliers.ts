@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 
 export interface RmSupplierRow {
   id: string;
@@ -64,10 +65,26 @@ export function useUpsertRmSupplier() {
         .select()
         .single();
       if (error) throw error;
-      return data as RmSupplierRow;
+      const row = data as RmSupplierRow;
+      // Primær må holdes i synk begge veier: øvrige koblinger nullstilles og
+      // råvaren peker på samme leverandør (kolonnen «Leverandør» i varelisten).
+      if (input.is_primary) {
+        const { error: othersErr } = await supabase
+          .from("raw_material_suppliers")
+          .update({ is_primary: false })
+          .eq("raw_material_id", row.raw_material_id)
+          .neq("id", row.id);
+        if (othersErr) throw othersErr;
+        const { error: rmErr } = await supabase
+          .from("raw_materials")
+          .update({ primary_supplier_id: row.supplier_id })
+          .eq("id", row.raw_material_id);
+        if (rmErr) throw rmErr;
+      }
+      return row;
     },
     onSuccess: (d) => {
-      qc.invalidateQueries({ queryKey: ["raw_material_suppliers", d.raw_material_id] });
+      invalidateRawMaterial(qc, d.raw_material_id);
       toast.success("Lagret");
     },
     onError: (e: any) => toast.error(`Kunne ikke lagre: ${e.message ?? e}`),
@@ -82,7 +99,7 @@ export function useDeleteRmSupplier() {
       if (error) throw error;
     },
     onSuccess: (_, vars) => {
-      qc.invalidateQueries({ queryKey: ["raw_material_suppliers", vars.raw_material_id] });
+      invalidateRawMaterial(qc, vars.raw_material_id);
       toast.success("Fjernet");
     },
     onError: (e: any) => toast.error(`Kunne ikke fjerne: ${e.message ?? e}`),
@@ -142,9 +159,7 @@ export function useAddPriceHistory() {
       }
     },
     onSuccess: (_d, vars) => {
-      qc.invalidateQueries({ queryKey: ["raw_material_price_history", vars.raw_material_id] });
-      qc.invalidateQueries({ queryKey: ["raw_material", vars.raw_material_id] });
-      qc.invalidateQueries({ queryKey: ["raw_materials"] });
+      invalidateRawMaterial(qc, vars.raw_material_id);
       toast.success("Pris registrert");
     },
     onError: (e: any) => toast.error(`Kunne ikke registrere: ${e.message ?? e}`),

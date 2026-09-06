@@ -130,7 +130,7 @@ export default function PakningerPage() {
       const el = e.target as HTMLElement | null;
       if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable)) return;
       const row = withSuggestion.find((r) => r.id === selectedId) ?? withSuggestion[0];
-      if (!row || !canWrite) return;
+      if (!row || !canWrite || savingId) return;
       const sug = suggestions?.get(row.id);
       if (!sug) return;
       e.preventDefault();
@@ -143,7 +143,7 @@ export default function PakningerPage() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [withSuggestion, selectedId, suggestions, canWrite]);
+  }, [withSuggestion, selectedId, suggestions, canWrite, savingId]);
 
   async function confirm(row: RawMaterialRow, values: EditValues) {
     const size = Number(values.size.replace(",", "."));
