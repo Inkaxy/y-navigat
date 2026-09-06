@@ -259,6 +259,9 @@ export interface BakersTotals {
   leavenPct: number;
   unitCount: number | null;
   doughPerUnitG: number | null;
+  /** Linjer som ikke kunne regnes om nøyaktig — beregningen er da ufullstendig. */
+  warnings: string[];
+  incomplete: boolean;
 }
 
 export function computeTotals(lines: BakersLine[], unitWeightGrams?: number | null): BakersTotals {
@@ -268,8 +271,13 @@ export function computeTotals(lines: BakersLine[], unitWeightGrams?: number | nu
   let saltG = 0;
   let leavenG = 0;
 
+  const warnings: string[] = [];
   for (const l of lines) {
-    const g = toGrams(l.quantity, l.unit);
+    const conv = lineToGrams(l);
+    const g = conv.grams;
+    if (!conv.exact) {
+      warnings.push(`${l.ingredient_name ?? l._rm?.name ?? "Ukjent råvare"}: ${conv.reason ?? "ufullstendig omregning"}`);
+    }
     totalDoughG += g;
     if (isFlourLine(l)) totalFlourG += g;
     totalWaterG += (g * waterPctForLine(l)) / 100;
@@ -289,6 +297,8 @@ export function computeTotals(lines: BakersLine[], unitWeightGrams?: number | nu
     leavenPct: pct(leavenG),
     unitCount: uw > 0 ? Math.floor(totalDoughG / uw) : null,
     doughPerUnitG: uw > 0 ? uw : null,
+    warnings,
+    incomplete: warnings.length > 0,
   };
 }
 
@@ -298,7 +308,7 @@ export function computePartSummary(partLines: BakersLine[], totalFlourG: number)
   let waterG = 0;
   let totalG = 0;
   for (const l of partLines) {
-    const g = toGrams(l.quantity, l.unit);
+    const g = lineToGrams(l).grams;
     totalG += g;
     if (isFlourLine(l)) flourG += g;
     waterG += (g * waterPctForLine(l)) / 100;
@@ -315,7 +325,7 @@ export function computePartSummary(partLines: BakersLine[], totalFlourG: number)
 /** Bakerprosent for én linje gitt samlet melvekt. */
 export function bakersPercentFor(line: BakersLine, totalFlourG: number): number {
   if (totalFlourG <= 0) return 0;
-  return (toGrams(line.quantity, line.unit) / totalFlourG) * 100;
+  return (lineToGrams(line).grams / totalFlourG) * 100;
 }
 
 /** Gram fra bakerprosent. */
