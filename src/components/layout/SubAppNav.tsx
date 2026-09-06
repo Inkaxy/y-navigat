@@ -10,6 +10,7 @@ import {
 import { useAccessibleApps } from "@/hooks/useAccessibleApps";
 import { useReviewCount } from "@/fakturaer/hooks/useReviewCount";
 import { useInvoiceAccess } from "@/ravarer/hooks/useInvoiceAccess";
+import { useRavarerAccessLevel } from "@/ravarer/hooks/useRavarerAccessLevel";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -81,6 +82,8 @@ interface DropdownItem {
   basePath: string;
   /** Eksplisitte ruter som gjør nedtrekket aktivt (basePath-prefiks er ikke nok). */
   matches?: string[];
+  /** Sum av varsler i nedtrekket, vist på selve knappen. */
+  badge?: number;
   links: DropdownLink[];
 }
 type NavItem = SimpleItem | DropdownItem;
@@ -489,7 +492,12 @@ function NavBar({ appSlug, items }: { appSlug: string; items: NavItem[] }) {
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button className={itemClass(active)} style={itemStyle(active)}>
-                    <Icon className="h-5 w-5" strokeWidth={active ? 2.25 : 1.75} />
+                    <span className="relative">
+                      <Icon className="h-5 w-5" strokeWidth={active ? 2.25 : 1.75} />
+                      {item.badge != null && item.badge > 0 && (
+                        <span className="absolute -right-2 -top-1.5"><CountBadge value={item.badge} /></span>
+                      )}
+                    </span>
                     <span className="flex items-center gap-0.5 whitespace-nowrap">
                       {item.label}
                       <ChevronDown className="h-3.5 w-3.5" />
