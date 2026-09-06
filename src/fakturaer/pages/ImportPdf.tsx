@@ -17,6 +17,7 @@ import { useSuppliersFor } from "@/fakturaer/hooks/useSuppliersFor";
 import { todayIso } from "@/fakturaer/lib/constants";
 import { computeLinesSum } from "@/fakturaer/lib/linesSum";
 import { cn } from "@/lib/utils";
+import { runAutoMatchAfterImport } from "@/fakturaer/lib/queueActions";
 
 interface ExtractedLine {
   description: string | null;
