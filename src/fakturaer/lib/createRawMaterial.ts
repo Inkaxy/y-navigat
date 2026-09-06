@@ -112,18 +112,9 @@ export async function createRawMaterialFromLine(input: CreateRawMaterialInput): 
     });
   if (aliases.length) await supabase.from("raw_material_supplier_aliases").insert(aliases);
 
-  if (input.pricePerBaseUnit != null) {
-    await supabase.from("raw_material_price_history").insert({
-      raw_material_id: rm.id,
-      supplier_id: line.invoice.supplier_id,
-      price: input.pricePerBaseUnit,
-      effective_date: line.invoice.invoice_date,
-      source: "invoice",
-      invoice_id: line.invoice_id,
-      created_by: user?.id,
-    });
-  }
-
+  // Linjen matches FØR prishistorikken skrives: databasetriggeren
+  // `fn_invoice_line_match_price_history` skriver historikkraden for
+  // manual-tillit selv. Vi legger bare til raden hvis triggeren ikke gjorde det.
   await supabase
     .from("invoice_lines")
     .update({
@@ -137,6 +128,27 @@ export async function createRawMaterialFromLine(input: CreateRawMaterialInput): 
       base_quantity: input.baseQuantity,
     })
     .eq("id", line.id);
+
+  if (input.pricePerBaseUnit != null) {
+    const { data: existing } = await supabase
+      .from("raw_material_price_history")
+      .select("id")
+      .eq("raw_material_id", rm.id)
+      .eq("invoice_id", line.invoice_id)
+      .limit(1);
+    if (!existing || existing.length === 0) {
+      await supabase.from("raw_material_price_history").insert({
+        raw_material_id: rm.id,
+        supplier_id: line.invoice.supplier_id,
+        price: input.pricePerBaseUnit,
+        effective_date: line.invoice.invoice_date,
+        source: "invoice",
+        invoice_id: line.invoice_id,
+        created_by: user?.id,
+      });
+    }
+  }
+
 
   return rm.id;
 }
