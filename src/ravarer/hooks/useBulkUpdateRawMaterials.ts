@@ -14,7 +14,14 @@ export type BulkPatch =
   | { kind: "active"; isActive: boolean }
   | { kind: "primary_supplier"; supplierId: string };
 
-function patchFor(patch: BulkPatch): Record<string, unknown> {
+interface RawMaterialPatch {
+  category?: string;
+  item_type?: ItemType;
+  is_active?: boolean;
+  primary_supplier_id?: string;
+}
+
+function patchFor(patch: BulkPatch): RawMaterialPatch {
   switch (patch.kind) {
     case "category":
       return { category: patch.category };
