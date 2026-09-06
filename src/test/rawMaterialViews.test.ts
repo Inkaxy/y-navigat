@@ -26,6 +26,8 @@ function item(patch: Partial<RawMaterialListItem> = {}): RawMaterialListItem {
     supplierId: "s1",
     supplierName: "Lantmännen",
     supplierSku: "12345",
+    primaryLinkId: "l1",
+
     matchedAlias: null,
     lastInvoicePrice: 10,
     lastInvoiceDate: "2026-01-01",
