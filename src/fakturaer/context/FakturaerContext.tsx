@@ -1,8 +1,8 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { useQuery } from "@tanstack/react-query";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { useInvoiceAccess } from "@/ravarer/hooks/useInvoiceAccess";
+import { useRavarerAccessLevel } from "@/ravarer/hooks/useRavarerAccessLevel";
 
 // Tilgang er nå basert på Råvarer-appens access_level + invoice_access flag.
 export type AccessLevel = "none" | "read" | "write" | "approve" | "admin";
@@ -33,15 +33,8 @@ export function FakturaerProvider({ children }: { children: ReactNode }) {
     return () => sub.subscription.unsubscribe();
   }, []);
 
-  const accessQuery = useQuery({
-    queryKey: ["ravarer-access-level", session?.user.id],
-    enabled: !!session?.user.id,
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("app_access_level", { p_app_code: "ravarer" });
-      if (error) throw error;
-      return (data as AccessLevel) ?? "none";
-    },
-  });
+  // Én delt kilde til tilgangsnivået — ingen egen RPC herfra.
+  const accessQuery = useRavarerAccessLevel(!!session?.user.id);
 
   const invoiceAccess = useInvoiceAccess();
 

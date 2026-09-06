@@ -99,7 +99,7 @@ export function MatchDrawer({ open, onOpenChange, line, onAcceptedNext }: Props)
    * og registrerte alias — det er ofte det eneste som står på fakturaen.
    */
   const { data: rmResults = [], isLoading: searching } = useQuery({
-    queryKey: ["rm-search", legalEntityId, search],
+    queryKey: ["rm-search", legalEntityId, supplierId, search],
     enabled: !!legalEntityId && search.length > 1,
     queryFn: async () => {
       // Komma og parentes er skilletegn i PostgREST-filtre — fjernes fra søket.
