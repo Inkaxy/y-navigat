@@ -137,6 +137,7 @@ export default function AvtalerPage() {
                   <th className="px-4 py-3">Råvare</th>
                   <th className="px-4 py-3">Kategori</th>
                   <th className="px-4 py-3 text-right">Avtalt pris</th>
+                  <th className="px-4 py-3 text-right">Pris per enhet</th>
                   <th className="px-4 py-3">Gyldig til</th>
                   <th className="px-4 py-3">Status</th>
                 </tr>
@@ -153,7 +154,26 @@ export default function AvtalerPage() {
                       <td className="px-4 py-3 font-medium">{row.supplier?.name ?? "—"}</td>
                       <td className="px-4 py-3">{row.raw_material?.name ?? "—"}</td>
                       <td className="px-4 py-3 text-ink-secondary">{row.raw_material?.category ?? "—"}</td>
-                      <td className="px-4 py-3 text-right tabular-nums">{formatNok(row.agreed_price)}</td>
+                      <td className="px-4 py-3 text-right tabular-nums">
+                        {formatNok(row.agreed_price)}
+                        {row.package_size != null && row.package_unit ? (
+                          <span className="ml-1 text-xs text-ink-secondary">
+                            per {row.package_size} {row.package_unit}
+                          </span>
+                        ) : null}
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums">
+                        {row.agreed_price_per_base_unit == null ? (
+                          <span className="text-ink-secondary">—</span>
+                        ) : (
+                          <>
+                            {formatNok(row.agreed_price_per_base_unit)}
+                            <span className="ml-1 text-xs text-ink-secondary">
+                              per {row.raw_material?.base_unit ?? "enhet"}
+                            </span>
+                          </>
+                        )}
+                      </td>
                       <td className="px-4 py-3 text-ink-secondary">{formatDate(row.agreement_valid_to)}</td>
                       <td className="px-4 py-3"><Badge variant="outline" className={meta.className}>{meta.label}</Badge></td>
                     </tr>
