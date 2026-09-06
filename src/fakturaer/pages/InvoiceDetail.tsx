@@ -55,7 +55,7 @@ export default function InvoiceDetailPage() {
         .eq("id", id!)
         .single();
       if (error) throw error;
-      return data as any;
+      return data as InvoiceDetailRow;
     },
   });
 
@@ -90,7 +90,7 @@ export default function InvoiceDetailPage() {
 
   const defaultTolerancePct = tolerances.defaultPct;
   const sourceMeta = INVOICE_SOURCES.find((s) => s.value === data.source);
-  const lines = (data.invoice_lines ?? []) as any[];
+  const lines = data.invoice_lines ?? [];
   const reviewLineCount = lines.filter((l) => l.requires_review).length;
   const isFinal = ["reconciled", "flagged"].includes(data.status);
   const sumMismatch = data.lines_sum_status === "mismatch";
@@ -144,7 +144,7 @@ export default function InvoiceDetailPage() {
           legal_entity: data.legal_entities ? { legal_name: data.legal_entities.legal_name, short_code: null } : null,
         },
 
-        suggestions: (matchLineSuggestions ?? []) as any,
+        suggestions: (matchLineSuggestions ?? []) as ReviewLineRow["suggestions"],
       }
     : null;
 
@@ -176,7 +176,7 @@ export default function InvoiceDetailPage() {
         body: { legal_entity_id: data.legal_entity_id, invoice_id: data.id, limit: 1 },
       });
       if (error) throw error;
-      if ((res as any)?.feilet > 0) toast.error("Kunne ikke hente linjer fra PDF");
+      if (Number((res as { feilet?: number } | null)?.feilet ?? 0) > 0) toast.error("Kunne ikke hente linjer fra PDF");
       else toast.success("Linjer hentet fra PDF");
       qc.invalidateQueries({ queryKey: ["invoice", id] });
     } catch (e: unknown) {

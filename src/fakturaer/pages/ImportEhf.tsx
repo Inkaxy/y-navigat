@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, FileUp, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { showError } from "@/lib/userError";
 import { supabase } from "@/integrations/supabase/client";
 import { FakturaerHeaderBanner } from "@/fakturaer/components/FakturaerHeaderBanner";
 import { useFakturaer } from "@/fakturaer/context/FakturaerContext";
@@ -49,8 +50,8 @@ export default function ImportEhfPage({ embedded = false }: { embedded?: boolean
         toast.success("EHF-faktura importert");
         navigate("/ravarer/fakturaer");
       }
-    } catch (e: any) {
-      toast.error(`Import feilet: ${e.message ?? e}`);
+    } catch (e: unknown) {
+      showError("ehf-import", e, "Importen feilet");
     } finally {
       setBusy(false);
     }
