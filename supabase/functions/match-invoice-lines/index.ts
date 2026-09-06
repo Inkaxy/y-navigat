@@ -2,7 +2,8 @@
 // Input: { invoice_id: string, line_ids?: string[] }
 import { createClient } from "npm:@supabase/supabase-js@2.95.0";
 import { corsHeaders } from "npm:@supabase/supabase-js@2.95.0/cors";
-import { normalizeUnit, isPackageUnit, resolveLineCost } from "../_shared/units.ts";
+import { normalizeUnit, isPackageUnit, resolveLineCost, stripPackageTokens } from "../_shared/units.ts";
+import { normalizeMatchKey } from "../_shared/matchNormalize.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const ANON = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -62,7 +63,7 @@ Deno.serve(async (req) => {
 
     // Fetch invoice + ensure caller has write
     const { data: inv, error: invErr } = await svc.from("invoices")
-      .select("id, legal_entity_id, supplier_id, total_amount, invoice_date")
+      .select("id, legal_entity_id, supplier_id, total_amount, invoice_date, status, currency, is_credit_note, extraction_confidence, lines_sum_status, original_invoice_id")
       .eq("id", invoiceId).single();
     if (invErr || !inv) return json({ error: "Invoice not found" }, 404);
 
@@ -91,7 +92,7 @@ Deno.serve(async (req) => {
 
     // Supplier's raw_material_suppliers (with aliases)
     const { data: rms } = await svc.from("raw_material_suppliers")
-      .select("id, raw_material_id, supplier_id, supplier_sku, supplier_product_name, agreed_price_per_base_unit, package_size, package_unit, base_units_per_package, package_confirmed_at, is_primary")
+      .select("id, raw_material_id, supplier_id, supplier_sku, supplier_product_name, agreed_price_per_base_unit, last_invoice_date, package_size, package_unit, base_units_per_package, package_confirmed_at, is_primary")
       .eq("supplier_id", inv.supplier_id);
     const rmsList = rms ?? [];
     const rmsIds = rmsList.map((r: AnyRec) => r.id);
@@ -105,9 +106,13 @@ Deno.serve(async (req) => {
     }
     const rmsById = new Map<string, AnyRec>(rmsList.map((r: AnyRec) => [r.id, r]));
 
+    // Avviste og erstattede alias er lærdom om hva som IKKE stemmer — de skal aldri matche.
+    const usableAliases = aliases.filter((a) => a.status !== "rejected" && a.status !== "superseded");
+    const aliasKey = (a: AnyRec) => normalizeMatchKey(a.alias_value_normalized ?? a.alias_value);
+
     // Raw materials in legal entity (active) — for fuzzy
     const { data: rmList } = await svc.from("raw_materials")
-      .select("id, name, sku, category, base_unit, current_cost_price, primary_supplier_id, package_size, package_unit, base_units_per_package")
+      .select("id, name, sku, category, base_unit, current_cost_price, price_updated_at, primary_supplier_id, package_size, package_unit, base_units_per_package")
       .eq("legal_entity_id", inv.legal_entity_id).eq("is_active", true);
     const rmById = new Map<string, AnyRec>((rmList ?? []).map((r: AnyRec) => [r.id, r]));
 
@@ -218,12 +223,14 @@ Deno.serve(async (req) => {
       let matchedAliasId: string | null = null;
       let confidenceLabel: string = "unmatched";
 
-      // STEG 2 — confirmed alias match
-      const skuN = norm(line.supplier_sku);
-      const descN = norm(line.description);
-      const confirmedHitsRaw = aliases.filter((a) => a.status === "confirmed" && (
-        (a.alias_type === "supplier_sku" && skuN && a.alias_value_normalized === skuN) ||
-        (a.alias_type === "product_name" && descN && a.alias_value_normalized === descN)
+      const skuN = normalizeMatchKey(line.supplier_sku);
+      const descN = normalizeMatchKey(line.description);
+      const descStripped = normalizeMatchKey(stripPackageTokens(line.description));
+
+      // STEG 2 — bekreftet alias, eksakt på normalisert verdi
+      const confirmedHitsRaw = usableAliases.filter((a) => a.status === "confirmed" && (
+        (a.alias_type === "supplier_sku" && skuN && aliasKey(a) === skuN) ||
+        (a.alias_type === "product_name" && descN && aliasKey(a) === descN)
       ));
       // Flere alias kan peke på SAMME råvare (f.eks. både SKU og produktnavn) — det er ikke tvetydig.
       const confirmedRmIds = new Set(
@@ -234,7 +241,6 @@ Deno.serve(async (req) => {
       const confirmedHits = confirmedRmIds.size <= 1 ? confirmedHitsRaw.slice(0, 1) : [];
 
       // Ekte tvetydighet: samme alias er bekreftet på flere ULIKE råvarer (dublett i råvareregisteret).
-      // Da foreslår vi alle kandidatene i stedet for å falle tilbake til fuzzy og ende opp umatchet.
       if (confirmedRmIds.size > 1) {
         let rank = 1;
         for (const rmId of confirmedRmIds) {
@@ -254,7 +260,6 @@ Deno.serve(async (req) => {
       }
 
       if (confirmedHits.length === 1) {
-
         const hit = confirmedHits[0];
         const rmsRow = rmsById.get(hit.raw_material_supplier_id);
         if (rmsRow) {
@@ -263,11 +268,10 @@ Deno.serve(async (req) => {
           matchedAliasId = hit.id;
           confidenceLabel = "auto_high";
 
-          // SKU collision check
+          // SKU-kollisjon: samme varenummer, men beskrivelsen ligner ikke historikken.
           if (skuN && hit.alias_type === "supplier_sku") {
             const histName = rmsRow.supplier_product_name ?? "";
-            if (histName && descN && similarity(descN, norm(histName)) < 0.5) {
-              // sku_collision — propose but don't auto-match
+            if (histName && descN && similarity(descN, normalizeMatchKey(histName)) < 0.5) {
               update.match_confidence = "unmatched";
               update.requires_review = true;
               update.review_reason = "sku_collision";
@@ -283,19 +287,77 @@ Deno.serve(async (req) => {
             }
           }
 
-          // increment match_count + last_seen_at
-          await svc.from("raw_material_supplier_aliases")
-            .update({ match_count: (hit.match_count ?? 0) + 1, last_seen_at: new Date().toISOString() })
-            .eq("id", matchedAliasId);
+          // match_count telles bare når koblingen faktisk settes eller endres —
+          // en ny kjøring på samme linje skal ikke blåse opp tallet.
+          if (line.raw_material_id !== matchedRmId) {
+            await svc.from("raw_material_supplier_aliases")
+              .update({ match_count: (hit.match_count ?? 0) + 1, last_seen_at: new Date().toISOString() })
+              .eq("id", matchedAliasId);
+          }
         }
       }
 
-      // STEG 4 — pending alias match (only if not yet matched)
+      // STEG 3 — direkte treff på leverandørens eget varenummer (raw_material_suppliers.supplier_sku)
+      if (!matchedRmId && skuN) {
+        const skuRows = rmsList.filter((r: AnyRec) => normalizeMatchKey(r.supplier_sku) === skuN);
+        const skuRmIds = new Set(skuRows.map((r: AnyRec) => r.raw_material_id));
+        if (skuRmIds.size === 1) {
+          const rmsRow = skuRows[0];
+          matchedRmsId = rmsRow.id;
+          matchedRmId = rmsRow.raw_material_id;
+          confidenceLabel = "auto_high";
+          // Lær varenummeret som bekreftet alias, slik at neste faktura går rett gjennom.
+          await upsertConfirmedSkuAlias(svc, usableAliases, rmsRow.id, line.supplier_sku, inv.id);
+        } else if (skuRmIds.size > 1) {
+          let rank = suggestionsToInsert.length + 1;
+          for (const rmId of skuRmIds) {
+            suggestionsToInsert.push({
+              invoice_line_id: line.id, raw_material_id: rmId,
+              confidence: 0.9, match_reason: "Flere varer har samme leverandør-varenummer", rank: rank++,
+            });
+          }
+          update.match_confidence = "unmatched";
+          update.requires_review = true;
+          update.review_reason = "sku_collision";
+          update.raw_material_id = null;
+          await applyUpdate(svc, line.id, update);
+          await insertSuggestions(svc, suggestionsToInsert);
+          results.push({ id: line.id, status: "sku_collision" });
+          continue;
+        }
+      }
+
+      // STEG 4 — beskrivelse uten pakningsord mot bekreftede alias og leverandørens produktnavn
+      if (!matchedRmId && descStripped) {
+        const strippedRmIds = new Set<string>();
+        let strippedRms: AnyRec | undefined;
+        for (const a of usableAliases) {
+          if (a.status !== "confirmed" || a.alias_type !== "product_name") continue;
+          if (normalizeMatchKey(stripPackageTokens(a.alias_value)) !== descStripped) continue;
+          const rmsRow = rmsById.get(a.raw_material_supplier_id);
+          if (!rmsRow) continue;
+          strippedRmIds.add(rmsRow.raw_material_id);
+          strippedRms = rmsRow;
+        }
+        for (const r of rmsList) {
+          if (!r.supplier_product_name) continue;
+          if (normalizeMatchKey(stripPackageTokens(r.supplier_product_name)) !== descStripped) continue;
+          strippedRmIds.add(r.raw_material_id);
+          strippedRms = r;
+        }
+        if (strippedRmIds.size === 1 && strippedRms) {
+          matchedRmsId = strippedRms.id;
+          matchedRmId = strippedRms.raw_material_id;
+          confidenceLabel = "auto_medium";
+        }
+      }
+
+      // STEG 5 — ventende alias (kun forslag)
       let pendingHit = false;
       if (!matchedRmId) {
-        const pendingHits = aliases.filter((a) => a.status === "pending" && (
-          (a.alias_type === "supplier_sku" && skuN && a.alias_value_normalized === skuN) ||
-          (a.alias_type === "product_name" && descN && a.alias_value_normalized === descN)
+        const pendingHits = usableAliases.filter((a) => a.status === "pending" && (
+          (a.alias_type === "supplier_sku" && skuN && aliasKey(a) === skuN) ||
+          (a.alias_type === "product_name" && descN && aliasKey(a) === descN)
         ));
         if (pendingHits.length > 0) {
           const top = pendingHits[0];
@@ -303,7 +365,7 @@ Deno.serve(async (req) => {
           if (rmsRow) {
             suggestionsToInsert.push({
               invoice_line_id: line.id, raw_material_id: rmsRow.raw_material_id,
-              confidence: 0.7, match_reason: "Pending alias-match", rank: 1,
+              confidence: 0.7, match_reason: "Ventende alias-match", rank: 1,
             });
             update.match_confidence = "unmatched";
             update.requires_review = true;
@@ -313,7 +375,7 @@ Deno.serve(async (req) => {
         }
       }
 
-      // STEG 5 — fuzzy match
+      // STEG 6 — fuzzy. Gir ALDRI mer enn auto_low: en likhetsscore er en gjetning.
       let fuzzyMatchRmsRow: AnyRec | undefined;
       if (!matchedRmId) {
         const candidates = new Map<string, { score: number; reason: string }>();
@@ -322,31 +384,33 @@ Deno.serve(async (req) => {
           if (!prev || prev.score < score) candidates.set(rmId, { score, reason });
         };
 
-        // (1) alias normalized — supplier scope
-        for (const a of aliases) {
-          if (a.status === "rejected" || a.status === "superseded") continue;
+        // (1) alias — leverandørens egne verdier
+        for (const a of usableAliases) {
           const rmsRow = rmsById.get(a.raw_material_supplier_id);
           if (!rmsRow) continue;
+          const key = aliasKey(a);
           const score = Math.max(
-            similarity(a.alias_value_normalized ?? "", descN),
-            skuN ? similarity(a.alias_value_normalized ?? "", skuN) : 0,
+            similarity(key, descN),
+            skuN ? similarity(key, skuN) : 0,
           ) * 1.0;
           if (score > fuzzyThreshold) update_cand(rmsRow.raw_material_id, score, `Alias-likhet (${a.alias_type})`);
         }
         // (2) supplier_product_name
         for (const r of rmsList) {
           if (!r.supplier_product_name) continue;
+          const key = normalizeMatchKey(r.supplier_product_name);
           const score = Math.max(
-            similarity(r.supplier_product_name, descN),
-            skuN ? similarity(r.supplier_product_name, skuN) : 0,
+            similarity(key, descN),
+            skuN ? similarity(key, skuN) : 0,
           ) * 0.97;
           if (score > fuzzyThreshold) update_cand(r.raw_material_id, score, "Leverandør-produktnavn");
         }
-        // (3) raw_material name
+        // (3) råvarenavn
         for (const r of (rmList ?? [])) {
+          const key = normalizeMatchKey(r.name);
           const score = Math.max(
-            similarity(r.name, descN),
-            skuN ? similarity(r.name, skuN) : 0,
+            similarity(key, descN),
+            skuN ? similarity(key, skuN) : 0,
           ) * 0.92;
           if (score > fuzzyThreshold) update_cand(r.id, score, "Råvarenavn");
         }
@@ -361,7 +425,6 @@ Deno.serve(async (req) => {
           // Forhold, ikke differanse: nest beste må være under fuzzyDom av beste.
           const dominance = second ? (second.score / top.score) <= fuzzyDom : true;
 
-          // Suggestions: top 3 (etter et eventuelt pending-forslag)
           const rankOffset = suggestionsToInsert.length;
           sorted.slice(0, 3).forEach((c, idx) => {
             suggestionsToInsert.push({
@@ -371,14 +434,8 @@ Deno.serve(async (req) => {
           });
 
           if (pendingHit) {
-            // Pending-alias forblir det foreslåtte valget; fuzzy gir kun flere forslag.
+            // Ventende alias forblir det foreslåtte valget; fuzzy gir kun flere forslag.
           } else if (top.score >= fuzzyAuto && dominance) {
-            matchedRmId = top.rmId;
-            confidenceLabel = "auto_medium";
-            update.match_confidence = "auto_medium";
-            update.requires_review = false;
-            update.review_reason = null;
-          } else if (top.score >= fuzzyAuto && !dominance) {
             matchedRmId = top.rmId;
             confidenceLabel = "auto_low";
             update.match_confidence = "auto_low";
@@ -394,12 +451,13 @@ Deno.serve(async (req) => {
             fuzzyMatchRmsRow = rmsList.find((r: AnyRec) => r.raw_material_id === matchedRmId);
           }
         }
-      } else if (matchedRmId) {
+      }
+
+      if (matchedRmId && (confidenceLabel === "auto_high" || confidenceLabel === "auto_medium")) {
         update.match_confidence = confidenceLabel;
         update.requires_review = false;
         update.review_reason = null;
       }
-
 
       // Normaliser enheten alltid (også for unmatched linjer)
       const normalizedUnit = normalizeUnit(line.unit);
@@ -419,7 +477,9 @@ Deno.serve(async (req) => {
         const usable = cost && !cost.needsInput && cost.confidenceLevel !== "low";
         const actual: number | null = usable ? cost!.pricePerBaseUnit : null;
         update.price_per_base_unit = actual;
-        update.base_quantity = cost && !cost.needsInput ? cost.baseQuantity : null;
+        // Mengden i baseenheter skrives bare når motoren er trygg — et gjettet
+        // tall her forplanter seg til lager og kalkyler.
+        update.base_quantity = cost && !cost.needsInput && cost.confidence >= 0.85 ? cost.baseQuantity : null;
         update.expected_price_per_base_unit = expected;
 
         const addReason = (reason: string) => {
@@ -486,14 +546,27 @@ Deno.serve(async (req) => {
       results.push({ id: line.id, status: update.match_confidence, requires_review: update.requires_review });
     }
 
-    // After pipeline: set invoice status based on review-state
-    const { data: stillPending } = await svc.from("invoice_lines")
-      .select("id").eq("invoice_id", invoiceId).is("match_confidence", null).limit(1);
-    if (!stillPending || stillPending.length === 0) {
-      const { data: needsReview } = await svc.from("invoice_lines")
-        .select("id").eq("invoice_id", invoiceId).eq("requires_review", true).limit(1);
-      const newStatus = needsReview && needsReview.length > 0 ? "needs_review" : "ready";
-      await svc.from("invoices").update({ status: newStatus }).eq("id", invoiceId);
+    // Fakturastatus etter kjøringen. Flagget eller avstemt faktura røres ALDRI —
+    // et menneske har tatt et standpunkt, og motoren skal ikke overkjøre det.
+    const lockedStatuses = ["flagged", "reconciled", "cancelled"];
+    if (!lockedStatuses.includes(String(inv.status))) {
+      const { data: stillPending } = await svc.from("invoice_lines")
+        .select("id").eq("invoice_id", invoiceId).is("match_confidence", null).limit(1);
+      if (!stillPending || stillPending.length === 0) {
+        const { data: needsReview } = await svc.from("invoice_lines")
+          .select("id").eq("invoice_id", invoiceId).eq("requires_review", true).limit(1);
+
+        // Forhold ved selve fakturaen tvinger gjennomgang, uansett hvor pene linjene er.
+        const invoiceLevelReview =
+          inv.lines_sum_status === "mismatch" ||
+          (inv.extraction_confidence != null && Number(inv.extraction_confidence) < 0.6) ||
+          (inv.is_credit_note === true && !inv.original_invoice_id);
+
+        const newStatus = (needsReview && needsReview.length > 0) || invoiceLevelReview
+          ? "needs_review"
+          : "ready";
+        await svc.from("invoices").update({ status: newStatus }).eq("id", invoiceId);
+      }
     }
 
     return json({ ok: true, processed: results.length, results });
@@ -507,6 +580,35 @@ Deno.serve(async (req) => {
 async function applyUpdate(svc: any, lineId: string, update: AnyRec) {
   await svc.from("invoice_lines").update(update).eq("id", lineId);
 }
+/**
+ * Lærer leverandørens varenummer som bekreftet alias etter et direkte SKU-treff.
+ * Oppdaterer en eksisterende rad i stedet for å upserte, slik at `match_count` beholdes.
+ */
+async function upsertConfirmedSkuAlias(
+  svc: any, aliasCache: AnyRec[], rmsId: string, sku: string | null, invoiceId: string,
+) {
+  if (!sku) return;
+  const key = normalizeMatchKey(sku);
+  const existing = aliasCache.find(
+    (a) => a.raw_material_supplier_id === rmsId && a.alias_type === "supplier_sku" &&
+      normalizeMatchKey(a.alias_value_normalized ?? a.alias_value) === key,
+  );
+  const nowIso = new Date().toISOString();
+  if (existing) {
+    if (existing.status === "confirmed") return;
+    existing.status = "confirmed";
+    await svc.from("raw_material_supplier_aliases")
+      .update({ status: "confirmed", confirmed_at: nowIso, last_seen_at: nowIso })
+      .eq("id", existing.id);
+    return;
+  }
+  await svc.from("raw_material_supplier_aliases").upsert({
+    raw_material_supplier_id: rmsId, alias_type: "supplier_sku", alias_value: sku,
+    status: "confirmed", confirmed_at: nowIso, first_seen_invoice_id: invoiceId,
+    match_count: 1, last_seen_at: nowIso,
+  }, { onConflict: "alias_type,alias_value_normalized,raw_material_supplier_id", ignoreDuplicates: true });
+}
+
 async function insertSuggestions(svc: any, rows: AnyRec[]) {
   if (!rows.length) return;
   await svc.from("invoice_line_match_suggestions").insert(rows);
@@ -514,6 +616,16 @@ async function insertSuggestions(svc: any, rows: AnyRec[]) {
 
 async function syncRegisteredPrices(svc: any, inv: AnyRec, line: AnyRec, rm: AnyRec | undefined, rmsRow: AnyRec | undefined, actual: number | null, update: AnyRec, tolPct = 2) {
   if (!rm || actual == null || !Number.isFinite(actual)) return;
+  // Registrerte priser skal aldri skrives fra et usikkert eller uegnet grunnlag.
+  if (actual <= 0) return;
+  if (inv.is_credit_note) return;                              // kreditnota er ikke en innkjøpspris
+  if (inv.currency && String(inv.currency).toUpperCase() !== "NOK") return;
+  // En eldre faktura skal ikke overskrive en nyere registrert pris.
+  const invDate = inv.invoice_date ? String(inv.invoice_date) : null;
+  const lastDate = rmsRow?.last_invoice_date ? String(rmsRow.last_invoice_date) : null;
+  if (invDate && lastDate && invDate < lastDate) return;
+  const rmPriceDate = rm.price_updated_at ? String(rm.price_updated_at).slice(0, 10) : null;
+  const staleForRm = !!(invDate && rmPriceDate && invDate < rmPriceDate);
 
   const registered = rm.current_cost_price != null ? Number(rm.current_cost_price) : null;
   const supplierRegistered = rmsRow?.agreed_price_per_base_unit != null ? Number(rmsRow.agreed_price_per_base_unit) : null;
@@ -531,6 +643,10 @@ async function syncRegisteredPrices(svc: any, inv: AnyRec, line: AnyRec, rm: Any
       ? Array.from(new Set(`${update.review_reason},${reason}`.split(","))).join(",")
       : reason;
   }
+
+  // Avviket over kan i seg selv ha sendt linja til gjennomgang. Da skal ingen
+  // registrert pris skrives før et menneske har sagt ja.
+  if (update.requires_review) return;
 
   const nowIso = new Date().toISOString();
   if (rmsRow?.id) {
@@ -552,7 +668,7 @@ async function syncRegisteredPrices(svc: any, inv: AnyRec, line: AnyRec, rm: Any
     }, { onConflict: "raw_material_id,supplier_id" });
   }
 
-  if (!rm.primary_supplier_id || rm.primary_supplier_id === inv.supplier_id || registered == null) {
+  if (!staleForRm && (!rm.primary_supplier_id || rm.primary_supplier_id === inv.supplier_id || registered == null)) {
     await svc.from("raw_materials").update({
       current_cost_price: actual,
       price_source: "invoice",

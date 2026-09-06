@@ -1,3 +1,5 @@
+// DENNE FILEN ER BYTE-IDENTISK MED supabase/functions/_shared/units.ts.
+// Endres den ene, må den andre endres likt — en vitest sammenligner filene.
 // Felles enhets-håndtering for fakturalinjer og databladet.
 // Mål: oversette norske/EHF-koder til kanoniske enheter, og hente pakke-størrelse
 // fra fritekst-beskrivelser.
@@ -113,63 +115,157 @@ export interface PackageInfo {
   matched: string;
 }
 
-/**
- * Trekk ut pakke-størrelse fra norsk fakturabeskrivelse.
- * Definisjonen er identisk med AI-prompten: `size` er størrelsen PER sub-enhet,
- * og `count` er antall sub-enheter. Total = size * count.
- * Eksempler:
- *   "10l"          -> { size: 10,    unit: "l",  count: 1 }
- *   "2 kg"         -> { size: 2,     unit: "kg", count: 1 }
- *   "500ml"        -> { size: 500,   unit: "ml", count: 1 }
- *   "1/4l"         -> { size: 0.25,  unit: "l",  count: 1 }
- *   "36X90G"       -> { size: 90,    unit: "g",  count: 36 }
- *   "12 x 500 ML"  -> { size: 500,   unit: "ml", count: 12 }
- *   "6X1L"         -> { size: 1,     unit: "l",  count: 6 }
- */
+const SIZE_UNIT_PATTERN = "kg|kilo|gram|grm|gr|g|ml|mlt|cl|dl|liter|litre|ltr|lt|l";
+const NUM_PATTERN = String.raw`\d+(?:[.,]\d+)?`;
+const FRAC_PATTERN = String.raw`\d+\s*\/\s*\d+`;
+const SIZE_PATTERN = `(?:${FRAC_PATTERN}|${NUM_PATTERN})`;
 
+/** Ord som beskriver emballasje, ikke innhold — fjernes før navnesammenligning. */
+const PACKAGE_WORDS = [
+  "krt", "kartong", "kart", "ks", "ksk", "esk", "eske", "esker", "pk", "pak", "pakke", "pakker",
+  "pose", "poser", "sekk", "sekker", "spann", "boks", "bokser", "brett", "flaske", "flasker",
+  "rull", "beger", "tube", "bunt", "kolli", "pall", "stk", "emb", "kolli",
+];
+
+/** Tolk ett størrelses-token. Håndterer brøk og norsk tusenskille («1.000 kg»). */
+function parseSizeToken(raw: string, unitRaw: string): number | null {
+  const frac = raw.match(/^(\d+)\s*\/\s*(\d+)$/);
+  if (frac) {
+    const n = Number(frac[1]);
+    const d = Number(frac[2]);
+    return d ? n / d : null;
+  }
+  const u = normalizeUnit(unitRaw);
+  // Norsk tusenskille: nøyaktig tre siffer etter punktum, ingen komma, masse-enhet.
+  if (/^\d{1,3}\.\d{3}$/.test(raw.trim()) && (u === "kg" || u === "g")) {
+    return Number(raw.trim().replace(".", ""));
+  }
+  return toNumber(raw);
+}
+
+/** Størrelsen omregnet til en felles skala, slik at flere treff kan sammenlignes. */
+function magnitude(size: number, unit: CanonicalUnit): number {
+  const toG = toBaseFactor(unit, "g");
+  if (toG != null) return size * toG;
+  const toMl = toBaseFactor(unit, "ml");
+  if (toMl != null) return size * toMl;
+  return size;
+}
+
+/**
+ * Trekk ut den PAKNINGSDEFINERENDE størrelsen fra en norsk fakturabeskrivelse.
+ * `size` er størrelsen PER sub-enhet og `count` er antall sub-enheter;
+ * total pakning = size × count.
+ *
+ * Eksempler:
+ *   "10l"                 -> { size: 10,   unit: "l",  count: 1 }
+ *   "36X90G"              -> { size: 90,   unit: "g",  count: 36 }
+ *   "1kg x 10"            -> { size: 1,    unit: "kg", count: 10 }
+ *   "500G X 12"           -> { size: 500,  unit: "g",  count: 12 }
+ *   "6 x 1/2 kg"          -> { size: 0.5,  unit: "kg", count: 6 }
+ *   "10 stk à 500 g"      -> { size: 500,  unit: "g",  count: 10 }
+ *   "OST 10 KG EMB 500 G" -> { size: 10,   unit: "kg", count: 1 }
+ *   "MEL 1.000 KG"        -> { size: 1000, unit: "kg", count: 1 }
+ */
 export function parsePackageFromDescription(desc: string | null | undefined): PackageInfo | null {
   if (!desc) return null;
   const text = String(desc).replace(/\s+/g, " ").trim();
   if (!text) return null;
 
-  // 1. Multiplikasjon: "36X90G", "12 x 500 ML", "6X1L"
-  const mulRe = /(\d+(?:[.,]\d+)?)\s*[x×*]\s*(\d+(?:[.,]\d+)?)\s*(kg|g|gram|grm|gr|ml|mlt|cl|dl|l|lt|ltr|liter|litre)\b/i;
-  const m = text.match(mulRe);
-  if (m) {
-    const count = toNumber(m[1]);
-    const each = toNumber(m[2]);
-    const unit = normalizeUnit(m[3]);
-    if (count && each && unit) {
-      return { size: each, unit, count, matched: m[0] };
-    }
+  const build = (
+    countRaw: string | null,
+    sizeRaw: string,
+    unitRaw: string,
+    matched: string,
+  ): PackageInfo | null => {
+    const size = parseSizeToken(sizeRaw, unitRaw);
+    const unit = normalizeUnit(unitRaw);
+    const count = countRaw != null ? toNumber(countRaw) : 1;
+    if (!size || size <= 0 || !unit || !count || count <= 0) return null;
+    return { size, unit, count, matched };
+  };
+
+  // 1) «10 stk à 500 g», «10 stk x 500 g», «6 pk à 1 kg»
+  const stkRe = new RegExp(
+    String.raw`(${NUM_PATTERN})\s*(?:stk|pk|pcs)\.?\s*(?:[x×*]|à|a)?\s*(${SIZE_PATTERN})\s*(${SIZE_UNIT_PATTERN})\b`,
+    "i",
+  );
+  const stkM = text.match(stkRe);
+  if (stkM) {
+    const r = build(stkM[1], stkM[2], stkM[3], stkM[0]);
+    if (r) return r;
   }
 
-  // 2. Brøk: "1/4l", "1/2 kg"
-  const fracRe = /\b(\d+)\s*\/\s*(\d+)\s*(kg|g|gram|grm|gr|ml|mlt|cl|dl|l|lt|ltr|liter|litre)\b/i;
-  const fr = text.match(fracRe);
-  if (fr) {
-    const num = toNumber(fr[1]);
-    const den = toNumber(fr[2]);
-    const unit = normalizeUnit(fr[3]);
-    if (num && den && unit) {
-      return { size: num / den, unit, count: 1, matched: fr[0] };
-    }
+  // 2) «36X90G», «12 x 500 ML», «10 x 1 kg», «6 x 1/2 kg»
+  const mulRe = new RegExp(
+    String.raw`(${NUM_PATTERN})\s*(?:[x×*]|à)\s*(${SIZE_PATTERN})\s*(${SIZE_UNIT_PATTERN})\b`,
+    "i",
+  );
+  const mulM = text.match(mulRe);
+  if (mulM) {
+    const r = build(mulM[1], mulM[2], mulM[3], mulM[0]);
+    if (r) return r;
   }
 
-  // 3. Enkel størrelse: "10l", "2 kg", "500ml" — ta SISTE forekomst (mest spesifikk)
-  const singleRe = /(\d+(?:[.,]\d+)?)\s*(kg|gram|grm|ml|mlt|cl|dl|liter|litre|ltr|lt|kilo|g|l)\b/gi;
-  let last: RegExpExecArray | null = null;
+  // 3) «1kg x 10», «500G X 12» — størrelsen først, antallet etter.
+  const revRe = new RegExp(
+    String.raw`(${SIZE_PATTERN})\s*(${SIZE_UNIT_PATTERN})\s*[x×*]\s*(${NUM_PATTERN})\b`,
+    "i",
+  );
+  const revM = text.match(revRe);
+  if (revM) {
+    const r = build(revM[3], revM[1], revM[2], revM[0]);
+    if (r) return r;
+  }
+
+  // 4) Brøk alene: «1/4l», «1/2 kg»
+  const fracRe = new RegExp(String.raw`\b(${FRAC_PATTERN})\s*(${SIZE_UNIT_PATTERN})\b`, "i");
+  const fracM = text.match(fracRe);
+  if (fracM) {
+    const r = build(null, fracM[1], fracM[2], fracM[0]);
+    if (r) return r;
+  }
+
+  // 5) Enkle størrelser: velg den STØRSTE — den beskriver pakningen, mens en
+  //    mindre størrelse som regel er innerpakningen («OST 10 KG EMB 500 G»).
+  const singleRe = new RegExp(String.raw`(${NUM_PATTERN})\s*(${SIZE_UNIT_PATTERN})\b`, "gi");
+  let best: PackageInfo | null = null;
+  let bestMag = -1;
   let cur: RegExpExecArray | null;
-  while ((cur = singleRe.exec(text)) !== null) last = cur;
-  if (last) {
-    const size = toNumber(last[1]);
-    const unit = normalizeUnit(last[2]);
-    if (size && unit) {
-      return { size, unit, count: 1, matched: last[0] };
+  while ((cur = singleRe.exec(text)) !== null) {
+    const r = build(null, cur[1], cur[2], cur[0]);
+    if (!r) continue;
+    const mag = magnitude(r.size, r.unit);
+    if (mag > bestMag) {
+      bestMag = mag;
+      best = r;
     }
   }
+  return best;
+}
 
-  return null;
+/**
+ * Fjern pakningsinformasjon fra en beskrivelse, slik at bare varenavnet står
+ * igjen («HVETEMEL 10X1KG KRT» → «hvetemel»). Brukes av matchingen når navnet
+ * skal sammenlignes uten at emballasjen forstyrrer.
+ */
+export function stripPackageTokens(desc: string | null | undefined): string {
+  if (!desc) return "";
+  let s = String(desc).toLowerCase();
+  s = s.replace(
+    new RegExp(String.raw`(${NUM_PATTERN})\s*(?:[x×*]|à)\s*(${SIZE_PATTERN})\s*(?:${SIZE_UNIT_PATTERN})\b`, "gi"),
+    " ",
+  );
+  s = s.replace(
+    new RegExp(String.raw`(${SIZE_PATTERN})\s*(?:${SIZE_UNIT_PATTERN})\s*[x×*]\s*(${NUM_PATTERN})\b`, "gi"),
+    " ",
+  );
+  s = s.replace(new RegExp(String.raw`(${SIZE_PATTERN})\s*(?:${SIZE_UNIT_PATTERN})\b`, "gi"), " ");
+  s = s.replace(new RegExp(String.raw`\b(${NUM_PATTERN})\s*[x×*]\s*`, "gi"), " ");
+  for (const w of PACKAGE_WORDS) {
+    s = s.replace(new RegExp(String.raw`\b${w}\b\.?`, "gi"), " ");
+  }
+  return s.replace(/[^\p{L}\p{N}]+/gu, " ").replace(/\s+/g, " ").trim();
 }
 
 function toNumber(s: string): number | null {
@@ -223,6 +319,11 @@ export interface PackageResolution {
   } | null;
   /** Satt når leverandørens `package_size = 1` med pakke-enhet ble forkastet som «ikke satt». */
   ignoredSupplierOne?: boolean;
+  /**
+   * Satt når pakningen IKKE kan avgjøres maskinelt og et menneske må inn:
+   * bekreftet «1 pakning» uten innhold, eller uenighet mellom kilder.
+   */
+  unresolved?: { reason: string } | null;
 }
 
 
@@ -415,6 +516,16 @@ export function resolvePackageContent(input: ResolveLineCostInput): PackageResol
     ? fromSizeUnit(parsed.size * (parsed.count || 1), parsed.unit, "description")
     : null;
 
+  // Når basisenheten er «stk», er innholdet ANTALLET sub-enheter i pakningen —
+  // ikke kilo eller liter. «10 x 1 kg» i en kartong er 10 stk.
+  const piecesPerPackage = (count: number | null, source: PackageSource): PackageResolution | null => {
+    if (base !== "stk") return null;
+    if (!count || count <= 0) return null;
+    return { baseUnitsPerPackage: count, source, packageUnitLabel: "stk" };
+  };
+  const descPieces = piecesPerPackage(parsed?.count ?? null, "description");
+  const linePieces = piecesPerPackage(toNum(input.countPerPackage), "line");
+
   // 1) Bekreftet av bruker på leverandørkoblingen — høyest tillit, alltid vinner.
   if (isConfirmed) {
     if (confirmed && confirmed > 0) {
@@ -423,6 +534,20 @@ export function resolvePackageContent(input: ResolveLineCostInput): PackageResol
     if (spSize && spSize > 0) {
       const r = fromSizeUnit(spSize, spUnitRaw, "rms_confirmed");
       if (r) return r;
+      // Bekreftet «1 sekk» uten innhold per pakning sier ingenting om hvor mange
+      // baseenheter sekken rommer — det må et menneske fylle inn.
+      if (spSize === 1 && isPackageUnit(spUnit)) {
+        return {
+          baseUnitsPerPackage: 0,
+          source: "rms_confirmed",
+          packageUnitLabel: spUnit,
+          unresolved: {
+            reason:
+              `Leverandørkoblingen er bekreftet med 1 ${spUnit} per pakning, men uten innhold per pakning. ` +
+              `Fyll inn hvor mange ${base} én ${spUnit} inneholder.`,
+          },
+        };
+      }
       // Bekreftet størrelse oppgitt i en pakke-enhet: da er tallet innholdet i baseenheter.
       return { baseUnitsPerPackage: spSize, source: "rms_confirmed", packageUnitLabel: spUnit };
     }
@@ -441,7 +566,7 @@ export function resolvePackageContent(input: ResolveLineCostInput): PackageResol
   }
 
   // Regel 2: ubekreftet leverandørpakning som er uenig med varenavnet med mer enn
-  // en faktor 1,5 — beskrivelsen er skrevet av leverandøren selv og vinner.
+  // en faktor 1,5. Da vet vi ikke hvilken som stemmer — et menneske må avgjøre.
   if (fromRms && fromDesc) {
     const a = fromRms.baseUnitsPerPackage;
     const b = fromDesc.baseUnitsPerPackage;
@@ -449,6 +574,11 @@ export function resolvePackageContent(input: ResolveLineCostInput): PackageResol
       return {
         ...fromDesc,
         disagreement: { supplierUnits: a, supplierUnitLabel: fromRms.packageUnitLabel, descriptionUnits: b },
+        unresolved: {
+          reason:
+            `Leverandørkoblingen sier ${fmtNum(a)} ${fromRms.packageUnitLabel ?? base} per pakning, ` +
+            `men varenavnet sier ${fmtNum(b)} ${base}. Bekreft pakningen før prisen kan brukes.`,
+        },
       };
     }
   }
@@ -462,8 +592,11 @@ export function resolvePackageContent(input: ResolveLineCostInput): PackageResol
     const r = fromSizeUnit(lineSize * mult, input.packageUnit, "line");
     if (r) return bogusOne ? { ...r, ignoredSupplierOne: true } : r;
   }
+  if (linePieces) return bogusOne ? { ...linePieces, ignoredSupplierOne: true } : linePieces;
+
   // 4) Tolket fra beskrivelsen.
   if (fromDesc) return bogusOne ? { ...fromDesc, ignoredSupplierOne: true } : fromDesc;
+  if (descPieces) return bogusOne ? { ...descPieces, ignoredSupplierOne: true } : descPieces;
 
   // 5) Varens egen pakning.
   const rmp = input.rawMaterialPackage;
@@ -545,13 +678,20 @@ export function resolveLineCost(input: ResolveLineCostInput): ResolveLineCostRes
 
   const invoiceUnit = normalizeUnit(input.unit);
   const pkg = resolvePackageContent(input);
-  const bupp = pkg?.baseUnitsPerPackage ?? null;
+  const bupp = pkg?.unresolved ? null : (pkg?.baseUnitsPerPackage ?? null);
 
   // 2) Kandidater
   const candidates: CostCandidate[] = [];
 
   // A — fakturaenhet: gyldig når enheten er en baseenhet i samme dimensjon.
   const directFactor = invoiceUnit && isBaseUnit(invoiceUnit) ? toBaseFactor(invoiceUnit, base) : null;
+
+  // Uavklart pakning: når fakturaenheten ikke kan regnes direkte om til
+  // basisenheten, må et menneske inn — vi gjetter aldri.
+  if (pkg?.unresolved && (directFactor == null || directFactor <= 0)) {
+    return emptyResult("package_size", pkg.unresolved.reason, checks);
+  }
+
   if (directFactor != null && directFactor > 0) {
     const baseQty = quantity * directFactor;
     const price = amount / baseQty;

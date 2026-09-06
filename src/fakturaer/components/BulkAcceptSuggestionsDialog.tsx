@@ -95,7 +95,10 @@ export function BulkAcceptSuggestionsDialog({ open, onOpenChange, candidates, th
             userId: user.id,
             packageSize: pkg?.size ?? null,
             packageUnit: pkg?.unit ?? null,
-            baseUnitsPerPackage: cost?.baseUnitsPerPackage ?? null,
+            // Masse-godkjenning har ingen menneskelig vurdering av pakningen,
+            // så den skal aldri stemples som bekreftet.
+            baseUnitsPerPackage: null,
+            confirmPackage: false,
             rememberSku: !!line.supplier_sku,
             rememberName: !!line.description && line.description !== line.supplier_sku,
           });

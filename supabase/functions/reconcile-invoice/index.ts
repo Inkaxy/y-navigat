@@ -46,35 +46,19 @@ Deno.serve(async (req) => {
       return json({ error: `${stillReview.length} linjer krever fortsatt gjennomgang` }, 400);
     }
 
-    // Skriv prishistorikk for matchede linjer.
-    // KUN price_per_base_unit — unit_price er leverandørens fakturaenhet og kan ikke
-    // brukes som kostpris (Regal fakturerer sekk, Norgesmøllene kg). Linjer uten
-    // beregnet kostpris hoppes over i stedet for å forgifte historikken.
+    // Prishistorikken skrives av databasetriggerne `fn_invoice_line_match_price_history`
+    // og `fn_invoice_status_price_history` når statusen settes til «reconciled».
+    // Begge har en NOT EXISTS-vakt per (faktura, råvare), så en innsetting herfra
+    // ville bare vært et duplikat med en annen tidsstempling. Derfor gjør vi det ikke.
     const skippedNoBasePrice = lines.filter(
       (l: any) => l.raw_material_id && l.price_per_base_unit == null,
     ).length;
-    const historyRows = lines
-      .filter((l: any) => l.raw_material_id && l.price_per_base_unit != null)
-      .map((l: any) => ({
-        raw_material_id: l.raw_material_id,
-        supplier_id: invoice.supplier_id,
-        price: l.price_per_base_unit,
-        source: "invoice",
-        invoice_id: invoice.id,
-        effective_date: invoice.invoice_date,
-        source_reference: invoice.invoice_number,
-        created_by: userId,
-      }));
-
-    if (historyRows.length > 0) {
-      const { error: histErr } = await svc.from("raw_material_price_history").insert(historyRows);
-      if (histErr) console.error("price history insert", histErr);
-    }
     if (skippedNoBasePrice > 0) {
       console.warn(
-        `reconcile-invoice: ${skippedNoBasePrice} linjer uten price_per_base_unit ble utelatt fra prishistorikken`,
+        `reconcile-invoice: ${skippedNoBasePrice} linjer uten price_per_base_unit får ingen prishistorikk`,
       );
     }
+
 
     const { error: updErr } = await svc
       .from("invoices")
@@ -87,7 +71,7 @@ Deno.serve(async (req) => {
       if (error) console.error("refresh_purchase_stats", error);
     });
 
-    return json({ ok: true, history_rows: historyRows.length, skipped_no_base_price: skippedNoBasePrice });
+    return json({ ok: true, skipped_no_base_price: skippedNoBasePrice });
   } catch (e) {
     console.error("reconcile-invoice error", e);
     return json({ error: (e as Error).message }, 500);

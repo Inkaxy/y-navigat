@@ -17,6 +17,19 @@ export interface AcceptMatchOptions {
   baseUnitsPerPackage?: number | null;
   /** Avtalepris per baseenhet. Skrives kun når den er satt. */
   agreedPricePerBaseUnit?: number | null;
+  /**
+   * Sant kun når et menneske uttrykkelig har krysset av for at pakningen stemmer.
+   * Bare da stemples `package_confirmed_at/by` — en tolket pakning er et forslag,
+   * ikke en bekreftelse.
+   */
+  confirmPackage?: boolean;
+  /**
+   * Varer brukeren aktivt valgte BORT i skuffen. Alias som peker på disse merkes
+   * avvist, slik at motoren ikke foreslår dem igjen.
+   */
+  rejectedRawMaterialIds?: string[];
+  /** Hopp over reberegning — masse-godkjenning kjører pipeline én gang til slutt. */
+  skipRematch?: boolean;
   rememberSku?: boolean;
   rememberName?: boolean;
   setAsPrimary?: boolean;
@@ -52,6 +65,9 @@ export async function acceptMatch(opts: AcceptMatchOptions): Promise<{ lineIds: 
     packageUnit = null,
     baseUnitsPerPackage = null,
     agreedPricePerBaseUnit = null,
+    confirmPackage = false,
+    rejectedRawMaterialIds = [],
+    skipRematch = false,
     rememberSku = false,
     rememberName = false,
     setAsPrimary = false,
@@ -92,8 +108,8 @@ export async function acceptMatch(opts: AcceptMatchOptions): Promise<{ lineIds: 
         supplier_product_name: line.description,
         package_size: pkgSize,
         package_unit: pkgUnit,
-        base_units_per_package: bupp,
-        ...(bupp != null ? { package_confirmed_at: nowIso, package_confirmed_by: userId } : {}),
+        base_units_per_package: confirmPackage ? bupp : null,
+        ...(confirmPackage && bupp != null ? { package_confirmed_at: nowIso, package_confirmed_by: userId } : {}),
         ...(agreed != null ? { agreed_price_per_base_unit: agreed } : {}),
         is_primary: setAsPrimary && !anyPrimary,
       })
@@ -112,7 +128,7 @@ export async function acceptMatch(opts: AcceptMatchOptions): Promise<{ lineIds: 
     } = {};
     if (pkgSize != null) upd.package_size = pkgSize;
     if (pkgUnit) upd.package_unit = pkgUnit;
-    if (bupp != null) {
+    if (confirmPackage && bupp != null) {
       upd.base_units_per_package = bupp;
       upd.package_confirmed_at = nowIso;
       upd.package_confirmed_by = userId;
@@ -224,6 +240,40 @@ export async function acceptMatch(opts: AcceptMatchOptions): Promise<{ lineIds: 
     }
   }
 
+  // 2c) Lær av det brukeren valgte BORT: alias mot avviste varer merkes avvist.
+  if (rejectedRawMaterialIds.length > 0 && supplierId) {
+    const { data: rejRms, error: rejErr } = await supabase
+      .from("raw_material_suppliers")
+      .select("id")
+      .eq("supplier_id", supplierId)
+      .in("raw_material_id", rejectedRawMaterialIds);
+    if (rejErr) {
+      console.warn(`acceptMatch: kunne ikke hente koblinger for avviste varer: ${rejErr.message}`);
+    }
+    const rejIds = (rejRms ?? []).map((r) => r.id);
+    if (rejIds.length > 0) {
+      const values: Array<{ type: "supplier_sku" | "product_name"; value: string }> = [];
+      if (line.supplier_sku) values.push({ type: "supplier_sku", value: line.supplier_sku });
+      if (line.description) values.push({ type: "product_name", value: line.description });
+      for (const v of values) {
+        const { error: rejUpdErr } = await supabase
+          .from("raw_material_supplier_aliases")
+          .update({
+            status: "rejected",
+            rejected_by: userId,
+            rejected_at: nowIso,
+            rejected_reason: "valgt annen råvare",
+          })
+          .in("raw_material_supplier_id", rejIds)
+          .eq("alias_type", v.type)
+          .eq("alias_value", v.value);
+        if (rejUpdErr) {
+          console.warn(`acceptMatch: kunne ikke avvise alias «${v.value}»: ${rejUpdErr.message}`);
+        }
+      }
+    }
+  }
+
   // 3) Skriv matchen på linjen (og evt. søsterlinjer)
   const lineIds: string[] = [line.id];
   if (applyToAll) {
@@ -259,6 +309,8 @@ export async function acceptMatch(opts: AcceptMatchOptions): Promise<{ lineIds: 
 
   // 4) Kjør pipeline på nytt for linjene (prisavvik regnes om).
   //    Feiler dette er matchen likevel lagret — logg og gå videre.
+  if (skipRematch) return { lineIds };
+
   const { error: fnErr } = await supabase.functions.invoke("match-invoice-lines", {
     body: { invoice_id: line.invoice_id, line_ids: lineIds },
   });
