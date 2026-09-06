@@ -475,7 +475,7 @@ export default function VarelistePage() {
           actions={canWrite && <NewRawMaterialButton onClick={() => setNewOpen(true)} />}
         />
 
-        <Card className="sticky top-0 z-10 p-4">
+        <Card className="p-4">
           <div className="flex flex-wrap items-center gap-3">
             <div className="relative min-w-[220px] flex-1">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -608,9 +608,10 @@ export default function VarelistePage() {
             }
           >
             {/* Tabell fra md og opp */}
-            <div className="hidden overflow-x-auto md:block">
+            {/* Ingen overflow-container her: den ville klippet sticky thead. */}
+            <div className="hidden md:block">
               <table className="w-full text-sm">
-                <thead className="sticky top-0 z-10 bg-muted/60 text-left text-xs uppercase text-muted-foreground">
+                <thead className="sticky top-0 z-20 bg-muted text-left text-xs uppercase text-muted-foreground">
                   <tr>
                     <th className="w-9 px-3 py-2">
                       <Checkbox
@@ -655,8 +656,8 @@ export default function VarelistePage() {
                       tolerance={tolerance}
                       editing={editing?.id === item.id ? editing.field : null}
                       onToggleSelect={toggleSelect}
-                      onStartEdit={(id, field) => setEditing({ id, field })}
-                      onCancelEdit={() => setEditing(null)}
+                      onStartEdit={startEdit}
+                      onCancelEdit={cancelEdit}
                       onCommitPrice={commitPrice}
                       onCommitCategory={commitCategory}
                       onFocusRow={setFocusedId}
@@ -671,7 +672,10 @@ export default function VarelistePage() {
             <ul className="divide-y divide-border md:hidden">
               {filtered.map((item) => (
                 <li key={item.id} className="p-3">
-                  <a href={`/ravarer/vareliste/${item.id}${listSearch ? `?${listSearch}` : ""}`} className="block">
+                  <Link
+                    to={`/ravarer/vareliste/${item.id}${listSearch ? `?${listSearch}` : ""}`}
+                    className="block"
+                  >
                     <p className="font-medium">{item.name}</p>
                     <p className="text-xs text-muted-foreground">
                       {item.supplierName ?? "Uten leverandør"} · {formatNok(item.costPrice)} /{" "}
@@ -687,7 +691,7 @@ export default function VarelistePage() {
                       {!item.declarationName && <Badge variant="outline">Mangler deklarasjon</Badge>}
                       {!item.isActive && <Badge variant="outline">Inaktiv</Badge>}
                     </div>
-                  </a>
+                  </Link>
                 </li>
               ))}
             </ul>
@@ -700,9 +704,15 @@ export default function VarelistePage() {
           existingCategories={existingCategories}
           busy={bulkMut.isPending}
           onApply={applyBulk}
-          onConfirmPackages={() => setPackageQueue(Array.from(selected))}
+          onConfirmPackages={startPackageQueue}
           onExport={exportCsv}
           onClear={() => setSelected(new Set())}
+        />
+
+        <SaveViewDialog
+          open={saveViewOpen}
+          onOpenChange={setSaveViewOpen}
+          onSave={saveCurrentView}
         />
 
         <NewRawMaterialDialog open={newOpen} onOpenChange={setNewOpen} />
