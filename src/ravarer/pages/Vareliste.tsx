@@ -39,7 +39,7 @@ import { useAddPriceHistory } from "@/ravarer/hooks/useRmSuppliers";
 import { usePackageWorklist } from "@/ravarer/hooks/usePackageSizes";
 import { useBulkUpdateRawMaterials, type BulkPatch } from "@/ravarer/hooks/useBulkUpdateRawMaterials";
 import { useUiPreference } from "@/hooks/useUiPreference";
-import { todayOslo } from "@/lib/osloDate";
+import { osloTodayISO } from "@/lib/osloDate";
 import { formatNok, formatNumber, formatDate } from "@/ravarer/lib/constants";
 import { categoryOptions } from "@/ravarer/lib/categories";
 import {
@@ -210,7 +210,7 @@ export default function VarelistePage() {
         raw_material_id: item.id,
         supplier_id: item.supplierId,
         price: value,
-        effective_date: todayOslo(),
+        effective_date: osloTodayISO(),
         source: "manual",
         notes: reason || null,
         set_as_current: true,
@@ -302,7 +302,7 @@ export default function VarelistePage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `vareliste-${todayOslo()}.csv`;
+    a.download = `vareliste-${osloTodayISO()}.csv`;
     a.click();
     URL.revokeObjectURL(url);
     toast.success(`${rows.length} rader eksportert`);
