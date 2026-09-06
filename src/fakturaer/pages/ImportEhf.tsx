@@ -38,10 +38,16 @@ export default function ImportEhfPage({ embedded = false }: { embedded?: boolean
         body: { xml: xmlText, storage_path: path },
       });
       if (error) throw error;
-      const invoiceId = (data as any)?.invoice_id;
-      toast.success("EHF-faktura importert");
-      if (invoiceId) navigate(`/ravarer/fakturaer/${invoiceId}`);
-      else navigate("/ravarer/fakturaer");
+      const invoiceId = (data as { invoice_id?: string } | null)?.invoice_id;
+      if (invoiceId) {
+        // Auto-match kjøres med én gang, slik at brukeren lander på ferdige forslag.
+        const matched = await runAutoMatchAfterImport(invoiceId);
+        toast.success(matched ? "EHF-faktura importert og matchet" : "EHF-faktura importert — kjør match fra innboksen");
+        navigate(`/ravarer/fakturaer/til-behandling?faktura=${invoiceId}`);
+      } else {
+        toast.success("EHF-faktura importert");
+        navigate("/ravarer/fakturaer");
+      }
     } catch (e: any) {
       toast.error(`Import feilet: ${e.message ?? e}`);
     } finally {
