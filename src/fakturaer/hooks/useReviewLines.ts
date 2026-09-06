@@ -138,8 +138,57 @@ export function useReviewLines(filters: Filters) {
       }
 
       rows.forEach((r) => r.suggestions?.sort((a, b) => a.rank - b.rank));
+      // Nyeste faktura først. Sorteringen gjøres i klienten fordi PostgREST
+      // ikke kan sortere toppnivået på en kolonne fra den innbakte fakturaen.
+      rows.sort((a, b) => {
+        const d = (b.invoice?.invoice_date ?? "").localeCompare(a.invoice?.invoice_date ?? "");
+        if (d !== 0) return d;
+        if (a.invoice_id !== b.invoice_id) return a.invoice_id.localeCompare(b.invoice_id);
+        return (a.line_number ?? 0) - (b.line_number ?? 0);
+      });
       return { rows, totalCount: rows.length, hiddenCount: 0, hasMore };
     },
     refetchInterval: 30000,
   });
 }
+
+/** Det lille settet med felter som trengs for å telle køen per fane. */
+export interface ReviewLineCountRow {
+  id: string;
+  invoice_id: string;
+  review_reason: string | null;
+  requires_review: boolean | null;
+  variance_status: string | null;
+  raw_material_id: string | null;
+}
+
+/**
+ * Teller HELE køen — ikke bare de linjene som er hentet inn i tabellen.
+ * Uten denne viste fanetellerne bare det avkortede settet.
+ */
+export function useReviewLineCounts(filters: Omit<Filters, "limit">) {
+  return useQuery({
+    queryKey: ["fakturaer-review-count", "lines", filters],
+    queryFn: async () => {
+      const build = (from: number, to: number) => {
+        let q = supabase
+          .from("invoice_lines")
+          .select(
+            "id, invoice_id, review_reason, requires_review, variance_status, raw_material_id, invoice:invoices!inner(id)",
+          )
+          .or("requires_review.eq.true,variance_status.eq.no_baseline")
+          .not("invoice.status", "in", `(${HIDDEN_INVOICE_STATUSES.join(",")})`)
+          .order("invoice_id")
+          .range(from, to);
+        if (filters.legalEntityId) q = q.eq("invoice.legal_entity_id", filters.legalEntityId);
+        if (filters.supplierId) q = q.eq("invoice.supplier_id", filters.supplierId);
+        if (filters.invoiceId) q = q.eq("invoice_id", filters.invoiceId);
+        if (filters.onlyReady) q = q.eq("invoice.status", "ready");
+        return q as unknown as PromiseLike<{ data: ReviewLineCountRow[] | null; error: { message: string } | null }>;
+      };
+      return await fetchAllRows<ReviewLineCountRow>(build);
+    },
+    refetchInterval: 30000,
+  });
+}
+
