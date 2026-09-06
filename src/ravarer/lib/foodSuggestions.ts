@@ -99,3 +99,79 @@ export function suggestFoods(
     confidence: Math.round(s.confidence * 100) / 100,
   }));
 }
+
+/* ------------------------------------------------------------------ *
+ * Sikkerhetsvurdering før automatisk kobling
+ *
+ * Prosenten over er en tekstlikhet, ikke en kalibrert sannsynlighet for at
+ * matvaren er riktig. «Melk, hel» og «Melk, skummet» får begge full score på
+ * søket «melk», og sorteringen ville da valgt det korteste navnet. Derfor må
+ * masse-kobling sperres når toppforslagene ligger tett, eller når toppforslaget
+ * er en variant (fettprosent, rå/kokt/tørket, saltet/usaltet, glutenfri) som
+ * råvarenavnet ikke sier noe om.
+ * ------------------------------------------------------------------ */
+
+/** Minste avstand mellom forslag 1 og 2 før vi tør å koble automatisk. */
+export const AMBIGUITY_MARGIN = 0.08;
+/** Laveste tekstlikhet som kan kobles automatisk. */
+export const AUTO_LINK_MIN_CONFIDENCE = 0.8;
+
+const VARIANT_PATTERNS: { label: string; re: RegExp }[] = [
+  { label: "fettinnhold", re: /(\d+([.,]\d+)?\s*%)/ },
+  { label: "fettinnhold", re: /\b(hel|helmelk|lett|lettmelk|ekstra lett|skummet|mager|fet|halvfet|full fat)\b/ },
+  { label: "tilberedning", re: /\b(ra|raa|kokt|ukokt|stekt|torket|torka|ristet|hermetisk|frossen|fersk|bakt|grillet|pasteurisert)\b/ },
+  { label: "salting", re: /\b(saltet|usaltet|lettsaltet|uten salt|med salt)\b/ },
+  { label: "gluten", re: /\b(glutenfri|glutenfritt|uten gluten)\b/ },
+  { label: "sukker", re: /\b(sukret|usukret|uten sukker|sukkerfri)\b/ },
+];
+
+/** Hvilke variantegenskaper en tekst omtaler. */
+export function variantMarkers(text: string | null | undefined): string[] {
+  const n = normalizeForSearch(text ?? "");
+  if (!n) return [];
+  const out: string[] = [];
+  for (const p of VARIANT_PATTERNS) {
+    if (p.re.test(n) && !out.includes(p.label)) out.push(p.label);
+  }
+  return out;
+}
+
+export interface SuggestionSafety {
+  /** Trygt å koble uten at et menneske ser på det. */
+  autoLinkAllowed: boolean;
+  /** Kort forklaring på norsk når kobling må gjøres manuelt. */
+  reason: string | null;
+}
+
+/** Kan toppforslaget kobles automatisk, eller må noen velge selv? */
+export function assessSuggestions(
+  rm: RawMaterialForSuggestion,
+  suggestions: readonly FoodSuggestion[],
+): SuggestionSafety {
+  const top = suggestions[0];
+  if (!top) return { autoLinkAllowed: false, reason: "Ingen forslag" };
+  if (top.confidence < AUTO_LINK_MIN_CONFIDENCE) {
+    return { autoLinkAllowed: false, reason: "For svakt treff — velg selv" };
+  }
+
+  const second = suggestions[1];
+  if (second && top.confidence - second.confidence < AMBIGUITY_MARGIN) {
+    return {
+      autoLinkAllowed: false,
+      reason: `Flere nesten like treff (${top.food_name} / ${second.food_name}) — velg selv`,
+    };
+  }
+
+  const rmText = [rm.declaration_name ?? "", rm.name].join(" ");
+  const asked = variantMarkers(rmText);
+  const offered = variantMarkers(top.food_name);
+  const unmatched = offered.filter((m) => !asked.includes(m));
+  if (unmatched.length > 0) {
+    return {
+      autoLinkAllowed: false,
+      reason: `«${top.food_name}» er en variant (${unmatched.join(", ")}) — velg selv`,
+    };
+  }
+
+  return { autoLinkAllowed: true, reason: null };
+}

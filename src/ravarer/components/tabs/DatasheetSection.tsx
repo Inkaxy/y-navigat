@@ -102,7 +102,16 @@ export function DatasheetSection({ rawMaterialId }: Props) {
       });
       if (error) throw error;
       if (data.error) throw new Error(data.error);
+      if (Array.isArray(data.failures) && data.failures.length > 0) {
+        throw new Error(`Noe ble ikke lagret: ${data.failures.join(" · ")}`);
+      }
       toast.success(`Lagret ${data.changes_logged} endringer · ${data.affected_products} produkter flagget`);
+      const pkg = data.follow_ups?.package_suggestion;
+      if (pkg) {
+        toast.info(
+          `Databladet oppgir pakning ${pkg.suggested.size} ${pkg.suggested.unit ?? ""} — bekreft i pakningsdialogen for å oppdatere kostprisen.`,
+        );
+      }
       setExtracted(null);
       setDatasheetId(null);
       invalidateRawMaterial(qc, rawMaterialId);

@@ -74,6 +74,10 @@ export function useExtractNutritionFromDatasheet() {
       });
       if (applyErr) throw new Error(`Kunne ikke lagre: ${applyErr.message}`);
       if ((applied as any)?.error) throw new Error((applied as any).error);
+      const failures = (applied as any)?.failures as string[] | undefined;
+      if (Array.isArray(failures) && failures.length > 0) {
+        throw new Error(`Noe ble ikke lagret: ${failures.join(" · ")}`);
+      }
       return applied;
     },
     onSuccess: () => {

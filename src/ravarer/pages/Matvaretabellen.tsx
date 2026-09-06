@@ -140,12 +140,12 @@ export default function Matvaretabellen() {
           <div className="text-sm text-ink-secondary">Dekning næringsdata</div>
           <div className="text-xl font-semibold tabular-nums">
             {coverage.data && coverage.data.total > 0
-              ? `${Math.round((coverage.data.withNutrition / coverage.data.total) * 100)} %`
+              ? `${Math.round((coverage.data.complete / coverage.data.total) * 100)} %`
               : "—"}
           </div>
           <div className="text-xs text-ink-secondary">
-            {coverage.data?.withNutrition ?? 0} av {coverage.data?.total ?? 0} matråvarer har næringsdata ·{" "}
-            {coverage.data?.missing.length ?? 0} mangler
+            {coverage.data?.complete ?? 0} av {coverage.data?.total ?? 0} matråvarer har fullstendig næringsdata ·{" "}
+            {coverage.data?.incomplete ?? 0} ufullstendige · {coverage.data?.missing ?? 0} mangler
           </div>
         </div>
         <Button asChild variant="outline">

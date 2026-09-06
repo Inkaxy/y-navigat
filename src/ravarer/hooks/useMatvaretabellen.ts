@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { toast } from "sonner";
 import { fetchAllRows } from "@/lib/supabasePaging";
+import { invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 
 export interface FoodRow {
   food_id: string;
@@ -60,7 +61,12 @@ export function useMatvaretabellenLinks() {
     queryKey: ["matvaretabellen_links", legalEntityId],
     enabled: !!legalEntityId,
     queryFn: async () => {
-      const data = await fetchAllRows<any>((from, to) =>
+      type LinkRow = {
+        raw_material_id: string;
+        matvaretabellen_food_id: string;
+        raw_material: { name: string | null } | null;
+      };
+      const data = await fetchAllRows<LinkRow>((from, to) =>
         supabase
           .from("raw_material_nutrition")
           .select("raw_material_id, matvaretabellen_food_id, raw_material:raw_materials!inner(name, legal_entity_id)")
@@ -71,8 +77,8 @@ export function useMatvaretabellenLinks() {
 
 
       const map = new Map<string, FoodLink[]>();
-      for (const row of (data ?? []) as any[]) {
-        const foodId = row.matvaretabellen_food_id as string;
+      for (const row of data ?? []) {
+        const foodId = row.matvaretabellen_food_id;
         const list = map.get(foodId) ?? [];
         list.push({
           food_id: foodId,
@@ -98,47 +104,62 @@ export function useSyncMatvaretabellen() {
       qc.invalidateQueries({ queryKey: ["matvaretabellen_foods"] });
       toast.success(`Matvaretabellen oppdatert — ${res?.upserted ?? 0} matvarer lagret`);
     },
-    onError: (e: any) => toast.error(`Kunne ikke oppdatere: ${e.message ?? e}`),
+    onError: (e: unknown) => toast.error(`Kunne ikke oppdatere: ${e instanceof Error ? e.message : e}`),
   });
 }
 
 export function useApplyMatvaretabellen() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { rawMaterialId: string; foodId: string }) => {
-      const { data: before } = await supabase
-        .from("raw_materials")
-        .select("declaration_name")
-        .eq("id", input.rawMaterialId)
-        .maybeSingle();
-      const { error } = await supabase.rpc("rm_apply_matvaretabellen", {
-        p_raw_material_id: input.rawMaterialId,
-        p_food_id: input.foodId,
-      });
-      if (error) throw error;
+    // `silent` brukes av masse-koblingen: da vises én oppsummering til slutt
+    // i stedet for én toast per rad, og vi hopper over ekstra-oppslagene som
+    // bare fantes for å pynte på toast-teksten.
+    mutationFn: async (input: { rawMaterialId: string; foodId: string; silent?: boolean }) => {
       let declarationNameSet: string | null = null;
-      if (!before?.declaration_name?.trim()) {
-        const { data: after } = await supabase
+      if (!input.silent) {
+        const { data: before, error: beforeErr } = await supabase
           .from("raw_materials")
           .select("declaration_name")
           .eq("id", input.rawMaterialId)
           .maybeSingle();
-        declarationNameSet = after?.declaration_name?.trim() || null;
+        if (beforeErr) throw beforeErr;
+        const { error } = await supabase.rpc("rm_apply_matvaretabellen", {
+          p_raw_material_id: input.rawMaterialId,
+          p_food_id: input.foodId,
+        });
+        if (error) throw error;
+        if (!before?.declaration_name?.trim()) {
+          const { data: after } = await supabase
+            .from("raw_materials")
+            .select("declaration_name")
+            .eq("id", input.rawMaterialId)
+            .maybeSingle();
+          declarationNameSet = after?.declaration_name?.trim() || null;
+        }
+      } else {
+        const { error } = await supabase.rpc("rm_apply_matvaretabellen", {
+          p_raw_material_id: input.rawMaterialId,
+          p_food_id: input.foodId,
+        });
+        if (error) throw error;
       }
       return { ...input, declarationNameSet };
     },
     onSuccess: (input) => {
-      qc.invalidateQueries({ queryKey: ["matvaretabellen_links"] });
-      qc.invalidateQueries({ queryKey: ["raw_material_nutrition", input.rawMaterialId] });
-      qc.invalidateQueries({ queryKey: ["raw_material", input.rawMaterialId] });
-      qc.invalidateQueries({ queryKey: ["declaration-worklist"] });
+      invalidateRawMaterial(qc, input.rawMaterialId);
+      void qc.invalidateQueries({ queryKey: ["matvaretabellen_links"] });
+      void qc.invalidateQueries({ queryKey: ["nutrition-coverage"] });
+      if (input.silent) return;
       toast.success(
         input.declarationNameSet
           ? `Næringsverdier hentet fra Matvaretabellen · Deklarasjonsnavn satt til «${input.declarationNameSet}»`
           : "Næringsverdier hentet fra Matvaretabellen",
       );
     },
-    onError: (e: any) => toast.error(`Kunne ikke koble: ${e.message ?? e}`),
+    onError: (e: unknown, input) => {
+      if (input?.silent) return;
+      toast.error(`Kunne ikke koble: ${e instanceof Error ? e.message : String(e)}`);
+    },
   });
 }
 
@@ -155,7 +176,7 @@ export function useUnlinkMatvaretabellen() {
       qc.invalidateQueries({ queryKey: ["raw_material_nutrition", rawMaterialId] });
       toast.success("Koblingen til Matvaretabellen er fjernet");
     },
-    onError: (e: any) => toast.error(`Kunne ikke koble fra: ${e.message ?? e}`),
+    onError: (e: unknown) => toast.error(`Kunne ikke koble fra: ${e instanceof Error ? e.message : e}`),
   });
 }
 

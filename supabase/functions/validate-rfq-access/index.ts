@@ -1,4 +1,10 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import {
+  RFQ_ITEM_SELECT,
+  RFQ_RESPONSE_SELECT,
+  projectRfqItems,
+  projectRfqResponses,
+} from "../_shared/negotiation-projection.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -70,12 +76,12 @@ Deno.serve(async (req) => {
     // Load full bundle: items + existing draft responses + supplier name + raw materials
     const { data: items } = await admin
       .from("negotiation_items")
-      .select("*, raw_materials(name, base_unit, package_size, package_unit)")
+      .select(RFQ_ITEM_SELECT)
       .eq("negotiation_id", row.negotiation_id)
       .order("sort_order");
     const { data: responses } = await admin
       .from("negotiation_responses")
-      .select("*")
+      .select(RFQ_RESPONSE_SELECT)
       .eq("recipient_id", row.recipient_id);
     const { data: supplier } = await admin
       .from("suppliers")
@@ -91,8 +97,8 @@ Deno.serve(async (req) => {
       negotiation_title: row.negotiation_title,
       response_deadline: row.response_deadline,
       supplier_name: supplier?.name ?? null,
-      items: items ?? [],
-      responses: responses ?? [],
+      items: projectRfqItems(items),
+      responses: projectRfqResponses(responses),
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e: any) {
     console.error("validate-rfq-access", e);

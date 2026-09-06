@@ -30,6 +30,20 @@ import { useRawMaterial } from "@/ravarer/hooks/useRawMaterials";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 import { UnsavedChangesDialog } from "@/components/common/UnsavedChangesDialog";
 
+const ALLERGEN_LABEL_BY_VALUE: Record<string, string> = Object.fromEntries(ALLERGENS.map((a) => [a.value, a.label]));
+const PRESENCE_LABEL: Record<string, string> = {
+  contains: "inneholder",
+  may_contain: "kan inneholde spor",
+  free_from: "fri for",
+};
+
+interface AllergenSuggestion {
+  allergen: string;
+  presence: "contains" | "may_contain";
+  /** Hva som er registrert i dag, slik at brukeren ser hva forslaget endrer. */
+  current: "contains" | "may_contain" | "free_from" | null;
+}
+
 interface Props {
   rawMaterialId: string;
   /** Lar råvaredetaljen koble ⌘S til lagring når fanen er aktiv. */
@@ -56,9 +70,23 @@ export function NutritionTab({ rawMaterialId, registerSave }: Props) {
   const setAllergen = useSetAllergen();
 
   const [draft, setDraft] = useState<NutritionRow>(empty);
-  useEffect(() => { setDraft(existing ?? { ...empty, raw_material_id: rawMaterialId }); }, [existing, rawMaterialId]);
-
   const dirty = JSON.stringify(draft) !== JSON.stringify(existing ?? { ...empty, raw_material_id: rawMaterialId });
+
+  // Skjemaet fylles fra databasen, men et bakgrunnsoppdatert svar skal aldri
+  // kaste bort noe brukeren har skrevet. Vi synker derfor bare når feltene er
+  // urørte, eller når vi bytter til en annen råvare.
+  const syncRef = useRef<{ id: string; snapshot: string } | null>(null);
+  useEffect(() => {
+    const base = existing ?? { ...empty, raw_material_id: rawMaterialId };
+    const snapshot = JSON.stringify(base);
+    const switched = syncRef.current?.id !== rawMaterialId;
+    if (!switched) {
+      if (syncRef.current?.snapshot === snapshot) return;
+      if (dirty) return;
+    }
+    syncRef.current = { id: rawMaterialId, snapshot };
+    setDraft(base);
+  }, [existing, rawMaterialId, dirty]);
 
   const macroSum = useMemo(() => {
     return (Number(draft.fat_g ?? 0) + Number(draft.carbs_g ?? 0) + Number(draft.protein_g ?? 0) + Number(draft.fiber_g ?? 0) + Number(draft.salt_g ?? 0));
@@ -81,7 +109,14 @@ export function NutritionTab({ rawMaterialId, registerSave }: Props) {
   });
   const becomesManual = sourceOnSave !== normalizeNutritionSource(existing?.source ?? null) && sourceOnSave === "manuell";
 
+  // Allergener er en matsikkerhetsopplysning. AI-forslag skrives derfor aldri
+  // rett inn — de vises som forslag, og et menneske huker av det som skal lagres.
   const [suggesting, setSuggesting] = useState(false);
+  const [applyingSuggestions, setApplyingSuggestions] = useState(false);
+  const [suggestions, setSuggestions] = useState<AllergenSuggestion[] | null>(null);
+  const [rejectedCount, setRejectedCount] = useState(0);
+  const [chosen, setChosen] = useState<Set<string>>(new Set());
+
   const suggestAllergens = async () => {
     setSuggesting(true);
     try {
@@ -91,23 +126,50 @@ export function NutritionTab({ rawMaterialId, registerSave }: Props) {
       if (error) throw new Error(error.message);
       if (data?.error) throw new Error(String(data.error));
       const list = Array.isArray(data?.suggestions) ? data.suggestions : [];
-      let added = 0;
+      const clean: AllergenSuggestion[] = [];
       for (const sug of list) {
         const code = normalizeAllergenCode(sug?.allergen);
         const presence = normalizeAllergenPresence(sug?.presence);
         if (!code || !presence || presence === "free_from") continue;
-        if (allergens.some((a) => a.allergen === code)) continue;
-        await setAllergen.mutateAsync({ raw_material_id: rawMaterialId, allergen: code, presence });
-        added++;
+        const current = allergens.find((a) => a.allergen === code)?.presence ?? null;
+        if (current === presence) continue;
+        if (clean.some((c) => c.allergen === code)) continue;
+        clean.push({ allergen: code, presence, current });
       }
-      const rejected = Array.isArray(data?.rejected) ? data.rejected.length : 0;
-      if (added === 0) toast.info("Ingen nye allergener å foreslå.");
-      else toast.success(`${added} allergener lagt til fra forslag${rejected > 0 ? ` · ${rejected} forkastet` : ""}`);
+      setRejectedCount(Array.isArray(data?.rejected) ? data.rejected.length : 0);
+      setSuggestions(clean);
+      setChosen(new Set());
+      if (clean.length === 0) toast.info("Ingen nye allergener å foreslå.");
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Kunne ikke hente forslag");
     } finally {
       setSuggesting(false);
     }
+  };
+
+  const applyChosenSuggestions = async () => {
+    if (!suggestions || chosen.size === 0 || applyingSuggestions) return;
+    setApplyingSuggestions(true);
+    const failed: string[] = [];
+    let saved = 0;
+    for (const s of suggestions) {
+      if (!chosen.has(s.allergen)) continue;
+      try {
+        await setAllergen.mutateAsync({
+          raw_material_id: rawMaterialId,
+          allergen: s.allergen,
+          presence: s.presence,
+        });
+        saved++;
+      } catch {
+        failed.push(s.allergen);
+      }
+    }
+    setApplyingSuggestions(false);
+    setSuggestions(null);
+    setChosen(new Set());
+    if (failed.length === 0) toast.success(`${saved} allergener lagret`);
+    else toast.warning(`${saved} lagret · feilet: ${failed.join(", ")}`);
   };
 
   const presenceFor = (a: string) => allergens.find(x => x.allergen === a)?.presence ?? null;
@@ -265,6 +327,54 @@ export function NutritionTab({ rawMaterialId, registerSave }: Props) {
             </Button>
           )}
         </div>
+
+        {suggestions && suggestions.length > 0 && (
+          <div className="rounded-xl border border-line-subtle bg-muted/30 p-4 space-y-3">
+            <div className="text-sm font-medium">
+              Forslag fra AI — ingenting er lagret ennå
+              {rejectedCount > 0 && (
+                <span className="ml-2 text-xs font-normal text-ink-secondary">{rejectedCount} forkastet av validering</span>
+              )}
+            </div>
+            <ul className="space-y-2">
+              {suggestions.map((s) => (
+                <li key={s.allergen} className="flex items-start gap-2 rounded-lg bg-surface-raised p-2.5 text-sm">
+                  <input
+                    type="checkbox"
+                    className="mt-1"
+                    id={`sug-${s.allergen}`}
+                    checked={chosen.has(s.allergen)}
+                    onChange={(e) =>
+                      setChosen((prev) => {
+                        const next = new Set(prev);
+                        if (e.target.checked) next.add(s.allergen);
+                        else next.delete(s.allergen);
+                        return next;
+                      })
+                    }
+                  />
+                  <label htmlFor={`sug-${s.allergen}`} className="cursor-pointer">
+                    <span className="font-medium">{ALLERGEN_LABEL_BY_VALUE[s.allergen] ?? s.allergen}</span>{" "}
+                    <span className="text-ink-secondary">
+                      {s.current ? `${PRESENCE_LABEL[s.current]} → ` : ""}
+                      {PRESENCE_LABEL[s.presence]}
+                    </span>
+                  </label>
+                </li>
+              ))}
+            </ul>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => { setSuggestions(null); setChosen(new Set()); }}>
+                Forkast forslagene
+              </Button>
+              <Button size="sm" disabled={chosen.size === 0 || applyingSuggestions} onClick={applyChosenSuggestions}>
+                {applyingSuggestions && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+                Godkjenn valgte ({chosen.size})
+              </Button>
+            </div>
+          </div>
+        )}
+
         <div className="space-y-4">
           {Object.entries(grouped).map(([group, items]) => (
             <div key={group}>

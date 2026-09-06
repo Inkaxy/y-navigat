@@ -148,6 +148,9 @@ export default function DatabladBulk() {
       if (error) throw new Error(error.message);
       if (!data) throw new Error("Ingen respons fra apply-datasheet-update");
       if (data.error) throw new Error(data.error);
+      if (Array.isArray(data.failures) && data.failures.length > 0) {
+        throw new Error(`Noe ble ikke lagret: ${data.failures.join(" · ")}`);
+      }
       updateRow(i, { applied: true });
       if (!silent) toast.success(`${r.file.name}: ${data.changes_logged} endringer logget`);
       return true;
