@@ -2,9 +2,9 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   CartesianGrid,
+  ComposedChart,
   Legend,
   Line,
-  LineChart,
   ReferenceArea,
   ResponsiveContainer,
   Scatter,
@@ -12,7 +12,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { format, parseISO, subMonths } from "date-fns";
+import { format } from "date-fns";
 import { nb } from "date-fns/locale";
 import { Download, TrendingUp } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -21,6 +21,12 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatNok, formatDate, PRICE_SOURCES } from "@/ravarer/lib/constants";
 import { osloTodayISO } from "@/lib/osloDate";
+import { PeriodPicker } from "@/ravarer/components/PeriodPicker";
+import {
+  rangeForPreset,
+  type DateRange,
+  type PeriodPreset,
+} from "@/ravarer/lib/periodPresets";
 import {
   buildTimeline,
   timelineCsv,
@@ -28,9 +34,6 @@ import {
   type TimelineLink,
   type TimelinePoint,
 } from "@/ravarer/lib/priceTimeline";
-
-const MONTH_OPTIONS = [3, 6, 12, 24] as const;
-type Months = (typeof MONTH_OPTIONS)[number];
 
 function sourceLabel(value: string): string {
   return PRICE_SOURCES.find((s) => s.value === value)?.label ?? value;
@@ -65,22 +68,36 @@ export function PriceTimeline({
   exportName = "pristidslinje",
 }: Props) {
   const navigate = useNavigate();
-  const [months, setMonths] = useState<Months>(12);
+  const [preset, setPreset] = useState<PeriodPreset>("last_12m");
+  const [range, setRange] = useState<DateRange>(() => rangeForPreset("last_12m"));
   const [unitMode, setUnitMode] = useState<"base" | "package">("base");
 
   const packageFactor = baseUnitsPerPackage && baseUnitsPerPackage > 0 ? baseUnitsPerPackage : null;
   const unitFactor = unitMode === "package" && packageFactor ? packageFactor : 1;
   const unitLabel = unitMode === "package" && packageFactor ? "pakning" : baseUnit;
 
-  const from = useMemo(
-    () => format(subMonths(parseISO(osloTodayISO()), months), "yyyy-MM-dd"),
-    [months],
+  const { series, bands, rows } = useMemo(
+    () =>
+      buildTimeline({
+        history,
+        supplierNames,
+        links,
+        unitFactor,
+        from: range.start,
+        to: range.end,
+      }),
+    [history, supplierNames, links, unitFactor, range.start, range.end],
   );
 
-  const { series, bands, rows } = useMemo(
-    () => buildTimeline({ history, supplierNames, links, unitFactor, from }),
-    [history, supplierNames, links, unitFactor, from],
-  );
+  /** Ett fargekart nøklet på leverandør — brukes av både avtalebånd og linjer. */
+  const colorByKey = useMemo(() => {
+    const keys = new Set<string>();
+    series.forEach((s) => keys.add(s.key));
+    bands.forEach((b) => keys.add(b.supplierKey));
+    const map = new Map<string, string>();
+    Array.from(keys).forEach((k, i) => map.set(k, seriesColor(i)));
+    return map;
+  }, [series, bands]);
 
   const markers = useMemo(
     () => rows.filter((r) => r.isCreditNote || r.isManual),
@@ -115,19 +132,22 @@ export function PriceTimeline({
             {title} — kr per {unitLabel}
           </h3>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Select value={String(months)} onValueChange={(v) => setMonths(Number(v) as Months)}>
-            <SelectTrigger className="h-9 w-[150px]" aria-label="Periode">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {MONTH_OPTIONS.map((m) => (
-                <SelectItem key={m} value={String(m)}>
-                  Siste {m} mnd
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="flex flex-wrap items-end gap-2">
+          <PeriodPicker
+            preset={preset}
+            range={range}
+            compare="none"
+            showCompare={false}
+            onPresetChange={(p, r) => {
+              setPreset(p);
+              setRange(r);
+            }}
+            onRangeChange={(r) => {
+              setPreset("custom");
+              setRange(r);
+            }}
+            onCompareChange={() => undefined}
+          />
           <Select
             value={unitMode}
             onValueChange={(v) => setUnitMode(v === "package" ? "package" : "base")}
@@ -156,7 +176,7 @@ export function PriceTimeline({
       ) : (
         <div className="h-72">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+            <ComposedChart margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
               <XAxis
                 dataKey="t"
@@ -169,28 +189,28 @@ export function PriceTimeline({
               <YAxis fontSize={11} tickFormatter={(v: number) => `${v} kr`} />
               <Tooltip content={<TimelineTooltip unitLabel={unitLabel} />} />
               <Legend />
-              {bands.map((b, i) => (
+              {bands.map((b) => (
                 <ReferenceArea
                   key={`${b.supplierKey}-${b.from}`}
                   x1={Date.parse(`${b.from}T00:00:00Z`)}
                   x2={Date.parse(`${b.to ?? osloTodayISO()}T00:00:00Z`)}
                   y1={b.price * 0.995}
                   y2={b.price * 1.005}
-                  fill={seriesColor(i)}
+                  fill={colorByKey.get(b.supplierKey) ?? seriesColor(0)}
                   fillOpacity={0.18}
-                  stroke={seriesColor(i)}
+                  stroke={colorByKey.get(b.supplierKey) ?? seriesColor(0)}
                   strokeOpacity={0.4}
                   strokeDasharray="4 4"
                 />
               ))}
-              {series.map((s, i) => (
+              {series.map((s) => (
                 <Line
                   key={s.key}
                   data={s.points}
                   dataKey="price"
                   name={s.name}
                   type="monotone"
-                  stroke={seriesColor(i)}
+                  stroke={colorByKey.get(s.key) ?? seriesColor(0)}
                   strokeWidth={2}
                   dot={{ r: 3 }}
                   activeDot={{
@@ -211,7 +231,7 @@ export function PriceTimeline({
                   shape="diamond"
                 />
               )}
-            </LineChart>
+            </ComposedChart>
           </ResponsiveContainer>
         </div>
       )}

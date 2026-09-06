@@ -18,6 +18,8 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { RavarerHeaderBanner } from "@/ravarer/components/RavarerHeaderBanner";
+import { Kpi } from "@/ravarer/components/Kpi";
+import { PriceTimeline } from "@/ravarer/components/PriceTimeline";
 import { ItemTypeBadge } from "@/ravarer/components/ItemTypeBadge";
 import { InvoiceStatusBadge } from "@/fakturaer/components/InvoiceStatusBadge";
 import { formatNok, formatDate, formatNumber } from "@/ravarer/lib/constants";
@@ -29,19 +31,19 @@ import {
   useSupplierSpend,
   useSupplierAliases,
   useUpdateSupplierNotes,
+  type SupplierItemRow,
 } from "@/ravarer/hooks/useSupplierDetail";
+import { usePriceHistory } from "@/ravarer/hooks/useRmSuppliers";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 type ItemSort = { key: "name" | "price"; dir: "asc" | "desc" };
 
-function Kpi({ label, value, hint }: { label: string; value: string; hint?: string }) {
-  return (
-    <Card className="p-4">
-      <p className="text-xs uppercase tracking-wider text-ink-secondary">{label}</p>
-      <p className="mt-1 text-2xl font-semibold tabular-nums text-ink-primary">{value}</p>
-      {hint && <p className="mt-0.5 text-xs text-ink-secondary">{hint}</p>}
-    </Card>
-  );
-}
 
 function EmptyTab({ icon: Icon, text }: { icon: typeof Package; text: string }) {
   return (
@@ -241,7 +243,10 @@ export default function LeverandorDetailPage() {
           <TabsTrigger value="aliaser">Aliaser ({aliases.length})</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="varer">
+        <TabsContent value="varer" className="space-y-4">
+          {items.length > 0 && (
+            <SupplierPriceTimeline supplierId={supplier.id} supplierName={supplier.name} items={items} />
+          )}
           <Card className="overflow-hidden">
             {itemsLoading ? (
               <div className="flex items-center justify-center p-12 text-ink-secondary">
@@ -478,5 +483,91 @@ export default function LeverandorDetailPage() {
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+/** Prisutvikling for én av leverandørens varer, filtrert på denne leverandøren. */
+function SupplierPriceTimeline({
+  supplierId,
+  supplierName,
+  items,
+}: {
+  supplierId: string;
+  supplierName: string;
+  items: SupplierItemRow[];
+}) {
+  const sorted = useMemo(
+    () =>
+      [...items].sort((a, b) =>
+        (a.raw_material?.name ?? "").localeCompare(b.raw_material?.name ?? "", "nb"),
+      ),
+    [items],
+  );
+  const [rawMaterialId, setRawMaterialId] = useState(sorted[0]?.raw_material_id ?? "");
+  const selected =
+    sorted.find((i) => i.raw_material_id === rawMaterialId) ?? sorted[0] ?? null;
+  const { data: history = [] } = usePriceHistory(selected?.raw_material_id);
+
+  const supplierNames = useMemo(
+    () => new Map<string, string>([[supplierId, supplierName]]),
+    [supplierId, supplierName],
+  );
+  const links = useMemo(
+    () =>
+      selected
+        ? [
+            {
+              supplier_id: supplierId,
+              agreed_price_per_base_unit: selected.agreed_price_per_base_unit,
+              agreement_valid_from: selected.agreement_valid_from,
+              agreement_valid_to: selected.agreement_valid_to,
+            },
+          ]
+        : [],
+    [selected, supplierId],
+  );
+  const rows = useMemo(
+    () =>
+      history
+        .filter((h) => h.supplier_id === supplierId)
+        .map((h) => ({
+          id: h.id,
+          effective_date: h.effective_date,
+          price: Number(h.price),
+          supplier_id: h.supplier_id,
+          source: h.source ?? "manual",
+          invoice_id: h.invoice_id,
+          invoiceNumber: h.invoices?.invoice_number ?? null,
+          isCreditNote: h.invoices?.is_credit_note ?? false,
+          notes: h.notes ?? null,
+        })),
+    [history, supplierId],
+  );
+
+  if (!selected) return null;
+
+  return (
+    <PriceTimeline
+      history={rows}
+      supplierNames={supplierNames}
+      links={links}
+      baseUnit={selected.raw_material?.base_unit ?? "enhet"}
+      title={`Prisutvikling — ${selected.raw_material?.name ?? "vare"}`}
+      exportName={`prisutvikling-${supplierName}`}
+      actions={
+        <Select value={selected.raw_material_id} onValueChange={setRawMaterialId}>
+          <SelectTrigger className="h-9 w-[240px]" aria-label="Velg vare">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {sorted.map((i) => (
+              <SelectItem key={i.id} value={i.raw_material_id}>
+                {i.raw_material?.name ?? "Ukjent vare"}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      }
+    />
   );
 }

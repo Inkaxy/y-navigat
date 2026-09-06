@@ -1,12 +1,11 @@
 import { DeclarationNameCard } from "./DeclarationNameCard";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import { useNutrition, useUpsertNutrition, useAllergens, useSetAllergen, type NutritionRow } from "@/ravarer/hooks/useNutrition";
 import { ALLERGENS, ALLERGEN_PRESENCE, COUNTRY_OPTIONS, calcEnergyKj, kjToKcal, formatNumber } from "@/ravarer/lib/constants";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
@@ -15,8 +14,14 @@ import { cn } from "@/lib/utils";
 import { DatasheetSection } from "./DatasheetSection";
 import { MatvaretabellenSourceCard } from "@/ravarer/components/matvaretabellen/MatvaretabellenSourceCard";
 import { useRawMaterial } from "@/ravarer/hooks/useRawMaterials";
+import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
+import { UnsavedChangesDialog } from "@/components/common/UnsavedChangesDialog";
 
-interface Props { rawMaterialId: string; }
+interface Props {
+  rawMaterialId: string;
+  /** Lar råvaredetaljen koble ⌘S til lagring når fanen er aktiv. */
+  registerSave?: (save: () => void) => void;
+}
 
 const empty: NutritionRow = {
   raw_material_id: "",
@@ -29,7 +34,7 @@ const empty: NutritionRow = {
   verified_at: null, verified_by: null,
 };
 
-export function NutritionTab({ rawMaterialId }: Props) {
+export function NutritionTab({ rawMaterialId, registerSave }: Props) {
   const { canWrite } = useRavarer();
   const { data: existing } = useNutrition(rawMaterialId);
   const { data: rm } = useRawMaterial(rawMaterialId);
@@ -55,6 +60,18 @@ export function NutritionTab({ rawMaterialId }: Props) {
   };
 
   const presenceFor = (a: string) => allergens.find(x => x.allergen === a)?.presence ?? null;
+
+  const guard = useUnsavedChangesGuard(dirty && canWrite);
+
+  const save = () => {
+    if (!canWrite || !dirty || upsert.isPending) return;
+    upsert.mutate({ ...draft, raw_material_id: rawMaterialId });
+  };
+  const saveRef = useRef(save);
+  saveRef.current = save;
+  useEffect(() => {
+    registerSave?.(() => saveRef.current());
+  }, [registerSave]);
 
   const grouped = useMemo(() => {
     const groups: Record<string, typeof ALLERGENS[number][]> = {};
@@ -149,8 +166,11 @@ export function NutritionTab({ rawMaterialId }: Props) {
       </Card>
 
       {canWrite && (
-        <div className="flex justify-end">
-          <Button disabled={!dirty || upsert.isPending} onClick={() => upsert.mutate({ ...draft, raw_material_id: rawMaterialId })}>
+        <div className="sticky bottom-4 z-10 flex items-center justify-end gap-3 rounded-xl border border-line-subtle bg-surface-raised/95 p-3 shadow-sm backdrop-blur">
+          {dirty && (
+            <span className="text-xs text-ink-secondary">Ulagrede endringer</span>
+          )}
+          <Button disabled={!dirty || upsert.isPending} onClick={save}>
             Lagre næringsinnhold
           </Button>
         </div>
@@ -204,6 +224,7 @@ export function NutritionTab({ rawMaterialId }: Props) {
           ))}
         </div>
       </Card>
+      <UnsavedChangesDialog {...guard.dialogProps} />
     </div>
   );
 }

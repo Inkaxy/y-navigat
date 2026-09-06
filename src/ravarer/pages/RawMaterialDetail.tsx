@@ -291,6 +291,8 @@ export default function RawMaterialDetail() {
       <Tabs
         value={tab}
         onValueChange={(v) => {
+          // Fanen som forlates eier ikke lagringen lenger.
+          saveRef.current = null;
           const next2 = new URLSearchParams(searchParams);
           if (v === "overview") next2.delete("tab");
           else next2.set("tab", v);
@@ -311,9 +313,9 @@ export default function RawMaterialDetail() {
         <TabsContent value="overview" className="mt-5">
           <OverviewTab
             rm={rm}
-            registerSave={(fn) =>
-              (saveRef.current = tab === "overview" ? fn : saveRef.current)
-            }
+            registerSave={(fn) => {
+              if (tab === "overview") saveRef.current = fn;
+            }}
           />
         </TabsContent>
         <TabsContent value="suppliers" className="mt-5">
@@ -321,7 +323,12 @@ export default function RawMaterialDetail() {
         </TabsContent>
         {!rm.is_packaging && (
           <TabsContent value="nutrition" className="mt-5">
-            <NutritionTab rawMaterialId={rm.id} />
+            <NutritionTab
+              rawMaterialId={rm.id}
+              registerSave={(fn) => {
+                if (tab === "nutrition") saveRef.current = fn;
+              }}
+            />
           </TabsContent>
         )}
         <TabsContent value="recipes" className="mt-5">
