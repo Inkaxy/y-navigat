@@ -116,12 +116,18 @@ export default function PublicRecipe() {
   const displayLines: BakersLine[] = useMemo(() => {
     if (!isScaled) return lines;
     const scaled = scaleLines(lines, factor, baseTotals.totalFlourG);
-    return lines.map((l, i) => ({
-      ...l,
-      quantity: roundBakerGrams(scaled[i].exactGrams),
-      unit: "g",
-      _displayPercent: scaled[i].percent,
-    }));
+    return lines.map((l, i) => {
+      const s = scaled[i];
+      // Ukjent omregning: behold enheten og skaler mengden — aldri 0 g.
+      if (!s.exact) return { ...l, quantity: s.scaledQuantity, _displayPercent: null };
+      return {
+        ...l,
+        quantity: roundBakerGrams(s.exactGrams),
+        unit: "g",
+        _displayPercent: s.percent,
+      };
+    });
+
   }, [lines, isScaled, factor, baseTotals.totalFlourG]);
 
   const totals = isScaled ? summary.totals : baseTotals;
