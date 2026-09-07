@@ -109,7 +109,7 @@ function IngredientRow({ line, index, showPercent }: { line: RecipePDFLine; inde
           {line.name}{line.isSubRecipe ? " †" : ""}
         </Text>
       </View>
-      <View style={styles.colGrams}><Text style={styles.ingGrams}>{fmtGrams(line.grams)} g</Text></View>
+      <View style={styles.colGrams}><Text style={styles.ingGrams}>{line.exactWeight ? `${fmtGrams(line.grams)} g` : (line.fallbackQuantity ?? "ukjent")}</Text></View>
       {showPercent && (
         <View style={styles.colPct}><Text style={styles.ingPct}>{pct(line.percent)}</Text></View>
       )}

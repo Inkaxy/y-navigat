@@ -98,7 +98,7 @@ function PartTable({ part, showCosts }: { part: RecipePDFPart; showCosts: boolea
           <View style={styles.colName}>
             <Text style={styles.cellName}>{l.name}{l.isSubRecipe ? " †" : ""}</Text>
           </View>
-          <View style={styles.colGrams}><Text style={styles.cellGrams}>{fmtGrams(l.grams)} g</Text></View>
+          <View style={styles.colGrams}><Text style={styles.cellGrams}>{l.exactWeight ? `${fmtGrams(l.grams)} g` : (l.fallbackQuantity ?? "ukjent")}</Text></View>
           <View style={styles.colPct}><Text style={styles.cellPct}>{pct(l.percent)}</Text></View>
           {showCosts && (
             <View style={styles.colCost}>
