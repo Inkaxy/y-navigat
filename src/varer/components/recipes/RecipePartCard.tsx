@@ -1,4 +1,4 @@
-import { useState } from "react";
+
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -16,9 +16,10 @@ import { RawMaterialAutocomplete } from "@/varer/components/products/RawMaterial
 import { useStockTrackedRawMaterials } from "@/varer/hooks/useStockTrackedRawMaterials";
 import {
   PART_TYPE_OPTIONS, PREFERMENT_KIND_OPTIONS, bakersPercentFor, computePartSummary,
-  fmtG, fmtPercent, gramsFromPercent, fromGrams, isFlourLine, toGrams,
+  fmtG, fmtPercent, gramsFromPercent, isFlourLine, isLineConvertible, lineFromGrams, lineToGrams,
   type BakersLine, type BakersRawMaterial,
 } from "@/varer/lib/bakers";
+
 
 const UNITS = ["g", "kg", "ml", "liter", "stk"];
 
@@ -240,28 +241,34 @@ function SortableLine({
         ? computedPct.toFixed(1)
         : "";
 
+  /** Sann når linjens enhet faktisk kan regnes om til gram — begge veier. */
+  const convertible = isLineConvertible(line);
+
   function setGrams(value: string) {
+    const conv = lineToGrams({ ...line, quantity: value });
     onChange({
       quantity: value,
       entry_mode: "grams",
-      bakers_percent: totalFlourG > 0 ? (toGrams(value, line.unit) / totalFlourG) * 100 : null,
+      // Er omregningen ukjent, lagrer vi INGEN bakerprosent — et tall her ville
+      // motsagt mengden brukeren skrev.
+      bakers_percent: conv.exact && totalFlourG > 0 ? (conv.grams / totalFlourG) * 100 : null,
     });
   }
 
   function setPercent(value: string) {
+    // Uten kjent omregning kan prosent ikke oversettes til en mengde. Feltet er
+    // deaktivert i den situasjonen, men vi vokter også her.
+    if (!convertible || totalFlourG <= 0) return;
     const pct = value === "" ? 0 : Number(value);
-    const grams = gramsFromPercent(pct, totalFlourG);
+    const quantity = lineFromGrams(gramsFromPercent(pct, totalFlourG), line);
+    if (!Number.isFinite(quantity)) return;
     onChange({
       bakers_percent: value === "" ? null : pct,
       entry_mode: "percent",
-      // Er omregningen ukjent (volum uten tetthet, stk uten stykkvekt), beholdes
-      // mengden slik brukeren skrev den — vi finner ikke på et tall.
-      quantity:
-        totalFlourG > 0 && Number.isFinite(fromGrams(grams, line.unit))
-          ? Number(fromGrams(grams, line.unit).toFixed(2))
-          : line.quantity,
+      quantity: value === "" ? line.quantity : Number(quantity.toFixed(3)),
     });
   }
+
 
   return (
     <div
@@ -343,16 +350,26 @@ function SortableLine({
       <div className="order-7 w-24 md:order-none md:w-auto">
         <div className="relative">
           <Input
-            type="number" step="0.1" placeholder="%"
-            value={showPct}
+            type="number" step="0.1" placeholder={convertible ? "%" : "?"}
+            value={convertible ? showPct : ""}
             onChange={(e) => setPercent(e.target.value)}
-            disabled={!canWrite || flour || totalFlourG <= 0}
-            title={flour ? "Melprosent er avledet — mel definerer nevneren" : "Bakerprosent av samlet melvekt"}
-            className={cn("h-10 pr-6 tabular-nums md:h-9", flour && "bg-muted/60 text-muted-foreground")}
+            disabled={!canWrite || flour || totalFlourG <= 0 || !convertible}
+            title={
+              !convertible
+                ? `Ukjent omregning til gram for «${line.unit}» — bakerprosent kan ikke beregnes`
+                : flour
+                  ? "Melprosent er avledet — mel definerer nevneren"
+                  : "Bakerprosent av samlet melvekt"
+            }
+            className={cn(
+              "h-10 pr-6 tabular-nums md:h-9",
+              (flour || !convertible) && "bg-muted/60 text-muted-foreground",
+            )}
           />
           <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
         </div>
       </div>
+
 
       <div className="order-8 flex justify-center md:order-none">
         <FlourToggle line={line} flour={flour} canWrite={canWrite} onChange={onChange} />

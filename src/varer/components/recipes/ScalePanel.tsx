@@ -55,12 +55,21 @@ export function ScalePanel({
 
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
           <Stat label="Faktor" value={`× ${fmtNum(summary.factor, 2)}`} muted={!isScaled} />
-          <Stat label="Antall emner" value={summary.unitCount != null ? `${fmtNum(summary.unitCount)} stk` : "—"} />
+          <Stat
+            label="Antall emner"
+            value={summary.unitCount != null ? `${fmtNum(summary.unitCount)} stk` : summary.incomplete ? "Ukjent" : "—"}
+            hint={summary.incomplete ? "Noen mengder mangler vekt" : undefined}
+          />
           <Stat
             label="Deigvekt totalt"
-            value={`${fmtG(summary.roundedDoughG)} g`}
-            hint={`uavrundet ${fmtNum(summary.exactDoughG, 1)} g`}
+            value={summary.incomplete ? `Minst ${fmtG(summary.roundedDoughG)} g` : `${fmtG(summary.roundedDoughG)} g`}
+            hint={
+              summary.incomplete
+                ? "Ufullstendig — ikke en produksjonsvekt"
+                : `uavrundet ${fmtNum(summary.exactDoughG, 1)} g`
+            }
           />
+
           {summary.batchCount != null && (
             <div className="flex items-center gap-1.5">
               <Layers className="h-4 w-4 text-app" />

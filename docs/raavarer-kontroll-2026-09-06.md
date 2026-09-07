@@ -268,3 +268,45 @@ og er ikke rørt (utenfor denne runden).
 
 Fortsatt ikke verifisert: levende database, edge-utrulling. Databladoppdateringen er
 fortsatt ikke transaksjonell.
+
+## Etterkontroll 7. september (leveranse 024e9777) — bakers.ts-regresjonen
+
+### 1. Linjeomregning begge veier (`src/varer/lib/bakers.ts`, `RecipePartCard.tsx`)
+- Ny felles kilde: `lineConvertOptions(line)` gir tetthet og stykkvekt, og brukes av
+  BÅDE `lineToGrams` og nye `lineFromGrams`. `isLineConvertible(line)` sier om enheten
+  faktisk kan regnes om.
+- Rent vann avgjøres nå av `isPureWaterLine` med et strengt navnemønster
+  (`vann`/`water`, eventuelt med temperaturord foran). «Kokosvann» og «rosenvann»
+  antas ikke lenger å være vann; 100 % vanninnhold uten navn regnes som vann.
+- `setGrams` bruker linjekonteksten, så 1 l rent vann får riktig bakerprosent, og
+  lagrer `bakers_percent: null` når omregningen er ukjent — aldri en prosent som
+  motsier mengden.
+- `setPercent` bruker `lineFromGrams` med `unit_weight_grams`. Er omregningen ukjent,
+  er prosentfeltet deaktivert med forklarende tittel og ingenting lagres.
+
+### 2. Skalert visning, veieliste og PDF
+- `scaleLines` returnerer nå `exact`, `reason` og `scaledQuantity`. Ukjente linjer får
+  ikke lenger `exactGrams: 0` presentert som en vekt.
+- `scaledSummary` setter `unitCount`, `totals.unitCount` og `batchCount` til `null` når
+  beregningen er ufullstendig, og eksponerer `incomplete`/`warnings`.
+- `RecipeDetail`/`PublicRecipe` beholder mengde og enhet for ukjente linjer i skalert
+  visning. `ScalePanel` viser «Ukjent» og «Minst … g» ved ufullstendig beregning.
+- `useRecipePDF` gir hver linje `exactWeight` og `fallbackQuantity`; produksjonsarket og
+  oppskriftskortet skriver mengde+enhet i stedet for «0 g».
+
+### 3. Tester
+`src/test/bakersUnits.test.ts` utvidet med 8 fokuserte tester: 1 l rent vann → 1000 g og
+tilbake, 60 % av 1 kg mel → 0,6 l, kjent stykkvekt begge veier, kokosvann og ukjent væske
+uten vannantakelse, `scaledSummary` uten bekreftet antall emner/satser ved ukjent linje,
+og at en ukjent linje ikke blir 0 g i skalert visning.
+
+### Verifisering
+`npm run typecheck` exit 0 · `npx vitest run` exit 0 (43 filer, 419 tester) ·
+`npm run build` exit 0 · `npx eslint` på berørte filer: exit 1, men kun forhåndseksisterende
+`no-explicit-any` i `RecipeDetail.tsx`, `PublicRecipe.tsx`, `RecipePartCard.tsx` og
+`useRecipePDF.tsx` — ingen funn i de nye eller endrede linjene. `bakers.ts`, `ScalePanel.tsx`,
+PDF-dokumentene og testfila er rene.
+
+### Begrensninger
+Ingen migrasjoner, ingen publisering, ingen produksjonsdata rørt. Ingen live-verifisering i
+database eller utrullet miljø.

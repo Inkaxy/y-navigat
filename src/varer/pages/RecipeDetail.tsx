@@ -306,12 +306,19 @@ export default function RecipeDetail() {
   const displayLines = useMemo<EditorLine[]>(() => {
     if (!isScaled) return hydratedLines;
     const scaled = scaleLines(hydratedLines, factor, totals.totalFlourG);
-    return hydratedLines.map((l, i) => ({
-      ...l,
-      quantity: roundBakerGrams(scaled[i].exactGrams),
-      unit: "g",
-      _displayPercent: scaled[i].percent,
-    }));
+    return hydratedLines.map((l, i) => {
+      const s = scaled[i];
+      // Ukjent omregning: behold mengde og enhet slik de står — 0 g ville vært
+      // et oppdiktet produksjonstall.
+      if (!s.exact) return { ...l, quantity: s.scaledQuantity, _displayPercent: null };
+      return {
+        ...l,
+        quantity: roundBakerGrams(s.exactGrams),
+        unit: "g",
+        _displayPercent: s.percent,
+      };
+    });
+
   }, [hydratedLines, isScaled, factor, totals.totalFlourG]);
 
   const displayTotals = isScaled ? scaleSummary.totals : totals;

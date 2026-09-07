@@ -8,6 +8,7 @@ import {
   isFlourLine,
   lineDisplayName,
   roundBakerGrams,
+  fmtNum,
   scaleLines,
   STEP_TYPE_LABEL,
   toGrams,
@@ -20,8 +21,12 @@ import {
 export interface RecipePDFLine {
   id: string;
   name: string;
-  /** Avrundet, bakervennlig gramvekt — det bakeren veier. */
+  /** Avrundet, bakervennlig gramvekt — det bakeren veier. 0 når vekten er ukjent. */
   grams: number;
+  /** Usann når mengden ikke kunne regnes om til gram — da er 0 g ikke en vekt. */
+  exactWeight: boolean;
+  /** Mengden i linjens egen enhet, brukt når gramvekten er ukjent. */
+  fallbackQuantity: string | null;
   /** Uavrundet gramvekt. */
   exactGrams: number;
   /** Bakerprosent — uendret av skalering. */
@@ -161,12 +166,17 @@ export function buildRecipePDFData(input: BuildRecipePDFInput): RecipePDFData {
     const ordered = weighingOrder(partLines);
     const lines: RecipePDFLine[] = ordered.map((l) => {
       const s = byId.get(l.id);
+      const exactWeight = s ? s.exact : true;
       const exactGrams = s?.exactGrams ?? toGrams(l.quantity, l.unit) * input.factor;
       const grams = roundBakerGrams(exactGrams);
       return {
         id: l.id,
         name: lineDisplayName(l),
         grams,
+        exactWeight,
+        fallbackQuantity: exactWeight
+          ? null
+          : `${fmtNum(s?.scaledQuantity ?? Number(l.quantity) * input.factor, 2)} ${l.unit}`,
         exactGrams,
         percent: s?.percent ?? 0,
         isFlour: isFlourLine(l),
