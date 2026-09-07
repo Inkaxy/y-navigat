@@ -16,9 +16,10 @@ import { RawMaterialAutocomplete } from "@/varer/components/products/RawMaterial
 import { useStockTrackedRawMaterials } from "@/varer/hooks/useStockTrackedRawMaterials";
 import {
   PART_TYPE_OPTIONS, PREFERMENT_KIND_OPTIONS, bakersPercentFor, computePartSummary,
-  fmtG, fmtPercent, gramsFromPercent, fromGrams, isFlourLine, toGrams,
+  fmtG, fmtPercent, gramsFromPercent, isFlourLine, isLineConvertible, lineFromGrams, lineToGrams,
   type BakersLine, type BakersRawMaterial,
 } from "@/varer/lib/bakers";
+
 
 const UNITS = ["g", "kg", "ml", "liter", "stk"];
 
