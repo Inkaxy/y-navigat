@@ -141,7 +141,7 @@ export default function LiveForhandlingSetup() {
               <SelectValue placeholder="Velg leverandør" />
             </SelectTrigger>
             <SelectContent>
-              {suppliers.map((s) => (
+              {suppliers.filter((s) => s.is_active && s.track_invoice_lines).map((s) => (
                 <SelectItem key={s.id} value={s.id}>
                   {s.name}
                 </SelectItem>
