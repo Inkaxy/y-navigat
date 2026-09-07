@@ -353,7 +353,7 @@ export default function ForhandlingWizard() {
               </thead>
               <tbody>
                 {suppliers
-                  .filter((s) => s.is_active)
+                  .filter((s) => s.is_active && s.track_invoice_lines)
                   .map((s) => {
                     const checked = selectedSup.has(s.id);
                     return (
