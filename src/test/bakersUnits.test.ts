@@ -3,7 +3,12 @@ import {
   computeTotals,
   convertToGrams,
   fromGrams,
+  gramsFromPercent,
+  isLineConvertible,
+  lineFromGrams,
   lineToGrams,
+  scaleLines,
+  scaledSummary,
   type BakersLine,
 } from "@/varer/lib/bakers";
 
@@ -99,5 +104,76 @@ describe("computeTotals", () => {
     expect(totals.incomplete).toBe(false);
     expect(totals.unitCount).toBe(16);
     expect(totals.hydrationPct).toBeCloseTo(60, 6);
+  });
+});
+
+// ===== Regresjoner funnet i etterkontrollen 7. september =====
+
+describe("linjeomregning begge veier (RecipePartCard-regresjonen)", () => {
+  const water = line({ id: "w", quantity: 1, unit: "l", _rm: { id: "v", name: "Vann" } });
+
+  it("1 l rent vann er 1000 g og 1000 g er 1 l", () => {
+    expect(lineToGrams(water)).toEqual({ grams: 1000, exact: true });
+    expect(lineFromGrams(1000, water)).toBeCloseTo(1, 9);
+  });
+
+  it("60 % av 1 kg mel gir 0,6 l vann", () => {
+    expect(lineFromGrams(gramsFromPercent(60, 1000), water)).toBeCloseTo(0.6, 9);
+  });
+
+  it("kjent stykkvekt virker begge veier", () => {
+    const egg = line({ quantity: 4, unit: "stk", _rm: { id: "e", name: "Egg", unit_weight_grams: 58 } });
+    expect(lineToGrams(egg).grams).toBe(232);
+    expect(lineFromGrams(232, egg)).toBe(4);
+    expect(isLineConvertible(egg)).toBe(true);
+  });
+
+  it("kokosvann antas ikke å være rent vann", () => {
+    const coco = line({ quantity: 1, unit: "l", _rm: { id: "k", name: "Kokosvann" } });
+    expect(lineToGrams(coco).exact).toBe(false);
+    expect(Number.isNaN(lineFromGrams(1000, coco))).toBe(true);
+    expect(isLineConvertible(coco)).toBe(false);
+  });
+
+  it("ukjent væske gir ukjent omregning begge veier", () => {
+    const oil = line({ quantity: 1, unit: "l", _rm: { id: "o", name: "Rapsolje" } });
+    expect(oil && lineToGrams(oil).exact).toBe(false);
+    expect(Number.isNaN(lineFromGrams(500, oil))).toBe(true);
+  });
+});
+
+describe("scaledSummary og scaleLines med ukjente mengder", () => {
+  const lines = [
+    line({ id: "a", quantity: 10, unit: "kg", _rm: { id: "m", name: "Hvetemel", grain_classification: "wheat" } }),
+    line({ id: "b", quantity: 2, unit: "l", _rm: { id: "o", name: "Rapsolje" } }),
+  ];
+
+  it("gir ikke bekreftet antall emner eller satser når en linje er ukjent", () => {
+    const s = scaledSummary(lines, 2, 500, 40, 20000);
+    expect(s.incomplete).toBe(true);
+    expect(s.unitCount).toBeNull();
+    expect(s.totals.unitCount).toBeNull();
+    expect(s.batchCount).toBeNull();
+  });
+
+  it("beholder beregnbar g/kg-skalering når alt er kjent", () => {
+    const known = [
+      lines[0],
+      line({ id: "c", quantity: 6, unit: "l", _rm: { id: "v", name: "Vann", water_content_pct: 100 } }),
+    ];
+    const s = scaledSummary(known, 2, 1000, 32, 20000);
+    expect(s.incomplete).toBe(false);
+    expect(s.exactDoughG).toBe(32000);
+    expect(s.unitCount).toBe(32);
+    expect(s.batchCount).toBe(2);
+  });
+
+  it("ukjent linje blir ikke 0 g, men beholder mengde og enhet", () => {
+    const scaled = scaleLines(lines, 2, 10000);
+    expect(scaled[0]).toMatchObject({ exact: true, exactGrams: 20000, roundedGrams: 20000 });
+    expect(scaled[1].exact).toBe(false);
+    expect(scaled[1].scaledQuantity).toBe(4);
+    expect(scaled[1].unit).toBe("l");
+    expect(scaled[1].percent).toBe(0);
   });
 });
