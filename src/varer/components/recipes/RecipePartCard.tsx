@@ -350,16 +350,26 @@ function SortableLine({
       <div className="order-7 w-24 md:order-none md:w-auto">
         <div className="relative">
           <Input
-            type="number" step="0.1" placeholder="%"
-            value={showPct}
+            type="number" step="0.1" placeholder={convertible ? "%" : "?"}
+            value={convertible ? showPct : ""}
             onChange={(e) => setPercent(e.target.value)}
-            disabled={!canWrite || flour || totalFlourG <= 0}
-            title={flour ? "Melprosent er avledet — mel definerer nevneren" : "Bakerprosent av samlet melvekt"}
-            className={cn("h-10 pr-6 tabular-nums md:h-9", flour && "bg-muted/60 text-muted-foreground")}
+            disabled={!canWrite || flour || totalFlourG <= 0 || !convertible}
+            title={
+              !convertible
+                ? `Ukjent omregning til gram for «${line.unit}» — bakerprosent kan ikke beregnes`
+                : flour
+                  ? "Melprosent er avledet — mel definerer nevneren"
+                  : "Bakerprosent av samlet melvekt"
+            }
+            className={cn(
+              "h-10 pr-6 tabular-nums md:h-9",
+              (flour || !convertible) && "bg-muted/60 text-muted-foreground",
+            )}
           />
           <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
         </div>
       </div>
+
 
       <div className="order-8 flex justify-center md:order-none">
         <FlourToggle line={line} flour={flour} canWrite={canWrite} onChange={onChange} />
