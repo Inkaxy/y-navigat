@@ -241,28 +241,34 @@ function SortableLine({
         ? computedPct.toFixed(1)
         : "";
 
+  /** Sann når linjens enhet faktisk kan regnes om til gram — begge veier. */
+  const convertible = isLineConvertible(line);
+
   function setGrams(value: string) {
+    const conv = lineToGrams({ ...line, quantity: value });
     onChange({
       quantity: value,
       entry_mode: "grams",
-      bakers_percent: totalFlourG > 0 ? (toGrams(value, line.unit) / totalFlourG) * 100 : null,
+      // Er omregningen ukjent, lagrer vi INGEN bakerprosent — et tall her ville
+      // motsagt mengden brukeren skrev.
+      bakers_percent: conv.exact && totalFlourG > 0 ? (conv.grams / totalFlourG) * 100 : null,
     });
   }
 
   function setPercent(value: string) {
+    // Uten kjent omregning kan prosent ikke oversettes til en mengde. Feltet er
+    // deaktivert i den situasjonen, men vi vokter også her.
+    if (!convertible || totalFlourG <= 0) return;
     const pct = value === "" ? 0 : Number(value);
-    const grams = gramsFromPercent(pct, totalFlourG);
+    const quantity = lineFromGrams(gramsFromPercent(pct, totalFlourG), line);
+    if (!Number.isFinite(quantity)) return;
     onChange({
       bakers_percent: value === "" ? null : pct,
       entry_mode: "percent",
-      // Er omregningen ukjent (volum uten tetthet, stk uten stykkvekt), beholdes
-      // mengden slik brukeren skrev den — vi finner ikke på et tall.
-      quantity:
-        totalFlourG > 0 && Number.isFinite(fromGrams(grams, line.unit))
-          ? Number(fromGrams(grams, line.unit).toFixed(2))
-          : line.quantity,
+      quantity: value === "" ? line.quantity : Number(quantity.toFixed(3)),
     });
   }
+
 
   return (
     <div
