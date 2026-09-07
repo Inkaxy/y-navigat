@@ -185,19 +185,47 @@ export function fromGrams(grams: number, unit: string, opts: ConvertOptions = {}
 }
 
 /**
- * Omregning for en oppskriftslinje. Stykkvekt hentes fra den faktiske kolonnen
- * `raw_materials.unit_weight_grams`. Tetthet finnes ikke som kolonne, så den
- * settes kun for rent vann (100 % vanninnhold) — alle andre væsker uten
- * oppgitt tetthet blir ufullstendige.
+ * Rent vann er den ENESTE væsken vi kjenner tettheten til uten en tetthetskolonne.
+ * Navnet må være vann alene (eventuelt med en temperaturbeskrivelse foran) — sammensatte
+ * navn som «kokosvann» eller «rosenvann» er noe annet enn vann og skal aldri antas.
  */
-export function lineToGrams(line: BakersLine): GramsResult {
-  const waterPct = Number(line._rm?.water_content_pct ?? 0);
-  const isPureWater = waterPct === 100 || /\bvann\b|water/i.test(line._rm?.name ?? line.ingredient_name ?? "");
-  return convertToGrams(line.quantity, line.unit, {
-    densityGPerMl: isPureWater ? 1 : null,
-    pieceWeightG: line._rm?.unit_weight_grams ?? null,
-  });
+const PURE_WATER_NAME_RE =
+  /^(is|kaldt|kald|varmt|varm|lunkent|lunket|romtemperert|temperert|cold|warm|ice)?[\s-]*(vann|water)$/i;
+
+export function isPureWaterLine(line: BakersLine): boolean {
+  const name = (line._rm?.name ?? line.ingredient_name ?? "").trim();
+  if (PURE_WATER_NAME_RE.test(name)) return true;
+  // 100 % vanninnhold uten navn er også rent vann, men et sammensatt navn vinner.
+  return name === "" && Number(line._rm?.water_content_pct) === 100;
 }
+
+/**
+ * Felles omregningsopsjoner for en linje — brukes BEGGE veier (gram → enhet og
+ * enhet → gram), slik at mengde og bakerprosent aldri kan motsi hverandre.
+ * Stykkvekt hentes fra den faktiske kolonnen `raw_materials.unit_weight_grams`.
+ */
+export function lineConvertOptions(line: BakersLine): ConvertOptions {
+  return {
+    densityGPerMl: isPureWaterLine(line) ? 1 : null,
+    pieceWeightG: line._rm?.unit_weight_grams ?? null,
+  };
+}
+
+/** Omregning for en oppskriftslinje: mengde+enhet → gram, med usikkerheten beholdt. */
+export function lineToGrams(line: BakersLine): GramsResult {
+  return convertToGrams(line.quantity, line.unit, lineConvertOptions(line));
+}
+
+/** Motsatt vei for samme linje: gram → linjens enhet. NaN når omregningen er ukjent. */
+export function lineFromGrams(grams: number, line: BakersLine): number {
+  return fromGrams(grams, line.unit, lineConvertOptions(line));
+}
+
+/** Sann når linjens enhet faktisk kan regnes om til gram begge veier. */
+export function isLineConvertible(line: BakersLine): boolean {
+  return convertToGrams(1, line.unit, lineConvertOptions(line)).exact;
+}
+
 
 // ===== Klassifisering =====
 
