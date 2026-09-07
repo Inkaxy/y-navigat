@@ -443,27 +443,38 @@ export function scaleFactor(desiredUnits: number, unitsPerBatch: number | null |
 }
 
 export interface ScaledLine extends BakersLine {
-  /** Uavrundet gramvekt etter skalering. */
+  /** Uavrundet gramvekt etter skalering. 0 når vekten er ukjent — se `exact`. */
   exactGrams: number;
-  /** Bakervennlig avrundet gramvekt. */
+  /** Bakervennlig avrundet gramvekt. 0 når vekten er ukjent — se `exact`. */
   roundedGrams: number;
-  /** Bakerprosent — uendret av skalering. */
+  /** Bakerprosent — uendret av skalering. Null når vekten er ukjent. */
   percent: number;
+  /** Usann når linjen ikke kunne regnes om — da er 0 g IKKE en gyldig vekt. */
+  exact: boolean;
+  /** Forklaring når `exact` er usann. */
+  reason?: string;
+  /** Skalert mengde i linjens egen enhet — brukes når gram er ukjent. */
+  scaledQuantity: number;
 }
 
 /**
  * Skalerer linjer til gram. Bakerprosenten regnes fra den USKALERTE oppskriften
  * og er dermed identisk før og etter skalering — den er oppskriftens fingeravtrykk.
+ * Linjer uten kjent omregning beholder mengde og enhet og merkes som ukjente.
  */
 export function scaleLines(lines: BakersLine[], factor: number, baseFlourG: number): ScaledLine[] {
+  const f = Number(factor) || 0;
   return lines.map((l) => {
-    const base = lineToGrams(l).grams;
-    const exactGrams = base * factor;
+    const conv = lineToGrams(l);
+    const exactGrams = conv.exact ? conv.grams * f : 0;
     return {
       ...l,
       exactGrams,
-      roundedGrams: roundBakerGrams(exactGrams),
-      percent: baseFlourG > 0 ? (base / baseFlourG) * 100 : 0,
+      roundedGrams: conv.exact ? roundBakerGrams(exactGrams) : 0,
+      percent: conv.exact && baseFlourG > 0 ? (conv.grams / baseFlourG) * 100 : 0,
+      exact: conv.exact,
+      reason: conv.reason,
+      scaledQuantity: (Number(l.quantity) || 0) * f,
     };
   });
 }
@@ -478,6 +489,9 @@ export interface ScaledSummary {
   roundedFlourG: number;
   unitCount: number | null;
   batchCount: number | null;
+  /** Sann når minst én linje ikke kunne regnes om — tallene er da nedre grenser. */
+  incomplete: boolean;
+  warnings: string[];
 }
 
 /** Nøkkeltall for en skalert visning. Prosenter er skala-invariante. */
@@ -496,6 +510,10 @@ export function scaledSummary(
   const roundedFlourG = scaled.filter(isFlourLine).reduce((s, l) => s + l.roundedGrams, 0);
   const cap = Number(mixerCapacityG) || 0;
   const uw = Number(unitWeightGrams) || 0;
+  const incomplete = baseTotals.incomplete;
+  // Er deigvekten ufullstendig, er verken antall emner eller antall satser
+  // bekreftede produksjonstall — da skal de vises som ukjent, ikke gjettes.
+  const unitCount = incomplete ? null : uw > 0 ? Math.floor(exactDoughG / uw) : null;
 
   return {
     factor,
@@ -505,17 +523,24 @@ export function scaledSummary(
       totalFlourG: exactFlourG,
       totalWaterG: baseTotals.totalWaterG * factor,
       totalDoughG: exactDoughG,
-      unitCount: uw > 0 ? Math.floor(exactDoughG / uw) : null,
+      unitCount,
       doughPerUnitG: uw > 0 ? uw : null,
     },
     exactDoughG,
     roundedDoughG,
     exactFlourG,
     roundedFlourG,
-    unitCount: uw > 0 ? Math.floor(exactDoughG / uw) : Math.round(Number(desiredUnits) || 0) || null,
-    batchCount: cap > 0 && exactDoughG > 0 ? Math.ceil(exactDoughG / cap) : null,
+    unitCount: incomplete
+      ? null
+      : uw > 0
+        ? Math.floor(exactDoughG / uw)
+        : Math.round(Number(desiredUnits) || 0) || null,
+    batchCount: !incomplete && cap > 0 && exactDoughG > 0 ? Math.ceil(exactDoughG / cap) : null,
+    incomplete,
+    warnings: baseTotals.warnings,
   };
 }
+
 
 /**
  * Veierekkefølge: mel først, deretter væske, så resten.
