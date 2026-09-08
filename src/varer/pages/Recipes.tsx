@@ -57,7 +57,7 @@ type RecipeListRow = {
   product_recipe_links: { product_id: string; products: { display_name: string | null } | null }[] | null;
 };
 type RecipeRow = RecipeListRow & {
-  totals: ReturnType<typeof computeTotals>;
+  totals: ReturnType<typeof computeTotalsForRecipe>;
   products: string[];
 };
 
