@@ -68,6 +68,24 @@ const RAW_MATERIAL_GLOBAL_KEYS: readonly string[] = [
   "stock-missing-base-quantity",
   "raw-material-units-bulk",
   "raw-material-nutrition",
+  "sku-collision-hist",
+  "credit-note-candidates",
+  "rm-name-match",
+  "rm-bakers-map",
+  "halvfabrikat_autocomplete",
+  "stock-product-search",
+  "stock_item_balance",
+  "stock_batch_balance",
+  "stock-ledger",
+  "ledger-raw-material-names",
+  "reorder-suggestions",
+  "nutrition-coverage",
+  "orphan-datasheets",
+  "datasheets-for-missing",
+  "matvaretabellen_links",
+  "supplier-price-index",
+  "total-supplier-spend",
+  "recipes-using-raw-material",
 ];
 
 /** Nøkler som tar råvare-id som andre ledd. */
@@ -80,6 +98,9 @@ const RAW_MATERIAL_SCOPED_KEYS: readonly string[] = [
   "raw-material-units",
   "rm-detail",
   "rms-link",
+  "rm-recent-invoice-lines",
+  "rm-product-link",
+  "rm-suggestion-links",
 ];
 
 const INVOICE_GLOBAL_KEYS: readonly string[] = [
@@ -87,9 +108,12 @@ const INVOICE_GLOBAL_KEYS: readonly string[] = [
   "fakturaer-review-lines",
   "fakturaer-review-count",
   "fakturaer-inbox",
+  "fakturaer-leverandorer",
+  "fakturaer-suppliers",
   "invoice-supplier-links",
   "supplier-invoices",
   "supplier-aliases",
+  "supplier-aliases-all",
 ];
 
 const INVOICE_SCOPED_KEYS: readonly string[] = [
@@ -97,6 +121,7 @@ const INVOICE_SCOPED_KEYS: readonly string[] = [
   "invoice-lines",
   "invoice-for-lines",
   "invoice-line-suggestions",
+  "invoice-doc-url",
 ];
 
 /** Alle nøkler som `invalidateRawMaterial` treffer — brukt i test og lib. */

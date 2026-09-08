@@ -25,7 +25,7 @@ import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { RecalcHistory } from "@/ravarer/components/packages/RecalcHistory";
 import { SetPackageDialog } from "@/ravarer/components/packages/SetPackageDialog";
 import {
-  usePackageWorklist,
+  usePackageWorklistRow,
   type PackageWorklistRow,
 } from "@/ravarer/hooks/usePackageSizes";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
@@ -110,10 +110,9 @@ export function OverviewTab({ rm, registerSave }: Props) {
 
   const guard = useUnsavedChangesGuard(dirty);
   const [packageOpen, setPackageOpen] = useState(false);
-  const { data: packageWorklist = [] } = usePackageWorklist();
+  const { data: worklistRow } = usePackageWorklistRow(rm.id);
   const packageRow = useMemo<PackageWorklistRow>(() => {
-    const found = packageWorklist.find((r) => r.id === rm.id);
-    if (found) return found;
+    if (worklistRow) return worklistRow;
     return {
       id: rm.id,
       legal_entity_id: rm.legal_entity_id,
@@ -136,7 +135,7 @@ export function OverviewTab({ rm, registerSave }: Props) {
       referansekilde: null,
       referansedato: null,
     } as PackageWorklistRow;
-  }, [packageWorklist, rm]);
+  }, [worklistRow, rm]);
 
   const save = async () => {
     if (!dirty) return;

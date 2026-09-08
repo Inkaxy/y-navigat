@@ -14,6 +14,19 @@ type AnyRec = Record<string, any>;
 
 const norm = (s: string | null | undefined) => (s ?? "").trim().toLowerCase();
 
+/**
+ * Slik skrives koblingen fra en kreditnota til den opprinnelige fakturaen.
+ * MÅ være identisk med `CREDIT_NOTE_REF_PREFIX` i src/fakturaer/lib/inbox.ts —
+ * ellers regner innboksen og motoren ulikt på om koblingen finnes.
+ */
+const CREDIT_NOTE_REF_PREFIX = "Opprinnelig faktura:";
+
+function creditNoteOriginalRef(notes: string | null | undefined): string | null {
+  if (!notes) return null;
+  const m = new RegExp(`${CREDIT_NOTE_REF_PREFIX}\\s*(\\S+)`, "i").exec(String(notes));
+  return m ? m[1] : null;
+}
+
 // Lightweight trigram-style similarity (fallback if pg_trgm RPC not used). Range 0..1.
 function similarity(a: string, b: string): number {
   const A = norm(a); const B = norm(b);
@@ -557,7 +570,7 @@ Deno.serve(async (req) => {
         const invoiceLevelReview =
           inv.lines_sum_status === "mismatch" ||
           (inv.extraction_confidence != null && Number(inv.extraction_confidence) < 0.6) ||
-          (inv.is_credit_note === true && !String(inv.notes ?? "").trim());
+          (inv.is_credit_note === true && !creditNoteOriginalRef(inv.notes));
 
         const newStatus = (needsReview && needsReview.length > 0) || invoiceLevelReview
           ? "needs_review"

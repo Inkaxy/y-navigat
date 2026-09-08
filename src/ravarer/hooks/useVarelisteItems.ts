@@ -26,11 +26,12 @@ function packageStateOf(r: RawMaterialRow): PackageState {
  * Setter sammen varelisten: råvarer + leverandører + kjøpsstatistikk +
  * søke-/statusindeks til én rad-modell som tabellen kan rendre direkte.
  */
-export function useVarelisteItems() {
-  const rawMaterials = useRawMaterials();
+export function useVarelisteItems(options?: { enabled?: boolean }) {
+  const enabled = options?.enabled ?? true;
+  const rawMaterials = useRawMaterials({ enabled });
   const suppliers = useSuppliers();
-  const stats = useAllRawMaterialPurchaseStats();
-  const index = useRawMaterialSearchIndex();
+  const stats = useAllRawMaterialPurchaseStats({ enabled });
+  const index = useRawMaterialSearchIndex({ enabled });
 
   const supplierMap = useMemo(
     () => new Map((suppliers.data ?? []).map((s) => [s.id, s.name])),
@@ -124,7 +125,9 @@ export function useVarelisteItems() {
   return {
     items,
     suppliers: suppliers.data ?? [],
-    isLoading: rawMaterials.isLoading || index.isLoading,
+    // Kjøpsstatistikken fyller volum- og fakturakolonnene; uten den i
+    // laste-tilstanden blinker listen fram med tomme tall.
+    isLoading: rawMaterials.isLoading || index.isLoading || stats.isLoading,
     isError,
     error,
     refetch: () => {

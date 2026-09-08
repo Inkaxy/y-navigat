@@ -95,11 +95,34 @@ export function MatchDrawer({ open, onOpenChange, line, onAcceptedNext }: Props)
   const supplierId = line?.invoice.supplier_id;
 
   /**
+   * Leverandørens alias hentes ÉN gang per leverandør og filtreres i minnet.
+   * Før lå dette inne i søket, som betød et nytt uttrekk av inntil 2000 rader
+   * for hvert tastetrykk.
+   */
+  const { data: supplierAliasRows = [] } = useQuery({
+    queryKey: ["supplier-aliases-all", supplierId],
+    enabled: !!supplierId,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("raw_material_supplier_aliases")
+        .select("alias_value, raw_material_suppliers!inner(raw_material_id, supplier_id)")
+        .eq("raw_material_suppliers.supplier_id", supplierId!)
+        .limit(2000);
+      if (error) throw error;
+      return (data ?? []) as unknown as Array<{
+        alias_value: string | null;
+        raw_material_suppliers: { raw_material_id: string } | null;
+      }>;
+    },
+  });
+
+  /**
    * Søk treffer navn og SKU på varen, men også leverandørens eget varenummer
    * og registrerte alias — det er ofte det eneste som står på fakturaen.
    */
   const { data: rmResults = [], isLoading: searching } = useQuery({
-    queryKey: ["rm-search", legalEntityId, supplierId, search],
+    queryKey: ["rm-search", legalEntityId, supplierId, search, supplierAliasRows.length],
     enabled: !!legalEntityId && search.length > 1,
     queryFn: async () => {
       // Komma og parentes er skilletegn i PostgREST-filtre — fjernes fra søket.
@@ -109,30 +132,16 @@ export function MatchDrawer({ open, onOpenChange, line, onAcceptedNext }: Props)
 
       // MERK: `alias_value_normalized` i databasen er bare lower(trim(...)),
       // så et normalisert ilike-søk treffer aldri «crème» eller «hvetemel, 25 kg».
-      // Derfor hentes leverandørens egne alias og filtreres i minnet med samme
-      // normalisering som matchemotoren. Kolonnen bør reberegnes med
-      // normalizeMatchKey i en senere migrasjon, så filteret kan gjøres i SQL.
-      const [bySupplier, byAlias] = await Promise.all([
-        supabase
-          .from("raw_material_suppliers")
-          .select("raw_material_id")
-          .or(`supplier_sku.ilike.${term},supplier_product_name.ilike.${term}`)
-          .limit(50),
-        supplierId
-          ? supabase
-              .from("raw_material_supplier_aliases")
-              .select("alias_value, raw_material_suppliers!inner(raw_material_id, supplier_id)")
-              .eq("raw_material_suppliers.supplier_id", supplierId)
-              .limit(2000)
-          : Promise.resolve({ data: [], error: null }),
-      ]);
+      // Derfor filtreres leverandørens alias i minnet med samme normalisering
+      // som matchemotoren.
+      const bySupplier = await supabase
+        .from("raw_material_suppliers")
+        .select("raw_material_id")
+        .or(`supplier_sku.ilike.${term},supplier_product_name.ilike.${term}`)
+        .limit(50);
       if (bySupplier.error) throw bySupplier.error;
-      if (byAlias.error) throw byAlias.error;
 
-      const aliasRows = (byAlias.data ?? []) as unknown as Array<{
-        alias_value: string | null;
-        raw_material_suppliers: { raw_material_id: string } | null;
-      }>;
+      const aliasRows = supplierAliasRows;
       const extraIds = [
         ...(bySupplier.data ?? []).map((r) => r.raw_material_id),
         ...aliasRows

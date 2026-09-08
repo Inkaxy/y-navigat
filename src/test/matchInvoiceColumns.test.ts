@@ -44,3 +44,29 @@ describe("match-invoice-lines select-strenger", () => {
     }
   });
 });
+
+describe("select-parser", () => {
+  it("finner minst én select per tabell og hopper over innbakte relasjoner", () => {
+    for (const table of ["invoices", "invoice_lines"]) {
+      const selects = selectsFor(table);
+      expect(selects.length, `ingen select funnet for ${table}`).toBeGreaterThan(0);
+      // Relasjonsledd som «invoices(...)» skal ikke tolkes som kolonnenavn.
+      for (const sel of selects) {
+        const embedded = sel.split(",").filter((c) => c.includes("("));
+        for (const e of embedded) expect(e).toMatch(/\w+\(/);
+      }
+    }
+  });
+
+  it("fanger opp en kolonne som ikke finnes", () => {
+    const cols = rowColumns("invoices");
+    expect(cols.has("invoice_date")).toBe(true);
+    expect(cols.has("kolonne_som_ikke_finnes")).toBe(false);
+  });
+
+  it("kreditnota uten eksplisitt referanse kan ikke bli «ready»", () => {
+    // Motoren MÅ bruke den samme eksplisitte teksten som innboksen.
+    expect(FN).toContain("Opprinnelig faktura:");
+    expect(FN).toContain("creditNoteOriginalRef(inv.notes)");
+  });
+});

@@ -51,12 +51,12 @@ interface AliasRow {
   alias_value: string;
 }
 
-export function useRawMaterialSearchIndex() {
+export function useRawMaterialSearchIndex(options?: { enabled?: boolean }) {
   const { legalEntityId } = useRavarer();
 
   return useQuery({
     queryKey: ["raw_material_search_index", legalEntityId],
-    enabled: !!legalEntityId,
+    enabled: (options?.enabled ?? true) && !!legalEntityId,
     staleTime: 60_000,
     queryFn: async (): Promise<RawMaterialSearchIndex> => {
       const [links, aliases, nutrition, datasheets, allergens] = await Promise.all([

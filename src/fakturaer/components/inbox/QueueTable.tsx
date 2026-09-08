@@ -20,6 +20,8 @@ export const REASON_LABELS: Record<string, string> = {
   unknown_package_size: "Ukjent pakningsstørrelse",
   sku_collision: "Konflikt",
   no_baseline: "Uten avtalepris",
+  // Prissynken setter denne når fakturaen er i annen valuta enn NOK.
+  unsupported_currency: "Ikke støttet valuta",
 };
 
 export function reasonsOf(line: { review_reason: string | null }): string[] {

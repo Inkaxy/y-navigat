@@ -52,6 +52,13 @@ describe("rawMaterialKpi", () => {
     expect(kpiDeviation(12, null, null)).toEqual({ pct: null, basis: null });
     expect(kpiDeviation(null, 10, 10)).toEqual({ pct: null, basis: null });
   });
+
+  it("gir negativt avvik når fakturaprisen er lavere enn avtalen", () => {
+    expect(kpiDeviation(9, 10, 8)).toEqual({ pct: -10, basis: "avtale" });
+    expect(kpiDeviation(10, 10, 8)).toEqual({ pct: 0, basis: "avtale" });
+    // Et nullgrunnlag kan ikke gi prosentavvik — ingen deling på null.
+    expect(kpiDeviation(10, 0, 0)).toEqual({ pct: null, basis: null });
+  });
 });
 
 describe("priceTimeline", () => {
@@ -100,6 +107,20 @@ describe("priceTimeline", () => {
     const keys = result.series.map((s) => s.key);
     expect(keys).toContain("s1");
     expect(keys).toContain(MANUAL_KEY);
+  });
+
+  it("skiller manuelle priser fra leverandørprisene", () => {
+    const result = buildTimeline({
+      history,
+      supplierNames: new Map([["s1", "Leverandør 1"]]),
+      links: [],
+    });
+    const manual = result.series.find((x) => x.key === MANUAL_KEY);
+    expect(manual?.points).toHaveLength(1);
+    expect(manual?.points[0].price).toBe(12);
+    // Den manuelle prisen skal ikke også telle som leverandørpris.
+    const supplier = result.series.find((x) => x.key === "s1");
+    expect(supplier?.points.map((p) => p.price)).not.toContain(12);
   });
 
   it("merker kreditnotaer", () => {

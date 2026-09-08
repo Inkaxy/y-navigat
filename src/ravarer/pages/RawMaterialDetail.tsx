@@ -20,7 +20,10 @@ import { useRenameRawMaterial } from "@/ravarer/hooks/useRawMaterials";
 import { useRawMaterialPage } from "@/ravarer/hooks/useRawMaterialPage";
 import { useRawMaterialPurchaseStats } from "@/ravarer/hooks/usePurchaseStats";
 import { useVarelisteItems } from "@/ravarer/hooks/useVarelisteItems";
+import { useRavarer } from "@/ravarer/context/RavarerContext";
+import { useMatchTolerances } from "@/fakturaer/hooks/useMatchTolerances";
 import {
+  DEFAULT_DEVIATION_TOLERANCE,
   filterAndSortItems,
   parseListQuery,
 } from "@/ravarer/lib/rawMaterialViews";
@@ -48,8 +51,8 @@ export default function RawMaterialDetail() {
   const page = useRawMaterialPage(id);
   const rm = page.rm;
   const rename = useRenameRawMaterial();
+  const { legalEntityId } = useRavarer();
   const { data: stats } = useRawMaterialPurchaseStats(id);
-  const { items } = useVarelisteItems();
 
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
@@ -62,13 +65,26 @@ export default function RawMaterialDetail() {
     return next.toString();
   }, [searchParams]);
 
+  // Hele varelisten hentes KUN for «forrige/neste». Kom brukeren hit uten
+  // listekontekst (direktelenke, søk), er navigasjonen uaktuell og de tunge
+  // spørringene skal ikke kjøre.
+  const wantsListNav = listSearch.length > 0;
+  const { items } = useVarelisteItems({ enabled: wantsListNav });
+  const tolerances = useMatchTolerances(legalEntityId);
+  const tolerance = tolerances.defaultPct ?? DEFAULT_DEVIATION_TOLERANCE;
+
   const ordered = useMemo(
     () =>
-      filterAndSortItems(
-        items,
-        parseListQuery(new URLSearchParams(listSearch)),
-      ),
-    [items, listSearch],
+      wantsListNav
+        ? filterAndSortItems(
+            items,
+            parseListQuery(new URLSearchParams(listSearch)),
+            // Samme avviks-toleranse som varelisten, ellers kan «Avvik»-
+            // visningen inneholde andre rader enn listen brukeren kom fra.
+            tolerance,
+          )
+        : [],
+    [items, listSearch, tolerance, wantsListNav],
   );
 
   const index = ordered.findIndex((i) => i.id === id);

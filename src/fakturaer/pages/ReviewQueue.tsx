@@ -56,6 +56,7 @@ type TabValue =
   | "uncertain_cost"
   | "unknown_package_size"
   | "sku_collision"
+  | "unsupported_currency"
   | "no_baseline";
 
 const TABS: { value: TabValue; label: string }[] = [
@@ -68,6 +69,7 @@ const TABS: { value: TabValue; label: string }[] = [
   { value: "uncertain_cost", label: REASON_LABELS.uncertain_cost },
   { value: "unknown_package_size", label: REASON_LABELS.unknown_package_size },
   { value: "sku_collision", label: REASON_LABELS.sku_collision },
+  { value: "unsupported_currency", label: REASON_LABELS.unsupported_currency },
   { value: "no_baseline", label: REASON_LABELS.no_baseline },
 ];
 

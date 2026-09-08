@@ -38,10 +38,11 @@ export function useRawMaterialPurchaseStats(rawMaterialId: string | undefined) {
   });
 }
 
-export function useAllRawMaterialPurchaseStats() {
+export function useAllRawMaterialPurchaseStats(options?: { enabled?: boolean }) {
   const { legalEntityId } = useRavarer();
   return useQuery({
     queryKey: ["purchase-stats-all", legalEntityId],
+    enabled: (options?.enabled ?? true) && !!legalEntityId,
     queryFn: async () => {
       const { data, error } = await supabase.rpc("list_raw_material_purchase_stats", {
         p_legal_entity_id: legalEntityId,
