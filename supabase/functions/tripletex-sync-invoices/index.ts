@@ -3,6 +3,14 @@
 // Henter IKKE PDF og kaller IKKE AI — det gjøres av egne funksjoner.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { getSessionToken, tripletexFetch, TripletexError } from "../_shared/tripletex.ts";
+import {
+  nextCursor,
+  pagesTruncated,
+  planExistingUpdate,
+  statusSummary,
+  syncStatus,
+  type ChunkResult,
+} from "./syncState.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -41,6 +49,8 @@ const digits = (s: unknown) => String(s ?? "").replace(/\s+/g, "");
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
 const MAX_CHUNK_DAYS = 31;
+const PAGE_SIZE = 1000;
+const MAX_PAGES = 20;
 const MAX_CHUNKS_PER_RUN = 3;
 
 async function authorize(
@@ -205,7 +215,7 @@ Deno.serve(async (req) => {
         invoiceDateFrom: from,
         invoiceDateTo: to,
         from: offset,
-        count: 1000,
+        count: PAGE_SIZE,
         fields: FIELDS,
       };
       // Ved etterhenting filtrerer vi på leverandør direkte i API-et.
