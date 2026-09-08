@@ -57,6 +57,7 @@ import { ReturTab } from "@/varer/components/products/detail/tabs/ReturTab";
 import { RecipeSummaryCard } from "@/varer/components/products/RecipeSummaryCard";
 import { SelvStekingCard } from "@/varer/components/products/detail/SelvStekingCard";
 import { DeclarationTab } from "@/varer/components/products/DeclarationTab";
+import { CostPriceTab } from "@/varer/components/products/CostPriceTab";
 import { CalculationTab } from "@/varer/components/products/CalculationTab";
 import { StockTab } from "@/varer/components/products/StockTab";
 import { useNavigate as useNav } from "react-router-dom";
@@ -74,8 +75,7 @@ const TABS: TabConfig[] = [
   { type: "tab", id: "varianter", label: "Varianter", icon: GitBranch },
   { type: "tab", id: "oppskrift", label: "Oppskrift", icon: ChefHat },
   { type: "tab", id: "deklarasjon", label: "Deklarasjon", icon: ScrollText },
-  { type: "tab", id: "kalkyle", label: "Kalkyle", icon: Receipt },
-  { type: "tab", id: "priser", label: "Priser", icon: Receipt },
+  { type: "tab", id: "kalkyle_pris", label: "Kalkyle & pris", icon: Receipt },
   { type: "separator", id: "sep2" },
   { type: "tab", id: "sortiment", label: "Sortiment", icon: ListChecks },
   { type: "tab", id: "avvik", label: "Avvik", icon: AlertTriangle },
@@ -444,7 +444,7 @@ export default function ProductDetail() {
   // (Ctrl+S-handler ligger nå før early-return for å overholde Rules of Hooks)
 
   // Skjul Oppskrift for varianter
-  const visibleTabs = TABS.filter((t) => !(t.type === "tab" && (t.id === "oppskrift" || t.id === "deklarasjon" || t.id === "kalkyle") && product.variant_of_product_id));
+  const visibleTabs = TABS.filter((t) => !(t.type === "tab" && (t.id === "oppskrift" || t.id === "deklarasjon" || t.id === "kalkyle_pris") && product.variant_of_product_id));
 
   const lookups = lookupsQuery.data;
   const productOptions = lookups?.allProducts ?? [];
@@ -545,36 +545,13 @@ export default function ProductDetail() {
         {tab === "deklarasjon" && !product.variant_of_product_id && (
           <DeclarationTab productId={product.id} productName={product.display_name} canWrite={canWrite} />
         )}
-        {tab === "kalkyle" && !product.variant_of_product_id && (
-          <CalculationTab productId={product.id} productName={product.display_name} canWrite={canWrite} />
-        )}
-        {tab === "priser" && (
-          <Card>
-            <CardHeader><CardTitle className="text-base">Priser</CardTitle></CardHeader>
-            <CardContent>
-              {(pricesQuery.data?.length ?? 0) === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  Denne varen ligger ikke i noen prisliste ennå. Gå til <a href="/varer/priser" className="text-app underline">Priser</a> for å legge den til.
-                </p>
-              ) : (
-                <table className="w-full text-sm">
-                  <thead className="text-xs uppercase text-muted-foreground">
-                    <tr><th className="py-2 text-left">Prisliste</th><th className="text-left">Gyldig fra</th><th className="text-left">Gyldig til</th><th className="text-right">Pris</th></tr>
-                  </thead>
-                  <tbody>
-                    {pricesQuery.data!.map((p: any) => (
-                      <tr key={p.id} className="border-t border-border">
-                        <td className="py-2">{p.price_lists?.display_name}</td>
-                        <td>{p.valid_from}</td>
-                        <td>{p.valid_to ?? "—"}</td>
-                        <td className="text-right tabular-nums">kr {Number(p.price).toFixed(2)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </CardContent>
-          </Card>
+        {tab === "kalkyle_pris" && !product.variant_of_product_id && (
+          <CostPriceTab
+            productId={product.id}
+            productName={product.display_name}
+            legalEntityId={legalEntityId}
+            canWrite={canWrite}
+          />
         )}
         {tab === "sortiment" && (
           <Card><CardContent className="py-12 text-center text-muted-foreground">Sortimentsstyring kommer når Kunder-appen er bygget.</CardContent></Card>
