@@ -64,7 +64,8 @@ export function useUpsertNutrition() {
     mutationFn: async (input: Partial<NutritionRow> & { raw_material_id: string }) => {
       const { data, error } = await supabase
         .from("raw_material_nutrition")
-        .upsert(input, { onConflict: "raw_material_id" })
+        // `source` er nullbar i vår type, men Insert-typen krever `string | undefined`.
+        .upsert(input as never, { onConflict: "raw_material_id" })
         .select()
         .single();
       if (error) throw error;
