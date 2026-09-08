@@ -110,8 +110,10 @@ describe("select-parser", () => {
   });
 
   it("kreditnota uten eksplisitt referanse kan ikke bli «ready»", () => {
-    // Motoren MÅ bruke den samme eksplisitte teksten som innboksen.
-    expect(FN).toContain("Opprinnelig faktura:");
+    // Regelen bor nå i den delte speilfila; motoren MÅ bruke den, ikke sin egen
+    // kopi av teksten.
+    expect(FN).toContain('from "../_shared/creditNote.ts"');
     expect(FN).toContain("creditNoteOriginalRef(inv.notes)");
   });
+
 });
