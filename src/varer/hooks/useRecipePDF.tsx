@@ -88,6 +88,10 @@ export interface RecipePDFData {
     targetDoughTemp: number | null;
     waterTemp: number | null;
     waterTempFeasible: boolean;
+    /** Faktisk rom- og meltemperatur som vanntemperaturen er regnet ut fra. */
+    roomTemp: number;
+    flourTemp: number;
+    prefermentTemp: number | null;
   };
 
   preferments: RecipePDFPart[];
@@ -249,6 +253,9 @@ export function buildRecipePDFData(input: BuildRecipePDFInput): RecipePDFData {
       targetDoughTemp: input.targetDoughTemp ?? null,
       waterTemp: temp.waterTemp,
       waterTempFeasible: temp.feasible,
+      roomTemp: input.roomTemp ?? 21,
+      flourTemp: input.flourTemp ?? 21,
+      prefermentTemp,
     },
     preferments,
     mainParts,
