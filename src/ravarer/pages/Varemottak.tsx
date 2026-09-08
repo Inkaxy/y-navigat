@@ -12,6 +12,12 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { AlertTriangle, Check, PackageCheck, PackagePlus, Truck } from "lucide-react";
 
+import { useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { SetPackageDialog } from "@/ravarer/components/packages/SetPackageDialog";
+import type { PackageWorklistRow } from "@/ravarer/hooks/usePackageSizes";
+import { useRawMaterialSearchIndex } from "@/ravarer/hooks/useRawMaterialSearchIndex";
 import { RavarerHeaderBanner } from "@/ravarer/components/RavarerHeaderBanner";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { useSuppliers } from "@/ravarer/hooks/useSuppliers";
@@ -212,6 +218,27 @@ function InvoiceReceiptDialog({
   };
   const [deviationLine, setDeviationLine] = useState<ReceiptLine | null>(null);
   const receive = useReceiveInvoiceLine();
+  const qc = useQueryClient();
+  const [packageLine, setPackageLine] = useState<ReceiptLine | null>(null);
+  const [rematching, setRematching] = useState(false);
+
+  /** Etter at pakningen er satt må linja regnes om på nytt for å få mengde. */
+  const rematchLine = async (line: ReceiptLine) => {
+    if (!invoiceId) return;
+    setRematching(true);
+    try {
+      const { error } = await supabase.functions.invoke("match-invoice-lines", {
+        body: { invoice_id: invoiceId, line_ids: [line.id] },
+      });
+      if (error) throw error;
+      await qc.invalidateQueries({ queryKey: ["receipt-lines", invoiceId] });
+      toast.success("Linja er regnet om på nytt");
+    } catch (e) {
+      toast.error(`Kunne ikke regne om linja: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setRematching(false);
+    }
+  };
 
   const purchaseUnitText = (line: ReceiptLine) => {
     if (line.base_quantity == null || !line.raw_material_id) return null;
@@ -285,12 +312,17 @@ function InvoiceReceiptDialog({
                             <Badge variant="outline" className="border-warning/50 text-warning">
                               Mangler omregning
                             </Badge>
-                            <p className="text-xs text-ink-secondary">
-                              <Link to="/ravarer/pakningsstorrelser?filter=ubekreftet" className="text-primary hover:underline">
+                            <p className="text-xs text-ink-secondary">Mangler pakning på varen.</p>
+                            {canWrite && l.raw_material_id && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={rematching}
+                                onClick={() => setPackageLine(l)}
+                              >
                                 Sett pakning
-                              </Link>{" "}
-                              så regnes linja om.
-                            </p>
+                              </Button>
+                            )}
                           </div>
                         ) : (
                           <Badge variant="outline" className="text-ink-secondary">Ikke mottatt</Badge>
@@ -333,8 +365,49 @@ function InvoiceReceiptDialog({
       </Dialog>
 
       <DeviationDialog line={deviationLine} invoiceNumber={invoiceNumber} onClose={() => setDeviationLine(null)} />
+
+      <SetPackageDialog
+        open={!!packageLine}
+        row={packageLine ? receiptLineAsWorklistRow(packageLine) : null}
+        onOpenChange={v => {
+          if (v) return;
+          const line = packageLine;
+          setPackageLine(null);
+          if (line) void rematchLine(line);
+        }}
+      />
     </>
   );
+}
+
+/** Pakningsdialogen forventer en arbeidslisterad; her har vi bare fakturalinja. */
+function receiptLineAsWorklistRow(line: ReceiptLine): PackageWorklistRow {
+  return {
+    id: line.raw_material_id!,
+    legal_entity_id: null,
+    name: line.raw_material_name ?? line.description ?? "",
+    base_unit: line.base_unit,
+    category: null,
+    current_cost_price: null,
+    pakningsfaktor: null,
+    faktor_kilde: null,
+    bekreftet_dato: null,
+    antall_fakturalinjer: null,
+    antall_leverandorer: null,
+    enheter_i_bruk: line.unit,
+    linjer_uten_pris: null,
+    kjopt_kr_totalt: null,
+    siste_faktura: null,
+    pris_spredning: null,
+    implisert_mengde: null,
+    referansepris: null,
+    referansekilde: null,
+    referansedato: null,
+    referanse_faktor: null,
+    foreslatt_fra_navn: null,
+    foreslatt_fra_referanse: null,
+    status: "mangler_pakning",
+  };
 }
 
 type DeviationKind = "less" | "more" | "waste";
@@ -424,6 +497,27 @@ function ManualReceiptDialog({ open, onOpenChange }: { open: boolean; onOpenChan
   const [date, setDate] = useState(today());
   const [note, setNote] = useState("");
 
+  const [search, setSearch] = useState("");
+  const index = useRawMaterialSearchIndex();
+  // Søket dekker leverandørens varenummer og bekreftede aliaser, ikke bare navn
+  // — «slice(0, 400)» gjorde at varer bakerst i lista aldri kunne velges.
+  const matches = useMemo(() => {
+    const needle = search.trim().toLowerCase();
+    if (!needle) return materials.slice(0, 50);
+    return materials
+      .filter(m => {
+        if (`${m.name} ${m.sku ?? ""}`.toLowerCase().includes(needle)) return true;
+        const links = index.data?.linksByRawMaterial.get(m.id) ?? [];
+        return links.some(
+          l =>
+            (l.supplierSku ?? "").toLowerCase().includes(needle) ||
+            (l.supplierProductName ?? "").toLowerCase().includes(needle) ||
+            l.aliases.some(a => a.toLowerCase().includes(needle)),
+        );
+      })
+      .slice(0, 50);
+  }, [materials, search, index.data]);
+
   const rm = materials.find(m => m.id === rmId) ?? null;
   const { data: units = [] } = useRawMaterialUnits(rmId ?? undefined);
   const base = rowsToBase(rows, units);
@@ -460,11 +554,11 @@ function ManualReceiptDialog({ open, onOpenChange }: { open: boolean; onOpenChan
               </PopoverTrigger>
               <PopoverContent className="w-[380px] p-0" align="start">
                 <Command>
-                  <CommandInput placeholder="Søk vare…" />
+                  <CommandInput placeholder="Søk navn, varenummer eller alias…" value={search} onValueChange={setSearch} />
                   <CommandList>
                     <CommandEmpty>Ingen treff.</CommandEmpty>
                     <CommandGroup>
-                      {materials.slice(0, 400).map(m => (
+                      {matches.map(m => (
                         <CommandItem
                           key={m.id}
                           value={`${m.name} ${m.sku ?? ""}`}
