@@ -375,6 +375,20 @@ export function DataQualityCard({
         rawMaterialName={manualFor?.name ?? ""}
         onSaved={onRecalculate}
       />
+
+      {foodPickerFor?.raw_material_id && (
+        <FoodPickerDialog
+          open
+          onOpenChange={(v) => {
+            if (!v) {
+              setFoodPickerFor(null);
+              // Koblingen skriver næring på råvaren — beregn oppskriften på nytt.
+              onRecalculate();
+            }
+          }}
+          rawMaterialId={foodPickerFor.raw_material_id}
+        />
+      )}
     </>
   );
 }
