@@ -21,6 +21,13 @@ import {
 import { useRawMaterials } from "@/ravarer/hooks/useRawMaterials";
 import { useSuppliers } from "@/ravarer/hooks/useSuppliers";
 import { formatDate, formatNok, formatNumber } from "@/ravarer/lib/constants";
+import {
+  offerPricePerBaseUnit,
+  bestOfferRecipient,
+  negotiationStatusLabel,
+  recipientStatusLabel,
+  isNegotiationClosed,
+} from "@/ravarer/lib/negotiationMatrix";
 
 export default function ForhandlingDetail() {
   const navigate = useNavigate();
@@ -47,6 +54,14 @@ export default function ForhandlingDetail() {
 
   const rmName = (rid: string) => rawMaterials.find((r) => r.id === rid)?.name ?? "—";
   const rmBaseUnit = (rid: string) => rawMaterials.find((r) => r.id === rid)?.base_unit ?? null;
+  const rmCost = (rid: string) => {
+    const c = rawMaterials.find((r) => r.id === rid)?.current_cost_price;
+    return c == null ? null : Number(c);
+  };
+  const rmBaseUnitsPerPackage = (rid: string) => {
+    const v = rawMaterials.find((r) => r.id === rid)?.base_units_per_package;
+    return v == null ? null : Number(v);
+  };
   const supName = (sid: string) => suppliers.find((s) => s.id === sid)?.name ?? "—";
   const recById = (rcId: string) => recipients.find((r) => r.id === rcId);
 
@@ -61,18 +76,45 @@ export default function ForhandlingDetail() {
     return map;
   }, [items, responses]);
 
-  // Best per item by lowest price
+  /**
+   * Alle tilbud regnes om til pris per grunnenhet før de sammenlignes.
+   * Tidligere ble rå «offered_price» sammenlignet, slik at et tilbud per sekk
+   * så billigere ut enn et tilbud per kilo.
+   */
+  const perBaseByItem = useMemo(() => {
+    const out = new Map<string, Map<string, number | null>>();
+    for (const it of items) {
+      const inner = new Map<string, number | null>();
+      for (const r of responses as any[]) {
+        if (r.negotiation_item_id !== it.id || r.status !== "submitted") continue;
+        const conv = offerPricePerBaseUnit({
+          offeredPrice: r.offered_price,
+          offeredPackageSize: r.offered_package_size,
+          offeredPackageUnit: r.offered_package_unit,
+          baseUnit: rmBaseUnit(it.raw_material_id),
+          linkBaseUnitsPerPackage: rmBaseUnitsPerPackage(it.raw_material_id),
+        });
+        inner.set(r.recipient_id, conv.value);
+      }
+      out.set(it.id, inner);
+    }
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, responses, rawMaterials]);
+
+  // Best per item by lowest price per grunnenhet
   const bestByItem = useMemo(() => {
     const out = new Map<string, string | null>();
     for (const it of items) {
-      const offers = (responses as any[])
-        .filter((r) => r.negotiation_item_id === it.id && r.offered_price != null && r.status === "submitted");
-      if (offers.length === 0) { out.set(it.id, null); continue; }
-      offers.sort((a, b) => a.offered_price - b.offered_price);
-      out.set(it.id, offers[0].recipient_id);
+      const inner = perBaseByItem.get(it.id);
+      const offers = Array.from(inner?.entries() ?? []).map(([recipientId, pricePerBaseUnit]) => ({
+        recipientId,
+        pricePerBaseUnit,
+      }));
+      out.set(it.id, bestOfferRecipient(offers));
     }
     return out;
-  }, [items, responses]);
+  }, [items, perBaseByItem]);
 
   // Total potential savings
   const totalSavings = useMemo(() => {
@@ -80,13 +122,13 @@ export default function ForhandlingDetail() {
     for (const it of items) {
       const winner = bestByItem.get(it.id);
       if (!winner || !it.actual_volume_baseline || !it.actual_cost_baseline) continue;
-      const r = (responses as any[]).find((x) => x.recipient_id === winner && x.negotiation_item_id === it.id);
-      if (!r?.offered_price) continue;
-      const newCost = Number(it.actual_volume_baseline) * Number(r.offered_price);
+      const perBase = perBaseByItem.get(it.id)?.get(winner) ?? null;
+      if (perBase == null) continue;
+      const newCost = Number(it.actual_volume_baseline) * perBase;
       saved += Number(it.actual_cost_baseline) - newCost;
     }
     return saved;
-  }, [items, responses, bestByItem]);
+  }, [items, perBaseByItem, bestByItem]);
 
   // Conclusion modal
   const [concludeOpen, setConcludeOpen] = useState(false);
@@ -128,13 +170,13 @@ export default function ForhandlingDetail() {
         subtitle={neg.purpose ?? "Forhandling"}
         actions={
           <>
-            <Badge variant="outline">{neg.status}</Badge>
+            <Badge variant="outline">{negotiationStatusLabel(neg.status)}</Badge>
             {isLive && (
               <Button size="sm" variant="outline" className="rounded-full" onClick={() => setTimelineOpen(true)}>
                 <History className="mr-1.5 h-4 w-4" /> Tidslinje
               </Button>
             )}
-            {!isLive && (
+            {!isLive && !isNegotiationClosed(neg.status) && (
               <Button size="sm" variant="outline" className="rounded-full"
                 onClick={() => navigate(`/ravarer/forhandlinger/${id}/rediger`)}>
                 Rediger
@@ -238,7 +280,7 @@ export default function ForhandlingDetail() {
             {recipients.map((r) => (
               <tr key={r.id} className="border-t border-line-subtle">
                 <td className="px-4 py-2 font-medium">{supName(r.supplier_id)}</td>
-                <td className="px-4 py-2"><Badge variant="outline">{r.status}</Badge></td>
+                <td className="px-4 py-2"><Badge variant="outline">{recipientStatusLabel(r.status)}</Badge></td>
                 <td className="px-4 py-2 text-ink-secondary">{formatDate(r.last_viewed_at)}</td>
                 <td className="px-4 py-2 text-ink-secondary">{formatDate(r.expires_at)}</td>
               </tr>
@@ -278,19 +320,39 @@ export default function ForhandlingDetail() {
                   </td>
                   {recipients.map((r) => {
                     const cell = matrix.get(it.id)?.get(r.id);
+                    const perBase = perBaseByItem.get(it.id)?.get(r.id) ?? null;
                     if (!cell?.offered_price) {
                       return <td key={r.id} className="px-4 py-2 text-right text-ink-muted">—</td>;
                     }
+                    if (perBase == null) {
+                      return (
+                        <td key={r.id} className="px-4 py-2 text-right text-xs text-ink-secondary">
+                          {formatNok(cell.offered_price)}
+                          <p>Mangler pakning — kan ikke sammenlignes</p>
+                        </td>
+                      );
+                    }
                     const isBest = winner === r.id;
-                    const better = it.actual_avg_price_baseline != null && cell.offered_price < Number(it.actual_avg_price_baseline);
+                    const reference = rmCost(it.raw_material_id) ??
+                      (it.actual_avg_price_baseline == null ? null : Number(it.actual_avg_price_baseline));
+                    const better = reference != null && perBase < reference;
+                    const delta = reference == null ? null : perBase - reference;
                     return (
                       <td key={r.id} className={`px-4 py-2 text-right tabular-nums ${isBest ? "bg-success/10 font-semibold text-success" : better ? "text-success" : "text-destructive"}`}>
                         <div className="flex items-center justify-end gap-1">
                           {isBest && <Trophy className="h-3.5 w-3.5" />}
                           {!isBest && better && <Check className="h-3.5 w-3.5" />}
                           {!better && !isBest && <X className="h-3.5 w-3.5" />}
-                          {formatNok(cell.offered_price)}
+                          {formatNok(perBase)}
+                          <span className="text-xs font-normal opacity-70">
+                            /{rmBaseUnit(it.raw_material_id) ?? "enhet"}
+                          </span>
                         </div>
+                        {delta != null && (
+                          <p className="text-xs font-normal opacity-80">
+                            {delta > 0 ? "+" : ""}{formatNok(delta)} mot dagens kost
+                          </p>
+                        )}
                       </td>
                     );
                   })}
