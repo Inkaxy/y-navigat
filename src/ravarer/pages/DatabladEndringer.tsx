@@ -16,9 +16,22 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useChangelog, useAcknowledgeChange, type ChangelogRow } from "@/ravarer/hooks/useDatasheets";
 import { formatDate } from "@/ravarer/lib/constants";
+import { nutritionValueDiff } from "@/ravarer/lib/nutritionLabels";
 import { useNavigate } from "react-router-dom";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { toast } from "sonner";
+
+/** Verdier som ikke er næringsobjekter vises som lesbar tekst, ikke rå JSON. */
+function formatPlainValue(value: unknown): string {
+  if (value == null || value === "") return "—";
+  if (Array.isArray(value)) return value.map((v) => String(v)).join(", ") || "—";
+  if (typeof value === "object") {
+    return Object.entries(value as Record<string, unknown>)
+      .map(([k, v]) => `${k}: ${v == null ? "—" : String(v)}`)
+      .join(" · ");
+  }
+  return String(value);
+}
 
 export default function DatabladEndringer() {
   const navigate = useNavigate();
@@ -126,16 +139,45 @@ export default function DatabladEndringer() {
                 <Card className="p-4">
                   <div className="text-xs uppercase tracking-wider text-ink-secondary mb-2">Endring</div>
                   <div className="text-sm font-medium">{describeChange(selected)}</div>
-                  <div className="grid grid-cols-2 gap-3 mt-3">
-                    <div>
-                      <div className="text-xs text-ink-secondary mb-1">Gammelt</div>
-                      <div className="rounded-lg bg-muted p-3 text-sm font-mono">{JSON.stringify(selected.old_value) ?? "—"}</div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-ink-secondary mb-1">Nytt</div>
-                      <div className="rounded-lg bg-muted p-3 text-sm font-mono">{JSON.stringify(selected.new_value) ?? "—"}</div>
-                    </div>
-                  </div>
+                  {(() => {
+                    const diff = nutritionValueDiff(selected.old_value, selected.new_value);
+                    if (diff) {
+                      return (
+                        <table className="mt-3 w-full text-sm">
+                          <thead>
+                            <tr className="text-xs text-ink-secondary">
+                              <th className="py-1 text-left font-normal">Felt</th>
+                              <th className="py-1 text-right font-normal">Før</th>
+                              <th className="py-1 text-right font-normal">Etter</th>
+                              <th className="py-1 text-right font-normal">Endring</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {diff.map((d) => (
+                              <tr key={d.field} className="border-t border-line-subtle">
+                                <td className="py-1">{d.label}</td>
+                                <td className="py-1 text-right tabular-nums">{d.before}</td>
+                                <td className="py-1 text-right tabular-nums font-medium">{d.after}</td>
+                                <td className="py-1 text-right tabular-nums text-ink-secondary">{d.change ?? "—"}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      );
+                    }
+                    return (
+                      <div className="grid grid-cols-2 gap-3 mt-3">
+                        <div>
+                          <div className="text-xs text-ink-secondary mb-1">Gammelt</div>
+                          <div className="rounded-lg bg-muted p-3 text-sm">{formatPlainValue(selected.old_value)}</div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-ink-secondary mb-1">Nytt</div>
+                          <div className="rounded-lg bg-muted p-3 text-sm">{formatPlainValue(selected.new_value)}</div>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </Card>
                 <Card className="p-4">
                   <div className="text-sm font-medium mb-2">Berørt: {selected.affected_recipes_count} oppskrifter</div>

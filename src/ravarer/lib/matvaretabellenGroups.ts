@@ -19,6 +19,9 @@ export const CATEGORY_FOOD_GROUPS: Record<string, readonly string[]> = {
     "Muggost",
     "Smelteost",
     "Egg",
+    // Smør ligger i «Margarin og smør» hos Matvaretabellen, men er en meierivare hos oss.
+    "Margarin og smør",
+    "Annet fett",
   ],
   "Gjær, hevemidler og bakehjelpemidler": ["Diverse ingredienser"],
   "Frø, nøtter og kjerner": ["Frø", "Nøtter", "Produkter av nøtter og frø"],
@@ -48,8 +51,31 @@ export const CATEGORY_FOOD_GROUPS: Record<string, readonly string[]> = {
 /** Kategorier som aldri skal kobles til Matvaretabellen. */
 export const NON_FOOD_CATEGORIES: readonly string[] = ["Emballasje", "Forbruksvarer"];
 
+/**
+ * Gamle småbokstav-kategorier fra første import. De finnes fortsatt på noen få
+ * råvarer og må slå ut på samme matvaregrupper som dagens navn.
+ */
+export const LEGACY_CATEGORY_ALIASES: Record<string, string> = {
+  noetter: "Frø, nøtter og kjerner",
+  nøtter: "Frø, nøtter og kjerner",
+  mel: "Mel og korn",
+  meieri: "Meieri og egg",
+  fett: "Fett og olje",
+  emballasje: "Emballasje",
+  forbruksvarer: "Forbruksvarer",
+};
+
+/** Dagens kategorinavn for en lagret kategori — gamle navn oversettes. */
+export function normalizeCategory(category: string | null | undefined): string | null {
+  const raw = (category ?? "").trim();
+  if (!raw) return null;
+  if (raw in CATEGORY_FOOD_GROUPS || NON_FOOD_CATEGORIES.includes(raw)) return raw;
+  return LEGACY_CATEGORY_ALIASES[raw.toLowerCase()] ?? raw;
+}
+
 export function isNonFoodCategory(category: string | null | undefined): boolean {
-  return !!category && NON_FOOD_CATEGORIES.includes(category);
+  const c = normalizeCategory(category);
+  return !!c && NON_FOOD_CATEGORIES.includes(c);
 }
 
 /**
@@ -58,8 +84,9 @@ export function isNonFoodCategory(category: string | null | undefined): boolean 
  * 1 når vi ikke vet.
  */
 export function foodGroupFit(category: string | null | undefined, foodGroupName: string | null | undefined): number {
-  if (!category) return 1;
-  const allowed = CATEGORY_FOOD_GROUPS[category];
+  const c = normalizeCategory(category);
+  if (!c) return 1;
+  const allowed = CATEGORY_FOOD_GROUPS[c];
   if (!allowed || allowed.length === 0) return 1;
   if (!foodGroupName) return 1;
   const g = normalizeForSearch(foodGroupName);

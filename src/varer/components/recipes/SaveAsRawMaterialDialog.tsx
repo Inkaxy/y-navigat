@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { costPerKg, makeSku } from "@/varer/lib/halvfabrikat";
+import { costPerKg, costPerKgBlockedReason, makeSku } from "@/varer/lib/halvfabrikat";
 import type { BakersLine } from "@/varer/lib/bakers";
 
 const BASE_UNITS = ["kg", "g", "liter", "ml", "stk"];
@@ -51,6 +51,7 @@ export function SaveAsRawMaterialDialog({
   }, [open, recipeName, existing]);
 
   const price = costPerKg(lines);
+  const priceBlocked = costPerKgBlockedReason(lines);
 
   /** Råvare med samme navn som ennå ikke er koblet til en oppskrift. */
   const matchQuery = useQuery({
@@ -161,6 +162,9 @@ export function SaveAsRawMaterialDialog({
               {price != null ? `${price.toFixed(2).replace(".", ",")} kr/kg` : "—"}
             </b>
           </p>
+          {price == null && priceBlocked && (
+            <p className="text-sm text-muted-foreground">{priceBlocked}</p>
+          )}
 
           {nameMatch && (
             <div className="rounded-md border border-app/40 bg-app/[0.06] p-3 text-sm">

@@ -129,7 +129,9 @@ export function useNutritionCoverage() {
       const recipeLines = await fetchAllRows<{ raw_material_id: string | null; recipe_id: string }>((from, to) =>
         supabase
           .from("recipe_lines")
-          .select("raw_material_id, recipe_id")
+          // Bare egne oppskrifter skal telle med i dekningen.
+          .select("raw_material_id, recipe_id, recipes!inner(legal_entity_id)")
+          .eq("recipes.legal_entity_id", legalEntityId!)
           .not("raw_material_id", "is", null)
           .range(from, to),
       );

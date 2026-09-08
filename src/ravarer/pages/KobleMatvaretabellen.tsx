@@ -12,7 +12,13 @@ import { QueryState } from "@/components/common/QueryState";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { useNutritionCoverage, type CoverageItem } from "@/ravarer/hooks/useNutritionCoverage";
 import { useApplyMatvaretabellen, useMatvaretabellenFoods } from "@/ravarer/hooks/useMatvaretabellen";
-import { assessSuggestions, suggestFoods, type FoodSuggestion, type SuggestionSafety } from "@/ravarer/lib/foodSuggestions";
+import {
+  assessSuggestions,
+  hasGroupPenalty,
+  suggestFoods,
+  type FoodSuggestion,
+  type SuggestionSafety,
+} from "@/ravarer/lib/foodSuggestions";
 import { FoodPickerDialog } from "@/ravarer/components/matvaretabellen/FoodPickerDialog";
 import { formatNumber } from "@/ravarer/lib/constants";
 
@@ -56,6 +62,13 @@ export default function KobleMatvaretabellen() {
   // eksisterende verdi kan bli overskrevet.
   const autoRows = useMemo(
     () => rows.filter((r) => r.safety.autoLinkAllowed && r.item.safe_to_overwrite),
+    [rows],
+  );
+
+  // Diagnose: rader der toppforslaget ligger i en matvaregruppe som ikke passer
+  // råvarekategorien. Mange slike betyr som regel at kategorikartet mangler noe.
+  const groupPenaltyCount = useMemo(
+    () => rows.filter((r) => hasGroupPenalty(r.item.category, r.suggestions[0])).length,
     [rows],
   );
 
@@ -176,6 +189,12 @@ export default function KobleMatvaretabellen() {
           Prosenten på forslagene er tekstlikhet, ikke en garanti. Varianter som fettprosent, rå/kokt/tørket,
           saltet/usaltet og glutenfri må alltid velges manuelt.
         </p>
+        {groupPenaltyCount > 0 && (
+          <p className="mt-1 text-xs text-ink-secondary">
+            {groupPenaltyCount} rader har et toppforslag fra en matvaregruppe som ikke passer råvarekategorien —
+            de er nedvektet og må velges manuelt.
+          </p>
+        )}
       </Card>
 
       {review.length > 0 && (

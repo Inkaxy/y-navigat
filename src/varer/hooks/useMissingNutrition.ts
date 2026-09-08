@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { MANUAL_NUTRITION_SOURCE } from "@/ravarer/lib/nutritionSource";
 
 export interface MissingNutritionRow {
   raw_material_id: string | null;
@@ -99,7 +100,7 @@ export function useSaveRawMaterialNutrition() {
         {
           raw_material_id: input.raw_material_id,
           ...input.values,
-          source: "manual",
+          source: MANUAL_NUTRITION_SOURCE,
           verified_at: new Date().toISOString(),
           verified_by: u.user?.id ?? null,
           updated_at: new Date().toISOString(),

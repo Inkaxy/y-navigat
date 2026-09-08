@@ -1,5 +1,5 @@
 import { assertEquals } from "https://deno.land/std@0.208.0/assert/mod.ts";
-import { validateOutcomes, type NegotiationItemRow, type RecipientRow, type ResponseRow } from "./validate.ts";
+import { pricePerBaseUnit, validateOutcomes, type NegotiationItemRow, type RecipientRow, type ResponseRow } from "./validate.ts";
 
 const negotiationId = "neg-1";
 const items: NegotiationItemRow[] = [
@@ -119,4 +119,51 @@ Deno.test("pris oppgitt per gram regnes om til baseenheten kg", () => {
     },
   ]);
   assertEquals(Math.round((prepared[0].agreed_price_per_base_unit ?? 0) * 100) / 100, 100);
+});
+
+// Prisenhets-kontrakten begge veier:
+// – Live-forhandling sender enheten prisen faktisk ble avtalt i (live_agreed_price_unit).
+// – RFQ-tilbud er alltid per baseenhet, og fronten sender derfor råvarens baseenhet.
+Deno.test("live: pris avtalt per sekk regnes om via pakningen", () => {
+  const r = pricePerBaseUnit({
+    price: 250,
+    priceUnit: "sekk",
+    baseUnit: "kg",
+    packageSize: 25,
+    packageUnit: "kg",
+  });
+  assertEquals(r.value, 10);
+});
+
+Deno.test("live: pris avtalt per gram regnes om til kilo", () => {
+  const r = pricePerBaseUnit({
+    price: 0.02,
+    priceUnit: "g",
+    baseUnit: "kg",
+    packageSize: null,
+    packageUnit: null,
+  });
+  assertEquals(r.value, 20);
+});
+
+Deno.test("RFQ: pris per baseenhet deles ikke på pakningen en gang til", () => {
+  const r = pricePerBaseUnit({
+    price: 12,
+    priceUnit: "kg",
+    baseUnit: "kg",
+    packageSize: 25,
+    packageUnit: "kg",
+  });
+  assertEquals(r.value, 12);
+});
+
+Deno.test("ukjent pakningsenhet gir ingen pris, ikke et gjett", () => {
+  const r = pricePerBaseUnit({
+    price: 250,
+    priceUnit: "kolli",
+    baseUnit: "kg",
+    packageSize: 25,
+    packageUnit: null,
+  });
+  assertEquals(r.value, null);
 });

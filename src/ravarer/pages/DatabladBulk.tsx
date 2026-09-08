@@ -9,6 +9,9 @@ import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { CreateRawMaterialFromDatasheetDialog, type DatasheetExtract } from "@/ravarer/components/CreateRawMaterialFromDatasheetDialog";
 import { useDeleteDatasheets, useOrphanDatasheets } from "@/ravarer/hooks/useDatasheets";
 import { formatDate } from "@/ravarer/lib/constants";
+import { SetPackageDialog } from "@/ravarer/components/packages/SetPackageDialog";
+import type { PackageWorklistRow } from "@/ravarer/hooks/usePackageSizes";
+import type { PackageFillSuggestion } from "@/ravarer/lib/packageMath";
 
 interface FileRow {
   file: File;
@@ -21,6 +24,8 @@ interface FileRow {
   selectedRm?: string;
   error?: string;
   applied?: boolean;
+  /** Pakning databladet foreslår — aldri lagret, må bekreftes i dialogen. */
+  packageSuggestion?: PackageFillSuggestion | null;
 }
 
 export default function DatabladBulk() {
@@ -32,6 +37,9 @@ export default function DatabladBulk() {
   const deleteDatasheets = useDeleteDatasheets();
   const [applyingAll, setApplyingAll] = useState(false);
   const [applyProgress, setApplyProgress] = useState({ done: 0, total: 0 });
+  const [packageTarget, setPackageTarget] = useState<
+    { row: PackageWorklistRow; suggestion: PackageFillSuggestion | null } | null
+  >(null);
   const rowsRef = useRef<FileRow[]>([]);
   rowsRef.current = rows;
 
@@ -41,10 +49,11 @@ export default function DatabladBulk() {
     const newRows: FileRow[] = files.map(f => ({ file: f, status: "pending" }));
     setRows(newRows);
 
-    const { data: batch } = await supabase.from("datasheet_upload_batches").insert({
+    const { data: batch, error: batchErr } = await supabase.from("datasheet_upload_batches").insert({
       legal_entity_id: legalEntityId,
       total_files: files.length,
     }).select("id").single();
+    if (batchErr) toast.error(`Kunne ikke starte opplastingen: ${batchErr.message}`);
     setBatchId(batch?.id ?? null);
 
     for (let i = 0; i < newRows.length; i++) {
@@ -60,7 +69,7 @@ export default function DatabladBulk() {
     const current = rowsRef.current;
     const failed = current.filter((r) => r.status === "error").length;
     const processed = current.filter((r) => r.status === "ready" || r.applied).length;
-    await supabase
+    const { error: syncErr } = await supabase
       .from("datasheet_upload_batches")
       .update({
         processed,
@@ -69,6 +78,7 @@ export default function DatabladBulk() {
         ...(status === "completed" ? { completed_at: new Date().toISOString() } : {}),
       })
       .eq("id", id);
+    if (syncErr) toast.error(`Kunne ikke oppdatere status for opplastingen: ${syncErr.message}`);
   };
 
   const updateRow = (i: number, patch: Partial<FileRow>) => {
@@ -126,10 +136,11 @@ export default function DatabladBulk() {
     }
   };
 
-  const retryRow = (i: number) => {
+  const retryRow = async (i: number) => {
     const r = rows[i];
     if (!r) return;
-    processRow(i, r, batchId ?? undefined);
+    await processRow(i, r, batchId ?? undefined);
+    await syncBatch(batchId);
   };
 
   const applyRow = async (i: number, silent = false): Promise<boolean> => {
@@ -142,7 +153,9 @@ export default function DatabladBulk() {
           raw_material_id: r.selectedRm,
           // «composite» er bevisst IKKE med som standard: AI-komponenter er ren tekst,
           // og ville ellers overstyrt råvarens egen næring og allergener.
-          accepted_fields: ["nutrition", "allergens", "ingredient_declaration", "grain", "package"],
+          // «package» er bevisst IKKE med: pakningsstørrelse skal bekreftes i
+          // pakningsdialogen, ikke skrives i en bulkjobb.
+          accepted_fields: ["nutrition", "allergens", "ingredient_declaration", "grain"],
         },
       });
       if (error) throw new Error(error.message);
@@ -151,7 +164,11 @@ export default function DatabladBulk() {
       if (Array.isArray(data.failures) && data.failures.length > 0) {
         throw new Error(`Noe ble ikke lagret: ${data.failures.join(" · ")}`);
       }
-      updateRow(i, { applied: true });
+      const pkg = data.follow_ups?.package_suggestion;
+      updateRow(i, {
+        applied: true,
+        packageSuggestion: pkg ? { size: pkg.suggested?.size ?? null, contentUnit: pkg.suggested?.unit ?? null } : null,
+      });
       if (!silent) toast.success(`${r.file.name}: ${data.changes_logged} endringer logget`);
       return true;
     } catch (e: unknown) {
@@ -167,8 +184,43 @@ export default function DatabladBulk() {
     updateRow(i, { selectedRm: rawMaterialId });
     const dsId = rowsRef.current[i]?.datasheet_id;
     if (dsId) {
-      await supabase.from("raw_material_datasheets").update({ raw_material_id: rawMaterialId }).eq("id", dsId);
+      const { error } = await supabase
+        .from("raw_material_datasheets")
+        .update({ raw_material_id: rawMaterialId })
+        .eq("id", dsId);
+      if (error) updateRow(i, { error: `Kunne ikke knytte databladet til råvaren: ${error.message}` });
     }
+  };
+
+  /** Henter et minimum av råvaren og åpner pakningsdialogen med forslaget. */
+  const openPackage = async (i: number) => {
+    const r = rowsRef.current[i] ?? rows[i];
+    if (!r?.selectedRm) return;
+    const { data, error } = await supabase
+      .from("raw_materials")
+      .select("id, legal_entity_id, name, base_unit, category, current_cost_price")
+      .eq("id", r.selectedRm)
+      .maybeSingle();
+    if (error || !data) {
+      toast.error(error ? `Kunne ikke hente råvaren: ${error.message}` : "Fant ikke råvaren");
+      return;
+    }
+    setPackageTarget({
+      row: {
+        id: data.id,
+        legal_entity_id: data.legal_entity_id,
+        name: data.name,
+        base_unit: data.base_unit,
+        category: data.category ?? null,
+        current_cost_price: data.current_cost_price ?? null,
+        pakningsfaktor: null, faktor_kilde: null, bekreftet_dato: null,
+        antall_fakturalinjer: null, antall_leverandorer: null, enheter_i_bruk: null,
+        linjer_uten_pris: null, kjopt_kr_totalt: null, siste_faktura: null,
+        pris_spredning: null, implisert_mengde: null, referansepris: null,
+        referansekilde: null, referansedato: null, referanse_faktor: null,
+      } as PackageWorklistRow,
+      suggestion: r.packageSuggestion ?? null,
+    });
   };
 
   const applyAllHigh = async () => {
@@ -241,6 +293,17 @@ export default function DatabladBulk() {
                     )}
                     {r.applied && <span className="text-success ml-2">✓ Anvendt</span>}
                   </div>
+                  {r.packageSuggestion && canWrite && (
+                    <div className="mt-1.5 flex items-center gap-2 text-xs text-ink-secondary">
+                      <span>
+                        Pakning: {r.packageSuggestion.size ?? "—"} {r.packageSuggestion.contentUnit ?? ""} foreslått —
+                        ikke lagret
+                      </span>
+                      <Button size="sm" variant="ghost" className="h-6 px-2" onClick={() => void openPackage(i)}>
+                        Åpne
+                      </Button>
+                    </div>
+                  )}
                   {r.status === "error" && (
                     <div className="mt-1.5 rounded-lg bg-destructive/10 border border-destructive/20 px-2.5 py-1.5">
                       <div className="text-xs text-destructive font-medium break-words">{r.error}</div>
@@ -257,7 +320,7 @@ export default function DatabladBulk() {
                   </Button>
                 )}
                 {r.status === "error" && (
-                  <Button size="sm" variant="outline" onClick={() => retryRow(i)}>
+                  <Button size="sm" variant="outline" onClick={() => void retryRow(i)}>
                     <RefreshCw className="mr-1 h-3.5 w-3.5" /> Prøv igjen
                   </Button>
                 )}
@@ -311,6 +374,13 @@ export default function DatabladBulk() {
           </div>
         </Card>
       )}
+
+      <SetPackageDialog
+        row={packageTarget?.row ?? null}
+        open={packageTarget !== null}
+        onOpenChange={(v) => { if (!v) setPackageTarget(null); }}
+        suggestion={packageTarget?.suggestion ?? null}
+      />
 
       {createDialogIdx !== null && rows[createDialogIdx]?.datasheet_id && (
         <CreateRawMaterialFromDatasheetDialog

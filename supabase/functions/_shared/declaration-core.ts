@@ -126,6 +126,21 @@ export type CoreResult = {
   nutritionByRm: Map<string, any>;
 };
 
+/**
+ * Tekstkomponenter i en sammensatt råvare har ingen egen næring eller allergener.
+ * Forelderens rad gjelder hele massen, så tekstandelen arver den forholdsmessig.
+ */
+export function textComponentInheritance(
+  parentHasNutrition: boolean,
+  parentAllergens: readonly string[],
+  parentMayAllergens: readonly string[],
+  componentAllergens: readonly string[],
+): { has_nutrition: boolean; allergens: string[]; may_allergens: string[] } {
+  const allergens = componentAllergens.length > 0 ? [...componentAllergens] : [...parentAllergens];
+  const may = parentMayAllergens.filter((a) => !allergens.includes(a));
+  return { has_nutrition: parentHasNutrition, allergens, may_allergens: may };
+}
+
 const RM_SELECT = "id, name, declaration_name, is_composite, grain_classification, cereal_type, water_content_pct, components_reviewed_at, unit_weight_grams";
 
 const PACKAGING_RE =
@@ -299,6 +314,13 @@ export async function computeDeclarationCore(service: any, topLines: TopLine[]):
       const nm = rm?.name ?? rmId;
       if (!composite_unreviewed.includes(nm)) composite_unreviewed.push(nm);
     }
+    const parentHasNutrition = rmId ? !!nutritionByRm.get(rmId) : false;
+    const parentAllergens = rmId
+      ? (allergensByRm.get(rmId) ?? []).filter((a) => a.presence === "contains").map((a) => a.allergen)
+      : [];
+    const parentMayAllergens = rmId
+      ? (allergensByRm.get(rmId) ?? []).filter((a) => a.presence === "may_contain").map((a) => a.allergen)
+      : [];
     const comps = (componentsByParent.get(rmId!) ?? []).slice().sort((a, b) => a.sort_order - b.sort_order);
     const out: FlatLine[] = [];
     const totalPct = comps.reduce((s, c) => s + Number(c.percentage), 0) || 100;
@@ -310,6 +332,14 @@ export async function computeDeclarationCore(service: any, topLines: TopLine[]):
         out.push(...decompose(source, childGrams, childEff, c.component_raw_material_id, "(komponent)", c.is_quid_relevant || isQuid, null, depth + 1, rmId, null));
       } else {
         const nm = c.primary_ingredient_name ?? "(komponent)";
+        // Tekstkomponenten har ingen egen næring eller allergener. Forelderens rad
+        // gjelder hele massen, så andelen her dekkes forholdsmessig av den.
+        const inherited = textComponentInheritance(
+          parentHasNutrition,
+          parentAllergens,
+          parentMayAllergens,
+          c.allergens ?? [],
+        );
         if (!composite_text_only.includes(nm)) composite_text_only.push(nm);
         out.push({
           source,
@@ -325,9 +355,9 @@ export async function computeDeclarationCore(service: any, topLines: TopLine[]):
           cereal_type: null,
           water_content_pct: null,
           water_content_source: "unknown",
-          allergens: c.allergens ?? [],
-          may_allergens: [],
-          has_nutrition: false,
+          allergens: inherited.allergens,
+          may_allergens: inherited.may_allergens,
+          has_nutrition: inherited.has_nutrition,
         });
       }
     }
