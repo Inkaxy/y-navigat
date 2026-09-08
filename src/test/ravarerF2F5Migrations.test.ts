@@ -14,7 +14,7 @@ const F5 = readFileSync(resolve("supabase/migrations-pending/20260908_f5_count_a
 describe("F2 — linjesporbar prishistorikk", () => {
   it("bruker aldri unit_price som fallback for pris per grunnenhet", () => {
     expect(/coalesce\s*\(\s*(new\.)?price_per_base_unit\s*,\s*(new\.)?unit_price/i.test(F2)).toBe(false);
-    expect(F2).toMatch(/v_l\.price_per_base_unit is null/i);
+    expect(F2).toMatch(/rm_is_finite\(v_l\.price_per_base_unit\)/i);
   });
 
   it("gir prishistorikken fakturalinje-ID med unikhet", () => {
