@@ -270,8 +270,19 @@ export function useResaleMargins() {
           .limit(1),
       ]);
 
+      interface RmCostRow { id: string; current_cost_price: number | null; price_updated_at: string | null }
+      interface ProductLinkRow {
+        raw_material_id: string;
+        product_id: string;
+        base_units_per_sold_unit: number | null;
+        is_primary: boolean;
+        product: { id: string; display_name: string } | null;
+      }
+      const rmRows = (rms ?? []) as unknown as RmCostRow[];
+      const linkRows = (links ?? []) as unknown as ProductLinkRow[];
+
       const defaultListId = lists?.[0]?.id ?? null;
-      const productIds = Array.from(new Set(((links ?? []) as any[]).map((l) => l.product_id)));
+      const productIds = Array.from(new Set(linkRows.map((l) => l.product_id)));
       const priceByProduct = new Map<string, number>();
       if (defaultListId && productIds.length > 0) {
         const { data: items } = await supabase
@@ -282,9 +293,9 @@ export function useResaleMargins() {
         (items ?? []).forEach((i) => priceByProduct.set(i.product_id as string, Number(i.price) || 0));
       }
 
-      const rmById = new Map(((rms ?? []) as any[]).map((r) => [r.id, r]));
-      const linkByRm = new Map<string, any>();
-      for (const l of (links ?? []) as any[]) {
+      const rmById = new Map(rmRows.map((r) => [r.id, r]));
+      const linkByRm = new Map<string, ProductLinkRow>();
+      for (const l of linkRows) {
         const prev = linkByRm.get(l.raw_material_id);
         if (!prev || (l.is_primary && !prev.is_primary)) linkByRm.set(l.raw_material_id, l);
       }
