@@ -110,3 +110,44 @@ export async function logAudit(input: LogAuditInput) {
     console.warn("logAudit failed:", e);
   }
 }
+
+/**
+ * Skriver mange audit-rader i ÉN insert. Brukes ved batch-prislagring der
+ * en logAudit per celle ville gitt N+1-kall.
+ */
+export async function logAuditBatch(entries: LogAuditInput[]) {
+  if (entries.length === 0) return;
+  try {
+    const { data: userData } = await supabase.auth.getUser();
+    const user = userData.user;
+    let display: string | null = null;
+    if (user) {
+      const { data: u } = await supabase
+        .from("users")
+        .select("display_name")
+        .eq("id", user.id)
+        .maybeSingle();
+      display = u?.display_name ?? user.email ?? null;
+    }
+    const legalEntityId = readActiveLegalEntityId();
+    const userAgent = typeof navigator !== "undefined" ? navigator.userAgent : null;
+    await supabase.from("audit_log").insert(
+      entries.map((input) => ({
+        action: input.action,
+        entity_type: input.entity_type,
+        entity_id: input.entity_id ?? null,
+        entity_display_reference: input.entity_display_reference ?? null,
+        changes: (input.changes ?? null) as never,
+        reason: input.reason ?? null,
+        outlet_id: input.outlet_id ?? null,
+        legal_entity_id: legalEntityId,
+        source_app: APP_SOURCE,
+        user_id: user?.id ?? null,
+        user_display_name: display,
+        user_agent: userAgent,
+      })),
+    );
+  } catch (e) {
+    console.warn("logAuditBatch failed:", e);
+  }
+}

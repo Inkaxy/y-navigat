@@ -1,4 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm, FormProvider } from "react-hook-form";
@@ -79,6 +89,7 @@ export default function ProductDetail() {
   const [params, setParams] = useSearchParams();
   const tab = params.get("tab") ?? "navn";
   const [saving, setSaving] = useState(false);
+  const [confirmDeactivate, setConfirmDeactivate] = useState(false);
   const [keywords, setKeywords] = useState<string[]>([]);
   const [salesGroupIds, setSalesGroupIds] = useState<string[]>([]);
   const [originalSalesGroupIds, setOriginalSalesGroupIds] = useState<string[]>([]);
@@ -396,9 +407,26 @@ export default function ProductDetail() {
     toast.info("Endringer forkastet");
   }
 
+  /** Setter status til Aktiv — brukes på utkast fra «Ny vare»-veiviseren. */
+  async function handleActivate() {
+    if (!product) return;
+    const { error } = await supabase.from("products").update({ status: "active" }).eq("id", product.id);
+    if (error) { toast.error(error.message); return; }
+    await logAudit({
+      action: "update",
+      entity_type: "product",
+      entity_id: product.id,
+      entity_display_reference: product.display_name,
+      changes: { status: { from: product.status, to: "active" } },
+    });
+    toast.success("Varen er aktiv");
+    qc.invalidateQueries({ queryKey: ["product", product.id] });
+    qc.invalidateQueries({ queryKey: ["products"] });
+  }
+
   async function handleDeactivate() {
     if (!product) return;
-    if (!confirm(`De-aktivere "${product.display_name}"? Status settes til Utgått.`)) return;
+    setConfirmDeactivate(false);
     const { error } = await supabase.from("products").update({ status: "discontinued" }).eq("id", product.id);
     if (error) { toast.error(error.message); return; }
     await logAudit({
@@ -410,6 +438,7 @@ export default function ProductDetail() {
     });
     toast.success("Vare de-aktivert");
     qc.invalidateQueries({ queryKey: ["product", product.id] });
+    qc.invalidateQueries({ queryKey: ["products"] });
   }
 
   // (Ctrl+S-handler ligger nå før early-return for å overholde Rules of Hooks)
@@ -441,7 +470,8 @@ export default function ProductDetail() {
         canWrite={canWrite}
         onSave={handleSaveClick}
         onCancel={handleCancel}
-        onDeactivate={handleDeactivate}
+        onDeactivate={() => setConfirmDeactivate(true)}
+        onActivate={handleActivate}
       >
         {tab === "navn" && (
           <NavnOgNummerTab product={product} canWrite={canWrite} hasGs1Prefix={!!lookups?.hasGs1Prefix} />
@@ -553,6 +583,21 @@ export default function ProductDetail() {
           <Card><CardContent className="py-12 text-center text-muted-foreground">Avviksregistrering kommer i fremtidig iterasjon.</CardContent></Card>
         )}
       </DetailLayout>
+
+      <AlertDialog open={confirmDeactivate} onOpenChange={setConfirmDeactivate}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>De-aktivere varen?</AlertDialogTitle>
+            <AlertDialogDescription>
+              «{product?.display_name}» settes til Utgått og kan ikke bestilles. Du kan aktivere den igjen senere.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Avbryt</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeactivate}>De-aktiver</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <UnsavedChangesDialog
         open={unsavedGuard.isBlocked}

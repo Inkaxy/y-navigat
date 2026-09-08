@@ -41,7 +41,7 @@ export interface PriceRoundLine {
   maal_brutto_pct: number | null;
   maal_dg2_pct: number | null;
   added_at: string;
-  products: { navn: string | null; display_number: number | null } | null;
+  products: { display_name: string | null; display_number: number | null } | null;
   price_lists: { display_name: string | null; code: string | null } | null;
 }
 
@@ -151,7 +151,7 @@ export function usePriceRoundLines(roundId: string | undefined) {
       const { data, error } = await supabase
         .from("price_round_lines")
         .select(
-          "*, products(navn, display_number), price_lists(display_name, code)",
+          "*, products(display_name, display_number), price_lists(display_name, code)",
         )
         .eq("round_id", roundId!)
         .order("added_at");

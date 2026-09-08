@@ -4,7 +4,9 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRows } from "@/lib/supabasePaging";
 
-import { logAudit } from "@/varer/lib/audit";
+import { logAudit, logAuditBatch } from "@/varer/lib/audit";
+import { writePriceBatch } from "@/varer/lib/priceWrite";
+import { supabasePriceStore, PRICE_QUERY_KEYS } from "@/varer/lib/supabasePriceStore";
 import { useAppContext } from "@/varer/context/AppContext";
 import { AppHeaderBanner } from "@/varer/components/layout/AppHeaderBanner";
 import { Card, CardContent } from "@/components/ui/card";
@@ -100,98 +102,43 @@ export default function PriceLists() {
     });
   }
 
+  /** Invaliderer alle spørringer som avhenger av pris/kost/margin. */
+  function invalidatePriceQueries() {
+    for (const key of PRICE_QUERY_KEYS) qc.invalidateQueries({ queryKey: [...key] });
+  }
+
   async function saveAllPending() {
     if (pendingEdits.size === 0) return;
     setSavingBatch(true);
-    let ok = 0;
-    let failed = 0;
     try {
-      // priceDate - 1 dag (for å lukke forrige periode)
-      const prevDate = (() => {
-        const d = new Date(priceDate + "T00:00:00Z");
-        d.setUTCDate(d.getUTCDate() - 1);
-        return osloDateISO(d);
-      })();
-      for (const [key, newPrice] of pendingEdits.entries()) {
+      const changes = [...pendingEdits.entries()].map(([key, price]) => {
         const [productId, priceListId] = key.split("::");
-        const productName = productNames[productId] ?? productId;
-        // Finn aktiv rad på priceDate (kan ha valid_from < priceDate)
-        const { data: activeRows, error: selErr } = await supabase
-          .from("price_list_items")
-          .select("id, price, valid_from, valid_to")
-          .eq("price_list_id", priceListId)
-          .eq("product_id", productId)
-          .lte("valid_from", priceDate)
-          .or(`valid_to.is.null,valid_to.gte.${priceDate}`)
-          .order("valid_from", { ascending: false })
-          .limit(1);
-        if (selErr) {
-          toast.error(`${productName}: ${selErr.message}`);
-          failed++;
-          continue;
-        }
-        const existing = activeRows?.[0] ?? null;
-        if (existing && existing.valid_from === priceDate) {
-          const { error } = await supabase
-            .from("price_list_items")
-            .update({ price: newPrice })
-            .eq("id", existing.id);
-          if (error) {
-            toast.error(`${productName}: ${error.message}`);
-            failed++;
-            continue;
-          }
-          await logAudit({
-            action: "update",
-            entity_type: "price_list_item",
-            entity_id: existing.id,
-            entity_display_reference: productName,
-            changes: { price: newPrice, valid_from: priceDate },
-          });
-        } else {
-          // Lukk forrige periode hvis den finnes (valid_from < priceDate)
-          if (existing && existing.valid_from < priceDate) {
-            const { error: closeErr } = await supabase
-              .from("price_list_items")
-              .update({ valid_to: prevDate })
-              .eq("id", existing.id);
-            if (closeErr) {
-              toast.error(`${productName}: ${closeErr.message}`);
-              failed++;
-              continue;
-            }
-          }
-          const { data, error } = await supabase
-            .from("price_list_items")
-            .insert({
-              price_list_id: priceListId,
-              product_id: productId,
-              price: newPrice,
-              valid_from: priceDate,
-            })
-            .select("id")
-            .single();
-          if (error) {
-            toast.error(`${productName}: ${error.message}`);
-            failed++;
-            continue;
-          }
-          await logAudit({
-            action: "create",
-            entity_type: "price_list_item",
-            entity_id: data.id,
-            entity_display_reference: productName,
-            changes: { price: newPrice, valid_from: priceDate },
-          });
-        }
-        ok++;
-      }
-      if (ok > 0) {
-        toast.success(`${ok} pris${ok === 1 ? "" : "er"} lagret${failed > 0 ? ` (${failed} feilet)` : ""}`);
+        return {
+          productId,
+          priceListId,
+          price,
+          label: productNames[productId] ?? productId,
+        };
+      });
+      const res = await writePriceBatch(supabasePriceStore, changes, priceDate);
+      await logAuditBatch(
+        res.written.map((w) => ({
+          action: "update" as const,
+          entity_type: "price_list_item" as const,
+          entity_id: w.rowId,
+          entity_display_reference: w.label,
+          changes: { price: w.price, previous_price: w.previousPrice, valid_from: priceDate },
+        })),
+      );
+      for (const f of res.failed) toast.error(`${f.label}: ${f.message}`);
+      if (res.ok > 0) {
+        toast.success(
+          `${res.ok} pris${res.ok === 1 ? "" : "er"} lagret${res.failed.length > 0 ? ` (${res.failed.length} feilet)` : ""}`,
+        );
         setPendingEdits(new Map());
-        qc.invalidateQueries({ queryKey: ["matrix-prices"] });
-      } else if (failed > 0) {
-        toast.error(`Ingen lagret — ${failed} feil`);
+        invalidatePriceQueries();
+      } else if (res.failed.length > 0) {
+        toast.error(`Ingen lagret — ${res.failed.length} feil`);
       }
     } finally {
       setSavingBatch(false);
@@ -459,50 +406,46 @@ export default function PriceLists() {
     changes: { productId: string; productName: string; priceListId: string; priceListName: string }[],
     next: Map<string, number>,
   ) {
-    let ok = 0;
-    for (const ch of changes) {
-      const newPrice = next.get(`${ch.productId}::${ch.priceListId}`);
-      if (newPrice == null) continue;
-      const { data: existing } = await supabase
-        .from("price_list_items")
-        .select("id")
-        .eq("price_list_id", ch.priceListId)
-        .eq("product_id", ch.productId)
-        .eq("valid_from", priceDate)
-        .maybeSingle();
-      if (existing) {
-        const { error } = await supabase
-          .from("price_list_items")
-          .update({ price: newPrice })
-          .eq("id", existing.id);
-        if (error) {
-          toast.error(`${ch.productName} → ${ch.priceListName}: ${error.message}`);
-          continue;
-        }
-      } else {
-        const { error } = await supabase.from("price_list_items").insert({
-          price_list_id: ch.priceListId,
-          product_id: ch.productId,
-          price: newPrice,
-          valid_from: priceDate,
-        });
-        if (error) {
-          toast.error(`${ch.productName} → ${ch.priceListName}: ${error.message}`);
-          continue;
-        }
-      }
-      ok++;
-    }
-    if (ok > 0) {
+    // Batch-justering bruker nøyaktig samme periodelogikk som celle-lagring:
+    // forrige periode lukkes dagen før, ny rad settes inn fra prisdatoen.
+    const jobs = changes
+      .map((ch) => {
+        const price = next.get(`${ch.productId}::${ch.priceListId}`);
+        if (price == null) return null;
+        return {
+          productId: ch.productId,
+          priceListId: ch.priceListId,
+          price,
+          label: `${ch.productName} → ${ch.priceListName}`,
+        };
+      })
+      .filter((j): j is { productId: string; priceListId: string; price: number; label: string } => j !== null);
+
+    const res = await writePriceBatch(supabasePriceStore, jobs, priceDate);
+    await logAuditBatch(
+      res.written.map((w) => ({
+        action: "price_adjusted" as const,
+        entity_type: "price_list_item" as const,
+        entity_id: w.rowId,
+        entity_display_reference: w.label,
+        changes: { price: w.price, previous_price: w.previousPrice, valid_from: priceDate },
+      })),
+    );
+    for (const f of res.failed) toast.error(`${f.label}: ${f.message}`);
+    if (res.ok > 0) {
       await logAudit({
         action: "price_adjusted",
         entity_type: "price_list_item",
         entity_id: null,
-        entity_display_reference: `Bulk-justering ${ok} celler · ${priceDate}`,
-        changes: { count: ok, valid_from: priceDate },
+        entity_display_reference: `Bulk-justering ${res.ok} celler · ${priceDate}`,
+        changes: { count: res.ok, failed: res.failed.length, valid_from: priceDate },
       });
-      toast.success(`${ok} pris(er) lagret`);
-      qc.invalidateQueries({ queryKey: ["matrix-prices"] });
+      toast.success(
+        `${res.ok} pris(er) lagret${res.failed.length > 0 ? ` — ${res.failed.length} feilet` : ""}`,
+      );
+      invalidatePriceQueries();
+    } else if (res.failed.length > 0) {
+      toast.error(`Ingen priser lagret — ${res.failed.length} feilet`);
     }
   }
 
