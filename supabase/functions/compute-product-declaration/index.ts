@@ -3,7 +3,15 @@
 // - Kjernelogikken (dekomponering, aggregering, QUID, allergener, næring, Brødskala'n)
 //   ligger i _shared/declaration-core.ts og deles med compute-recipe-label.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { computeDeclarationCore, NUT_FIELDS, type TopLine } from "../_shared/declaration-core.ts";
+import {
+  computeDeclarationCore,
+  declarationGate,
+  resolveFinalWeight,
+  NUT_FIELDS,
+  type TopLine,
+} from "../_shared/declaration-core.ts";
+import { expandRecipeLines, sumLineGrams } from "../_shared/recipe-lines.ts";
+import { storeNutrient } from "../_shared/nutritionFormat.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -43,7 +51,7 @@ Deno.serve(async (req) => {
         id, product_id, recipe_id, extra_lines, yield_weight_g_override,
         declaration_mode, manual_ingredient_declaration, manual_nutrition, manual_allergen_summary,
         products(id, display_name),
-        recipes(id, declaration_mode, manual_ingredient_declaration, manual_nutrition, manual_allergen_summary, yield_grams, yield_loss_pct)
+        recipes(id, declaration_mode, manual_ingredient_declaration, manual_nutrition, manual_allergen_summary, yield_grams, yield_loss_pct, finished_weight_grams, yield_quantity, yield_unit)
       `)
       .eq("id", linkId)
       .maybeSingle();
@@ -52,11 +60,15 @@ Deno.serve(async (req) => {
     const recipe = (link as any).recipes;
     const product = (link as any).products;
 
-    const { data: masterLines } = await service
-      .from("recipe_lines")
-      .select("id, raw_material_id, ingredient_name, quantity, unit, waste_percent, include_in_declaration, is_quid_relevant, custom_declaration_text, sort_order, raw_materials(id, name, unit_weight_grams, is_composite, grain_classification, components_reviewed_at)")
-      .eq("recipe_id", link.recipe_id)
-      .order("sort_order");
+    // ÉN motor: samme utbretting av halvfabrikater som compute-recipe-label.
+    const expandWarnings: string[] = [];
+    const masterTopLines: TopLine[] = await expandRecipeLines(
+      service,
+      link.recipe_id as string,
+      0,
+      new Set([link.recipe_id as string]),
+      expandWarnings,
+    );
 
     const extraLinesArr = Array.isArray(link.extra_lines) ? link.extra_lines as any[] : [];
     const extraRmIds = extraLinesArr.map((e) => e.raw_material_id).filter(Boolean);
@@ -69,23 +81,7 @@ Deno.serve(async (req) => {
       for (const r of rms ?? []) extraRmMap.set(r.id, r);
     }
 
-    const topLines: TopLine[] = [];
-    for (const l of masterLines ?? []) {
-      const rm = (l as any).raw_materials;
-      topLines.push({
-        source: "master",
-        raw_material: rm ?? null,
-        raw_material_id: l.raw_material_id ?? null,
-        name: rm?.name ?? l.ingredient_name ?? "(ukjent)",
-        quantity: Number(l.quantity) || 0,
-        unit: l.unit ?? "g",
-        waste_percent: Number(l.waste_percent) || 0,
-        include: l.include_in_declaration !== false,
-        is_quid: !!l.is_quid_relevant,
-        custom_text: l.custom_declaration_text || null,
-        unit_weight_grams: rm?.unit_weight_grams ?? null,
-      });
-    }
+    const topLines: TopLine[] = [...masterTopLines];
     for (const e of extraLinesArr) {
       const rm = e.raw_material_id ? extraRmMap.get(e.raw_material_id) : null;
       topLines.push({
@@ -103,19 +99,24 @@ Deno.serve(async (req) => {
       });
     }
 
-    const core = await computeDeclarationCore(service, topLines);
+    // Ferdigvekt løses med samme funksjon som oppskriftsveien.
+    const inputEstimate = sumLineGrams(topLines.filter((t) => t.include));
+    const yieldGrams = link.yield_weight_g_override ?? null;
+    const finalWeight =
+      (yieldGrams != null && Number(yieldGrams) > 0
+        ? Number(yieldGrams)
+        : resolveFinalWeight(recipe, inputEstimate).grams) || 1;
+
+    const core = await computeDeclarationCore(service, topLines, { finalWeightGrams: finalWeight });
     const sortedAgg = core.sortedAgg;
     const totalInputGrams = core.totalInputGrams;
-
-    const yieldGrams = link.yield_weight_g_override ?? recipe?.yield_grams ?? null;
-    const yieldLoss = Number(recipe?.yield_loss_pct) || 0;
-    const finalWeight = (yieldGrams ?? (totalInputGrams * (1 - yieldLoss / 100))) || 1;
 
     const per100: Record<string, number | null> = {};
     for (const f of NUT_FIELDS) {
       const t = core.nutritionTotals[f];
-      per100[f] = t != null ? Math.round((t / finalWeight) * 1000) / 10 : null;
+      per100[f] = t != null ? storeNutrient((t / finalWeight) * 100) : null;
     }
+    if (!core.fiber_complete) per100.fiber_g = null;
 
     const grainPct = core.breadscale.grain_pct;
     const grainCategory = core.breadscale.grain_category;
@@ -124,27 +125,16 @@ Deno.serve(async (req) => {
     const breadscaleUnclassified = core.breadscale.unclassified;
     const flourRatioOfTotal = totalInputGrams > 0 ? totalFlour / totalInputGrams : 0;
 
-    if (grainPct != null) {
-      await service.from("recipe_grain_score").upsert({
-        product_recipe_link_id: linkId,
-        total_flour_grams: totalFlour,
-        coarse_grams_weighted: coarseWeighted,
-        grain_score_pct: grainPct,
-        category: grainCategory,
-        classification_complete: breadscaleUnclassified.length === 0,
-        unclassified_count: breadscaleUnclassified.length,
-        unclassified_names: breadscaleUnclassified,
-        computed_at: new Date().toISOString(),
-      } as never, { onConflict: "product_recipe_link_id" });
-    }
-
     // Datakvalitet
     const linesWithoutRm = sortedAgg.filter((a) => !a.raw_material_id).length;
     const linesWithoutNut = sortedAgg.filter((a) => a.raw_material_id && !a.has_nutrition).length;
-    const nutritionCoveragePct = Math.round((core.coveredGrams / (totalInputGrams || 1)) * 100);
+    const nutritionCoveragePct = Math.round((core.coveredGrams / (totalInputGrams || 1)) * 1000) / 10;
+    const gate = declarationGate(core, nutritionCoveragePct);
 
-    const warnings: string[] = [];
-    if (yieldGrams == null) warnings.push("Mangler ferdigvekt — næring pr 100 g antar input-vekt");
+    const warnings: string[] = [...expandWarnings];
+    if (yieldGrams == null && (recipe?.yield_grams == null && recipe?.finished_weight_grams == null)) {
+      warnings.push("Mangler ferdigvekt — næring pr 100 g antar input-vekt");
+    }
     if (linesWithoutRm) warnings.push(`${linesWithoutRm} aggregert(e) ingrediens(er) mangler råvare-kobling`);
     if (linesWithoutNut) warnings.push(`${linesWithoutNut} råvare(r) mangler næringsdata`);
     if (core.composite_unreviewed.length) warnings.push(`Sammensatt råvare uten review: ${core.composite_unreviewed.join(", ")}`);
@@ -154,7 +144,9 @@ Deno.serve(async (req) => {
         `${core.missing_declaration_names.length} råvare(r) mangler deklarasjonsnavn — innkjøpsnavnet brukes midlertidig: ${core.missing_declaration_names.map((m) => m.name).join(", ")}`,
       );
     }
-    if (nutritionCoveragePct < 80) warnings.push(`Kun ${nutritionCoveragePct}% av vekten har næringsdekning`);
+    // Samme terskel som oppskriftsveien: 90 %.
+    if (nutritionCoveragePct < 90) warnings.push(`Kun ${String(nutritionCoveragePct).replace(".", ",")} % av vekten har næringsdekning`);
+    for (const r of gate.reasons) if (!warnings.includes(r)) warnings.push(r);
     if (breadscaleUnclassified.length) warnings.push(`Brødskala: ${breadscaleUnclassified.length} ingredienser ikke klassifisert`);
 
     // Modus + manuelle overstyringer
@@ -174,6 +166,7 @@ Deno.serve(async (req) => {
     if (mode === "manual") {
       const ing = pickManual(link.manual_ingredient_declaration, recipe?.manual_ingredient_declaration);
       if (ing) finalIngredient = ing as string;
+      else warnings.push("Manuell modus, men ingen manuell ingrediensliste er lagret — beregningen vises i stedet");
       const nut = pickManual(link.manual_nutrition, recipe?.manual_nutrition);
       if (nut && typeof nut === "object") finalNutrition = nut as any;
       const all = pickManual(link.manual_allergen_summary, recipe?.manual_allergen_summary);
@@ -225,10 +218,20 @@ Deno.serve(async (req) => {
         lines_without_raw_material: linesWithoutRm,
         lines_without_nutrition: linesWithoutNut,
         nutrition_coverage_pct: nutritionCoveragePct,
-        yield_grams_set: yieldGrams != null,
+        yield_grams_set: yieldGrams != null || recipe?.yield_grams != null || recipe?.finished_weight_grams != null,
+        blocked: gate.blocked,
+        block_reasons: gate.reasons,
       },
+      ingredient_declaration_text: core.ingredientText,
+      coverage_by_nutrient: core.coverage_by_nutrient,
       missing_data: {
         declaration_names: core.missing_declaration_names,
+        nutrition: core.missing_nutrition,
+        lines_without_nutrition_over_pct: core.lines_without_nutrition_over_pct,
+        critical_missing_nutrition: core.critical_missing_nutrition,
+        unit_problems: core.unit_problems,
+        free_text_lines: core.free_text_lines,
+        composite_percent_residual: core.composite_percent_residual,
       },
       warnings,
       computed_lines: sortedAgg.map((a) => ({

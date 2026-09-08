@@ -6,10 +6,11 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, Printer } from "lucide-react";
 import { toast } from "sonner";
-import { fmtNum, fmtPct, grainCategoryFromPct, grainLevelLabel } from "@/varer/lib/breadscale";
+import { fmtPct, grainCategoryFromPct, grainLevelLabel } from "@/varer/lib/breadscale";
 import { BRODSKALAN_MARKS } from "@/varer/lib/brodskalan";
 import { LABEL_SIZES, type LabelSizeKey } from "../ConsumerLabelPDFDocument";
-import { NUT_ROWS } from "./labelShared";
+import { NUT_ROWS, nutritionValueText } from "./labelShared";
+import { MarkedText } from "@/varer/components/label/MarkedText";
 import type { EffectiveDeclaration } from "@/varer/lib/effectiveDeclaration";
 
 interface EntityInfo {
@@ -77,14 +78,11 @@ export function ConsumerLabelSection({
     ? [entity.address_line1, [entity.postal_code, entity.city].filter(Boolean).join(" ")].filter(Boolean).join(", ")
     : null;
 
-  const nutritionRows = NUT_ROWS.map((r) => {
-    const v = effective.nutrition?.[r.key as keyof typeof effective.nutrition];
-    return {
-      label: r.indent ? `— ${r.label}` : r.label,
-      value: v == null ? "—" : `${fmtNum(Number(v), r.d)} ${r.unit}`,
-      indent: r.indent,
-    };
-  });
+  const nutritionRows = NUT_ROWS.map((r) => ({
+    label: r.indent ? `— ${r.label}` : r.label,
+    value: nutritionValueText(r.key, effective.nutrition as Record<string, number | null> | null),
+    indent: r.indent,
+  }));
 
   const canPrint = !!(effective.ingredientText && effective.ingredientText.trim());
 
@@ -174,12 +172,14 @@ export function ConsumerLabelSection({
 
             <div>
               <div className="font-semibold uppercase">Ingredienser</div>
-              <p>{effective.ingredientText || "—"}</p>
+              <p><MarkedText text={effective.ingredientText || "—"} /></p>
             </div>
 
             {(effective.contains.length > 0 || effective.mayContain.length > 0) && (
               <div className="space-y-0.5">
-                {effective.contains.length > 0 && (
+                {/* Art. 21: «Inneholder:» skal IKKE gjentas når allergenene er uthevet
+                    i ingredienslisten. Vises bare når listen mangler. */}
+                {effective.contains.length > 0 && !effective.ingredientText?.trim() && (
                   <p>
                     <b>Inneholder:</b> {effective.contains.join(", ")}
                   </p>

@@ -12,7 +12,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { AlertTriangle, ClipboardCopy, Copy, Loader2, Save } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { showError } from "@/lib/userError";
-import { fmtNum } from "@/varer/lib/breadscale";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 import { UnsavedChangesDialog } from "@/varer/components/products/detail/UnsavedChangesDialog";
 import { useUserDisplayName, type RecipeLabelCalculated } from "@/varer/hooks/useRecipeLabel";
@@ -27,7 +26,7 @@ import {
   type NutritionPer100g,
   type RecipeLabelSnapshot,
 } from "@/varer/lib/effectiveDeclaration";
-import { DiffNote, NUT_ROWS, SourceColumn, SourceSegmented, formatDateTimeNb } from "./labelShared";
+import { DiffNote, NUT_ROWS, SourceColumn, SourceSegmented, formatDateTimeNb, nutritionValueText } from "./labelShared";
 
 const NUT_LABELS: Record<string, string> = {
   energy_kj: "Energi (kJ)",
@@ -321,24 +320,21 @@ export function DeclarationNutritionSection({
                       </tr>
                     </thead>
                     <tbody>
-                      {NUT_ROWS.map((r) => {
-                        const v = calculated.nutrition_per_100g?.[r.key];
-                        return (
-                          <tr key={r.key + r.unit} className="border-b border-border/50 last:border-0">
-                            <td className={cn("py-1.5", r.indent && "pl-4 text-muted-foreground")}>
-                              {r.indent ? `— ${r.label}` : r.label}
-                            </td>
+                      {NUT_ROWS.map((r) => (
+                        <tr key={r.key} className="border-b border-border/50 last:border-0">
+                          <td className={cn("py-1.5", r.indent && "pl-4 text-muted-foreground")}>
+                            {r.indent ? `— ${r.label}` : r.label}
+                          </td>
+                          <td className="py-1.5 text-right tabular-nums">
+                            {nutritionValueText(r.key, calculated.nutrition_per_100g)}
+                          </td>
+                          {factor && (
                             <td className="py-1.5 text-right tabular-nums">
-                              {v == null ? "—" : `${fmtNum(v, r.d)} ${r.unit}`}
+                              {nutritionValueText(r.key, calculated.nutrition_per_100g, factor)}
                             </td>
-                            {factor && (
-                              <td className="py-1.5 text-right tabular-nums">
-                                {v == null ? "—" : `${fmtNum(v * factor, r.d)} ${r.unit}`}
-                              </td>
-                            )}
-                          </tr>
-                        );
-                      })}
+                          )}
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                   <p className="pt-2 text-xs text-muted-foreground">

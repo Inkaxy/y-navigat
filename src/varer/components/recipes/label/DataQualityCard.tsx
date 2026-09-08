@@ -22,6 +22,18 @@ export interface MissingData {
   composite_text_only?: Array<{ name?: string } | string>;
   declaration_names?: MissingDeclarationNameRow[];
   lines_without_raw_material?: number;
+  /** Linjer over 0,25 % av vekten uten komplett næringsdata. */
+  lines_without_nutrition_over_pct?: Array<{ name: string; pct_of_weight?: number }>;
+  /** Salt, vann eller gjær uten næringsrad — hard sperre. */
+  critical_missing_nutrition?: string[];
+  /** Ukjent enhet eller stk uten stykkvekt. */
+  unit_problems?: Array<{ name: string; reason?: string }>;
+  /** Fritekstlinjer som sperrer automatisk deklarasjon. */
+  free_text_lines?: Array<{ name: string; grams?: number }>;
+  fiber_complete?: boolean;
+  missing_bake_loss?: boolean;
+  blocked?: boolean;
+  block_reasons?: string[];
 }
 
 interface Props {
@@ -67,10 +79,21 @@ export function DataQualityCard({
   const compositeTextOnly = nameList(missingData?.composite_text_only);
   const missingDeclNames = missingData?.declaration_names ?? [];
   const unlinked = missingData?.lines_without_raw_material ?? 0;
+  const criticalMissing = missingData?.critical_missing_nutrition ?? [];
+  const smallButMissing = missingData?.lines_without_nutrition_over_pct ?? [];
+  const unitProblems = missingData?.unit_problems ?? [];
+  const freeTextLines = missingData?.free_text_lines ?? [];
+  const blocked = missingData?.blocked === true;
+  const blockReasons = missingData?.block_reasons ?? [];
   const warns = warnings ?? [];
 
   const hasIssues =
     !ok ||
+    blocked ||
+    criticalMissing.length > 0 ||
+    smallButMissing.length > 0 ||
+    unitProblems.length > 0 ||
+    freeTextLines.length > 0 ||
     missing.length > 0 ||
     water.length > 0 ||
     unclassified.length > 0 ||
@@ -141,7 +164,68 @@ export function DataQualityCard({
               />
             </div>
 
+            {blocked && (
+              <div className="rounded-md border-2 border-destructive/60 bg-destructive/10 p-3">
+                <p className="text-sm font-semibold">Deklarasjonen kan ikke brukes ennå</p>
+                <ul className="mt-1 list-disc space-y-0.5 pl-5 text-sm">
+                  {blockReasons.map((r, i) => (
+                    <li key={i}>{r}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             <CollapsibleContent className="space-y-4 pt-2">
+              {criticalMissing.length > 0 && (
+                <Group title="Kritiske ingredienser uten næringsdata">
+                  <p className="text-sm">{criticalMissing.join(", ")}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Salt, vann og gjær må ha næringsdata. Uten dem vises saltet som «ukjent», ikke som 0 g.
+                  </p>
+                </Group>
+              )}
+
+              {smallButMissing.length > 0 && (
+                <Group title="Linjer over 0,25 % uten komplett næring">
+                  <p className="text-sm">
+                    {smallButMissing
+                      .map((l) => (l.pct_of_weight != null ? `${l.name} (${fmtPct(l.pct_of_weight)})` : l.name))
+                      .join(", ")}
+                  </p>
+                </Group>
+              )}
+
+              {unitProblems.length > 0 && (
+                <Group title="Enheter som ikke kan regnes om">
+                  <p className="text-sm">
+                    {unitProblems.map((u) => (u.reason ? `${u.name} — ${u.reason}` : u.name)).join(", ")}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Linjen settes aldri stille til 0 g. Sett stykkvekt eller bytt til en kjent enhet.
+                  </p>
+                </Group>
+              )}
+
+              {freeTextLines.length > 0 && (
+                <Group title="Fritekstlinjer sperrer automatisk deklarasjon">
+                  <p className="text-sm">{freeTextLines.map((f) => f.name).join(", ")}</p>
+                  {onGoToRecipeTab && (
+                    <Button size="sm" variant="outline" onClick={onGoToRecipeTab}>
+                      Koble til råvare
+                    </Button>
+                  )}
+                </Group>
+              )}
+
+              {missingData?.missing_bake_loss && (
+                <Group title="Stektap mangler">
+                  <p className="text-sm">
+                    Oppskriften har 0 % stektap og ingen ferdigvekt. BKLF antar ca. 12 % for brød — uten det blir
+                    næring per 100 g for lav.
+                  </p>
+                </Group>
+              )}
+
               {!hasIssues && (
                 <p className="text-sm text-muted-foreground">
                   Ingen mangler funnet — beregningsgrunnlaget er komplett.
