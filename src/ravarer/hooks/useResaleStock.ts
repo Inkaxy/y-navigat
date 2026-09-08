@@ -5,6 +5,7 @@ import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { useAllStockStatus } from "@/ravarer/hooks/useAllStockStatus";
 import { fetchAllRows } from "@/lib/supabasePaging";
 import { packageBaseUnits, roundToPackages } from "@/ravarer/lib/reorder";
+import { useRawMaterialUnitsFor, type RawMaterialUnitRow } from "@/ravarer/hooks/useRawMaterialUnits";
 
 export interface ResaleStockRow {
   raw_material_id: string;
@@ -152,10 +153,12 @@ export function useReorderSuggestions() {
   }, [all.data, resaleById]);
 
   const ids = candidates.map((r) => r.raw_material_id).sort();
+  const unitsQuery = useRawMaterialUnitsFor(ids);
+  const unitsById = unitsQuery.data ?? new Map<string, RawMaterialUnitRow[]>();
 
   const query = useQuery({
-    queryKey: ["reorder-suggestions", legalEntityId, ids.join(",")],
-    enabled: !!legalEntityId && all.isSuccess,
+    queryKey: ["reorder-suggestions", legalEntityId, ids.join(","), unitsQuery.dataUpdatedAt],
+    enabled: !!legalEntityId && all.isSuccess && (ids.length === 0 || unitsQuery.isSuccess),
     queryFn: async (): Promise<ReorderGroup[]> => {
       if (ids.length === 0) return [];
       const links = await fetchAllRows<SupplierLink>((from, to) =>
@@ -183,7 +186,7 @@ export function useReorderSuggestions() {
         const behov = Math.max(target - r.disponibelt, r.disponibelt < 0 ? -r.disponibelt : 0);
         if (behov <= 0) continue;
 
-        const perPackage = packageBaseUnits(link, r.base_unit);
+        const perPackage = packageBaseUnits(link, r.base_unit, unitsById.get(r.raw_material_id));
         const rounded = roundToPackages(behov, perPackage);
         const unitCost =
           link?.agreed_price_per_base_unit != null ? Number(link.agreed_price_per_base_unit) : r.kostpris;
@@ -220,7 +223,7 @@ export function useReorderSuggestions() {
     },
   });
 
-  return { ...query, isLoading: all.isLoading || resale.isLoading || query.isLoading };
+  return { ...query, isLoading: all.isLoading || resale.isLoading || unitsQuery.isLoading || query.isLoading };
 }
 
 export interface MarginRow {
