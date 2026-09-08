@@ -14,17 +14,32 @@ export interface PackageInfo {
   package_unit?: string | null;
 }
 
+export interface RawMaterialUnitLike {
+  unit_label: string;
+  units_in_base: number;
+}
+
 /**
  * Hvor mange BASEENHETER én innkjøpspakning inneholder.
  * Rekkefølge: bekreftet innhold → størrelse × enhetsfaktor → ukjent (null).
  */
-export function packageBaseUnits(info: PackageInfo | null | undefined, baseUnit: string | null | undefined): number | null {
+export function packageBaseUnits(
+  info: PackageInfo | null | undefined,
+  baseUnit: string | null | undefined,
+  units?: RawMaterialUnitLike[],
+): number | null {
   if (!info) return null;
   const confirmed = Number(info.base_units_per_package);
   if (Number.isFinite(confirmed) && confirmed > 0) return confirmed;
 
   const size = Number(info.package_size);
   if (!Number.isFinite(size) || size <= 0) return null;
+
+  // Pakningsenheten kan være en råvarespesifikk enhet («sekk» = 25 kg), ikke
+  // bare en enhet toBaseFactor kjenner globalt.
+  const customUnit = units?.find(u => u.unit_label.toLowerCase() === (info.package_unit ?? "").toLowerCase());
+  if (customUnit && customUnit.units_in_base > 0) return size * customUnit.units_in_base;
+
   const factor = toBaseFactor(info.package_unit ?? "", baseUnit ?? "");
   if (factor == null || !(factor > 0)) return null;
   return size * factor;

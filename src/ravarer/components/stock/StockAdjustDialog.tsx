@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useCreateStockMovement } from "@/ravarer/hooks/useStock";
 import { useRawMaterialUnits } from "@/ravarer/hooks/useRawMaterialUnits";
 import { formatNumber } from "@/ravarer/lib/constants";
+import { countMovement } from "@/ravarer/lib/stock";
 
 export type AdjustMode = "count" | "waste" | "opening";
 
@@ -33,6 +34,9 @@ export function StockAdjustDialog({ open, onOpenChange, mode, rawMaterial }: Pro
   const [extra, setExtra] = useState("");
   const [unitId, setUnitId] = useState<string>(BASE);
   const [note, setNote] = useState("");
+  // Brukeren skal kunne velge enhet fritt uten at et sent units-svar overstyrer
+  // valget. Flagget nullstilles hver gang dialogen åpnes på nytt.
+  const userPickedRef = useRef(false);
 
   useEffect(() => {
     if (open) {
@@ -40,13 +44,20 @@ export function StockAdjustDialog({ open, onOpenChange, mode, rawMaterial }: Pro
       setExtra("");
       setNote("");
       setUnitId(BASE);
+      userPickedRef.current = false;
     }
   }, [open, rawMaterial?.id, mode]);
 
   useEffect(() => {
+    if (!open || userPickedRef.current) return;
     const def = units.find(u => u.is_default_count);
-    if (open && def) setUnitId(def.id);
+    if (def) setUnitId(def.id);
   }, [open, units]);
+
+  const handleUnitChange = (v: string) => {
+    userPickedRef.current = true;
+    setUnitId(v);
+  };
 
   if (!rawMaterial) return null;
 
@@ -76,21 +87,21 @@ export function StockAdjustDialog({ open, onOpenChange, mode, rawMaterial }: Pro
         // En telling er en telling, ikke en generell justering — det skal
         // kunne skilles i reskontroen.
         movement_type: "count_adjust",
-        quantity_base: diff,
+        quantity_base: countMovement(mode, numeric, rawMaterial.current_stock),
         note: note.trim(),
       });
     } else if (mode === "waste") {
       await create.mutateAsync({
         raw_material_id: rawMaterial.id,
         movement_type: "waste",
-        quantity_base: -Math.abs(numeric),
+        quantity_base: countMovement(mode, numeric, rawMaterial.current_stock),
         note: note.trim(),
       });
     } else {
       await create.mutateAsync({
         raw_material_id: rawMaterial.id,
         movement_type: "opening",
-        quantity_base: numeric,
+        quantity_base: countMovement(mode, numeric, rawMaterial.current_stock),
         note: note.trim() || "Inngående beholdning",
       });
     }
@@ -135,7 +146,7 @@ export function StockAdjustDialog({ open, onOpenChange, mode, rawMaterial }: Pro
             </div>
             <div className="w-[150px]">
               <Label className="text-xs">Enhet</Label>
-              <Select value={unitId} onValueChange={setUnitId}>
+              <Select value={unitId} onValueChange={handleUnitChange}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>

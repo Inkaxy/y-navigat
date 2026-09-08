@@ -120,12 +120,25 @@ interface Query {
   text: string;
   /** Fettprosenter fra søket. */
   percents: number[];
+  /** Merkevaren i innkjøpsnavnet, FØR den ble strippet vekk («Tine»). */
+  brand: string | null;
 }
 
-function makeQuery(source: string): Query | null {
+/** Merket i råteksten, normalisert («TINE Smør» → "tine"). Brukes som hint, ikke søk. */
+function detectBrand(name: string | null | undefined): string | null {
+  const t = ` ${(name ?? "").toLowerCase()} `;
+  for (const b of BRAND_WORDS) {
+    if (new RegExp(`\\b${escapeRe(b)}\\b`).test(t) || new RegExp(`\\b${escapeRe(b)}(?=[a-zæøå]{3,})`).test(t)) {
+      return normalizeForSearch(b);
+    }
+  }
+  return null;
+}
+
+function makeQuery(source: string, brand: string | null): Query | null {
   const text = normalizeForSearch(source);
   if (!text) return null;
-  return { text, percents: percentValues(source) };
+  return { text, percents: percentValues(source), brand };
 }
 
 /** Søketekstene vi prøver: deklarasjonsnavn, renset innkjøpsnavn, rått navn. */
@@ -134,6 +147,7 @@ export function suggestionQueries(rm: RawMaterialForSuggestion): string[] {
 }
 
 function buildQueries(rm: RawMaterialForSuggestion): Query[] {
+  const brand = detectBrand(rm.name);
   const sources = [
     rm.declaration_name ?? "",
     cleanPurchaseName(rm.name),
@@ -142,7 +156,7 @@ function buildQueries(rm: RawMaterialForSuggestion): Query[] {
   ];
   const out: Query[] = [];
   for (const s of sources) {
-    const q = makeQuery(s);
+    const q = makeQuery(s, brand);
     if (q && !out.some((o) => o.text === q.text && o.percents.join() === q.percents.join())) out.push(q);
   }
   return out;
@@ -183,7 +197,7 @@ export const DEFAULT_QUALIFIERS: Record<string, readonly string[]> = {
 const UNIVERSAL_DEFAULT_QUALIFIER = "uspesifisert";
 
 function isDefaultQualifier(foodHead: string, quals: readonly string[]): boolean {
-  if (quals.length !== 1) return quals.includes(UNIVERSAL_DEFAULT_QUALIFIER) && quals.length === 1;
+  if (quals.length !== 1) return false;
   const q = quals[0];
   if (q === UNIVERSAL_DEFAULT_QUALIFIER) return true;
   return (DEFAULT_QUALIFIERS[foodHead] ?? []).includes(q);
@@ -211,12 +225,30 @@ export function isManualOnlyFood(foodName: string | null | undefined): boolean {
  * Poenggivning
  * ------------------------------------------------------------------ */
 
+const BRAND_WORDS_NORMALIZED = new Set(BRAND_WORDS.map((b) => normalizeForSearch(b)));
+
+/** Sant for kvalifikatorer som bare nevner en merkevare («Tine»). */
+function isBrandQualifier(q: string): boolean {
+  return BRAND_WORDS_NORMALIZED.has(q);
+}
+
+/** Ekstra kvalifikatorer som gir fradrag ved prosenttreff når søket ikke nevner dem. */
+const PERCENT_EXTRA_QUALIFIERS = new Set([
+  "laktosefri",
+  "laktoseredusert",
+  "okologisk",
+  "vitamin d",
+  "langtidsholdbar",
+]);
+
 /** Fradrag for matvarenavn med kvalifikator etter komma («Sukker, brunt»). */
 export const QUALIFIER_PENALTY = 0.12;
 /** Tillegg til standardvarianten i en gruppe når søket ikke sier noe annet. */
 export const DEFAULT_QUALIFIER_BONUS = 0.1;
 /** Tak for treff som bare kommer fra søkeord (search_keywords). */
 export const KEYWORD_MAX = 0.85;
+/** Poeng for søkeordtreff der matvarenavnet også har en kvalifikator («potetstivelse»). */
+export const KEYWORD_QUALIFIER_SCORE = 0.82;
 /** Poeng når fettprosenten i navnet avviker fra råvarens. */
 export const PERCENT_MISMATCH_SCORE = 0.86;
 
@@ -237,14 +269,28 @@ function headMatch(query: string, foodHead: string): MatchKind {
   return null;
 }
 
-function keywordScore(query: string, food: FoodCandidate, hasComma: boolean): number {
+/** Smaks-/typeord foran et hode («bærsirup») svekker et rent suffikstreff. */
+const FLAVOUR_PREFIXES = ["bær", "karamell", "vanilje", "frukt"];
+
+function isWeakSuffix(query: string, foodHead: string): boolean {
+  const words = query.split(" ");
+  if (words.length > foodHead.split(" ").length) return true;
+  return words.some(
+    (w) => w !== foodHead && w.endsWith(foodHead) && FLAVOUR_PREFIXES.some((p) => w.startsWith(p)),
+  );
+}
+
+function keywordScore(query: string, food: FoodCandidate, foodHasQualifier: boolean): number {
   const qWords = searchWords(query);
   let s = 0;
   for (const kw of food.search_keywords ?? []) {
     const k = normalizeForSearch(kw);
     if (!k) continue;
-    if (k === query) s = Math.max(s, hasComma ? 0.78 : KEYWORD_MAX);
-    else if (k.length >= 4 && qWords.includes(k)) s = Math.max(s, 0.7);
+    if (k === query) {
+      // 1b: søkeordet ER hele søket, og navnet har ingen kvalifikator å ta feil av.
+      if (!foodHasQualifier) return KEYWORD_MAX;
+      s = Math.max(s, KEYWORD_QUALIFIER_SCORE);
+    } else if (k.length >= 4 && qWords.includes(k)) s = Math.max(s, 0.7);
   }
   return Math.min(s, KEYWORD_MAX);
 }
@@ -252,6 +298,16 @@ function keywordScore(query: string, food: FoodCandidate, hasComma: boolean): nu
 interface ScoreResult {
   score: number;
   percentMismatch: boolean;
+}
+
+/** Fradrag per prosentpoengs avvik ved feil fettprosent, for å skille søsken. */
+const PERCENT_DIFF_PENALTY = 0.01;
+
+/** Minste |avvik| mellom to prosentlister — 0 hvis en av dem er tom. */
+function minPercentDiff(a: readonly number[], b: readonly number[]): number {
+  let min = Infinity;
+  for (const x of a) for (const y of b) min = Math.min(min, Math.abs(x - y));
+  return Number.isFinite(min) ? min : 0;
 }
 
 function scoreFood(query: Query, food: FoodCandidate, variantSpecified: boolean): ScoreResult {
@@ -264,21 +320,48 @@ function scoreFood(query: Query, food: FoodCandidate, variantSpecified: boolean)
 
   if (kind) {
     if (quals.length === 0) {
-      return { score: kind === "exact" ? 1 : kind === "phrase" ? 0.92 : 0.9, percentMismatch: false };
+      if (kind === "exact") return { score: 1, percentMismatch: false };
+      if (kind === "phrase") return { score: 0.92, percentMismatch: false };
+      return { score: isWeakSuffix(query.text, h) ? 0.79 : 0.9, percentMismatch: false };
     }
     const base = kind === "suffix" ? 1 - QUALIFIER_PENALTY - 0.1 : 1 - QUALIFIER_PENALTY;
     const foodPercents = percentValues(food.food_name);
+    const qWords = new Set(searchWords(query.text));
 
     // Prosent er den skarpeste varianten vi har: den avgjør alene.
     if (query.percents.length > 0 && foodPercents.length > 0) {
       const hit = query.percents.some((p) => foodPercents.includes(p));
-      return hit ? { score: 1, percentMismatch: false } : { score: PERCENT_MISMATCH_SCORE, percentMismatch: true };
+      if (!hit) {
+        // Sperr på nærmeste avvik, men rangér kandidatene etter hvor tett de
+        // faktisk ligger — begrunnelsen skal kunne peke på det nærmeste.
+        const diff = minPercentDiff(query.percents, foodPercents);
+        const score = Math.max(0.5, PERCENT_MISMATCH_SCORE - diff * PERCENT_DIFF_PENALTY);
+        return { score, percentMismatch: true };
+      }
+      let score = 1;
+      for (const q of quals) {
+        if (PERCENT_EXTRA_QUALIFIERS.has(q) && !q.split(" ").every((w) => qWords.has(w))) score -= 0.05;
+      }
+      // Fasit-merket i innkjøpsnavnet stemmer med merket i matvarenavnet.
+      if (query.brand && quals[quals.length - 1] === query.brand) score += 0.02;
+      // «Uspesifisert» er en gjettevariant når innkjøpsnavnet faktisk nevner et
+      // merke — den skal ikke stå likt med varianten som stemmer på merket.
+      else if (query.brand && quals[quals.length - 1] === UNIVERSAL_DEFAULT_QUALIFIER) score -= 0.03;
+      return { score: Math.min(1, score), percentMismatch: false };
     }
 
-    // Nevner søket kvalifikatoren eksplisitt («brunt sukker»), er treffet entydig.
-    const qWords = new Set(searchWords(query.text));
-    if (quals.some((q) => q.split(" ").every((w) => qWords.has(w)))) {
-      return { score: 1, percentMismatch: false };
+    // Nevner søket kvalifikatoren eksplisitt («brunt sukker»), er treffet entydig —
+    // men bare når ALLE kvalifikatorer (utenom merkevare/uspesifisert) er dekket.
+    const scorableQuals = quals.filter((q) => q !== UNIVERSAL_DEFAULT_QUALIFIER && !isBrandQualifier(q));
+    if (scorableQuals.length > 0) {
+      const uncovered = scorableQuals.filter((q) => !q.split(" ").every((w) => qWords.has(w)));
+      if (uncovered.length === 0) return { score: 1, percentMismatch: false };
+      // Søket nevner en ANNEN variant enn denne — jo mindre av kvalifikatoren
+      // som stemmer, jo lenger ned skal kandidaten falle.
+      if (variantSpecified) {
+        const score = Math.max(0, base - 0.1 * (uncovered.length / scorableQuals.length));
+        return { score, percentMismatch: false };
+      }
     }
 
     if (!variantSpecified && isDefaultQualifier(h, quals)) {
@@ -289,6 +372,13 @@ function scoreFood(query: Query, food: FoodCandidate, variantSpecified: boolean)
 
   const kw = keywordScore(query.text, food, full !== h);
   if (kw > 0) return { score: kw, percentMismatch: false };
+
+  // Søket er lik nøyaktig én kvalifikator i navnet («potetstivelse» i
+  // «Potetmel, potetstivelse»), selv om hodet ikke treffer.
+  if (!query.text.includes(" ") && query.text.length >= 6) {
+    const qualHit = quals.some((q) => q === query.text);
+    if (qualHit) return { score: 0.92, percentMismatch: false };
+  }
 
   return { score: Math.min(trigramSimilarity(query.text, full) * 0.9, 0.75), percentMismatch: false };
 }
@@ -499,7 +589,7 @@ export function assessSuggestions(
   if (askedPct.length > 0 && topPct.length > 0 && !askedPct.some((p) => topPct.includes(p))) {
     return {
       autoLinkAllowed: false,
-      reason: `Fettprosent avviker (råvare ${askedPct.join("/")} % · forslag ${topPct.join("/")} %) — velg selv`,
+      reason: `Fettprosent avviker (råvare ${askedPct.join("/")} % · nærmeste forslag er ${top.food_name} med ${topPct.join("/")} %) — velg selv`,
     };
   }
 

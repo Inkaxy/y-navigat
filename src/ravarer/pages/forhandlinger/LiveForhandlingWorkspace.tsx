@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, Loader2, Radio, Flag, Check, Pause, Play, X, History, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
@@ -62,19 +63,25 @@ export default function LiveForhandlingWorkspace() {
   const [credentials, setCredentials] = useState<{ url: string; password: string; email: string | null } | null>(null);
 
   // Alle mottakere vises — en live-forhandling kan ha flere leverandører i rommet.
-  const supplierId = recipients[0]?.supplier_id ?? "";
   const supplierNames = recipients
     .map((r) => suppliers.find((s) => s.id === r.supplier_id)?.name)
     .filter((n): n is string => !!n);
   const supplierName = supplierNames.length > 0 ? supplierNames.join(", ") : "—";
   const isPaused = !!neg?.live_session_paused;
 
+  // Hvilken mottaker prisene og bekreftelsen skal gjelde. Tidligere ble alltid
+  // den første mottakeren brukt, samme mønster som i ForhandlingDetail.
+  const [activeRecipientId, setActiveRecipientId] = useState<string>("");
+  const selectedRecipient =
+    recipients.find((r) => r.id === activeRecipientId) ?? (recipients.length === 1 ? recipients[0] : undefined);
+  const supplierId = selectedRecipient?.supplier_id ?? "";
+
   /**
    * Live-flaten må vise det andre i rommet gjør. Vi lytter på endringer i
    * linjene og hendelsene, med en enkel oppfriskning hvert 5. sekund som
    * reserve hvis realtime-forbindelsen faller ut.
    */
-  const realtimeUp = useRef(false);
+  const [realtimeConnected, setRealtimeConnected] = useState(false);
   useEffect(() => {
     if (!id) return;
     const channel = supabase
@@ -90,16 +97,19 @@ export default function LiveForhandlingWorkspace() {
         "postgres_changes",
         { event: "*", schema: "public", table: "negotiation_live_events", filter: `negotiation_id=eq.${id}` },
         () => {
-          qc.invalidateQueries({ queryKey: ["live-events", id] });
+          qc.invalidateQueries({ queryKey: ["negotiation-live-events", id] });
           qc.invalidateQueries({ queryKey: ["negotiation", id] });
         },
       )
       .subscribe((status) => {
-        realtimeUp.current = status === "SUBSCRIBED";
+        setRealtimeConnected(status === "SUBSCRIBED");
       });
 
+    // negotiation_items/negotiation_live_events ligger ikke i
+    // supabase_realtime-publikasjonen, så kanalen over blir aldri SUBSCRIBED i
+    // praksis. Pollingen er derfor hovedmekanismen, ikke bare en reserve —
+    // den kjører uansett kanalstatus.
     const fallback = window.setInterval(() => {
-      if (realtimeUp.current) return;
       qc.invalidateQueries({ queryKey: ["negotiation-items", id] });
       qc.invalidateQueries({ queryKey: ["negotiation", id] });
     }, 5000);
@@ -325,6 +335,9 @@ export default function LiveForhandlingWorkspace() {
               {supplierName} ·{" "}
               <LiveTimer startedAt={neg.live_session_started_at} endedAt={neg.live_session_ended_at} />
             </p>
+            <p className="mt-0.5 text-xs text-ink-muted">
+              Sanntid: {realtimeConnected ? "på" : "av (bruker 5 sek. oppdatering)"}
+            </p>
           </div>
         </div>
         <div className="flex gap-2">
@@ -354,6 +367,26 @@ export default function LiveForhandlingWorkspace() {
       {isPaused && !isEnded && (
         <Card className="border-warning/40 bg-warning/10 p-3 text-sm text-warning">
           Møtet er pauset. Klikk «Gjenoppta» når dere er tilbake.
+        </Card>
+      )}
+
+      {recipients.length > 1 && (
+        <Card className="p-4">
+          <label className="text-xs uppercase tracking-wide text-ink-secondary">
+            Hvilken leverandør gjelder prisene for?
+          </label>
+          <Select value={activeRecipientId} onValueChange={setActiveRecipientId}>
+            <SelectTrigger className="mt-1 max-w-xs" aria-label="Leverandør avtalen gjelder">
+              <SelectValue placeholder="Velg leverandør" />
+            </SelectTrigger>
+            <SelectContent>
+              {recipients.map((r) => (
+                <SelectItem key={r.id} value={r.id}>
+                  {suppliers.find((s) => s.id === r.supplier_id)?.name ?? "—"}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </Card>
       )}
 
@@ -540,10 +573,10 @@ export default function LiveForhandlingWorkspace() {
               >
                 Kopier sammendrag
               </Button>
-              {recipients[0]?.contact_email && credentials && (
+              {selectedRecipient?.contact_email && credentials && (
                 <Button asChild variant="outline" size="sm">
                   <a
-                    href={`mailto:${recipients[0].contact_email}?subject=${encodeURIComponent(
+                    href={`mailto:${selectedRecipient.contact_email}?subject=${encodeURIComponent(
                       "Bekreftelse av avtaler: " + (neg.title ?? "")
                     )}&body=${encodeURIComponent(summaryText())}`}
                   >

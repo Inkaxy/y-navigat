@@ -90,3 +90,44 @@ export function clearCountDraft(key: string): void {
     // Ingenting å gjøre — utkastet er uansett tømt i minnet.
   }
 }
+
+
+/**
+ * Lokasjon på hylle/lager per råvare, lagret separat fra telleutkastet.
+ *
+ * Lokasjonen endres sjelden og gjelder varen uansett dato — derfor lagres den
+ * per selskap, ikke per telling, slik at den huskes fra forrige gang varen ble talt.
+ */
+const LOCATION_PREFIX = "nbhub:rm-count-location:";
+
+export function locationStoreKey(legalEntityId: string | null | undefined): string {
+  return `${LOCATION_PREFIX}${legalEntityId ?? "ukjent"}`;
+}
+
+export function loadLocations(legalEntityId: string | null | undefined): Record<string, string> {
+  try {
+    const raw = localStorage.getItem(locationStoreKey(legalEntityId));
+    if (!raw) return {};
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return {};
+    return parsed as Record<string, string>;
+  } catch {
+    // Et ødelagt register skal ikke hindre tellingen — varene mister bare huskede lokasjoner.
+    return {};
+  }
+}
+
+export function saveLocation(legalEntityId: string | null | undefined, rawMaterialId: string, location: string): void {
+  try {
+    const key = locationStoreKey(legalEntityId);
+    const current = loadLocations(legalEntityId);
+    if (location.trim() === "") {
+      delete current[rawMaterialId];
+    } else {
+      current[rawMaterialId] = location;
+    }
+    localStorage.setItem(key, JSON.stringify(current));
+  } catch {
+    // Full disk eller privat modus: lokasjonen fungerer fortsatt i denne økten.
+  }
+}

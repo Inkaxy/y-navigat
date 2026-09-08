@@ -18,6 +18,7 @@ export interface SuspiciousPackageRow {
   raw_material_id: string;
   raw_material_name: string;
   base_unit: string | null;
+  supplier_id: string | null;
   supplier_name: string | null;
   supplier_product_name: string | null;
   package_size: number | null;
@@ -112,6 +113,7 @@ export function useSuspiciousPackages() {
           raw_material_id: r.raw_material_id,
           raw_material_name: rm?.name ?? "—",
           base_unit: base,
+          supplier_id: r.supplier_id,
           supplier_name: r.suppliers?.name ?? null,
           supplier_product_name: r.supplier_product_name ?? null,
           package_size: size,
@@ -128,7 +130,11 @@ export function useSuspiciousPackages() {
   });
 }
 
-/** Bekreft pakningen på leverandørkoblingen — varen er da ferdig for godt. */
+/**
+ * @deprecated Skriver direkte til raw_material_suppliers og omgår RPC-en
+ * `set_raw_material_package`, så kostpris regnes aldri om. Bruk SetPackageDialog
+ * (som kaller RPC-en) i stedet — se SuspiciousPackagesCard.
+ */
 export function useConfirmSuspiciousPackage() {
   const qc = useQueryClient();
   const { user } = useAuth();

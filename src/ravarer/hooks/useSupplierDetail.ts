@@ -193,18 +193,22 @@ export function useSupplierPriceIndex(supplierId: string | undefined) {
       if (invoices.length === 0) return { indexPct: null, materials: 0 };
       const ids = invoices.map((i) => i.id);
 
-      const lines: { raw_material_id: string | null; price_per_base_unit: number | null; created_at: string | null }[] = [];
+      type LineRow = {
+        raw_material_id: string | null;
+        price_per_base_unit: number | null;
+        invoices: { invoice_date: string | null } | null;
+      };
+      const lines: LineRow[] = [];
       for (let i = 0; i < ids.length; i += 200) {
         const chunk = ids.slice(i, i + 200);
-        const part = await fetchAllRows<{ raw_material_id: string | null; price_per_base_unit: number | null; created_at: string | null }>(
-          (from, to) =>
-            supabase
-              .from("invoice_lines")
-              .select("raw_material_id, price_per_base_unit, created_at")
-              .in("invoice_id", chunk)
-              .not("raw_material_id", "is", null)
-              .not("price_per_base_unit", "is", null)
-              .range(from, to),
+        const part = await fetchAllRows<LineRow>((from, to) =>
+          supabase
+            .from("invoice_lines")
+            .select("raw_material_id, price_per_base_unit, invoices!inner(invoice_date)")
+            .in("invoice_id", chunk)
+            .not("raw_material_id", "is", null)
+            .not("price_per_base_unit", "is", null)
+            .range(from, to),
         );
         lines.push(...part);
       }
@@ -217,7 +221,7 @@ export function useSupplierPriceIndex(supplierId: string | undefined) {
         const entry = byMaterial.get(rm) ?? { sum: 0, n: 0, latest: null };
         entry.sum += price;
         entry.n += 1;
-        const at = l.created_at ?? "";
+        const at = l.invoices?.invoice_date ?? "";
         if (!entry.latest || at > entry.latest.at) entry.latest = { at, price };
         byMaterial.set(rm, entry);
       }

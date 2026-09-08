@@ -11,9 +11,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { fetchAllRows } from "@/lib/supabasePaging";
 import { QueryState } from "@/components/common/QueryState";
-import { MOVEMENT_TYPES, movementLabel } from "@/ravarer/lib/stock";
+import { Link } from "react-router-dom";
+import { MOVEMENT_TYPES, movementLabel, movementSourceLink } from "@/ravarer/lib/stock";
 import { formatNumber } from "@/ravarer/lib/constants";
-import { osloDateISOPlusDays, osloTodayISO } from "@/lib/osloDate";
+import { osloDateISOPlusDays, osloDayEndIso, osloDayStartIso, osloTodayISO } from "@/lib/osloDate";
 
 interface LedgerRow {
   id: string;
@@ -22,6 +23,8 @@ interface LedgerRow {
   quantity_base: number | null;
   occurred_at: string;
   source_table: string | null;
+  source_id: string | null;
+  reason: string | null;
   note: string | null;
 }
 
@@ -40,6 +43,7 @@ export function StockLedger() {
   const [fromDate, setFromDate] = useState(osloDateISOPlusDays(-30));
   const [toDate, setToDate] = useState(osloTodayISO());
   const [type, setType] = useState("all");
+  const [reasonFilter, setReasonFilter] = useState("all");
   const [q, setQ] = useState("");
 
   const namesQuery = useQuery({
@@ -64,23 +68,46 @@ export function StockLedger() {
     enabled: !!legalEntityId,
     queryFn: async () => {
       // Reskontroen summeres, så alt må hentes — ikke bare første side.
-      return await fetchAllRows<LedgerRow>((from, to) => {
+      const rows = await fetchAllRows<LedgerRow>((from, to) => {
         let query = supabase
           .from("stock_movements")
-          .select("id, raw_material_id, movement_type, quantity_base, occurred_at, source_table, note")
+          .select("id, raw_material_id, movement_type, quantity_base, occurred_at, source_table, source_id, reason, note")
           .eq("legal_entity_id", legalEntityId!)
-          .gte("occurred_at", `${fromDate}T00:00:00`)
-          .lte("occurred_at", `${toDate}T23:59:59`);
+          .gte("occurred_at", osloDayStartIso(fromDate))
+          .lte("occurred_at", osloDayEndIso(toDate));
         if (type !== "all") query = query.eq("movement_type", type);
         return query.order("occurred_at", { ascending: false }).range(from, to);
       });
+
+      // Fakturalinjer trenger faktura-IDen for å kunne lenkes til, akkurat som useStock.ts.
+      const invoiceLineIds = rows
+        .filter(r => r.source_table === "invoice_lines" && r.source_id)
+        .map(r => r.source_id!) as string[];
+      const invoiceIdByLineId = new Map<string, string>();
+      if (invoiceLineIds.length > 0) {
+        const { data: lines } = await supabase
+          .from("invoice_lines")
+          .select("id, invoice_id")
+          .in("id", Array.from(new Set(invoiceLineIds)));
+        (lines ?? []).forEach(l => invoiceIdByLineId.set(l.id, l.invoice_id));
+      }
+      return { rows, invoiceIdByLineId };
     },
   });
 
+  const reasons = useMemo(
+    () =>
+      Array.from(new Set((movesQuery.data?.rows ?? []).map(m => m.reason).filter((r): r is string => !!r))).sort((a, b) =>
+        a.localeCompare(b, "nb"),
+      ),
+    [movesQuery.data],
+  );
+
   const rows = useMemo(() => {
     const names = namesQuery.data;
+    const invoiceIdByLineId = movesQuery.data?.invoiceIdByLineId;
     const needle = q.trim().toLowerCase();
-    return (movesQuery.data ?? [])
+    return (movesQuery.data?.rows ?? [])
       .map(m => {
         const rm = m.raw_material_id ? names?.get(m.raw_material_id) : undefined;
         return {
@@ -88,16 +115,27 @@ export function StockLedger() {
           name: rm?.name ?? "—",
           base_unit: rm?.base_unit ?? "",
           qty: Number(m.quantity_base) || 0,
+          source: movementSourceLink(m.source_table, m.source_id, invoiceIdByLineId),
         };
       })
-      .filter(r => !needle || `${r.name} ${r.note ?? ""}`.toLowerCase().includes(needle));
-  }, [movesQuery.data, namesQuery.data, q]);
+      .filter(r => reasonFilter === "all" || r.reason === reasonFilter)
+      .filter(r => !needle || `${r.name} ${r.note ?? ""} ${r.reason ?? ""}`.toLowerCase().includes(needle));
+  }, [movesQuery.data, namesQuery.data, q, reasonFilter]);
 
   const downloadCsv = () => {
     const esc = (v: string | number | null) => `"${String(v ?? "").replace(/"/g, '""')}"`;
-    const head = ["Tidspunkt", "Vare", "Type", "Mengde", "Enhet", "Kilde", "Notat"];
+    const head = ["Tidspunkt", "Vare", "Type", "Mengde", "Enhet", "Kilde", "Årsak", "Notat"];
     const body = rows.map(r =>
-      [dt.format(new Date(r.occurred_at)), r.name, movementLabel(r.movement_type), r.qty, r.base_unit, r.source_table, r.note]
+      [
+        dt.format(new Date(r.occurred_at)),
+        r.name,
+        movementLabel(r.movement_type),
+        r.qty,
+        r.base_unit,
+        r.source?.label ?? r.source_table,
+        r.reason,
+        r.note,
+      ]
         .map(esc)
         .join(";"),
     );
@@ -139,6 +177,18 @@ export function StockLedger() {
               </SelectContent>
             </Select>
           </div>
+          <div>
+            <Label className="text-xs">Årsak</Label>
+            <Select value={reasonFilter} onValueChange={setReasonFilter}>
+              <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Alle årsaker</SelectItem>
+                {reasons.map(r => (
+                  <SelectItem key={r} value={r}>{r}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <div className="relative min-w-[200px] flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-secondary" />
             <Input value={q} onChange={e => setQ(e.target.value)} placeholder="Søk vare eller årsak…" className="pl-9" />
@@ -171,6 +221,7 @@ export function StockLedger() {
                   <th className="px-4 py-3">Vare</th>
                   <th className="px-4 py-3">Type</th>
                   <th className="px-4 py-3 text-right">Mengde</th>
+                  <th className="px-4 py-3">Kilde</th>
                   <th className="px-4 py-3">Årsak</th>
                 </tr>
               </thead>
@@ -184,7 +235,16 @@ export function StockLedger() {
                       {r.qty > 0 ? "+" : ""}
                       {formatNumber(r.qty, 2)} {r.base_unit}
                     </td>
-                    <td className="px-4 py-2 text-ink-secondary">{r.note ?? "—"}</td>
+                    <td className="px-4 py-2">
+                      {r.source ? (
+                        <Link to={r.source.to} className="text-primary hover:underline">
+                          {r.source.label}
+                        </Link>
+                      ) : (
+                        <span className="text-ink-secondary">{r.source_table ?? "—"}</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2 text-ink-secondary">{r.reason ?? r.note ?? "—"}</td>
                   </tr>
                 ))}
               </tbody>

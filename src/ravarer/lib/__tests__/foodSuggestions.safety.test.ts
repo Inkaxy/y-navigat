@@ -81,12 +81,15 @@ describe("fasit mot ekte matvarenavn (8. sep 2026)", () => {
     ["DANSK SUKKER 25 KG", { name: "DANSK SUKKER 25 KG", declaration_name: "sukker", category: "Sukker og søtning" }, "Sukker, hvitt"],
     ["BRUNT SUKKER", { name: "BRUNT SUKKER", category: "Sukker og søtning" }, "Sukker, brunt"],
     ["TINE Smør 25kg", { name: "TINE Smør 25kg", declaration_name: "smør", category: "Fett og olje" }, "Smør"],
-    ["MEIERISMØR 500G TINE", { name: "MEIERISMØR 500G TINE", declaration_name: "smør", category: "Meieri og egg" }, "Smør"],
+    ["MEIERISMØR 500G TINE", { name: "MEIERISMØR 500G TINE", declaration_name: null, category: "Meieri og egg" }, "Smør"],
     ["TINE Helmelk 3,5% bib slim 10l", { name: "TINE Helmelk 3,5% bib slim 10l", declaration_name: "melk", category: "Meieri og egg" }, "Helmelk, 3,5 % fett, Tine"],
     ["Lett Tinemelk 1% m/kork 1/4l", { name: "Lett Tinemelk 1% m/kork 1/4l", category: "Meieri og egg" }, "Lettmelk, 1,0 % fett, Tine"],
     ["HELMELK", { name: "HELMELK", category: "Meieri og egg" }, "Helmelk, uspesifisert"],
     ["LETTMELK", { name: "LETTMELK", category: "Meieri og egg" }, "Lettmelk, uspesifisert"],
     ["EGG", { name: "EGG", category: "Meieri og egg" }, "Egg, rå"],
+    ["HVETEMEL SAMMALT", { name: "HVETEMEL SAMMALT", category: "Mel og korn" }, "Hvetemel, sammalt, fint/grovt"],
+    ["MATLAGINGSFETT", { name: "MATLAGINGSFETT", category: "Fett og olje" }, "Matlagingsfett, uspesifisert"],
+    ["POTETMEL POTETSTIVELSE", { name: "POTETMEL POTETSTIVELSE", category: "Mel og korn" }, "Potetmel, potetstivelse"],
   ];
 
   for (const [label, rm, expected] of kobles) {
@@ -120,6 +123,23 @@ describe("fasit mot ekte matvarenavn (8. sep 2026)", () => {
     expect(r.confidence).toBeLessThan(0.8);
     expect(r.reason).toContain("flere plausible");
   });
+
+  it("GRØNN TE SITRON 100POS TWINING er sperret — ingen mat i basen matcher", () => {
+    const r = check({ name: "GRØNN TE SITRON 100POS TWINING", category: "Diverse" });
+    expect(r.autoLinkAllowed).toBe(false);
+  });
+
+  it("HOFF POTETSTIVELSE treffer potetstivelse med minst 0,80 i tillit", () => {
+    const r = check({ name: "HOFF POTETSTIVELSE", declaration_name: "potetstivelse", category: "Mel og korn" });
+    expect(r.top).toBe("Potetmel, potetstivelse");
+    expect(r.confidence).toBeGreaterThanOrEqual(0.8);
+  });
+
+  it("Monin-sirup foreslår «Sirup», men kobles ikke automatisk", () => {
+    const r = check({ name: "MONIN JORDBÆRSIRUP 700ML", category: "Sukker og søtning" });
+    expect(r.top).toBe("Sirup");
+    expect(r.autoLinkAllowed).toBe(false);
+  });
 });
 
 describe("poengsummene skiller søsknene", () => {
@@ -149,5 +169,22 @@ describe("poengsummene skiller søsknene", () => {
     const helmelk = { name: "HELMELK", category: "Meieri og egg" };
     expect(score(helmelk, "Helmelk, uspesifisert")).toBe(0.98);
     expect(score(helmelk, "Helmelk, 3,5 % fett, Tine")).toBe(0.88);
+  });
+
+  it("merket variant slår laktosefri/uspesifisert når innkjøpsnavnet nevner merket", () => {
+    const helmelkTine = { name: "TINE Helmelk 3,5 %", category: "Meieri og egg" };
+    expect(score(helmelkTine, "Helmelk, 3,5 % fett, Tine")).toBe(1);
+    expect(score(helmelkTine, "Helmelk, 3,5 % fett, laktosefri")).toBe(0.95);
+
+    const lettmelkTine = { name: "TINE Lettmelk 1 %", category: "Meieri og egg" };
+    const tineScore = score(lettmelkTine, "Lettmelk, 1,0 % fett, Tine");
+    const uspesifisertScore = score(lettmelkTine, "Lettmelk, 1 % fett, uspesifisert");
+    expect(tineScore).toBeGreaterThan(uspesifisertScore);
+  });
+
+  it("nærmeste fettprosent rangeres øverst ved avvik", () => {
+    const s = suggestFoods({ name: "TINE Lettrømme 17% 5kg", category: "Meieri og egg" }, MATVARETABELLEN_FIXTURE, 5, 0);
+    const names = s.map((x) => x.food_name);
+    expect(names.indexOf("Lettrømme, 18 % fett")).toBeLessThan(names.indexOf("Lettrømme, 10 % fett"));
   });
 });

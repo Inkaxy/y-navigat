@@ -143,11 +143,14 @@ export default function AvtalerPage() {
               <tbody>
                 {filtered.map(({ row, status }) => {
                   const baseUnit = row.raw_material?.base_unit ?? "enhet";
+                  // Prisen per pakning skal følge antall GRUNNENHETER i pakningen,
+                  // ikke den fysiske pakningsstørrelsen — de to kan avvike (f.eks. sekk
+                  // oppgitt i stk, mens grunnenheten er kg).
                   const perPackage =
                     row.agreed_price != null
                       ? row.agreed_price
-                      : row.agreed_price_per_base_unit != null && row.package_size != null
-                        ? row.agreed_price_per_base_unit * row.package_size
+                      : row.agreed_price_per_base_unit != null && row.base_units_per_package != null
+                        ? row.agreed_price_per_base_unit * row.base_units_per_package
                         : null;
                   return (
                     <tr

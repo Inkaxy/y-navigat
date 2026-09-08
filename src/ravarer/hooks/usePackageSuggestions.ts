@@ -22,19 +22,33 @@ export function usePackageSuggestions(rawMaterialIds: string[]) {
     enabled: rawMaterialIds.length > 0,
     staleTime: 5 * 60 * 1000,
     queryFn: async (): Promise<Map<string, PackageSuggestion>> => {
-      const { data, error } = await supabase
-        .from("invoice_lines")
-        .select(
-          "raw_material_id, package_size, package_unit, count_per_package, description, invoice:invoices!inner(invoice_date)",
-        )
-        .in("raw_material_id", rawMaterialIds)
-        .not("package_size", "is", null)
-        .order("created_at", { ascending: false })
-        .limit(2000);
-      if (error) throw error;
+      // Store-grensa på antall verdier i .in() krever chunking for lange lister.
+      const chunkSize = 100;
+      const rows: {
+        raw_material_id: string | null;
+        package_size: number | null;
+        package_unit: string | null;
+        count_per_package: number | null;
+        description: string | null;
+        invoice: { invoice_date: string | null } | null;
+      }[] = [];
+      for (let i = 0; i < rawMaterialIds.length; i += chunkSize) {
+        const chunk = rawMaterialIds.slice(i, i + chunkSize);
+        const { data, error } = await supabase
+          .from("invoice_lines")
+          .select(
+            "raw_material_id, package_size, package_unit, count_per_package, description, invoice:invoices!inner(invoice_date)",
+          )
+          .in("raw_material_id", chunk)
+          .not("package_size", "is", null)
+          .order("created_at", { ascending: false })
+          .limit(2000);
+        if (error) throw error;
+        rows.push(...(data ?? []));
+      }
 
       const map = new Map<string, PackageSuggestion>();
-      for (const row of data ?? []) {
+      for (const row of rows) {
         const rmId = row.raw_material_id;
         if (!rmId) continue;
         const invoice = row.invoice as { invoice_date: string | null } | null;

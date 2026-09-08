@@ -99,6 +99,7 @@ interface MaterialRow {
   base_units_per_package: number | null;
   package_size: number | null;
   package_unit: string | null;
+  package_confirmed_at: string | null;
 }
 
 interface SupplierLinkRow {
@@ -144,7 +145,7 @@ export function useCostRecalc() {
       const [matRes, linkRes] = await Promise.all([
         supabase
           .from("raw_materials")
-          .select("id, name, sku, base_unit, current_cost_price, base_units_per_package, package_size, package_unit")
+          .select("id, name, sku, base_unit, current_cost_price, base_units_per_package, package_size, package_unit, package_confirmed_at")
           .eq("legal_entity_id", legalEntityId)
           .eq("is_active", true),
         supabase
@@ -237,6 +238,7 @@ export function useCostRecalc() {
               baseUnitsPerPackage: mat.base_units_per_package,
               packageSize: mat.package_size,
               packageUnit: mat.package_unit,
+              packageConfirmedAt: mat.package_confirmed_at,
             },
           });
 

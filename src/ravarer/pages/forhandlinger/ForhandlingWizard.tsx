@@ -29,6 +29,7 @@ import { useQuery } from "@tanstack/react-query";
 import { formatNok, formatNumber } from "@/ravarer/lib/constants";
 import { UnitPriceHint } from "@/ravarer/components/forhandlinger/UnitPriceHint";
 import { osloDateISO } from "@/lib/osloDate";
+import { Link } from "react-router-dom";
 
 type Step = 1 | 2 | 3 | 4 | 5;
 
@@ -143,6 +144,10 @@ export default function ForhandlingWizard() {
 
   // ---- step 3 ----
   const { data: suppliers = [] } = useSuppliers();
+  const hiddenSupplierCount = useMemo(
+    () => suppliers.filter((s) => s.is_active && !s.track_invoice_lines).length,
+    [suppliers],
+  );
   const { data: recipients = [] } = useNegotiationRecipients(negotiationId ?? undefined);
   const [selectedSup, setSelectedSup] = useState<Set<string>>(new Set());
   useEffect(() => {
@@ -342,6 +347,15 @@ export default function ForhandlingWizard() {
           <div className="border-b border-line-subtle p-4 text-sm text-ink-secondary">
             Velg leverandører som skal motta forespørsel. Listen viser bare aktive leverandører
             som er merket med «Følg fakturalinjer» — forhandlingen bygger på fakturahistorikken deres.
+            {hiddenSupplierCount > 0 && (
+              <p className="mt-1">
+                {hiddenSupplierCount} leverandører uten «Følg fakturalinjer» vises ikke – slå på under{" "}
+                <Link to="/ravarer/leverandorer" className="underline">
+                  Leverandører
+                </Link>
+                .
+              </p>
+            )}
           </div>
           <div className="max-h-[480px] overflow-auto">
             <table className="w-full text-sm">

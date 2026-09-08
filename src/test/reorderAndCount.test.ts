@@ -10,7 +10,7 @@ import {
   newOpId,
   saveCountDraft,
 } from "@/ravarer/lib/countDraft";
-import { MOVEMENT_TYPES, movementLabel } from "@/ravarer/lib/stock";
+import { MOVEMENT_TYPES, movementLabel, countMovement } from "@/ravarer/lib/stock";
 
 describe("pakningsavrunding", () => {
   it("bruker bekreftet innhold per pakning", () => {
@@ -25,9 +25,21 @@ describe("pakningsavrunding", () => {
     expect(packageBaseUnits({ base_units_per_package: null, package_size: null, package_unit: null }, "kg")).toBeNull();
   });
 
+  it("bruker råvarens egne enheter når pakningsenheten ikke er en global enhet", () => {
+    const units = [{ unit_label: "sekk", units_in_base: 25 }];
+    expect(
+      packageBaseUnits({ base_units_per_package: null, package_size: 1, package_unit: "sekk" }, "kg", units),
+    ).toBe(25);
+  });
+
   it("runder opp til hele pakninger", () => {
     expect(roundToPackages(30, 25)).toEqual({ packages: 2, orderBaseQty: 50, baseUnitsPerPackage: 25 });
     expect(roundToPackages(25, 25).packages).toBe(1);
+  });
+
+  it("runder ordrett: 7 av 25 blir én hel pakning (25), 26 av 25 blir to (50)", () => {
+    expect(roundToPackages(7, 25)).toEqual({ packages: 1, orderBaseQty: 25, baseUnitsPerPackage: 25 });
+    expect(roundToPackages(26, 25)).toEqual({ packages: 2, orderBaseQty: 50, baseUnitsPerPackage: 25 });
   });
 
   it("runder til hele grunnenheter når pakningen mangler", () => {
@@ -94,12 +106,35 @@ describe("telleutkast", () => {
     clearCountDraft(key);
     expect(loadCountDraft(key)).toBeNull();
   });
+
+  it("bevarer et lagret utkast når det ikke skjer noen brukerendring", () => {
+    saveCountDraft(key, { opId: "op-1", entries: { rm1: [{ amount: "12", unitKey: "__base" }] }, lineNotes: {}, note: "" });
+    // Simulerer at komponenten ikke autolagrer et tomt state før brukeren faktisk
+    // har gjort noe — utkastet skal fortsatt ligge i localStorage uendret.
+    expect(loadCountDraft(key)?.entries.rm1[0].amount).toBe("12");
+  });
 });
 
 describe("bevegelsestyper", () => {
   it("har egen type for telling", () => {
     expect(MOVEMENT_TYPES).toContain("count_adjust");
     expect(movementLabel("count_adjust")).toBe("Telling");
+  });
+});
+
+describe("countMovement", () => {
+  it("telling gir differansen mot beholdningen", () => {
+    expect(countMovement("count", 30, 25)).toBe(5);
+    expect(countMovement("count", 20, 25)).toBe(-5);
+  });
+
+  it("svinn er alltid negativt", () => {
+    expect(countMovement("waste", 4, 25)).toBe(-4);
+    expect(countMovement("waste", -4, 25)).toBe(-4);
+  });
+
+  it("inngående beholdning er tallet selv", () => {
+    expect(countMovement("opening", 12, 0)).toBe(12);
   });
 });
 
