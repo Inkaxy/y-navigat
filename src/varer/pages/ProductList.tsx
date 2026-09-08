@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { AppHeaderBanner, NewProductActionButton } from "@/varer/components/layout/AppHeaderBanner";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { LABELING_STATUS_LABEL, type LabelingStatus } from "@/varer/lib/labelStaleness";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -41,7 +42,15 @@ type ProductRow = {
   pieces_per_tray: number | null;
   in_web_shop: boolean | null;
   in_pos: boolean | null;
+  manual_ingredient_declaration: string | null;
+  declaration_needs_review: boolean | null;
 };
+
+/** Merkestatus for produktlista, avledet fra snapshotet på produktet. */
+function productLabelingStatus(p: ProductRow): LabelingStatus {
+  if (!p.manual_ingredient_declaration) return "missing";
+  return p.declaration_needs_review ? "stale" : "approved";
+}
 
 const STATUS_BADGE: Record<ProductStatus, string> = {
   active: "bg-success/15 text-success border-success/30",
@@ -80,6 +89,7 @@ export default function ProductList() {
   const [category, setCategory] = useState<string>("all");
   const [status, setStatus] = useState<string>("all");
   const [variantFilter, setVariantFilter] = useState<string>("all");
+  const [labelingFilter, setLabelingFilter] = useState<"all" | LabelingStatus>("all");
   const [wizardOpen, setWizardOpen] = useState(false);
   const [bulkImagesOpen, setBulkImagesOpen] = useState(false);
 
@@ -93,7 +103,7 @@ export default function ProductList() {
       const { data, error } = await supabase
         .from("products")
         .select(
-          "id, display_number, code, display_name, product_category, product_subcategory, unit_of_sale, status, variant_of_product_id, variant_label, label_mode, is_cake_component, cake_role, image_url, mva_rate, pieces_per_tray, in_web_shop, in_pos, main_category:product_main_categories(code, display_name), sub_category:product_sub_categories(code, display_name)",
+          "id, display_number, code, display_name, product_category, product_subcategory, unit_of_sale, status, variant_of_product_id, variant_label, label_mode, is_cake_component, cake_role, image_url, mva_rate, pieces_per_tray, in_web_shop, in_pos, manual_ingredient_declaration, declaration_needs_review, main_category:product_main_categories(code, display_name), sub_category:product_sub_categories(code, display_name)",
         )
         .eq("legal_entity_id", legalEntityId!)
         .order("display_number", { ascending: true })
@@ -146,9 +156,10 @@ export default function ProductList() {
       if (status !== "all" && p.status !== status) return false;
       if (variantFilter === "parents" && p.variant_of_product_id) return false;
       if (variantFilter === "variants" && !p.variant_of_product_id) return false;
+      if (labelingFilter !== "all" && productLabelingStatus(p) !== labelingFilter) return false;
       return true;
     });
-  }, [all, search, category, status, variantFilter]);
+  }, [all, search, category, status, variantFilter, labelingFilter]);
 
   const defaultPriceList = useQuery({
     queryKey: ["default-pricelist", legalEntityId],
@@ -393,6 +404,27 @@ export default function ProductList() {
         render: (p) => (p.cake_role ? CAKE_ROLE_LABEL[p.cake_role] : "—"),
       },
       {
+        key: "labeling",
+        label: "Merking",
+        render: (p) => {
+          const st = productLabelingStatus(p);
+          return (
+            <Badge
+              variant="outline"
+              className={
+                st === "approved"
+                  ? "border-emerald-500/50 text-emerald-700"
+                  : st === "stale"
+                    ? "border-amber-500/60 text-amber-700"
+                    : "border-destructive/50 text-destructive"
+              }
+            >
+              {LABELING_STATUS_LABEL[st]}
+            </Badge>
+          );
+        },
+      },
+      {
         key: "status",
         label: "Status",
         fixed: true,
@@ -504,6 +536,16 @@ export default function ProductList() {
                 {categories.map((c) => (
                   <SelectItem key={c} value={c}>{c}</SelectItem>
                 ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={labelingFilter} onValueChange={(v) => setLabelingFilter(v as "all" | LabelingStatus)}>
+              <SelectTrigger className="w-40"><SelectValue placeholder="Merking" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All merking</SelectItem>
+                <SelectItem value="approved">Merking: godkjent</SelectItem>
+                <SelectItem value="stale">Merking: utdatert</SelectItem>
+                <SelectItem value="missing">Merking: mangler</SelectItem>
               </SelectContent>
             </Select>
 
