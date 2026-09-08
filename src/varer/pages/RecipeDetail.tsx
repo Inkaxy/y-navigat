@@ -546,147 +546,66 @@ export default function RecipeDetail() {
     setDirty(true);
   }
 
-  async function save() {
+  const { saving: savingRecipe, save: persistRecipe } = useRecipeSave();
+
+  const save = useCallback(async () => {
     if (!recipe) return;
     setSaving(true);
     try {
-      const { error: e1 } = await supabase
-        .from("recipes")
-        .update({
-          name: header.name || null,
-          category: header.category || null,
-          department: header.department || null,
+      await persistRecipe({
+        recipeId: recipe.id,
+        displayName: header.name || recipe.name || recipe.id,
+        originalPartIds: ((recipe.recipe_parts ?? []) as { id: string }[]).map((p) => p.id),
+        header: {
+          name: header.name,
+          category: header.category,
+          department: header.department,
           status: header.status,
-          description: header.description || null,
-          notes: header.notes || null,
-          decor_notes: header.decor_notes || null,
-          dough_piece_grams: header.dough_piece_grams === "" ? null : Number(header.dough_piece_grams),
-          dough_waste_pct: header.dough_waste_pct === "" ? null : Number(header.dough_waste_pct),
-          finished_weight_grams: header.finished_weight_grams === "" ? null : Number(header.finished_weight_grams),
-          measured_per_kg: !!header.measured_per_kg,
-          units_per_batch: header.units_per_batch === "" ? null : Number(header.units_per_batch),
-          target_dough_temp_celsius: header.target_dough_temp_celsius,
-          friction_factor_celsius: header.friction_factor_celsius,
-          mixing_speed1_minutes: header.mixing_speed1_minutes === "" ? null : Number(header.mixing_speed1_minutes),
-          mixing_speed2_minutes: header.mixing_speed2_minutes === "" ? null : Number(header.mixing_speed2_minutes),
-          autolyse_minutes: header.autolyse_minutes === "" ? null : Number(header.autolyse_minutes),
-        } as never)
-        .eq("id", recipe.id);
-      if (e1) throw e1;
-
-      // Deler: slett fjernede, insert nye, oppdater eksisterende
-      const keptIds = parts.filter((p) => !p._new).map((p) => p.id);
-      const originalIds = (recipe.recipe_parts ?? []).map((p: any) => p.id);
-      const toDelete = originalIds.filter((pid: string) => !keptIds.includes(pid));
-      if (toDelete.length) await supabase.from("recipe_parts").delete().in("id", toDelete);
-
-      const partIdMap: Record<string, string> = {};
-      for (const p of parts) {
-        const payload = {
-          name: p.name,
-          sort_order: p.sort_order,
-          instructions: p.instructions,
-          prep_time_minutes: p.prep_time_minutes,
-          rest_time_minutes: p.rest_time_minutes,
-          part_type: p.part_type,
-          preferment_kind: p.part_type === "preferment" ? p.preferment_kind : null,
-          target_temp_celsius: p.target_temp_celsius,
-          ripe_time_hours: p.ripe_time_hours,
-        };
-        if (p._new) {
-          const { data, error } = await supabase
-            .from("recipe_parts")
-            .insert({ recipe_id: recipe.id, ...payload } as never)
-            .select("id")
-            .single();
-          if (error) throw error;
-          partIdMap[p.id] = data.id;
-        } else {
-          const { error } = await supabase.from("recipe_parts").update(payload as never).eq("id", p.id);
-          if (error) throw error;
-        }
-      }
-
-      const lineRows = lines
-        .map((l) => {
-          const partId = partIdMap[l.recipe_part_id] ?? l.recipe_part_id;
-          const qty = Number(l.quantity) || 0;
-          if (qty <= 0 && !l.raw_material_id && !(l as any).sub_product_id && !l.ingredient_name) return null;
-          return {
-            recipe_id: recipe.id,
-            recipe_part_id: partId,
-            raw_material_id: l.raw_material_id,
-            sub_product_id: (l as any).sub_product_id ?? null,
-            ingredient_name: l.raw_material_id ? null : (l.ingredient_name || null),
-            quantity: qty,
-            unit: l.unit,
-            waste_percent: Number(l.waste_percent) || 0,
-            sort_order: l.sort_order,
-            notes: l.notes ?? null,
-            entry_mode: l.entry_mode ?? "grams",
-            bakers_percent: l.bakers_percent == null || l.bakers_percent === "" ? null : Number(l.bakers_percent),
-            is_flour_override: l.is_flour_override ?? null,
-            water_content_pct_override:
-              l.water_content_pct_override == null || l.water_content_pct_override === ""
-                ? null
-                : Number(l.water_content_pct_override),
-            include_in_declaration: l.include_in_declaration !== false,
-            is_quid_relevant: !!l.is_quid_relevant,
-            custom_declaration_text: l.custom_declaration_text || null,
-          };
-        })
-        .filter((r): r is NonNullable<typeof r> => r !== null);
-
-      const { error: e2 } = await (supabase as any).rpc("replace_child_rows", {
-        p_table: "recipe_lines",
-        p_parent_column: "recipe_id",
-        p_parent_id: recipe.id,
-        p_rows: lineRows,
-      });
-      if (e2) throw e2;
-
-      const stepRows = steps.map((s, i) => ({
-        recipe_id: recipe.id,
-        sort_order: i,
-        step_type: s.step_type,
-        title: s.title || null,
-        instruction: s.instruction || null,
-        duration_minutes: s.duration_minutes,
-        temp_celsius: s.temp_celsius,
-        humidity_pct: s.humidity_pct,
-      }));
-      const { error: e3 } = await (supabase as any).rpc("replace_child_rows", {
-        p_table: "recipe_steps",
-        p_parent_column: "recipe_id",
-        p_parent_id: recipe.id,
-        p_rows: stepRows,
-      });
-      if (e3) throw e3;
-
-      await logAudit({
-        action: "update",
-        entity_type: "recipe",
-        entity_id: recipe.id,
-        entity_display_reference: header.name || recipe.name || recipe.id,
-        changes: { parts: parts.length, lines: lines.length, steps: steps.length },
+          description: header.description,
+          notes: header.notes,
+          decor_notes: header.decor_notes,
+          dough_piece_grams: header.dough_piece_grams,
+          dough_waste_pct: header.dough_waste_pct,
+          finished_weight_grams: header.finished_weight_grams,
+          measured_per_kg: header.measured_per_kg,
+          units_per_batch: header.units_per_batch,
+          target_dough_temp_celsius: header.target_dough_temp_celsius ?? null,
+          friction_factor_celsius: header.friction_factor_celsius ?? null,
+          mixing_speed1_minutes: header.mixing_speed1_minutes,
+          mixing_speed2_minutes: header.mixing_speed2_minutes,
+          autolyse_minutes: header.autolyse_minutes,
+        },
+        parts,
+        lines,
+        steps,
       });
       setDirty(false);
+      setRemoteConflict(false);
       toast.success("Oppskrift lagret");
       qc.invalidateQueries({ queryKey: ["recipe-detail", recipe.id] });
       qc.invalidateQueries({ queryKey: ["recipes-list"] });
-      recipeQuery.refetch();
       // Merkedata (deklarasjon, næring, grovhet, Nøkkelhull) beregnes automatisk ved lagring
       computeLabel.mutate(recipe.id);
       // Grunnoppskrift: den koblede råvaren skal alltid ha fersk kilopris.
       void syncCompositePriceQuietly();
-
-
-    } catch (err: any) {
-      toast.error(err.message ?? "Kunne ikke lagre");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Kunne ikke lagre oppskriften");
     } finally {
       setSaving(false);
     }
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recipe, header, parts, lines, steps, persistRecipe, qc]);
+
+  /** Ctrl/Cmd + S lagrer, som i alle andre editorer. */
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== "s") return;
+      e.preventDefault();
+      if (editable && dirty && !saving) void save();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [editable, dirty, saving, save]);
 
   async function updateCompositePrice() {
     if (!composite) return;
