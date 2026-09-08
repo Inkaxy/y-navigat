@@ -80,7 +80,7 @@ export function LineGrid({
 
   return (
     <div className="space-y-1.5">
-      <div className="hidden gap-2 px-2 text-xs font-medium text-muted-foreground md:grid md:grid-cols-[20px_minmax(0,1fr)_96px_64px_92px_36px_76px_36px_32px]">
+      <div className="hidden gap-2 px-2 text-xs font-medium text-muted-foreground md:grid md:grid-cols-[20px_minmax(0,1fr)_96px_64px_92px_76px_76px_36px_32px]">
         <div />
         <div>Ingrediens</div>
         <div>Mengde</div>
@@ -218,7 +218,7 @@ const GridRow = memo(function GridRow({
       style={style}
       className={cn(
         "flex flex-wrap items-center gap-2 rounded-md border px-2 py-1.5",
-        "md:grid md:grid-cols-[20px_minmax(0,1fr)_96px_64px_92px_36px_76px_36px_32px]",
+        "md:grid md:grid-cols-[20px_minmax(0,1fr)_96px_64px_92px_76px_76px_36px_32px]",
         unmatched ? "border-warning/40 bg-warning/5" : "border-transparent",
       )}
     >
