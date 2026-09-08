@@ -5,6 +5,7 @@
 // Samme logikk finnes i frontend: src/varer/lib/effectiveDeclaration.ts
 
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { htmlToMarkedText } from "./declaration-core.ts";
 
 export const NUTRITION_KEYS = [
   "energy_kj",
@@ -70,6 +71,8 @@ interface CalculatedRow {
   allergens: { contains?: string[]; may_contain?: string[] } | null;
   nutrition_per_100g: Record<string, number | null> | null;
   coverage_by_weight_pct: number | null;
+  /** Sann når beregningen er sperret (manglende næring, ukjent enhet, fritekstlinje). */
+  blocked?: boolean;
 }
 
 /**
@@ -105,9 +108,10 @@ export async function syncAutoProductsForRecipe(
   if (!links?.length) return 0;
 
   const coverage = calculated.coverage_by_weight_pct ?? 0;
-  const coverageOk = coverage >= MIN_NUTRITION_COVERAGE_PCT;
+  const coverageOk = coverage >= MIN_NUTRITION_COVERAGE_PCT && !calculated.blocked;
   const payload = {
-    manual_ingredient_declaration: stripHtml(calculated.ingredient_declaration) || null,
+    // Uthevingen skal overleve helt ut på etiketten: <strong> → *stjerner*.
+    manual_ingredient_declaration: htmlToMarkedText(calculated.ingredient_declaration ?? "") || null,
     manual_allergens_contains: calculated.allergens?.contains ?? [],
     manual_allergens_may_contain: calculated.allergens?.may_contain ?? [],
     // Under 90 % dekning skal næringstabellen ikke ut på emballasje.
@@ -162,7 +166,7 @@ async function syncOverrideLink(
     const { error: upErr } = await service
       .from("products")
       .update({
-        manual_ingredient_declaration: stripHtml(c.ingredient_declaration_html) || null,
+        manual_ingredient_declaration: htmlToMarkedText(c.ingredient_declaration_html ?? "") || null,
         manual_allergens_contains: c.allergens_contains ?? [],
         manual_allergens_may_contain: c.allergens_may_contain ?? [],
         manual_nutrition_per_100g:

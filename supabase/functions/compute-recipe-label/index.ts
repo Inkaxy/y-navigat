@@ -3,11 +3,13 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import {
   computeDeclarationCore,
+  declarationGate,
   resolveFinalWeight,
-  toGrams,
   NUT_FIELDS,
   type TopLine,
 } from "../_shared/declaration-core.ts";
+import { expandRecipeLines, sumLineGrams } from "../_shared/recipe-lines.ts";
+import { storeNutrient } from "../_shared/nutritionFormat.ts";
 import { syncAutoProductsForRecipe } from "../_shared/effective-declaration.ts";
 
 const corsHeaders = {
@@ -58,127 +60,6 @@ function nb(n: number, decimals = 1): string {
 }
 
 
-/** Maks nivåer halvfabrikat-i-halvfabrikat som følges. Beskytter mot sykluser. */
-const MAX_SUB_DEPTH = 4;
-
-const LINE_SELECT =
-  "id, raw_material_id, sub_product_id, ingredient_name, quantity, unit, waste_percent, include_in_declaration, is_quid_relevant, custom_declaration_text, water_content_pct_override, sort_order, raw_materials(id, name, unit_weight_grams, is_composite, grain_classification, cereal_type, water_content_pct, components_reviewed_at)";
-
-/** Ferdigvekt for en oppskrift (kun tallet) — brukes for halvfabrikater. */
-function finalWeightOf(recipe: any, inputGrams: number): number {
-  return resolveFinalWeight(recipe, inputGrams).grams;
-}
-
-
-/**
- * Leser oppskriftslinjer og erstatter halvfabrikat-linjer (`sub_product_id`)
- * med halvfabrikatets egne ingredienser, skalert etter hvor mange gram av
- * halvfabrikatet som inngår. Slik forplanter allergener og ingredienser seg
- * oppover i stedet for å forsvinne.
- */
-async function expandRecipeLines(
-  service: any,
-  recipeId: string,
-  depth: number,
-  seen: Set<string>,
-  warnings: string[],
-): Promise<TopLine[]> {
-  const { data: lines } = await service
-    .from("recipe_lines")
-    .select(LINE_SELECT)
-    .eq("recipe_id", recipeId)
-    .order("sort_order");
-
-  const out: TopLine[] = [];
-  for (const l of (lines ?? []) as any[]) {
-    const rm = l.raw_materials;
-    const base: TopLine = {
-      source: "master",
-      raw_material: rm ?? null,
-      raw_material_id: l.raw_material_id ?? null,
-      name: rm?.name ?? l.ingredient_name ?? "(ukjent)",
-      quantity: Number(l.quantity) || 0,
-      unit: l.unit ?? "g",
-      waste_percent: Number(l.waste_percent) || 0,
-      include: l.include_in_declaration !== false,
-      is_quid: !!l.is_quid_relevant,
-      custom_text: l.custom_declaration_text || null,
-      unit_weight_grams: rm?.unit_weight_grams ?? null,
-      water_content_pct_override: l.water_content_pct_override ?? null,
-    };
-
-    if (!l.sub_product_id) {
-      out.push(base);
-      continue;
-    }
-
-    const neededGrams = toGrams(base.quantity, base.unit, base.unit_weight_grams);
-    if (neededGrams <= 0) {
-      out.push(base);
-      continue;
-    }
-
-    if (depth >= MAX_SUB_DEPTH) {
-      warnings.push(`Halvfabrikat «${base.name}» går dypere enn ${MAX_SUB_DEPTH} nivåer — ingrediensene er ikke regnet med`);
-      out.push(base);
-      continue;
-    }
-
-    const { data: link } = await service
-      .from("product_recipe_links")
-      .select("recipe_id, is_primary")
-      .eq("product_id", l.sub_product_id)
-      .order("is_primary", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    const subRecipeId: string | null = link?.recipe_id ?? null;
-
-    if (!subRecipeId || seen.has(subRecipeId)) {
-      if (subRecipeId) warnings.push(`Halvfabrikat «${base.name}» peker i ring — hoppet over`);
-      else warnings.push(`Halvfabrikat «${base.name}» mangler oppskrift — ingrediensene er ikke regnet med`);
-      out.push(base);
-      continue;
-    }
-
-    const { data: subRecipe } = await service
-      .from("recipes")
-      .select("id, name, yield_grams, yield_loss_pct, finished_weight_grams, yield_quantity, yield_unit")
-      .eq("id", subRecipeId)
-      .maybeSingle();
-
-    const subLines = await expandRecipeLines(
-      service,
-      subRecipeId,
-      depth + 1,
-      new Set([...seen, subRecipeId]),
-      warnings,
-    );
-    const subInput = subLines.reduce(
-      (sum, sl) => sum + toGrams(sl.quantity, sl.unit, sl.unit_weight_grams) * (1 + sl.waste_percent / 100),
-      0,
-    );
-    const subFinal = finalWeightOf(subRecipe, subInput);
-    if (subFinal <= 0 || subInput <= 0) {
-      warnings.push(`Halvfabrikat «${base.name}» mangler vekt — ingrediensene er ikke regnet med`);
-      out.push(base);
-      continue;
-    }
-
-    // Skaler halvfabrikatets innveide gram til andelen som faktisk brukes her.
-    const factor = (neededGrams / subFinal) * (1 + base.waste_percent / 100);
-    for (const sl of subLines) {
-      out.push({
-        ...sl,
-        quantity: toGrams(sl.quantity, sl.unit, sl.unit_weight_grams) * (1 + sl.waste_percent / 100) * factor,
-        unit: "g",
-        waste_percent: 0,
-        include: base.include && sl.include,
-      });
-    }
-  }
-  return out;
-}
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -223,16 +104,26 @@ Deno.serve(async (req) => {
       expandWarnings,
     );
 
-    const core = await computeDeclarationCore(service, topLines);
     const warnings: string[] = [...expandWarnings];
 
-    // 2) Vekter — yield_grams, ellers stk × ferdigvekt per stk, ellers innveid minus stektap
-    const totalInputGrams = core.totalInputGrams;
-    const resolved = resolveFinalWeight(recipe, totalInputGrams);
+    // 2) Vekter — ferdigvekt løses FØR beregningen, så QUID og vannregelen
+    //    kan regnes mot ferdig produkt og ikke mot innveid deig.
+    const inputGramsEstimate = sumLineGrams(topLines.filter((t) => t.include));
+    const resolved = resolveFinalWeight(recipe, inputGramsEstimate);
     const finalWeight = resolved.grams || 1;
     if (resolved.source) warnings.push(resolved.source);
     else warnings.push("Ferdigvekt mangler — beregnet fra innveid vekt minus stektap");
 
+    const yieldLossPct = Number(recipe.yield_loss_pct) || 0;
+    const hasFinishedWeight = recipe.finished_weight_grams != null && Number(recipe.finished_weight_grams) > 0;
+    // Uten stektap blir næring per 100 g regnet på deigvekt — 11–18 % for lavt for brød.
+    const missingBakeLoss = yieldLossPct <= 0 && !hasFinishedWeight;
+    if (missingBakeLoss) {
+      warnings.push("0 % stektap er registrert — BKLF antar ca. 12 % for brød. Næring per 100 g blir for lav til den er satt.");
+    }
+
+    const core = await computeDeclarationCore(service, topLines, { finalWeightGrams: finalWeight });
+    const totalInputGrams = core.totalInputGrams;
 
     // 3) Tørrstoff
     let dryMatterGrams = 0;
@@ -262,25 +153,28 @@ Deno.serve(async (req) => {
     // 5) Rugandel
     const ryeSharePct = flourGrams > 0 ? Math.round((core.rye_flour_grams / flourGrams) * 1000) / 10 : null;
 
-    // 6) Næring pr 100 g — MOT FERDIGVEKT (vann fordamper under steking)
+    // 6) Næring pr 100 g — MOT FERDIGVEKT (vann fordamper under steking).
+    //    Lagres URUNDET (3 desimaler); avrunding skjer bare ved visning.
     const per100: Record<string, number | null> = {};
     for (const f of NUT_FIELDS) {
       const t = core.nutritionTotals[f];
-      per100[f] = t != null ? Math.round((t / finalWeight) * 1000) / 10 : null;
+      per100[f] = t != null ? storeNutrient((t / finalWeight) * 100) : null;
     }
+    // Fiber vises ikke når ikke alle bidragsytere har fiberverdi.
+    if (!core.fiber_complete) per100.fiber_g = null;
 
     // 7) Datadekning målt i VEKT
     const coveragePct = Math.round((core.coveredGrams / totalInputGrams) * 1000) / 10;
-    const missingNutrition = core.sortedAgg
-      .filter((a) => !a.has_nutrition)
-      .map((a) => ({
-        raw_material_id: a.raw_material_id,
-        name: a.name,
-        grams: Math.round(a.effective_grams * 10) / 10,
-        pct_of_dough: Math.round((a.effective_grams / totalInputGrams) * 1000) / 10,
-      }))
-      .sort((x, y) => y.grams - x.grams);
+    const missingNutrition = core.missing_nutrition.map((m) => ({
+      raw_material_id: m.raw_material_id,
+      name: m.name,
+      grams: m.grams,
+      pct_of_dough: m.pct_of_weight,
+      critical: m.critical,
+    }));
     if (coveragePct < 90) warnings.push(`Kun ${nb(coveragePct)} % av deigvekten har næringsdata`);
+    const gate = declarationGate(core, coveragePct);
+    for (const r of gate.reasons) if (!warnings.includes(r)) warnings.push(r);
 
     // 8) Nøkkelhullet
     const measured: Record<string, number | null> = {
@@ -390,8 +284,17 @@ Deno.serve(async (req) => {
       unclassified_grain_names: core.breadscale.unclassified,
       composite_unreviewed: core.composite_unreviewed,
       composite_text_only: core.composite_text_only,
+      composite_percent_residual: core.composite_percent_residual,
       declaration_names: core.missing_declaration_names,
       lines_without_raw_material: core.sortedAgg.filter((a) => !a.raw_material_id).length,
+      lines_without_nutrition_over_pct: core.lines_without_nutrition_over_pct,
+      critical_missing_nutrition: core.critical_missing_nutrition,
+      unit_problems: core.unit_problems,
+      free_text_lines: core.free_text_lines,
+      fiber_complete: core.fiber_complete,
+      missing_bake_loss: missingBakeLoss,
+      blocked: gate.blocked,
+      block_reasons: gate.reasons,
     };
 
     if (core.missing_declaration_names.length) {
@@ -416,7 +319,11 @@ Deno.serve(async (req) => {
       grain_category: grainCategory,
       rye_share_of_grain_pct: ryeSharePct,
       nutrition_per_100g: per100,
+      nutrition_per_100g_raw: per100,
+      coverage_by_nutrient: core.coverage_by_nutrient,
       ingredient_declaration: core.ingredientHtml,
+      // Ren tekst med *stjernemarkering* — brukes av etikett-PDF og nettbutikk.
+      lines: { ingredient_declaration_text: core.ingredientText },
       allergens,
       keyhole,
       coverage_by_weight_pct: coveragePct,
@@ -441,6 +348,7 @@ Deno.serve(async (req) => {
         allergens: row.allergens,
         nutrition_per_100g: row.nutrition_per_100g,
         coverage_by_weight_pct: row.coverage_by_weight_pct,
+        blocked: gate.blocked,
       });
     } catch (e) {
       console.error("compute-recipe-label sync", e);

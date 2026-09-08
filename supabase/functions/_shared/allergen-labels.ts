@@ -5,7 +5,7 @@
 // selv inneholder allergenet («fløte» → «fløte (melk)»).
 
 export const ALLERGEN_LABEL: Record<string, string> = {
-  gluten_wheat: "hvete", gluten_rye: "rug", gluten_barley: "bygg", gluten_oats: "havre", gluten_spelt: "spelt",
+  gluten_wheat: "hvete", gluten_rye: "rug", gluten_barley: "bygg", gluten_oats: "havre", gluten_spelt: "spelt", gluten_khorasan: "khorasan (kamut)",
   crustaceans: "krepsdyr", fish: "fisk", molluscs: "bløtdyr",
   eggs: "egg", milk: "melk",
   peanuts: "peanøtter", nuts_almond: "mandler", nuts_hazelnut: "hasselnøtter", nuts_walnut: "valnøtter",

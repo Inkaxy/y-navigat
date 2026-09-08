@@ -15,6 +15,7 @@ import { FALLBACK_FIELD_LABELS } from "@/produksjon/features/utskriftsprofiler/t
 import { fitFontSizePt } from "@/produksjon/features/utskriftsprofiler/lib/fitText";
 import type { LabelProductRow } from "../types";
 import { code128Modules } from "./code128";
+import { splitMarkedText } from "@/varer/lib/markedText";
 import {
   brodskalanFor,
   grainCategoryFromBreadscaleValue,
@@ -217,7 +218,13 @@ function renderField(field: ProfileField, data: LabelPdfData, key: string) {
               {labelText}
             </Text>
           ) : null}
-          {v.text ?? ""}
+          {splitMarkedText(v.text ?? "").map((seg, i) =>
+            seg.bold ? (
+              <Text key={i} style={{ fontWeight: 700 }}>{seg.text}</Text>
+            ) : (
+              <Text key={i}>{seg.text}</Text>
+            ),
+          )}
         </Text>
       )}
     </View>

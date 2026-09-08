@@ -8679,6 +8679,7 @@ export type Database = {
           datasheet_url: string | null
           declaration_needs_review: boolean
           declaration_review_reason: string | null
+          declaration_version_id: string | null
           description: string | null
           description_rich: Json | null
           display_name: string
@@ -8781,6 +8782,7 @@ export type Database = {
           datasheet_url?: string | null
           declaration_needs_review?: boolean
           declaration_review_reason?: string | null
+          declaration_version_id?: string | null
           description?: string | null
           description_rich?: Json | null
           display_name: string
@@ -8883,6 +8885,7 @@ export type Database = {
           datasheet_url?: string | null
           declaration_needs_review?: boolean
           declaration_review_reason?: string | null
+          declaration_version_id?: string | null
           description?: string | null
           description_rich?: Json | null
           display_name?: string
@@ -8978,6 +8981,13 @@ export type Database = {
             columns: ["calc_source_product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "products_declaration_version_id_fkey"
+            columns: ["declaration_version_id"]
+            isOneToOne: false
+            referencedRelation: "recipe_declaration_versions"
             referencedColumns: ["id"]
           },
           {
@@ -10409,6 +10419,103 @@ export type Database = {
           },
         ]
       }
+      recipe_declaration_versions: {
+        Row: {
+          allergens_contains: string[]
+          allergens_may_contain: string[]
+          approved_at: string
+          approved_by: string | null
+          breadscale_pct: number | null
+          claim_grain: boolean
+          claim_keyhole: boolean
+          coverage_pct: number | null
+          created_at: string
+          diff_from_previous: Json | null
+          id: string
+          ingredient_html: string | null
+          ingredient_text: string | null
+          net_weight_g: number | null
+          nutrition_per_100g: Json | null
+          origin_text: string | null
+          recipe_id: string
+          restored_from_version_id: string | null
+          shelf_life_days: number | null
+          source: string
+          storage_text: string | null
+          version: number
+        }
+        Insert: {
+          allergens_contains?: string[]
+          allergens_may_contain?: string[]
+          approved_at?: string
+          approved_by?: string | null
+          breadscale_pct?: number | null
+          claim_grain?: boolean
+          claim_keyhole?: boolean
+          coverage_pct?: number | null
+          created_at?: string
+          diff_from_previous?: Json | null
+          id?: string
+          ingredient_html?: string | null
+          ingredient_text?: string | null
+          net_weight_g?: number | null
+          nutrition_per_100g?: Json | null
+          origin_text?: string | null
+          recipe_id: string
+          restored_from_version_id?: string | null
+          shelf_life_days?: number | null
+          source: string
+          storage_text?: string | null
+          version: number
+        }
+        Update: {
+          allergens_contains?: string[]
+          allergens_may_contain?: string[]
+          approved_at?: string
+          approved_by?: string | null
+          breadscale_pct?: number | null
+          claim_grain?: boolean
+          claim_keyhole?: boolean
+          coverage_pct?: number | null
+          created_at?: string
+          diff_from_previous?: Json | null
+          id?: string
+          ingredient_html?: string | null
+          ingredient_text?: string | null
+          net_weight_g?: number | null
+          nutrition_per_100g?: Json | null
+          origin_text?: string | null
+          recipe_id?: string
+          restored_from_version_id?: string | null
+          shelf_life_days?: number | null
+          source?: string
+          storage_text?: string | null
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recipe_declaration_versions_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipe_nutrition_calculated"
+            referencedColumns: ["recipe_id"]
+          },
+          {
+            foreignKeyName: "recipe_declaration_versions_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipe_declaration_versions_restored_from_version_id_fkey"
+            columns: ["restored_from_version_id"]
+            isOneToOne: false
+            referencedRelation: "recipe_declaration_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       recipe_grain_score: {
         Row: {
           category: string | null
@@ -10463,7 +10570,10 @@ export type Database = {
       recipe_label_calculated: {
         Row: {
           allergens: Json | null
+          bran_grams: number | null
+          breadscale_denominator_grams: number | null
           computed_at: string
+          coverage_by_nutrient: Json | null
           coverage_by_weight_pct: number | null
           dry_matter_grams: number | null
           dry_matter_pct: number | null
@@ -10472,19 +10582,29 @@ export type Database = {
           grain_category: string | null
           grain_score_pct: number | null
           ingredient_declaration: string | null
+          inputs_hash: string | null
+          is_stale: boolean
           keyhole: Json | null
+          keyhole_group: string | null
+          lines: Json | null
           missing_data: Json | null
           nutrition_per_100g: Json | null
+          nutrition_per_100g_raw: Json | null
           recipe_id: string
           rye_share_of_grain_pct: number | null
+          stale_reason: string | null
           total_input_grams: number | null
           warnings: Json | null
           whole_grain_grams: number | null
+          whole_grain_grams_keyhole: number | null
           whole_grain_pct_of_dry: number | null
         }
         Insert: {
           allergens?: Json | null
+          bran_grams?: number | null
+          breadscale_denominator_grams?: number | null
           computed_at?: string
+          coverage_by_nutrient?: Json | null
           coverage_by_weight_pct?: number | null
           dry_matter_grams?: number | null
           dry_matter_pct?: number | null
@@ -10493,19 +10613,29 @@ export type Database = {
           grain_category?: string | null
           grain_score_pct?: number | null
           ingredient_declaration?: string | null
+          inputs_hash?: string | null
+          is_stale?: boolean
           keyhole?: Json | null
+          keyhole_group?: string | null
+          lines?: Json | null
           missing_data?: Json | null
           nutrition_per_100g?: Json | null
+          nutrition_per_100g_raw?: Json | null
           recipe_id: string
           rye_share_of_grain_pct?: number | null
+          stale_reason?: string | null
           total_input_grams?: number | null
           warnings?: Json | null
           whole_grain_grams?: number | null
+          whole_grain_grams_keyhole?: number | null
           whole_grain_pct_of_dry?: number | null
         }
         Update: {
           allergens?: Json | null
+          bran_grams?: number | null
+          breadscale_denominator_grams?: number | null
           computed_at?: string
+          coverage_by_nutrient?: Json | null
           coverage_by_weight_pct?: number | null
           dry_matter_grams?: number | null
           dry_matter_pct?: number | null
@@ -10514,14 +10644,21 @@ export type Database = {
           grain_category?: string | null
           grain_score_pct?: number | null
           ingredient_declaration?: string | null
+          inputs_hash?: string | null
+          is_stale?: boolean
           keyhole?: Json | null
+          keyhole_group?: string | null
+          lines?: Json | null
           missing_data?: Json | null
           nutrition_per_100g?: Json | null
+          nutrition_per_100g_raw?: Json | null
           recipe_id?: string
           rye_share_of_grain_pct?: number | null
+          stale_reason?: string | null
           total_input_grams?: number | null
           warnings?: Json | null
           whole_grain_grams?: number | null
+          whole_grain_grams_keyhole?: number | null
           whole_grain_pct_of_dry?: number | null
         }
         Relationships: [
@@ -13999,6 +14136,16 @@ export type Database = {
       }
     }
     Functions: {
+      _approve_recipe_declaration_impl: {
+        Args: {
+          p_actor: string
+          p_overrides: Json
+          p_recipe_id: string
+          p_restored_from: string
+          p_source: string
+        }
+        Returns: Json
+      }
       _audit_jsonb_diff: {
         Args: { p_exclude: string[]; p_new: Json; p_old: Json }
         Returns: Json
@@ -14053,6 +14200,10 @@ export type Database = {
       app_access_level: {
         Args: { p_app_code: string }
         Returns: Database["public"]["Enums"]["access_level"]
+      }
+      approve_recipe_declaration: {
+        Args: { p_overrides: Json; p_recipe_id: string; p_source: string }
+        Returns: Json
       }
       approve_refund: {
         Args: { p_refund_id: string }
@@ -14600,6 +14751,19 @@ export type Database = {
         }[]
       }
       gtin_check_digit: { Args: { p_base12: string }; Returns: number }
+      h2_jsonb_text_array: { Args: { p: Json }; Returns: string[] }
+      h2_mark_recipes_stale: {
+        Args: { p_reason: string; p_recipe_ids: string[] }
+        Returns: number
+      }
+      h2_raw_material_names: {
+        Args: { p_raw_material_ids: string[] }
+        Returns: string
+      }
+      h2_recipes_using_raw_materials: {
+        Args: { p_raw_material_ids: string[] }
+        Returns: string[]
+      }
       has_access_to_outlet: { Args: { p_outlet_id: string }; Returns: boolean }
       has_active_position: {
         Args: { p_position_code: string }
@@ -15371,6 +15535,7 @@ export type Database = {
           reason: string
         }[]
       }
+      recipe_label_recalc_stale: { Args: { p_limit: number }; Returns: number }
       recipe_line_base_qty: {
         Args: {
           p_base_unit: string
@@ -15536,6 +15701,10 @@ export type Database = {
           target_dg2_pct: number
           warn_below_pp: number
         }[]
+      }
+      restore_recipe_declaration: {
+        Args: { p_version_id: string }
+        Returns: Json
       }
       return_is_approved: { Args: { p_order_id: string }; Returns: boolean }
       return_unit_price: {

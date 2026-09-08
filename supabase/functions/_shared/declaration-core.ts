@@ -2,10 +2,17 @@
 // Brukes av compute-product-declaration (produkt-kobling) og compute-recipe-label (oppskrift).
 // Håndterer: gram-konvertering, svinn, rekursiv dekomponering av sammensatte råvarer,
 // aggregering, QUID, allergener, næring og Brødskala'n.
+//
+// SVINN — ÉN DEFINISJON:
+// `waste_percent` er EKSTRA innveid mengde som IKKE havner i produktet.
+// Innveid gram = det som står på linjen. Mengden som faktisk er i produktet
+// (og som deklarasjonen bygger på) er derfor `grams / (1 + waste/100)`.
+// Samme regel gjelder i edge-funksjonene og i klienten.
 
 export { ALLERGEN_LABEL, highlightAllergens } from "./allergen-labels.ts";
 import { ALLERGEN_LABEL, highlightAllergens } from "./allergen-labels.ts";
 import { computeUnitCount, convertToGrams, resolveFinalWeight } from "./units-recipe.ts";
+import { MANDATORY_NUTRIENTS } from "./nutritionFormat.ts";
 export { computeUnitCount, resolveFinalWeight };
 
 
@@ -16,6 +23,20 @@ export const NUT_FIELDS = [
 export const BRAN_FACTOR: Record<string, number> = {
   wheat_bran: 4.5, rye_bran: 4.0, oat_bran: 2.0,
 };
+
+/** Ingredienser som praktisk talt alltid finnes og som ALDRI skal antas å være 0. */
+export const CRITICAL_INGREDIENT_RE = /\b(salt|vann|gj(æ|ae)r)\b/i;
+
+/** Linjer over denne andelen av vekten må ha komplett næring før etiketten kan brukes. */
+export const CRITICAL_LINE_PCT = 0.25;
+
+/** Matvaretabellen-koden for drikkevann — får automatisk nullrad. */
+export const WATER_FOOD_CODE = "13.033";
+
+export function isWaterName(name: string | null | undefined): boolean {
+  const n = String(name ?? "").toLowerCase().trim();
+  return /^(vann|kaldt vann|varmt vann|isvann|drikkevann)\b/.test(n) || n === "vann";
+}
 
 /**
  * Gram-konvertering for deklarasjoner. Bruker den delte enhetsmotoren
@@ -35,6 +56,28 @@ export function toGrams(
     pieceWeightG: unitWeightG,
     densityGPerMl: densityGPerMl ?? 1,
   }).grams;
+}
+
+/**
+ * Som `toGrams`, men uten stille antakelser: ukjent enhet og «stk» uten
+ * stykkvekt gir `exact: false` med en forklaring i stedet for 0 g.
+ */
+export function toGramsChecked(
+  qty: number,
+  unit: string,
+  unitWeightG: number | null,
+  densityGPerMl: number | null = 1,
+): { grams: number; exact: boolean; reason?: string } {
+  return convertToGrams(qty, unit, {
+    pieceWeightG: unitWeightG,
+    densityGPerMl: densityGPerMl ?? 1,
+  });
+}
+
+/** Mengden som faktisk er i produktet etter ekstra innveid svinn. */
+export function gramsAfterWaste(grams: number, wastePercent: number): number {
+  const w = Number(wastePercent) || 0;
+  return grams / (1 + w / 100);
 }
 
 
@@ -57,6 +100,32 @@ export function escapeHtml(s: string): string {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+}
+
+/**
+ * HTML med `<strong>` → ren tekst der de samme ordene er markert med `*stjerner*`.
+ * Slik overlever uthevingen helt ut til etikett-PDF og nettbutikk.
+ */
+export function htmlToMarkedText(html: string): string {
+  return String(html ?? "")
+    .replace(/<strong>(.*?)<\/strong>/gi, "*$1*")
+    .replace(/<[^>]*>/g, "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Stor forbokstav på første ingrediens — resten røres ikke. */
+export function capitalizeFirstIngredient(text: string): string {
+  const s = String(text ?? "");
+  const m = s.match(/^(\s*(?:<[^>]*>\s*)*)(\p{L})/u);
+  if (!m) return s;
+  return s.slice(0, m[1].length) + m[2].toUpperCase() + s.slice(m[1].length + m[2].length);
 }
 
 export type TopLine = {
@@ -121,14 +190,40 @@ export type Agg = {
   parent_ids: Set<string>;
 };
 
+export type MissingNutritionLine = {
+  raw_material_id: string | null;
+  name: string;
+  grams: number;
+  pct_of_weight: number;
+  critical: boolean;
+};
+
 export type CoreResult = {
   sortedAgg: Agg[];
   totalInputGrams: number;
   ingredientHtml: string;
+  /** Ren tekst med *stjernemarkering* rundt allergenene. */
+  ingredientText: string;
   containsList: string[];
   mayContainList: string[];
   nutritionTotals: Record<string, number>;
   coveredGrams: number;
+  /** Andel av vekten (%) med data, per obligatorisk næringsfelt. */
+  coverage_by_nutrient: Record<string, number>;
+  /** Linjer over 0,25 % av vekten uten komplett næring. */
+  lines_without_nutrition_over_pct: MissingNutritionLine[];
+  /** Alle linjer uten komplett næring, tyngste først. */
+  missing_nutrition: MissingNutritionLine[];
+  /** Kritiske ingredienser (salt/vann/gjær) uten næringsdata. */
+  critical_missing_nutrition: string[];
+  /** Linjer der enheten ikke kan regnes om til gram. */
+  unit_problems: Array<{ name: string; unit: string; reason: string }>;
+  /** Fritekstlinjer uten råvarekobling — hard sperre for auto-deklarasjon. */
+  free_text_lines: Array<{ name: string; grams: number }>;
+  /** Sant bare når alle bidragsytere har fiberverdi. */
+  fiber_complete: boolean;
+  /** Sammensatte råvarer der komponentprosentene ikke summerer til 100. */
+  composite_percent_residual: Array<{ name: string; residual_pct: number }>;
   breadscale: {
     total_flour_grams: number;
     coarse_grams_weighted: number;
@@ -176,6 +271,15 @@ export function textComponentInheritance(
   };
 }
 
+/** Komplett næring = alle obligatoriske felt er satt. En rad med bare ingredienstekst teller ikke. */
+export function nutritionIsComplete(row: any): boolean {
+  if (!row) return false;
+  return MANDATORY_NUTRIENTS.every((f) => {
+    const v = row[f];
+    return v != null && Number.isFinite(Number(v));
+  });
+}
+
 const RM_SELECT = "id, name, declaration_name, is_composite, grain_classification, cereal_type, water_content_pct, components_reviewed_at, unit_weight_grams";
 
 const PACKAGING_RE =
@@ -210,11 +314,23 @@ export function declarationNameFor(rm: any, fallbackName: string): string {
   return suggestDeclarationName(src) || String(src).toLowerCase().trim() || fallbackName;
 }
 
+export interface DeclarationOptions {
+  /**
+   * Ferdigvekt i gram. Er den satt, regnes QUID mot ferdig produkt og
+   * vannregelen brukes: vann i ferdig produkt = ferdigvekt − Σ øvrige.
+   */
+  finalWeightGrams?: number | null;
+}
+
 /**
  * Regner ut aggregert deklarasjonsgrunnlag fra topplinjer.
  * `service` må være en Supabase-klient med service-role.
  */
-export async function computeDeclarationCore(service: any, topLines: TopLine[]): Promise<CoreResult> {
+export async function computeDeclarationCore(
+  service: any,
+  topLines: TopLine[],
+  options: DeclarationOptions = {},
+): Promise<CoreResult> {
   type Comp = {
     id: string;
     parent_raw_material_id: string;
@@ -249,6 +365,8 @@ export async function computeDeclarationCore(service: any, topLines: TopLine[]):
 
   const composite_unreviewed: string[] = [];
   const composite_text_only: string[] = [];
+  const composite_percent_residual: Array<{ name: string; residual_pct: number }> = [];
+  const unit_problems: Array<{ name: string; unit: string; reason: string }> = [];
   const missingDeclMap = new Map<string, { raw_material_id: string; name: string; fallback_used: string }>();
 
   const collectedRmIds = new Set<string>();
@@ -291,11 +409,47 @@ export async function computeDeclarationCore(service: any, topLines: TopLine[]):
     allergensByRm.set(a.raw_material_id, arr);
   }
 
+  /** Nullrad for vann: vann har ingen næring, men skal telle som DEKKET — ikke som hull. */
+  const ZERO_NUTRITION: Record<string, number> = Object.fromEntries(NUT_FIELDS.map((f) => [f, 0]));
+
+  function isWaterRow(rmId: string | null, name: string): boolean {
+    if (isWaterName(name)) return true;
+    if (!rmId) return false;
+    const rm = rmMap.get(rmId);
+    if (isWaterName(rm?.name) || isWaterName(rm?.declaration_name)) return true;
+    const n = nutritionByRm.get(rmId);
+    const code = n?.matvaretabellen_food_id ?? n?.source_food_id ?? n?.source_code ?? null;
+    return code != null && String(code) === WATER_FOOD_CODE;
+  }
+
+  /** Næringsraden som gjelder for en aggregert linje — vann får automatisk nullrad. */
+  function nutritionRowFor(rmId: string | null, nutritionRef: string | null, name: string): any | null {
+    const direct = rmId ? nutritionByRm.get(rmId) : null;
+    if (nutritionIsComplete(direct)) return direct;
+    const ref = nutritionRef ? nutritionByRm.get(nutritionRef) : null;
+    if (nutritionIsComplete(ref)) return ref;
+    if (isWaterRow(rmId, name)) return ZERO_NUTRITION;
+    return direct ?? ref ?? null;
+  }
+
+  function hasCompleteNutrition(rmId: string | null, name: string): boolean {
+    if (isWaterRow(rmId, name)) return true;
+    return rmId ? nutritionIsComplete(nutritionByRm.get(rmId)) : false;
+  }
+
   function waterFor(rm: any, override: number | null | undefined): { pct: number | null; source: FlatLine["water_content_source"] } {
     if (override != null && Number.isFinite(Number(override))) return { pct: Number(override), source: "override" };
     const v = rm?.water_content_pct;
     if (v != null && Number.isFinite(Number(v))) return { pct: Number(v), source: "raw_material" };
     return { pct: null, source: "unknown" };
+  }
+
+  function allergensOf(rmId: string | null): { contains: string[]; may: string[] } {
+    const rows = rmId ? allergensByRm.get(rmId) ?? [] : [];
+    return {
+      contains: rows.filter((a) => a.presence === "contains").map((a) => a.allergen),
+      may: rows.filter((a) => a.presence === "may_contain").map((a) => a.allergen),
+    };
   }
 
   function decompose(
@@ -317,11 +471,13 @@ export async function computeDeclarationCore(service: any, topLines: TopLine[]):
     const hasLinkedComponents = ownComponents.some((c) => !!c.component_raw_material_id);
     const isComposite = !!rm?.is_composite && depth < 3 && hasLinkedComponents;
     if (!isComposite) {
-      const allergens = rmId ? (allergensByRm.get(rmId) ?? []).filter((a) => a.presence === "contains").map((a) => a.allergen) : [];
-      const may = rmId ? (allergensByRm.get(rmId) ?? []).filter((a) => a.presence === "may_contain").map((a) => a.allergen) : [];
-      const key = rmId ? `rm:${rmId}` : `text:${normName(fallbackName)}`;
-      const w = waterFor(rm, depth === 0 ? waterOverride : null);
+      const al = allergensOf(rmId);
       const declName = declarationNameFor(rm, fallbackName);
+      // Samme råvare kan stå både som egen linje og inne i en parentes —
+      // derfor tas forelderen med i nøkkelen.
+      const base = rmId ? `rm:${rmId}` : `text:${normName(fallbackName)}`;
+      const key = parentChain ? `${base}@${parentChain}` : base;
+      const w = waterFor(rm, depth === 0 ? waterOverride : null);
       const hasDeclName = typeof rm?.declaration_name === "string" && rm.declaration_name.trim() !== "";
       if (rmId && rm && !hasDeclName && !missingDeclMap.has(rmId)) {
         missingDeclMap.set(rmId, { raw_material_id: rmId, name: rm.name ?? fallbackName, fallback_used: declName });
@@ -340,11 +496,11 @@ export async function computeDeclarationCore(service: any, topLines: TopLine[]):
         cereal_type: rm?.cereal_type ?? null,
         water_content_pct: w.pct,
         water_content_source: w.source,
-        allergens,
-        may_allergens: may,
+        allergens: al.contains,
+        may_allergens: al.may,
         inherited_allergens: [],
         inherited_may_allergens: [],
-        has_nutrition: rmId ? !!nutritionByRm.get(rmId) : false,
+        has_nutrition: hasCompleteNutrition(rmId, declName),
         nutrition_ref: null,
       }];
     }
@@ -352,18 +508,23 @@ export async function computeDeclarationCore(service: any, topLines: TopLine[]):
       const nm = rm?.name ?? rmId;
       if (!composite_unreviewed.includes(nm)) composite_unreviewed.push(nm);
     }
-    const parentHasNutrition = rmId ? !!nutritionByRm.get(rmId) : false;
-    const parentAllergens = rmId
-      ? (allergensByRm.get(rmId) ?? []).filter((a) => a.presence === "contains").map((a) => a.allergen)
-      : [];
-    const parentMayAllergens = rmId
-      ? (allergensByRm.get(rmId) ?? []).filter((a) => a.presence === "may_contain").map((a) => a.allergen)
-      : [];
+    const parentComplete = rmId ? nutritionIsComplete(nutritionByRm.get(rmId)) : false;
+    const parentAl = allergensOf(rmId);
     const comps = (componentsByParent.get(rmId!) ?? []).slice().sort((a, b) => a.sort_order - b.sort_order);
     const out: FlatLine[] = [];
-    const totalPct = comps.reduce((s, c) => s + Number(c.percentage), 0) || 100;
+    const sumPct = comps.reduce((s, c) => s + (Number(c.percentage) || 0), 0);
+    // Summerer ikke komponentene til 100 %, blir resten en synlig «(øvrige)»-post
+    // i stedet for at alt normaliseres stille opp.
+    const residual = Math.round((100 - sumPct) * 100) / 100;
+    const totalPct = sumPct > 0 ? Math.max(sumPct, 100) : 100;
+    if (Math.abs(residual) >= 0.5) {
+      const nm = rm?.name ?? rmId ?? "Sammensatt";
+      if (!composite_percent_residual.some((r) => r.name === nm)) {
+        composite_percent_residual.push({ name: nm, residual_pct: residual });
+      }
+    }
     for (const c of comps) {
-      const ratio = Number(c.percentage) / totalPct;
+      const ratio = (Number(c.percentage) || 0) / totalPct;
       const childGrams = grams * ratio;
       const childEff = effective_grams * ratio;
       if (c.component_raw_material_id) {
@@ -373,15 +534,15 @@ export async function computeDeclarationCore(service: any, topLines: TopLine[]):
         // Tekstkomponenten har ingen egen næring eller allergener. Forelderens rad
         // gjelder hele massen, så andelen her dekkes forholdsmessig av den.
         const inherited = textComponentInheritance(
-          parentHasNutrition,
-          parentAllergens,
-          parentMayAllergens,
+          parentComplete,
+          parentAl.contains,
+          parentAl.may,
           c.allergens ?? [],
         );
         if (!composite_text_only.includes(nm)) composite_text_only.push(nm);
         out.push({
           source,
-          key: `text:${normName(nm)}`,
+          key: `text:${normName(nm)}@${rmId}`,
           raw_material_id: null,
           name: nm,
           grams: childGrams,
@@ -403,17 +564,61 @@ export async function computeDeclarationCore(service: any, topLines: TopLine[]):
         });
       }
     }
+    if (Math.abs(residual) >= 0.5 && residual > 0) {
+      const ratio = residual / totalPct;
+      out.push({
+        source,
+        key: `text:øvrige@${rmId}`,
+        raw_material_id: null,
+        name: "øvrige",
+        grams: grams * ratio,
+        effective_grams: effective_grams * ratio,
+        is_quid: false,
+        custom_text: null,
+        from_composite_parent_id: rmId,
+        grain_classification: null,
+        cereal_type: null,
+        water_content_pct: null,
+        water_content_source: "unknown",
+        allergens: [],
+        may_allergens: [],
+        inherited_allergens: parentAl.contains,
+        inherited_may_allergens: parentAl.may,
+        has_nutrition: parentComplete,
+        nutrition_ref: rmId,
+      });
+    }
     return out;
   }
 
+  // Allergener fra linjer som er tatt UT av ingredienslisten. De skal fortsatt
+  // stå i «Inneholder» — art. 21 gjelder uansett om ingrediensen listes eller ei.
+  const allergenOnlyContains = new Set<string>();
+  const allergenOnlyMay = new Set<string>();
+  const free_text_lines: Array<{ name: string; grams: number }> = [];
+
   const flatLines: FlatLine[] = [];
   for (const t of topLines) {
-    if (!t.include) continue;
-    const grams = toGrams(t.quantity, t.unit, t.unit_weight_grams);
-    const effective = grams * (1 - t.waste_percent / 100);
+    const conv = toGramsChecked(t.quantity, t.unit, t.unit_weight_grams);
+    if (!conv.exact && (Number(t.quantity) || 0) > 0) {
+      unit_problems.push({ name: t.name, unit: t.unit, reason: conv.reason ?? "ukjent omregning" });
+    }
+    const grams = conv.grams;
+    const effective = gramsAfterWaste(grams, t.waste_percent);
+
+    if (!t.include) {
+      const al = allergensOf(t.raw_material_id);
+      for (const a of al.contains) allergenOnlyContains.add(a);
+      for (const a of al.may) allergenOnlyMay.add(a);
+      continue;
+    }
+
     if (t.custom_text) {
       const rm = t.raw_material_id ? rmMap.get(t.raw_material_id) : null;
       const w = waterFor(rm, t.water_content_pct_override);
+      // Fritekstlinjen beholder råvarens allergener når den er koblet.
+      const al = allergensOf(t.raw_material_id);
+      if (!t.raw_material_id) free_text_lines.push({ name: t.custom_text, grams: effective });
       flatLines.push({
         source: t.source, key: `text:${normName(t.custom_text)}`,
         raw_material_id: t.raw_material_id, name: t.name,
@@ -423,13 +628,14 @@ export async function computeDeclarationCore(service: any, topLines: TopLine[]):
         grain_classification: rm?.grain_classification ?? t.raw_material?.grain_classification ?? null,
         cereal_type: rm?.cereal_type ?? null,
         water_content_pct: w.pct, water_content_source: w.source,
-        allergens: [], may_allergens: [],
+        allergens: al.contains, may_allergens: al.may,
         inherited_allergens: [], inherited_may_allergens: [],
         nutrition_ref: null,
-        has_nutrition: t.raw_material_id ? !!nutritionByRm.get(t.raw_material_id) : false,
+        has_nutrition: hasCompleteNutrition(t.raw_material_id, t.custom_text),
       });
       continue;
     }
+    if (!t.raw_material_id) free_text_lines.push({ name: t.name, grams: effective });
     flatLines.push(...decompose(t.source, grams, effective, t.raw_material_id, t.name, t.is_quid, null, 0, null, t.water_content_pct_override));
   }
 
@@ -471,6 +677,33 @@ export async function computeDeclarationCore(service: any, topLines: TopLine[]):
   }
 
   const totalInputGrams = [...aggMap.values()].reduce((s, l) => s + l.effective_grams, 0) || 1;
+
+  /**
+   * Vannregelen (vedlegg VII del A punkt 6): vann skal oppgis med mengden det
+   * utgjør i det FERDIGE produktet, og utelates når det er ≤ 5 %.
+   */
+  const finalWeight = Number(options.finalWeightGrams) || 0;
+  if (finalWeight > 0) {
+    const waterKeys = [...aggMap.values()].filter((a) => isWaterRow(a.raw_material_id, a.name)).map((a) => a.key);
+    if (waterKeys.length) {
+      const others = [...aggMap.values()]
+        .filter((a) => !waterKeys.includes(a.key))
+        .reduce((s, a) => s + a.effective_grams, 0);
+      const waterInProduct = finalWeight - others;
+      // Alt vannet samles på den første vannlinjen.
+      const [firstKey, ...restKeys] = waterKeys;
+      for (const k of restKeys) aggMap.delete(k);
+      const first = aggMap.get(firstKey)!;
+      if (waterInProduct <= finalWeight * 0.05 || waterInProduct <= 0) {
+        aggMap.delete(firstKey);
+      } else {
+        first.effective_grams = waterInProduct;
+        first.grams = waterInProduct;
+      }
+    }
+  }
+
+  const quidBase = finalWeight > 0 ? finalWeight : totalInputGrams;
   const sortedAgg = [...aggMap.values()].sort((a, b) => b.effective_grams - a.effective_grams);
 
   // Wrap sammensatte råvarer i deklarasjonen
@@ -484,39 +717,44 @@ export async function computeDeclarationCore(service: any, topLines: TopLine[]):
     }
   }
   const wrapParents = new Set<string>();
+  const parentWeight = new Map<string, number>();
   for (const [pid, kids] of parentToChildren.entries()) {
-    if (kids.length > 0 && kids.every((k) => k.parent_ids.size === 1)) wrapParents.add(pid);
+    if (kids.length > 0 && kids.every((k) => k.parent_ids.size === 1)) {
+      wrapParents.add(pid);
+      parentWeight.set(pid, kids.reduce((s, k) => s + k.effective_grams, 0));
+    }
   }
 
   function renderItem(a: Agg, includeQuid: boolean): string {
-    if (a.custom_text) return escapeHtml(a.custom_text);
+    // Fritekst skal også få allergenene sine uthevet — art. 21 gjelder teksten.
+    if (a.custom_text) return highlightAllergens(escapeHtml(a.custom_text), [...a.allergens]);
     // Alle allergener uthevet; de som ikke står i navnet legges til i parentes.
-    let display = highlightAllergens(escapeHtml(a.name), a.allergens);
+    let display = highlightAllergens(escapeHtml(a.name), [...a.allergens]);
     if (includeQuid && a.is_quid) {
-      const pct = Math.round((a.effective_grams / totalInputGrams) * 1000) / 10;
-      // QUID vises i parentes med norsk desimalkomma: «(12,5 %)».
-      display += ` (${String(pct).replace(".", ",")} %)`;
+      const pct = Math.round((a.effective_grams / quidBase) * 1000) / 10;
+      if (pct > 100) {
+        // Mer enn 100 g per 100 g ferdig produkt (vann fordampet) — da kreves «g per 100 g».
+        const gPer100 = Math.round((a.effective_grams / quidBase) * 1000) / 10;
+        display += ` (${String(gPer100).replace(".", ",")} g per 100 g)`;
+      } else {
+        // QUID vises i parentes med norsk desimalkomma: «(12,5 %)».
+        display += ` (${String(pct).replace(".", ",")} %)`;
+      }
     }
 
     return display;
   }
 
-  const renderedKeys = new Set<string>();
-  const ingredientParts: string[] = [];
-  const parentFirstPos = new Map<string, number>();
-  sortedAgg.forEach((a, i) => {
+  // Sammensatte råvarer plasseres etter SAMLET vekt, ikke etter tyngste komponent.
+  type Entry = { weight: number; render: () => string; keys: string[] };
+  const entries: Entry[] = [];
+  const handledParents = new Set<string>();
+  for (const a of sortedAgg) {
     if (a.parent_ids.size === 1) {
       const pid = [...a.parent_ids][0];
-      if (wrapParents.has(pid) && !parentFirstPos.has(pid)) parentFirstPos.set(pid, i);
-    }
-  });
-  for (let i = 0; i < sortedAgg.length; i++) {
-    const a = sortedAgg[i];
-    if (renderedKeys.has(a.key)) continue;
-    let wrapped = false;
-    if (a.parent_ids.size === 1) {
-      const pid = [...a.parent_ids][0];
-      if (wrapParents.has(pid) && parentFirstPos.get(pid) === i) {
+      if (wrapParents.has(pid)) {
+        if (handledParents.has(pid)) continue;
+        handledParents.add(pid);
         const parentRm = rmMap.get(pid) ?? null;
         const parentName = declarationNameFor(parentRm, "Sammensatt");
         const parentHasDeclName = typeof parentRm?.declaration_name === "string" && parentRm.declaration_name.trim() !== "";
@@ -524,48 +762,81 @@ export async function computeDeclarationCore(service: any, topLines: TopLine[]):
           missingDeclMap.set(pid, { raw_material_id: pid, name: parentRm.name ?? "Sammensatt", fallback_used: parentName });
         }
         const kids = (parentToChildren.get(pid) ?? []).slice().sort((x, y) => y.effective_grams - x.effective_grams);
-        for (const k of kids) renderedKeys.add(k.key);
-        ingredientParts.push(`${parentName} (${kids.map((k) => renderItem(k, false)).join(", ")})`);
-        wrapped = true;
-      } else if (wrapParents.has(pid)) {
+        // Forelderens egne allergener uthevet på FORELDER-nivå.
+        const parentAllergens = allergensOf(pid).contains;
+        entries.push({
+          weight: parentWeight.get(pid) ?? 0,
+          keys: kids.map((k) => k.key),
+          render: () =>
+            `${highlightAllergens(escapeHtml(parentName), parentAllergens)} (${kids.map((k) => renderItem(k, false)).join(", ")})`,
+        });
         continue;
       }
     }
-    if (!wrapped) {
-      renderedKeys.add(a.key);
-      ingredientParts.push(renderItem(a, true));
-    }
+    entries.push({ weight: a.effective_grams, keys: [a.key], render: () => renderItem(a, true) });
   }
-  const ingredientHtml = ingredientParts.join(", ");
+  entries.sort((x, y) => y.weight - x.weight);
+  const ingredientHtml = capitalizeFirstIngredient(entries.map((e) => e.render()).join(", "));
+  const ingredientText = capitalizeFirstIngredient(htmlToMarkedText(ingredientHtml));
 
-  const allergenSet = new Set<string>();
+  const allergenSet = new Set<string>(allergenOnlyContains);
   const mayContainSet = new Set<string>();
   for (const a of sortedAgg) {
     for (const al of a.allergens) allergenSet.add(al);
     // Arvede allergener teller i «Inneholder», men står ikke i parentes på linjen.
     for (const al of a.inherited_allergens) allergenSet.add(al);
+  }
+  for (const a of sortedAgg) {
     for (const al of a.may_allergens) if (!allergenSet.has(al)) mayContainSet.add(al);
     for (const al of a.inherited_may_allergens) if (!allergenSet.has(al)) mayContainSet.add(al);
   }
+  for (const al of allergenOnlyMay) if (!allergenSet.has(al)) mayContainSet.add(al);
   const containsList = [...allergenSet].map((a) => ALLERGEN_LABEL[a] ?? a).sort();
   const mayContainList = [...mayContainSet].map((a) => ALLERGEN_LABEL[a] ?? a).sort();
 
   // Næring — totalsummer (ikke delt på vekt ennå)
   const nutritionTotals: Record<string, number> = {};
+  const coveredByField: Record<string, number> = Object.fromEntries(NUT_FIELDS.map((f) => [f, 0]));
   let coveredGrams = 0;
+  let fiberComplete = true;
+  const missing_nutrition: MissingNutritionLine[] = [];
+  const totalForCoverage = sortedAgg.reduce((s, a) => s + a.effective_grams, 0) || totalInputGrams;
+
   for (const a of sortedAgg) {
-    const n = a.raw_material_id
-      ? nutritionByRm.get(a.raw_material_id)
-      : a.nutrition_ref
-        ? nutritionByRm.get(a.nutrition_ref)
-        : null;
-    if (!n) continue;
-    coveredGrams += a.effective_grams;
+    const n = nutritionRowFor(a.raw_material_id, a.nutrition_ref, a.name);
+    const complete = nutritionIsComplete(n) || (n === ZERO_NUTRITION);
+    if (complete) coveredGrams += a.effective_grams;
+    else {
+      const pct = Math.round((a.effective_grams / totalForCoverage) * 10000) / 100;
+      missing_nutrition.push({
+        raw_material_id: a.raw_material_id,
+        name: a.name,
+        grams: Math.round(a.effective_grams * 10) / 10,
+        pct_of_weight: pct,
+        critical: CRITICAL_INGREDIENT_RE.test(a.name),
+      });
+    }
+    if (!n) {
+      fiberComplete = false;
+      continue;
+    }
+    if (n.fiber_g == null || !Number.isFinite(Number(n.fiber_g))) fiberComplete = false;
     for (const f of NUT_FIELDS) {
       const v = Number(n[f]);
-      if (Number.isFinite(v)) nutritionTotals[f] = (nutritionTotals[f] ?? 0) + (v * a.effective_grams) / 100;
+      if (n[f] != null && Number.isFinite(v)) {
+        nutritionTotals[f] = (nutritionTotals[f] ?? 0) + (v * a.effective_grams) / 100;
+        coveredByField[f] += a.effective_grams;
+      }
     }
   }
+  missing_nutrition.sort((x, y) => y.grams - x.grams);
+
+  const coverage_by_nutrient: Record<string, number> = {};
+  for (const f of NUT_FIELDS) {
+    coverage_by_nutrient[f] = Math.round((coveredByField[f] / totalForCoverage) * 1000) / 10;
+  }
+  const lines_without_nutrition_over_pct = missing_nutrition.filter((m) => m.pct_of_weight > CRITICAL_LINE_PCT);
+  const critical_missing_nutrition = missing_nutrition.filter((m) => m.critical).map((m) => m.name);
 
   // Brødskala'n
   let totalFlour = 0, coarseWeighted = 0, ryeFlour = 0;
@@ -599,10 +870,19 @@ export async function computeDeclarationCore(service: any, topLines: TopLine[]):
     sortedAgg,
     totalInputGrams,
     ingredientHtml,
+    ingredientText,
     containsList,
     mayContainList,
     nutritionTotals,
     coveredGrams,
+    coverage_by_nutrient,
+    lines_without_nutrition_over_pct,
+    missing_nutrition,
+    critical_missing_nutrition,
+    unit_problems,
+    free_text_lines,
+    fiber_complete: fiberComplete,
+    composite_percent_residual,
     breadscale: {
       total_flour_grams: totalFlour,
       coarse_grams_weighted: coarseWeighted,
@@ -618,4 +898,27 @@ export async function computeDeclarationCore(service: any, topLines: TopLine[]):
     rmMap,
     nutritionByRm,
   };
+}
+
+export type DeclarationGate = {
+  blocked: boolean;
+  reasons: string[];
+};
+
+/**
+ * Felles sperre for auto-deklarasjon. Samme regel i oppskrift- og produktveien:
+ * under 90 % vektdekning, en linje over 0,25 % uten næring, en kritisk ingrediens
+ * uten næring, en ukjent enhet eller en fritekstlinje ⇒ etiketten kan ikke brukes.
+ */
+export function declarationGate(core: CoreResult, coveragePct: number): DeclarationGate {
+  const reasons: string[] = [];
+  if (coveragePct < 90) reasons.push(`Kun ${String(Math.round(coveragePct * 10) / 10).replace(".", ",")} % av vekten har næringsdata`);
+  for (const c of core.critical_missing_nutrition) reasons.push(`${c} mangler næringsdata`);
+  for (const l of core.lines_without_nutrition_over_pct) {
+    if (core.critical_missing_nutrition.includes(l.name)) continue;
+    reasons.push(`${l.name} mangler næringsdata (${String(l.pct_of_weight).replace(".", ",")} % av vekten)`);
+  }
+  for (const u of core.unit_problems) reasons.push(`${u.name}: ${u.reason}`);
+  for (const t of core.free_text_lines) reasons.push(`Fritekstlinjen «${t.name}» må kobles til en råvare`);
+  return { blocked: reasons.length > 0, reasons };
 }

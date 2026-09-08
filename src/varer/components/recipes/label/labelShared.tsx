@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { NUTRITION_TABLE_ROWS, formatEnergyRow, formatNutrient } from "@/varer/lib/nutritionFormat";
 
 /**
  * ÉN visuell modell for «hva følger produktet».
@@ -103,17 +104,31 @@ export function DiffNote({ children }: { children: ReactNode }) {
   );
 }
 
-export const NUT_ROWS: Array<{ key: string; label: string; unit: string; d: number; indent?: boolean }> = [
-  { key: "energy_kj", label: "Energi", unit: "kJ", d: 0 },
-  { key: "energy_kcal", label: "Energi", unit: "kcal", d: 0 },
-  { key: "fat_g", label: "Fett", unit: "g", d: 1 },
-  { key: "saturated_fat_g", label: "hvorav mettede fettsyrer", unit: "g", d: 1, indent: true },
-  { key: "carbs_g", label: "Karbohydrater", unit: "g", d: 1 },
-  { key: "sugars_g", label: "hvorav sukkerarter", unit: "g", d: 1, indent: true },
-  { key: "fiber_g", label: "Kostfiber", unit: "g", d: 1 },
-  { key: "protein_g", label: "Protein", unit: "g", d: 1 },
-  { key: "salt_g", label: "Salt", unit: "g", d: 2 },
-];
+/**
+ * Radene i næringstabellen etter vedlegg XV. Energi er ÉN rad («1 050 kJ / 250 kcal»).
+ * Avrunding kommer fra den delte modulen nutritionFormat.ts — aldri faste desimaler her.
+ */
+export const NUT_ROWS = NUTRITION_TABLE_ROWS;
+
+export type NutritionValues = Record<string, number | null | undefined> | null | undefined;
+
+/** Formatert verdi for én rad, valgfritt skalert til porsjonsstørrelse. */
+export function nutritionValueText(
+  key: string,
+  values: NutritionValues,
+  factor = 1,
+): string {
+  const scale = (v: number | null | undefined) => (v == null ? null : Number(v) * factor);
+  if (key === "energy") {
+    const kj = scale(values?.energy_kj);
+    const kcal = scale(values?.energy_kcal);
+    if (kj == null && kcal == null) return "—";
+    return formatEnergyRow(kj, kcal);
+  }
+  const v = scale(values?.[key]);
+  if (v == null) return key === "salt_g" ? "ukjent" : "—";
+  return formatNutrient(key, v);
+}
 
 /** Relativ tid på norsk: «for 3 timer siden». */
 export function relativeTimeNb(iso: string | null | undefined): string {
