@@ -31,6 +31,8 @@ interface Props {
   onOpenChange: (v: boolean) => void;
   lines: ReviewLineRow[];
   onDone?: () => void;
+  /** Kalles ved delvis feil med ID-ene til linjene som faktisk ble opprettet. */
+  onPartial?: (createdLineIds: string[]) => void;
 }
 
 interface Draft {
@@ -92,7 +94,7 @@ function draftFor(line: ReviewLineRow): Draft {
  * egen rad som kan rettes eller hakes bort før alt lagres — ingenting
  * opprettes blindt.
  */
-export function BulkCreateRawMaterialsDialog({ open, onOpenChange, lines, onDone }: Props) {
+export function BulkCreateRawMaterialsDialog({ open, onOpenChange, lines, onDone, onPartial }: Props) {
   const qc = useQueryClient();
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [sharedCategory, setSharedCategory] = useState("");
@@ -101,13 +103,28 @@ export function BulkCreateRawMaterialsDialog({ open, onOpenChange, lines, onDone
   const lineIds = useMemo(() => lines.map((l) => l.id).join(","), [lines]);
 
   // Bevisst bare `open` og linje-ID-ene: en ny array-referanse med samme
-  // linjer skal ikke slette det brukeren har skrevet.
+  // linjer skal ikke slette det brukeren har skrevet. Er de nye linje-ID-ene
+  // en delmengde av forrige (typisk: ReviewQueue fjerner de opprettede fra
+  // utvalget etter en delvis feil), beholdes eksisterende utkast for de
+  // resterende — ellers ville de urørte utkastene blitt nullstilt.
   const linesRef = useRef(lines);
   linesRef.current = lines;
+  const prevLineIdsRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     if (!open) return;
-    setDrafts(linesRef.current.map(draftFor));
-    setSharedCategory("");
+    const currentIds = new Set(linesRef.current.map((l) => l.id));
+    const isSubsetOfPrev =
+      prevLineIdsRef.current.size > 0 &&
+      currentIds.size > 0 &&
+      currentIds.size < prevLineIdsRef.current.size &&
+      [...currentIds].every((id) => prevLineIdsRef.current.has(id));
+    if (isSubsetOfPrev) {
+      setDrafts((d) => d.filter((x) => currentIds.has(x.lineId)));
+    } else {
+      setDrafts(linesRef.current.map(draftFor));
+      setSharedCategory("");
+    }
+    prevLineIdsRef.current = currentIds;
   }, [open, lineIds]);
 
   function patch(lineId: string, p: Partial<Draft>) {
@@ -179,9 +196,12 @@ export function BulkCreateRawMaterialsDialog({ open, onOpenChange, lines, onDone
       } else {
         // Bare de opprettede radene fjernes. Utkastet til radene som feilet
         // står urørt — navn, varenummer og pakning må ikke skrives på nytt.
+        // `onDone` kalles bevisst IKKE her: den tømmer utvalget i
+        // ReviewQueue, som ville tømt `lines` og nullstilt utkastene mens
+        // dialogen fortsatt står åpen med rader som feilet.
         setDrafts((d) => d.filter((x) => !createdIds.has(x.lineId)));
         toast.warning(`${ok} opprettet. Feilet: ${failed.join(" · ")}`);
-        onDone?.();
+        onPartial?.([...createdIds]);
       }
     } catch (e: unknown) {
       showError("masse-opprett-raavarer", e, "Kunne ikke opprette varene");

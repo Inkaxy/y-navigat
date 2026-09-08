@@ -57,3 +57,15 @@
 - [ ] Nummeroppslag fra label_units i kakebilder og pakksedler
 - [ ] Manuell nummersynk, mangelsvarsler og kakebilder i etikettabellen
 - [ ] Tester, typecheck, lint og bygg
+
+## Råvarer 9d — restpunkter (E9b-verifisering)
+- [x] 1. RawMaterialDetail: forrige/neste virker fra standardlisten (tom querystring)
+- [x] 2. BulkCreateRawMaterialsDialog: delvis feil skal ikke kalle onDone; onPartial + bevar utkast
+- [x] 3. RecentInvoiceLinesCard: server-side order på invoices(invoice_date), fjern 200-vindu
+- [x] 4. Tester: parsePackageFromDescription "SALT 0.500 KG"; matchInvoiceColumns strip relasjonsgrupper + flere tabeller
+- [x] 5. rawMaterialKpi-tester: reelle deltaPrevPct/deltaAgreementPct/isManual-assertions
+- [x] 6. Vareliste: bivirkninger ut av setPackageQueue-updater (StrictMode dobbel toast)
+- [x] 7. aliasLearning: returner confirmRows + test på pending → confirmed
+- [x] 8. creditNote-regel som speilfil i supabase/functions/_shared + src/fakturaer/lib + cmp-test
+- [x] 9. invalidate.ts: rydd de 13 ekstra nøklene, dokumenter og oppdater test
+- [x] 10. Kosmetisk: QueueTable «Valuta ikke støttet»; MatchDrawer dataUpdatedAt som cache-buster

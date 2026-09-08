@@ -134,6 +134,48 @@ describe("priceTimeline", () => {
     expect(supplier?.points.filter((p) => p.isCreditNote)).toHaveLength(1);
   });
 
+  it("regner Δ mot forrige punkt i samme serie", () => {
+    const result = buildTimeline({
+      history,
+      supplierNames: new Map([["s1", "Leverandør 1"]]),
+      links: [],
+    });
+    const supplier = result.series.find((x) => x.key === "s1");
+    // 10 kr -> -3 kr: (-3 - 10) / |10| * 100 = -130 %.
+    expect(supplier?.points[0].deltaPrevPct).toBeNull();
+    expect(supplier?.points[1].deltaPrevPct).toBeCloseTo(-130, 4);
+  });
+
+  it("regner Δ mot avtaleprisen som gjaldt på datoen", () => {
+    const result = buildTimeline({
+      history,
+      supplierNames: new Map([["s1", "Leverandør 1"]]),
+      links: [
+        {
+          supplier_id: "s1",
+          agreed_price_per_base_unit: 8,
+          agreement_valid_from: "2026-01-01",
+          agreement_valid_to: null,
+        },
+      ],
+    });
+    const supplier = result.series.find((x) => x.key === "s1");
+    // Avtale 8, faktura 10: (10 - 8) / 8 * 100 = 25 %.
+    expect(supplier?.points[0].deltaAgreementPct).toBeCloseTo(25, 4);
+  });
+
+  it("markerer isManual ut fra kilden", () => {
+    const result = buildTimeline({
+      history,
+      supplierNames: new Map([["s1", "Leverandør 1"]]),
+      links: [],
+    });
+    const manual = result.series.find((x) => x.key === MANUAL_KEY);
+    expect(manual?.points[0].isManual).toBe(true);
+    const supplier = result.series.find((x) => x.key === "s1");
+    expect(supplier?.points.every((p) => p.isManual === false)).toBe(true);
+  });
+
   it("regner om til pris per pakning", () => {
     const result = buildTimeline({
       history: [history[0]],

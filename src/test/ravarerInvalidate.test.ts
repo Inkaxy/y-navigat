@@ -53,6 +53,10 @@ describe("invalidateRawMaterial", () => {
     expect(flat).toContain("reorder-suggestions");
     expect(flat).toContain("nutrition-coverage");
     expect(flat).toContain("recipes-using-raw-material");
+    // Fjernet i 9d/9: leverandørens totalforbruk summerer fakturalinjer og
+    // hører hjemme i fakturainvalideringen, ikke i råvareinvalideringen.
+    expect(flat).not.toContain("total-supplier-spend");
+
     expect(flat).toContain("raw_material_search_index");
     expect(calls).toHaveLength(rawMaterialQueryKeys("rm-1").length);
   });
@@ -79,7 +83,10 @@ describe("invalidateInvoice", () => {
     expect(flat).toContain("supplier-invoices");
     expect(flat).toContain("supplier-aliases");
     expect(flat).toContain("supplier-aliases-all");
-    expect(flat).toContain("invoice-doc-url|inv-1");
+    // `invoice-doc-url` er bevisst utelatt: nøkkelen tar en lagringssti, ikke
+    // faktura-id, så den ble aldri truffet uansett.
+    expect(flat).not.toContain("invoice-doc-url|inv-1");
+
     expect(calls).toHaveLength(invoiceQueryKeys("inv-1").length);
   });
 });

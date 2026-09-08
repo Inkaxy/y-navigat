@@ -99,7 +99,7 @@ export function MatchDrawer({ open, onOpenChange, line, onAcceptedNext }: Props)
    * Før lå dette inne i søket, som betød et nytt uttrekk av inntil 2000 rader
    * for hvert tastetrykk.
    */
-  const { data: supplierAliasRows = [] } = useQuery({
+  const { data: supplierAliasRows = [], dataUpdatedAt: supplierAliasUpdatedAt } = useQuery({
     queryKey: ["supplier-aliases-all", supplierId],
     enabled: !!supplierId,
     staleTime: 5 * 60 * 1000,
@@ -122,7 +122,10 @@ export function MatchDrawer({ open, onOpenChange, line, onAcceptedNext }: Props)
    * og registrerte alias — det er ofte det eneste som står på fakturaen.
    */
   const { data: rmResults = [], isLoading: searching } = useQuery({
-    queryKey: ["rm-search", legalEntityId, supplierId, search, supplierAliasRows.length],
+    // Cache-buster: siste vellykkede henting av aliasene, ikke antallet
+    // rader — to ulike alias-sett kan tilfeldigvis ha samme lengde og
+    // ville da IKKE trigget et nytt søk.
+    queryKey: ["rm-search", legalEntityId, supplierId, search, supplierAliasUpdatedAt],
     enabled: !!legalEntityId && search.length > 1,
     queryFn: async () => {
       // Komma og parentes er skilletegn i PostgREST-filtre — fjernes fra søket.

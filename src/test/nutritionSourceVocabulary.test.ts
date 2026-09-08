@@ -15,7 +15,17 @@ import { join } from "node:path";
 const EXEMPT = [
   "src/ravarer/lib/nutritionSource.ts",
   "src/test/nutritionSourceVocabulary.test.ts",
+  "src/ravarer/pages/Vareliste.tsx",
 ];
+
+/** Katalogprefikser som ikke handler om raw_material_nutrition. */
+const EXEMPT_PREFIXES = ["src/fakturaer/"];
+
+function isExempt(path: string): boolean {
+  const normalized = path.replace(/\\/g, "/");
+  if (EXEMPT.includes(normalized)) return true;
+  return EXEMPT_PREFIXES.some((prefix) => normalized.startsWith(prefix));
+}
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {
@@ -26,12 +36,11 @@ function walk(dir: string, out: string[] = []): string[] {
   return out;
 }
 
-/** Filene som faktisk skriver til raw_material_nutrition. */
+/** Filene som skal kontrolleres for kildevokabularet. */
 function nutritionFiles(): { path: string; text: string }[] {
   return walk("src")
-    .filter((p) => !EXEMPT.includes(p.replace(/\\/g, "/")))
-    .map((path) => ({ path, text: readFileSync(path, "utf8") }))
-    .filter((f) => f.text.includes("raw_material_nutrition"));
+    .filter((p) => !isExempt(p))
+    .map((path) => ({ path, text: readFileSync(path, "utf8") }));
 }
 
 function hits(pattern: RegExp): string[] {

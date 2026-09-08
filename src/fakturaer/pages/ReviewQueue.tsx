@@ -812,6 +812,15 @@ export default function FakturaerInboxPage() {
         onOpenChange={setBulkCreateOpen}
         lines={selectedLines}
         onDone={() => setSelected({})}
+        onPartial={(createdLineIds) => {
+          // Bare de faktisk opprettede linjene fjernes fra utvalget — resten
+          // står igjen slik at dialogen fortsatt viser utkastene som feilet.
+          setSelected((s) => {
+            const next = { ...s };
+            for (const id of createdLineIds) delete next[id];
+            return next;
+          });
+        }}
       />
       <LinkCreditNoteDialog
         open={!!creditNoteId}

@@ -76,6 +76,11 @@ const RAW_MATERIAL_GLOBAL_KEYS: readonly string[] = [
   "stock-product-search",
   "stock_item_balance",
   "stock_batch_balance",
+  // Gjennomgått mot hookene (9d/9): disse leser faktisk råvaredata og blir
+  // stående. `stock-ledger` (StockLedger.tsx) leser stock_movements, som endres
+  // av mottak og telling; `supplier-price-index` (useSupplierDetail.ts) leser
+  // raw_material_price_history; `orphan-datasheets` (useDatasheets.ts) endres
+  // når et datablad kobles til en råvare.
   "stock-ledger",
   "ledger-raw-material-names",
   "reorder-suggestions",
@@ -84,8 +89,11 @@ const RAW_MATERIAL_GLOBAL_KEYS: readonly string[] = [
   "datasheets-for-missing",
   "matvaretabellen_links",
   "supplier-price-index",
-  "total-supplier-spend",
+  // `total-supplier-spend` er fjernet: den summerer fakturalinjer per
+  // leverandør og endres av fakturaer, ikke av en råvareendring. Den
+  // invalideres via `invalidateInvoice`-flatene der den hører hjemme.
   "recipes-using-raw-material",
+
 ];
 
 /** Nøkler som tar råvare-id som andre ledd. */
@@ -121,8 +129,14 @@ const INVOICE_SCOPED_KEYS: readonly string[] = [
   "invoice-lines",
   "invoice-for-lines",
   "invoice-line-suggestions",
-  "invoice-doc-url",
+  // `invoice-doc-url` er fjernet: nøkkelen tar en lagringssti (ikke faktura-id)
+  // og gir en signert URL. Den ble aldri truffet, og en ny signert URL har
+  // ingenting med endret fakturadata å gjøre.
 ];
+
+/** Nøkler som `invalidateInvoice` bevisst IKKE treffer. Se kommentaren over. */
+export const INVOICE_KEYS_INTENTIONALLY_SKIPPED: readonly string[] = ["invoice-doc-url"];
+
 
 /** Alle nøkler som `invalidateRawMaterial` treffer — brukt i test og lib. */
 export function rawMaterialQueryKeys(id?: string): unknown[][] {

@@ -5,6 +5,7 @@ import { corsHeaders } from "npm:@supabase/supabase-js@2.95.0/cors";
 import { normalizeUnit, isPackageUnit, resolveLineCost, stripPackageTokens } from "../_shared/units.ts";
 import { normalizeMatchKey } from "../_shared/matchNormalize.ts";
 import { syncRegisteredPrices, learnPendingAliases } from "../_shared/priceSync.ts";
+import { CREDIT_NOTE_REF_PREFIX, creditNoteOriginalRef } from "../_shared/creditNote.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const ANON = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -13,19 +14,6 @@ const SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 type AnyRec = Record<string, any>;
 
 const norm = (s: string | null | undefined) => (s ?? "").trim().toLowerCase();
-
-/**
- * Slik skrives koblingen fra en kreditnota til den opprinnelige fakturaen.
- * MÅ være identisk med `CREDIT_NOTE_REF_PREFIX` i src/fakturaer/lib/inbox.ts —
- * ellers regner innboksen og motoren ulikt på om koblingen finnes.
- */
-const CREDIT_NOTE_REF_PREFIX = "Opprinnelig faktura:";
-
-function creditNoteOriginalRef(notes: string | null | undefined): string | null {
-  if (!notes) return null;
-  const m = new RegExp(`${CREDIT_NOTE_REF_PREFIX}\\s*(\\S+)`, "i").exec(String(notes));
-  return m ? m[1] : null;
-}
 
 // Lightweight trigram-style similarity (fallback if pg_trgm RPC not used). Range 0..1.
 function similarity(a: string, b: string): number {
