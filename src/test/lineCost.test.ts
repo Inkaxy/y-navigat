@@ -317,6 +317,12 @@ describe("delte filer mot _shared", () => {
     const shared = readFileSync("supabase/functions/_shared/matchNormalize.ts", "utf8");
     expect(front).toBe(shared);
   });
+
+  it("creditNote.ts er byte-identisk med edge-versjonen", () => {
+    const front = readFileSync("src/fakturaer/lib/creditNote.ts", "utf8");
+    const shared = readFileSync("supabase/functions/_shared/creditNote.ts", "utf8");
+    expect(front).toBe(shared);
+  });
 });
 
 describe("pakningsparser", () => {
