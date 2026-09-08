@@ -166,34 +166,50 @@ export function RecipePartCard({
       )}
 
       <div className="space-y-3 p-3">
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext items={lines.map((l) => l.id)} strategy={verticalListSortingStrategy}>
-            <div className="space-y-1.5">
-              {lines.length === 0 && (
-                <div className="rounded-md border border-dashed border-border py-4 text-center text-xs text-muted-foreground">
-                  Ingen linjer. Klikk «Legg til ingrediens».
-                </div>
-              )}
-              {lines.map((l) => (
-                <SortableLine
-                  key={l.id}
-                  line={l}
-                  canWrite={canWrite}
-                  totalFlourG={totalFlourG}
-                  rmMap={rmMap}
-                  currentRecipeId={currentRecipeId}
-                  onChange={(patch) => onUpdateLine(l.id, patch)}
-                  onRemove={() => onRemoveLine(l.id)}
-                />
+        {canWrite && (
+          <div className="flex items-center gap-2">
+            <Label className="text-xs text-muted-foreground">Registrering</Label>
+            <div className="inline-flex overflow-hidden rounded-md border border-input">
+              {(["grams", "percent"] as PartEntryMode[]).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => onEntryModeChange?.(mode)}
+                  className={cn(
+                    "px-2.5 py-1 text-xs",
+                    entryMode === mode ? "bg-app/10 font-medium text-app" : "text-muted-foreground hover:bg-muted",
+                  )}
+                >
+                  {PART_ENTRY_MODE_LABEL[mode]}
+                </button>
               ))}
             </div>
-          </SortableContext>
-        </DndContext>
-        {canWrite && (
-          <Button type="button" variant="ghost" size="sm" onClick={onAddLine}>
-            <Plus className="mr-1 h-3.5 w-3.5" /> Legg til ingrediens
-          </Button>
+            <span className="text-[11px] text-muted-foreground">
+              {entryMode === "percent"
+                ? "Du skriver bakerprosent — gram regnes ut fra melvekten."
+                : "Du skriver gram — bakerprosent regnes ut."}
+            </span>
+          </div>
         )}
+
+        <LineGrid
+          partId={part.id}
+          lines={lines}
+          canWrite={canWrite}
+          totalFlourG={totalFlourG}
+          rmMap={rmMap}
+          entryMode={entryMode}
+          currentRecipeId={currentRecipeId}
+          warningsByLine={warningsByLine}
+          onUpdateLine={onUpdateLine}
+          onRemoveLine={onRemoveLine}
+          onReorderLines={onReorderLines}
+          onAddLine={onAddLine}
+          renderRowExtras={(line) => (
+            <LineExtras line={line} canWrite={canWrite} onChange={(patch) => onUpdateLine(line.id, patch)} />
+          )}
+        />
+
         <div className="grid grid-cols-2 gap-3 border-t border-border pt-3">
           <div>
             <Label className="text-xs">Prep-tid (min)</Label>
