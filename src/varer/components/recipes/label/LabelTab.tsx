@@ -51,6 +51,15 @@ interface LegalEntityLabelInfo {
   city: string | null;
 }
 
+/** Kolonnenavnene i `legal_entities` — feltene heter invoice_* i basen. */
+interface LegalEntityRow {
+  legal_name: string | null;
+  display_name: string | null;
+  invoice_address_line1: string | null;
+  invoice_postal_code: string | null;
+  invoice_city: string | null;
+}
+
 interface Props {
   recipeId: string;
   recipeName: string;
@@ -82,12 +91,21 @@ export function LabelTab({
     queryKey: ["legal-entity-label", legalEntityId],
     enabled: !!legalEntityId,
     queryFn: async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("legal_entities")
-        .select("name, address_line1, postal_code, city")
+        .select("legal_name, display_name, invoice_address_line1, invoice_postal_code, invoice_city")
         .eq("id", legalEntityId!)
         .maybeSingle();
-      return (data ?? null) as LegalEntityLabelInfo | null;
+      if (error) throw error;
+      const row = (data ?? null) as LegalEntityRow | null;
+      if (!row) return null;
+      return {
+        // Etiketten skal bære det juridiske navnet, med visningsnavn som reserve.
+        name: row.legal_name ?? row.display_name ?? null,
+        address_line1: row.invoice_address_line1 ?? null,
+        postal_code: row.invoice_postal_code ?? null,
+        city: row.invoice_city ?? null,
+      } satisfies LegalEntityLabelInfo;
     },
   });
 
