@@ -182,7 +182,8 @@ export function buildRecipePDFData(input: BuildRecipePDFInput): RecipePDFData {
         isFlour: isFlourLine(l),
         isSubRecipe: !!l.sub_product_id || !!l._rm?.produced_by_recipe_id,
 
-        cost: input.includeCosts ? lineCost(l, exactGrams) : null,
+        // Ukjent vekt gir ingen kostpris — 0 g ville blitt 0 kr og skjult mangelen.
+        cost: input.includeCosts && exactWeight ? lineCost(l, exactGrams) : null,
       };
     });
     return {

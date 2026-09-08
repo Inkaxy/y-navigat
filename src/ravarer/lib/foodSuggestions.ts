@@ -41,6 +41,13 @@ function head(foodName: string): string {
   return normalizeForSearch((foodName ?? "").split(",")[0] ?? "");
 }
 
+/**
+ * Fradrag for matvarenavn med kvalifikator etter komma («Sukker, brunt»).
+ * Uten dette fikk «Sukker» og «Sukker, brunt» samme poengsum, og hele
+ * masse-koblingen stoppet på «flere nesten like treff».
+ */
+export const QUALIFIER_PENALTY = 0.12;
+
 /** Grunnpoeng 0–1 for én matvare mot ett søk. */
 function scoreQuery(query: string, food: FoodCandidate): number {
   const full = normalizeForSearch(food.food_name);
@@ -62,6 +69,10 @@ function scoreQuery(query: string, food: FoodCandidate): number {
     if (k === query) s = Math.max(s, 0.95);
     else if (k.length >= 4 && qWords.includes(k)) s = Math.max(s, 0.82);
   }
+
+  // Full score krever at HELE navnet stemmer. Har navnet en kvalifikator som
+  // søket ikke nevner, må treffet ligge minst ett hakk under det rene navnet.
+  if (full !== h && query !== full) s = Math.min(s, 1 - QUALIFIER_PENALTY);
   return s;
 }
 
@@ -86,7 +97,10 @@ export function suggestFoods(
       if (s > base) base = s;
     }
     if (base <= 0) continue;
-    const confidence = Math.min(1, base * foodGroupFit(rm.category, food.food_group_name));
+    // Gruppebonusen løfter mot 1 i stedet for å gange og klippe — ellers ville
+    // både «Sukker» og «Sukker, brunt» endt på 1,00 og blitt «flere like treff».
+    const fit = foodGroupFit(rm.category, food.food_group_name);
+    const confidence = fit >= 1 ? 1 - (1 - base) / fit : base * fit;
     if (confidence < minConfidence) continue;
     scored.push({ food, confidence, len: normalizeForSearch(food.food_name).length });
   }
@@ -184,6 +198,30 @@ export function variantMarkers(text: string | null | undefined): string[] {
   return [...variantAttributes(text).keys()];
 }
 
+function isPercentValue(value: string): boolean {
+  return value.trim().endsWith("%");
+}
+
+/**
+ * Matvaretabellen skriver alltid fettprosenten i navnet («Melk, hel, 3,5 % fett»),
+ * mens innkjøpsnavnet vårt sjelden gjør det. Oppgir råvaren ingen prosent, er
+ * prosenten i forslaget en presisering — ikke en konflikt.
+ */
+function dropUnaskedPercent(
+  asked: Map<string, Set<string>>,
+  offered: Map<string, Set<string>>,
+): Map<string, Set<string>> {
+  const askedPct = [...(asked.get("fettinnhold") ?? [])].some(isPercentValue);
+  if (askedPct) return offered;
+  const set = offered.get("fettinnhold");
+  if (!set) return offered;
+  const kept = new Set([...set].filter((v) => !isPercentValue(v)));
+  const copy = new Map(offered);
+  if (kept.size > 0) copy.set("fettinnhold", kept);
+  else copy.delete("fettinnhold");
+  return copy;
+}
+
 function sameValues(a: Set<string> | undefined, b: Set<string> | undefined): boolean {
   const av = [...(a ?? [])].sort();
   const bv = [...(b ?? [])].sort();
@@ -225,7 +263,7 @@ export function assessSuggestions(
   // «Smør usaltet» mot «Smør, saltet» nevner begge salting, men er ulike varer.
   const rmText = [rm.declaration_name ?? "", rm.name].join(" ");
   const asked = variantAttributes(rmText);
-  const offered = variantAttributes(top.food_name);
+  const offered = dropUnaskedPercent(asked, variantAttributes(top.food_name));
   const labels = new Set([...asked.keys(), ...offered.keys()]);
   for (const label of labels) {
     const a = asked.get(label);
@@ -238,4 +276,12 @@ export function assessSuggestions(
   }
 
   return { autoLinkAllowed: true, reason: null };
+}
+
+/** Sant når matvaregruppen ikke passer råvarekategorien (0,75-straffen). */
+export function hasGroupPenalty(
+  category: string | null | undefined,
+  suggestion: { food_group_name: string | null } | undefined,
+): boolean {
+  return !!suggestion && foodGroupFit(category, suggestion.food_group_name) < 1;
 }

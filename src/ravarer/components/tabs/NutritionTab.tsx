@@ -27,6 +27,9 @@ import { cn } from "@/lib/utils";
 import { DatasheetSection } from "./DatasheetSection";
 import { MatvaretabellenSourceCard } from "@/ravarer/components/matvaretabellen/MatvaretabellenSourceCard";
 import { useRawMaterial } from "@/ravarer/hooks/useRawMaterials";
+import { useUserDisplayName } from "@/varer/hooks/useRecipeLabel";
+import { format } from "date-fns";
+import { nb } from "date-fns/locale";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 import { useNutritionDraft } from "@/ravarer/hooks/useNutritionDraft";
 import { QueryState } from "@/components/common/QueryState";
@@ -163,6 +166,26 @@ export function NutritionTab({ rawMaterialId, registerSave }: Props) {
 
   const guard = useUnsavedChangesGuard(dirty && canWrite);
 
+  const { data: verifierName } = useUserDisplayName(existing?.verified_by);
+  const verificationText = existing?.verified_at
+    ? `Verifisert ${format(new Date(existing.verified_at), "d. MMM yyyy", { locale: nb })}${
+        verifierName ? ` av ${verifierName}` : ""
+      }`
+    : "Ikke verifisert";
+
+  /** Bekrefter tallene slik de står — rører ingen verdier. */
+  const markVerified = () => {
+    if (!canWrite || upsert.isPending) return;
+    upsert.mutate(
+      {
+        raw_material_id: rawMaterialId,
+        verified_at: new Date().toISOString(),
+        verified_by: user?.id ?? null,
+      },
+      { onSuccess: () => toast.success("Næringsinnholdet er markert som verifisert") },
+    );
+  };
+
   const save = () => {
     if (!canWrite || !dirty || !hydrated || upsert.isPending) return;
     // Redigerer noen tallene fra Matvaretabellen eller et datablad, er kilden ikke lenger den.
@@ -171,7 +194,9 @@ export function NutritionTab({ rawMaterialId, registerSave }: Props) {
       ...draft,
       source: sourceOnSave,
       raw_material_id: rawMaterialId,
-      ...(becomesManual ? { verified_at: new Date().toISOString(), verified_by: user?.id ?? null } : {}),
+      // Manuell retting er ikke en verifisering — den nullstiller stempelet,
+      // slik at noen må bekrefte tallene på nytt.
+      ...(becomesManual ? { verified_at: null, verified_by: null } : {}),
     };
     upsert.mutate(submitted, {
       // Serverraden er fasit: den bekreftes eksplisitt slik at et nytt
@@ -218,12 +243,20 @@ export function NutritionTab({ rawMaterialId, registerSave }: Props) {
             <h3 className="text-base font-semibold">Næringsinnhold pr 100 g</h3>
             <Badge variant="secondary">Kilde: {nutritionSourceLabel(sourceOnSave)}</Badge>
             {becomesManual && <Badge variant="outline">Manuelt overstyrt ved lagring</Badge>}
+            <span className="text-xs text-muted-foreground">{verificationText}</span>
           </div>
-          {canWrite && (
-            <Button variant="outline" size="sm" onClick={autoEnergy}>
-              <Sparkles className="mr-1.5 h-3.5 w-3.5" /> Auto-beregn energi
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {canWrite && !dirty && !existing?.verified_at && (
+              <Button variant="outline" size="sm" disabled={upsert.isPending} onClick={markVerified}>
+                Marker som verifisert
+              </Button>
+            )}
+            {canWrite && (
+              <Button variant="outline" size="sm" onClick={autoEnergy}>
+                <Sparkles className="mr-1.5 h-3.5 w-3.5" /> Auto-beregn energi
+              </Button>
+            )}
+          </div>
         </div>
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
           <NumField label="Energi (kJ)" value={draft.energy_kj} onChange={setNum("energy_kj")} disabled={!canWrite} />

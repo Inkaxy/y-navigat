@@ -5,6 +5,9 @@
 export const NUTRITION_SOURCES = ["matvaretabellen", "datablad", "manuell", "analyse"] as const;
 export type NutritionSource = (typeof NUTRITION_SOURCES)[number];
 
+/** Kilden som skrives når et menneske taster inn tallene selv. */
+export const MANUAL_NUTRITION_SOURCE: NutritionSource = "manuell";
+
 const READ_ALIASES: Record<string, NutritionSource> = {
   manual: "manuell",
   manuel: "manuell",

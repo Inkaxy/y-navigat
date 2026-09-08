@@ -21,18 +21,7 @@ import { NUTRITION_NUMBER_FIELDS } from "@/ravarer/lib/nutritionSource";
 import { SetPackageDialog } from "@/ravarer/components/packages/SetPackageDialog";
 import type { PackageWorklistRow } from "@/ravarer/hooks/usePackageSizes";
 import type { PackageFillSuggestion } from "@/ravarer/lib/packageMath";
-
-const NUTRITION_LABELS: Record<string, string> = {
-  energy_kj: "Energi (kJ)",
-  energy_kcal: "Energi (kcal)",
-  fat_g: "Fett",
-  saturated_fat_g: "— mettet",
-  carbs_g: "Karbohydrater",
-  sugars_g: "— sukkerarter",
-  fiber_g: "Fiber",
-  protein_g: "Protein",
-  salt_g: "Salt",
-};
+import { NUTRITION_LABELS, changePct } from "@/ravarer/lib/nutritionLabels";
 
 const ALLERGEN_LABEL_BY_CODE: Record<string, string> = Object.fromEntries(ALLERGENS.map((a) => [a.value, a.label]));
 
@@ -44,7 +33,7 @@ const FIELD_LABELS: Record<string, string> = {
   ingredient_declaration: "Ingrediensdeklarasjon",
   composite: "Sammensetning",
   grain: "Brødskala-klassifisering",
-  package: "Pakningsstørrelse",
+  package: "Pakningsstørrelse (vis forslag)",
 };
 
 export function DatasheetSection({ rawMaterialId }: Props) {
@@ -395,12 +384,6 @@ export function DatasheetSection({ rawMaterialId }: Props) {
   );
 }
 
-function changePct(oldV: number | null, newV: number): string {
-  if (oldV == null || oldV === 0) return oldV == null ? "ny" : "—";
-  const pct = ((newV - oldV) / Math.abs(oldV)) * 100;
-  const sign = pct > 0 ? "+" : "";
-  return `${sign}${formatNumber(pct, 1)} %`;
-}
 
 function BeforeAfter({ before, after }: { before: string | null; after: string | null | undefined }) {
   return (

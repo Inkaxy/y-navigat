@@ -27,6 +27,8 @@ import { useRawMaterials } from "@/ravarer/hooks/useRawMaterials";
 import { useSuppliers } from "@/ravarer/hooks/useSuppliers";
 import { useDebouncedValue } from "@/ordre/hooks/useDebouncedValue";
 import { useApplyMatvaretabellen, useMatvaretabellenLinks } from "@/ravarer/hooks/useMatvaretabellen";
+import { rankBySearch } from "@/lib/textSimilarity";
+import { nutritionSourceLabel } from "@/ravarer/lib/nutritionSource";
 
 interface Props {
   open: boolean;
@@ -66,11 +68,9 @@ export function LinkRawMaterialDialog({ open, onOpenChange, foodId, foodName, in
   const supplierMap = useMemo(() => new Map(suppliers.map((s: { id: string; name: string }) => [s.id, s.name])), [suppliers]);
 
   const visible = useMemo(() => {
-    const needle = debounced.trim().toLowerCase();
-    return rows
-      .filter((r) => r.is_active)
-      .filter((r) => !needle || `${r.name} ${r.sku} ${r.category ?? ""}`.toLowerCase().includes(needle))
-      .slice(0, 100);
+    const active = rows.filter((r) => r.is_active);
+    // Samme rangering som ellers i NBhub: navn først, deretter SKU og kategori.
+    return rankBySearch(active, debounced.trim(), (r) => [r.name, r.sku ?? "", r.category ?? ""]).slice(0, 100);
   }, [rows, debounced]);
 
   const link = async (rawMaterialId: string) => {
@@ -198,7 +198,7 @@ export function LinkRawMaterialDialog({ open, onOpenChange, foodId, foodName, in
           <AlertDialogHeader>
             <AlertDialogTitle>Overskrive næringsdata?</AlertDialogTitle>
             <AlertDialogDescription>
-              «{pending?.name}» har allerede næringsdata (kilde: {pending?.source}). Verdiene overskrives med tall fra
+              «{pending?.name}» har allerede næringsdata (kilde: {nutritionSourceLabel(pending?.source ?? null)}). Verdiene overskrives med tall fra
               Matvaretabellen.
             </AlertDialogDescription>
           </AlertDialogHeader>
