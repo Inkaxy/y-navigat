@@ -134,6 +134,10 @@ export default function ForhandlingDetail() {
   const [concludeOpen, setConcludeOpen] = useState(false);
   const [timelineOpen, setTimelineOpen] = useState(false);
   const [activating, setActivating] = useState(false);
+  /** Hvilken mottaker live-avtalen gjelder. Tidligere ble alltid den første brukt. */
+  const [activeRecipientId, setActiveRecipientId] = useState<string>("");
+  const selectedRecipient =
+    recipients.find((r) => r.id === activeRecipientId) ?? (recipients.length === 1 ? recipients[0] : undefined);
 
   const isLive = (neg as any)?.negotiation_mode === "live";
 
@@ -195,6 +199,9 @@ export default function ForhandlingDetail() {
         neg={neg}
         items={items}
         recipients={recipients}
+        selectedRecipient={selectedRecipient}
+        activeRecipientId={activeRecipientId}
+        onSelectRecipient={setActiveRecipientId}
         rmName={rmName}
         supName={supName}
         activating={activating}
@@ -205,7 +212,8 @@ export default function ForhandlingDetail() {
               ? items.filter((i) => i.live_status === "confirmed")
               : items.filter((i) => i.live_status === "confirmed" || i.live_status === "tentatively_agreed");
             if (targets.length === 0) { toast.info("Ingen linjer å aktivere"); return; }
-            const rec = recipients[0];
+            const rec = selectedRecipient;
+            if (!rec) { toast.error("Velg hvilken leverandør avtalen gjelder"); return; }
             const outcomes = targets.map((it: any) => ({
               negotiation_item_id: it.id,
               winner_recipient_id: rec?.id ?? null,
@@ -394,13 +402,13 @@ export default function ForhandlingDetail() {
   );
 }
 
-function LiveConfirmationStatus({ neg, items, recipients, rmName, supName, activating, onActivate }: any) {
+function LiveConfirmationStatus({ neg, items, recipients, selectedRecipient, activeRecipientId, onSelectRecipient, rmName, supName, activating, onActivate }: any) {
   const tentative = items.filter((i: any) => i.live_status === "tentatively_agreed");
   const confirmed = items.filter((i: any) => i.live_status === "confirmed");
   const disputed = items.filter((i: any) => i.live_supplier_note && i.live_status === "tentatively_agreed");
   const unconfActive = items.filter((i: any) => i.live_status === "unconfirmed_active");
   const total = tentative.length + confirmed.length + unconfActive.length;
-  const recipient = recipients[0];
+  const recipient = selectedRecipient ?? null;
   const deadline = neg.live_confirmation_deadline;
   const overdue = deadline && new Date(deadline) < new Date();
   const allConfirmed = tentative.length === 0;
