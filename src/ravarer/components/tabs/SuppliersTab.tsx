@@ -598,11 +598,13 @@ function AddPriceDialog({ open, onOpenChange, rm, suppliers }: AddPriceDialogPro
   const [setCurrent, setSetCurrent] = useState(true);
 
   const submit = async () => {
-    if (!price) return;
+    // «12,50» må godtas — Number() på komma gir NaN og tapte prisen stille.
+    const priceNum = parseDecimal(price);
+    if (priceNum == null) return;
     await add.mutateAsync({
       raw_material_id: rm.id,
       supplier_id: supplierId === "_none" ? null : supplierId,
-      price: Number(price),
+      price: priceNum,
       effective_date: date,
       source,
       notes: notes || null,
@@ -624,8 +626,8 @@ function AddPriceDialog({ open, onOpenChange, rm, suppliers }: AddPriceDialogPro
             <div>
               <Label>Pris (kr/{rm.base_unit}) *</Label>
               <Input
-                type="number"
-                step="0.01"
+                type="text"
+                inputMode="decimal"
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
               />
