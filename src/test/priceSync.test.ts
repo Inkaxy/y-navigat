@@ -40,14 +40,17 @@ const line: AnyRec = { supplier_sku: "A-1", description: "Hvetemel 25 kg" };
 const baseInv: AnyRec = { id: "inv1", supplier_id: "s1", invoice_date: "2026-02-01", currency: "NOK", is_credit_note: false };
 
 describe("syncRegisteredPrices", () => {
-  it("skriver registrert pris når alt er i orden", async () => {
+  it("oppdaterer leverandørkoblingen, men skriver aldri kostpris ved matching", async () => {
     const svc = mockClient();
     const update: AnyRec = { requires_review: false, review_reason: null };
     await syncRegisteredPrices(svc, baseInv, line, rm, rmsRow, 100, update, 2);
     expect(svc.calls.map((c) => c.table)).toContain("raw_material_suppliers");
-    expect(svc.calls.map((c) => c.table)).toContain("raw_materials");
+    // Kostprisen settes først etter avstemming (rm_apply_derived_cost_price),
+    // slik at manuell overstyring ikke overskrives av en umatchet linje.
+    expect(svc.calls.map((c) => c.table)).not.toContain("raw_materials");
     expect(update.requires_review).toBe(false);
   });
+
 
   it("skriver aldri fra en kreditnota", async () => {
     const svc = mockClient();
