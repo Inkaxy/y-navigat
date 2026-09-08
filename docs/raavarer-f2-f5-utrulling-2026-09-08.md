@@ -76,3 +76,22 @@ byttes ut med direkte `supabase.rpc(...)`-kall.
   regenerert.
 * `rm_stock_count_apply_v2` skriver telleark-raden ved bokføring; løpende lagring av utkast til
   `rm_stock_count_sheets` fra klienten (i tillegg til localStorage) er ikke koblet på ennå.
+
+## Tillegg fra live-kontrollen (F2b / F1 / F6)
+
+**Migrasjon (ikke kjørt):** `supabase/migrations-pending/20260908_f2b_legacy_recalc_and_grants.sql`
+- Merker 35 kreditnota-rader (`is_credit`) og historikk uten samsvarende fakturalinje / med flere linjer som `is_legacy` + `superseded_at`. Ingen rader slettes eller endres i verdi, og canonical event dobbelteller dem ikke.
+- Herder `recalc_raw_material_cost`: kun NOK, ingen kreditnota, ingen linjer til gjennomgang/flagget, og manuelt satt kostpris (`price_source = 'manual'`) overskrives ikke. `undo_raw_material_recalc` beholder historikken og setter recalc-rader til side i stedet for å slette.
+- Trekker tilbake direkte SELECT på `raw_material_monthly_purchases` og `raw_material_purchase_stats` (kontrollert: alle klienter bruker de tilgangskontrollerte RPC-ene), og trekker tilbake public/anon EXECUTE på `rm_apply_matvaretabellen`, `rm_unlink_matvaretabellen` og recalc-funksjonene.
+
+**Én autoritativ prisberegning:** `supabase/functions/_shared/priceSync.ts` skriver ikke lenger `raw_materials.current_cost_price` ved matching. Leverandørkoblingen oppdateres fortsatt, men feil fra update/upsert flagges nå som `price_sync_failed` i stedet for å ignoreres. Kostprisen avledes etter validering/avstemming og respekterer manuell overstyring. Test oppdatert i `src/test/priceSync.test.ts`.
+
+**Tripletex-synk:** ny `supabase/functions/tripletex-sync-invoices/syncState.ts` med ren, testbar tilstandslogikk, koblet inn i `index.ts`:
+- 20×1000-taket regnes som ufullstendig henting og gir `partial`, ikke `success`.
+- Cursor flyttes kun til og med siste komplette bit; første feilede/ufullstendige periode hentes på nytt.
+- Statuslogg og `tripletex_credentials.last_sync_status` viser `partial`/`error` med lesbar oppsummering; `initial_import_done` settes bare ved en fullstendig, feilfri kjøring.
+- Eksisterende fakturaer får oppdaterte Tripletex-referanser (voucher/supplier/linjestatus). Dato, beløp og kreditnota-flagg overskrives aldri — avvik rapporteres som konflikt, slik at manuell matching og avstemming står urørt.
+- Leverandørstatistikk teller nå med `count: exact` i stedet for upaginert select.
+- 10 Deno-tester i `syncState_test.ts`, inkludert simulert API. Ingen skriving mot ekte Tripletex-bilag.
+
+**Verifisering:** `tsgo --noEmit` exit 0 · Vitest 48 filer / 488 tester grønt · `npm run build` exit 0 · Deno `syncState_test.ts` 10/10 · lint uten feil (edge-filer ignoreres av eslint-konfigen). Slutt-SHA før denne rapportlinja: `965ea5a9952cc510efcf67505cd24a056beb6453`.

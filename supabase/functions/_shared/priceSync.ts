@@ -68,13 +68,19 @@ export async function syncRegisteredPrices(
   const nowIso = new Date().toISOString();
   if (rmsRow?.id) {
     // Eksisterende kobling: rør kun fakturapris/-dato — aldri avtalepris eller brukerens sku/navn.
-    await svc.from("raw_material_suppliers").update({
+    const { error } = await svc.from("raw_material_suppliers").update({
       last_invoice_price: actual,
       last_invoice_date: inv.invoice_date ?? null,
       updated_at: nowIso,
     }).eq("id", rmsRow.id);
+    // En feil her skal ikke gå stille: linja må ses av et menneske.
+    if (error) {
+      addReason(update, "price_sync_failed");
+      console.error("priceSync: kunne ikke oppdatere leverandørkobling", error);
+      return;
+    }
   } else {
-    await svc.from("raw_material_suppliers").upsert({
+    const { error } = await svc.from("raw_material_suppliers").upsert({
       raw_material_id: rm.id,
       supplier_id: inv.supplier_id,
       supplier_sku: line.supplier_sku,
@@ -83,17 +89,25 @@ export async function syncRegisteredPrices(
       last_invoice_date: inv.invoice_date ?? null,
       updated_at: nowIso,
     }, { onConflict: "raw_material_id,supplier_id" });
+    if (error) {
+      addReason(update, "price_sync_failed");
+      console.error("priceSync: kunne ikke opprette leverandørkobling", error);
+      return;
+    }
   }
 
-  if (!staleForRm && (!rm.primary_supplier_id || rm.primary_supplier_id === inv.supplier_id || registered == null)) {
-    await svc.from("raw_materials").update({
-      current_cost_price: actual,
-      price_source: "invoice",
-      price_updated_at: inv.invoice_date,
-      primary_supplier_id: rm.primary_supplier_id ?? inv.supplier_id,
-    }).eq("id", rm.id);
-  }
+  // Kostprisen settes IKKE her.
+  //
+  // Matching skjer før avstemming. Den autoritative kostprisen beregnes av
+  // `rm_apply_derived_cost_price` i basen — etter at fakturaen er validert og
+  // bekreftet — og den respekterer manuell overstyring (price_source = 'manual').
+  // Å skrive kostpris her ville gitt to konkurrerende kilder og kunne overskrive
+  // en manuelt satt pris med en umatchet linje.
+  //
+  // Vi noterer bare at grunnlaget mangler dekning når vi ikke kan si noe:
+  if (staleForRm) return;
 }
+
 
 /**
  * Lærer av en vellykket, men usikker match: skriver ventende alias for

@@ -3,6 +3,15 @@
 // Henter IKKE PDF og kaller IKKE AI — det gjøres av egne funksjoner.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { getSessionToken, tripletexFetch, TripletexError } from "../_shared/tripletex.ts";
+import {
+  nextCursor,
+  pagesTruncated,
+  planExistingUpdate,
+  statusSummary,
+  syncStatus,
+  type ChunkResult,
+  type ExistingInvoice,
+} from "./syncState.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -41,6 +50,8 @@ const digits = (s: unknown) => String(s ?? "").replace(/\s+/g, "");
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
 const MAX_CHUNK_DAYS = 31;
+const PAGE_SIZE = 1000;
+const MAX_PAGES = 20;
 const MAX_CHUNKS_PER_RUN = 3;
 
 async function authorize(
@@ -205,7 +216,7 @@ Deno.serve(async (req) => {
         invoiceDateFrom: from,
         invoiceDateTo: to,
         from: offset,
-        count: 1000,
+        count: PAGE_SIZE,
         fields: FIELDS,
       };
       // Ved etterhenting filtrerer vi på leverandør direkte i API-et.
@@ -231,16 +242,27 @@ Deno.serve(async (req) => {
     const touchedSupplierIds = new Set<string>();
     const nowIso = new Date().toISOString();
     let lastCompletedChunkTo: string | null = null;
+    const chunkResults: ChunkResult[] = [];
+    const failedSamples: string[] = [];
+    const conflicts: { invoice_id: string; invoice_number: string; fields: unknown[] }[] = [];
+
 
     for (const chunk of chunks) {
       const invoices: any[] = [];
-      for (let page = 0; page < 20; page++) {
-        const res = await fetchPage(chunk.from, chunk.to, page * 1000);
+      let pagesRead = 0;
+      let lastPageSize = 0;
+      for (let page = 0; page < MAX_PAGES; page++) {
+        const res = await fetchPage(chunk.from, chunk.to, page * PAGE_SIZE);
         const values: any[] = res?.values ?? [];
         invoices.push(...values);
-        if (values.length < 1000) break;
+        pagesRead = page + 1;
+        lastPageSize = values.length;
+        if (values.length < PAGE_SIZE) break;
       }
+      const truncated = pagesTruncated(pagesRead, MAX_PAGES, lastPageSize, PAGE_SIZE);
+      const failedBefore = failed;
       fetched += invoices.length;
+
 
       for (const inv of invoices) {
         try {
@@ -289,20 +311,38 @@ Deno.serve(async (req) => {
           // 2) Finnes fakturaen fra før?
           const { data: existing } = await admin
             .from("invoices")
-            .select("id, line_extraction_status")
+            .select(
+              "id, line_extraction_status, invoice_date, total_amount, is_credit_note, " +
+                "tripletex_voucher_id, tripletex_voucher_number, tripletex_supplier_id",
+            )
             .eq("legal_entity_id", legalEntityId)
             .eq("tripletex_supplier_invoice_id", ttInvoiceId)
             .maybeSingle();
 
           if (existing) {
-            if (supplier.track_invoice_lines && existing.line_extraction_status === "not_requested") {
-              await admin
-                .from("invoices")
-                .update({ line_extraction_status: "pending" })
-                .eq("id", existing.id);
+            const ex = existing as unknown as ExistingInvoice;
+            // Eksisterende faktura får oppdaterte Tripletex-referanser, men beløp,
+            // dato og kreditnota-flagg røres aldri — manuell matching og avstemming
+            // skal ikke nullstilles. Avvik rapporteres som konflikt i stedet.
+            const ttAmountRaw = Number(inv.amount ?? 0) || Number(inv.amountCurrency ?? 0);
+            const plan = planExistingUpdate(ex, {
+              invoice_date: inv.invoiceDate ?? null,
+              total_amount: Number.isFinite(ttAmountRaw) ? ttAmountRaw : null,
+              is_credit_note: !!inv.isCreditNote,
+              tripletex_voucher_id: inv?.voucher?.id ? String(inv.voucher.id) : null,
+              tripletex_voucher_number: inv?.voucher?.number ? String(inv.voucher.number) : null,
+              tripletex_supplier_id: ttSupId,
+            }, { trackLines: !!supplier.track_invoice_lines });
+
+            if (Object.keys(plan.patch).length > 0) {
+              const { error: updErr } = await admin.from("invoices").update(plan.patch).eq("id", ex.id);
+              if (updErr) throw new Error(updErr.message);
               updated++;
             } else {
               skipped++;
+            }
+            if (plan.conflicts.length > 0) {
+              conflicts.push({ invoice_id: ex.id, invoice_number: String(inv.invoiceNumber ?? ""), fields: plan.conflicts });
             }
             continue;
           }
@@ -313,6 +353,7 @@ Deno.serve(async (req) => {
           const rawExVat = Number(inv.amountExcludingVat ?? 0);
           const usedCurrencyAmount = rawAmount === 0;
           const amount = usedCurrencyAmount ? Number(inv.amountCurrency ?? 0) : rawAmount;
+
           const exVat = usedCurrencyAmount
             ? Number(inv.amountExcludingVatCurrency ?? 0)
             : rawExVat;
@@ -353,68 +394,94 @@ Deno.serve(async (req) => {
             throw new Error(insErr.message);
           }
           imported++;
-        } catch (_e) {
+        } catch (e) {
           failed++;
+          const msg = e instanceof Error ? e.message : String(e);
+          if (failedSamples.length < 5) failedSamples.push(msg);
+          console.error("tripletex-sync-invoices: faktura feilet", msg);
         }
       }
 
-      lastCompletedChunkTo = chunk.to;
-      // Manuelle kall med eksplisitt `from`, og etterhenting for én leverandør,
-      // skal ikke flytte den løpende posisjonen — og den skal aldri gå bakover.
-      if (!isBackfill && !body.from) {
-        const nextCursor = chunk.to > today ? today : chunk.to;
-        const current = cred.last_invoice_synced_date;
-        // Flytt fram, eller korriger ned en cursor som står i framtiden.
-        if (!current || nextCursor > current || current > today) {
-          cred.last_invoice_synced_date = nextCursor;
-          await admin
-            .from("tripletex_credentials")
-            .update({ last_invoice_synced_date: nextCursor })
-            .eq("legal_entity_id", legalEntityId);
-        }
-      }
+      chunkResults.push({
+        from: chunk.from,
+        to: chunk.to,
+        failed: failed - failedBefore,
+        truncated,
+      });
+      if (failed === failedBefore && !truncated) lastCompletedChunkTo = chunk.to;
+    }
 
+    // Cursor flyttes bare til og med SISTE fullførte bit. En bit med feil eller
+    // ufullstendig henting hentes på nytt neste kjøring.
+    const cursorTo = nextCursor(chunkResults, cred.last_invoice_synced_date ?? null, today, {
+      isBackfill,
+      hasExplicitFrom: !!body.from,
+    });
+    if (cursorTo) {
+      cred.last_invoice_synced_date = cursorTo;
+      await admin
+        .from("tripletex_credentials")
+        .update({ last_invoice_synced_date: cursorTo })
+        .eq("legal_entity_id", legalEntityId);
     }
 
     // --- Leverandørstatistikk ---
     for (const sid of touchedSupplierIds) {
-      const { data: stats } = await admin
+      // Antall telles med exact count, ikke ved å laste ned radene (upaginert
+      // select stoppet på 1000 og ga for lavt antall).
+      const { count } = await admin
+        .from("invoices")
+        .select("id", { count: "exact", head: true })
+        .eq("legal_entity_id", legalEntityId)
+        .eq("supplier_id", sid);
+      const { data: latest } = await admin
         .from("invoices")
         .select("invoice_date")
         .eq("legal_entity_id", legalEntityId)
         .eq("supplier_id", sid)
-        .order("invoice_date", { ascending: false });
-      const rows = stats ?? [];
+        .order("invoice_date", { ascending: false })
+        .limit(1);
       await admin
         .from("suppliers")
         .update({
-          last_invoice_date: rows[0]?.invoice_date ?? null,
-          invoice_count: rows.length,
+          last_invoice_date: latest?.[0]?.invoice_date ?? null,
+          invoice_count: count ?? 0,
         })
         .eq("id", sid);
     }
+
+
+    const status = syncStatus(chunkResults);
+    const summary = statusSummary(chunkResults);
+    const ufullstendig = chunkResults.some((c) => c.truncated);
 
     const details = {
       from: windowFrom,
       to: windowTo,
       behandlet_til: lastCompletedChunkTo,
       antall_biter: chunks.length,
-      har_mer: harMer,
+      har_mer: harMer || ufullstendig,
+      ufullstendig_henting: ufullstendig,
       oppdatert: updated,
       hoppet_over_ikke_fulgt: hoppetOverIkkeFulgt,
       etterhenting: isBackfill ? body.supplier_id : null,
+      biter: chunkResults,
+      feil_eksempler: failedSamples,
+      konflikter: conflicts,
     };
 
     if (logId) {
       await admin
         .from("tripletex_sync_log")
         .update({
-          status: "success",
+          // «success» kun når ingenting feilet og hentingen var komplett.
+          status,
           completed_at: new Date().toISOString(),
           vouchers_fetched: fetched,
           vouchers_imported: imported,
           vouchers_skipped: skipped + updated,
           vouchers_failed: failed,
+          error_message: summary,
           details,
         })
         .eq("id", logId);
@@ -422,31 +489,38 @@ Deno.serve(async (req) => {
 
     const credPatch: Record<string, unknown> = {
       last_synced_at: new Date().toISOString(),
-      last_sync_status: "success",
-      last_sync_error: null,
+      last_sync_status: status,
+      last_sync_error: summary,
     };
-    // Kun et løpende kall (uten eksplisitt vindu) kan markere førsteimporten som ferdig.
-    if (!isBackfill && !harMer && !body.from && !body.to) credPatch.initial_import_done = true;
+    // Kun en fullstendig, feilfri løpende kjøring kan markere førsteimporten som ferdig.
+    if (!isBackfill && !harMer && !ufullstendig && failed === 0 && !body.from && !body.to) {
+      credPatch.initial_import_done = true;
+    }
     await admin
       .from("tripletex_credentials")
       .update(credPatch)
       .eq("legal_entity_id", legalEntityId);
 
     return json({
-      ok: true,
+      ok: status !== "error",
+      status,
+      melding: summary,
       fetched,
       imported,
       skipped,
       updated,
       failed,
+      ufullstendig_henting: ufullstendig,
+      konflikter: conflicts.length,
       hoppet_over_ikke_fulgt: hoppetOverIkkeFulgt,
       etterhenting: isBackfill,
       from: windowFrom,
       to: windowTo,
       behandlet_til: lastCompletedChunkTo,
       antall_biter: chunks.length,
-      har_mer: harMer,
+      har_mer: harMer || ufullstendig,
     });
+
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     if (logId) {
