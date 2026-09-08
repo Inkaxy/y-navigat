@@ -435,27 +435,37 @@ Deno.serve(async (req) => {
     }
 
 
+    const status = syncStatus(chunkResults);
+    const summary = statusSummary(chunkResults);
+    const ufullstendig = chunkResults.some((c) => c.truncated);
+
     const details = {
       from: windowFrom,
       to: windowTo,
       behandlet_til: lastCompletedChunkTo,
       antall_biter: chunks.length,
-      har_mer: harMer,
+      har_mer: harMer || ufullstendig,
+      ufullstendig_henting: ufullstendig,
       oppdatert: updated,
       hoppet_over_ikke_fulgt: hoppetOverIkkeFulgt,
       etterhenting: isBackfill ? body.supplier_id : null,
+      biter: chunkResults,
+      feil_eksempler: failedSamples,
+      konflikter: conflicts,
     };
 
     if (logId) {
       await admin
         .from("tripletex_sync_log")
         .update({
-          status: "success",
+          // «success» kun når ingenting feilet og hentingen var komplett.
+          status,
           completed_at: new Date().toISOString(),
           vouchers_fetched: fetched,
           vouchers_imported: imported,
           vouchers_skipped: skipped + updated,
           vouchers_failed: failed,
+          error_message: summary,
           details,
         })
         .eq("id", logId);
@@ -463,31 +473,38 @@ Deno.serve(async (req) => {
 
     const credPatch: Record<string, unknown> = {
       last_synced_at: new Date().toISOString(),
-      last_sync_status: "success",
-      last_sync_error: null,
+      last_sync_status: status,
+      last_sync_error: summary,
     };
-    // Kun et løpende kall (uten eksplisitt vindu) kan markere førsteimporten som ferdig.
-    if (!isBackfill && !harMer && !body.from && !body.to) credPatch.initial_import_done = true;
+    // Kun en fullstendig, feilfri løpende kjøring kan markere førsteimporten som ferdig.
+    if (!isBackfill && !harMer && !ufullstendig && failed === 0 && !body.from && !body.to) {
+      credPatch.initial_import_done = true;
+    }
     await admin
       .from("tripletex_credentials")
       .update(credPatch)
       .eq("legal_entity_id", legalEntityId);
 
     return json({
-      ok: true,
+      ok: status !== "error",
+      status,
+      melding: summary,
       fetched,
       imported,
       skipped,
       updated,
       failed,
+      ufullstendig_henting: ufullstendig,
+      konflikter: conflicts.length,
       hoppet_over_ikke_fulgt: hoppetOverIkkeFulgt,
       etterhenting: isBackfill,
       from: windowFrom,
       to: windowTo,
       behandlet_til: lastCompletedChunkTo,
       antall_biter: chunks.length,
-      har_mer: harMer,
+      har_mer: harMer || ufullstendig,
     });
+
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     if (logId) {
