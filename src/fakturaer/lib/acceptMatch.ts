@@ -175,33 +175,18 @@ export async function acceptMatch(opts: AcceptMatchOptions): Promise<{ lineIds: 
     }
   }
 
-  // 2) Alias
-  const aliasInserts: AliasInsert[] = [];
+  // 2) Alias — hvilke som skal bekreftes bestemmes av planen (aliasLearning.ts),
+  // slik at det er samme kode som avgjør hva som skal skrives og hva som skal læres.
+  const confirmedAliasValues: Array<{ alias_type: "supplier_sku" | "product_name"; alias_value: string }> = [];
   if (rememberSku && line.supplier_sku) {
-    aliasInserts.push({
-      raw_material_supplier_id: rmsId,
-      alias_type: "supplier_sku",
-      alias_value: line.supplier_sku,
-      status: "confirmed",
-      confirmed_by: userId,
-      confirmed_at: nowIso,
-      first_seen_invoice_id: line.invoice_id,
-    });
+    confirmedAliasValues.push({ alias_type: "supplier_sku", alias_value: line.supplier_sku });
   }
   if (rememberName && line.description) {
-    aliasInserts.push({
-      raw_material_supplier_id: rmsId,
-      alias_type: "product_name",
-      alias_value: line.description,
-      status: "confirmed",
-      confirmed_by: userId,
-      confirmed_at: nowIso,
-      first_seen_invoice_id: line.invoice_id,
-    });
+    confirmedAliasValues.push({ alias_type: "product_name", alias_value: line.description });
   }
   // Leverandørens koblinger og alias hentes ÉN gang; all sammenligning skjer i minnet
   // på normalisert nøkkel (databasen normaliserer bare lower/trim).
-  const needsAliasWork = aliasInserts.length > 0 || rejectedRawMaterialIds.length > 0;
+  const needsAliasWork = confirmedAliasValues.length > 0 || rejectedRawMaterialIds.length > 0;
   let supplierRmsRows: Array<{ id: string; raw_material_id: string }> = [];
   let supplierAliases: Array<{
     id: string;
@@ -235,31 +220,41 @@ export async function acceptMatch(opts: AcceptMatchOptions): Promise<{ lineIds: 
   }
 
 
-  // 2a) Bekreftede alias — én batch-upsert.
-  if (aliasInserts.length > 0) {
-    const { error: aliasErr } = await supabase.from("raw_material_supplier_aliases").upsert(aliasInserts, {
-      onConflict: "alias_type,alias_value_normalized,raw_material_supplier_id",
-    });
-    if (aliasErr) {
-      throw new Error(`Kunne ikke lagre alias (${aliasInserts.length} rader): ${aliasErr.message}`);
-    }
-  }
-
-  // 2b/2c) Selve læringen er ren logikk (se aliasLearning.ts): hvilke alias som
-  // skal pensjoneres, og hvilke som skal avvises fordi brukeren valgte varen bort.
-  if (needsAliasWork && supplierRmsRows.length > 0) {
+  // 2a-2c) Selve læringen er ren logikk (se aliasLearning.ts): hvilke alias som
+  // skal bekreftes, hvilke som skal pensjoneres, og hvilke som skal avvises
+  // fordi brukeren valgte varen bort.
+  if (needsAliasWork) {
     const lineValues: Array<{ alias_type: "supplier_sku" | "product_name"; alias_value: string }> = [];
     if (line.supplier_sku) lineValues.push({ alias_type: "supplier_sku", alias_value: line.supplier_sku });
     if (line.description) lineValues.push({ alias_type: "product_name", alias_value: line.description });
 
     const plan = planAliasLearning({
       rawMaterialId,
+      matchedSupplierLinkId: rmsId,
       supplierLinks: supplierRmsRows,
       existingAliases: supplierAliases,
-      confirmedAliases: aliasInserts.map((a) => ({ alias_type: a.alias_type, alias_value: a.alias_value })),
+      confirmedAliases: confirmedAliasValues,
       rejectedRawMaterialIds,
       lineValues,
     });
+
+    if (plan.confirmRows.length > 0) {
+      const aliasInserts: AliasInsert[] = plan.confirmRows.map((r) => ({
+        raw_material_supplier_id: r.raw_material_supplier_id,
+        alias_type: r.alias_type,
+        alias_value: r.alias_value,
+        status: "confirmed",
+        confirmed_by: userId,
+        confirmed_at: nowIso,
+        first_seen_invoice_id: line.invoice_id,
+      }));
+      const { error: aliasErr } = await supabase.from("raw_material_supplier_aliases").upsert(aliasInserts, {
+        onConflict: "alias_type,alias_value_normalized,raw_material_supplier_id",
+      });
+      if (aliasErr) {
+        throw new Error(`Kunne ikke lagre alias (${aliasInserts.length} rader): ${aliasErr.message}`);
+      }
+    }
 
     if (plan.supersedeIds.length > 0) {
       const { error: supErr } = await supabase
