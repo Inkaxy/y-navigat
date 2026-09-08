@@ -115,11 +115,24 @@ export function useSyncSuppliersFromTripletex() {
       });
       if (error) throw error;
       if ((data as any)?.error) throw new Error((data as any).error);
-      return data as { hentet: number; opprettet: number; oppdatert: number; uendret: number };
+      return data as {
+        hentet: number;
+        opprettet: number;
+        oppdatert: number;
+        uendret: number;
+        hoppet?: number;
+        hoppet_navn?: { navn: string; grunn: string }[];
+      };
     },
     onSuccess: (r) => {
       qc.invalidateQueries({ queryKey: ["suppliers"] });
-      toast.success(`${r.hentet} hentet – ${r.opprettet} nye, ${r.oppdatert} oppdatert`);
+      const skipped = r.hoppet ?? 0;
+      toast.success(
+        `${r.hentet} hentet – ${r.opprettet} nye, ${r.oppdatert} oppdatert${skipped ? `, ${skipped} hoppet over` : ""}`,
+      );
+      if (skipped && r.hoppet_navn?.length) {
+        toast.info(`Hoppet over: ${r.hoppet_navn.map((h) => h.navn).join(", ")}`);
+      }
     },
     onError: (e: any) => toast.error(`Synk feilet: ${e.message ?? e}`),
   });
