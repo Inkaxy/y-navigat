@@ -432,7 +432,7 @@ const App = () => (
               <Route path="/ravarer/forhandlinger/:id/rediger" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><InvoiceAccessGuard><RavarerForhandlingWizard /></InvoiceAccessGuard></RavarerProvider></AppAccessGuard></Shell>} />
               <Route path="/ravarer/forhandlinger/:id" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><InvoiceAccessGuard><RavarerForhandlingDetail /></InvoiceAccessGuard></RavarerProvider></AppAccessGuard></Shell>} />
               <Route path="/ravarer/innstillinger/tripletex" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><TripletexSettings /></RavarerProvider></AppAccessGuard></Shell>} />
-              <Route path="/ravarer/innstillinger/ai-tjenester" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><AiServicesSettings /></RavarerProvider></AppAccessGuard></Shell>} />
+              <Route path="/ravarer/innstillinger/ai-tjenester" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><PlatformAdminGuard title="AI-tjenester"><AiServicesSettings /></PlatformAdminGuard></RavarerProvider></AppAccessGuard></Shell>} />
               <Route path="/ravarer/innstillinger/match-toleranser" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><MatchToleranserSettings /></RavarerProvider></AppAccessGuard></Shell>} />
               <Route path="/ravarer/innstillinger/kategorier" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><KategorierSettings /></RavarerProvider></AppAccessGuard></Shell>} />
 
