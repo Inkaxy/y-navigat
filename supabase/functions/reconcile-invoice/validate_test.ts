@@ -53,30 +53,27 @@ Deno.test("linjer merket «ikke råvare» og linjer uten råvare krever ikke pri
   assertEquals(bs.length, 0);
 });
 
-Deno.test("blandede linjer: gjennomgang, umatchet og ulik pris fanges hver for seg", () => {
+Deno.test("blandede linjer: gjennomgang og umatchet fanges hver for seg", () => {
   const bs = validateReconcile(invoice(), [
     line({ id: "a", requires_review: true }),
     line({ id: "b", raw_material_id: null, price_per_base_unit: null }),
     line({ id: "c", raw_material_id: "rm2", price_per_base_unit: 10 }),
-    line({ id: "d", raw_material_id: "rm2", price_per_base_unit: 12 }),
   ]);
   const c = codes(bs);
   assertEquals(c.includes("lines_need_review"), true);
   assertEquals(c.includes("unmatched_lines"), true);
-  assertEquals(c.includes("duplicate_raw_material_prices"), true);
 });
 
-Deno.test("meldingen ved flere priser ber ikke om å slette eller omklassifisere linjer", () => {
+Deno.test("to linjer på samme råvare med ulik pris er lov (én rad per fakturalinje)", () => {
   const bs = validateReconcile(invoice(), [
     line({ id: "c", raw_material_id: "rm2", price_per_base_unit: 10 }),
     line({ id: "d", raw_material_id: "rm2", price_per_base_unit: 12 }),
   ]);
-  const msg = bs.find((b) => b.code === "duplicate_raw_material_prices")!.message;
-  assertEquals(/slå sammen|slett|ikke råvare|ikke skal telle/i.test(msg), false);
-  assertEquals(msg.includes("F2"), true);
+  assertEquals(bs.length, 0);
 });
 
-Deno.test("kreditnota og fremmed valuta er fortsatt sperret", () => {
-  assertEquals(codes(validateReconcile(invoice({ is_credit_note: true }), [line()])).includes("credit_note"), true);
+Deno.test("kreditnota er tillatt, fremmed valuta er fortsatt sperret", () => {
+  assertEquals(validateReconcile(invoice({ is_credit_note: true }), [line()]).length, 0);
   assertEquals(codes(validateReconcile(invoice({ currency: "EUR" }), [line()])).includes("foreign_currency"), true);
 });
+
