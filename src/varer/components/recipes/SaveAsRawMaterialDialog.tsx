@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { costPerKg, costPerKgBlockedReason, makeSku } from "@/varer/lib/halvfabrikat";
-import type { BakersLine } from "@/varer/lib/bakers";
+import { computeTotals, isFlourLine, lineToGrams, type BakersLine } from "@/varer/lib/bakers";
 
 const BASE_UNITS = ["kg", "g", "liter", "ml", "stk"];
 
@@ -34,6 +34,51 @@ interface Props {
   existing: CompositeRawMaterial | null;
 }
 
+
+/** Klassifiseringer som regnes som «grov»/fullkorn på `raw_materials.grain_classification`. */
+const COARSE_GRAIN_CLASSIFICATIONS = new Set(["whole_grain_flour", "whole_grains", "wheat_bran"]);
+
+/**
+ * Avleder kornklassifisering og vanninnhold for en råvare produsert av
+ * oppskriften.
+ *
+ * Kornklassifisering: melinjene vektes mot hverandre. Utgjør grovt/fullkorn
+ * (`whole_grain_flour`, `whole_grains`, `wheat_bran`) mer enn halvparten av
+ * melvekten, arves den grove klassifiseringen (`whole_grain_flour`), ellers
+ * den fine (`sifted_flour`). Ingen melinjer gir `null`.
+ *
+ * Vanninnhold: samlet vannvekt (fra `computeTotals`, som teller både rene
+ * vannlinjer og vanninnholdet i andre råvarer via `water_content_pct`) delt
+ * på total deigvekt, i prosent. Er beregningen usikker (ingen linjer, ukjent
+ * deigvekt eller ufullstendige omregninger), returneres `null` — aldri 0 som
+ * om det var målt.
+ */
+function deriveFromRecipe(lines: BakersLine[]): {
+  grainClassification: string | null;
+  waterContentPct: number | null;
+} {
+  let flourG = 0;
+  let coarseFlourG = 0;
+  for (const l of lines) {
+    if (!isFlourLine(l)) continue;
+    const conv = lineToGrams(l);
+    if (!conv.exact) continue;
+    flourG += conv.grams;
+    const cls = l._rm?.grain_classification ?? null;
+    if (cls && COARSE_GRAIN_CLASSIFICATIONS.has(cls)) coarseFlourG += conv.grams;
+  }
+  const grainClassification =
+    flourG > 0 ? (coarseFlourG / flourG > 0.5 ? "whole_grain_flour" : "sifted_flour") : null;
+
+  const totals = computeTotals(lines);
+  const waterContentPct =
+    !totals.incomplete && totals.totalDoughG > 0
+      ? Math.round((totals.totalWaterG / totals.totalDoughG) * 1000) / 10
+      : null;
+
+  return { grainClassification, waterContentPct };
+}
+
 export function SaveAsRawMaterialDialog({
   open, onOpenChange, recipeId, recipeName, legalEntityId, lines, existing,
 }: Props) {
@@ -52,6 +97,8 @@ export function SaveAsRawMaterialDialog({
 
   const price = costPerKg(lines);
   const priceBlocked = costPerKgBlockedReason(lines);
+
+  const { grainClassification, waterContentPct } = deriveFromRecipe(lines);
 
   /** Råvare med samme navn som ennå ikke er koblet til en oppskrift. */
   const matchQuery = useQuery({
