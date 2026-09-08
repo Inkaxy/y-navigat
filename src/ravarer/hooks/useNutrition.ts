@@ -135,6 +135,7 @@ export function useSetAllergen() {
     },
     onSuccess: (_d, vars) => {
       qc.invalidateQueries({ queryKey: ["raw_material_allergens", vars.raw_material_id] });
+      void recomputeRecipesForRawMaterial(vars.raw_material_id, qc, { silent: true });
     },
     onError: (e: unknown) =>
       toast.error(`Kunne ikke lagre allergen: ${e instanceof Error ? e.message : String(e)}`),
