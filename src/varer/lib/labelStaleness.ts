@@ -63,10 +63,7 @@ export function deriveLabelingStatus(input: {
   blocked?: boolean;
 }): LabelingStatus {
   if (!input.approvedAt || input.blocked) return "missing";
-  const staleness = computeStaleness(input.computedAt, [
-    ...input.sources,
-    { name: "Godkjenning", updatedAt: null },
-  ]);
+  const staleness = computeStaleness(input.computedAt, input.sources);
   if (staleness.neverComputed) return "missing";
   const approved = ms(input.approvedAt);
   const computed = ms(input.computedAt);
