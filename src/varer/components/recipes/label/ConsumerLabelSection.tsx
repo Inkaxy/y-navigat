@@ -92,6 +92,7 @@ export function ConsumerLabelSection({
     : null;
 
   const nutritionRows = NUT_ROWS.map((r) => ({
+    key: r.key,
     label: r.indent ? `— ${r.label}` : r.label,
     value: nutritionValueText(r.key, effective.nutrition as Record<string, number | null> | null),
     indent: r.indent,
