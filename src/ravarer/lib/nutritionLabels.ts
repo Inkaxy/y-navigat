@@ -44,10 +44,30 @@ function show(value: unknown): string {
 }
 
 /**
+ * Én endringsrad fra endringsloggen, der raden lagrer skalarer per felt
+ * (field/old_value/new_value). Dette er formen radene FAKTISK har i basen —
+ * objektvarianten under gjelder eldre rader.
+ */
+export function nutritionValueDiff(
+  field: string,
+  oldValue: unknown,
+  newValue: unknown,
+): NutritionValueDiff {
+  const n = typeof newValue === "number" ? newValue : null;
+  return {
+    field,
+    label: NUTRITION_LABELS[field] ?? field,
+    before: show(oldValue),
+    after: show(newValue),
+    change: n != null ? changePct(typeof oldValue === "number" ? oldValue : null, n) : null,
+  };
+}
+
+/**
  * Gjør old_value/new_value fra endringsloggen om til lesbare rader.
  * Returnerer null når verdiene ikke er objekter vi kjenner igjen.
  */
-export function nutritionValueDiff(oldValue: unknown, newValue: unknown): NutritionValueDiff[] | null {
+export function nutritionObjectDiff(oldValue: unknown, newValue: unknown): NutritionValueDiff[] | null {
   const before = asRecord(oldValue) ?? {};
   const after = asRecord(newValue) ?? {};
   if (asRecord(oldValue) == null && asRecord(newValue) == null) return null;

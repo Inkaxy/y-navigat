@@ -3,9 +3,9 @@ import {
   assessSuggestions,
   suggestFoods,
   variantAttributes,
-  type FoodCandidate,
   type FoodSuggestion,
 } from "@/ravarer/lib/foodSuggestions";
+import { MATVARETABELLEN_FIXTURE } from "./matvaretabellenFixture";
 
 const sug = (name: string, confidence: number): FoodSuggestion => ({
   food_id: name,
@@ -67,79 +67,87 @@ describe("assessSuggestions", () => {
   });
 });
 
-// ===== Akseptanse: «Koble alle ≥ 80 %» skal faktisk koble de opplagte =====
+// ===== Akseptanse: ekte råvarenavn mot ekte kandidater fra basen =====
 
-const MELK: FoodCandidate[] = [
-  { food_id: "m1", food_name: "Melk, hel, 3,5 % fett", food_group_name: "Melk", search_keywords: ["helmelk"] },
-  { food_id: "m2", food_name: "Melk, lett, 1 % fett", food_group_name: "Melk", search_keywords: ["lettmelk"] },
-  { food_id: "m3", food_name: "Melk, skummet, 0,1 % fett", food_group_name: "Melk", search_keywords: ["skummet melk"] },
-];
-
-function check(rm: { name: string; category?: string | null }, foods: FoodCandidate[]) {
-  const s = suggestFoods(rm, foods, 3);
-  return { top: s[0]?.food_name ?? null, ...assessSuggestions(rm, s) };
+function check(rm: { name: string; declaration_name?: string | null; category?: string | null }) {
+  const s = suggestFoods(rm, MATVARETABELLEN_FIXTURE, 3);
+  return { top: s[0]?.food_name ?? null, confidence: s[0]?.confidence ?? 0, ...assessSuggestions(rm, s) };
 }
 
-describe("entydige treff kobles automatisk", () => {
-  it("HVETEMEL", () => {
-    const r = check({ name: "HVETEMEL", category: "Mel og korn" }, [
-      { food_id: "f1", food_name: "Hvetemel", food_group_name: "Mel" },
-      { food_id: "f2", food_name: "Hvetemel, siktet", food_group_name: "Mel" },
-      { food_id: "f3", food_name: "Hvetemel, sammalt, fin", food_group_name: "Mel" },
-    ]);
-    expect(r.top).toBe("Hvetemel");
-    expect(r.autoLinkAllowed).toBe(true);
-  });
+describe("fasit mot ekte matvarenavn (8. sep 2026)", () => {
+  const kobles: [string, { name: string; declaration_name?: string | null; category?: string | null }, string][] = [
+    ["REGAL HVETEMEL INDUSTRI 25KG", { name: "REGAL HVETEMEL INDUSTRI 25KG", declaration_name: "hvetemel", category: "Mel og korn" }, "Hvetemel, siktet"],
+    ["Hvetemel Activ Bulk", { name: "Hvetemel Activ Bulk", declaration_name: "hvetemel", category: "Mel og korn" }, "Hvetemel, siktet"],
+    ["DANSK SUKKER 25 KG", { name: "DANSK SUKKER 25 KG", declaration_name: "sukker", category: "Sukker og søtning" }, "Sukker, hvitt"],
+    ["BRUNT SUKKER", { name: "BRUNT SUKKER", category: "Sukker og søtning" }, "Sukker, brunt"],
+    ["TINE Smør 25kg", { name: "TINE Smør 25kg", declaration_name: "smør", category: "Fett og olje" }, "Smør"],
+    ["MEIERISMØR 500G TINE", { name: "MEIERISMØR 500G TINE", declaration_name: "smør", category: "Meieri og egg" }, "Smør"],
+    ["TINE Helmelk 3,5% bib slim 10l", { name: "TINE Helmelk 3,5% bib slim 10l", declaration_name: "melk", category: "Meieri og egg" }, "Helmelk, 3,5 % fett, Tine"],
+    ["Lett Tinemelk 1% m/kork 1/4l", { name: "Lett Tinemelk 1% m/kork 1/4l", category: "Meieri og egg" }, "Lettmelk, 1,0 % fett, Tine"],
+    ["HELMELK", { name: "HELMELK", category: "Meieri og egg" }, "Helmelk, uspesifisert"],
+    ["LETTMELK", { name: "LETTMELK", category: "Meieri og egg" }, "Lettmelk, uspesifisert"],
+    ["EGG", { name: "EGG", category: "Meieri og egg" }, "Egg, rå"],
+  ];
 
-  it("SUKKER", () => {
-    const r = check({ name: "SUKKER", category: "Sukker og søtning" }, [
-      { food_id: "s1", food_name: "Sukker", food_group_name: "Sukker og honning" },
-      { food_id: "s2", food_name: "Sukker, brunt", food_group_name: "Sukker og honning" },
-    ]);
-    expect(r.top).toBe("Sukker");
-    expect(r.autoLinkAllowed).toBe(true);
-  });
+  for (const [label, rm, expected] of kobles) {
+    it(`${label} → ${expected}`, () => {
+      const r = check(rm);
+      expect(r.top).toBe(expected);
+      expect(r.reason).toBeNull();
+      expect(r.autoLinkAllowed).toBe(true);
+    });
+  }
 
-  it("SMØR", () => {
-    const r = check({ name: "SMØR", category: "Meieri og egg" }, [
-      { food_id: "b1", food_name: "Smør", food_group_name: "Margarin og smør" },
-      { food_id: "b2", food_name: "Smør, usaltet", food_group_name: "Margarin og smør" },
-      { food_id: "b3", food_name: "Margarin", food_group_name: "Margarin og smør" },
-    ]);
-    expect(r.top).toBe("Smør");
-    expect(r.autoLinkAllowed).toBe(true);
-  });
-
-  it("EGG", () => {
-    const r = check({ name: "EGG", category: "Meieri og egg" }, [
-      { food_id: "e1", food_name: "Egg", food_group_name: "Egg" },
-      { food_id: "e2", food_name: "Egg, kokt", food_group_name: "Egg" },
-    ]);
-    expect(r.top).toBe("Egg");
-    expect(r.autoLinkAllowed).toBe(true);
-  });
-
-  it("HELMELK — «hel» er nok, prosenten i matvarenavnet er ingen konflikt", () => {
-    const r = check({ name: "HELMELK", category: "Meieri og egg" }, MELK);
-    expect(r.top).toBe("Melk, hel, 3,5 % fett");
-    expect(r.autoLinkAllowed).toBe(true);
-  });
-
-  it("LETTMELK", () => {
-    const r = check({ name: "LETTMELK", category: "Meieri og egg" }, MELK);
-    expect(r.top).toBe("Melk, lett, 1 % fett");
-    expect(r.autoLinkAllowed).toBe(true);
-  });
-
-  it("MELK 1L uten variant sperres", () => {
-    const r = check({ name: "MELK 1L", category: "Meieri og egg" }, MELK);
+  it("TINE Lettrømme 17% 5kg foreslås øverst, men sperres på fettprosent", () => {
+    const r = check({ name: "TINE Lettrømme 17% 5kg", category: "Meieri og egg" });
+    expect(r.top).toBe("Lettrømme, 18 % fett");
     expect(r.autoLinkAllowed).toBe(false);
+    expect(r.reason).toContain("Fettprosent avviker");
   });
 
-  it("Rømme mot «Rømme, lett» sperres når råvaren ikke sier lett", () => {
-    const r = check({ name: "Rømme", category: "Meieri og egg" }, [
-      { food_id: "r1", food_name: "Rømme, lett", food_group_name: "Fløte og rømme" },
-    ]);
+  it("MELK 1L krever manuelt valg av fettinnhold", () => {
+    const r = check({ name: "MELK 1L", category: "Meieri og egg" });
+    expect(r.top).toBe("Melk, uspesifisert");
     expect(r.autoLinkAllowed).toBe(false);
+    expect(r.reason).toContain("fettinnhold");
+  });
+
+  it("SMØREMYK ELDORADO kobles ikke — «smøre-» er ikke smør", () => {
+    const r = check({ name: "SMØREMYK ELDORADO", category: "Fett og olje" });
+    expect(r.autoLinkAllowed).toBe(false);
+    // «smøremyk» er ikke smør — treffet er for svakt til å kobles, og
+    // brukeren får se hvilke som er plausible.
+    expect(r.confidence).toBeLessThan(0.8);
+    expect(r.reason).toContain("flere plausible");
+  });
+});
+
+describe("poengsummene skiller søsknene", () => {
+  const score = (rm: { name: string; category?: string | null }, food: string) => {
+    const s = suggestFoods(rm, MATVARETABELLEN_FIXTURE, 20, 0);
+    return s.find((x) => x.food_name === food)?.confidence ?? 0;
+  };
+
+  it("standardvarianten ligger et hakk over søsknene", () => {
+    const mel = { name: "HVETEMEL", category: "Mel og korn" };
+    expect(score(mel, "Hvetemel, siktet")).toBe(0.98);
+    expect(score(mel, "Hvetemel, økologisk")).toBe(0.88);
+
+    const sukker = { name: "SUKKER", category: "Sukker og søtning" };
+    expect(score(sukker, "Sukker, hvitt")).toBe(0.98);
+    expect(score(sukker, "Sukker, brunt")).toBe(0.88);
+    expect(score(sukker, "Melis")).toBe(0.85);
+
+    const smor = { name: "SMØR", category: "Fett og olje" };
+    expect(score(smor, "Smør")).toBe(1);
+    expect(score(smor, "Brelett")).toBe(0.85);
+
+    const egg = { name: "EGG", category: "Meieri og egg" };
+    expect(score(egg, "Egg, rå")).toBe(0.98);
+    expect(score(egg, "Egg, kokt")).toBe(0.88);
+
+    const helmelk = { name: "HELMELK", category: "Meieri og egg" };
+    expect(score(helmelk, "Helmelk, uspesifisert")).toBe(0.98);
+    expect(score(helmelk, "Helmelk, 3,5 % fett, Tine")).toBe(0.88);
   });
 });

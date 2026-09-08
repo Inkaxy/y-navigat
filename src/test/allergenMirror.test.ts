@@ -36,6 +36,20 @@ describe("highlightAllergens", () => {
     expect(out).not.toContain("<strong><strong>");
   });
 
+  // Produksjonsstien i declaration-core kjører highlightAllergens på
+  // deklarasjonsteksten. Kjøres den to ganger — eller er teksten allerede
+  // merket i databladet — skal markeringen stå urørt.
+  it("markerer ikke om igjen tekst som allerede er merket", () => {
+    const once = highlightAllergens("fløte", ["milk"]);
+    expect(once).toBe("fløte (<strong>melk</strong>)");
+    expect(highlightAllergens(once, ["milk"])).toBe(once);
+  });
+
+  it("lar en ferdig merket ingrediens fra databladet stå uendret", () => {
+    const given = "<strong>hvete</strong>mel, sukker";
+    expect(highlightAllergens(given, ["gluten_wheat"])).toBe(given);
+  });
+
   it("ukjent kode endrer ingenting", () => {
     expect(highlightAllergens("sukker", ["ukjent"])).toBe("sukker");
   });

@@ -33,7 +33,6 @@ const FIELD_LABELS: Record<string, string> = {
   ingredient_declaration: "Ingrediensdeklarasjon",
   composite: "Sammensetning",
   grain: "Brødskala-klassifisering",
-  package: "Pakningsstørrelse (vis forslag)",
 };
 
 export function DatasheetSection({ rawMaterialId }: Props) {
@@ -88,7 +87,6 @@ export function DatasheetSection({ rawMaterialId }: Props) {
       if (data.extracted.ingredient_declaration) auto.add("ingredient_declaration");
       // «composite» velges bevisst ikke automatisk — komponentene må sees over først.
       if (data.extracted.grain_classification_hint) auto.add("grain");
-      if (data.extracted.package_size_value) auto.add("package");
       setAccepted(auto);
       // Alle næringsfelt med verdi er valgt som utgangspunkt; brukeren kan skru av enkeltfelt.
       setAcceptedNutrition(
@@ -295,12 +293,6 @@ export function DatasheetSection({ rawMaterialId }: Props) {
                 {k === "grain" && (
                   <BeforeAfter before={rm?.grain_classification ?? null} after={extracted.grain_classification_hint} />
                 )}
-                {k === "package" && (
-                  <BeforeAfter
-                    before={rm?.package_size != null ? `${rm.package_size} ${rm.package_unit ?? ""}`.trim() : null}
-                    after={`${extracted.package_size_value} ${extracted.package_size_unit ?? ""}`.trim()}
-                  />
-                )}
                 {k === "composite" && (
                   <p className="mt-2 text-xs text-ink-secondary">
                     Komponentene lagres som forslag til gjennomgang. Råvarens egen næring og allergener beholdes.
@@ -437,7 +429,6 @@ function isFieldPresent(ext: any, key: string): boolean {
     case "ingredient_declaration": return !!ext.ingredient_declaration;
     case "composite": return Array.isArray(ext.composite_components) && ext.composite_components.length > 0;
     case "grain": return !!ext.grain_classification_hint;
-    case "package": return ext.package_size_value != null;
   }
   return false;
 }
@@ -449,7 +440,6 @@ function summary(ext: any, key: string): string {
     case "ingredient_declaration": return ext.ingredient_declaration.slice(0, 120) + (ext.ingredient_declaration.length > 120 ? "…" : "");
     case "composite": return ext.composite_components.map((c: any) => c.name + (c.percentage ? ` (${c.percentage}%)` : "")).join(", ");
     case "grain": return ext.grain_classification_hint;
-    case "package": return `${ext.package_size_value} ${ext.package_size_unit ?? ""}`;
   }
   return "";
 }

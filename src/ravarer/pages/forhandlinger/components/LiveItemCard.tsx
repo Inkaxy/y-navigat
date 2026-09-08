@@ -3,6 +3,8 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { CANONICAL_BASE_UNITS, CANONICAL_PACKAGE_UNITS } from "@/fakturaer/lib/units";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Check, Pause, X, TrendingUp, Loader2 } from "lucide-react";
@@ -12,6 +14,9 @@ import { formatNok, formatNumber } from "@/ravarer/lib/constants";
 import { targetPctForItem } from "@/ravarer/lib/negotiationMatrix";
 import type { NegotiationItemRow } from "@/ravarer/hooks/useNegotiations";
 import type { RawMaterialRow } from "@/ravarer/hooks/useRawMaterials";
+
+/** Baseenheter først, deretter pakningsenheter — samme vokabular som valideringen. */
+const UNIT_OPTIONS: string[] = [...CANONICAL_BASE_UNITS, ...CANONICAL_PACKAGE_UNITS];
 
 interface Props {
   item: NegotiationItemRow;
@@ -46,7 +51,7 @@ export function LiveItemCard({ item, rawMaterial, supplierId, facilitatorId, onS
 
   // Form state seeded from item
   const [price, setPrice] = useState<string>(item.live_agreed_price?.toString() ?? "");
-  const [priceUnit, setPriceUnit] = useState<string>(item.live_agreed_price_unit ?? `kr/${baseUnit}`);
+  const [priceUnit, setPriceUnit] = useState<string>(item.live_agreed_price_unit ?? baseUnit);
   const [pkgSize, setPkgSize] = useState<string>(item.live_agreed_package_size?.toString() ?? "");
   const [pkgUnit, setPkgUnit] = useState<string>(item.live_agreed_package_unit ?? baseUnit);
   const [months, setMonths] = useState<string>(item.live_agreed_contract_months?.toString() ?? "");
@@ -57,7 +62,7 @@ export function LiveItemCard({ item, rawMaterial, supplierId, facilitatorId, onS
   useEffect(() => {
     // re-seed when item id changes (different active item)
     setPrice(item.live_agreed_price?.toString() ?? "");
-    setPriceUnit(item.live_agreed_price_unit ?? `kr/${baseUnit}`);
+    setPriceUnit(item.live_agreed_price_unit ?? baseUnit);
     setPkgSize(item.live_agreed_package_size?.toString() ?? "");
     setPkgUnit(item.live_agreed_package_unit ?? baseUnit);
     setMonths(item.live_agreed_contract_months?.toString() ?? "");
@@ -151,13 +156,33 @@ export function LiveItemCard({ item, rawMaterial, supplierId, facilitatorId, onS
           <Field label="Pris">
             <div className="flex gap-2">
               <Input value={price} onChange={(e) => setPrice(e.target.value)} placeholder="0.00" inputMode="decimal" />
-              <Input value={priceUnit} onChange={(e) => setPriceUnit(e.target.value)} className="w-28" />
+              {/* Enheten må være kanonisk — «kr/kg» ble avvist av valideringen
+                  når avtalen skulle bekreftes. */}
+              <Select value={priceUnit} onValueChange={setPriceUnit}>
+                <SelectTrigger className="w-32" aria-label="Prisenhet">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {UNIT_OPTIONS.map((u) => (
+                    <SelectItem key={u} value={u}>{`kr/${u}`}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </Field>
           <Field label="Pakning">
             <div className="flex gap-2">
               <Input value={pkgSize} onChange={(e) => setPkgSize(e.target.value)} placeholder="0" inputMode="decimal" />
-              <Input value={pkgUnit} onChange={(e) => setPkgUnit(e.target.value)} className="w-28" />
+              <Select value={pkgUnit} onValueChange={setPkgUnit}>
+                <SelectTrigger className="w-32" aria-label="Pakningsenhet">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {UNIT_OPTIONS.map((u) => (
+                    <SelectItem key={u} value={u}>{u}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </Field>
           <Field label="Avtale-lengde (mnd)">

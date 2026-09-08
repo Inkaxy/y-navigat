@@ -340,7 +340,8 @@ export default function ForhandlingWizard() {
       {step === 3 && (
         <Card className="overflow-hidden">
           <div className="border-b border-line-subtle p-4 text-sm text-ink-secondary">
-            Velg leverandører som skal motta forespørsel.
+            Velg leverandører som skal motta forespørsel. Listen viser bare aktive leverandører
+            som er merket med «Følg fakturalinjer» — forhandlingen bygger på fakturahistorikken deres.
           </div>
           <div className="max-h-[480px] overflow-auto">
             <table className="w-full text-sm">
@@ -352,6 +353,8 @@ export default function ForhandlingWizard() {
                 </tr>
               </thead>
               <tbody>
+                {/* Bare leverandører med «Følg fakturalinjer» er med: forhandling bygger på
+fakturahistorikk, og uten den finnes verken volum eller prisgrunnlag. */}
                 {suppliers
                   .filter((s) => s.is_active && s.track_invoice_lines)
                   .map((s) => {
