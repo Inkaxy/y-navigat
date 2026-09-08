@@ -39,6 +39,16 @@ export default function ForhandlingDetail() {
   const { data: rawMaterials = [] } = useRawMaterials();
   const { data: suppliers = [] } = useSuppliers();
 
+  interface ResponseRow {
+    id: string;
+    negotiation_item_id: string;
+    recipient_id: string;
+    offered_price: number | null;
+    offered_package_size: number | null;
+    offered_package_unit: string | null;
+    status: string;
+  }
+
   const { data: responses = [] } = useQuery({
     queryKey: ["negotiation-responses", id],
     enabled: !!id,
@@ -48,7 +58,7 @@ export default function ForhandlingDetail() {
         .select("*")
         .eq("negotiation_id", id);
       if (error) throw error;
-      return (data ?? []) as any[];
+      return (data ?? []) as unknown as ResponseRow[];
     },
   });
 
@@ -85,7 +95,7 @@ export default function ForhandlingDetail() {
     const out = new Map<string, Map<string, number | null>>();
     for (const it of items) {
       const inner = new Map<string, number | null>();
-      for (const r of responses as any[]) {
+      for (const r of responses) {
         if (r.negotiation_item_id !== it.id || r.status !== "submitted") continue;
         const conv = offerPricePerBaseUnit({
           offeredPrice: r.offered_price,
@@ -430,7 +440,7 @@ function LiveConfirmationStatus({ neg, items, recipients, selectedRecipient, act
                   <SelectValue placeholder="Velg leverandør" />
                 </SelectTrigger>
                 <SelectContent>
-                  {recipients.map((r: any) => (
+                  {recipients.map((r: { id: string; supplier_id: string }) => (
                     <SelectItem key={r.id} value={r.id}>{supName(r.supplier_id)}</SelectItem>
                   ))}
                 </SelectContent>
