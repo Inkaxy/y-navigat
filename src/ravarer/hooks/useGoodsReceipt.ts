@@ -4,6 +4,8 @@ import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { toast } from "sonner";
 import { invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 import { fetchAllRows } from "@/lib/supabasePaging";
+import { rpcReceiveInvoiceLine } from "@/ravarer/lib/pendingRpc";
+
 
 export interface ReceiptInvoiceRow {
   id: string;
@@ -243,14 +245,25 @@ export interface ReceiveLineInput {
 /**
  * Fører én fakturalinje inn på lager.
  *
- * Idempotent: finnes det allerede en purchase-bevegelse på linja, gjør vi
- * ingenting. Ellers ville et dobbeltklikk lagt varen inn to ganger.
+ * Bruker RPC-en `rm_receive_invoice_line` når den er rullet ut: den låser linja og
+ * fakturaen, kontrollerer tilgang og selskap i basen, og fører ALDRI en bevegelse
+ * på toppen av den fakturalinje-triggeren allerede har laget. Kreditnota beholder
+ * negativ mengde. Finnes ikke funksjonen ennå, faller vi tilbake til den gamle
+ * klientveien, som er idempotent på (fakturalinje, kjøp).
  */
 export function useReceiveInvoiceLine() {
   const qc = useQueryClient();
   const { legalEntityId, user } = useRavarer();
   return useMutation({
     mutationFn: async (input: ReceiveLineInput): Promise<{ skipped: boolean }> => {
+      try {
+        const res = await rpcReceiveInvoiceLine(input.invoice_line_id);
+        return { skipped: res.already_posted === true || !!res.skipped };
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        if (!/could not find the function|does not exist/i.test(message)) throw e;
+      }
+
       if (!(input.quantity_base > 0)) throw new Error("Linja mangler omregnet mengde");
       const { data: existing, error: exErr } = await supabase
         .from("stock_movements")
@@ -276,6 +289,7 @@ export function useReceiveInvoiceLine() {
       if (error) throw error;
       return { skipped: false };
     },
+
     onSuccess: (res, vars) => {
       invalidateRawMaterial(qc, vars.raw_material_id);
       void qc.invalidateQueries({ queryKey: ["receipt-lines", vars.invoice_id] });

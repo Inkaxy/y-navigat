@@ -22,9 +22,11 @@ import {
   clearCountDraft,
   countDraftKey,
   loadCountDraft,
+  newOpId,
   saveCountDraft,
   type CountDraft,
 } from "@/ravarer/lib/countDraft";
+
 
 export default function Varetelling() {
   const { canWrite, legalEntityId } = useRavarer();
@@ -52,6 +54,9 @@ export default function Varetelling() {
   // gamle tall opp midt i en ny telling.
   const [pendingDraft, setPendingDraft] = useState<CountDraft | null>(null);
   const [draftLoaded, setDraftLoaded] = useState(false);
+  // Operasjons-ID: følger tellingen til den er bokført, slik at et nytt forsøk
+  // etter nettbrudd eller dobbeltklikk aldri fører tellingen to ganger.
+  const [opId, setOpId] = useState<string>(() => newOpId());
 
   useEffect(() => {
     setPendingDraft(loadCountDraft(draftKey));
@@ -60,8 +65,9 @@ export default function Varetelling() {
 
   useEffect(() => {
     if (!draftLoaded) return;
-    saveCountDraft(draftKey, { entries, lineNotes, note });
-  }, [draftKey, draftLoaded, entries, lineNotes, note]);
+    saveCountDraft(draftKey, { entries, lineNotes, note, opId });
+  }, [draftKey, draftLoaded, entries, lineNotes, note, opId]);
+
 
   const categories = useMemo(
     () => Array.from(new Set(rows.map(r => r.category).filter((c): c is string => !!c))).sort((a, b) => a.localeCompare(b, "nb")),
@@ -111,7 +117,13 @@ export default function Varetelling() {
   const submit = async () => {
     if (apply.isPending) return;
     const lines = filled
-      .map(r => ({ raw_material_id: r.raw_material_id, counted_base: countedBase(r) as number }))
+      .map(r => ({
+        raw_material_id: r.raw_material_id,
+        counted_base: countedBase(r) as number,
+        // Beholdningen telleren så: serveren avviser tellingen hvis den er endret av andre.
+        expected_base: r.current_stock,
+        line_note: (lineNotes[r.raw_material_id] ?? "").trim() || null,
+      }))
       .filter(l => Number.isFinite(l.counted_base));
     if (lines.length === 0) return;
     try {
@@ -122,17 +134,21 @@ export default function Varetelling() {
         })
         .filter((x): x is string => !!x);
       const fullNote = [note.trim() || "Varetelling", ...details].join(" | ");
-      const res = await apply.mutateAsync({ lines, note: fullNote });
+      const res = await apply.mutateAsync({ opId, lines, note: fullNote });
       setResult(res);
-      // Utkastet tømmes kun når tellingen faktisk ble bokført.
+      // Utkastet tømmes kun når tellingen faktisk ble bokført, og neste telling
+      // får en ny operasjons-ID.
       setEntries({});
       setLineNotes({});
       setNote("");
+      setOpId(newOpId());
       clearCountDraft(draftKey);
     } catch {
-      // Feilmeldingen vises av mutasjonen; utkastet beholdes slik det var.
+      // Feilmeldingen vises av mutasjonen; utkastet og operasjons-ID-en beholdes,
+      // slik at et nytt forsøk er trygt.
     }
   };
+
 
   /** Fyller 0 på alt som er synlig og ikke talt — «resten er tomt». */
   const setRestToZero = () => {
@@ -178,8 +194,11 @@ export default function Varetelling() {
                 setEntries(pendingDraft.entries);
                 setLineNotes(pendingDraft.lineNotes);
                 setNote(pendingDraft.note);
+                // Samme telling fortsetter på samme operasjons-ID.
+                setOpId(pendingDraft.opId);
                 setPendingDraft(null);
               }}
+
             >
               Fortsett tellingen
             </Button>

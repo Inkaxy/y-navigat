@@ -71,14 +71,14 @@ describe("telleutkast", () => {
   });
 
   it("lagrer og henter et påbegynt utkast", () => {
-    saveCountDraft(key, { entries: { rm1: [{ amount: "12,5", unitKey: "__base" }] }, lineNotes: { rm1: "Hylle 3" }, note: "" });
+    saveCountDraft(key, { opId: "op-1", entries: { rm1: [{ amount: "12,5", unitKey: "__base" }] }, lineNotes: { rm1: "Hylle 3" }, note: "" });
     const loaded = loadCountDraft(key);
     expect(loaded?.entries.rm1[0].amount).toBe("12,5");
     expect(loaded?.lineNotes.rm1).toBe("Hylle 3");
   });
 
   it("lagrer ikke et tomt utkast", () => {
-    saveCountDraft(key, { entries: { rm1: [{ amount: "", unitKey: "__base" }] }, lineNotes: {}, note: "" });
+    saveCountDraft(key, { opId: "op-1", entries: { rm1: [{ amount: "", unitKey: "__base" }] }, lineNotes: {}, note: "" });
     expect(loadCountDraft(key)).toBeNull();
     expect(draftHasContent(null)).toBe(false);
   });
@@ -89,7 +89,7 @@ describe("telleutkast", () => {
   });
 
   it("kan forkastes", () => {
-    saveCountDraft(key, { entries: { rm1: [{ amount: "3", unitKey: "__base" }] }, lineNotes: {}, note: "" });
+    saveCountDraft(key, { opId: "op-1", entries: { rm1: [{ amount: "3", unitKey: "__base" }] }, lineNotes: {}, note: "" });
     clearCountDraft(key);
     expect(loadCountDraft(key)).toBeNull();
   });
