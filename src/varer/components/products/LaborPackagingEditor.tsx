@@ -9,19 +9,16 @@ import { toast } from "sonner";
 
 interface LaborLine {
   id: string;
-  recipe_id: string;
-  description: string | null;
-  minutes: number | null;
+  labor_type: string;
+  hours: number;
   hourly_rate: number | null;
 }
 
 interface PackagingLine {
   id: string;
-  recipe_id: string;
-  raw_material_id: string | null;
-  description: string | null;
-  quantity: number | null;
-  unit_cost: number | null;
+  name: string | null;
+  quantity: number;
+  unit_price_override: number | null;
 }
 
 /**
@@ -43,11 +40,11 @@ export function LaborPackagingEditor({
     queryFn: async (): Promise<LaborLine[]> => {
       const { data, error } = await supabase
         .from("recipe_labor_lines")
-        .select("id, recipe_id, description, minutes, hourly_rate")
+        .select("id, labor_type, hours, hourly_rate")
         .eq("recipe_id", recipeId)
-        .order("created_at");
+        .order("sort_order");
       if (error) throw error;
-      return (data ?? []) as LaborLine[];
+      return data ?? [];
     },
   });
 
@@ -56,11 +53,11 @@ export function LaborPackagingEditor({
     queryFn: async (): Promise<PackagingLine[]> => {
       const { data, error } = await supabase
         .from("recipe_packaging_lines")
-        .select("id, recipe_id, raw_material_id, description, quantity, unit_cost")
+        .select("id, name, quantity, unit_price_override")
         .eq("recipe_id", recipeId)
-        .order("created_at");
+        .order("sort_order");
       if (error) throw error;
-      return (data ?? []) as PackagingLine[];
+      return data ?? [];
     },
   });
 
@@ -72,7 +69,7 @@ export function LaborPackagingEditor({
     qc.invalidateQueries({ queryKey: ["profitability-sheet"] });
   }
 
-  async function run(fn: () => Promise<{ error: { message: string } | null }>) {
+  async function run(fn: () => PromiseLike<{ error: { message: string } | null }>) {
     setSaving(true);
     try {
       const { error } = await fn();
@@ -86,6 +83,9 @@ export function LaborPackagingEditor({
     }
   }
 
+  const laborLines = laborQuery.data ?? [];
+  const packagingLines = packagingQuery.data ?? [];
+
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       <Card>
@@ -98,9 +98,12 @@ export function LaborPackagingEditor({
               disabled={saving}
               onClick={() =>
                 run(() =>
-                  supabase
-                    .from("recipe_labor_lines")
-                    .insert({ recipe_id: recipeId, description: "Arbeid", minutes: 0 } as never),
+                  supabase.from("recipe_labor_lines").insert({
+                    recipe_id: recipeId,
+                    labor_type: "Arbeid",
+                    hours: 0,
+                    sort_order: laborLines.length,
+                  }),
                 )
               }
             >
@@ -111,41 +114,59 @@ export function LaborPackagingEditor({
         <CardContent className="space-y-2">
           {laborQuery.isLoading ? (
             <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-          ) : (laborQuery.data ?? []).length === 0 ? (
+          ) : laborLines.length === 0 ? (
             <p className="text-sm text-muted-foreground">Ingen arbeidslinjer.</p>
           ) : (
-            (laborQuery.data ?? []).map((l) => (
+            laborLines.map((l) => (
               <div key={l.id} className="flex items-center gap-2">
                 <Input
                   className="h-8"
-                  defaultValue={l.description ?? ""}
+                  defaultValue={l.labor_type}
                   disabled={!canWrite}
-                  aria-label="Beskrivelse"
+                  aria-label="Type arbeid"
                   onBlur={(e) =>
                     run(() =>
                       supabase
                         .from("recipe_labor_lines")
-                        .update({ description: e.target.value })
+                        .update({ labor_type: e.target.value })
                         .eq("id", l.id),
                     )
                   }
                 />
                 <Input
-                  className="h-8 w-24 text-right"
+                  className="h-8 w-20 text-right"
                   inputMode="decimal"
-                  aria-label="Minutter"
-                  defaultValue={l.minutes ?? 0}
+                  aria-label="Timer"
+                  defaultValue={l.hours}
                   disabled={!canWrite}
                   onBlur={(e) =>
                     run(() =>
                       supabase
                         .from("recipe_labor_lines")
-                        .update({ minutes: Number(e.target.value) || 0 })
+                        .update({ hours: Number(e.target.value) || 0 })
                         .eq("id", l.id),
                     )
                   }
                 />
-                <span className="text-xs text-muted-foreground">min</span>
+                <span className="text-xs text-muted-foreground">t</span>
+                <Input
+                  className="h-8 w-24 text-right"
+                  inputMode="decimal"
+                  aria-label="Timesats"
+                  defaultValue={l.hourly_rate ?? ""}
+                  placeholder="std."
+                  disabled={!canWrite}
+                  onBlur={(e) =>
+                    run(() =>
+                      supabase
+                        .from("recipe_labor_lines")
+                        .update({
+                          hourly_rate: e.target.value.trim() === "" ? null : Number(e.target.value),
+                        })
+                        .eq("id", l.id),
+                    )
+                  }
+                />
                 {canWrite && (
                   <Button
                     size="icon"
@@ -176,9 +197,10 @@ export function LaborPackagingEditor({
                 run(() =>
                   supabase.from("recipe_packaging_lines").insert({
                     recipe_id: recipeId,
-                    description: "Emballasje",
+                    name: "Emballasje",
                     quantity: 1,
-                  } as never),
+                    sort_order: packagingLines.length,
+                  }),
                 )
               }
             >
@@ -189,21 +211,21 @@ export function LaborPackagingEditor({
         <CardContent className="space-y-2">
           {packagingQuery.isLoading ? (
             <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-          ) : (packagingQuery.data ?? []).length === 0 ? (
+          ) : packagingLines.length === 0 ? (
             <p className="text-sm text-muted-foreground">Ingen emballasjelinjer.</p>
           ) : (
-            (packagingQuery.data ?? []).map((l) => (
+            packagingLines.map((l) => (
               <div key={l.id} className="flex items-center gap-2">
                 <Input
                   className="h-8"
-                  defaultValue={l.description ?? ""}
+                  defaultValue={l.name ?? ""}
                   disabled={!canWrite}
-                  aria-label="Beskrivelse"
+                  aria-label="Navn"
                   onBlur={(e) =>
                     run(() =>
                       supabase
                         .from("recipe_packaging_lines")
-                        .update({ description: e.target.value })
+                        .update({ name: e.target.value })
                         .eq("id", l.id),
                     )
                   }
@@ -212,7 +234,7 @@ export function LaborPackagingEditor({
                   className="h-8 w-20 text-right"
                   inputMode="decimal"
                   aria-label="Antall"
-                  defaultValue={l.quantity ?? 1}
+                  defaultValue={l.quantity}
                   disabled={!canWrite}
                   onBlur={(e) =>
                     run(() =>
@@ -226,14 +248,18 @@ export function LaborPackagingEditor({
                 <Input
                   className="h-8 w-24 text-right"
                   inputMode="decimal"
-                  aria-label="Enhetskost"
-                  defaultValue={l.unit_cost ?? 0}
+                  aria-label="Enhetspris"
+                  defaultValue={l.unit_price_override ?? ""}
+                  placeholder="fra råvare"
                   disabled={!canWrite}
                   onBlur={(e) =>
                     run(() =>
                       supabase
                         .from("recipe_packaging_lines")
-                        .update({ unit_cost: Number(e.target.value) || 0 })
+                        .update({
+                          unit_price_override:
+                            e.target.value.trim() === "" ? null : Number(e.target.value),
+                        })
                         .eq("id", l.id),
                     )
                   }
