@@ -378,46 +378,62 @@ Deno.serve(async (req) => {
             throw new Error(insErr.message);
           }
           imported++;
-        } catch (_e) {
+        } catch (e) {
           failed++;
+          const msg = e instanceof Error ? e.message : String(e);
+          if (failedSamples.length < 5) failedSamples.push(msg);
+          console.error("tripletex-sync-invoices: faktura feilet", msg);
         }
       }
 
-      lastCompletedChunkTo = chunk.to;
-      // Manuelle kall med eksplisitt `from`, og etterhenting for én leverandør,
-      // skal ikke flytte den løpende posisjonen — og den skal aldri gå bakover.
-      if (!isBackfill && !body.from) {
-        const nextCursor = chunk.to > today ? today : chunk.to;
-        const current = cred.last_invoice_synced_date;
-        // Flytt fram, eller korriger ned en cursor som står i framtiden.
-        if (!current || nextCursor > current || current > today) {
-          cred.last_invoice_synced_date = nextCursor;
-          await admin
-            .from("tripletex_credentials")
-            .update({ last_invoice_synced_date: nextCursor })
-            .eq("legal_entity_id", legalEntityId);
-        }
-      }
+      chunkResults.push({
+        from: chunk.from,
+        to: chunk.to,
+        failed: failed - failedBefore,
+        truncated,
+      });
+      if (failed === failedBefore && !truncated) lastCompletedChunkTo = chunk.to;
+    }
 
+    // Cursor flyttes bare til og med SISTE fullførte bit. En bit med feil eller
+    // ufullstendig henting hentes på nytt neste kjøring.
+    const cursorTo = nextCursor(chunkResults, cred.last_invoice_synced_date ?? null, today, {
+      isBackfill,
+      hasExplicitFrom: !!body.from,
+    });
+    if (cursorTo) {
+      cred.last_invoice_synced_date = cursorTo;
+      await admin
+        .from("tripletex_credentials")
+        .update({ last_invoice_synced_date: cursorTo })
+        .eq("legal_entity_id", legalEntityId);
     }
 
     // --- Leverandørstatistikk ---
     for (const sid of touchedSupplierIds) {
-      const { data: stats } = await admin
+      // Antall telles med exact count, ikke ved å laste ned radene (upaginert
+      // select stoppet på 1000 og ga for lavt antall).
+      const { count } = await admin
+        .from("invoices")
+        .select("id", { count: "exact", head: true })
+        .eq("legal_entity_id", legalEntityId)
+        .eq("supplier_id", sid);
+      const { data: latest } = await admin
         .from("invoices")
         .select("invoice_date")
         .eq("legal_entity_id", legalEntityId)
         .eq("supplier_id", sid)
-        .order("invoice_date", { ascending: false });
-      const rows = stats ?? [];
+        .order("invoice_date", { ascending: false })
+        .limit(1);
       await admin
         .from("suppliers")
         .update({
-          last_invoice_date: rows[0]?.invoice_date ?? null,
-          invoice_count: rows.length,
+          last_invoice_date: latest?.[0]?.invoice_date ?? null,
+          invoice_count: count ?? 0,
         })
         .eq("id", sid);
     }
+
 
     const details = {
       from: windowFrom,
