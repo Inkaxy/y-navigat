@@ -15919,6 +15919,20 @@ export type Database = {
           unit_of_sale: string
         }[]
       }
+      set_price: {
+        Args: {
+          p_note?: string
+          p_price: number
+          p_price_list_id: string
+          p_product_id: string
+          p_valid_from?: string
+        }
+        Returns: Json
+      }
+      set_prices: {
+        Args: { p_all_or_nothing?: boolean; p_rows: Json }
+        Returns: Json
+      }
       set_raw_material_package: {
         Args: {
           p_apply?: boolean
