@@ -498,8 +498,10 @@ function EffectiveStatusCard({
         <Badge variant="outline" className="gap-1"><AlertTriangle className="h-3 w-3" /> Ingen deklarasjon lagret</Badge>
       )}
     </div>
+    </>
   );
 }
+
 
 function ModeSelector({ mode, canWrite, saving, onChange }: { mode: Mode; canWrite: boolean; saving: boolean; onChange: (m: Mode | "inherit") => void }) {
   const items: { value: Mode; title: string; desc: string; icon: React.ReactNode }[] = [
