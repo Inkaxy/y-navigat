@@ -219,6 +219,18 @@ export function RecipePDFDocument({ data }: { data: RecipePDFData }) {
             <Text style={styles.headMetaLabel}>Dato</Text>
             <Text style={styles.headMetaValue}>{fmtDate(data.printedAt)}</Text>
           </View>
+          {data.productionDate && (
+            <View style={styles.headMeta}>
+              <Text style={styles.headMetaLabel}>Produksjonsdato</Text>
+              <Text style={styles.headMetaValue}>{fmtDate(new Date(`${data.productionDate}T00:00:00`))}</Text>
+            </View>
+          )}
+          {data.batchId && (
+            <View style={styles.headMeta}>
+              <Text style={styles.headMetaLabel}>Batch-id</Text>
+              <Text style={styles.headMetaValue}>{data.batchId}</Text>
+            </View>
+          )}
           <View style={styles.headMeta}>
             <Text style={styles.headMetaLabel}>Versjon</Text>
             <Text style={styles.headMetaValue}>v{data.version ?? 1}</Text>
@@ -234,12 +246,21 @@ export function RecipePDFDocument({ data }: { data: RecipePDFData }) {
           ))}
         </View>
 
+        {data.allergens && data.allergens.length > 0 && (
+          <View style={styles.allergenBox}>
+            <Text style={styles.allergenTitle}>Allergener</Text>
+            <Text style={styles.allergenText}>{data.allergens.join(", ")}</Text>
+          </View>
+        )}
+
+        {data.batches && data.batches.count > 1 && <BatchTable batches={data.batches} />}
+
         {data.preferments.length > 0 && (
           <View>
             <Text style={styles.sectionTitle}>Fordeiger</Text>
             {data.preferments.map((p) => (
-              <View key={p.id} style={styles.prefermentBox} wrap={false}>
-                <View style={styles.prefermentHead}>
+              <View key={p.id} style={styles.prefermentBox}>
+                <View style={styles.prefermentHead} wrap minPresenceAhead={60}>
                   <Text style={styles.prefermentTitle}>
                     {p.prefermentKind
                       ? p.prefermentKind.charAt(0).toUpperCase() + p.prefermentKind.slice(1)
@@ -250,6 +271,13 @@ export function RecipePDFDocument({ data }: { data: RecipePDFData }) {
                     {p.targetTempCelsius != null ? ` · ${fmtNum(p.targetTempCelsius, 1)} °C` : ""}
                   </Text>
                 </View>
+                {(p.prepNote || p.restMinutes != null) && (
+                  <Text style={styles.partMeta}>
+                    {p.prepNote ?? ""}
+                    {p.prepNote && p.restMinutes != null ? " · " : ""}
+                    {p.restMinutes != null ? `Hvile: ${fmtDuration(p.restMinutes)}` : ""}
+                  </Text>
+                )}
                 <IngredientTable part={p} showPercent />
                 {p.instructions ? <Text style={styles.instructions}>{p.instructions}</Text> : null}
               </View>
@@ -260,6 +288,13 @@ export function RecipePDFDocument({ data }: { data: RecipePDFData }) {
         {data.mainParts.map((p) => (
           <View key={p.id} style={{ marginBottom: 12 }}>
             <Text style={styles.sectionTitle}>{p.name}</Text>
+            {(p.prepNote || p.restMinutes != null) && (
+              <Text style={styles.partMeta}>
+                {p.prepNote ?? ""}
+                {p.prepNote && p.restMinutes != null ? " · " : ""}
+                {p.restMinutes != null ? `Hvile: ${fmtDuration(p.restMinutes)}` : ""}
+              </Text>
+            )}
             <IngredientTable part={p} showPercent />
             {p.instructions ? <Text style={styles.instructions}>{p.instructions}</Text> : null}
           </View>
