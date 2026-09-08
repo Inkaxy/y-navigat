@@ -287,9 +287,9 @@ export default function RecipeDetail() {
         factor,
         Number(header.dough_piece_grams) || null,
         desiredUnits || baseUnits,
-        Number(mixerCapacity) || null,
+        null,
       ),
-    [hydratedLines, factor, header.dough_piece_grams, desiredUnits, baseUnits, mixerCapacity],
+    [hydratedLines, factor, header.dough_piece_grams, desiredUnits, baseUnits],
   );
 
   /**
