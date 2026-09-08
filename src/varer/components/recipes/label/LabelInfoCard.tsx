@@ -59,6 +59,17 @@ export function LabelInfoCard({
     form.storage !== saved.storage ||
     form.origin !== saved.origin;
 
+  // Vakt mot å forlate siden med ulagrede pliktfelt.
+  useEffect(() => {
+    if (!dirty) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [dirty]);
+
   const save = useMutation({
     mutationFn: async () => {
       const num = (v: string) => {
