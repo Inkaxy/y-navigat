@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, Save, FileText } from "lucide-react";
+import { sanitizeDeclarationHtml } from "@/varer/lib/declarationHtml";
 import { RichTextEditor } from "@/ordre/components/shell/RichTextEditor";
 import { toast } from "sonner";
 import { logAudit } from "@/varer/lib/audit";
@@ -82,7 +83,7 @@ export function ManualDeclarationEditor({
       if (v !== "" && Number.isFinite(Number(v))) nut[f.key] = Number(v);
     }
     const payload = {
-      manual_ingredient_declaration: ingredient.trim() || null,
+      manual_ingredient_declaration: sanitizeDeclarationHtml(ingredient) || null,
       manual_allergens_contains: contains
         .split(",")
         .map((s) => s.trim())
@@ -139,6 +140,10 @@ export function ManualDeclarationEditor({
           <CardTitle className="text-base">Ingrediensdeklarasjon</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
+          <p className="text-xs text-muted-foreground">
+            Dette overstyrer snapshotet fra oppskriften. Teksten vises ordrett på etikett, nettside og i portalen —
+            bare uthevet tekst (fet) beholdes.
+          </p>
           <RichTextEditor
             value={ingredient}
             onChange={(html) => {
