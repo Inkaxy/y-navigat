@@ -55,6 +55,7 @@ type RecipeListRow = {
   status: string | null;
   department: string | null;
   version: number | null;
+  updated_at: string | null;
   unit_weight_grams: number | null;
   units_per_batch: number | null;
   dough_piece_grams: number | null;
@@ -69,7 +70,7 @@ type RecipeRow = RecipeListRow & {
 };
 
 /** Kolonner som kan sorteres i oppskriftslisten. */
-type SortKey = "name" | "category" | "department" | "hydration" | "dough" | "products" | "status";
+type SortKey = "name" | "category" | "department" | "hydration" | "dough" | "products" | "status" | "updated";
 
 export default function Recipes() {
   const { legalEntityId, canWrite } = useAppContext();
@@ -78,7 +79,11 @@ export default function Recipes() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [deptFilter, setDeptFilter] = useState<"all" | RecipeDepartment | "none">("all");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({ key: "name", dir: "asc" });
+  const [page, setPage] = useState(1);
+  const [creatingFromTemplate, setCreatingFromTemplate] = useState(false);
+  const PAGE_SIZE = 50;
 
   /** Klikk på kolonne: samme kolonne snur retning, ny kolonne starter stigende. */
   const toggleSort = (key: SortKey) =>
