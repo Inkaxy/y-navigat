@@ -230,3 +230,58 @@ export function useReceiptMovement() {
     onError: (e: unknown) => toast.error(`Kunne ikke registrere: ${e instanceof Error ? e.message : String(e)}`),
   });
 }
+
+export interface ReceiveLineInput {
+  invoice_line_id: string;
+  invoice_id: string;
+  raw_material_id: string;
+  quantity_base: number;
+  invoice_number: string;
+  occurred_at?: string;
+}
+
+/**
+ * Fører én fakturalinje inn på lager.
+ *
+ * Idempotent: finnes det allerede en purchase-bevegelse på linja, gjør vi
+ * ingenting. Ellers ville et dobbeltklikk lagt varen inn to ganger.
+ */
+export function useReceiveInvoiceLine() {
+  const qc = useQueryClient();
+  const { legalEntityId, user } = useRavarer();
+  return useMutation({
+    mutationFn: async (input: ReceiveLineInput): Promise<{ skipped: boolean }> => {
+      if (!(input.quantity_base > 0)) throw new Error("Linja mangler omregnet mengde");
+      const { data: existing, error: exErr } = await supabase
+        .from("stock_movements")
+        .select("id")
+        .eq("source_table", "invoice_lines")
+        .eq("source_id", input.invoice_line_id)
+        .eq("movement_type", "purchase")
+        .limit(1);
+      if (exErr) throw exErr;
+      if ((existing ?? []).length > 0) return { skipped: true };
+
+      const { error } = await supabase.from("stock_movements").insert({
+        legal_entity_id: legalEntityId,
+        raw_material_id: input.raw_material_id,
+        movement_type: "purchase",
+        quantity_base: input.quantity_base,
+        note: `Mottak faktura ${input.invoice_number}`,
+        occurred_at: input.occurred_at ?? new Date().toISOString(),
+        source_table: "invoice_lines",
+        source_id: input.invoice_line_id,
+        created_by: user?.id ?? null,
+      });
+      if (error) throw error;
+      return { skipped: false };
+    },
+    onSuccess: (res, vars) => {
+      invalidateRawMaterial(qc, vars.raw_material_id);
+      void qc.invalidateQueries({ queryKey: ["receipt-lines", vars.invoice_id] });
+      void qc.invalidateQueries({ queryKey: ["receipt-invoices"] });
+      toast.success(res.skipped ? "Linja er allerede mottatt" : "Ført inn på lager");
+    },
+    onError: (e: unknown) => toast.error(`Kunne ikke motta: ${e instanceof Error ? e.message : String(e)}`),
+  });
+}
