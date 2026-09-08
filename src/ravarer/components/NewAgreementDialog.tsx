@@ -108,7 +108,22 @@ export function NewAgreementDialog({ open, onOpenChange, defaultRawMaterialId, d
         .eq("supplier_id", supplierId)
         .maybeSingle();
 
-      const payload: Record<string, unknown> = {
+      const payload: {
+        raw_material_id: string;
+        supplier_id: string;
+        supplier_sku: string | null;
+        supplier_product_name: string | null;
+        agreed_price: number | null;
+        agreed_price_per_base_unit: number | null;
+        package_size: number | null;
+        package_unit: string | null;
+        agreement_valid_from: string | null;
+        agreement_valid_to: string | null;
+        agreed_price_set_at: string | null;
+        agreed_price_set_by: string | null;
+        is_primary: boolean;
+        agreement_document_url?: string;
+      } = {
         raw_material_id: rawMaterialId,
         supplier_id: supplierId,
         supplier_sku: supplierSku.trim() || null,

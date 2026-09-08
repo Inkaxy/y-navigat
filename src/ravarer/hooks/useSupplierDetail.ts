@@ -193,10 +193,10 @@ export function useSupplierPriceIndex(supplierId: string | undefined) {
       if (invoices.length === 0) return { indexPct: null, materials: 0 };
       const ids = invoices.map((i) => i.id);
 
-      const lines: { raw_material_id: string | null; price_per_base_unit: number | null; created_at: string }[] = [];
+      const lines: { raw_material_id: string | null; price_per_base_unit: number | null; created_at: string | null }[] = [];
       for (let i = 0; i < ids.length; i += 200) {
         const chunk = ids.slice(i, i + 200);
-        const part = await fetchAllRows<{ raw_material_id: string | null; price_per_base_unit: number | null; created_at: string }>(
+        const part = await fetchAllRows<{ raw_material_id: string | null; price_per_base_unit: number | null; created_at: string | null }>(
           (from, to) =>
             supabase
               .from("invoice_lines")
@@ -217,7 +217,8 @@ export function useSupplierPriceIndex(supplierId: string | undefined) {
         const entry = byMaterial.get(rm) ?? { sum: 0, n: 0, latest: null };
         entry.sum += price;
         entry.n += 1;
-        if (!entry.latest || l.created_at > entry.latest.at) entry.latest = { at: l.created_at, price };
+        const at = l.created_at ?? "";
+        if (!entry.latest || at > entry.latest.at) entry.latest = { at, price };
         byMaterial.set(rm, entry);
       }
 
