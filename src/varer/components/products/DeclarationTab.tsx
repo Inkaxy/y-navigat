@@ -439,13 +439,25 @@ const MODE_LABELS: Record<Mode, string> = {
 };
 
 /** Viser hva som faktisk følger produktet nå, og når det sist ble synket. */
-function EffectiveStatusCard({ productId, mode, isOverridden }: { productId: string; mode: Mode; isOverridden: boolean }) {
+function EffectiveStatusCard({
+  productId,
+  mode,
+  isOverridden,
+  onRecompute,
+  recomputing,
+}: {
+  productId: string;
+  mode: Mode;
+  isOverridden: boolean;
+  onRecompute?: () => void;
+  recomputing?: boolean;
+}) {
   const snapshot = useQuery({
     queryKey: ["product-effective-decl", productId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")
-        .select("manual_declaration_updated_at, manual_ingredient_declaration")
+        .select("manual_declaration_updated_at, manual_ingredient_declaration, declaration_needs_review")
         .eq("id", productId)
         .maybeSingle();
       if (error) throw error;
@@ -454,7 +466,23 @@ function EffectiveStatusCard({ productId, mode, isOverridden }: { productId: str
   });
 
   const updated = snapshot.data?.manual_declaration_updated_at;
+  const needsReview = snapshot.data?.declaration_needs_review === true;
   return (
+    <>
+    {needsReview && (
+      <div className="flex flex-wrap items-center gap-2 rounded-md border-2 border-amber-500/60 bg-amber-500/10 px-3 py-2 text-xs">
+        <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+        <span className="flex-1">
+          En råvare er endret siden sist — deklarasjonen bør gjennomgås.
+        </span>
+        {onRecompute && (
+          <Button size="sm" variant="outline" onClick={onRecompute} disabled={recomputing}>
+            {recomputing && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+            Beregn på nytt
+          </Button>
+        )}
+      </div>
+    )}
     <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/30 px-3 py-2 text-xs">
       <ShieldCheck className="h-3.5 w-3.5 text-muted-foreground" />
       <span>
