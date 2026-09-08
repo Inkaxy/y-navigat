@@ -9,7 +9,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Search, Loader2, ChefHat, Plus, Link2, Copy, MoreHorizontal, Wheat, ArrowUp, ArrowDown, ChevronsUpDown, Trash2 } from "lucide-react";
+import { Search, Loader2, ChefHat, Plus, Link2, Copy, MoreHorizontal, Wheat, ArrowUp, ArrowDown, ChevronsUpDown, Trash2, ChevronLeft, ChevronRight, FileStack } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
 import {
@@ -21,6 +21,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { copyRecipe } from "@/varer/lib/copyRecipe";
+import { fetchAllRows } from "@/lib/supabasePaging";
+import { format } from "date-fns";
+import { nb } from "date-fns/locale";
 
 import {
   computeTotalsForRecipe, fmtG, fmtPercent, RECIPE_STATUS_LABEL, type BakersLine, type BakersRawMaterial,
@@ -29,6 +32,10 @@ import { BASE_RECIPE_CATEGORY } from "@/varer/lib/halvfabrikat";
 import {
   asDepartment, RECIPE_DEPARTMENT_BADGE, RECIPE_DEPARTMENT_LABEL, type RecipeDepartment,
 } from "@/varer/lib/departments";
+import { RecipeListCard } from "@/varer/components/recipes/RecipeListCard";
+
+/** Kategoriverdi som markerer en oppskrift som mal for «Ny fra mal». */
+export const RECIPE_TEMPLATE_CATEGORY = "Mal";
 
 /** Valgene i segmentkontrollen for avdeling. */
 const DEPARTMENT_FILTERS: { value: "all" | RecipeDepartment | "none"; label: string }[] = [
