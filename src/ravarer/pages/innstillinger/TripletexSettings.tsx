@@ -226,7 +226,7 @@ function EntityConfig({ legalEntityId }: { legalEntityId: string }) {
       if (error) throw error;
       const res = data as SyncInvoiceResult | null;
       setLastRun(res ?? null);
-      if (res?.skipped) toast.info("Tripletex ikke konfigurert");
+      if (res?.skipped === true) toast.info("Tripletex ikke konfigurert");
       else
         toast.success(
           `Sync kjørt – hentet ${res?.fetched ?? 0}, importert ${res?.imported ?? 0}, hoppet over ${res?.skipped_count ?? res?.skipped ?? 0}, feilet ${res?.failed ?? 0}`,
