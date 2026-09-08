@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
 import type { RecipeDepartment } from "@/varer/lib/departments";
+import { lineCost } from "@/varer/lib/recipeCost";
 import {
   calcWaterTemp,
   computePartSummary,
@@ -87,6 +88,10 @@ export interface RecipePDFData {
     targetDoughTemp: number | null;
     waterTemp: number | null;
     waterTempFeasible: boolean;
+    /** Faktisk rom- og meltemperatur som vanntemperaturen er regnet ut fra. */
+    roomTemp: number;
+    flourTemp: number;
+    prefermentTemp: number | null;
   };
 
   preferments: RecipePDFPart[];
@@ -132,11 +137,8 @@ export interface BuildRecipePDFInput {
   includeCosts?: boolean;
 }
 
-function lineCost(line: BakersLine, grams: number): number | null {
-  const price = Number(line._rm?.current_cost_price ?? NaN);
-  if (!Number.isFinite(price)) return null;
-  if (line.unit === "stk") return (Number(line.quantity) || 0) * price;
-  return (grams / 1000) * price;
+function lineCostOrNull(line: BakersLine, grams: number): number | null {
+  return lineCost(line, grams).cost;
 }
 
 /**
@@ -183,7 +185,7 @@ export function buildRecipePDFData(input: BuildRecipePDFInput): RecipePDFData {
         isSubRecipe: !!l.sub_product_id || !!l._rm?.produced_by_recipe_id,
 
         // Ukjent vekt gir ingen kostpris — 0 g ville blitt 0 kr og skjult mangelen.
-        cost: input.includeCosts && exactWeight ? lineCost(l, exactGrams) : null,
+        cost: input.includeCosts && exactWeight ? lineCostOrNull(l, exactGrams) : null,
       };
     });
     return {
@@ -251,6 +253,9 @@ export function buildRecipePDFData(input: BuildRecipePDFInput): RecipePDFData {
       targetDoughTemp: input.targetDoughTemp ?? null,
       waterTemp: temp.waterTemp,
       waterTempFeasible: temp.feasible,
+      roomTemp: input.roomTemp ?? 21,
+      flourTemp: input.flourTemp ?? 21,
+      prefermentTemp,
     },
     preferments,
     mainParts,

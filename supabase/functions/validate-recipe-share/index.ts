@@ -2,6 +2,7 @@
 // Kostpriser, leverandører, marginer og interne notater forlater ALDRI serveren
 // med mindre lenken eksplisitt er merket med include_costs.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { convertToGrams } from "../_shared/units-recipe.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -30,12 +31,15 @@ function rateCheck(map: Map<string, { count: number; resetAt: number }>, key: st
   return true;
 }
 
-// ---- Bakermatematikk (speiler src/varer/lib/bakers.ts) ----
-const UNIT_TO_G: Record<string, number> = { g: 1, gram: 1, kg: 1000, ml: 1, dl: 100, l: 1000, liter: 1000 };
-
-function toGrams(quantity: unknown, unit: string | null): number {
-  const q = Number(quantity) || 0;
-  return q * (UNIT_TO_G[(unit ?? "g").toLowerCase()] ?? 1);
+// ---- Bakermatematikk ----
+// Bruker den delte enhetsmotoren (_shared/units-recipe.ts), samme fil som
+// oppskriftseditoren i appen. Volum uten kjent tetthet regnes som 1 g/ml, slik
+// at den offentlige visningen fortsatt får en vekt å vise.
+function toGrams(quantity: unknown, unit: string | null, pieceWeightG: number | null = null): number {
+  return convertToGrams(Number(quantity) || 0, unit ?? "g", {
+    densityGPerMl: 1,
+    pieceWeightG,
+  }).grams;
 }
 
 interface Line {
@@ -50,7 +54,13 @@ interface Line {
   water_content_pct_override: number | null;
   entry_mode: string | null;
   sort_order: number | null;
-  _rm: { id: string; name: string; grain_classification: string | null; water_content_pct: number | null } | null;
+  _rm: {
+    id: string;
+    name: string;
+    grain_classification: string | null;
+    water_content_pct: number | null;
+    unit_weight_grams: number | null;
+  } | null;
 }
 
 function isFlour(l: Line): boolean {
@@ -103,7 +113,7 @@ Deno.serve(async (req) => {
     const { data: recipe, error: recErr } = await admin
       .from("recipes")
       .select(
-        "id, name, category, version, description, image_url, unit_weight_grams, units_per_batch, " +
+        "id, name, category, version, description, image_url, unit_weight_grams, units_per_batch, dough_piece_grams, dough_waste_pct, " +
           "target_dough_temp_celsius, friction_factor_celsius, mixing_speed1_minutes, mixing_speed2_minutes, autolyse_minutes",
       )
       .eq("id", link.recipe_id)
@@ -138,7 +148,7 @@ Deno.serve(async (req) => {
     if (rmIds.length) {
       const { data: rms } = await admin
         .from("raw_materials")
-        .select("id, name, grain_classification, water_content_pct, current_cost_price")
+        .select("id, name, grain_classification, water_content_pct, unit_weight_grams, current_cost_price")
         .in("id", rmIds);
       for (const r of (rms ?? []) as any[]) {
         rmMap[r.id] = {
@@ -159,7 +169,7 @@ Deno.serve(async (req) => {
     // Nøkkeltall regnes på serveren, så klienten ikke trenger noe internt.
     let totalFlourG = 0, totalWaterG = 0, totalDoughG = 0, saltG = 0, leavenG = 0;
     for (const l of lines) {
-      const g = toGrams(l.quantity, l.unit);
+      const g = toGrams(l.quantity, l.unit, l._rm?.unit_weight_grams ?? null);
       totalDoughG += g;
       if (isFlour(l)) totalFlourG += g;
       totalWaterG += (g * waterPct(l)) / 100;
@@ -169,7 +179,7 @@ Deno.serve(async (req) => {
     }
     const prefermentFlourG = lines
       .filter((l) => isFlour(l) && (parts ?? []).some((p: any) => p.id === l.recipe_part_id && p.part_type === "preferment"))
-      .reduce((s, l) => s + toGrams(l.quantity, l.unit), 0);
+      .reduce((s, l) => s + toGrams(l.quantity, l.unit, l._rm?.unit_weight_grams ?? null), 0);
     const pct = (v: number) => (totalFlourG > 0 ? (v / totalFlourG) * 100 : 0);
     const uw = Number(recipe.unit_weight_grams) || 0;
 

@@ -7,7 +7,8 @@ import { Loader2, FileText, Link2Off, Clock, HelpCircle } from "lucide-react";
 import { ScalePanel } from "@/varer/components/recipes/ScalePanel";
 import { useRecipePDF, buildRecipePDFData } from "@/varer/hooks/useRecipePDF";
 import {
-  computeTotals, scaleFactor, scaleLines, scaledSummary, roundBakerGrams, weighingOrder,
+  computeTotalsForRecipe, convertToGrams, lineConvertOptions, lineToGrams,
+  scaleFactor, scaleLines, scaledSummary, roundBakerGrams, weighingOrder,
   lineDisplayName, fmtG, fmtPercent, fmtDuration, isFlourLine,
   PREFERMENT_KIND_OPTIONS, STEP_TYPE_LABEL, type BakersLine,
 } from "@/varer/lib/bakers";
@@ -92,7 +93,13 @@ export default function PublicRecipe() {
   const lines: BakersLine[] = useMemo(() => (bundle?.lines ?? []) as BakersLine[], [bundle]);
 
   const baseTotals = useMemo(
-    () => computeTotals(lines, Number(recipe?.unit_weight_grams) || null),
+    () =>
+      computeTotalsForRecipe(lines, {
+        unit_weight_grams: recipe?.unit_weight_grams ?? null,
+        dough_piece_grams: recipe?.dough_piece_grams ?? null,
+        dough_waste_pct: recipe?.dough_waste_pct ?? null,
+        units_per_batch: recipe?.units_per_batch ?? null,
+      }),
     [lines, recipe],
   );
 
@@ -142,8 +149,8 @@ export default function PublicRecipe() {
     if (l._displayPercent != null) return l._displayPercent;
     const flour = baseTotals.totalFlourG;
     if (!flour) return 0;
-    const g = Number(l.quantity) || 0;
-    return (g * (l.unit === "kg" ? 1000 : 1) / flour) * 100;
+    // Samme enhetsmotor som i editoren — «2 l melk» blir 2 000 g, ikke 2 g.
+    return (lineToGrams(l).grams / flour) * 100;
   }
 
   function partTitle(p: any) {
@@ -272,7 +279,12 @@ export default function PublicRecipe() {
                             <span className={isFlourLine(l) ? "font-medium" : ""}>{lineDisplayName(l)}</span>
                           </td>
                           <td className="w-24 py-1.5 text-right tabular-nums">
-                            {fmtG(Number(l.quantity) * (l.unit === "kg" ? 1000 : 1))} {l.unit === "stk" ? "stk" : "g"}
+                            {(() => {
+                              const g = convertToGrams(l.quantity, l.unit, lineConvertOptions(l));
+                              return g.exact
+                                ? `${fmtG(g.grams)} g`
+                                : `${fmtG(Number(l.quantity) || 0)} ${l.unit}`;
+                            })()}
                           </td>
                           <td className="w-20 py-1.5 text-right tabular-nums text-xs text-muted-foreground">
                             {fmtPercent(percentFor(l))}

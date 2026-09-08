@@ -150,6 +150,9 @@ export function RecipePDFDocument({ data }: { data: RecipePDFData }) {
     { label: "Forfermentert", value: pct(s.prefermentedFlourPct) },
     { label: "Ønsket deigtemp", value: s.targetDoughTemp != null ? `${fmtNum(s.targetDoughTemp, 1)} °C` : "—" },
     { label: "Vanntemp", value: s.waterTempFeasible && s.waterTemp != null ? `${fmtNum(s.waterTemp, 1)} °C` : "—" },
+    { label: "Romtemp", value: `${fmtNum(s.roomTemp, 1)} °C` },
+    { label: "Meltemp", value: `${fmtNum(s.flourTemp, 1)} °C` },
+    { label: "Fordeigtemp", value: s.prefermentTemp != null ? `${fmtNum(s.prefermentTemp, 1)} °C` : "—" },
   ];
 
   const headMeta = `${fmtNum(data.scaledUnits)} stk · v${data.version ?? 1} · ${fmtDate(data.printedAt)}`;

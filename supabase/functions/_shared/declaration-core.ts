@@ -5,6 +5,9 @@
 
 export { ALLERGEN_LABEL, highlightAllergens } from "./allergen-labels.ts";
 import { ALLERGEN_LABEL, highlightAllergens } from "./allergen-labels.ts";
+import { computeUnitCount, convertToGrams, resolveFinalWeight } from "./units-recipe.ts";
+export { computeUnitCount, resolveFinalWeight };
+
 
 export const NUT_FIELDS = [
   "energy_kj", "energy_kcal", "fat_g", "saturated_fat_g", "carbs_g", "sugars_g", "fiber_g", "protein_g", "salt_g",
@@ -14,17 +17,26 @@ export const BRAN_FACTOR: Record<string, number> = {
   wheat_bran: 4.5, rye_bran: 4.0, oat_bran: 2.0,
 };
 
-export function toGrams(qty: number, unit: string, unitWeightG: number | null): number {
-  const u = (unit || "").toLowerCase();
-  if (u === "g") return qty;
-  if (u === "kg") return qty * 1000;
-  if (u === "ml") return qty;
-  if (u === "cl") return qty * 10;
-  if (u === "dl") return qty * 100;
-  if (u === "l" || u === "liter") return qty * 1000;
-  if (u === "stk") return qty * (unitWeightG ?? 0);
-  return 0;
+/**
+ * Gram-konvertering for deklarasjoner. Bruker den delte enhetsmotoren
+ * (units-recipe.ts) slik at oppskriftseditor, PDF og deklarasjon regner likt.
+ *
+ * Deklarasjonen må alltid ende med en vekt, så volum uten oppgitt tetthet
+ * regnes som 1 g/ml — samme antakelse som før. Kallere som kjenner tettheten
+ * sender den inn og får et riktigere tall.
+ */
+export function toGrams(
+  qty: number,
+  unit: string,
+  unitWeightG: number | null,
+  densityGPerMl: number | null = 1,
+): number {
+  return convertToGrams(qty, unit, {
+    pieceWeightG: unitWeightG,
+    densityGPerMl: densityGPerMl ?? 1,
+  }).grams;
 }
+
 
 export function normName(s: string): string {
   return s.toLowerCase().trim().replace(/\s*\([^)]*\)\s*$/, "").replace(/\s+/g, " ");
