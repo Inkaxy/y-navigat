@@ -107,6 +107,16 @@ export default function TripletexSettings() {
   );
 }
 
+interface SyncInvoiceResult {
+  skipped?: boolean | number;
+  skipped_count?: number;
+  fetched?: number;
+  imported?: number;
+  failed?: number;
+  ufullstendig_henting?: boolean;
+  errors?: { invoice_number: string; reason: string }[];
+}
+
 function EntityConfig({ legalEntityId }: { legalEntityId: string }) {
   const qc = useQueryClient();
   const { data: cred, isLoading } = useTripletexCredentials(legalEntityId);
@@ -118,6 +128,8 @@ function EntityConfig({ legalEntityId }: { legalEntityId: string }) {
   const [consumerToken, setConsumerToken] = useState("");
   const [employeeToken, setEmployeeToken] = useState("");
   const [syncEnabled, setSyncEnabled] = useState(false);
+  const [supplierSyncing, setSupplierSyncing] = useState(false);
+  const [lastRun, setLastRun] = useState<SyncInvoiceResult | null>(null);
   const [frequency, setFrequency] = useState(60);
   const [testing, setTesting] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -212,14 +224,39 @@ function EntityConfig({ legalEntityId }: { legalEntityId: string }) {
         body: { legal_entity_id: legalEntityId },
       });
       if (error) throw error;
-      if ((data as any)?.skipped) toast.info("Tripletex ikke konfigurert");
-      else toast.success(`Sync kjørt – hentet ${(data as any)?.fetched ?? 0} bilag`);
+      const res = data as SyncInvoiceResult | null;
+      setLastRun(res ?? null);
+      if (res?.skipped) toast.info("Tripletex ikke konfigurert");
+      else
+        toast.success(
+          `Sync kjørt – hentet ${res?.fetched ?? 0}, importert ${res?.imported ?? 0}, hoppet over ${res?.skipped_count ?? res?.skipped ?? 0}, feilet ${res?.failed ?? 0}`,
+        );
       qc.invalidateQueries({ queryKey: ["tripletex-sync-log", legalEntityId] });
       qc.invalidateQueries({ queryKey: ["tripletex-credentials", legalEntityId] });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Sync feilet");
     } finally {
       setSyncing(false);
+    }
+  };
+
+  const handleSupplierSync = async () => {
+    setSupplierSyncing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("tripletex-sync-suppliers", {
+        body: { legal_entity_id: legalEntityId },
+      });
+      if (error) throw error;
+      const res = data as { hentet?: number; opprettet?: number; oppdatert?: number; hoppet?: number } | null;
+      toast.success(
+        `Leverandører: ${res?.hentet ?? 0} hentet, ${res?.opprettet ?? 0} nye, ${res?.oppdatert ?? 0} oppdatert${res?.hoppet ? `, ${res.hoppet} hoppet over` : ""}`,
+      );
+      qc.invalidateQueries({ queryKey: ["tripletex-credentials", legalEntityId] });
+      qc.invalidateQueries({ queryKey: ["suppliers"] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Leverandørsynk feilet");
+    } finally {
+      setSupplierSyncing(false);
     }
   };
 
@@ -337,14 +374,85 @@ function EntityConfig({ legalEntityId }: { legalEntityId: string }) {
               {saving ? "Lagrer…" : "Lagre"}
             </Button>
             {isConfigured && (
-              <Button variant="outline" onClick={handleSyncNow} disabled={syncing} className="gap-2">
-                <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
-                {syncing ? "Synker…" : "Synk nå"}
-              </Button>
+              <>
+                <Button variant="outline" onClick={handleSyncNow} disabled={syncing} className="gap-2">
+                  <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
+                  {syncing ? "Synker fakturaer…" : "Kjør fakturasynk nå"}
+                </Button>
+                <Button variant="outline" onClick={handleSupplierSync} disabled={supplierSyncing} className="gap-2">
+                  <RefreshCw className={`h-4 w-4 ${supplierSyncing ? "animate-spin" : ""}`} />
+                  {supplierSyncing ? "Synker leverandører…" : "Kjør leverandørsynk nå"}
+                </Button>
+              </>
             )}
           </div>
         </CardContent>
       </Card>
+
+      {isConfigured && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Synkstatus</CardTitle>
+            <CardDescription>Siste kjøring, feil og hvor langt importen har kommet.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Siste fakturasynk</p>
+                <p>{cred?.last_synced_at ? new Date(cred.last_synced_at).toLocaleString("nb-NO") : "Aldri"}</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Siste leverandørsynk</p>
+                <p>{cred?.last_supplier_sync_at ? new Date(cred.last_supplier_sync_at).toLocaleString("nb-NO") : "Aldri"}</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Synket til og med</p>
+                <p>{cred?.last_invoice_synced_date ?? "—"}</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Status</p>
+                <p>
+                  <Badge
+                    variant={
+                      cred?.last_sync_status === "success"
+                        ? "secondary"
+                        : cred?.last_sync_status === "error"
+                          ? "destructive"
+                          : "outline"
+                    }
+                  >
+                    {cred?.last_sync_status ?? "ukjent"}
+                  </Badge>
+                </p>
+              </div>
+            </div>
+            {cred?.last_sync_error && (
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>{cred.last_sync_error}</AlertDescription>
+              </Alert>
+            )}
+            {lastRun && (
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground">
+                  Siste kjøring: {lastRun.fetched ?? 0} hentet, {lastRun.imported ?? 0} importert,{" "}
+                  {lastRun.skipped_count ?? lastRun.skipped ?? 0} hoppet over, {lastRun.failed ?? 0} feilet
+                  {lastRun.ufullstendig_henting ? " (ufullstendig henting)" : ""}
+                </p>
+                {lastRun.errors && lastRun.errors.length > 0 && (
+                  <ul className="space-y-1 rounded-md border p-2 text-xs">
+                    {lastRun.errors.map((e, i) => (
+                      <li key={`${e.invoice_number}-${i}`} className="text-destructive">
+                        Faktura {e.invoice_number}: {e.reason}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader className="pb-3">
