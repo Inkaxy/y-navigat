@@ -2,10 +2,15 @@ import { useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Copy, PackagePlus, ShoppingCart } from "lucide-react";
+import { Copy, Download, PackagePlus, ShoppingCart } from "lucide-react";
 import { toast } from "sonner";
 import { formatNumber } from "@/ravarer/lib/constants";
-import { reorderGroupToText, useReorderSuggestions } from "@/ravarer/hooks/useResaleStock";
+import {
+  reorderGroupToCsv,
+  reorderGroupToText,
+  useReorderSuggestions,
+  type ReorderGroup,
+} from "@/ravarer/hooks/useResaleStock";
 
 const kr = (n: number | null) =>
   n == null ? "—" : new Intl.NumberFormat("nb-NO", { style: "currency", currency: "NOK", maximumFractionDigits: 0 }).format(n);
@@ -26,6 +31,17 @@ export function ReorderSuggestions() {
   const copy = async (text: string) => {
     await navigator.clipboard.writeText(text);
     toast.success("Kopiert til utklippstavlen");
+  };
+
+  const downloadCsv = (group: ReorderGroup) => {
+    // BOM slik at Excel viser æ, ø og å riktig.
+    const blob = new Blob(["\uFEFF" + reorderGroupToCsv(group)], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `bestilling-${group.supplier_name.replace(/[^\wæøåÆØÅ-]+/g, "-").toLowerCase()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   if (isLoading || groups.length === 0) return null;
