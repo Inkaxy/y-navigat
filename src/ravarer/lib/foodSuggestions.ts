@@ -298,6 +298,16 @@ interface ScoreResult {
   percentMismatch: boolean;
 }
 
+/** Fradrag per prosentpoengs avvik ved feil fettprosent, for å skille søsken. */
+const PERCENT_DIFF_PENALTY = 0.01;
+
+/** Minste |avvik| mellom to prosentlister — 0 hvis en av dem er tom. */
+function minPercentDiff(a: readonly number[], b: readonly number[]): number {
+  let min = Infinity;
+  for (const x of a) for (const y of b) min = Math.min(min, Math.abs(x - y));
+  return Number.isFinite(min) ? min : 0;
+}
+
 function scoreFood(query: Query, food: FoodCandidate, variantSpecified: boolean): ScoreResult {
   const full = normalizeForSearch(food.food_name);
   const h = head(food.food_name);
@@ -320,8 +330,11 @@ function scoreFood(query: Query, food: FoodCandidate, variantSpecified: boolean)
     if (query.percents.length > 0 && foodPercents.length > 0) {
       const hit = query.percents.some((p) => foodPercents.includes(p));
       if (!hit) {
-        // Sperr på nærmeste avvik: begrunnelsen skal peke på det tetteste alternativet.
-        return { score: PERCENT_MISMATCH_SCORE, percentMismatch: true };
+        // Sperr på nærmeste avvik, men rangér kandidatene etter hvor tett de
+        // faktisk ligger — begrunnelsen skal kunne peke på det nærmeste.
+        const diff = minPercentDiff(query.percents, foodPercents);
+        const score = Math.max(0.5, PERCENT_MISMATCH_SCORE - diff * PERCENT_DIFF_PENALTY);
+        return { score, percentMismatch: true };
       }
       let score = 1;
       for (const q of quals) {
@@ -329,6 +342,9 @@ function scoreFood(query: Query, food: FoodCandidate, variantSpecified: boolean)
       }
       // Fasit-merket i innkjøpsnavnet stemmer med merket i matvarenavnet.
       if (query.brand && quals[quals.length - 1] === query.brand) score += 0.02;
+      // «Uspesifisert» er en gjettevariant når innkjøpsnavnet faktisk nevner et
+      // merke — den skal ikke stå likt med varianten som stemmer på merket.
+      else if (query.brand && quals[quals.length - 1] === UNIVERSAL_DEFAULT_QUALIFIER) score -= 0.03;
       return { score: Math.min(1, score), percentMismatch: false };
     }
 
@@ -568,7 +584,7 @@ export function assessSuggestions(
   if (askedPct.length > 0 && topPct.length > 0 && !askedPct.some((p) => topPct.includes(p))) {
     return {
       autoLinkAllowed: false,
-      reason: `Fettprosent avviker (råvare ${askedPct.join("/")} % · forslag ${topPct.join("/")} %) — velg selv`,
+      reason: `Fettprosent avviker (råvare ${askedPct.join("/")} % · nærmeste forslag er ${top.food_name} med ${topPct.join("/")} %) — velg selv`,
     };
   }
 
