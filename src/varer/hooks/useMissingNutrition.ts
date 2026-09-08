@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { MANUAL_NUTRITION_SOURCE } from "@/ravarer/lib/nutritionSource";
+import { recomputeRecipesForRawMaterial } from "@/varer/lib/recomputeFanout";
 
 export interface MissingNutritionRow {
   raw_material_id: string | null;
@@ -81,9 +82,10 @@ export function useExtractNutritionFromDatasheet() {
       }
       return applied;
     },
-    onSuccess: () => {
+    onSuccess: (_res, input) => {
       qc.invalidateQueries({ queryKey: ["datasheets-for-missing"] });
       qc.invalidateQueries({ queryKey: ["raw-material-nutrition"] });
+      void recomputeRecipesForRawMaterial(input.raw_material_id, qc);
       toast.success("Næringsdata lest ut fra databladet");
     },
     onError: (e: any) => toast.error(e.message ?? "Uttrekk feilet"),
@@ -108,8 +110,9 @@ export function useSaveRawMaterialNutrition() {
       );
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_res, input) => {
       qc.invalidateQueries({ queryKey: ["raw-material-nutrition"] });
+      void recomputeRecipesForRawMaterial(input.raw_material_id, qc);
       toast.success("Næringsdata lagret");
     },
     onError: (e: any) => toast.error(e.message),

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { recomputeRecipesForRawMaterial } from "@/varer/lib/recomputeFanout";
 
 export interface DeclarationWorklistRow {
   raw_material_id: string;
@@ -64,6 +65,7 @@ export function useSaveDeclarationName() {
       qc.invalidateQueries({ queryKey: ["declaration-worklist"] });
       qc.invalidateQueries({ queryKey: ["raw_materials"] });
       qc.invalidateQueries({ queryKey: ["raw_material", res.rawMaterialId] });
+      void recomputeRecipesForRawMaterial(res.rawMaterialId, qc, { silent: res.silent });
       // `silent` brukes av «Lagre alle utfylte», som gir én oppsummering til slutt.
       if (!res.silent) toast.success(`Deklarasjonsnavn lagret: «${res.value}»`);
     },

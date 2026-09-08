@@ -4,6 +4,7 @@ import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { toast } from "sonner";
 import { fetchAllRows } from "@/lib/supabasePaging";
 import { invalidateRawMaterial } from "@/ravarer/lib/invalidate";
+import { recomputeRecipesForRawMaterial } from "@/varer/lib/recomputeFanout";
 
 export interface FoodRow {
   food_id: string;
@@ -149,6 +150,8 @@ export function useApplyMatvaretabellen() {
       invalidateRawMaterial(qc, input.rawMaterialId);
       void qc.invalidateQueries({ queryKey: ["matvaretabellen_links"] });
       void qc.invalidateQueries({ queryKey: ["nutrition-coverage"] });
+      // Oppskriftene som bruker råvaren beregnes på nytt i bakgrunnen.
+      void recomputeRecipesForRawMaterial(input.rawMaterialId, qc, { silent: input.silent });
       if (input.silent) return;
       toast.success(
         input.declarationNameSet
