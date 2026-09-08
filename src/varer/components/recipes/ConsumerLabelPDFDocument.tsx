@@ -27,6 +27,8 @@ export interface ConsumerLabelData {
   ingredientText: string;
   /** Allergennavn som skal stå i fet skrift i ingredienslisten. */
   allergenTerms: string[];
+  /** «Kan inneholde spor av …» — skal stå på etiketten, ikke bare i visningen. */
+  mayContain: string[];
   netWeightText: string | null;
   shelfLifeText: string | null;
   storageText: string | null;
@@ -115,6 +117,13 @@ export function ConsumerLabelPDFDocument({
           <Text style={styles.h}>Ingredienser</Text>
           {renderIngredients(data.ingredientText, data.allergenTerms, fs)}
         </View>
+
+        {data.mayContain.length > 0 && (
+          <Text style={[styles.section, { fontSize: fs }]}>
+            <Text style={{ fontFamily: "Helvetica-Bold" }}>Kan inneholde spor av: </Text>
+            {data.mayContain.join(", ")}
+          </Text>
+        )}
 
         {data.netWeightText && (
           <Text style={styles.section}>Nettovekt: {data.netWeightText}</Text>
