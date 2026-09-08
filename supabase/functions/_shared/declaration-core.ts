@@ -79,7 +79,12 @@ export type FlatLine = {
   water_content_source: "override" | "raw_material" | "unknown";
   allergens: string[];
   may_allergens: string[];
+  /** Allergener som kommer fra en sammensatt forelder — vises IKKE i parentes på linjen. */
+  inherited_allergens: string[];
+  inherited_may_allergens: string[];
   has_nutrition: boolean;
+  /** Råvaren næringen skal hentes fra når linjen selv ikke har en rad (tekstkomponent). */
+  nutrition_ref: string | null;
 };
 
 export type Agg = {
@@ -96,7 +101,10 @@ export type Agg = {
   water_content_source: "override" | "raw_material" | "unknown";
   allergens: Set<string>;
   may_allergens: Set<string>;
+  inherited_allergens: Set<string>;
+  inherited_may_allergens: Set<string>;
   has_nutrition: boolean;
+  nutrition_ref: string | null;
   sources: Set<"master" | "extra">;
   parent_ids: Set<string>;
 };
@@ -128,17 +136,32 @@ export type CoreResult = {
 
 /**
  * Tekstkomponenter i en sammensatt råvare har ingen egen næring eller allergener.
- * Forelderens rad gjelder hele massen, så tekstandelen arver den forholdsmessig.
+ * Forelderens allergener gjelder massen som HELHET — de skal telle med i
+ * «Inneholder», men aldri skrives som parentes på delkomponenten. Ellers ble
+ * «sukker» til «sukker (melk, soya)» i ingredienslisten.
  */
 export function textComponentInheritance(
   parentHasNutrition: boolean,
   parentAllergens: readonly string[],
   parentMayAllergens: readonly string[],
   componentAllergens: readonly string[],
-): { has_nutrition: boolean; allergens: string[]; may_allergens: string[] } {
-  const allergens = componentAllergens.length > 0 ? [...componentAllergens] : [...parentAllergens];
-  const may = parentMayAllergens.filter((a) => !allergens.includes(a));
-  return { has_nutrition: parentHasNutrition, allergens, may_allergens: may };
+): {
+  has_nutrition: boolean;
+  allergens: string[];
+  may_allergens: string[];
+  inherited_allergens: string[];
+  inherited_may_allergens: string[];
+} {
+  const allergens = [...componentAllergens];
+  const inherited = parentAllergens.filter((a) => !allergens.includes(a));
+  const inheritedMay = parentMayAllergens.filter((a) => !allergens.includes(a) && !inherited.includes(a));
+  return {
+    has_nutrition: parentHasNutrition,
+    allergens,
+    may_allergens: [],
+    inherited_allergens: inherited,
+    inherited_may_allergens: inheritedMay,
+  };
 }
 
 const RM_SELECT = "id, name, declaration_name, is_composite, grain_classification, cereal_type, water_content_pct, components_reviewed_at, unit_weight_grams";
@@ -307,7 +330,10 @@ export async function computeDeclarationCore(service: any, topLines: TopLine[]):
         water_content_source: w.source,
         allergens,
         may_allergens: may,
+        inherited_allergens: [],
+        inherited_may_allergens: [],
         has_nutrition: rmId ? !!nutritionByRm.get(rmId) : false,
+        nutrition_ref: null,
       }];
     }
     if (rmId && !rm?.components_reviewed_at) {
@@ -357,7 +383,11 @@ export async function computeDeclarationCore(service: any, topLines: TopLine[]):
           water_content_source: "unknown",
           allergens: inherited.allergens,
           may_allergens: inherited.may_allergens,
+          inherited_allergens: inherited.inherited_allergens,
+          inherited_may_allergens: inherited.inherited_may_allergens,
           has_nutrition: inherited.has_nutrition,
+          // Næringen ligger på forelderen; andelen her dekkes forholdsmessig.
+          nutrition_ref: rmId,
         });
       }
     }
@@ -382,6 +412,8 @@ export async function computeDeclarationCore(service: any, topLines: TopLine[]):
         cereal_type: rm?.cereal_type ?? null,
         water_content_pct: w.pct, water_content_source: w.source,
         allergens: [], may_allergens: [],
+        inherited_allergens: [], inherited_may_allergens: [],
+        nutrition_ref: null,
         has_nutrition: t.raw_material_id ? !!nutritionByRm.get(t.raw_material_id) : false,
       });
       continue;
@@ -399,6 +431,9 @@ export async function computeDeclarationCore(service: any, topLines: TopLine[]):
       ex.is_quid = ex.is_quid || l.is_quid;
       for (const a of l.allergens) ex.allergens.add(a);
       for (const a of l.may_allergens) ex.may_allergens.add(a);
+      for (const a of l.inherited_allergens) ex.inherited_allergens.add(a);
+      for (const a of l.inherited_may_allergens) ex.inherited_may_allergens.add(a);
+      if (!ex.nutrition_ref && l.nutrition_ref) ex.nutrition_ref = l.nutrition_ref;
       ex.sources.add(l.source);
       if (l.from_composite_parent_id) ex.parent_ids.add(l.from_composite_parent_id);
       if (ex.water_content_source === "unknown" && l.water_content_source !== "unknown") {
@@ -414,6 +449,9 @@ export async function computeDeclarationCore(service: any, topLines: TopLine[]):
         water_content_pct: l.water_content_pct,
         water_content_source: l.water_content_source,
         allergens: new Set(l.allergens), may_allergens: new Set(l.may_allergens),
+        inherited_allergens: new Set(l.inherited_allergens),
+        inherited_may_allergens: new Set(l.inherited_may_allergens),
+        nutrition_ref: l.nutrition_ref,
         has_nutrition: l.has_nutrition, sources: new Set([l.source]),
         parent_ids: new Set(l.from_composite_parent_id ? [l.from_composite_parent_id] : []),
       });
@@ -492,7 +530,10 @@ export async function computeDeclarationCore(service: any, topLines: TopLine[]):
   const mayContainSet = new Set<string>();
   for (const a of sortedAgg) {
     for (const al of a.allergens) allergenSet.add(al);
+    // Arvede allergener teller i «Inneholder», men står ikke i parentes på linjen.
+    for (const al of a.inherited_allergens) allergenSet.add(al);
     for (const al of a.may_allergens) if (!allergenSet.has(al)) mayContainSet.add(al);
+    for (const al of a.inherited_may_allergens) if (!allergenSet.has(al)) mayContainSet.add(al);
   }
   const containsList = [...allergenSet].map((a) => ALLERGEN_LABEL[a] ?? a).sort();
   const mayContainList = [...mayContainSet].map((a) => ALLERGEN_LABEL[a] ?? a).sort();
@@ -501,7 +542,11 @@ export async function computeDeclarationCore(service: any, topLines: TopLine[]):
   const nutritionTotals: Record<string, number> = {};
   let coveredGrams = 0;
   for (const a of sortedAgg) {
-    const n = a.raw_material_id ? nutritionByRm.get(a.raw_material_id) : null;
+    const n = a.raw_material_id
+      ? nutritionByRm.get(a.raw_material_id)
+      : a.nutrition_ref
+        ? nutritionByRm.get(a.nutrition_ref)
+        : null;
     if (!n) continue;
     coveredGrams += a.effective_grams;
     for (const f of NUT_FIELDS) {

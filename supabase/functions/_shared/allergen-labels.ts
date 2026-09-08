@@ -39,8 +39,12 @@ export function highlightAllergens(html: string, allergens: readonly string[]): 
     let hit = false;
     for (let i = 0; i < parts.length; i++) {
       if (parts[i].startsWith("<")) continue;
-      if (i > 0 && parts[i - 1] === "<strong>") continue;
       if (!re.test(parts[i])) continue;
+      if (i > 0 && parts[i - 1] === "<strong>") {
+        // Allerede uthevet — hverken marker på nytt eller legg det til i parentes.
+        hit = true;
+        break;
+      }
 
       parts[i] = parts[i].replace(re, "<strong>$1</strong>");
       hit = true;

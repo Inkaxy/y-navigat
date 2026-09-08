@@ -179,3 +179,52 @@ Deno.test("gyldighet: uten kontraktsperiode brukes dagens dato og åpen slutt", 
   assertEquals(r.validFrom, "2026-09-08");
   assertEquals(r.validTo, null);
 });
+
+// Prisenheten som fronten sender MÅ være kanonisk. Fritekst som «kr/kg» kom fra
+// et åpent tekstfelt i live-forhandlingen og stoppet hele bekreftelsen.
+Deno.test("prisenhet: RFQ sender baseenheten «kg»", () => {
+  const { errors, prepared } = run([
+    {
+      negotiation_item_id: "item-1",
+      winner_recipient_id: "rec-1",
+      winner_response_id: "resp-1",
+      agreed_price: 12,
+      agreed_price_unit: "kg",
+      apply_to_supplier: true,
+    },
+  ]);
+  assertEquals(errors, []);
+  assertEquals(prepared[0].agreed_price_per_base_unit, 12);
+});
+
+Deno.test("prisenhet: live sender «sekk» med pakning", () => {
+  const { errors, prepared } = run([
+    {
+      negotiation_item_id: "item-1",
+      winner_recipient_id: "rec-1",
+      winner_response_id: "resp-1",
+      agreed_price: 250,
+      agreed_price_unit: "sekk",
+      agreed_package_size: 25,
+      agreed_package_unit: "kg",
+      apply_to_supplier: true,
+    },
+  ]);
+  assertEquals(errors, []);
+  assertEquals(prepared[0].agreed_price_per_base_unit, 10);
+});
+
+Deno.test("prisenhet: fritekst «kr/kg» avvises", () => {
+  const { errors, prepared } = run([
+    {
+      negotiation_item_id: "item-1",
+      winner_recipient_id: "rec-1",
+      winner_response_id: "resp-1",
+      agreed_price: 12,
+      agreed_price_unit: "kr/kg",
+      apply_to_supplier: true,
+    },
+  ]);
+  assertEquals(errors.length > 0, true);
+  assertEquals(prepared.length, 0);
+});

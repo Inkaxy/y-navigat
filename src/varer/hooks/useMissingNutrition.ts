@@ -95,14 +95,13 @@ export function useSaveRawMaterialNutrition() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: { raw_material_id: string; values: Record<string, number | null> }) => {
-      const { data: u } = await supabase.auth.getUser();
+      // Manuell utfylling er IKKE en verifisering — den skal ikke sette
+      // verified_at/verified_by, ellers ser uverifiserte tall verifiserte ut.
       const { error } = await supabase.from("raw_material_nutrition").upsert(
         {
           raw_material_id: input.raw_material_id,
           ...input.values,
           source: MANUAL_NUTRITION_SOURCE,
-          verified_at: new Date().toISOString(),
-          verified_by: u.user?.id ?? null,
           updated_at: new Date().toISOString(),
         } as never,
         { onConflict: "raw_material_id" },

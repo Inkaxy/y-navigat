@@ -141,6 +141,8 @@ export default function LiveForhandlingSetup() {
               <SelectValue placeholder="Velg leverandør" />
             </SelectTrigger>
             <SelectContent>
+              {/* Bare leverandører med «Følg fakturalinjer» er med: forhandling bygger på
+fakturahistorikk, og uten den finnes verken volum eller prisgrunnlag. */}
               {suppliers.filter((s) => s.is_active && s.track_invoice_lines).map((s) => (
                 <SelectItem key={s.id} value={s.id}>
                   {s.name}
@@ -148,6 +150,10 @@ export default function LiveForhandlingSetup() {
               ))}
             </SelectContent>
           </Select>
+          <p className="text-xs text-ink-secondary">
+            Bare aktive leverandører merket med «Følg fakturalinjer» kan velges — forhandlingen
+            trenger fakturahistorikken for å vise volum og priser.
+          </p>
         </div>
 
         <div className="space-y-2">

@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useChangelog, useAcknowledgeChange, type ChangelogRow } from "@/ravarer/hooks/useDatasheets";
 import { formatDate } from "@/ravarer/lib/constants";
-import { nutritionValueDiff } from "@/ravarer/lib/nutritionLabels";
+import { nutritionValueDiff, nutritionObjectDiff, NUTRITION_LABELS } from "@/ravarer/lib/nutritionLabels";
 import { useNavigate } from "react-router-dom";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { toast } from "sonner";
@@ -140,7 +140,7 @@ export default function DatabladEndringer() {
                   <div className="text-xs uppercase tracking-wider text-ink-secondary mb-2">Endring</div>
                   <div className="text-sm font-medium">{describeChange(selected)}</div>
                   {(() => {
-                    const diff = nutritionValueDiff(selected.old_value, selected.new_value);
+                    const diff = diffRows(selected);
                     if (diff) {
                       return (
                         <table className="mt-3 w-full text-sm">
@@ -197,11 +197,23 @@ export default function DatabladEndringer() {
   );
 }
 
-function describeChange(c: ChangelogRow): string {
+/**
+ * Radene lagrer per-felt skalarer, ikke jsonb-objekter. Uten dette ble
+ * tabellen aldri vist for nye rader.
+ */
+function diffRows(c: ChangelogRow) {
+  if (c.change_type === "nutrition_changed" && c.field) {
+    return [nutritionValueDiff(c.field, c.old_value, c.new_value)];
+  }
+  return nutritionObjectDiff(c.old_value, c.new_value);
+}
+
+export function describeChange(c: ChangelogRow): string {
+  const fieldLabel = c.field ? (NUTRITION_LABELS[c.field] ?? c.field) : "";
   const map: Record<string, string> = {
-    allergen_added: `Allergen lagt til (${c.field})`,
-    allergen_removed: `Allergen fjernet (${c.field})`,
-    nutrition_changed: `Næring endret: ${c.field}`,
+    allergen_added: `Allergen lagt til (${fieldLabel})`,
+    allergen_removed: `Allergen fjernet (${fieldLabel})`,
+    nutrition_changed: `Næring endret: ${fieldLabel}`,
     composition_changed: `Sammensetning endret`,
     grain_changed: `Brødskala endret`,
     package_changed: `Pakningsstørrelse endret`,

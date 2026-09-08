@@ -72,6 +72,23 @@ export default function KobleMatvaretabellen() {
     [rows],
   );
 
+  // Hvorfor står radene igjen? Uten dette så man bare at ingenting ble koblet.
+  const blockedCounts = useMemo(() => {
+    let margin = 0;
+    let variant = 0;
+    let manual = 0;
+    let weak = 0;
+    for (const r of rows) {
+      const reason = r.safety.reason;
+      if (!reason || r.safety.autoLinkAllowed) continue;
+      if (reason.startsWith("Flere nesten like treff")) margin++;
+      else if (reason.startsWith("Generisk samlepost")) manual++;
+      else if (reason.startsWith("Usikkert treff") || reason === "Ingen forslag") weak++;
+      else variant++;
+    }
+    return { margin, variant, manual, weak };
+  }, [rows]);
+
   const busy = !!bulk || !!busyId;
   const coveragePct =
     coverage.data && coverage.data.total > 0
@@ -189,6 +206,23 @@ export default function KobleMatvaretabellen() {
           Prosenten på forslagene er tekstlikhet, ikke en garanti. Varianter som fettprosent, rå/kokt/tørket,
           saltet/usaltet og glutenfri må alltid velges manuelt.
         </p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {groupPenaltyCount > 0 && (
+            <Badge variant="outline">{groupPenaltyCount} feil matvaregruppe</Badge>
+          )}
+          {blockedCounts.margin > 0 && (
+            <Badge variant="outline">{blockedCounts.margin} sperret på margin</Badge>
+          )}
+          {blockedCounts.variant > 0 && (
+            <Badge variant="outline">{blockedCounts.variant} sperret på variant</Badge>
+          )}
+          {blockedCounts.manual > 0 && (
+            <Badge variant="outline">{blockedCounts.manual} krever manuelt valg</Badge>
+          )}
+          {blockedCounts.weak > 0 && (
+            <Badge variant="outline">{blockedCounts.weak} for svakt treff</Badge>
+          )}
+        </div>
         {groupPenaltyCount > 0 && (
           <p className="mt-1 text-xs text-ink-secondary">
             {groupPenaltyCount} rader har et toppforslag fra en matvaregruppe som ikke passer råvarekategorien —

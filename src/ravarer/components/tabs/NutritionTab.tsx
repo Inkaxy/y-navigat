@@ -175,14 +175,15 @@ export function NutritionTab({ rawMaterialId, registerSave }: Props) {
 
   /** Bekrefter tallene slik de står — rører ingen verdier. */
   const markVerified = () => {
-    if (!canWrite || upsert.isPending) return;
+    // Uten en lagret næringsrad finnes det ingenting å bekrefte.
+    if (!canWrite || upsert.isPending || !existing) return;
     upsert.mutate(
       {
         raw_material_id: rawMaterialId,
         verified_at: new Date().toISOString(),
         verified_by: user?.id ?? null,
       },
-      { onSuccess: () => toast.success("Næringsinnholdet er markert som verifisert") },
+      // Lagringen kvitterer allerede med én toast — ikke to for samme handling.
     );
   };
 
@@ -246,7 +247,7 @@ export function NutritionTab({ rawMaterialId, registerSave }: Props) {
             <span className="text-xs text-muted-foreground">{verificationText}</span>
           </div>
           <div className="flex items-center gap-2">
-            {canWrite && !dirty && !existing?.verified_at && (
+            {canWrite && !dirty && existing && !existing.verified_at && (
               <Button variant="outline" size="sm" disabled={upsert.isPending} onClick={markVerified}>
                 Marker som verifisert
               </Button>

@@ -53,14 +53,21 @@ export default function DatabladBulk() {
       legal_entity_id: legalEntityId,
       total_files: files.length,
     }).select("id").single();
-    if (batchErr) toast.error(`Kunne ikke starte opplastingen: ${batchErr.message}`);
-    setBatchId(batch?.id ?? null);
+    if (batchErr || !batch?.id) {
+      // Uten en batch finnes det ingen sporbarhet for filene — da skal vi ikke
+      // laste opp noe i det hele tatt.
+      toast.error(`Kunne ikke starte opplastingen: ${batchErr?.message ?? "ukjent feil"}`);
+      setRows([]);
+      e.target.value = "";
+      return;
+    }
+    setBatchId(batch.id);
 
     for (let i = 0; i < newRows.length; i++) {
-      await processRow(i, newRows[i], batch?.id);
-      await syncBatch(batch?.id ?? null);
+      await processRow(i, newRows[i], batch.id);
+      await syncBatch(batch.id);
     }
-    await syncBatch(batch?.id ?? null, "completed");
+    await syncBatch(batch.id, "completed");
   };
 
   /** Holder datasheet_upload_batches i takt med hva som faktisk er behandlet. */
