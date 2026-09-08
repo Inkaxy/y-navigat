@@ -7873,6 +7873,47 @@ export type Database = {
           },
         ]
       }
+      product_cost_cache: {
+        Row: {
+          computed_at: string | null
+          cost: Json | null
+          cost_per_unit: number | null
+          has_cost: boolean | null
+          is_stale: boolean
+          product_id: string
+          quality: string | null
+          stale_marked_at: string
+        }
+        Insert: {
+          computed_at?: string | null
+          cost?: Json | null
+          cost_per_unit?: number | null
+          has_cost?: boolean | null
+          is_stale?: boolean
+          product_id: string
+          quality?: string | null
+          stale_marked_at?: string
+        }
+        Update: {
+          computed_at?: string | null
+          cost?: Json | null
+          cost_per_unit?: number | null
+          has_cost?: boolean | null
+          is_stale?: boolean
+          product_id?: string
+          quality?: string | null
+          stale_marked_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_cost_cache_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: true
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_declaration_overrides: {
         Row: {
           field_name: string
@@ -14789,6 +14830,15 @@ export type Database = {
       }
       h2_recipes_using_raw_materials: {
         Args: { p_raw_material_ids: string[] }
+        Returns: string[]
+      }
+      h4_mark_cost_stale: { Args: { p_product_ids: string[] }; Returns: number }
+      h4_products_for_raw_materials: {
+        Args: { p_rm_ids: string[] }
+        Returns: string[]
+      }
+      h4_products_for_recipes: {
+        Args: { p_recipe_ids: string[] }
         Returns: string[]
       }
       has_access_to_outlet: { Args: { p_outlet_id: string }; Returns: boolean }
