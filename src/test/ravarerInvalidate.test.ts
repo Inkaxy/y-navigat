@@ -53,6 +53,10 @@ describe("invalidateRawMaterial", () => {
     expect(flat).toContain("reorder-suggestions");
     expect(flat).toContain("nutrition-coverage");
     expect(flat).toContain("recipes-using-raw-material");
+    // Fjernet i 9d/9: leverandørens totalforbruk summerer fakturalinjer og
+    // hører hjemme i fakturainvalideringen, ikke i råvareinvalideringen.
+    expect(flat).not.toContain("total-supplier-spend");
+
     expect(flat).toContain("raw_material_search_index");
     expect(calls).toHaveLength(rawMaterialQueryKeys("rm-1").length);
   });
