@@ -130,13 +130,18 @@ export default function Recipes() {
 
   const rmQuery = useQuery({
     queryKey: ["rm-bakers-map", legalEntityId],
+    enabled: !!legalEntityId,
     queryFn: async () => {
-      const { data } = await supabase
-        .from("raw_materials")
-        .select("id, name, category, grain_classification, water_content_pct, unit_weight_grams, current_cost_price")
-        .limit(2000);
+      const data = await fetchAllRows<BakersRawMaterial>((from, to) =>
+        supabase
+          .from("raw_materials")
+          .select("id, name, category, grain_classification, water_content_pct, unit_weight_grams, current_cost_price")
+          .eq("legal_entity_id", legalEntityId)
+          .eq("is_active", true)
+          .range(from, to) as unknown as PromiseLike<{ data: BakersRawMaterial[] | null; error: { message: string } | null }>,
+      );
       const map: Record<string, BakersRawMaterial> = {};
-      for (const r of (data ?? []) as unknown as BakersRawMaterial[]) map[r.id] = r;
+      for (const r of data) map[r.id] = r;
       return map;
     },
   });
@@ -144,12 +149,15 @@ export default function Recipes() {
   const recipesQuery = useQuery({
     queryKey: ["recipes-list", legalEntityId],
     queryFn: async () => {
-      const { data } = await supabase
-        .from("recipes")
-        .select("id, name, image_url, category, status, department, version, unit_weight_grams, units_per_batch, dough_piece_grams, dough_waste_pct, product_id, recipe_lines(id, quantity, unit, raw_material_id, is_flour_override, water_content_pct_override, ingredient_name), product_recipe_links(product_id, products(display_name))")
-        .is("valid_to", null)
-        .order("created_at", { ascending: false });
-      return (data ?? []) as unknown as RecipeListRow[];
+      const data = await fetchAllRows<RecipeListRow>((from, to) =>
+        supabase
+          .from("recipes")
+          .select("id, name, image_url, category, status, department, version, updated_at, unit_weight_grams, units_per_batch, dough_piece_grams, dough_waste_pct, product_id, recipe_lines(id, quantity, unit, raw_material_id, is_flour_override, water_content_pct_override, ingredient_name), product_recipe_links(product_id, products(display_name))")
+          .is("valid_to", null)
+          .order("created_at", { ascending: false })
+          .range(from, to) as unknown as PromiseLike<{ data: RecipeListRow[] | null; error: { message: string } | null }>,
+      );
+      return data;
     },
   });
 
