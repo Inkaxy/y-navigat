@@ -19,80 +19,6 @@ export interface StockMovementRow {
   note: string | null;
 }
 
-export interface StockItem {
-  id: string;
-  name: string;
-  sku: string;
-  base_unit: string;
-  current_stock: number;
-  min_stock: number | null;
-  last_purchase_at: string | null;
-  last_sale_at: string | null;
-  sold_30d: number;
-  linked_products: number;
-}
-
-/** Alle handelsvarer med lagerføring + avledet salgs-/innkjøpsstatistikk. */
-export function useStockItems() {
-  const { legalEntityId } = useRavarer();
-  return useQuery({
-    queryKey: ["stock-items", legalEntityId],
-    enabled: !!legalEntityId,
-    queryFn: async (): Promise<StockItem[]> => {
-      const { data: rms, error } = await supabase
-        .from("raw_materials")
-        .select("id, name, sku, base_unit, current_stock, min_stock")
-        .eq("legal_entity_id", legalEntityId)
-        .eq("is_resale_item", true)
-        .eq("stock_tracking", true)
-        .order("name");
-      if (error) throw error;
-      const ids = (rms ?? []).map(r => r.id);
-      if (ids.length === 0) return [];
-
-      const since = new Date(Date.now() - 180 * 86400000).toISOString();
-      const movements = await fetchAllRows<StockMovementRow>((from, to) =>
-        supabase
-          .from("stock_movements")
-          .select("id, raw_material_id, movement_type, quantity_base, occurred_at, source_table, source_id, product_id, note")
-          .in("raw_material_id", ids)
-          .gte("occurred_at", since)
-          .order("occurred_at", { ascending: false })
-          .range(from, to),
-      );
-
-      const { data: links } = await supabase
-        .from("raw_material_products")
-        .select("raw_material_id")
-        .in("raw_material_id", ids);
-      const linkCount = new Map<string, number>();
-      (links ?? []).forEach(l => linkCount.set(l.raw_material_id, (linkCount.get(l.raw_material_id) ?? 0) + 1));
-
-      const cutoff30 = Date.now() - 30 * 86400000;
-      return (rms ?? []).map(r => {
-        const mine = movements.filter(m => m.raw_material_id === r.id);
-        const lastPurchase = mine.find(m => m.movement_type === "purchase");
-        const lastSale = mine.find(m => m.movement_type === "sale");
-        const sold30 = mine
-          .filter(m => m.movement_type === "sale" && new Date(m.occurred_at).getTime() >= cutoff30)
-          .reduce((s, m) => s + Math.abs(Number(m.quantity_base) || 0), 0);
-        return {
-          id: r.id,
-          name: r.name,
-          sku: r.sku,
-          base_unit: r.base_unit,
-          current_stock: Number(r.current_stock) || 0,
-          min_stock: r.min_stock == null ? null : Number(r.min_stock),
-          last_purchase_at: lastPurchase?.occurred_at ?? null,
-          last_sale_at: lastSale?.occurred_at ?? null,
-          sold_30d: sold30,
-          linked_products: linkCount.get(r.id) ?? 0,
-        };
-      });
-    },
-  });
-}
-
 /** Bevegelseshistorikk for én råvare, nyeste først. */
 export function useStockMovements(rawMaterialId: string | undefined) {
   return useQuery({
@@ -189,7 +115,7 @@ export function useCreateStockMovement() {
       invalidateRawMaterial(qc, vars.raw_material_id);
       toast.success("Bevegelse registrert");
     },
-    onError: (e: any) => toast.error(`Kunne ikke registrere: ${e.message ?? e}`),
+    onError: (e: unknown) => toast.error(`Kunne ikke registrere: ${e instanceof Error ? e.message : String(e)}`),
   });
 }
 
@@ -275,7 +201,7 @@ export function useLinkProduct() {
       invalidateRawMaterial(qc, vars.raw_material_id);
       toast.success("Vare koblet");
     },
-    onError: (e: any) => toast.error(`Kunne ikke koble: ${e.message ?? e}`),
+    onError: (e: unknown) => toast.error(`Kunne ikke koble: ${e instanceof Error ? e.message : String(e)}`),
   });
 }
 
@@ -291,7 +217,7 @@ export function useUpdateProductLink() {
       qc.invalidateQueries({ queryKey: ["raw-material-products", vars.raw_material_id] });
       toast.success("Lagret");
     },
-    onError: (e: any) => toast.error(`Kunne ikke lagre: ${e.message ?? e}`),
+    onError: (e: unknown) => toast.error(`Kunne ikke lagre: ${e instanceof Error ? e.message : String(e)}`),
   });
 }
 
@@ -306,7 +232,7 @@ export function useDeleteProductLink() {
       invalidateRawMaterial(qc, vars.raw_material_id);
       toast.success("Kobling fjernet");
     },
-    onError: (e: any) => toast.error(`Kunne ikke fjerne: ${e.message ?? e}`),
+    onError: (e: unknown) => toast.error(`Kunne ikke fjerne: ${e instanceof Error ? e.message : String(e)}`),
   });
 }
 
