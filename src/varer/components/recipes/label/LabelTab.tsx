@@ -144,14 +144,14 @@ export function LabelTab({
   const links = linksQuery.data ?? [];
   const primaryCount = links.filter((l) => l.is_primary).length;
 
-  const { staleness } = useLabelStaleness(recipeId, label?.computed_at ?? null);
+  const { staleness, data: stalenessSources } = useLabelStaleness(recipeId, label?.computed_at ?? null);
   const approvedAt = recipe.declaration_updated_at ?? null;
   const approverQuery = useUserDisplayName(recipe.declaration_updated_by ?? null);
   const missing = (label?.missing_data ?? null) as MissingData | null;
   const status = deriveLabelingStatus({
     approvedAt,
     computedAt: label?.computed_at ?? null,
-    sources: staleness.sources,
+    sources: stalenessSources ?? [],
     blocked: !!missing?.blocked || checklistBlocked,
   });
 
@@ -224,7 +224,7 @@ export function LabelTab({
         approvedAt={approvedAt}
         approvedByName={approverQuery.data ?? null}
         staleSourceName={staleness.sourceName}
-        staleSourceAt={staleness.sourceAt}
+        staleSourceAt={staleness.changedAt}
         allergenReviewed={(missing?.composite_unreviewed?.length ?? 0) === 0}
         declarationNamed={(missing?.declaration_names?.length ?? 0) === 0}
         approving={approve.isPending}
@@ -330,7 +330,7 @@ export function LabelTab({
         countryOfOrigin={recipe.country_of_origin ?? null}
         entity={entityQuery.data ?? null}
         blocked={!!missing?.blocked}
-        keyholeQualifies={keyhole?.qualifies ?? false}
+        keyholeQualifies={keyhole?.status === "oppfylt"}
         coveragePct={coveragePct}
         onChecklistChange={onChecklistChange}
         nutritionUsable={declarationManual ? !!effective.nutrition : coverageOk && !!effective.nutrition}
