@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, Printer } from "lucide-react";
 import { toast } from "sonner";
-import { fmtNum, fmtPct, grainCategoryFromPct, grainLevelLabel } from "@/varer/lib/breadscale";
+import { fmtPct, grainCategoryFromPct, grainLevelLabel } from "@/varer/lib/breadscale";
 import { BRODSKALAN_MARKS } from "@/varer/lib/brodskalan";
 import { LABEL_SIZES, type LabelSizeKey } from "../ConsumerLabelPDFDocument";
 import { NUT_ROWS, nutritionValueText } from "./labelShared";

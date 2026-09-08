@@ -12,7 +12,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { AlertTriangle, ClipboardCopy, Copy, Loader2, Save } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { showError } from "@/lib/userError";
-import { fmtNum } from "@/varer/lib/breadscale";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 import { UnsavedChangesDialog } from "@/varer/components/products/detail/UnsavedChangesDialog";
 import { useUserDisplayName, type RecipeLabelCalculated } from "@/varer/hooks/useRecipeLabel";
