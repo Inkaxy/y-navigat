@@ -1,8 +1,5 @@
 
-import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
-import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, Plus, Trash2, MoreVertical, Copy, ArrowUp, ArrowDown, FileText, Wheat, Package } from "lucide-react";
+import { Trash2, MoreVertical, Copy, ArrowUp, ArrowDown, FileText, Wheat, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,16 +9,14 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import { RawMaterialAutocomplete } from "@/varer/components/products/RawMaterialAutocomplete";
+import { LineGrid } from "@/varer/components/recipes/LineGrid";
 import { useStockTrackedRawMaterials } from "@/varer/hooks/useStockTrackedRawMaterials";
 import {
-  PART_TYPE_OPTIONS, PREFERMENT_KIND_OPTIONS, bakersPercentFor, computePartSummary,
-  fmtG, fmtPercent, gramsFromPercent, isFlourLine, isLineConvertible, lineFromGrams, lineToGrams,
+  PART_TYPE_OPTIONS, PREFERMENT_KIND_OPTIONS, computePartSummary,
+  fmtG, fmtPercent, isFlourLine,
   type BakersLine, type BakersRawMaterial,
 } from "@/varer/lib/bakers";
-
-
-const UNITS = ["g", "kg", "ml", "liter", "stk"];
+import { PART_ENTRY_MODE_LABEL, type PartEntryMode } from "@/varer/lib/percentFirst";
 
 export type EditorLine = BakersLine & {
   _new?: boolean;
@@ -59,10 +54,16 @@ interface Props {
   onRemove: () => void;
   onDuplicate: () => void;
   onMove: (dir: -1 | 1) => void;
-  onAddLine: () => void;
+  /** Legger til en linje og returnerer id-en, slik at griddet kan fokusere den. */
+  onAddLine: () => string | null;
   onUpdateLine: (id: string, patch: Partial<EditorLine>) => void;
   onRemoveLine: (id: string) => void;
   onReorderLines: (partId: string, activeId: string, overId: string) => void;
+  /** Registreringsmodus for delen — «gram» eller «prosent». */
+  entryMode?: PartEntryMode;
+  onEntryModeChange?: (mode: PartEntryMode) => void;
+  /** Advarselstekst per linje-id. */
+  warningsByLine?: Record<string, string | undefined>;
   /** Oppskriften som redigeres — brukes til sirkelvern i ingrediensvelgeren. */
   currentRecipeId?: string | null;
 }
@@ -70,17 +71,10 @@ interface Props {
 export function RecipePartCard({
   part, lines, canWrite, totalFlourG, rmMap, isFirst, isLast,
   onUpdate, onRemove, onDuplicate, onMove, onAddLine, onUpdateLine, onRemoveLine, onReorderLines,
-  currentRecipeId = null,
+  entryMode = "grams", onEntryModeChange, warningsByLine, currentRecipeId = null,
 }: Props) {
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
   const isPreferment = part.part_type === "preferment";
   const summary = computePartSummary(lines, totalFlourG);
-
-  function handleDragEnd(e: DragEndEvent) {
-    const { active, over } = e;
-    if (!over || active.id === over.id) return;
-    onReorderLines(part.id, String(active.id), String(over.id));
-  }
 
   return (
     <div
@@ -232,204 +226,25 @@ export function RecipePartCard({
   );
 }
 
-function SortableLine({
-  line, canWrite, totalFlourG, rmMap, currentRecipeId, onChange, onRemove,
-}: {
-  line: EditorLine;
-  canWrite: boolean;
-  totalFlourG: number;
-  rmMap: Record<string, BakersRawMaterial>;
-  currentRecipeId?: string | null;
-  onChange: (p: Partial<EditorLine>) => void;
-  onRemove: () => void;
-}) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: line.id });
-  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
+/** Melbryter, deklarasjon og lagermerke — ekstrafeltene ytterst på en linje. */
+function LineExtras({
+  line, canWrite, onChange,
+}: { line: EditorLine; canWrite: boolean; onChange: (p: Partial<EditorLine>) => void }) {
   const { data: trackedIds } = useStockTrackedRawMaterials();
   const stockTracked = !!line.raw_material_id && !!trackedIds?.has(line.raw_material_id);
-  const unmatched = !line.raw_material_id;
-  const flour = isFlourLine(line);
-  const computedPct = line._displayPercent ?? bakersPercentFor(line, totalFlourG);
-  const showPct =
-    line.entry_mode === "percent" && !flour && line.bakers_percent != null && line._displayPercent == null
-      ? String(line.bakers_percent)
-      : computedPct
-        ? computedPct.toFixed(1)
-        : "";
-
-  /** Sann når linjens enhet faktisk kan regnes om til gram — begge veier. */
-  const convertible = isLineConvertible(line);
-  // Advarselen hører hjemme på selve linja, ikke bare i totalsammendraget.
-  const conversion = lineToGrams(line);
-  const conversionWarning = conversion.exact
-    ? null
-    : conversion.reason ?? "Mengden kan ikke regnes om til gram";
-
-  function setGrams(value: string) {
-    const conv = lineToGrams({ ...line, quantity: value });
-    onChange({
-      quantity: value,
-      entry_mode: "grams",
-      // Er omregningen ukjent, lagrer vi INGEN bakerprosent — et tall her ville
-      // motsagt mengden brukeren skrev.
-      bakers_percent: conv.exact && totalFlourG > 0 ? (conv.grams / totalFlourG) * 100 : null,
-    });
-  }
-
-  function setPercent(value: string) {
-    // Uten kjent omregning kan prosent ikke oversettes til en mengde. Feltet er
-    // deaktivert i den situasjonen, men vi vokter også her.
-    if (!convertible || totalFlourG <= 0) return;
-    const pct = value === "" ? 0 : Number(value);
-    const quantity = lineFromGrams(gramsFromPercent(pct, totalFlourG), line);
-    if (!Number.isFinite(quantity)) return;
-    onChange({
-      bakers_percent: value === "" ? null : pct,
-      entry_mode: "percent",
-      quantity: value === "" ? line.quantity : Number(quantity.toFixed(3)),
-    });
-  }
-
-
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={cn(
-        // Mobil: to rader (håndtak+råvare+slett, deretter tallfeltene) via flex + order.
-        // Fra md: eksplisitt kolonnemal, slett-knappen ALLTID ytterst til høyre på linja.
-        "flex flex-wrap items-center gap-2 rounded-md border px-2 py-1.5",
-        "md:grid md:grid-cols-[20px_minmax(0,1fr)_96px_64px_92px_36px_76px_36px_32px]",
-        unmatched ? "border-warning/40 bg-warning/5" : "border-transparent",
+    <div className="flex items-center">
+      <FlourToggle line={line} flour={isFlourLine(line)} canWrite={canWrite} onChange={onChange} />
+      <DeclarationPopover line={line} canWrite={canWrite} onChange={onChange} />
+      {stockTracked && (
+        <Package
+          className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
+          aria-label="Lagerføres"
+        />
       )}
-    >
-      {canWrite ? (
-        <button {...attributes} {...listeners} className="order-1 flex h-10 w-5 cursor-grab items-center justify-center text-muted-foreground hover:text-foreground active:cursor-grabbing md:order-none md:h-auto">
-          <GripVertical className="h-4 w-4" />
-        </button>
-      ) : <div className="order-1 md:order-none" />}
-
-      <div className={cn("order-2 min-w-0 flex-1 basis-[55%] md:order-none md:flex-none md:basis-auto", (line as any).sub_product_id && "rounded-md ring-1 ring-purple-300")}>
-
-        <RawMaterialAutocomplete
-          value={line.raw_material_id}
-          currentRecipeId={currentRecipeId}
-          subValue={(line as any).sub_product_id ?? null}
-          disabled={!canWrite}
-          onChange={(id, opt) => {
-            onChange({
-              raw_material_id: id,
-              ...(id ? { sub_product_id: null } : {}),
-              ingredient_name: opt?.name ?? line.ingredient_name,
-            // Baseenheten heter «l» i den kanoniske lista — ikke «liter». Med
-            // feil navn her ble «l» kopiert inn som linjeenhet og gram forsvant.
-            unit: opt?.base_unit === "kg" || opt?.base_unit === "l" ? line.unit : (opt?.base_unit ?? line.unit),
-              _rm: id ? (rmMap[id] ?? { id, name: opt?.name ?? "" }) : null,
-            } as never);
-          }}
-          onSelectSubProduct={(id, name) => {
-            if (!id) {
-              onChange({ sub_product_id: null } as never);
-              return;
-            }
-            onChange({
-              sub_product_id: id,
-              raw_material_id: null,
-              ingredient_name: name ?? line.ingredient_name,
-              _rm: null,
-            } as never);
-          }}
-          placeholder={line.ingredient_name ? `(ukoblet) ${line.ingredient_name}` : "Velg råvare…"}
-        />
-        {stockTracked && (
-          <Badge variant="outline" className="mt-1 gap-1 text-[10px]" title="Trekkes fra lager ved kjørt pakkseddel">
-            <Package className="h-3 w-3" /> Lagerføres
-          </Badge>
-        )}
-      </div>
-
-      {/* Tvinger radbrudd under md, slik at tallfeltene får hele bredde nummer to. */}
-      <div className="order-4 basis-full md:hidden" aria-hidden />
-
-      <div className="order-5 w-24 md:order-none md:w-auto">
-        <Input
-          type="number" step="any" placeholder="Gram"
-          value={line.quantity}
-          onChange={(e) => setGrams(e.target.value)}
-          disabled={!canWrite} className="h-10 tabular-nums md:h-9"
-          title={conversionWarning ?? undefined}
-        />
-      </div>
-      {conversionWarning && (
-        <p className="order-11 basis-full text-xs text-warning md:col-span-9 md:order-none">
-          {conversionWarning}
-        </p>
-      )}
-      <div className="order-6 w-[72px] md:order-none md:w-auto">
-        <select
-          value={line.unit}
-          onChange={(e) => onChange({ unit: e.target.value })}
-          disabled={!canWrite}
-          className="h-10 w-full rounded-md border border-input bg-background px-1 text-sm md:h-9"
-        >
-          {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
-        </select>
-      </div>
-
-      <div className="order-7 w-24 md:order-none md:w-auto">
-        <div className="relative">
-          <Input
-            type="number" step="0.1" placeholder={convertible ? "%" : "?"}
-            value={convertible ? showPct : ""}
-            onChange={(e) => setPercent(e.target.value)}
-            disabled={!canWrite || flour || totalFlourG <= 0 || !convertible}
-            title={
-              !convertible
-                ? `Ukjent omregning til gram for «${line.unit}» — bakerprosent kan ikke beregnes`
-                : flour
-                  ? "Melprosent er avledet — mel definerer nevneren"
-                  : "Bakerprosent av samlet melvekt"
-            }
-            className={cn(
-              "h-10 pr-6 tabular-nums md:h-9",
-              (flour || !convertible) && "bg-muted/60 text-muted-foreground",
-            )}
-          />
-          <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
-        </div>
-      </div>
-
-
-      <div className="order-8 flex justify-center md:order-none">
-        <FlourToggle line={line} flour={flour} canWrite={canWrite} onChange={onChange} />
-      </div>
-
-      <div className="order-9 w-[76px] md:order-none md:w-auto">
-        <Input
-          type="number" step="0.1" placeholder="Svinn"
-          value={line.waste_percent ?? 0}
-          onChange={(e) => onChange({ waste_percent: e.target.value })}
-          disabled={!canWrite} className="h-10 tabular-nums md:h-9"
-        />
-      </div>
-
-      <div className="order-10 flex justify-center md:order-none">
-        <DeclarationPopover line={line} canWrite={canWrite} onChange={onChange} />
-      </div>
-
-      {canWrite ? (
-        <Button
-          type="button" variant="ghost" size="icon" onClick={onRemove}
-          aria-label="Slett ingrediens"
-          className="order-3 ml-auto h-10 w-10 md:order-none md:ml-0 md:h-8 md:w-8 md:justify-self-end"
-        >
-          <Trash2 className="h-4 w-4 text-muted-foreground md:h-3.5 md:w-3.5" />
-        </Button>
-      ) : <div className="order-3 md:order-none" />}
     </div>
   );
 }
-
 
 function FlourToggle({
   line, flour, canWrite, onChange,
