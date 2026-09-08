@@ -296,20 +296,37 @@ Deno.serve(async (req) => {
           // 2) Finnes fakturaen fra før?
           const { data: existing } = await admin
             .from("invoices")
-            .select("id, line_extraction_status")
+            .select(
+              "id, line_extraction_status, invoice_date, total_amount, is_credit_note, " +
+                "tripletex_voucher_id, tripletex_voucher_number, tripletex_supplier_id",
+            )
             .eq("legal_entity_id", legalEntityId)
             .eq("tripletex_supplier_invoice_id", ttInvoiceId)
             .maybeSingle();
 
           if (existing) {
-            if (supplier.track_invoice_lines && existing.line_extraction_status === "not_requested") {
-              await admin
-                .from("invoices")
-                .update({ line_extraction_status: "pending" })
-                .eq("id", existing.id);
+            // Eksisterende faktura får oppdaterte Tripletex-referanser, men beløp,
+            // dato og kreditnota-flagg røres aldri — manuell matching og avstemming
+            // skal ikke nullstilles. Avvik rapporteres som konflikt i stedet.
+            const ttAmountRaw = Number(inv.amount ?? 0) || Number(inv.amountCurrency ?? 0);
+            const plan = planExistingUpdate(existing as any, {
+              invoice_date: inv.invoiceDate ?? null,
+              total_amount: Number.isFinite(ttAmountRaw) ? ttAmountRaw : null,
+              is_credit_note: !!inv.isCreditNote,
+              tripletex_voucher_id: inv?.voucher?.id ? String(inv.voucher.id) : null,
+              tripletex_voucher_number: inv?.voucher?.number ? String(inv.voucher.number) : null,
+              tripletex_supplier_id: ttSupId,
+            }, { trackLines: !!supplier.track_invoice_lines });
+
+            if (Object.keys(plan.patch).length > 0) {
+              const { error: updErr } = await admin.from("invoices").update(plan.patch).eq("id", existing.id);
+              if (updErr) throw new Error(updErr.message);
               updated++;
             } else {
               skipped++;
+            }
+            if (plan.conflicts.length > 0) {
+              conflicts.push({ invoice_id: existing.id, invoice_number: String(inv.invoiceNumber ?? ""), fields: plan.conflicts });
             }
             continue;
           }
@@ -320,6 +337,7 @@ Deno.serve(async (req) => {
           const rawExVat = Number(inv.amountExcludingVat ?? 0);
           const usedCurrencyAmount = rawAmount === 0;
           const amount = usedCurrencyAmount ? Number(inv.amountCurrency ?? 0) : rawAmount;
+
           const exVat = usedCurrencyAmount
             ? Number(inv.amountExcludingVatCurrency ?? 0)
             : rawExVat;
