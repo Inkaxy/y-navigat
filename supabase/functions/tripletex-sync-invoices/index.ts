@@ -10,6 +10,7 @@ import {
   statusSummary,
   syncStatus,
   type ChunkResult,
+  type ExistingInvoice,
 } from "./syncState.ts";
 
 const corsHeaders = {
@@ -319,11 +320,12 @@ Deno.serve(async (req) => {
             .maybeSingle();
 
           if (existing) {
+            const ex = existing as unknown as ExistingInvoice;
             // Eksisterende faktura får oppdaterte Tripletex-referanser, men beløp,
             // dato og kreditnota-flagg røres aldri — manuell matching og avstemming
             // skal ikke nullstilles. Avvik rapporteres som konflikt i stedet.
             const ttAmountRaw = Number(inv.amount ?? 0) || Number(inv.amountCurrency ?? 0);
-            const plan = planExistingUpdate(existing as any, {
+            const plan = planExistingUpdate(ex, {
               invoice_date: inv.invoiceDate ?? null,
               total_amount: Number.isFinite(ttAmountRaw) ? ttAmountRaw : null,
               is_credit_note: !!inv.isCreditNote,
@@ -333,14 +335,14 @@ Deno.serve(async (req) => {
             }, { trackLines: !!supplier.track_invoice_lines });
 
             if (Object.keys(plan.patch).length > 0) {
-              const { error: updErr } = await admin.from("invoices").update(plan.patch).eq("id", existing.id);
+              const { error: updErr } = await admin.from("invoices").update(plan.patch).eq("id", ex.id);
               if (updErr) throw new Error(updErr.message);
               updated++;
             } else {
               skipped++;
             }
             if (plan.conflicts.length > 0) {
-              conflicts.push({ invoice_id: existing.id, invoice_number: String(inv.invoiceNumber ?? ""), fields: plan.conflicts });
+              conflicts.push({ invoice_id: ex.id, invoice_number: String(inv.invoiceNumber ?? ""), fields: plan.conflicts });
             }
             continue;
           }
