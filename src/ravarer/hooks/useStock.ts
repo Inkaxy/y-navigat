@@ -25,14 +25,16 @@ export function useStockMovements(rawMaterialId: string | undefined) {
     queryKey: ["stock-movements", rawMaterialId],
     enabled: !!rawMaterialId,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("stock_movements")
-        .select("id, raw_material_id, movement_type, quantity_base, occurred_at, source_table, source_id, product_id, note")
-        .eq("raw_material_id", rawMaterialId!)
-        .order("occurred_at", { ascending: false })
-        .limit(300);
-      if (error) throw error;
-      const rows = (data ?? []) as StockMovementRow[];
+      // Hele historikken hentes — en .limit() her skjulte eldre bevegelser
+      // og gjorde reskontroen misvisende.
+      const rows = await fetchAllRows<StockMovementRow>((from, to) =>
+        supabase
+          .from("stock_movements")
+          .select("id, raw_material_id, movement_type, quantity_base, occurred_at, source_table, source_id, product_id, note")
+          .eq("raw_material_id", rawMaterialId!)
+          .order("occurred_at", { ascending: false })
+          .range(from, to),
+      );
 
       // Slå opp faktura-id for linje-baserte innkjøp så vi kan lenke til fakturaen.
       const lineIds = rows

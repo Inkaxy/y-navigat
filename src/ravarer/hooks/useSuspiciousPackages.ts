@@ -54,8 +54,21 @@ export function useSuspiciousPackages() {
         .eq("raw_materials.legal_entity_id", legalEntityId!);
       if (error) throw error;
 
+      interface LinkRow {
+        id: string;
+        raw_material_id: string;
+        supplier_id: string | null;
+        supplier_product_name: string | null;
+        package_size: number | null;
+        package_unit: string | null;
+        base_units_per_package: number | null;
+        package_confirmed_at: string | null;
+        raw_materials: { id: string; name: string; base_unit: string } | null;
+        suppliers: { name: string } | null;
+      }
+
       const rows: SuspiciousPackageRow[] = [];
-      for (const r of (data ?? []) as any[]) {
+      for (const r of (data ?? []) as unknown as LinkRow[]) {
         const rm = r.raw_materials;
         const base = normalizeUnit(rm?.base_unit) ?? (rm?.base_unit ?? "").toLowerCase();
         if (!base) continue;
@@ -135,6 +148,6 @@ export function useConfirmSuspiciousPackage() {
       invalidateRawMaterial(qc, vars.rawMaterialId);
       toast.success("Pakningen er bekreftet");
     },
-    onError: (e: any) => toast.error(`Kunne ikke bekrefte: ${e.message ?? e}`),
+    onError: (e: unknown) => toast.error(`Kunne ikke bekrefte: ${e instanceof Error ? e.message : String(e)}`),
   });
 }
