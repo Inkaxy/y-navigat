@@ -33,6 +33,10 @@ interface Props {
   onApprove: (mode: "auto" | "manual", adopt: ApproveSourceData | null) => void;
 }
 
+function fmtNum(v: number | null): string {
+  return v == null ? "—" : String(v).replace(".", ",");
+}
+
 /** Godkjenning med diff — kilden velges her, ingen bryter skriver umiddelbart. */
 export function ApproveDeclarationDialog({
   open,
@@ -106,8 +110,8 @@ export function ApproveDeclarationDialog({
               <ul className="space-y-0.5 text-xs">
                 {nutRows.map((r) => (
                   <li key={r.key}>
-                    {r.label}: <span className="text-destructive line-through">{r.beforeText}</span>{" "}
-                    <span className="text-emerald-700">→ {r.afterText}</span>
+                    {r.label}: <span className="text-destructive line-through">{fmtNum(r.from)}</span>{" "}
+                    <span className="text-emerald-700">→ {fmtNum(r.to)}</span>
                   </li>
                 ))}
               </ul>
