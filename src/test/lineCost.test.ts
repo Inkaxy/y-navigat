@@ -440,6 +440,22 @@ describe("kartong med stk-antall", () => {
     expect(r.pricePerBaseUnit).toBeCloseTo(10, 6);
   });
 
+  it("bekreftet pakning på RÅVAREN selv brukes når leverandørkoblingen ikke er bekreftet", () => {
+    const r = resolveLineCost({
+      quantity: 1,
+      unit: "sekk",
+      totalAmount: 500,
+      description: "HVETEMEL 10 kg",
+      baseUnit: "kg",
+      supplierPackage: { packageConfirmedAt: null },
+      rawMaterialPackage: { baseUnitsPerPackage: 25, packageConfirmedAt: "2026-01-01T00:00:00Z" },
+    });
+    expect(r.needsInput).toBeNull();
+    expect(r.basis).toBe("pakning");
+    expect(r.source).toBe("raw_material");
+    expect(r.baseQuantity).toBe(25);
+  });
+
   it("ubekreftet pakning som motsier beskrivelsen krever avklaring", () => {
     const r = resolveLineCost({
       quantity: 2,

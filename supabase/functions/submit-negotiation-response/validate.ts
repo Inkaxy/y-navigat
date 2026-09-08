@@ -1,13 +1,19 @@
 // Ren validering av et leverandørsvar. Ingen databasekall her, slik at reglene
 // kan testes direkte.
 
-/** Statuser der leverandøren fortsatt får lov til å svare. */
-export const OPEN_NEGOTIATION_STATUSES = ["invited", "in_progress", "awaiting_confirmation"] as const;
+/**
+ * Statuser der leverandøren fortsatt får lov til å svare på en RFQ.
+ * «awaiting_confirmation» hører til LIVE-forhandlinger (leverandøren bekrefter
+ * det som ble avtalt over bordet, ikke et nytt tilbud) og skal derfor IKKE
+ * regnes som en åpen RFQ-status her.
+ */
+export const OPEN_NEGOTIATION_STATUSES = ["invited", "in_progress"] as const;
 
 export interface NegotiationRow {
   id: string;
   status: string | null;
   response_deadline: string | null;
+  negotiation_mode?: string | null;
 }
 
 export interface ItemRow {

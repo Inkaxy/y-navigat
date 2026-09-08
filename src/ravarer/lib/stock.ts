@@ -75,3 +75,17 @@ export function urgencyRank(currentStock: number, minStock: number | null): 0 | 
   if (minStock != null && currentStock <= minStock) return 1;
   return 2;
 }
+
+/** Modus for lagerjustering: telling, svinn eller inngående beholdning. */
+export type CountMode = "count" | "waste" | "opening";
+
+/**
+ * Ren beregning av bevegelsen for en lagerjustering. Skilt ut fra
+ * StockAdjustDialog for å kunne testes uten UI, og for at avrundingen (7/25
+ * → 25) skal kunne verifiseres ordrett.
+ */
+export function countMovement(mode: CountMode, numeric: number, current: number): number {
+  if (mode === "count") return numeric - current;
+  if (mode === "waste") return -Math.abs(numeric);
+  return numeric;
+}

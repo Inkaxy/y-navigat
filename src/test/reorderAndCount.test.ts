@@ -10,7 +10,7 @@ import {
   newOpId,
   saveCountDraft,
 } from "@/ravarer/lib/countDraft";
-import { MOVEMENT_TYPES, movementLabel } from "@/ravarer/lib/stock";
+import { MOVEMENT_TYPES, movementLabel, countMovement } from "@/ravarer/lib/stock";
 
 describe("pakningsavrunding", () => {
   it("bruker bekreftet innhold per pakning", () => {
@@ -28,6 +28,11 @@ describe("pakningsavrunding", () => {
   it("runder opp til hele pakninger", () => {
     expect(roundToPackages(30, 25)).toEqual({ packages: 2, orderBaseQty: 50, baseUnitsPerPackage: 25 });
     expect(roundToPackages(25, 25).packages).toBe(1);
+  });
+
+  it("runder ordrett: 7 av 25 blir én hel pakning (25), 26 av 25 blir to (50)", () => {
+    expect(roundToPackages(7, 25)).toEqual({ packages: 1, orderBaseQty: 25, baseUnitsPerPackage: 25 });
+    expect(roundToPackages(26, 25)).toEqual({ packages: 2, orderBaseQty: 50, baseUnitsPerPackage: 25 });
   });
 
   it("runder til hele grunnenheter når pakningen mangler", () => {
@@ -100,6 +105,22 @@ describe("bevegelsestyper", () => {
   it("har egen type for telling", () => {
     expect(MOVEMENT_TYPES).toContain("count_adjust");
     expect(movementLabel("count_adjust")).toBe("Telling");
+  });
+});
+
+describe("countMovement", () => {
+  it("telling gir differansen mot beholdningen", () => {
+    expect(countMovement("count", 30, 25)).toBe(5);
+    expect(countMovement("count", 20, 25)).toBe(-5);
+  });
+
+  it("svinn er alltid negativt", () => {
+    expect(countMovement("waste", 4, 25)).toBe(-4);
+    expect(countMovement("waste", -4, 25)).toBe(-4);
+  });
+
+  it("inngående beholdning er tallet selv", () => {
+    expect(countMovement("opening", 12, 0)).toBe(12);
   });
 });
 

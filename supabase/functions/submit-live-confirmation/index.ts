@@ -141,15 +141,12 @@ Deno.serve(async (req) => {
           )
           .eq("negotiation_id", negotiationId)
           .eq("live_status", "confirmed");
-        const { data: rec } = await admin
-          .from("negotiation_recipients")
-          .select("id")
-          .eq("negotiation_id", negotiationId)
-          .limit(1)
-          .maybeSingle();
+        // Vinneren er ALLTID leverandøren tokenet tilhører — ikke «den første»
+        // mottakeren i forhandlingen, som kan være en annen leverandør i rommet.
+        const winnerRecipientId = row.recipient_id ?? null;
         const outcomes = (confItems ?? []).map((it: any) => ({
           negotiation_item_id: it.id,
-          winner_recipient_id: rec?.id ?? null,
+          winner_recipient_id: winnerRecipientId,
           winner_response_id: null,
           agreed_price: it.live_agreed_price_per_base_unit ?? it.live_agreed_price,
           agreed_package_size: it.live_agreed_package_size,

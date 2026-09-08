@@ -16,6 +16,7 @@ const ICONS: Record<string, any> = {
   confirmation_submitted: FileCheck,
   confirmation_disputed: AlertTriangle,
   all_confirmed: Check,
+  apply_failed: AlertTriangle,
 };
 
 const LABELS: Record<string, string> = {
@@ -31,6 +32,7 @@ const LABELS: Record<string, string> = {
   confirmation_submitted: "Bekreftet av leverandør",
   confirmation_disputed: "Innsigelse fra leverandør",
   all_confirmed: "Alle linjer bekreftet",
+  apply_failed: "Aktivering feilet",
 };
 
 interface Props {

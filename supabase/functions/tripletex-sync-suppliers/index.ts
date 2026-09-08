@@ -199,6 +199,14 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Statuskortet i Tripletex-innstillinger viser «Aldri» uten dette —
+    // synkroniseringen kjørte, men tidspunktet ble aldri lagret.
+    const { error: credErr } = await admin
+      .from("tripletex_credentials")
+      .update({ last_supplier_sync_at: nowIso })
+      .eq("legal_entity_id", legalEntityId);
+    if (credErr) console.error("tripletex-sync-suppliers: kunne ikke oppdatere last_supplier_sync_at", credErr);
+
     return json({
       ok: true,
       hentet: ttSuppliers.length,
