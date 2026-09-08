@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { arrayMove } from "@dnd-kit/sortable";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAppContext } from "@/varer/context/AppContext";
@@ -17,13 +16,23 @@ import { logAudit } from "@/varer/lib/audit";
 import { RecipeProductLinks } from "@/varer/components/products/RecipeProductLinks";
 import { RecipeStatsBar } from "@/varer/components/recipes/RecipeStatsBar";
 import { DoughTempPanel } from "@/varer/components/recipes/DoughTempPanel";
-import { RecipeStepsEditor, type EditorStep } from "@/varer/components/recipes/RecipeStepsEditor";
+import { RecipeStepsEditor } from "@/varer/components/recipes/RecipeStepsEditor";
+import { StepTimeline } from "@/varer/components/recipes/StepTimeline";
 import { RecipePartCard, type EditorLine, type EditorPart } from "@/varer/components/recipes/RecipePartCard";
+import { RecipeWarningsBanner } from "@/varer/components/recipes/RecipeWarningsBanner";
+import { DraftRecoveryBanner } from "@/varer/components/recipes/DraftRecoveryBanner";
+import {
+  useRecipeEditor, type RecipeDetailRow, type RecipeEditorState,
+} from "@/varer/hooks/useRecipeEditor";
+import { useRecipeDraft } from "@/varer/hooks/useRecipeDraft";
+import { useRecipeWarnings } from "@/varer/hooks/useRecipeWarnings";
+import { entryModeFor } from "@/varer/lib/percentFirst";
+import { scaleRecipe, type RoundingStep, type ScaleMode } from "@/varer/lib/scaling";
 import { ScalePanel } from "@/varer/components/recipes/ScalePanel";
 import { PrintRecipeCardDialog } from "@/varer/components/recipes/PrintRecipeCardDialog";
 import { ShareRecipeDialog } from "@/varer/components/recipes/ShareRecipeDialog";
 import {
-  RECIPE_STATUS_OPTIONS, computeTotalsForRecipe, roundBakerGrams, scaleFactor, scaleLines, scaledSummary,
+  RECIPE_STATUS_OPTIONS, computeTotalsForRecipe, roundBakerGrams, scaleLines, scaledSummary,
   type BakersRawMaterial,
 } from "@/varer/lib/bakers";
 import { computeRecipeCost } from "@/varer/lib/recipeCost";
@@ -47,34 +56,13 @@ import { SaveAsRawMaterialDialog, type CompositeRawMaterial } from "@/varer/comp
 import { RecipeImageUpload } from "@/varer/components/recipes/RecipeImageUpload";
 import { BASE_RECIPE_CATEGORY, costPerKg, costPerKgBlockedReason } from "@/varer/lib/halvfabrikat";
 import { copyRecipe } from "@/varer/lib/copyRecipe";
+import { RECIPE_TEMPLATE_CATEGORY } from "@/varer/pages/Recipes";
 import { asDepartment, RECIPE_DEPARTMENT_LABEL, RECIPE_DEPARTMENTS } from "@/varer/lib/departments";
 import { Switch } from "@/components/ui/switch";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-
-/** Redigerbare felter på oppskriftshodet — speiler `recipes`-kolonnene vi eier her. */
-type HeaderState = {
-  name: string;
-  category: string;
-  /** '' = ingen avdeling; ellers 'bakeri' | 'konditori'. */
-  department: string;
-  status: string;
-  description: string;
-  dough_piece_grams: number | string;
-  dough_waste_pct: number | string;
-  finished_weight_grams: number | string;
-  measured_per_kg: boolean;
-  units_per_batch: number | string;
-  target_dough_temp_celsius: number | null;
-  friction_factor_celsius: number | null;
-  mixing_speed1_minutes: number | string;
-  mixing_speed2_minutes: number | string;
-  autolyse_minutes: number | string;
-  notes: string;
-  decor_notes: string;
-};
 
 
 export default function RecipeDetail() {
@@ -96,7 +84,7 @@ export default function RecipeDetail() {
         .eq("id", id!)
         .maybeSingle();
       if (error) throw error;
-      return data as any;
+      return data as unknown as RecipeDetailRow | null;
     },
   });
 
@@ -108,7 +96,7 @@ export default function RecipeDetail() {
         .select("id, name, category, grain_classification, water_content_pct, unit_weight_grams, base_unit, current_cost_price, produced_by_recipe_id")
         .limit(2000);
       const map: Record<string, BakersRawMaterial> = {};
-      for (const r of (data ?? []) as any[]) map[r.id] = r;
+      for (const r of (data ?? []) as BakersRawMaterial[]) map[r.id] = r;
       return map;
     },
   });
@@ -150,13 +138,11 @@ export default function RecipeDetail() {
 
   const recipe = recipeQuery.data;
 
-  const [header, setHeader] = useState<Partial<HeaderState>>({});
-  const [parts, setParts] = useState<EditorPart[]>([]);
-  const [lines, setLines] = useState<EditorLine[]>([]);
-  const [steps, setSteps] = useState<EditorStep[]>([]);
-  const [dirty, setDirty] = useState(false);
+  const editor = useRecipeEditor();
+  const { header, parts, lines, steps, imageUrl, entryModes, dirty } = editor.state;
   const [saving, setSaving] = useState(false);
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  /** Delen brukeren er i ferd med å slette — bekreftes i dialog, aldri med `confirm`. */
+  const [partToDelete, setPartToDelete] = useState<EditorPart | null>(null);
   const [rawMatOpen, setRawMatOpen] = useState(false);
   const [repricing, setRepricing] = useState(false);
   const [copying, setCopying] = useState(false);
@@ -187,57 +173,14 @@ export default function RecipeDetail() {
   const loadedRef = useRef<{ id: string | null; updatedAt: string | null }>({ id: null, updatedAt: null });
   const [remoteConflict, setRemoteConflict] = useState(false);
 
-  const hydrate = useCallback((recipe: any) => {
-    setHeader({
-      name: recipe.name ?? "",
-      category: recipe.category ?? "",
-      department: asDepartment((recipe as { department?: string | null }).department) ?? "",
-      status: recipe.status ?? "draft",
-      description: recipe.description ?? "",
-      dough_piece_grams: (recipe as any).dough_piece_grams ?? "",
-      dough_waste_pct: (recipe as any).dough_waste_pct ?? "",
-      finished_weight_grams: (recipe as any).finished_weight_grams ?? "",
-      measured_per_kg: (recipe as any).measured_per_kg ?? false,
-      units_per_batch: recipe.units_per_batch ?? "",
-      target_dough_temp_celsius: recipe.target_dough_temp_celsius,
-      friction_factor_celsius: recipe.friction_factor_celsius,
-      mixing_speed1_minutes: recipe.mixing_speed1_minutes ?? "",
-      mixing_speed2_minutes: recipe.mixing_speed2_minutes ?? "",
-      autolyse_minutes: recipe.autolyse_minutes ?? "",
-      notes: recipe.notes ?? "",
-      decor_notes: (recipe as any).decor_notes ?? "",
-    });
-    setImageUrl(recipe.image_url ?? null);
-    setParts(
-      [...(recipe.recipe_parts ?? [])]
-        .sort((a: any, b: any) => a.sort_order - b.sort_order)
-        .map((p: any) => ({
-          id: p.id,
-          name: p.name,
-          sort_order: p.sort_order,
-          instructions: p.instructions,
-          prep_time_minutes: p.prep_time_minutes,
-          rest_time_minutes: p.rest_time_minutes,
-          part_type: p.part_type ?? "dough",
-          preferment_kind: p.preferment_kind ?? null,
-          target_temp_celsius: p.target_temp_celsius ?? null,
-          ripe_time_hours: p.ripe_time_hours ?? null,
-        })),
-    );
-    setLines(
-      [...(recipe.recipe_lines ?? [])]
-        .sort((a: any, b: any) => a.sort_order - b.sort_order)
-        .map((l: any) => ({ ...l, _rm: l.raw_material_id ? null : null })),
-    );
-    setSteps(
-      [...(recipe.recipe_steps ?? [])]
-        .sort((a: any, b: any) => a.sort_order - b.sort_order)
-        .map((s: any) => ({ ...s })),
-    );
-    setDirty(false);
-    setRemoteConflict(false);
-    loadedRef.current = { id: recipe.id ?? null, updatedAt: recipe.updated_at ?? null };
-  }, []);
+  const hydrate = useCallback(
+    (row: RecipeDetailRow) => {
+      editor.hydrate(row);
+      setRemoteConflict(false);
+      loadedRef.current = { id: row.id ?? null, updatedAt: row.updated_at ?? null };
+    },
+    [editor],
+  );
 
   useEffect(() => {
     if (!recipe) return;
@@ -245,7 +188,7 @@ export default function RecipeDetail() {
       loadedRecipeId: loadedRef.current.id,
       loadedUpdatedAt: loadedRef.current.updatedAt,
       incomingRecipeId: recipe.id ?? null,
-      incomingUpdatedAt: (recipe as { updated_at?: string | null }).updated_at ?? null,
+      incomingUpdatedAt: recipe.updated_at ?? null,
       dirty,
     });
     if (decision === "hydrate") hydrate(recipe);
@@ -265,7 +208,7 @@ export default function RecipeDetail() {
   const flourLines = useMemo<FlourLine[]>(
     () =>
       hydratedLines
-        .map((l: any) => ({
+        .map((l) => ({
           raw_material_id: l.raw_material_id ?? null,
           name: l._rm?.name ?? l.ingredient_name ?? "Ukjent",
           grams: Number(l.quantity) || 0,
@@ -306,16 +249,36 @@ export default function RecipeDetail() {
     return totals.unitCount && totals.unitCount > 0 ? totals.unitCount : 1;
   }, [header.units_per_batch, totals.unitCount]);
 
+  const [scaleMode, setScaleMode] = useState<ScaleMode>("units");
   const [scaleInput, setScaleInput] = useState("");
-  const [mixerCapacity, setMixerCapacity] = useState("");
+  const [rounding, setRounding] = useState<RoundingStep>(1);
+  const [scaleWaste, setScaleWaste] = useState("");
 
   useEffect(() => {
     setScaleInput(String(baseUnits));
+    setScaleMode("units");
   }, [baseUnits, recipe?.id]);
 
   const desiredUnits = Number(scaleInput) || 0;
-  const factor = scaleFactor(desiredUnits, baseUnits);
-  const isScaled = Math.abs(factor - 1) > 0.0001;
+
+  /** Skaleringsmotoren eier regnestykket — siden viser bare resultatet. */
+  const scaleResult = useMemo(
+    () =>
+      scaleRecipe(hydratedLines, {
+        dough_piece_grams: header.dough_piece_grams ?? null,
+        dough_waste_pct: header.dough_waste_pct ?? null,
+        units_per_batch: header.units_per_batch ?? null,
+      }, {
+        mode: scaleMode,
+        target: Number(scaleInput) || 0,
+        rounding,
+        wastePct: Number(scaleWaste) || 0,
+      }),
+    [hydratedLines, header.dough_piece_grams, header.dough_waste_pct, header.units_per_batch, scaleMode, scaleInput, rounding, scaleWaste],
+  );
+
+  const factor = scaleResult.factor;
+  const isScaled = Math.abs(scaleResult.factor - 1) > 0.0001;
 
   const scaleSummary = useMemo(
     () =>
@@ -324,9 +287,9 @@ export default function RecipeDetail() {
         factor,
         Number(header.dough_piece_grams) || null,
         desiredUnits || baseUnits,
-        Number(mixerCapacity) || null,
+        null,
       ),
-    [hydratedLines, factor, header.dough_piece_grams, desiredUnits, baseUnits, mixerCapacity],
+    [hydratedLines, factor, header.dough_piece_grams, desiredUnits, baseUnits],
   );
 
   /**
@@ -354,6 +317,23 @@ export default function RecipeDetail() {
   const displayTotals = isScaled ? scaleSummary.totals : totals;
   /** Skalert visning låser redigering — man skal ikke kunne lagre en skalert utgave. */
   const editable = canWrite && !isScaled;
+
+  /**
+   * Autolagret utkast i nettleseren. Uten dette forsvinner arbeidet ved en
+   * tilfeldig reload — og en oppskrift er mye skriving å gjøre om igjen.
+   */
+  const draft = useRecipeDraft<RecipeEditorState>({
+    recipeId: recipe?.id ?? null,
+    value: editor.state,
+    dirty,
+    baseUpdatedAt: recipe?.updated_at ?? null,
+  });
+
+  /** Live-advarsler: mangler som gjør oppskriften ubrukelig i produksjon eller på etikett. */
+  const warnings = useRecipeWarnings({
+    lines: hydratedLines,
+    status: String(header.status ?? "draft"),
+  });
 
   /**
    * Rom- og meltemperatur er arbeidsplassens verdier, ikke oppskriftens.
@@ -467,107 +447,14 @@ export default function RecipeDetail() {
   const unsavedGuard = useUnsavedChangesGuard(dirty && canWrite);
 
 
-  function patchHeader(patch: Partial<HeaderState>) {
-    setHeader((h: any) => ({ ...h, ...patch }));
-    setDirty(true);
-  }
+  const patchHeader = editor.patchHeader;
+  const { addPart, updatePart, duplicatePart, movePart, addLine, updateLine, removeLine, reorderLines } = editor;
 
-  // ===== Deler =====
-  function addPart(type = "dough") {
-    setParts((ps) => [
-      ...ps,
-      {
-        id: `new-part-${Date.now()}-${Math.random()}`,
-        _new: true,
-        name: type === "preferment" ? "Fordeig" : "Hoveddeig",
-        sort_order: ps.length,
-        instructions: null,
-        prep_time_minutes: null,
-        rest_time_minutes: null,
-        part_type: type,
-        preferment_kind: type === "preferment" ? "fordeig" : null,
-        target_temp_celsius: null,
-        ripe_time_hours: null,
-      },
-    ]);
-    setDirty(true);
-  }
-  function updatePart(pid: string, patch: Partial<EditorPart>) {
-    setParts((ps) => ps.map((p) => (p.id === pid ? { ...p, ...patch } : p)));
-    setDirty(true);
-  }
-  function removePart(pid: string) {
-    if (!confirm("Slett denne delen og alle linjene i den?")) return;
-    setParts((ps) => ps.filter((p) => p.id !== pid).map((p, i) => ({ ...p, sort_order: i })));
-    setLines((ls) => ls.filter((l) => l.recipe_part_id !== pid));
-    setDirty(true);
-  }
-  function duplicatePart(pid: string) {
-    const p = parts.find((x) => x.id === pid);
-    if (!p) return;
-    const newId = `new-part-${Date.now()}`;
-    const idx = parts.findIndex((x) => x.id === pid);
-    const dupLines = lines
-      .filter((l) => l.recipe_part_id === pid)
-      .map((l) => ({ ...l, id: `new-line-${Date.now()}-${Math.random()}`, _new: true, recipe_part_id: newId }));
-    setParts([
-      ...parts.slice(0, idx + 1),
-      { ...p, id: newId, _new: true, name: `${p.name} (kopi)`, sort_order: idx + 1 },
-      ...parts.slice(idx + 1),
-    ].map((x, i) => ({ ...x, sort_order: i })));
-    setLines([...lines, ...dupLines]);
-    setDirty(true);
-  }
-  function movePart(pid: string, dir: -1 | 1) {
-    const idx = parts.findIndex((p) => p.id === pid);
-    const next = idx + dir;
-    if (next < 0 || next >= parts.length) return;
-    setParts(arrayMove(parts, idx, next).map((p, i) => ({ ...p, sort_order: i })));
-    setDirty(true);
-  }
-
-  // ===== Linjer =====
-  function addLine(partId: string) {
-    const count = lines.filter((l) => l.recipe_part_id === partId).length;
-    setLines((ls) => [
-      ...ls,
-      {
-        id: `new-line-${Date.now()}-${Math.random()}`,
-        _new: true,
-        recipe_part_id: partId,
-        raw_material_id: null,
-        sub_product_id: null,
-        ingredient_name: null,
-        quantity: "",
-        unit: "g",
-        waste_percent: 0,
-        sort_order: count,
-        entry_mode: "grams",
-        bakers_percent: null,
-        is_flour_override: null,
-        water_content_pct_override: null,
-        include_in_declaration: true,
-        is_quid_relevant: false,
-        custom_declaration_text: null,
-      } as EditorLine,
-    ]);
-    setDirty(true);
-  }
-  function updateLine(lid: string, patch: Partial<EditorLine>) {
-    setLines((ls) => ls.map((l) => (l.id === lid ? { ...l, ...patch } : l)));
-    setDirty(true);
-  }
-  function removeLine(lid: string) {
-    setLines((ls) => ls.filter((l) => l.id !== lid));
-    setDirty(true);
-  }
-  function reorderLines(partId: string, activeId: string, overId: string) {
-    const partLines = lines.filter((l) => l.recipe_part_id === partId);
-    const others = lines.filter((l) => l.recipe_part_id !== partId);
-    const oldIdx = partLines.findIndex((l) => l.id === activeId);
-    const newIdx = partLines.findIndex((l) => l.id === overId);
-    setLines([...others, ...arrayMove(partLines, oldIdx, newIdx).map((l, i) => ({ ...l, sort_order: i }))]);
-    setDirty(true);
+  /** Sletting av en del tar med seg linjene — det bekreftes i dialog. */
+  function confirmRemovePart() {
+    if (!partToDelete) return;
+    editor.removePart(partToDelete.id);
+    setPartToDelete(null);
   }
 
   const { save: persistRecipe } = useRecipeSave();
@@ -603,7 +490,8 @@ export default function RecipeDetail() {
         lines,
         steps,
       });
-      setDirty(false);
+      editor.markSaved();
+      draft.clear();
       setRemoteConflict(false);
       toast.success("Oppskrift lagret");
       qc.invalidateQueries({ queryKey: ["recipe-detail", recipe.id] });
@@ -618,7 +506,7 @@ export default function RecipeDetail() {
       setSaving(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recipe, header, parts, lines, steps, persistRecipe, qc]);
+  }, [recipe, header, parts, lines, steps, persistRecipe, qc, editor, draft]);
 
   /** Ctrl/Cmd + S lagrer, som i alle andre editorer. */
   useEffect(() => {
@@ -686,6 +574,27 @@ export default function RecipeDetail() {
       navigate(`/varer/oppskrifter/${newId}?rename=1`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Kunne ikke kopiere oppskriften");
+    } finally {
+      setCopying(false);
+    }
+  }
+
+  /** Lagre som mal: kopien merkes med malkategorien og kan brukes som startpunkt. */
+  async function handleSaveAsTemplate() {
+    if (!recipe) return;
+    setCopying(true);
+    try {
+      const newId = await copyRecipe(recipe.id);
+      const { error } = await supabase
+        .from("recipes")
+        .update({ category: RECIPE_TEMPLATE_CATEGORY } as never)
+        .eq("id", newId);
+      if (error) throw error;
+      qc.invalidateQueries({ queryKey: ["recipes-list"] });
+      toast.success("Malen er lagret");
+      navigate(`/varer/oppskrifter/${newId}?rename=1`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Kunne ikke lagre malen");
     } finally {
       setCopying(false);
     }
@@ -799,6 +708,11 @@ export default function RecipeDetail() {
               Lag kopi
             </Button>
           )}
+          {canWrite && (
+            <Button variant="outline" onClick={handleSaveAsTemplate} disabled={copying}>
+              <FileText className="mr-2 h-4 w-4" /> Lagre som mal
+            </Button>
+          )}
 
           <Button
             variant="outline"
@@ -852,14 +766,27 @@ export default function RecipeDetail() {
 
           <TabsContent value="oppskrift" className="space-y-4">
         <ScalePanel
-          value={scaleInput}
-          onChange={setScaleInput}
+          mode={scaleMode}
+          onModeChange={(m) => {
+            setScaleMode(m);
+            setScaleInput(m === "units" ? String(baseUnits) : m === "batches" ? "60" : String(Math.round(totals.totalDoughG)));
+          }}
+          target={scaleInput}
+          onTargetChange={setScaleInput}
+          rounding={rounding}
+          onRoundingChange={setRounding}
+          waste={scaleWaste}
+          onWasteChange={setScaleWaste}
+          result={scaleResult}
           baseUnits={baseUnits}
-          mixerCapacity={mixerCapacity}
-          onMixerCapacityChange={setMixerCapacity}
-          summary={scaleSummary}
           isScaled={isScaled}
-          onReset={() => setScaleInput(String(baseUnits))}
+          onReset={() => {
+            setScaleMode("units");
+            setScaleInput(String(baseUnits));
+            setScaleWaste("");
+          }}
+          onSaveAsNew={canWrite ? handleCopy : undefined}
+          savingAsNew={copying}
         />
 
         {isScaled && (
@@ -891,6 +818,20 @@ export default function RecipeDetail() {
             </Button>
           </div>
         )}
+        {draft.pending && editable && (
+          <DraftRecoveryBanner
+            savedAtLabel={draft.savedAtLabel}
+            conflict={draft.conflict}
+            onRestore={() => {
+              editor.restore(draft.pending!.data);
+              draft.accept();
+            }}
+            onDiscard={draft.discard}
+          />
+        )}
+
+        <RecipeWarningsBanner warnings={warnings.warnings} />
+
         <RecipeStatsBar totals={displayTotals} cost={isScaled ? undefined : cost} />
 
 
@@ -904,7 +845,7 @@ export default function RecipeDetail() {
                 imageUrl={imageUrl}
                 canWrite={canWrite}
                 onChange={(url) => {
-                  setImageUrl(url);
+                  editor.setImage(url);
                   qc.invalidateQueries({ queryKey: ["recipes-list"] });
                 }}
               />
@@ -1111,13 +1052,16 @@ export default function RecipeDetail() {
               isFirst={i === 0}
               isLast={i === parts.length - 1}
               onUpdate={(patch) => updatePart(p.id, patch)}
-              onRemove={() => removePart(p.id)}
+              onRemove={() => setPartToDelete(p)}
               onDuplicate={() => duplicatePart(p.id)}
               onMove={(dir) => movePart(p.id, dir)}
               onAddLine={() => addLine(p.id)}
               onUpdateLine={updateLine}
               onRemoveLine={removeLine}
               onReorderLines={reorderLines}
+              entryMode={entryModeFor(entryModes, p.id)}
+              onEntryModeChange={(mode) => editor.setEntryMode(p.id, mode)}
+              warningsByLine={warnings.byLine}
             />
           ))}
           {editable && (
@@ -1132,10 +1076,19 @@ export default function RecipeDetail() {
           )}
         </div>
 
+        <StepTimeline
+          steps={steps}
+          header={{
+            autolyse_minutes: header.autolyse_minutes ?? null,
+            mixing_speed1_minutes: header.mixing_speed1_minutes ?? null,
+            mixing_speed2_minutes: header.mixing_speed2_minutes ?? null,
+          }}
+        />
+
         <RecipeStepsEditor
           steps={steps}
           canWrite={editable}
-          onChange={(s) => { setSteps(s); setDirty(true); }}
+          onChange={editor.setSteps}
         />
 
 
@@ -1259,6 +1212,21 @@ export default function RecipeDetail() {
               {deactivating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Deaktiver råvaren også
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={partToDelete !== null} onOpenChange={(open) => { if (!open) setPartToDelete(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Slette «{partToDelete?.name}»?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Delen og alle ingredienslinjene i den fjernes fra editoren. Ingenting slettes i basen før du lagrer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Avbryt</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmRemovePart}>Slett del</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

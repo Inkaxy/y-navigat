@@ -9,7 +9,6 @@ import { CSS } from "@dnd-kit/utilities";
 import { AlertTriangle, GripVertical, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import type { RawMaterialOption } from "@/varer/components/products/RawMaterialAutocomplete";
 import { LineNameCell, LineNumberCell } from "@/varer/components/recipes/LineCell";
 import { useLineGridKeys, type GridColumn, type GridFocus } from "@/varer/hooks/useLineGridKeys";
 import {
@@ -80,7 +79,7 @@ export function LineGrid({
 
   return (
     <div className="space-y-1.5">
-      <div className="hidden gap-2 px-2 text-xs font-medium text-muted-foreground md:grid md:grid-cols-[20px_minmax(0,1fr)_96px_64px_92px_36px_76px_36px_32px]">
+      <div className="hidden gap-2 px-2 text-xs font-medium text-muted-foreground md:grid md:grid-cols-[20px_minmax(0,1fr)_96px_64px_92px_76px_76px_36px_32px]">
         <div />
         <div>Ingrediens</div>
         <div>Mengde</div>
@@ -216,9 +215,18 @@ const GridRow = memo(function GridRow({
     <div
       ref={setNodeRef}
       style={style}
+      onFocusCapture={(e) => {
+        // Klikker brukeren rett i en celle, skal tastaturnavigasjonen fortsette derfra.
+        const cell = (e.target as HTMLElement).closest?.("[data-grid-cell]");
+        const key = cell?.getAttribute("data-grid-cell");
+        const column = key?.split(":")[1] as GridColumn | undefined;
+        if (column && (focus?.lineId !== line.id || focus.column !== column)) {
+          onFocus({ lineId: line.id, column });
+        }
+      }}
       className={cn(
         "flex flex-wrap items-center gap-2 rounded-md border px-2 py-1.5",
-        "md:grid md:grid-cols-[20px_minmax(0,1fr)_96px_64px_92px_36px_76px_36px_32px]",
+        "md:grid md:grid-cols-[20px_minmax(0,1fr)_96px_64px_92px_76px_76px_36px_32px]",
         unmatched ? "border-warning/40 bg-warning/5" : "border-transparent",
       )}
     >

@@ -2,9 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, FileText, Link2Off, Clock, HelpCircle } from "lucide-react";
-import { ScalePanel } from "@/varer/components/recipes/ScalePanel";
 import { useRecipePDF, buildRecipePDFData } from "@/varer/hooks/useRecipePDF";
 import {
   computeTotalsForRecipe, convertToGrams, lineConvertOptions, lineToGrams,
@@ -59,7 +59,7 @@ export default function PublicRecipe() {
   const [loading, setLoading] = useState(true);
 
   const [scaleInput, setScaleInput] = useState("");
-  const [mixerCapacity, setMixerCapacity] = useState("");
+  const mixerCapacity = "";
   const { generating, printRecipeCard } = useRecipePDF();
 
   useEffect(() => {
@@ -238,16 +238,32 @@ export default function PublicRecipe() {
         )}
 
         <div className="mb-6 space-y-3">
-          <ScalePanel
-            value={scaleInput}
-            onChange={setScaleInput}
-            baseUnits={baseUnits}
-            mixerCapacity={mixerCapacity}
-            onMixerCapacityChange={setMixerCapacity}
-            summary={summary}
-            isScaled={isScaled}
-            onReset={() => setScaleInput(String(baseUnits))}
-          />
+          {/* Delt visning: enkel skalering på antall emner — ingen produksjonsverktøy. */}
+          <div className="flex flex-wrap items-end gap-4 rounded-lg border border-border p-3">
+            <div>
+              <label htmlFor="public-scale" className="text-xs text-muted-foreground">Skaler til</label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="public-scale"
+                  type="number"
+                  min={1}
+                  value={scaleInput}
+                  onChange={(e) => setScaleInput(e.target.value)}
+                  className="h-9 w-28 tabular-nums text-base font-semibold"
+                />
+                <span className="text-sm text-muted-foreground">enheter</span>
+              </div>
+            </div>
+            <p className="pb-2 text-sm text-muted-foreground">
+              Faktor × {summary.factor.toFixed(2).replace(".", ",")} · deigvekt{" "}
+              <span className="font-semibold text-foreground tabular-nums">{Math.round(summary.roundedDoughG)} g</span>
+            </p>
+            {isScaled && (
+              <Button variant="outline" size="sm" onClick={() => setScaleInput(String(baseUnits))}>
+                Tilbakestill
+              </Button>
+            )}
+          </div>
           <Button variant="outline" onClick={downloadCard} disabled={generating !== null}>
             {generating === "card" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
             Last ned som PDF

@@ -9595,13 +9595,16 @@ export type Database = {
           energy_kj: number | null
           fat_g: number | null
           fiber_g: number | null
+          field_sources: Json
           ingredient_declaration: string | null
+          is_complete: boolean | null
           matvaretabellen_food_id: string | null
           protein_g: number | null
           raw_material_id: string
           salt_g: number | null
           saturated_fat_g: number | null
-          source: string | null
+          sodium_mg: number | null
+          source: string
           source_document_url: string | null
           sugars_g: number | null
           updated_at: string
@@ -9616,13 +9619,16 @@ export type Database = {
           energy_kj?: number | null
           fat_g?: number | null
           fiber_g?: number | null
+          field_sources?: Json
           ingredient_declaration?: string | null
+          is_complete?: boolean | null
           matvaretabellen_food_id?: string | null
           protein_g?: number | null
           raw_material_id: string
           salt_g?: number | null
           saturated_fat_g?: number | null
-          source?: string | null
+          sodium_mg?: number | null
+          source?: string
           source_document_url?: string | null
           sugars_g?: number | null
           updated_at?: string
@@ -9637,13 +9643,16 @@ export type Database = {
           energy_kj?: number | null
           fat_g?: number | null
           fiber_g?: number | null
+          field_sources?: Json
           ingredient_declaration?: string | null
+          is_complete?: boolean | null
           matvaretabellen_food_id?: string | null
           protein_g?: number | null
           raw_material_id?: string
           salt_g?: number | null
           saturated_fat_g?: number | null
-          source?: string | null
+          sodium_mg?: number | null
+          source?: string
           source_document_url?: string | null
           sugars_g?: number | null
           updated_at?: string
@@ -9692,43 +9701,71 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string | null
+          currency: string
           effective_date: string
           id: string
           invoice_id: string | null
+          invoice_line_id: string | null
+          invoice_line_ref: string | null
+          is_credit: boolean
+          is_legacy: boolean
           notes: string | null
           price: number
           raw_material_id: string
           source: string
           source_reference: string | null
+          superseded_at: string | null
+          superseded_reason: string | null
           supplier_id: string | null
         }
         Insert: {
           created_at?: string
           created_by?: string | null
+          currency?: string
           effective_date: string
           id?: string
           invoice_id?: string | null
+          invoice_line_id?: string | null
+          invoice_line_ref?: string | null
+          is_credit?: boolean
+          is_legacy?: boolean
           notes?: string | null
           price: number
           raw_material_id: string
           source: string
           source_reference?: string | null
+          superseded_at?: string | null
+          superseded_reason?: string | null
           supplier_id?: string | null
         }
         Update: {
           created_at?: string
           created_by?: string | null
+          currency?: string
           effective_date?: string
           id?: string
           invoice_id?: string | null
+          invoice_line_id?: string | null
+          invoice_line_ref?: string | null
+          is_credit?: boolean
+          is_legacy?: boolean
           notes?: string | null
           price?: number
           raw_material_id?: string
           source?: string
           source_reference?: string | null
+          superseded_at?: string | null
+          superseded_reason?: string | null
           supplier_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "raw_material_price_history_invoice_line_id_fkey"
+            columns: ["invoice_line_id"]
+            isOneToOne: false
+            referencedRelation: "invoice_lines"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "raw_material_price_history_raw_material_id_fkey"
             columns: ["raw_material_id"]
@@ -10020,6 +10057,7 @@ export type Database = {
           agreed_price_set_at: string | null
           agreed_price_set_by: string | null
           agreement_document_url: string | null
+          agreement_priority: number
           agreement_valid_from: string | null
           agreement_valid_to: string | null
           base_units_per_package: number | null
@@ -10046,6 +10084,7 @@ export type Database = {
           agreed_price_set_at?: string | null
           agreed_price_set_by?: string | null
           agreement_document_url?: string | null
+          agreement_priority?: number
           agreement_valid_from?: string | null
           agreement_valid_to?: string | null
           base_units_per_package?: number | null
@@ -10072,6 +10111,7 @@ export type Database = {
           agreed_price_set_at?: string | null
           agreed_price_set_by?: string | null
           agreement_document_url?: string | null
+          agreement_priority?: number
           agreement_valid_from?: string | null
           agreement_valid_to?: string | null
           base_units_per_package?: number | null
@@ -10217,6 +10257,7 @@ export type Database = {
       raw_materials: {
         Row: {
           agreed_price: number | null
+          allergens_reviewed_at: string | null
           base_unit: string
           base_units_per_package: number | null
           categories: string[]
@@ -10228,6 +10269,7 @@ export type Database = {
           current_cost_price: number | null
           current_stock: number
           declaration_name: string | null
+          density_g_per_ml: number | null
           description: string | null
           grain_classification: string | null
           id: string
@@ -10235,6 +10277,7 @@ export type Database = {
           is_composite: boolean
           is_packaging: boolean
           is_resale_item: boolean
+          is_water: boolean | null
           item_type: string
           legal_entity_id: string
           min_stock: number | null
@@ -10255,6 +10298,7 @@ export type Database = {
         }
         Insert: {
           agreed_price?: number | null
+          allergens_reviewed_at?: string | null
           base_unit: string
           base_units_per_package?: number | null
           categories?: string[]
@@ -10266,6 +10310,7 @@ export type Database = {
           current_cost_price?: number | null
           current_stock?: number
           declaration_name?: string | null
+          density_g_per_ml?: number | null
           description?: string | null
           grain_classification?: string | null
           id?: string
@@ -10273,6 +10318,7 @@ export type Database = {
           is_composite?: boolean
           is_packaging?: boolean
           is_resale_item?: boolean
+          is_water?: boolean | null
           item_type?: string
           legal_entity_id: string
           min_stock?: number | null
@@ -10293,6 +10339,7 @@ export type Database = {
         }
         Update: {
           agreed_price?: number | null
+          allergens_reviewed_at?: string | null
           base_unit?: string
           base_units_per_package?: number | null
           categories?: string[]
@@ -10304,6 +10351,7 @@ export type Database = {
           current_cost_price?: number | null
           current_stock?: number
           declaration_name?: string | null
+          density_g_per_ml?: number | null
           description?: string | null
           grain_classification?: string | null
           id?: string
@@ -10311,6 +10359,7 @@ export type Database = {
           is_composite?: boolean
           is_packaging?: boolean
           is_resale_item?: boolean
+          is_water?: boolean | null
           item_type?: string
           legal_entity_id?: string
           min_stock?: number | null
@@ -11448,6 +11497,286 @@ export type Database = {
             columns: ["legal_entity_id"]
             isOneToOne: false
             referencedRelation: "legal_entities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rm_goods_receipts: {
+        Row: {
+          created_at: string
+          id: string
+          invoice_id: string
+          invoice_line_id: string
+          legal_entity_id: string
+          lot_id: string | null
+          movement_id: string | null
+          note: string | null
+          quantity_base: number
+          raw_material_id: string
+          received_at: string
+          received_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          invoice_id: string
+          invoice_line_id: string
+          legal_entity_id: string
+          lot_id?: string | null
+          movement_id?: string | null
+          note?: string | null
+          quantity_base: number
+          raw_material_id: string
+          received_at?: string
+          received_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          invoice_id?: string
+          invoice_line_id?: string
+          legal_entity_id?: string
+          lot_id?: string | null
+          movement_id?: string | null
+          note?: string | null
+          quantity_base?: number
+          raw_material_id?: string
+          received_at?: string
+          received_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rm_goods_receipts_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rm_goods_receipts_invoice_line_id_fkey"
+            columns: ["invoice_line_id"]
+            isOneToOne: true
+            referencedRelation: "invoice_lines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rm_goods_receipts_legal_entity_id_fkey"
+            columns: ["legal_entity_id"]
+            isOneToOne: false
+            referencedRelation: "legal_entities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rm_goods_receipts_lot_id_fkey"
+            columns: ["lot_id"]
+            isOneToOne: false
+            referencedRelation: "rm_stock_lots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rm_goods_receipts_movement_id_fkey"
+            columns: ["movement_id"]
+            isOneToOne: false
+            referencedRelation: "stock_movements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rm_goods_receipts_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "raw_material_declaration_worklist"
+            referencedColumns: ["raw_material_id"]
+          },
+          {
+            foreignKeyName: "rm_goods_receipts_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "raw_material_package_worklist"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rm_goods_receipts_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "raw_material_stock_status"
+            referencedColumns: ["raw_material_id"]
+          },
+          {
+            foreignKeyName: "rm_goods_receipts_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "raw_materials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rm_goods_receipts_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "resale_stock_status"
+            referencedColumns: ["raw_material_id"]
+          },
+        ]
+      }
+      rm_stock_count_sheets: {
+        Row: {
+          applied_at: string | null
+          applied_by: string | null
+          count_date: string
+          created_at: string
+          created_by: string | null
+          id: string
+          legal_entity_id: string
+          note: string | null
+          op_id: string
+          payload: Json
+          payload_hash: string | null
+          result: Json | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          applied_at?: string | null
+          applied_by?: string | null
+          count_date?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          legal_entity_id: string
+          note?: string | null
+          op_id: string
+          payload?: Json
+          payload_hash?: string | null
+          result?: Json | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          applied_at?: string | null
+          applied_by?: string | null
+          count_date?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          legal_entity_id?: string
+          note?: string | null
+          op_id?: string
+          payload?: Json
+          payload_hash?: string | null
+          result?: Json | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rm_stock_count_sheets_legal_entity_id_fkey"
+            columns: ["legal_entity_id"]
+            isOneToOne: false
+            referencedRelation: "legal_entities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rm_stock_lots: {
+        Row: {
+          best_before: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          invoice_line_id: string | null
+          legal_entity_id: string
+          lot_number: string | null
+          quantity_base: number
+          raw_material_id: string
+          received_at: string
+          remaining_base: number
+          supplier_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          best_before?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          invoice_line_id?: string | null
+          legal_entity_id: string
+          lot_number?: string | null
+          quantity_base: number
+          raw_material_id: string
+          received_at?: string
+          remaining_base: number
+          supplier_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          best_before?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          invoice_line_id?: string | null
+          legal_entity_id?: string
+          lot_number?: string | null
+          quantity_base?: number
+          raw_material_id?: string
+          received_at?: string
+          remaining_base?: number
+          supplier_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rm_stock_lots_invoice_line_id_fkey"
+            columns: ["invoice_line_id"]
+            isOneToOne: false
+            referencedRelation: "invoice_lines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rm_stock_lots_legal_entity_id_fkey"
+            columns: ["legal_entity_id"]
+            isOneToOne: false
+            referencedRelation: "legal_entities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rm_stock_lots_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "raw_material_declaration_worklist"
+            referencedColumns: ["raw_material_id"]
+          },
+          {
+            foreignKeyName: "rm_stock_lots_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "raw_material_package_worklist"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rm_stock_lots_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "raw_material_stock_status"
+            referencedColumns: ["raw_material_id"]
+          },
+          {
+            foreignKeyName: "rm_stock_lots_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "raw_materials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rm_stock_lots_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "resale_stock_status"
+            referencedColumns: ["raw_material_id"]
+          },
+          {
+            foreignKeyName: "rm_stock_lots_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
             referencedColumns: ["id"]
           },
         ]
@@ -13150,6 +13479,7 @@ export type Database = {
       product_nutrition_calculated: {
         Row: {
           carbs_g_per_100g: number | null
+          coverage_pct: number | null
           energy_kcal_per_100g: number | null
           energy_kj_per_100g: number | null
           fat_g_per_100g: number | null
@@ -13177,10 +13507,18 @@ export type Database = {
       }
       raw_material_declaration_worklist: {
         Row: {
+          allergens_reviewed_at: string | null
+          category: string | null
+          incomplete_nutrition: boolean | null
           is_composite: boolean | null
           legal_entity_id: string | null
           matvaretabellen_name: string | null
+          missing_declaration_name: boolean | null
+          missing_grain_class: boolean | null
+          missing_nutrition: boolean | null
+          missing_water_content: boolean | null
           name: string | null
+          needs_allergen_review: boolean | null
           raw_material_id: string | null
           recipes_using: number | null
           suggested_name: string | null
@@ -13483,6 +13821,7 @@ export type Database = {
       recipe_nutrition_calculated: {
         Row: {
           carbs_g_per_100g: number | null
+          coverage_pct: number | null
           energy_kcal_per_100g: number | null
           energy_kj_per_100g: number | null
           fat_g_per_100g: number | null
@@ -13930,6 +14269,10 @@ export type Database = {
         Returns: string
       }
       find_ticket_by_short_id: { Args: { p_short: string }; Returns: string }
+      fn_rm_price_history_upsert_line: {
+        Args: { p_line_id: string }
+        Returns: boolean
+      }
       gen_rfq_password: { Args: never; Returns: string }
       gen_rfq_token: { Args: never; Returns: string }
       generate_delivery_notes: {
@@ -15021,6 +15364,13 @@ export type Database = {
         Args: { p_recipe_id: string }
         Returns: number
       }
+      recipe_declaration_ready: {
+        Args: { p_recipe_id: string }
+        Returns: {
+          detail: string
+          reason: string
+        }[]
+      }
       recipe_line_base_qty: {
         Args: {
           p_base_unit: string
@@ -15097,6 +15447,7 @@ export type Database = {
         Args: { p_id: string; p_name: string }
         Returns: {
           agreed_price: number | null
+          allergens_reviewed_at: string | null
           base_unit: string
           base_units_per_package: number | null
           categories: string[]
@@ -15108,6 +15459,7 @@ export type Database = {
           current_cost_price: number | null
           current_stock: number
           declaration_name: string | null
+          density_g_per_ml: number | null
           description: string | null
           grain_classification: string | null
           id: string
@@ -15115,6 +15467,7 @@ export type Database = {
           is_composite: boolean
           is_packaging: boolean
           is_resale_item: boolean
+          is_water: boolean | null
           item_type: string
           legal_entity_id: string
           min_stock: number | null
@@ -15198,12 +15551,42 @@ export type Database = {
           rule_value: number
         }[]
       }
-      rm_apply_matvaretabellen: {
-        Args: { p_food_id: string; p_raw_material_id: string }
-        Returns: undefined
+      rm_apply_agreement: { Args: { p_payload: Json }; Returns: Json }
+      rm_apply_derived_cost_price: {
+        Args: { p_raw_material_id: string }
+        Returns: number
       }
+      rm_apply_matvaretabellen:
+        | {
+            Args: { p_food_id: string; p_raw_material_id: string }
+            Returns: undefined
+          }
+        | {
+            Args: {
+              p_food_id: string
+              p_force: boolean
+              p_raw_material_id: string
+            }
+            Returns: Json
+          }
       rm_can_read: { Args: { _rm_id: string }; Returns: boolean }
       rm_can_write: { Args: { _rm_id: string }; Returns: boolean }
+      rm_effective_agreement: {
+        Args: { p_on_date?: string; p_raw_material_id: string }
+        Returns: {
+          agreed_price: number
+          agreed_price_per_base_unit: number
+          agreement_document_url: string
+          agreement_priority: number
+          agreement_valid_from: string
+          agreement_valid_to: string
+          is_primary: boolean
+          package_size: number
+          package_unit: string
+          supplier_id: string
+        }[]
+      }
+      rm_is_finite: { Args: { p: number }; Returns: boolean }
       rm_line_base: {
         Args: {
           p_base_unit: string
@@ -15225,8 +15608,22 @@ export type Database = {
           source: string
         }[]
       }
+      rm_receive_invoice_line: {
+        Args: {
+          p_best_before?: string
+          p_line_id: string
+          p_lot_number?: string
+          p_note?: string
+        }
+        Returns: Json
+      }
+      rm_reconcile_invoice: { Args: { p_invoice_id: string }; Returns: Json }
       rm_stock_count_apply: {
         Args: { p_lines: Json; p_note?: string }
+        Returns: Json
+      }
+      rm_stock_count_apply_v2: {
+        Args: { p_lines: Json; p_note?: string; p_op_id: string }
         Returns: Json
       }
       rm_suggest_package_from_name: {
