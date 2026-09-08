@@ -70,14 +70,8 @@ export function validateReconcile(invoice: ReconcileInvoice, lines: ReconcileLin
     });
   }
 
-  if (invoice.is_credit_note) {
-    blockers.push({
-      code: "credit_note",
-      message:
-        "Kreditnota kan ikke bekreftes her: en negativ mengde ville blitt lest som en ny innkjøpspris. " +
-        "Krediteringen må håndteres mot den opprinnelige fakturaen.",
-    });
-  }
+  // Kreditnota er tillatt: databasen fører den som en KREDITHENDELSE
+  // (raw_material_price_history.is_credit), som aldri blir ny normal kostpris.
 
   const review = relevant.filter((l) => l.requires_review);
   if (review.length > 0) {
@@ -128,41 +122,9 @@ export function validateReconcile(invoice: ReconcileInvoice, lines: ReconcileLin
     });
   }
 
-  // Prishistorikken har én rad per (faktura, råvare) — både triggerne og denne
-  // funksjonen. Flere linjer på samme råvare med ulik pris kan derfor ikke
-  // føres riktig, og vi lar heller brukeren rydde enn å miste en linje.
-  const byRm = new Map<string, ReconcileLine[]>();
-  for (const l of relevant) {
-    if (!l.raw_material_id) continue;
-    byRm.set(l.raw_material_id, [...(byRm.get(l.raw_material_id) ?? []), l]);
-  }
-  const conflicting: string[] = [];
-  for (const [, group] of byRm) {
-    if (group.length < 2) continue;
-    const prices = new Set(group.filter((g) => g.price_per_base_unit != null).map((g) => Number(g.price_per_base_unit)));
-    if (prices.size > 1) conflicting.push(...group.map((g) => g.id));
-  }
-  if (conflicting.length > 0) {
-    blockers.push({
-      code: "duplicate_raw_material_prices",
-      message:
-        "Samme råvare står på flere linjer med ulik enhetspris. Prishistorikken lagrer i dag én pris per " +
-        "faktura og råvare, så begge kjøpene kan ikke føres riktig. Fakturalinjene skal stå som de er — " +
-        "riktig linjehistorikk krever at prishistorikken utvides med fakturalinje-ID og flere kjøpshendelser (F2).",
-      line_ids: conflicting,
-    });
-  }
+  // Flere linjer på samme råvare er nå lov: prishistorikken har én rad per
+  // FAKTURALINJE (raw_material_price_history.invoice_line_id), så to kjøp av samme
+  // vare på samme faktura føres som to prishendelser.
 
   return blockers;
-}
-
-/** Linjer som skal få en prishistorikkrad skrevet av funksjonen (auto_medium). */
-export function mediumHistoryLines(lines: ReconcileLine[]): ReconcileLine[] {
-  return lines.filter(
-    (l) =>
-      !isNotApplicable(l) &&
-      l.match_confidence === "auto_medium" &&
-      !!l.raw_material_id &&
-      l.price_per_base_unit != null,
-  );
 }
