@@ -146,7 +146,7 @@ export function useUpsertRmSupplier() {
       context?.snapshots.forEach(([key, index]) => qc.setQueryData(key, index));
       toast.error(`Kunne ikke lagre: ${errText(e)}`);
     },
-    onSuccess: (d) => {
+    onSuccess: () => {
       invalidateSupplierAliases(qc);
       toast.success("Lagret");
     },
