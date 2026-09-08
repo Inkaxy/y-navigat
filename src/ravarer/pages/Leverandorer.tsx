@@ -27,7 +27,7 @@ import {
   type SupplierRow,
 } from "@/ravarer/hooks/useSuppliers";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
-import { NewSupplierDialog } from "@/ravarer/components/NewSupplierDialog";
+import { NewSupplierDialog, SupplierDialog } from "@/ravarer/components/NewSupplierDialog";
 
 const TRACK_HELP =
   "Er denne på, hentes leverandørens fakturaer inn i NBhub: PDF-en lastes ned og varelinjene leses ut automatisk, slik at priser per råvare oppdateres. Er den av, hentes ingen fakturaer fra leverandøren i det hele tatt — leverandøren blir stående i listen, men uten fakturaer. Slå den på for råvareleverandører, og la den være av for strøm, forsikring og lignende.";
@@ -51,6 +51,7 @@ export default function LeverandorerPage() {
   const [view, setView] = useState<ViewFilter>("alle");
   const [showInactive, setShowInactive] = useState(false);
   const [confirmOn, setConfirmOn] = useState<SupplierRow | null>(null);
+  const [editRow, setEditRow] = useState<SupplierRow | null>(null);
 
   const setTracking = useSetTrackInvoiceLines();
   const sync = useSyncSuppliersFromTripletex();
@@ -66,7 +67,9 @@ export default function LeverandorerPage() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return rows.filter((r) => {
-      if (!showInactive && r.tripletex_is_inactive) return false;
+      // «Vis inaktive» dekker både lokalt deaktiverte og de som er inaktive i
+      // Tripletex — ellers dukket lokalt inaktive opp under «Alle».
+      if (!showInactive && (r.tripletex_is_inactive || !r.is_active)) return false;
       if (view === "folges" && !r.track_invoice_lines) return false;
       if (view === "aktive" && !r.is_active) return false;
       if (!q) return true;
@@ -110,6 +113,12 @@ export default function LeverandorerPage() {
         }
       />
       <NewSupplierDialog open={newOpen} onOpenChange={setNewOpen} />
+      <SupplierDialog
+        key={editRow?.id ?? "none"}
+        open={!!editRow}
+        onOpenChange={(v) => !v && setEditRow(null)}
+        supplier={editRow}
+      />
 
       <Card className="p-4 space-y-3">
         <p className="text-sm text-ink-secondary">
@@ -145,7 +154,7 @@ export default function LeverandorerPage() {
           </div>
           <label className="flex items-center gap-2 text-sm text-ink-secondary">
             <Switch checked={showInactive} onCheckedChange={setShowInactive} />
-            Vis inaktive fra Tripletex
+            Vis inaktive
           </label>
           <span className="text-sm text-ink-secondary">{filtered.length} leverandører</span>
         </div>
@@ -187,6 +196,7 @@ export default function LeverandorerPage() {
                     </th>
                     <th className="px-4 py-3">Siste faktura</th>
                     <th className="px-4 py-3">Antall</th>
+                    <th className="px-4 py-3"></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -235,6 +245,13 @@ export default function LeverandorerPage() {
                         {formatDate(r.last_invoice_date)}
                       </td>
                       <td className="px-4 py-3 text-ink-secondary">{r.invoice_count ?? 0}</td>
+                      <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                        {canWrite && (
+                          <Button size="sm" variant="ghost" onClick={() => setEditRow(r)}>
+                            Rediger
+                          </Button>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
