@@ -28,6 +28,8 @@ export interface MissingData {
   lines_without_nutrition_over_pct?: Array<{ name: string; pct_of_weight?: number }>;
   /** Salt, vann eller gjær uten næringsrad — hard sperre. */
   critical_missing_nutrition?: string[];
+  /** Råvarer uten en eneste allergenrad — allergener ikke gjennomgått. */
+  allergens_unreviewed?: Array<{ raw_material_id?: string | null; name: string; pct_of_weight?: number }>;
   /** Ukjent enhet eller stk uten stykkvekt. */
   unit_problems?: Array<{ name: string; reason?: string }>;
   /** Fritekstlinjer som sperrer automatisk deklarasjon. */
@@ -83,6 +85,7 @@ export function DataQualityCard({
   const unlinked = missingData?.lines_without_raw_material ?? 0;
   const criticalMissing = missingData?.critical_missing_nutrition ?? [];
   const smallButMissing = missingData?.lines_without_nutrition_over_pct ?? [];
+  const allergensUnreviewed = missingData?.allergens_unreviewed ?? [];
   const unitProblems = missingData?.unit_problems ?? [];
   const freeTextLines = missingData?.free_text_lines ?? [];
   const blocked = missingData?.blocked === true;
@@ -93,6 +96,7 @@ export function DataQualityCard({
     !ok ||
     blocked ||
     criticalMissing.length > 0 ||
+    allergensUnreviewed.length > 0 ||
     smallButMissing.length > 0 ||
     unitProblems.length > 0 ||
     freeTextLines.length > 0 ||
@@ -184,6 +188,34 @@ export function DataQualityCard({
                   <p className="text-sm">{criticalMissing.join(", ")}</p>
                   <p className="text-xs text-muted-foreground">
                     Salt, vann og gjær må ha næringsdata. Uten dem vises saltet som «ukjent», ikke som 0 g.
+                  </p>
+                </Group>
+              )}
+
+              {allergensUnreviewed.length > 0 && (
+                <Group title="Allergener ikke gjennomgått">
+                  <ul className="space-y-1 text-sm">
+                    {allergensUnreviewed.map((r) => (
+                      <li key={r.raw_material_id ?? r.name} className="flex items-center justify-between gap-2">
+                        <span>
+                          {r.name}
+                          {r.pct_of_weight != null ? ` (${fmtPct(r.pct_of_weight)})` : ""}
+                        </span>
+                        {r.raw_material_id && (
+                          <a
+                            className="text-xs underline underline-offset-2"
+                            href={`/ravarer/${r.raw_material_id}?tab=nutrition`}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            Bekreft allergener
+                          </a>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="text-xs text-muted-foreground">
+                    Råvarer uten allergenrader regnes ikke som allergenfrie — de må gjennomgås før godkjenning.
                   </p>
                 </Group>
               )}
