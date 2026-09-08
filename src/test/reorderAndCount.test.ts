@@ -7,6 +7,7 @@ import {
   countDraftKey,
   draftHasContent,
   loadCountDraft,
+  newOpId,
   saveCountDraft,
 } from "@/ravarer/lib/countDraft";
 import { MOVEMENT_TYPES, movementLabel } from "@/ravarer/lib/stock";
@@ -99,5 +100,30 @@ describe("bevegelsestyper", () => {
   it("har egen type for telling", () => {
     expect(MOVEMENT_TYPES).toContain("count_adjust");
     expect(movementLabel("count_adjust")).toBe("Telling");
+  });
+});
+
+describe("operasjons-ID på tellingen", () => {
+  const key = countDraftKey("firma-1", "2026-04-01");
+
+  beforeEach(() => localStorage.clear());
+
+  it("beholder samme ID gjennom utkastet", () => {
+    saveCountDraft(key, { opId: "op-42", entries: { rm1: [{ amount: "5", unitKey: "__base" }] }, lineNotes: {}, note: "" });
+    expect(loadCountDraft(key)?.opId).toBe("op-42");
+  });
+
+  it("gir eldre utkast uten ID en ny", () => {
+    localStorage.setItem(
+      key,
+      JSON.stringify({ entries: { rm1: [{ amount: "5", unitKey: "__base" }] }, lineNotes: {}, note: "" }),
+    );
+    const loaded = loadCountDraft(key);
+    expect(typeof loaded?.opId).toBe("string");
+    expect(loaded?.opId.length).toBeGreaterThan(10);
+  });
+
+  it("lager unike ID-er", () => {
+    expect(newOpId()).not.toBe(newOpId());
   });
 });
