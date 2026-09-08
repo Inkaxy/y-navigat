@@ -546,7 +546,7 @@ export default function RecipeDetail() {
     setDirty(true);
   }
 
-  const { saving: savingRecipe, save: persistRecipe } = useRecipeSave();
+  const { save: persistRecipe } = useRecipeSave();
 
   const save = useCallback(async () => {
     if (!recipe) return;
@@ -849,6 +849,24 @@ export default function RecipeDetail() {
           </div>
         )}
 
+        {remoteConflict && (
+          <div className="flex flex-wrap items-center gap-3 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm">
+            <AlertTriangle className="h-4 w-4 shrink-0 text-warning" />
+            <span className="flex-1">
+              Oppskriften er endret av noen andre etter at du begynte å redigere. Endringene dine er beholdt.
+              Lagrer du nå, overskriver du den nyere versjonen.
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                if (recipe) hydrate(recipe);
+              }}
+            >
+              Hent nyeste og forkast mine endringer
+            </Button>
+          </div>
+        )}
         <RecipeStatsBar totals={displayTotals} cost={isScaled ? undefined : cost} />
 
 
