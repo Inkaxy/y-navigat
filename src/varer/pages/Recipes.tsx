@@ -67,10 +67,11 @@ type RecipeListRow = {
 type RecipeRow = RecipeListRow & {
   totals: ReturnType<typeof computeTotalsForRecipe>;
   products: string[];
+  labeling: LabelingStatus;
 };
 
 /** Kolonner som kan sorteres i oppskriftslisten. */
-type SortKey = "name" | "category" | "department" | "hydration" | "dough" | "products" | "status" | "updated";
+type SortKey = "name" | "category" | "department" | "hydration" | "dough" | "products" | "status" | "labeling" | "updated";
 
 export default function Recipes() {
   const { legalEntityId, canWrite } = useAppContext();
@@ -80,6 +81,7 @@ export default function Recipes() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [deptFilter, setDeptFilter] = useState<"all" | RecipeDepartment | "none">("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [labelingFilter, setLabelingFilter] = useState<"all" | LabelingStatus>("all");
   const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({ key: "name", dir: "asc" });
   const [page, setPage] = useState(1);
   const [creatingFromTemplate, setCreatingFromTemplate] = useState(false);
@@ -179,8 +181,33 @@ export default function Recipes() {
     },
   });
 
+  /** Merkestatus pr oppskrift: godkjenning vs. siste beregning og siste endring. */
+  const labelingQuery = useQuery({
+    queryKey: ["recipes-labeling-status", legalEntityId],
+    queryFn: async () => {
+      const [calcRes, recRes] = await Promise.all([
+        supabase.from("recipe_label_calculated").select("recipe_id, computed_at"),
+        supabase.from("recipes").select("id, updated_at, declaration_updated_at").is("valid_to", null),
+      ]);
+      if (calcRes.error) throw calcRes.error;
+      if (recRes.error) throw recRes.error;
+      const computedBy = new Map<string, string | null>();
+      for (const c of calcRes.data ?? []) computedBy.set(c.recipe_id, c.computed_at);
+      const out: Record<string, LabelingStatus> = {};
+      for (const r of recRes.data ?? []) {
+        out[r.id] = deriveLabelingStatus({
+          approvedAt: r.declaration_updated_at,
+          computedAt: computedBy.get(r.id) ?? null,
+          sources: [{ name: "Oppskriften", updatedAt: r.updated_at }],
+        });
+      }
+      return out;
+    },
+  });
+
   const rmMap = rmQuery.data ?? {};
   const shareCounts = shareCountsQuery.data ?? {};
+  const labelingMap = useMemo(() => labelingQuery.data ?? {}, [labelingQuery.data]);
 
 
   const rows = useMemo<RecipeRow[]>(() => {
@@ -195,9 +222,10 @@ export default function Recipes() {
         const products = (r.product_recipe_links ?? [])
           .map((l) => l.products?.display_name)
           .filter((n): n is string => !!n);
-        return { ...r, totals, products };
+        return { ...r, totals, products, labeling: labelingMap[r.id] ?? "missing" };
       })
       .filter((r) => (statusFilter === "all" ? true : (r.status ?? "draft") === statusFilter))
+      .filter((r) => (labelingFilter === "all" ? true : r.labeling === labelingFilter))
       .filter((r) => {
         if (deptFilter === "all") return true;
         const d = asDepartment(r.department);
@@ -228,6 +256,8 @@ export default function Recipes() {
             return cmpNum(num(a.totals.totalDoughG), num(b.totals.totalDoughG));
           case "products":
             return (a.products.length - b.products.length) * dir;
+          case "labeling":
+            return txt(a.labeling).localeCompare(txt(b.labeling), "nb") * dir;
           case "status":
             return txt(a.status ?? "draft").localeCompare(txt(b.status ?? "draft"), "nb") * dir;
           case "updated":
@@ -239,7 +269,7 @@ export default function Recipes() {
             return txt(a.name).localeCompare(txt(b.name), "nb") * dir;
         }
       });
-  }, [recipesQuery.data, rmMap, search, statusFilter, deptFilter, categoryFilter, sort]);
+  }, [recipesQuery.data, rmMap, labelingMap, search, statusFilter, labelingFilter, deptFilter, categoryFilter, sort]);
 
   /** Distinkte kategorier som faktisk finnes i dataene, sortert på norsk. */
   const categories = useMemo(() => {
@@ -265,7 +295,7 @@ export default function Recipes() {
   /** Nullstill sidetall når søk/filtre/sortering endres. */
   useEffect(() => {
     setPage(1);
-  }, [search, statusFilter, deptFilter, categoryFilter, sort]);
+  }, [search, statusFilter, labelingFilter, deptFilter, categoryFilter, sort]);
 
   /** Tøm alle filtre. */
   function resetFilters() {
@@ -273,6 +303,7 @@ export default function Recipes() {
     setStatusFilter("all");
     setDeptFilter("all");
     setCategoryFilter("all");
+    setLabelingFilter("all");
   }
 
   /** Opprett en ny oppskrift fra en mal via kopiering, og gi den et beskrivende navn. */
@@ -331,6 +362,17 @@ export default function Recipes() {
             <option value="draft">Utkast</option>
             <option value="active">Aktiv</option>
             <option value="archived">Arkivert</option>
+          </select>
+          <select
+            value={labelingFilter}
+            onChange={(e) => setLabelingFilter(e.target.value as "all" | LabelingStatus)}
+            className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+            aria-label="Filtrer på merking"
+          >
+            <option value="all">All merking</option>
+            <option value="approved">Merking: godkjent</option>
+            <option value="stale">Merking: utdatert</option>
+            <option value="missing">Merking: mangler</option>
           </select>
           <select
             value={categoryFilter}
@@ -423,6 +465,7 @@ export default function Recipes() {
                     <SortableTh label="Deigvekt" sortKey="dough" sort={sort} onSort={toggleSort} align="right" />
                     <SortableTh label="Produkter" sortKey="products" sort={sort} onSort={toggleSort} />
                     <SortableTh label="Status" sortKey="status" sort={sort} onSort={toggleSort} />
+                    <SortableTh label="Merking" sortKey="labeling" sort={sort} onSort={toggleSort} />
                     <SortableTh label="Oppdatert" sortKey="updated" sort={sort} onSort={toggleSort} />
                     <th className="w-10 px-2 py-2.5" />
                   </tr>
